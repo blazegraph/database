@@ -89,14 +89,16 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
         xsdMap = getXSDMap();
         
-        /**
-         * Cache the IV on the BigdataValue for these boolean constants.
-         * 
-         * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert
-         *      data with boolean object causes IllegalArgumentException </a>
-         */
-        TRUE.setIV(XSDBooleanIV.TRUE);
-        FALSE.setIV(XSDBooleanIV.FALSE);
+        // @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert data with boolean object causes IllegalArgumentException </a>
+        // @see <a href="http://trac.bigdata.com/ticket/980"> Object position query hint is not a Literal </a>
+//        /**
+//         * Cache the IV on the BigdataValue for these boolean constants.
+//         * 
+//         * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert
+//         *      data with boolean object causes IllegalArgumentException </a>
+//         */
+//        TRUE.setIV(XSDBooleanIV.TRUE);
+//        FALSE.setIV(XSDBooleanIV.FALSE);
     }
     
 	/**
@@ -315,11 +317,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final BigdataURIImpl xsd_boolean = new BigdataURIImpl(this, xsd
             + "boolean");
 
-    private final BigdataLiteralImpl TRUE = new BigdataLiteralImpl(this, "true", null,
-            xsd_boolean);
-
-    private final BigdataLiteralImpl FALSE = new BigdataLiteralImpl(this, "false", null,
-            xsd_boolean);
+//    private final BigdataLiteralImpl TRUE = new BigdataLiteralImpl(this, "true", null,
+//            xsd_boolean);
+//
+//    private final BigdataLiteralImpl FALSE = new BigdataLiteralImpl(this, "false", null,
+//            xsd_boolean);
 
 	/**
 	 * Map for fast resolution of XSD URIs. The keys are the string values of
@@ -349,10 +351,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
     
+    /**
+     * {@inheritDoc}
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert data
+     *      with boolean object causes IllegalArgumentException </a>
+     * @see <a href="http://trac.bigdata.com/ticket/980"> Object position of
+     *      query hint is not a Literal </a>
+     */
     @Override
-    public BigdataLiteralImpl createLiteral(boolean arg0) {
+    public BigdataLiteralImpl createLiteral(final boolean arg0) {
 
-        return (arg0 ? TRUE : FALSE);
+        return (arg0 //
+                ? new BigdataLiteralImpl(this, "true", null, xsd_boolean)
+                : new BigdataLiteralImpl(this, "false", null, xsd_boolean)
+                );
 
     }
 

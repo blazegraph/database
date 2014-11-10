@@ -62,6 +62,7 @@ import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.RWStrategy;
+import com.bigdata.journal.TestJournalAbort;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
@@ -126,10 +127,20 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 */
 		suite.addTest(TestJournalBasics.suite());
 
+		/*
+		 * TODO This should be a proxied test suite. It is RWStore specific
+		 * right now.
+		 * 
+		 * @see #1021 (Add critical section protection to
+		 * AbstractJournal.abort() and BigdataSailConnection.rollback())
+		 */
+		suite.addTestSuite(TestJournalAbort.class);
+		
 		return suite;
 
 	}
 
+	@Override
 	public Properties getProperties() {
 
         final Properties properties = super.getProperties();
@@ -2178,12 +2189,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
          *      not robust to internal failure.</a>
          */
 		public void test_commitStateError() {
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
-            	RWStore rws = bs.getStore();
+            	final RWStore rws = bs.getStore();
             	
             	final long addr = bs.write(randomData(78));
             	
@@ -2260,10 +2271,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		public void test_allocCommitFreeWithHistory() {
-			Journal store = (Journal) getStore(4);
+			final Journal store = (Journal) getStore(4);
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	final long addr = bs.write(randomData(78));
             	

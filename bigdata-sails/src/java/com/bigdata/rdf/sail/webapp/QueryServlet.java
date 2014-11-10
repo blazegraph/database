@@ -48,7 +48,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
-import org.openrdf.query.MalformedQueryException;
 import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.bop.BOpUtility;
@@ -65,6 +64,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -327,10 +327,6 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
         
-        final String namespace = getNamespace(req);
-
-        final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
-
         // The SPARQL update
         final String updateStr = getUpdateString(req);
 
@@ -343,71 +339,148 @@ public class QueryServlet extends BigdataRDFServlet {
 
         }
 
-        /*
-         * Setup task to execute the request. The task is executed on a thread
-         * pool. This bounds the possible concurrency of query execution (as
-         * opposed to queries accepted for eventual execution).
+		try {
+
+	        final String namespace = getNamespace(req);
+
+	        final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
+
+			submitApiTask(
+					new SparqlUpdateTask(req, resp, namespace, timestamp,
+							updateStr, getBigdataRDFContext() //
+					)).get();
+
+		} catch (Throwable t) {
+
+			launderThrowable(t, resp, "SPARQL-UPDATE: updateStr=" + updateStr);
+
+		}
+
+    }
+
+	private static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
+		
+		private final String updateStr;
+    	private final BigdataRDFContext context;
+
+        /**
          * 
-         * Note: If the client closes the connection, then the response's
-         * InputStream will be closed and the task will terminate rather than
-         * running on in the background with a disconnected client.
+         * @param namespace
+         *            The namespace of the target KB instance.
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
          */
-        try {
-
-            final BigdataRDFContext context = getBigdataRDFContext();
-
-            final UpdateTask updateTask;
-            try {
-
-                /*
-                 * Attempt to construct a task which we can use to evaluate the
-                 * query.
-                 */
-                
-                updateTask = (UpdateTask) context.getQueryTask(namespace,
-                        timestamp, updateStr, null/* acceptOverride */, req,
-                        resp, resp.getOutputStream(), true/* update */);
-                
-                if (updateTask == null) {
-                    // KB not found. Response already committed.
-                    return;
-                }
-                
-            } catch (MalformedQueryException ex) {
-                /*
-                 * Send back a BAD REQUEST (400) along with the text of the
-                 * syntax error message.
-                 */
-                resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        ex.getLocalizedMessage());
-                return;
-            }
-
-            final FutureTask<Void> ft = new FutureTask<Void>(updateTask);
-
-            if (log.isTraceEnabled())
-                log.trace("Will run update: " + updateStr);
-
-            updateTask.updateFuture = ft;
-            
-            /*
-             * Begin executing the query (asynchronous).
-             * 
-             * Note: UPDATEs currently contend with QUERYs against the same
-             * thread pool.
-             */
-            getBigdataRDFContext().queryService.execute(ft);
-
-            // Wait for the Future.
-            ft.get();
-
-        } catch (Throwable e) {
-
-            throw BigdataRDFServlet.launderThrowable(e, resp, updateStr);
-
+        public SparqlUpdateTask(//
+        		final HttpServletRequest req,//
+                final HttpServletResponse resp,//
+                final String namespace, //
+                final long timestamp,//
+                final String updateStr,//
+                final BigdataRDFContext context//
+                ) {
+            super(req, resp, namespace, timestamp);
+            this.updateStr = updateStr;
+            this.context = context;
         }
         
-    }
+        @Override
+        final public boolean isReadOnly() {
+            return false;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+			BigdataSailRepositoryConnection conn = null;
+			boolean success = false;
+			try {
+
+				conn = getUnisolatedConnection();
+
+				{
+
+					/*
+					 * Setup the baseURI for this request. It will be set to the
+					 * requestURI.
+					 */
+					final String baseURI = req.getRequestURL().toString();
+
+					final AbstractTripleStore tripleStore = conn
+							.getTripleStore();
+
+					/*
+					 * Parse the query so we can figure out how it will need to
+					 * be executed.
+					 * 
+					 * Note: This goes through some pains to make sure that we
+					 * parse the query exactly once in order to minimize the
+					 * resources associated with the query parser.
+					 */
+					final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+							tripleStore).parseUpdate2(updateStr, baseURI);
+
+					if (log.isDebugEnabled())
+						log.debug(astContainer.toString());
+
+					/*
+					 * Attempt to construct a task which we can use to evaluate
+					 * the query.
+					 */
+
+					final UpdateTask updateTask = context.getUpdateTask(conn,
+							namespace, timestamp, baseURI, astContainer, req,
+							resp, resp.getOutputStream());
+
+					final FutureTask<Void> ft = new FutureTask<Void>(updateTask);
+
+					if (log.isTraceEnabled())
+						log.trace("Will run update: " + updateStr);
+
+					updateTask.updateFuture = ft;
+
+					/*
+					 * Begin executing the query (asynchronous).
+					 * 
+					 * Note: UPDATEs currently contend with QUERYs against the
+					 * same thread pool.
+					 */
+					context.queryService.execute(ft);
+
+					// Wait for the Future.
+					ft.get();
+
+	                success = true;
+	                
+				}
+
+				/**
+				 * Note: The SPARQL UPDATE is already committed. This is done in
+				 * the UpdateTask class when we execute the following code
+				 * 
+				 * <pre>
+				 * this.commitTime.set(update.execute2());
+				 * </pre>
+				 */
+//				conn.commit();
+
+                return null;
+                
+            } finally {
+                
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
+                    conn.close();
+
+                }
+                
+            }
+
+        }
+
+	}
 
     /**
      * Run a SPARQL query.
@@ -420,10 +493,6 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
 
-        final String namespace = getNamespace(req);
-
-        final long timestamp = getTimestamp(req);
-
         final String queryStr = getQueryString(req);
 
         if (queryStr == null) {
@@ -435,219 +504,227 @@ public class QueryServlet extends BigdataRDFServlet {
 
         }
 
-        /*
-         * Setup task to execute the query. The task is executed on a thread
-         * pool. This bounds the possible concurrency of query execution (as
-         * opposed to queries accepted for eventual execution).
-         * 
-         * Note: If the client closes the connection, then the response's
-         * InputStream will be closed and the task will terminate rather than
-         * running on in the background with a disconnected client.
-         */
-        try {
+		try {
 
-            final OutputStream os = resp.getOutputStream();
+	        final String namespace = getNamespace(req);
 
-            final BigdataRDFContext context = getBigdataRDFContext();
+	        final long timestamp = getTimestamp(req);
 
-            // final boolean explain =
-            // req.getParameter(BigdataRDFContext.EXPLAIN) != null;
+			submitApiTask(
+					new SparqlQueryTask(req, resp, namespace, timestamp,
+							queryStr, getBigdataRDFContext() //
+					)).get();
 
-            final AbstractQueryTask queryTask;
-            try {
-                
-                /*
-                 * Attempt to construct a task which we can use to evaluate the
-                 * query.
-                 */
-                
-                queryTask = context.getQueryTask(namespace, timestamp,
-                        queryStr, null/* acceptOverride */, req, resp, os,
-                        false/* update */);
+		} catch (Throwable t) {
 
-                if (queryTask == null) {
-                    // KB not found. Response already committed.
-                    return;
-                }
-                
-            } catch (MalformedQueryException ex) {
-                /*
-                 * Send back a BAD REQUEST (400) along with the text of the
-                 * syntax error message.
-                 */
-                resp.sendError(HttpServletResponse.SC_BAD_REQUEST,
-                        ex.getLocalizedMessage());
-                return;
-            }
+			launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
 
-//            /*
-//             * Test the cache.
-//             */
-//            {
-//
-//                req.setAttribute(ATTR_QUERY_TASK, queryTask);
-//                
-//                doCache(req, resp);
-//
-//                if (resp.isCommitted()) {
-//                    // Answered by the cache.
-//                    return;
-//                }
-//                
-//            }
-
-            final FutureTask<Void> ft;
-
-            if (!queryTask.explain && queryTask.xhtml) {
-
-                /*
-                 * Wrap the query result with an XSL transform that will paint
-                 * the page.
-                 */
-
-                switch(queryTask.queryType) {
-                case ASK:
-                    // For ASK, just delivery the text/plain response.
-                    ft = new FutureTask<Void>(queryTask);
-                    break;
-                case SELECT:
-                    /*
-                     * XSLT from XML representation of the solutions to XHTML.
-                     * 
-                     * Note: This is handled by attaching a processor
-                     * declaration when we generate the RDF/XML.
-                     */
-                    ft = new FutureTask<Void>(queryTask);
-                    break;
-                case DESCRIBE:
-                case CONSTRUCT:
-                    /*
-                     * FIXME : XSLT from RDF/XML => RDFa. Maybe using a Fresnel
-                     * lens.
-                     */
-                    ft = new FutureTask<Void>(queryTask);
-                    break;
-                default:
-                    throw new AssertionError("QueryType=" + queryTask.queryType);
-                }
-
-            } else {
-
-                /*
-                 * Send back the data using whatever was the negotiated content
-                 * type.
-                 */
-
-                ft = new FutureTask<Void>(queryTask);
-
-            }
-
-            if (log.isTraceEnabled())
-                log.trace("Will run query: " + queryStr);
-
-            /*
-             * Setup the response headers.
-             */
-
-            resp.setStatus(HTTP_OK);
-
-            if (queryTask.explain) {
-                
-                /*
-                 * Send back an explanation of the query execution, not the
-                 * query results.
-                 */
-                
-                resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
-                final Writer w = new OutputStreamWriter(os, queryTask.charset);
-                try {
-                    // Begin executing the query (asynchronous)
-                    getBigdataRDFContext().queryService.execute(ft);
-                    // Send an explanation instead of the query results.
-                    explainQuery(queryStr, queryTask, ft, w);
-                } finally {
-                    w.flush();
-                    w.close();
-                    os.flush();
-                    os.close();
-                }
-
-            } else {
-
-                /*
-                 * Send back the query results.
-                 */
-                
-                resp.setContentType(queryTask.mimeType);
-
-                if (queryTask.charset != null) {
-
-                    // Note: Binary encodings do not specify charset.
-                    resp.setCharacterEncoding(queryTask.charset.name());
-
-                }
-
-                if (isAttachment(queryTask.mimeType)) {
-                    /*
-                     * Mark this as an attachment (rather than inline). This is
-                     * just a hint to the user agent. How the user agent handles
-                     * this hint is up to it.
-                     */
-                    resp.setHeader("Content-disposition",
-                            "attachment; filename=query" + queryTask.queryId
-                                    + "." + queryTask.fileExt);
-                }
-
-                if (TimestampUtility.isCommitTime(queryTask.timestamp)) {
-
-                    /*
-                     * A read against a commit time or a read-only tx. Such
-                     * results SHOULD be cached because the data from which the
-                     * response was constructed have snapshot isolation. (Note:
-                     * It is possible that the commit point against which the
-                     * query reads will be aged out of database and that the
-                     * query would therefore fail if it were retried. This can
-                     * happen with the RWStore or in scale-out.)
-                     * 
-                     * Note: READ_COMMITTED requests SHOULD NOT be cached. Such
-                     * requests will read against then current committed state
-                     * of the database each time they are processed.
-                     * 
-                     * Note: UNISOLATED queries SHOULD NOT be cached. Such
-                     * operations will read on (and write on) the then current
-                     * state of the unisolated indices on the database each time
-                     * they are processed. The results of such operations could
-                     * be different with each request.
-                     * 
-                     * Note: Full read-write transaction requests SHOULD NOT be
-                     * cached unless they are queries and the transaction scope
-                     * is limited to the request (rather than running across
-                     * multiple requests).
-                     */
-
-                    resp.addHeader("Cache-Control", "public");
-
-                    // to disable caching.
-                    // r.addHeader("Cache-Control", "no-cache");
-
-                }
-
-                // Begin executing the query (asynchronous)
-                getBigdataRDFContext().queryService.execute(ft);
-
-                // Wait for the Future.
-                ft.get();
-
-            }
-
-		} catch (Throwable e) {
-
-		    throw BigdataRDFServlet.launderThrowable(e, resp, queryStr);
-		    
 		}
 	
 	}
-    
+
+    /**
+     * Helper task for the SPARQL QUERY.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private static class SparqlQueryTask extends AbstractRestApiTask<Void> {
+
+		private final String queryStr;
+		private final BigdataRDFContext context;
+
+		public SparqlQueryTask(final HttpServletRequest req,
+				final HttpServletResponse resp, final String namespace,
+				final long timestamp, final String queryStr,
+				final BigdataRDFContext context) {
+
+			super(req, resp, namespace, timestamp);
+
+			if (queryStr == null)
+				throw new IllegalArgumentException();
+			if (context == null)
+				throw new IllegalArgumentException();
+
+			this.queryStr = queryStr;
+            this.context = context;
+            
+        }
+        
+        @Override
+        final public boolean isReadOnly() {
+            return true;
+        }
+
+        @Override
+        public Void call() throws Exception {
+            
+			BigdataSailRepositoryConnection conn = null;
+			try {
+
+				conn = getQueryConnection();
+
+				{
+					/*
+					 * Setup task to execute the query. The task is executed on
+					 * a thread pool. This bounds the possible concurrency of
+					 * query execution (as opposed to queries accepted for
+					 * eventual execution).
+					 * 
+					 * Note: If the client closes the connection, then the
+					 * response's InputStream will be closed and the task will
+					 * terminate rather than running on in the background with a
+					 * disconnected client.
+					 */
+
+					final OutputStream os = resp.getOutputStream();
+
+					/*
+					 * Attempt to construct a task which we can use to evaluate
+					 * the query.
+					 */
+
+					final AbstractQueryTask queryTask = context.getQueryTask(
+							conn, namespace, timestamp, queryStr,
+							null/* acceptOverride */, req, resp, os);
+
+					// /*
+					// * Test the cache.
+					// */
+					// {
+					//
+					// req.setAttribute(ATTR_QUERY_TASK, queryTask);
+					//
+					// doCache(req, resp);
+					//
+					// if (resp.isCommitted()) {
+					// // Answered by the cache.
+					// return;
+					// }
+					//
+					// }
+
+					final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+
+					if (log.isTraceEnabled())
+						log.trace("Will run query: " + queryStr);
+
+					/*
+					 * Setup the response headers.
+					 */
+
+					resp.setStatus(HTTP_OK);
+
+					if (queryTask.explain) {
+
+						/*
+						 * Send back an explanation of the query execution, not
+						 * the query results.
+						 */
+
+						resp.setContentType(BigdataServlet.MIME_TEXT_HTML);
+						final Writer w = new OutputStreamWriter(os,
+								queryTask.charset);
+						try {
+							// Begin executing the query (asynchronous)
+							context.queryService.execute(ft);
+							// Send an explanation instead of the query results.
+							explainQuery(queryStr, queryTask, ft, w);
+						} finally {
+							w.flush();
+							w.close();
+							os.flush();
+							os.close();
+						}
+
+					} else {
+
+						/*
+						 * Send back the query results.
+						 */
+
+						resp.setContentType(queryTask.mimeType);
+
+						if (queryTask.charset != null) {
+
+							// Note: Binary encodings do not specify charset.
+							resp.setCharacterEncoding(queryTask.charset.name());
+
+						}
+
+						if (isAttachment(queryTask.mimeType)) {
+							/*
+							 * Mark this as an attachment (rather than inline).
+							 * This is just a hint to the user agent. How the
+							 * user agent handles this hint is up to it.
+							 */
+							resp.setHeader("Content-disposition",
+									"attachment; filename=query"
+											+ queryTask.queryId + "."
+											+ queryTask.fileExt);
+						}
+
+						if (TimestampUtility.isCommitTime(queryTask.timestamp)) {
+
+							/*
+							 * A read against a commit time or a read-only tx.
+							 * Such results SHOULD be cached because the data
+							 * from which the response was constructed have
+							 * snapshot isolation. (Note: It is possible that
+							 * the commit point against which the query reads
+							 * will be aged out of database and that the query
+							 * would therefore fail if it were retried. This can
+							 * happen with the RWStore or in scale-out.)
+							 * 
+							 * Note: READ_COMMITTED requests SHOULD NOT be
+							 * cached. Such requests will read against then
+							 * current committed state of the database each time
+							 * they are processed.
+							 * 
+							 * Note: UNISOLATED queries SHOULD NOT be cached.
+							 * Such operations will read on (and write on) the
+							 * then current state of the unisolated indices on
+							 * the database each time they are processed. The
+							 * results of such operations could be different
+							 * with each request.
+							 * 
+							 * Note: Full read-write transaction requests SHOULD
+							 * NOT be cached unless they are queries and the
+							 * transaction scope is limited to the request
+							 * (rather than running across multiple requests).
+							 */
+
+							resp.addHeader("Cache-Control", "public");
+
+							// to disable caching.
+							// r.addHeader("Cache-Control", "no-cache");
+
+						}
+
+						// Begin executing the query (asynchronous)
+						context.queryService.execute(ft);
+
+						// Wait for the Future.
+						ft.get();
+
+					}
+				}
+
+				return null;
+
+			} finally {
+
+				if (conn != null) {
+
+					conn.close();
+
+				}
+
+			}
+
+		}
+
+    } // SparqlQueryTask.
+
     /**
      * The SPARQL query.
      * 
@@ -727,7 +804,7 @@ public class QueryServlet extends BigdataRDFServlet {
      *             could be more {@link IRunningQuery}s issued and we will also
      *             want to paint the statics which it uncovers in its rounds.
      */
-	private void explainQuery(final String queryStr,
+	static private void explainQuery(final String queryStr,
 			final AbstractQueryTask queryTask, final FutureTask<Void> ft,
 			final Writer w) throws Exception {
 		
@@ -862,8 +939,8 @@ public class QueryServlet extends BigdataRDFServlet {
 			if (queryId2 != null) {
 				if(log.isDebugEnabled())
 					log.debug("Resolving IRunningQuery: queryId2=" + queryId2);
-				final IIndexManager indexManager = getBigdataRDFContext()
-						.getIndexManager();
+				final IIndexManager indexManager = BigdataServlet
+						.getIndexManager(queryTask.req.getServletContext());
 				final QueryEngine queryEngine = QueryEngineFactory
 						.getQueryController(indexManager);
 				while (!ft.isDone() && q == null) {
