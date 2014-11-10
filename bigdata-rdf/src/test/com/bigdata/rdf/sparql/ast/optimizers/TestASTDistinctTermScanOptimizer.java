@@ -84,7 +84,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 	 * are some constants in the statement pattern. E.g.,
 	 * 
 	 * <pre>
-	 * SELECT ?o {:s ?p ?o}
+	 * SELECT DISTINCT ?o {:s ?p ?o}
 	 * </pre>
 	 * 
 	 * We need to look at whether the pipeline join would be as efficient, in
@@ -99,6 +99,14 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 	 * be either bound to a constant or be a variable. If it is a variable, then
 	 * it may be either projected out or not. If it is not projected out, then
 	 * it is simply ignored.
+	 * 
+	 * TODO Write test. The triple pattern can be OPTIONAL (simple optional).
+	 * This just means that we produce no bindings for ?s, which is exactly what
+	 * would happen anyway in a SELECT with a single required triple pattern.
+	 * 
+	 * <pre>
+	 * SELECT (DISTINCT|REDUCED) ?s { OPTIONAL { ?s ?p ?o} }
+	 * </pre>
 	 */
 	public void test_distinctTermScanOptimizer_01() {
 

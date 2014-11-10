@@ -10,7 +10,15 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
- * AST node models the assignment of a value expression to a variable.
+ * AST node models the assignment of a value expression to a variable
+ * 
+ * <pre>
+ * BIND( valueExpr AS ?var )
+ * </pre>
+ * 
+ * where args[0] is the {@link VarNode}<br>
+ * 
+ * where args[1] is the {@link IValueExpression}<br>
  */
 public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         implements IValueExpressionNode, Comparable<AssignmentNode>,
@@ -55,13 +63,26 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
 
     }
 
+	/**
+	 * The variable onto which the assignment is bound (as a {@link VarNode}).
+	 * 
+	 * @return For <code>BIND(valueExpr AS ?var)</code> this returns
+	 *         <code>?var</code> as a {@link VarNode}.
+	 */
     public VarNode getVarNode() {
         
         return (VarNode) get(0);
         
     }
 
-    public IVariable<IV> getVar() {
+	/**
+	 * The variable onto which the assignment is bound (as an {@link IVariable}).
+	 * 
+	 * @return For <code>BIND(valueExpr AS ?var)</code> this returns
+	 *         <code>?var</code> as an {@link IVariable}.
+	 */
+    @SuppressWarnings("rawtypes")
+	public IVariable<IV> getVar() {
 
         return getVarNode().getValueExpression();
         
@@ -82,14 +103,16 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         
     }
 
-    @Override
+	@Override
+    @SuppressWarnings("rawtypes")
     public IValueExpression<? extends IV> getValueExpression() {
 
         return getValueExpressionNode().getValueExpression();
         
     }
     
-    @Override
+	@Override
+    @SuppressWarnings("rawtypes")
     public void setValueExpression(final IValueExpression<? extends IV> ve) {
     	
     	getValueExpressionNode().setValueExpression(ve);

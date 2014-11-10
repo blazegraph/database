@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.List;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -195,6 +197,8 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 			return;
 		}
 		
+		final IVariable<?> projectedVar = assignmentNode.getVar();
+		
 		/**
 		 * Looking for a single triple or quad pattern in the WHERE clause.
 		 */
@@ -216,11 +220,18 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
 		
-		if (sp.isOptional()) {
-			// Distinct-Term-Scan does not handle OPTIONAL.
+		final Set<IVariable<?>> producedBindings = sp.getProducedBindings();
+		
+		if(!producedBindings.contains(projectedVar)) {
+			/*
+			 * The projected variable is not any of the variables used in the
+			 * triple pattern.
+			 * 
+			 * TODO Does this already handle named graph APs?
+			 */
 			return;
 		}
-
+		
 		/*
 		 * FIXME We need to look at the variables projected into and out of this
 		 * SELECT (if any) and those bound by the triple pattern. This rewrite
@@ -232,10 +243,12 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 * 
 		 * At the same time, if the SELECT appears as a sub-SELECT and the
 		 * evaluation context would have already bound the projected variable(s)
-		 * then there is no point using the distinct term scan. We can either
-		 * leave the SP alone or we can mark the SELECT as a named-subquery
-		 * (lift it out to run it first) and apply the distinct term scan
-		 * rewrite.
+		 * then there is no point using the distinct term scan (unless we lift
+		 * it out into a named subquery).
+		 * 
+		 * TODO We can mark the SELECT as a named-subquery. This will cause it
+		 * to be lifted out to run it first. This could be advantageous if there
+		 * would otherwise be bindings entering into the distinct term scan.
 		 */
 
 //		final VarNode theVar = assignmentNode.getVarNode();
