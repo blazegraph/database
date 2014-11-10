@@ -207,6 +207,16 @@ public class StatementPatternNode extends
 		 */
         String FAST_RANGE_COUNT = "fastRangeCount";
         
+		/**
+		 * An optional annotation whose value is an array of variables that will
+		 * be bound by a {@link DistinctTermAdvancer} layered over the access
+		 * path.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1034" > DISTINCT
+		 *      PREDICATEs query is slow </a>
+		 */
+        String DISTINCT_TERM_SCAN = "distinctTermScan";
+        
     }
     
     /**
@@ -427,6 +437,30 @@ public class StatementPatternNode extends
 			throw new IllegalArgumentException();
 
 		setProperty(Annotations.FAST_RANGE_COUNT, var);
+
+	}
+
+	/**
+	 * Return the array of variables that will form the prefix key for a
+	 * {@link DistinctTermAdvancer} pattern.
+	 * 
+	 * @return The distinct term scan variables -or- <code>null</code> if the
+	 *         access path will not use a distinct term scan.
+	 * 
+	 * @see Annotations#DISTINCT_TERM_SCAN
+	 */
+	final public VarNode[] getDistinctTermScanVars() {
+
+		return (VarNode[]) getProperty(Annotations.DISTINCT_TERM_SCAN);
+
+	}
+
+	final public void setDistinctTermScanVars(final VarNode[] vars) {
+
+		if (vars != null && vars.length == 0)
+			throw new IllegalArgumentException();
+
+		setProperty(Annotations.DISTINCT_TERM_SCAN, vars);
 
 	}
     
