@@ -28,10 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.List;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -49,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -239,6 +242,11 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 
 		/*
 		 * Looking for COUNT([DISTINCT|REDUCED]? "*")
+		 * 
+		 * The DISTINCT and REDUCED are optional for triples mode APs and for
+		 * quads mode APs where all 4 components of the quad are captured in the
+		 * COUNT( expression-list ). In both cases the fast range count will
+		 * automatically give us the DISTINCT triples / quads.
 		 */
 		final ProjectionNode projection = queryBase.getProjection();
 
@@ -260,26 +268,9 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 			// Not COUNT
 			return;
 
-		if (functionNode.arity() != 1
-				|| !(functionNode.get(0) instanceof VarNode)
-				|| !(((VarNode) functionNode.get(0)).isWildcard())) {
-			/*
-			 * Not COUNT(*)
-			 * 
-			 * Note: if a specific variable is given rather than "*" then we can
-			 * use a distinct-term-scan instead of a fast-range-count. This
-			 * means that both cases can be recognized easily by a single
-			 * optimizer, but we still need to translate them differently when
-			 * generating the query plan in order to target the appropriate
-			 * physical operators.
-			 */
-			return;
-		}
-
-		/**
-		 * SELECT COUNT([DISTINCT|REDUCED]? "*")
+		/*
+		 * Extract the single triple pattern from the WHERE clause.
 		 */
-
 		final GraphPatternGroup<IGroupMemberNode> whereClause = queryBase
 				.getWhereClause();
 
@@ -296,6 +287,100 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 		// The single triple pattern.
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
+
+		/**
+		 * Figure out if this is COUNT(*) or semantically equivalent to
+		 * COUNT(*).
+		 * 
+		 * Note: COUNT(x y z) is semantically equivalent to COUNT(*) if x, y,
+		 * and z are the names of the variables in the triple pattern.
+		 * 
+		 * Note: A simple BPG does not declare the graph variable. The graph
+		 * variable is ONLY declared by GRAPH ?g {BPG}. For quads mode APs, the
+		 * graph variable needs to be declared (using GRAPH ?g {BPG}) and used
+		 * in the COUNT( expression-list ) in order for the rewrite to have the
+		 * correct semantics.
+		 * 
+		 * FIXME We also need to handle named graph vs default graph.
+		 * 
+		 * Thus any of the following can be converted:
+		 * 
+		 * - COUNT(*) {GRAPH ?g {?s ?p ?o}}
+		 * 
+		 * - COUNT(*) {GRAPH ?g {:s ?p ?o}}
+		 * 
+		 * - COUNT(*) {GRAPH :g {?s ?p ?o}}
+		 * 
+		 * - COUNT(?s ?p ?p ?g) {GRAPH ?g {?s ?p ?o}}
+		 * 
+		 * However, in quads mode the following MAY NOT be converted (unless
+		 * there is a single named graph) because the hidden graph variable is
+		 * not part of the expression-list for COUNT.
+		 * 
+		 * - COUNT(*) {?s ?p ?o}
+		 * 
+		 * - COUNT(?s ?p ?o) {?s ?p ?o}
+		 * 
+		 * In particular, we would get the WRONG answer if we converted the
+		 * following in quads mode since the COUNT(DISTINCT ?s ?p ?o) is just
+		 * distinct TRIPLES but the AP fast range count would report distinct
+		 * QUADS.
+		 * 
+		 * - COUNT(DISTINCT ?s ?p ?o) {?s ?p ?o} where defaultGraph=ALL
+		 * 
+		 * TODO Another possibility for this last case is to explicitly compute
+		 * the sum of the range counts over the triple pattern for the set of
+		 * named or default graphs.
+		 */
+		boolean isCountStar = false;
+		if (functionNode.arity() == 1
+				&& (functionNode.get(0) instanceof VarNode)
+				&& (((VarNode) functionNode.get(0)).isWildcard())) {
+			/*
+			 * COUNT(*)
+			 */
+			isCountStar = true;
+		}
+		if (!isCountStar
+				&& functionNode.arity() == context.getAbstractTripleStore()
+						.getSPOKeyArity()) {
+			/*
+			 * There are as many function arguments as the arity of the KB.
+			 * 
+			 * Check to see if all variables in the associated triple pattern
+			 * are declared in the COUNT( expression-list ).
+			 */
+			final Set<IVariable<?>> boundVars = sp.getProducedBindings();
+			for (int i = 0; i < functionNode.arity(); i++) {
+				final ValueExpressionNode arg = (ValueExpressionNode) functionNode
+						.get(i);
+				if (!(arg instanceof VarNode)) {
+					// Not a simple variable.
+					break;
+				}
+				// remove any variable in the COUNT( expression-list )
+				boundVars.remove(((VarNode) arg).getValueExpression());
+			}
+			if (boundVars.isEmpty()) {
+				/*
+				 * If boundVars is now empty then all variables appearing in the
+				 * triple pattern also appear in the COUNT( expression-list ).
+				 * So this is effectively equivalent to a COUNT(*) expression.
+				 */
+				isCountStar = true;
+			}
+		}
+
+		if (!isCountStar) {
+			/*
+			 * Neither explicit nor implicit COUNT(*).
+			 */
+			return;
+		}
+		
+		/**
+		 * Rewrite the (sub-)SELECT.
+		 */
 
 		final VarNode theVar = assignmentNode.getVarNode();
 

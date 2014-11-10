@@ -13,7 +13,9 @@ import com.bigdata.bop.NV;
 
 /**
  * AST node for anything which is neither a constant nor a variable, including
- * math operators, string functions, etc.
+ * math operators, string functions, etc. The {@link FunctionNode} arguments are
+ * the ordered list {@link ValueExpressionNode}s that are the arguments to the
+ * SPARQL function.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
