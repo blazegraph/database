@@ -32,6 +32,7 @@ import java.util.List;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
@@ -51,6 +52,7 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdateContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -124,15 +126,26 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-    	/*
-    	 * TODO If KB uses full read/write transactions then this optimization
-    	 * must be disabled since we can have delete markers in the indices
-    	 * (this might not be true - the delete markers might exist solely in
-    	 * the tx specific indices and not in the global indices, in which case
-    	 * we can still use the fast range counts for SPARQL QUERY, but perhaps
-    	 * not for SPARQL UPDATE).
-    	 */
-    	
+		if (context instanceof AST2BOpUpdateContext
+				&& TimestampUtility.isReadWriteTx(context
+						.getAbstractTripleStore().getTimestamp())) {
+			/*
+			 * Disallow for SPARQL UPDATE when using full read-write tx.
+			 * 
+			 * Full read-write transactions use delete markers. However, I
+			 * believe that the delete markers are expunged when we merge the
+			 * transaction write set into the unisolated indices. In this case,
+			 * the fast-range count will remain accurate for any read-only
+			 * query. However, it could be only approximate if we are rewriting
+			 * the AST during the evaluation of a SPARQL UPDATE against a KB
+			 * protected by full read/write transactions. Thus, I am allowing
+			 * read-write tx to use this optimization here but we need to
+			 * disable this if the evaluation context is for SPARQL UPDATE not
+			 * SPARQL query.
+			 */
+    		return queryNode;
+    	}
+		
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
@@ -235,8 +248,7 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 		if (projection.arity() > 1)
 			return;
 		
-		final AssignmentNode assignmentNode = projection
-				.getAssignmentProjections().get(0);
+		final AssignmentNode assignmentNode = projection.getExpr(0);
 
 		if (!(assignmentNode.getValueExpressionNode() instanceof FunctionNode))
 			return;

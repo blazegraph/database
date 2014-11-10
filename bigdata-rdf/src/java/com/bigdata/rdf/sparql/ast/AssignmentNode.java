@@ -48,8 +48,10 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
      */
     public AssignmentNode(final BOp[] args, final Map<String, Object> anns) {
 
-        super(args, anns);
-        assert args[0] instanceof VarNode;
+		super(args, anns);
+
+		if (!(args[0] instanceof VarNode))
+			throw new IllegalArgumentException();
 
     }
 
@@ -73,18 +75,21 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
      * This assumption is build into the GROUP_BY handling in
      * {@link AST2BOpUtility}.
      */
+    @Override
     public IValueExpressionNode getValueExpressionNode() {
      
         return (IValueExpressionNode) get(1);
         
     }
 
+    @Override
     public IValueExpression<? extends IV> getValueExpression() {
 
         return getValueExpressionNode().getValueExpression();
         
     }
     
+    @Override
     public void setValueExpression(final IValueExpression<? extends IV> ve) {
     	
     	getValueExpressionNode().setValueExpression(ve);

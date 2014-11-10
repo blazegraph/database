@@ -98,9 +98,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * BY in which duplicate solutions are discarded after the sort by a filter
  * which compares the current solution with the prior solution.
  * 
- * TODO AST optimizer to turn SELECT DISTINCT ?p WHERE { ?s ?p ?o } into a
- * DistinctTermScan? (We are doing something very similar for GRAPH ?g {}).
- * 
  * TODO A query with a LIMIT of ZERO (0) should be failed as there will be no
  * solutions.
  * 
@@ -442,28 +439,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTFlattenJoinGroupsOptimizer());
 
-		/**
-		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
-		 * count mechanisms when that feature would produce exact results for
-		 * the KB instance.
-		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
-		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
-		 *      </a>
-		 */
-        add(new ASTFastRangeCountOptimizer());
-        
-        /**
-		 * Optimizes
-		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
-		 * and similar patterns using an O(N) algorithm, where N is the number
-		 * of distinct solutions.
-		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
-		 *      PREDICATEs query is slow </a>
-		 */
-        add(new ASTDistinctTermScanOptimizer());
-        
         /*
          * Join Order Optimization
          */
@@ -496,6 +471,35 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Add range counts to all statement patterns.
          */
         add(new ASTRangeCountOptimizer());
+        
+		/**
+		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
+		 * count mechanisms when that feature would produce exact results for
+		 * the KB instance.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+		 *      </a>
+		 */
+        add(new ASTFastRangeCountOptimizer());
+        
+        /**
+		 * Optimizes
+		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
+		 * and similar patterns using an O(N) algorithm, where N is the number
+		 * of distinct solutions.
+		 * <p>
+		 * Note: Either this must run after the {@link ASTRangeCountOptimizer}
+		 * in order to modify the estimated cardinality associated with using
+		 * the {@link DistinctTermAdvancer} (which does less work than a scan)
+		 * or the {@link ASTRangeCountOptimizer} must not overwrite the
+		 * cardinality estimates attached by this optimizer and this optimizer
+		 * could run first.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
+		 *      PREDICATEs query is slow </a>
+		 */
+        add(new ASTDistinctTermScanOptimizer());
         
         /**
          * Run the static join order optimizer. This attaches the estimated

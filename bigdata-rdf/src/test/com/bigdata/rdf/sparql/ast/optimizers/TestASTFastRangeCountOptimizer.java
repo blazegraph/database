@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.Annotations;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
 
 /**
@@ -69,6 +68,10 @@ public class TestASTFastRangeCountOptimizer extends AbstractOptimizerTestCase {
 	 * <pre>
 	 * SELECT (COUNT(*) as ?w) {?s ?p ?o}
 	 * </pre>
+	 * 
+	 * TODO Do a test where the inner triple pattern is OPTIONAL. This does not
+	 * effect anything and the fast range count will still be correct so the
+	 * rewrite SHOULD take place.
 	 */
 	public void test_fastRangeCountOptimizer_01() {
 
@@ -129,39 +132,11 @@ public class TestASTFastRangeCountOptimizer extends AbstractOptimizerTestCase {
 
 	/**
 	 * TODO Do a test to make sure that this optimizer is disabled if the KB
-	 * uses full read/write transactions.
+	 * uses full read/write transactions AND the evaluation context is SPARQL
+	 * UPDATE (vs SPARQL QUERY).
 	 */
-	public void test_fastRangeCountOptimizer_xx() {
+	public void test_fastRangeCountOptimizer_disabledForSPARQLUpdateAndRWTx() {
 		fail("more coverage of different cases");
 	}
-
-	/**
-	 * FIXME Handle these cases.
-	 * 
-	 * This case is quite similar structurally to the fast-range-count but it
-	 * gets translated into a {@link DistinctTermAdvancer} in a physical
-	 * operator which then counts the number of distinct terms that are visited.
-	 * 
-	 * <pre>
-	 * SELECT (COUNT(?s) as ?w) {?s ?p ?o}
-	 * </pre>
-	 * 
-	 * This case does not include the COUNT(). It is translated into a
-	 * {@link DistinctTermAdvancer} and the distinct terms are simply bound onto
-	 * ?s.
-	 * 
-	 * Note: This is only possible when the values of the other variables are
-	 * ignored.
-	 * 
-	 * <pre>
-	 * SELECT ?s {?s ?p ?o}
-	 * </pre>
-	 * 
-	 */
-	public void test_distinctTermScanOptimizer_01() {
-
-		fail("write tests");
-    	
-    }
 
 }
