@@ -77,6 +77,9 @@ public class StorageStats {
 		long m_deletes;
 		long m_deleteSize;
 		
+		// By copying committed data the stats can be reset on abort
+		BlobBucket m_committed = null;
+		
 		public BlobBucket(final int size) {
 			m_size = size;
 		}
@@ -86,7 +89,10 @@ public class StorageStats {
 			m_allocations = instr.readLong();
 			m_deleteSize = instr.readLong();
 			m_deletes = instr.readLong();
+			
+			commit();
 		}
+		
 		public void write(DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
 			outstr.writeLong(m_allocationSize);
@@ -94,6 +100,30 @@ public class StorageStats {
 			outstr.writeLong(m_deleteSize);
 			outstr.writeLong(m_deletes);
 		}
+		public void commit() {
+			if (m_committed == null) {
+				m_committed = new BlobBucket(m_size);
+			}
+			m_committed.m_allocationSize = m_allocationSize;
+			m_committed.m_allocations = m_allocations;
+			m_committed.m_deleteSize = m_deleteSize;
+			m_committed.m_deletes = m_deletes;
+		}
+		
+		public void reset() {
+			if (m_committed != null) {
+				m_allocationSize = m_committed.m_allocationSize;
+				m_allocations = m_committed.m_allocations;
+				m_deleteSize = m_committed.m_deleteSize;
+				m_deletes = m_committed.m_deletes;
+			} else {
+				m_allocationSize = 0;
+				m_allocations = 0;
+				m_deleteSize = 0;
+				m_deletes = 0;
+			}
+		}
+		
 		public void delete(int sze) {
 			m_deleteSize += sze;
 			m_deletes++;
@@ -131,6 +161,9 @@ public class StorageStats {
 		long m_sizeAllocations;
 		long m_sizeDeletes;
 		
+		// By copying committed data the stats can be reset on abort
+		Bucket m_committed = null;
+		
 		public Bucket(final int size, final int startRange) {
 			m_size = size;
 			m_start = startRange;
@@ -144,6 +177,8 @@ public class StorageStats {
 			m_totalSlots = instr.readLong();
 			m_sizeAllocations = instr.readLong();
 			m_sizeDeletes = instr.readLong();
+			
+			commit();
 		}
 		public void write(DataOutputStream outstr) throws IOException {
 			outstr.writeInt(m_size);
@@ -155,6 +190,37 @@ public class StorageStats {
 			outstr.writeLong(m_sizeAllocations);
 			outstr.writeLong(m_sizeDeletes);
 		}
+		
+		public void commit() {
+			if (m_committed == null) {
+				m_committed = new Bucket(m_size, m_start);
+			}
+			m_committed.m_allocators = m_allocators;
+			m_committed.m_slotAllocations = m_slotAllocations;
+			m_committed.m_slotDeletes = m_slotDeletes;
+			m_committed.m_totalSlots = m_totalSlots;
+			m_committed.m_sizeAllocations = m_sizeAllocations;
+			m_committed.m_sizeDeletes = m_sizeDeletes;
+		}
+		
+		public void reset() {
+			if (m_committed != null) {
+				m_allocators = m_committed.m_allocators;
+				m_slotAllocations = m_committed.m_slotAllocations;
+				m_slotDeletes = m_committed.m_slotDeletes;
+				m_totalSlots = m_committed.m_totalSlots;
+				m_sizeAllocations = m_committed.m_sizeAllocations;
+				m_sizeDeletes = m_committed.m_sizeDeletes;
+			} else {
+				m_allocators = 0;
+				m_slotAllocations = 0;
+				m_slotDeletes = 0;
+				m_totalSlots =0;
+				m_sizeAllocations = 0;
+				m_sizeDeletes = 0;
+			}
+		}
+		
 		public void delete(int sze) {
 			if (sze < 0)
 				throw new IllegalArgumentException("delete requires positive size, got: " + sze);
@@ -532,7 +598,23 @@ public class StorageStats {
 	}
 
 	public void register(SectorAllocator allocator, boolean init) {
-		// TODO Auto-generated method stub
-		
+		throw new UnsupportedOperationException();
+	}
+
+	public void commit() {
+		for (Bucket b: m_buckets) {
+			b.commit();
+		}
+		for (BlobBucket b: m_blobBuckets) {
+			b.commit();
+		}
+	}
+	public void reset() {
+		for (Bucket b: m_buckets) {
+			b.reset();
+		}
+		for (BlobBucket b: m_blobBuckets) {
+			b.reset();
+		}
 	}
 }

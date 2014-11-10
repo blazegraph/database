@@ -123,8 +123,9 @@ public class ProjectionOp extends PipelineOp {
             if (vars == null)
                 throw new IllegalArgumentException();
 
-            if (vars.length == 0)
-                throw new IllegalArgumentException();
+            // @see #946 (Empty PROJECTION causes IllegalArgumentException)
+//            if (vars.length == 0)
+//                throw new IllegalArgumentException();
 
         }
 

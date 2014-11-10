@@ -133,7 +133,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
         if (this.iv != null && !IVUtility.equals(this.iv, iv)) {
 
             throw new IllegalStateException("Already assigned: old="
-                    + this.iv + ", new=" + iv);
+                    + this.iv + ", new=" + iv + ", this: " + this);
 
         }
         

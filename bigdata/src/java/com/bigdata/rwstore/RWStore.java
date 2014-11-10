@@ -3007,6 +3007,16 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * (RWStore does not discard deferred deletes on reset)
              */
             m_deferredFreeOut.reset();
+            
+            /*
+             * Reset any storage stats
+             */
+            if (m_storageStatsAddr != 0) {
+                m_storageStats.reset();             
+            } else {
+                m_storageStats = new StorageStats(m_allocSizes);
+            }
+
         } catch (Exception e) {
             throw new IllegalStateException("Unable to reset the store", e);
         } finally {
@@ -3156,12 +3166,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
         /** Reset pre-commit state to support reset/abort/rollback. */
         void reset() {
-            if (!m_allocationWriteLock.isHeldByCurrentThread())
+        	if (!m_allocationWriteLock.isHeldByCurrentThread())
                 throw new IllegalMonitorStateException();
             RWStore.this.m_storageStatsAddr = m_storageStatsAddr;
             RWStore.this.m_committedNextAllocation = m_lastCommittedNextAllocation;
             RWStore.this.m_metaBitsAddr = m_metaBitsAddr;
-        }
+         }
 
     }
 
@@ -3414,6 +3424,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
             fa.postCommit();
             
+        }
+
+        if (m_storageStats != null) {
+        	m_storageStats.commit();
         }
 
         m_commitList.clear();
@@ -6330,6 +6344,25 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
     }
 
+	/**
+	 * Debug ONLY method added to permit unit tests to be written that the
+	 * native transaction counter is correctly decremented to zero. The returned
+	 * value is ONLY valid while holding the {@link #m_allocationLock}.
+	 * Therefore this method MAY NOT be used reliably outside of code that can
+	 * guarantee that there are no concurrent committers on the {@link RWStore}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1036"> Journal file growth
+	 *      reported with 1.3.3 </a>
+	 */
+    public int getActiveTxCount() {
+		m_allocationWriteLock.lock();
+		try {
+			return m_activeTxCount;
+        } finally {
+            m_allocationWriteLock.unlock();
+        }
+    }
+    
     /**
      * Returns the slot size associated with this address
      */

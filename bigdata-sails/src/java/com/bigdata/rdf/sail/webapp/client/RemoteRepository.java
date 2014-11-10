@@ -1638,9 +1638,11 @@ public class RemoteRepository {
 
         ConnectOptions.addQueryParams(urlString, opts.requestParams);
 
+        // Ensure all POST requests contain parameters in body, but convert GET if
+        //	isLongRequestURL
         final boolean isLongRequestURL = urlString.length() > getMaxRequestURLLength();
 
-        if (isLongRequestURL && opts.method.equals("POST")
+        if (/* isLongRequestURL && */ opts.method.equals("POST")
                 && opts.entity == null) {
 
             /*

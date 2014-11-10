@@ -1367,6 +1367,7 @@ public abstract class BigdataGraph implements Graph {
     }
     
     /**
+<<<<<<< HEAD
      * Select results using a SPARQL query.
      */
     public boolean ask(final String queryStr) throws Exception {
@@ -1400,6 +1401,8 @@ public abstract class BigdataGraph implements Graph {
     }
     
     /**
+=======
+>>>>>>> master
      * Update graph using SPARQL Update.
      */
     public void update(final String queryStr) throws Exception {

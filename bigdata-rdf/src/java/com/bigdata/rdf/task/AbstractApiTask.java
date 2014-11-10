@@ -151,6 +151,9 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * a read-only connection. When it is associated with the
      * {@link ITx#UNISOLATED} view or a read-write transaction, this will be a
      * mutable connection.
+     * <p>
+     * This version uses the namespace and timestamp associated with the HTTP
+     * request.
      * 
      * @throws RepositoryException
      */
@@ -163,6 +166,22 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
          * (unless the query explicitly overrides the timestamp of the view on
          * which it will operate).
          */
+		return getQueryConnection(namespace, timestamp);
+
+	}
+
+    /**
+     * This version uses the namespace and timestamp provided by the caller.
+
+     * @param namespace
+     * @param timestamp
+     * @return
+     * @throws RepositoryException
+     */
+	protected BigdataSailRepositoryConnection getQueryConnection(
+			final String namespace, final long timestamp)
+			throws RepositoryException {
+
         final AbstractTripleStore tripleStore = getTripleStore(namespace,
                 timestamp);
 
@@ -198,13 +217,15 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
 
     /**
-     * Return an UNISOLATED connection.
-     * 
-     * @return The UNISOLATED connection.
-     * 
-     * @throws SailException
-     * @throws RepositoryException
-     */
+	 * Return an UNISOLATED connection.
+	 * 
+	 * @return The UNISOLATED connection.
+	 * 
+	 * @throws SailException
+	 * @throws RepositoryException
+	 * @throws DatasetNotFoundException
+	 *             if the specified namespace does not exist.
+	 */
     protected BigdataSailRepositoryConnection getUnisolatedConnection()
             throws SailException, RepositoryException {
 
@@ -214,7 +235,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
         if (tripleStore == null) {
 
-            throw new RuntimeException("Not found: namespace=" + namespace);
+			throw new DatasetNotFoundException("Not found: namespace="
+					+ namespace);
 
         }
 

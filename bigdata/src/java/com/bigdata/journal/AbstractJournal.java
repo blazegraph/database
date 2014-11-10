@@ -553,6 +553,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @see #getName2Addr()
 	 */
 	private volatile Name2Addr _name2Addr;
+	
+	/**
+	 * An atomic state specifying whether a clean abort is required.  This is set
+	 * to true by critical section code in the _abort if it does not complete cleanly.
+	 * <p>
+	 * It is checked in the commit() method ensure updates are protected.
+	 * 
+	 * @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+	 */
+	private final AtomicBoolean abortRequired = new AtomicBoolean(false);
 
 	/**
 	 * Return the "live" BTree mapping index names to the last metadata record
@@ -2745,6 +2755,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
 
 		lock.lock();
+		// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+		boolean success = false;
 
 		try {
 
@@ -2757,6 +2769,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			if (_bufferStrategy == null) {
 
 				// Nothing to do.
+				success = true;
+				
 				return;
 
 			}
@@ -2896,8 +2910,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
 			if (log.isInfoEnabled())
 				log.info("done");
+			
+			success = true; // mark successful abort.
 
 		} finally {
+			// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+			abortRequired.set(!success);
 
 			lock.unlock();
 
@@ -3049,6 +3067,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     
     @Override
 	public long commit() {
+    	
+    	// Critical Section Check. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+    	if (abortRequired.get()) // FIXME Move this into commitNow() after tagging hot fix.
+    		throw new IllegalStateException("Commit cannot be called, a call to abort must be made before further updates");
 
 		// The timestamp to be assigned to this commit point.
 		final long commitTime = nextCommitTimestamp();

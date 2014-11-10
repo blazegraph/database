@@ -65,9 +65,9 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
         <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
             <include name="**/*.jar" />
         </fileset>
-      <fileset dir="${bigdata.dir}/bigdata-gom/lib">
+      <!-- <fileset dir="${bigdata.dir}/bigdata-gom/lib">
          <include name="**/*.jar" />
-      </fileset>
+      </fileset> -->
         <!--
         <fileset dir="${bigdata.dir}/ctc-striterator/lib">
             <include name="**/*.jar" />
@@ -477,9 +477,9 @@ ga('send', 'pageview');
     <fileset dir="${bigdata.dir}/bigdata-blueprints/lib">
         <include name="**/*.jar" />
     </fileset>
-   <fileset dir="${bigdata.dir}/bigdata-gom/lib">
+   <!-- <fileset dir="${bigdata.dir}/bigdata-gom/lib">
       <include name="**/*.jar" />
-   </fileset>
+   </fileset> -->
      </copy>
      <!-- Do NOT flatten the jini jars. We need the to preserve the -->
      <!-- lib, lib-dl, and lib-ext distinctions.                    -->
@@ -970,7 +970,7 @@ ${postInstallMessage}</echo>
       <property name="bigdata-rdf.lib" location="${bigdata.dir}/bigdata-rdf/lib" />
       <property name="bigdata-sails.lib" location="${bigdata.dir}/bigdata-sails/lib" />
       <property name="bigdata-blueprints.lib" location="${bigdata.dir}/bigdata-blueprints/lib" />
-      <property name="bigdata-gom.lib" location="${bigdata.dir}/bigdata-gom/lib" />
+      <!-- <property name="bigdata-gom.lib" location="${bigdata.dir}/bigdata-gom/lib" /> -->
       <property name="bigdata-jetty.lib" location="${bigdata.dir}/bigdata/lib/jetty" />
       <property name="bigdata-http.lib" location="${bigdata.dir}/bigdata-sails/lib/httpcomponents" />
       <property name="bigdata-zookeeper.lib" location="${bigdata.dir}/bigdata-jini/lib/apache" />
@@ -1533,9 +1533,9 @@ substitutions.
         <fileset dir="${bigdata.dir}/bigdata-rdf/lib" />
       </copy>
       <mkdir dir="${build.dir}/bigdata-gom/lib" />
-      <copy toDir="${build.dir}/bigdata-gom/lib">
+      <!-- <copy toDir="${build.dir}/bigdata-gom/lib">
         <fileset dir="${bigdata.dir}/bigdata-gom/lib" />
-      </copy>
+      </copy> -->
       <mkdir dir="${build.dir}/bigdata-sails/lib" />
       <copy toDir="${build.dir}/bigdata-sails/lib">
         <fileset dir="${bigdata.dir}/bigdata-sails/lib" />
@@ -1605,7 +1605,7 @@ substitutions.
           <include name="bigdata-rdf/lib/**" />
           <include name="bigdata-sails/lib/**" />
           <include name="bigdata-blueprints/lib/**" />
-          <include name="bigdata-gom/lib/**" />
+          <!-- <include name="bigdata-gom/lib/**" /> -->
           <include name="src/**" />
           <exclude name="classes/**" />
           <exclude name="${version}.jar" />
