@@ -175,8 +175,12 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestTicket946.class);
 
         // SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern}
-        // @see 1037 (fast-range-count optimizer)
+        // @see #1037 (fast-range-count optimizer)
         suite.addTestSuite(TestFastRangeCountOptimizer.class);
+
+        // SELECT (DISTINCT|REDUCED) ?property WHERE { ?x ?property ?y . }
+        // @see #1035 (distinct-term-scan optimizer)
+        suite.addTestSuite(TestDistinctTermScanOptimizer.class);
 
         /*
          * Runtime Query Optimizer (RTO).
