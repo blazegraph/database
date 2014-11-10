@@ -196,6 +196,9 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 					// Note: DISTINCT|REDUCED are NOT part of the projection.
 					final ProjectionNode projection = projection(varNode(s));
 					
+					projection.setDistinct(false);
+					projection.setReduced(false);
+					
 					// the expected AST.
 					expected = select(projection, where(sp1));
 
@@ -203,8 +206,6 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 
 			}
 		}.test();
-
-		fail("write tests");
     	
     }
 
