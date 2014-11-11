@@ -111,12 +111,23 @@ public class LogUtil {
 
     }
     
+    public interface Options {
+
+        /**
+         * This may be used to suppress the banner text. 
+         */
+        String QUIET = "com.bigdata.util.config.LogUtil.quiet";
+        
+    }
+    
     // Static initialization block that retrieves and initializes 
     // the log4j logger configuration for the given VM in which this
     // class resides. Note that this block is executed only once
     // during the life of the associated VM.
     static {
 
+        final boolean quiet = Boolean.getBoolean(Options.QUIET);
+        
         /*
          * First, attempt to resolve the configuration property.
          */
@@ -126,13 +137,13 @@ public class LogUtil {
                                     log4jConfig.endsWith(".logging"))) {
 
             PropertyConfigurator.configureAndWatch(log4jConfig);
-            System.out.println("INFO: " + LogUtil.class.getName()
+            if (!quiet) System.out.println("INFO: " + LogUtil.class.getName()
                     + ": Configure and watch: " + log4jConfig);
 
         } else if (log4jConfig != null && log4jConfig.endsWith(".xml")) {
 
             DOMConfigurator.configureAndWatch(log4jConfig);
-            System.out.println("INFO: " + LogUtil.class.getName()
+            if (!quiet) System.out.println("INFO: " + LogUtil.class.getName()
                     + ": Configure and watch: " + log4jConfig);
 
         } else {
@@ -149,13 +160,13 @@ public class LogUtil {
                     )) {
 
                 PropertyConfigurator.configure(log4jUrl);
-                System.out.println("INFO: " + LogUtil.class.getName()
+                if (!quiet) System.out.println("INFO: " + LogUtil.class.getName()
                         + ": Configure: " + log4jUrl);
 
             } else if (log4jUrl != null && log4jUrl.getFile().endsWith(".xml")) {
 
                 DOMConfigurator.configure(log4jUrl);
-                System.out.println("INFO: " + LogUtil.class.getName()
+                if (!quiet) System.out.println("INFO: " + LogUtil.class.getName()
                         + ": Configure: " + log4jUrl);
 
             } else {
