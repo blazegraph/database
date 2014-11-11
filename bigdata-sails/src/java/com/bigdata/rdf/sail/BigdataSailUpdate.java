@@ -23,22 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.Dataset;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.repository.sail.SailUpdate;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
-import com.bigdata.rdf.sparql.ast.IDataSetNode;
-import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Extension API for bigdata queries.
+ * Extension API for bigdata.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -47,6 +42,7 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     private final ASTContainer astContainer;
 
+    @Override
     public ASTContainer getASTContainer() {
         
         return astContainer;
@@ -65,6 +61,7 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     }
 
+    @Override
     public ParsedUpdate getParsedUpdate() {
         
         throw new UnsupportedOperationException();
@@ -78,6 +75,7 @@ public class BigdataSailUpdate extends SailUpdate implements
         
     }
 
+    @Override
     public AbstractTripleStore getTripleStore() {
 
         return ((BigdataSailRepositoryConnection) getConnection())
@@ -161,10 +159,11 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     }
 
-    @Override
-    public BindingSet getBindings() {
-        // TODO Auto-generated method stub
-        return super.getBindings();
-    }
+//    @Override
+//    public BindingSet getBindings() {
+//
+//    	return super.getBindings();
+//    	
+//    }
 
 }
