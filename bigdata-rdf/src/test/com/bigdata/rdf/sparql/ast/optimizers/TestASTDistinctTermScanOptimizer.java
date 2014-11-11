@@ -185,9 +185,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						 * Annotate with the name of the variable(s) to become
 						 * bound to the fast range count of that triple pattern.
 						 */
-						final VarNode[] distinctTermScanVars = new VarNode[] { new VarNode(
-								s) };
-						sp1.setDistinctTermScanVars(distinctTermScanVars);
+						final VarNode distinctTermScanVar = new VarNode(s);
+						sp1.setDistinctTermScanVar(distinctTermScanVar);
 						/*
 						 * Estimate the cardinality of the distinct term scan
 						 * access path. This is just a linear estimate based on
@@ -197,7 +196,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						 * the arity and cardinality of the underlying triple or
 						 * quad pattern access path.
 						 */
-						final long newRangeCount = (long) (((double) distinctTermScanVars.length) / (store
+						final long newRangeCount = (long) (1.0 / (store
 								.isQuads() ? 4 : 3)) * rangeCount_sp1;
 						/*
 						 * Update the estimated cardinality on the SP.
