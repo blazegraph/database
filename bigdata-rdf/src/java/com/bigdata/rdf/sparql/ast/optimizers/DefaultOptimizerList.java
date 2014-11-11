@@ -143,7 +143,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
-    	 * into an IN filter using the full text index to determine the IN
+    	 * into an7 full text index to determine the IN
     	 * set.
     	 * 
     	 * Convert:
@@ -481,7 +481,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 		 *      </a>
 		 */
-        add(new ASTFastRangeCountOptimizer());
+//        add(new ASTFastRangeCountOptimizer());
         
         /**
 		 * Optimizes
@@ -499,7 +499,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
 		 *      PREDICATEs query is slow </a>
 		 */
-        add(new ASTDistinctTermScanOptimizer());
+//        add(new ASTDistinctTermScanOptimizer());
         
         /**
          * Run the static join order optimizer. This attaches the estimated

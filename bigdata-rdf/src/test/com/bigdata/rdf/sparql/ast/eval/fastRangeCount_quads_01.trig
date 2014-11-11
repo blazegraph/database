@@ -1,0 +1,15 @@
+@prefix : <http://bigdata.com#> .
+
+:graph1 {
+:s1 :p1 :o1 .
+}
+
+:graph2 {
+:s1 :p1 :o2 .
+:s1 :p2 :o3 .
+}
+
+:graph3 {
+:s2 :p1 :o4 .
+:s2 :p3 :o5 .
+}
