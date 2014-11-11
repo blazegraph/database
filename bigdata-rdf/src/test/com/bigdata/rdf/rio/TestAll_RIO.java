@@ -61,8 +61,6 @@ public class TestAll_RIO extends TestCase {
 
         final TestSuite suite = new TestSuite("RIO Extensions");
 
-        suite.addTest(com.bigdata.rdf.rio.nquads.TestAll.suite());
-
         suite.addTest(com.bigdata.rdf.rio.ntriples.TestAll.suite());
 
         return suite;

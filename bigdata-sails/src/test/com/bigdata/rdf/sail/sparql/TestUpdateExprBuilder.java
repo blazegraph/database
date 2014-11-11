@@ -29,10 +29,10 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
-import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
