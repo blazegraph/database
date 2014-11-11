@@ -88,7 +88,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public static Test suite() {
 	
         return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
-                "test.*DELETE.*", TestMode.quads, TestMode.sids,
+                "test_SELECT_ALL", TestMode.quads, TestMode.sids,
                 TestMode.triples);
 	    
 	}
@@ -529,7 +529,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         }
         
         /**
-         * FIXME JJC: Uncomment to test CONNEG for JSON.
+         * Uncommented to test CONNEG for JSON (available with openrdf 2.7).
          * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
          *      JSON-LD </a>
@@ -538,12 +538,12 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/704" >
          *      ask does not return json </a>
          */
-//        {
-//            final IPreparedBooleanQuery query = m_repo
-//                    .prepareBooleanQuery(queryStr);
-//            query.setHeader("Accept", "application/sparql-results+json");
-//            assertEquals(false, query.evaluate());
-//        }
+        {
+            final IPreparedBooleanQuery query = m_repo
+                    .prepareBooleanQuery(queryStr);
+            query.setHeader("Accept", "application/sparql-results+json");
+            assertEquals(false, query.evaluate());
+        }
         
     }
 
@@ -609,13 +609,10 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         }
 
         /**
-         * FIXME The necessary parser does not appear to be available. If you
-         * enable this you will get ClassNotFoundException for
-         * <code>au/com/bytecode/opencsv/CSVReader</code>
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
-         *      Migrate to openrdf 2.7 </a>
-         */
+		 * FIXME The necessary parser does not appear to be available (even with
+		 * openrdf 2.7). If you enable this you will get ClassNotFoundException
+		 * for <code>au/com/bytecode/opencsv/CSVReader</code>
+		 */
         if (false) {
 
             final IPreparedTupleQuery query = m_repo
@@ -641,15 +638,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         }
 
         /**
-         * FIXME Enable this once we have a JSON result format parser (openrdf
-         * 2.7).
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
-         *      Migrate to openrdf 2.7 </a>
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
-         *      JSON-LD </a>
-         */
-        if (false) {
+		 * Enabled now that we have a JSON result format parser (openrdf 2.7).
+		 * 
+		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
+		 *      Migrate to openrdf 2.7 </a>
+		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
+		 *      JSON-LD </a>
+		 */
+        if (true) {
 
             final IPreparedTupleQuery query = m_repo
                     .prepareTupleQuery(queryStr);
@@ -663,31 +659,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         
 	}
 
-//    /**
-//     * Select everything in the kb using a POST. There will be no solutions
-//     * (assuming that we are using a told triple kb or quads kb w/o axioms).
-//     */
-//    public void test_POST_SELECT_ALL() throws Exception {
-//
-//        final String queryStr = "select * where {?s ?p ?o}";
-//
-//        final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "POST";
-//
-//        opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//        // TODO JSON parser is not bundled by openrdf.
-////        opts.acceptHeader = TupleQueryResultFormat.JSON.getDefaultMIMEType();
-////        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//        opts.acceptHeader = TupleQueryResultFormat.BINARY.getDefaultMIMEType();
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//    }
-
     /**
      * A GET query which should result in an error (the query is not well
      * formed).
@@ -696,7 +667,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         final String queryStr = "select * where {?s ?p ?o} X {}";
 
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
         
         try {
@@ -710,16 +680,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         	// perfect
         	
         }
-
-//		final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "GET";
-//
-//        opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
-//        
-//        assertErrorStatusCode(HttpServletResponse.SC_BAD_REQUEST,
-//                doSparqlQuery(opts, requestPath));
 
     }
     
@@ -761,13 +721,12 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         
     }
 
-//    // FIXME We need an NQuadsWriter to run this test.
 //    // Note: quads interchange
-//    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
-//
-//        doInsertWithBodyTest("POST", 23, NQuadsParser.nquads);
-//        
-//    }
+    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
+
+        doInsertWithBodyTest("POST", 23, RDFFormat.NQUADS);
+        
+    }
 
     // TODO Write test for UPDATE where we override the default context using
     // the context-uri.
