@@ -85,6 +85,9 @@ public class TestAll extends TestCase {
          */
 		suite.addTestSuite(TestNestedLoopJoinOp.class);
 
+		suite.addTestSuite(TestFastRangeCountOp.class);
+		suite.addTestSuite(TestDistinctTermScanOp.class);
+
         return suite;
         
     }

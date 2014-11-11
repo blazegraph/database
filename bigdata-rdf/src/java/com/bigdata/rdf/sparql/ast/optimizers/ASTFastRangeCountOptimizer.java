@@ -55,7 +55,6 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUpdateContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -129,24 +128,31 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-		if (context instanceof AST2BOpUpdateContext
-				&& TimestampUtility.isReadWriteTx(context
+		if (//context instanceof AST2BOpUpdateContext &&
+				TimestampUtility.isReadWriteTx(context
 						.getAbstractTripleStore().getTimestamp())) {
-			/*
-			 * Disallow for SPARQL UPDATE when using full read-write tx.
-			 * 
-			 * Full read-write transactions use delete markers. However, I
-			 * believe that the delete markers are expunged when we merge the
-			 * transaction write set into the unisolated indices. In this case,
-			 * the fast-range count will remain accurate for any read-only
-			 * query. However, it could be only approximate if we are rewriting
-			 * the AST during the evaluation of a SPARQL UPDATE against a KB
-			 * protected by full read/write transactions. Thus, I am allowing
-			 * read-write tx to use this optimization here but we need to
-			 * disable this if the evaluation context is for SPARQL UPDATE not
-			 * SPARQL query.
+			/**
+			 * Disallow for SPARQL QUERY/UPDATE when using full read-write tx.
+			 * <p>
+			 * Full read-write transactions use delete markers in the unisolated
+			 * index in order to detect write-write conflicts when one tx
+			 * deletes a tuple and another writes on the same tuple.
+			 * <p>
+			 * The presence of deleteMarkers in the unisolated version of the
+			 * isolatable index means that the fast-range count will be turned
+			 * into a key-range scan, which is not desired.
+			 * <p>
+			 * While AccessPath.rangeCountExact(true) method will do the right
+			 * thing even if the index has delete markers (it will convert to a
+			 * scan for either delete markers or if there is a FILTER attached
+			 * to the index), converting to a scan defeats the purpose of the
+			 * ASTFastRangeCountOptimizer. In this case, the cost would have
+			 * been the same if we had not rewritten the AST. Hence we do not
+			 * rewrite the query.
 			 */
-    		return queryNode;
+
+			return queryNode;
+			
     	}
 		
         final QueryRoot queryRoot = (QueryRoot) queryNode;
