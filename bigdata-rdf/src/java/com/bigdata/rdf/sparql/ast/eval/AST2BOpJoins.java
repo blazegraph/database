@@ -47,13 +47,13 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.ap.filter.BOpFilterBase;
 import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.join.AccessPathJoinAnnotations;
+import com.bigdata.bop.join.DistinctTermScanOp;
 import com.bigdata.bop.join.FastRangeCountOp;
 import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinOp;
@@ -69,6 +69,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -202,7 +203,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
 			
 			// distinct-term-scan. see #1035.
 			left = distinctTermScanJoin(left, anns, pred, dataset, cutoffLimit,
-					queryHints, ctx);
+					distinctTermScanVar, queryHints, ctx);
 			
 			return left;
 			
@@ -279,17 +280,64 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
     }
 
-    /*
+    /**
 	 * FIXME We need to handle cutoff joins here or the distinct-term-scan will
 	 * not work with the RTO.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+	 *      query is slow </a>
 	 */
-    private static PipelineOp distinctTermScanJoin(PipelineOp left,
-			List<NV> anns, Predicate pred, DatasetNode dataset,
-			Long cutoffLimit, Properties queryHints, AST2BOpContext ctx) {
-    	// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+    private static PipelineOp distinctTermScanJoin(//
+			final PipelineOp left,//
+			final List<NV> anns, //
+			final Predicate pred,//
+			final DatasetNode dataset, //
+			final Long cutoffLimitIsIgnored,//
+			final VarNode distinctTermScanVar, //
+			final Properties queryHints, //
+			final AST2BOpContext ctx//
+			) {
+
+		/*
+		 * Figure out which index to use. We want whatever index has the
+		 * [distinctVar] in the first key component for this predicate. So we
+		 * need to look for the ordinal position of the [distinctVar] in the
+		 * predicate and then choose the corresponding triples or quads mode
+		 * index.
+		 * 
+		 * FIXME We also need to look at the constants that are already bound
+		 * in the predicate (if any) and use them to restrict the range.
+		 * 
+		 * TODO We should do this at runtime in case something will
+		 * be bound before we actually execute this join.  (Alternatively,
+		 * we can look at the knownBound incoming variables and use them to
+		 * choose the index.)
+		 */
+		
+//		for(BOp t : pred.args()) {
+//			if(!(t instanceof IVariable))
+//		}
+		if(true)
+			throw new UnsupportedOperationException();
+		anns.add(new NV(DistinctTermScanOp.Annotations.DISTINCT_VAR,
+				distinctTermScanVar.getValueExpression()));
+
+        anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+		return applyQueryHints(
+				new DistinctTermScanOp(leftOrEmpty(left), NV.asMap(anns
+						.toArray(new NV[anns.size()]))), queryHints, ctx);
+		
 	}
 
+    /**
+	 * Use the {@link FastRangeCountOp} rather than a key-range scan.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+	 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+	 *      </a>
+	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static PipelineOp fastRangeCountJoin(//
 			final PipelineOp left,//
