@@ -81,7 +81,7 @@ public class TestDistinctTermScanOptimizer extends
 
 		/**
 		 * <pre>
-		 * SELECT DISTINCT ?p WHERE { ?s ?p ?o . }
+		 * SELECT DISTINCT ?s WHERE { ?s ?p ?o . }
 		 * </pre>
 		 */
 		public void test_distinctTermScan_triples_01() throws Exception {
@@ -90,6 +90,52 @@ public class TestDistinctTermScanOptimizer extends
 					"distinctTermScan_triples_01.rq",// queryFileURL
 					"distinctTermScan_triples_01.ttl",// dataFileURL
 					"distinctTermScan_triples_01.srx"// resultFileURL
+			);
+			
+			h.runTest();
+
+			// Verify that the DistinctTermScanOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							DistinctTermScanOp.class).size());
+
+		}
+
+		/**
+		 * <pre>
+		 * SELECT DISTINCT ?p WHERE { ?s ?p ?o . }
+		 * </pre>
+		 */
+		public void test_distinctTermScan_triples_02() throws Exception {
+
+			final TestHelper h = new TestHelper("distinctTermScan_triples_02", // testURI,
+					"distinctTermScan_triples_02.rq",// queryFileURL
+					"distinctTermScan_triples_02.ttl",// dataFileURL
+					"distinctTermScan_triples_02.srx"// resultFileURL
+			);
+			
+			h.runTest();
+
+			// Verify that the DistinctTermScanOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							DistinctTermScanOp.class).size());
+
+		}
+
+		/**
+		 * <pre>
+		 * SELECT DISTINCT ?o WHERE { ?s ?p ?o . }
+		 * </pre>
+		 */
+		public void test_distinctTermScan_triples_03() throws Exception {
+
+			final TestHelper h = new TestHelper("distinctTermScan_triples_03", // testURI,
+					"distinctTermScan_triples_03.rq",// queryFileURL
+					"distinctTermScan_triples_03.ttl",// dataFileURL
+					"distinctTermScan_triples_03.srx"// resultFileURL
 			);
 			
 			h.runTest();

@@ -52,7 +52,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.spo.DistinctTermAdvancer;
 
 /**
  * Optimizes
@@ -72,7 +71,6 @@ import com.bigdata.rdf.spo.DistinctTermAdvancer;
  * 
  * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
  *      query is slow </a>
- * @see DistinctTermAdvancer
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
