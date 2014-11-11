@@ -289,10 +289,8 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 * Setup the distinct-term-scan annotation with the variables that will
 		 * be projected out of the SELECT.
 		 */
-		final VarNode[] distinctTermScanVars = new VarNode[] { //
-		new VarNode(projectedVar.getName()) //
-		};
-		sp.setDistinctTermScanVars(distinctTermScanVars);
+		final VarNode distinctTermScanVar = new VarNode(projectedVar.getName());
+		sp.setDistinctTermScanVar(distinctTermScanVar);
 
 		/**
 		 * Change the estimated cardinality.
@@ -300,7 +298,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 * The new cardinality is:
 		 * 
 		 * <pre>
-		 * newCard = oldCard * distinctTermScanVars.length / sp.arity()
+		 * newCard = oldCard * 1.0 / sp.arity()
 		 * </pre>
 		 * 
 		 * where arity() is 3 for triples and 4 for quads.
@@ -313,8 +311,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 					"Expecting estimated-cardinality to be bound: sp=" + sp);
 		}
 
-		final long newCard = (long) (((double) distinctTermScanVars.length) / sp
-				.arity());
+		final long newCard = (long) (1.0 / sp.arity());
 
 		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
 
