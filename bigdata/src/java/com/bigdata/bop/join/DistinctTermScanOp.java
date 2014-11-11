@@ -397,7 +397,9 @@ public class DistinctTermScanOp<E> extends PipelineOp {
 		 * 
 		 * @return An iterator visiting the distinct term identifiers.
 		 * 
-		 *         TODO Move this method to {@link AccessPath}.
+		 *         TODO Move this method to {@link AccessPath}. Also, refactor
+		 *         {@link SPORelation#distinctTermScan(IKeyOrder)} to use this
+		 *         code.
 		 */
 		private static <E> IChunkedIterator<IV> distinctTermScan(
 				final AccessPath<E> ap, final ITermIVFilter termIdFilter) {

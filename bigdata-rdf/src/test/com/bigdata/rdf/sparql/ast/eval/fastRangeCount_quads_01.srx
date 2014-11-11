@@ -6,7 +6,7 @@
     <results>
         <result>
             <binding name='count'>
-				<literal datatype="http://www.w3.org/2001/XMLSchema#integer">6</literal>
+				<literal datatype="http://www.w3.org/2001/XMLSchema#integer">5</literal>
             </binding>
         </result>
     </results>
