@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpEvaluationContext;
@@ -4095,10 +4094,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final DatasetNode dataset = query.getDataset();
 
-        final Value predValue = sp.p().getValue();
-        if (log.isDebugEnabled()) {
-            log.debug(predValue);
-        }
+//        final Value predValue = sp.p().getValue();
+//        if (log.isDebugEnabled()) {
+//            log.debug(predValue);
+//        }
 
         final IVariableOrConstant<IV> s = sp.s().getValueExpression();
         final IVariableOrConstant<IV> p = sp.p().getValueExpression();
@@ -4177,6 +4176,20 @@ public class AST2BOpUtility extends AST2BOpRTO {
             anns.add(new NV(IPredicate.Annotations.OPTIONAL, Boolean.TRUE));
         }
 
+		if (sp.getProperty(StatementPatternNode.Annotations.DISTINCT_TERM_SCAN_VAR) != null) {
+			// propagate annotation for distinct-term-scan. see #1035
+			anns.add(new NV(
+					StatementPatternNode.Annotations.DISTINCT_TERM_SCAN_VAR,
+					sp.getProperty(StatementPatternNode.Annotations.DISTINCT_TERM_SCAN_VAR)));
+		}
+        
+		if (sp.getProperty(StatementPatternNode.Annotations.FAST_RANGE_COUNT_VAR) != null) {
+			// propagate annotation for fast-range-count. see #1037
+			anns.add(new NV(
+					StatementPatternNode.Annotations.FAST_RANGE_COUNT_VAR,
+					sp.getProperty(StatementPatternNode.Annotations.FAST_RANGE_COUNT_VAR)));
+		}
+        
         /*
 		 * Statements about statements.
 		 * 
@@ -4313,39 +4326,43 @@ public class AST2BOpUtility extends AST2BOpRTO {
         } // quads
 
         /*
-         * Layer on filters which can run on the local access path (close to the
-         * data).
-         * 
-         * Note: We can now stack filters so there may be other things which can
-         * be leveraged here.
-         * 
-         * TODO Handle StatementPatternNode#EXISTS here in support of GRAPH uri
-         * {}, which is an existence test for a non-empty context. (This turns
-         * into an iterator with a limit of ONE (1) on the {@link
-         * SPOAccessPath}. This should turn into a LIMIT annotation on the
-         * access path (which does not currently recognize an offset/limit
-         * annotation; instead you use an alternative iterator call).
-         * 
-         * We may require an inline access path attached to a predicate in order
-         * to support GRAPH ?g {}, which is basically an inline AP for the
-         * dataset. That should probably be another annotation on the
-         * StatementPatternNode, perhaps COLUMN_PROJECTION (var,vals) or
-         * IN(var,vals)? There are also several StatementPatternNode annotation
-         * concepts which have been sketched out for DISTINCT, EXISTS, IN, and
-         * RANGE. Those annotations could be used to do the right thing in
-         * toPredicate().
-         * 
-         * Remove the "knownIN" stuff contributed by Matt.
-         * 
-         * @see ASTGraphGroupOptimizer
-         * 
-         * @see TestNamedGraphs
-         * 
-         * @see Inline AP + filter if AP is not perfect issues.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/429
-         * (Optimization for GRAPH uri {} and GRAPH ?foo {})
-         */
+		 * Layer on filters which can run on the local access path (close to the
+		 * data).
+		 * 
+		 * Note: We can now stack filters so there may be other things which can
+		 * be leveraged here.
+		 * 
+		 * TODO Handle StatementPatternNode#EXISTS here in support of GRAPH uri
+		 * {}, which is an existence test for a non-empty context. (This turns
+		 * into an iterator with a limit of ONE (1) on the {@link
+		 * SPOAccessPath}. This should turn into a LIMIT annotation on the
+		 * access path (which does not currently recognize an offset/limit
+		 * annotation; instead you use an alternative iterator call).
+		 * 
+		 * We may require an inline access path attached to a predicate in order
+		 * to support GRAPH ?g {}, which is basically an inline AP for the
+		 * dataset. That should probably be another annotation on the
+		 * StatementPatternNode, perhaps COLUMN_PROJECTION (var,vals) or
+		 * IN(var,vals)? There are also several StatementPatternNode annotation
+		 * concepts which have been sketched out for DISTINCT, EXISTS, IN, and
+		 * RANGE. Those annotations could be used to do the right thing in
+		 * toPredicate().
+		 * 
+		 * Remove the "knownIN" stuff contributed by Matt.
+		 * 
+		 * @see ASTGraphGroupOptimizer
+		 * 
+		 * @see TestNamedGraphs
+		 * 
+		 * @see Inline AP + filter if AP is not perfect issues.
+		 * 
+		 * @see https://sourceforge.net/apps/trac/bigdata/ticket/429
+		 * (Optimization for GRAPH uri {} and GRAPH ?foo {})
+		 * 
+		 * TODO Can this be reworked into physical operators similar to how we
+		 * are now handling fast-range-count (#1037) and distinct-term scan
+		 * (#1037)?
+		 */
         {
 
             final List<IFilter> filters = new LinkedList<IFilter>();

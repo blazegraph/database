@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.math.BigInteger;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -54,7 +55,7 @@ import com.bigdata.bop.engine.MockRunningQuery;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -194,7 +195,7 @@ public class TestFastRangeCountOp extends TestCase2 {
         final IBindingSet[] expected = new IBindingSet[] {//
                 new ListBindingSet(//
                         new IVariable[] { Var.var("count") },//
-                        new IConstant[] { new Constant<XSDNumericIV>(new XSDNumericIV((long)2)) }//
+                        new IConstant[] { new Constant<XSDIntegerIV>(new XSDIntegerIV(BigInteger.valueOf(2L))) }//
                 ),//
         };
 

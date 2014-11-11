@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.math.BigInteger;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -43,7 +44,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -341,9 +342,13 @@ public class FastRangeCountOp<E> extends PipelineOp {
 					// New binding set.
 					final IBindingSet right = new ListBindingSet();
 
-					// Bind the countVar.
-					right.set(countVar, new Constant<XSDNumericIV>(
-							new XSDNumericIV(rangeCount)));
+					/*
+					 * Bind the countVar.
+					 * 
+					 * Note: per the spec, SPARQL expects an xsd:integer here.
+					 */
+					right.set(countVar, new Constant<XSDIntegerIV>(
+							new XSDIntegerIV(BigInteger.valueOf(rangeCount))));
 
 					// See if the solutions join.
 					final IBindingSet outSolution = BOpContext.bind(//

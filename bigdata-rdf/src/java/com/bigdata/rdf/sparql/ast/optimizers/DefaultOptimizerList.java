@@ -481,7 +481,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 		 *      </a>
 		 */
-//        add(new ASTFastRangeCountOptimizer());
+        add(new ASTFastRangeCountOptimizer());
         
         /**
 		 * Optimizes
