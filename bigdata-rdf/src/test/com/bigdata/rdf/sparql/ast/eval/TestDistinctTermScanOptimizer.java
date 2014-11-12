@@ -245,7 +245,8 @@ public class TestDistinctTermScanOptimizer extends
 	 * SOPC
 	 * </pre>
 	 * 
-	 * @author bryan
+	 * FIXME Add explicit tests using FROM and FROM NAMED. The optimizer handles
+	 * this, but we should have test coverage for it also.
 	 */
 	public static class TestQuadsModeAPs extends TestDistinctTermScanOptimizer {
 

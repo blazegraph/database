@@ -83,7 +83,7 @@ public class TestFastRangeCountOptimizer extends
 		 * SELECT (COUNT(*) as ?count) {?s ?p ?o}
 		 * </pre>
 		 */
-		public void test_fastRangeCount_01() throws Exception {
+		public void test_fastRangeCount_triples_01() throws Exception {
 
 			final TestHelper h = new TestHelper("fastRangeCount_triples_01", // testURI,
 					"fastRangeCount_triples_01.rq",// queryFileURL
@@ -101,16 +101,45 @@ public class TestFastRangeCountOptimizer extends
 
 		}
 
+		/**
+		 * <pre>
+		 * SELECT (COUNT(*) as ?count) {?s ?p <http://bigdata.com#o1>}
+		 * </pre>
+		 */
+		public void test_fastRangeCount_triples_02() throws Exception {
+
+			final TestHelper h = new TestHelper("fastRangeCount_triples_02", // testURI,
+					"fastRangeCount_triples_02.rq",// queryFileURL
+					"fastRangeCount_triples_01.ttl",// dataFileURL
+					"fastRangeCount_triples_02.srx"// resultFileURL
+			);
+
+			h.runTest();
+
+			// Verify that the FastRangeCountOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							FastRangeCountOp.class).size());
+
+		}
+
 	}
 	
+    /**
+     * Quads mode test suite.
+     * 
+	 * FIXME Add explicit tests using FROM and FROM NAMED. 
+    */
 	public static class TestQuadsModeAPs extends TestFastRangeCountOptimizer {
 		
 		/**
+		 * Default graph query.  Returns the total range count of the index.
 		 * <pre>
 		 * SELECT (COUNT(*) as ?count) {?s ?p ?o}
 		 * </pre>
 		 */
-		public void test_fastRangeCount_01() throws Exception {
+		public void test_fastRangeCount_quads_01() throws Exception {
 
 			final TestHelper h = new TestHelper("fastRangeCount_quads_01", // testURI,
 					"fastRangeCount_quads_01.rq",// queryFileURL
@@ -123,6 +152,118 @@ public class TestFastRangeCountOptimizer extends
 			// Verify that the FastRangeCountOp was used in the query plan.
 			assertEquals(
 					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							FastRangeCountOp.class).size());
+
+		}
+
+		/**
+		 * Default graph query. Returns range count of Oxxx index where O is
+		 * bound to a constant.
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(*) as ?count) {?s ?p <http://bigdata.com#o1>}
+		 * </pre>
+		 */
+		public void test_fastRangeCount_quads_02() throws Exception {
+
+			final TestHelper h = new TestHelper("fastRangeCount_quads_02", // testURI,
+					"fastRangeCount_quads_02.rq",// queryFileURL
+					"fastRangeCount_quads_01.trig",// dataFileURL
+					"fastRangeCount_quads_02.srx"// resultFileURL
+			);
+
+			h.runTest();
+
+			// Verify that the FastRangeCountOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							FastRangeCountOp.class).size());
+
+		}
+
+		/**
+		 * Named graph query where the graph is not constrained. Returns range
+		 * count of Oxxx index where O is bound to a constant.
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(*) as ?count) {GRAPH ?g {?s ?p <http://bigdata.com#o1>} }
+		 * </pre>
+		 */
+		public void test_fastRangeCount_quads_03() throws Exception {
+
+			final TestHelper h = new TestHelper("fastRangeCount_quads_03", // testURI,
+					"fastRangeCount_quads_03.rq",// queryFileURL
+					"fastRangeCount_quads_01.trig",// dataFileURL
+					"fastRangeCount_quads_03.srx"// resultFileURL
+			);
+
+			h.runTest();
+
+			// Verify that the FastRangeCountOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							FastRangeCountOp.class).size());
+
+		}
+
+		/**
+		 * Named graph query where the graph is constrained. Returns range
+		 * count of Cxxx index where C is bound to a constant.
+		 * 
+		 * <pre>
+		 * SELECT (COUNT(*) as ?count) {GRAPH <http://bigdata.com#g1> {?s ?p ?o} }
+		 * </pre>
+		 */
+		public void test_fastRangeCount_quads_04() throws Exception {
+
+			final TestHelper h = new TestHelper("fastRangeCount_quads_04", // testURI,
+					"fastRangeCount_quads_04.rq",// queryFileURL
+					"fastRangeCount_quads_01.trig",// dataFileURL
+					"fastRangeCount_quads_04.srx"// resultFileURL
+			);
+
+			h.runTest();
+
+			// Verify that the FastRangeCountOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							FastRangeCountOp.class).size());
+
+		}
+
+		/**
+		 * Named graph query where the graph is not constrained but the set of
+		 * named graphs is constrained by a FROM NAMED clause.
+		 * 
+		 * <pre>
+		 * FROM NAMED <http://bigdata.com#g1>
+		 * FROM NAMED <http://bigdata.com#g3>
+		 * 
+		 * SELECT (COUNT(*) as ?count) {GRAPH ?g {?s ?p ?o} }
+		 * </pre>
+		 * 
+		 * TODO This case CAN be rewritten as the SUM over the range counts of
+		 * the individual named-graph APs. This COULD be done as an aggregate or
+		 * as a physical operator. However, that has not been done yet so we
+		 * MUST NOT rewrite this query.
+		 */
+		public void test_fastRangeCount_quads_05() throws Exception {
+
+			final TestHelper h = new TestHelper("fastRangeCount_quads_05", // testURI,
+					"fastRangeCount_quads_05.rq",// queryFileURL
+					"fastRangeCount_quads_01.trig",// dataFileURL
+					"fastRangeCount_quads_05.srx"// resultFileURL
+			);
+
+			h.runTest();
+
+			// Verify that the FastRangeCountOp was NOT used in the query plan.
+			assertEquals(
+					0,
 					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
 							FastRangeCountOp.class).size());
 
