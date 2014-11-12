@@ -84,7 +84,7 @@ public class RDFParserOptions implements Serializable, IRDFParserOptions {
         String STOP_AT_FIRST_ERROR = RDFParserOptions.class.getName()
                 + ".stopAtFirstError";
 
-        String DEFAULT_STOP_AT_FIRST_ERROR = "true";
+        String DEFAULT_STOP_AT_FIRST_ERROR = "false";
 
         /**
          * Optional boolean property may be used to set
@@ -94,11 +94,11 @@ public class RDFParserOptions implements Serializable, IRDFParserOptions {
         String DATATYPE_HANDLING = RDFParserOptions.class.getName()
                 + ".datatypeHandling";
 
-        String DEFAULT_DATATYPE_HANDLING = DatatypeHandling.VERIFY.toString();
+        String DEFAULT_DATATYPE_HANDLING = DatatypeHandling.IGNORE.toString();
 
     }
 
-    private DatatypeHandling datatypeHandling = DatatypeHandling.VERIFY;
+    private DatatypeHandling datatypeHandling = DatatypeHandling.IGNORE;
 
     private boolean preserveBNodeIDs = Boolean.valueOf(Options.DEFAULT_PRESERVE_BNODE_IDS);
 

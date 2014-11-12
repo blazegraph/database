@@ -26,7 +26,6 @@ import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.rio.nquads.NQuadsParser;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 
 /**
@@ -221,13 +220,12 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         
     }
 
-//    // FIXME We need an NQuadsWriter to run this test.
-//    // Note: quads interchange
-//    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
-//
-//        doInsertWithBodyTest("POST", 23, NQuadsParser.nquads);
-//        
-//    }
+    // Note: quads interchange
+    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
+
+        doInsertWithBodyTest("POST", 23, RDFFormat.NQUADS);
+        
+    }
 
     // TODO Write test for UPDATE where we override the default context using
     // the context-uri.

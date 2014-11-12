@@ -70,18 +70,18 @@ public class BigdataSparqlFullRWTxTest extends BigdataSparqlTest {
         
     }
 
-	/**
-	 * Overridden to use {@link BigdataSail#getConnection()} since we do not
-	 * have to workaround a deadlock in concurrent access to the unisolated
-	 * connection by the test harness when using full read-write transactions.
-	 */
-	@Override
-	protected BigdataSailRepositoryConnection getQueryConnection(Repository dataRep)
-			throws Exception {
-
-		return ((BigdataSailRepository) ((DatasetRepository) dataRep)
-				.getDelegate()).getConnection();
-
-	}
+//	/**
+//	 * Overridden to use {@link BigdataSail#getConnection()} since we do not
+//	 * have to workaround a deadlock in concurrent access to the unisolated
+//	 * connection by the test harness when using full read-write transactions.
+//	 */
+//	@Override
+//	protected BigdataSailRepositoryConnection getQueryConnection(Repository dataRep)
+//			throws Exception {
+//
+//		return ((BigdataSailRepository) ((DatasetRepository) dataRep)
+//				.getDelegate()).getConnection();
+//
+//	}
 
 }

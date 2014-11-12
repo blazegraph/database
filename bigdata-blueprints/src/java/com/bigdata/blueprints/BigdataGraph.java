@@ -41,6 +41,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
+import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
@@ -552,12 +553,32 @@ public abstract class BigdataGraph implements Graph {
         
     }
     
+    /**
+     * Set an edge (overwrite the to vertex).
+     */
+    public Edge setEdge(final Object key, final Vertex from, final Vertex to, 
+            final String label) {
+        
+        return addEdge(key, from, to, label, true);
+
+    }
+    
+    /**
+     * Add an edge.
+     */
+    @Override
+    public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
+            final String label) {
+        
+        return addEdge(key, from, to, label, false);
+        
+    }
+        
 	/**
-	 * Add an edge.
+	 * Add an edge , possibly removing the old to vertex value.
 	 */
-	@Override
 	public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
-			final String label) {
+			final String label, final boolean clean) {
 		
 	    if (log.isInfoEnabled())
 	        log.info("("+key+", "+from+", "+to+", "+label+")");
@@ -594,6 +615,11 @@ public abstract class BigdataGraph implements Graph {
 			final URI toURI = factory.toVertexURI(to.getId().toString());
 			
 			final RepositoryConnection cxn = getWriteConnection();
+			
+			if (clean) {
+			    cxn.remove(fromURI, edgeURI, null);
+			}
+			
 			cxn.add(fromURI, edgeURI, toURI);
 			cxn.add(edgeURI, TYPE, EDGE);
 			cxn.add(edgeURI, LABEL, factory.toLiteral(label));
@@ -1053,6 +1079,8 @@ public abstract class BigdataGraph implements Graph {
 
 	/**
 	 * Remove a vertex and its edges and properties.
+	 * 
+	 * TODO FIXME I am not fully removing dependent edges.
 	 */
 	@Override
 	public void removeVertex(final Vertex vertex) {
@@ -1323,6 +1351,39 @@ public abstract class BigdataGraph implements Graph {
                 } finally {
                     result.close();
                 }
+                
+            } finally {
+            
+                cxn.close();
+                
+            }
+            
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+    
+    /**
+     * Select results using a SPARQL query.
+     */
+    public boolean ask(final String queryStr) throws Exception {
+        
+        try {
+            
+            final RepositoryConnection cxn = readFromWriteConnection ? 
+                    getWriteConnection() : getReadConnection();
+            
+            try {
+                
+                final BooleanQuery query = (BooleanQuery) 
+                        cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
+                
+                final boolean result = query.evaluate();
+                
+                return result;
                 
             } finally {
             

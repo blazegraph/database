@@ -1,68 +1,44 @@
-/**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
-
-Contact:
-     SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
-
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; version 2 of the License.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+/* 
+ * Licensed to Aduna under one or more contributor license agreements.  
+ * See the NOTICE.txt file distributed with this work for additional 
+ * information regarding copyright ownership. 
+ *
+ * Aduna licenses this file to you under the terms of the Aduna BSD 
+ * License (the "License"); you may not use this file except in compliance 
+ * with the License. See the LICENSE.txt file distributed with this work 
+ * for the full License.
+ *
+ * Unless required by applicable law or agreed to in writing, software 
+ * distributed under the License is distributed on an "AS IS" BASIS, 
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or 
+ * implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
 package com.bigdata.rdf.rio.json;
 
-import java.nio.charset.Charset;
-
-import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFParser;
-import org.openrdf.rio.RDFParserFactory;
-import org.openrdf.rio.turtle.TurtleParser;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
+import org.openrdf.query.resultio.TupleQueryResultParser;
+import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 
 /**
- * An {@link RDFParserFactory} for Turtle parsers.
+ * A {@link TupleQueryResultParserFactory} for parsers of SPARQL-1.1 JSON Tuple
+ * Query Results.
  * 
- * @author Arjohn Kampman
- * @openrdf
+ * @author Peter Ansell
  */
-public class BigdataSPARQLResultsJSONParserFactory implements RDFParserFactory {
+public class BigdataSPARQLResultsJSONParserFactory implements TupleQueryResultParserFactory {
 
-	public static final RDFFormat JSON = new RDFFormat(
-			"JSON", // name 
-			"application/sparql-results+json", // mime-type 
-			Charset.forName("UTF-8"), // charset
-			"json", // file extension
-			false, // supports namespaces
-			true // supports contexts
-			);
-	
-	static {
-		
-		RDFFormat.register(JSON);
-		
-	}
-	
 	/**
-	 * Returns {@link RDFFormat#TURTLE}.
+	 * Returns {@link TupleQueryResultFormat#JSON}.
 	 */
-	public RDFFormat getRDFFormat() {
-		return JSON;
+	public TupleQueryResultFormat getTupleQueryResultFormat() {
+		return TupleQueryResultFormat.JSON;
 	}
 
 	/**
-	 * Returns a new instance of {@link TurtleParser}.
+	 * Returns a new instance of {@link SPARQLResultsJSONParser}.
 	 */
-	public RDFParser getParser() {
+	public TupleQueryResultParser getParser() {
 		return new BigdataSPARQLResultsJSONParser();
 	}
 }

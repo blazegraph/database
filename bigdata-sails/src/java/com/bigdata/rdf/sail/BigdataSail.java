@@ -62,6 +62,7 @@ import info.aduna.iteration.CloseableIteration;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -76,6 +77,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
+import org.openrdf.model.Model;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -83,10 +85,14 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ContextStatementImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.NamespaceImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.algebra.DeleteData;
+import org.openrdf.query.algebra.InsertData;
+import org.openrdf.query.algebra.Modify;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
@@ -95,6 +101,8 @@ import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
+import org.openrdf.sail.UnknownSailTransactionStateException;
+import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -138,6 +146,7 @@ import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -3774,27 +3783,27 @@ public class BigdataSail extends SailBase implements Sail {
          * Update
          */
         
-        /**
-         * Bigdata now uses an internal query model which differs significantly
-         * from the Sesame query model. Support is not provided for
-         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
-         * prepared and evaluated using a
-         * {@link BigdataSailRepositoryConnection}.
-         * 
-         * @throws SailException
-         *             <em>always</em>.
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
-         *      SPARQL 1.1 Update </a>
-         */
-        @Override
-        public void executeUpdate(final UpdateExpr updateExpr,
-                final Dataset dataset, final BindingSet bindingSet,
-                boolean includeInferred) throws SailException {
-
-            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
-            
-        }
+//        /**
+//         * Bigdata now uses an internal query model which differs significantly
+//         * from the Sesame query model. Support is not provided for
+//         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
+//         * prepared and evaluated using a
+//         * {@link BigdataSailRepositoryConnection}.
+//         * 
+//         * @throws SailException
+//         *             <em>always</em>.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+//         *      SPARQL 1.1 Update </a>
+//         */
+//        @Override
+//        public void executeUpdate(final UpdateExpr updateExpr,
+//                final Dataset dataset, final BindingSet bindingSet,
+//                boolean includeInferred) throws SailException {
+//
+//            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+//            
+//        }
         
         /*
          * High-level query.
@@ -3983,6 +3992,60 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
+        }
+
+        @Override
+        public void begin() throws SailException {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public boolean isActive() throws UnknownSailTransactionStateException {
+            // TODO Auto-generated method stub
+            return true;
+        }
+
+        @Override
+        public void prepare() throws SailException {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void startUpdate(UpdateContext op)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        @Override
+        public void addStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        @Override
+        public void removeStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        @Override
+        public void endUpdate(UpdateContext op)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+            
         }
 
     } // class BigdataSailConnection

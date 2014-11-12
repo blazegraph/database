@@ -27,10 +27,14 @@
 
 package com.bigdata.rdf.model;
 
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.BNode;
@@ -43,6 +47,7 @@ import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
@@ -432,6 +437,18 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_double);
 
+    }
+    
+    public BigdataLiteralImpl createLiteral(final Date date) {
+        GregorianCalendar c = new GregorianCalendar();
+        c.setTime(date);
+        try {
+            XMLGregorianCalendar xmlGregCalendar = DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
+            return createLiteral(xmlGregCalendar);
+        }
+        catch (DatatypeConfigurationException e) {
+            throw new RuntimeException("Could not instantiate javax.xml.datatype.DatatypeFactory", e);
+        }
     }
 
     @Override

@@ -195,11 +195,11 @@ public class ProxySuiteHelper {
 		try {
 			@SuppressWarnings("unchecked")
 			final
-			Constructor<? extends TestCase> cons = TestSuite.getTestConstructor(clazz);
+			Constructor<?> cons = TestSuite.getTestConstructor(clazz);
 			if (cons.getParameterTypes().length == 1) {
-				return cons.newInstance(name);
+				return (Test) cons.newInstance(name);
 			} else {
-				final TestCase test = cons.newInstance();
+				final TestCase test = (TestCase) cons.newInstance();
 				test.setName(name);
 				return test;
 			}

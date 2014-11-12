@@ -8,23 +8,30 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.openrdf.model.vocabulary.DC;
 import org.openrdf.model.vocabulary.FN;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.OWL;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.SESAME;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
+import com.bigdata.rdf.sail.sparql.ast.ASTInsertData;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTQName;
 import com.bigdata.rdf.sail.sparql.ast.ASTServiceGraphPattern;
+import com.bigdata.rdf.sail.sparql.ast.ASTUnparsedQuadDataBlock;
 import com.bigdata.rdf.sail.sparql.ast.SyntaxTreeBuilderTreeConstants;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -40,6 +47,23 @@ import com.bigdata.rdf.vocab.decls.FOAFVocabularyDecl;
  */
 public class PrefixDeclProcessor {
 
+    public static final Map<String,String> defaultDecls =
+            new LinkedHashMap<String, String>();
+    
+    static {
+        defaultDecls.put("rdf", RDF.NAMESPACE);
+        defaultDecls.put("rdfs", RDFS.NAMESPACE);
+        defaultDecls.put("sesame", SESAME.NAMESPACE);
+        defaultDecls.put("owl", OWL.NAMESPACE);
+        defaultDecls.put("xsd", XMLSchema.NAMESPACE);
+        defaultDecls.put("fn", FN.NAMESPACE);
+        defaultDecls.put("foaf", FOAF.NAMESPACE);
+        defaultDecls.put("dc", DC.NAMESPACE);
+        defaultDecls.put("hint", QueryHints.NAMESPACE);
+        defaultDecls.put("bd", BD.NAMESPACE);
+        defaultDecls.put("bds", BDS.NAMESPACE);
+    }
+    
     /**
      * Processes prefix declarations in queries. This method collects all
      * prefixes that are declared in the supplied query, verifies that prefixes
@@ -54,13 +78,14 @@ public class PrefixDeclProcessor {
      *         If the query contains redefined prefixes or qnames that use
      *         undefined prefixes.
      */
-    public static Map<String, String> process(final ASTOperationContainer qc)
+    public static Map<String, String> process(ASTOperationContainer qc)
         throws MalformedQueryException
     {
         List<ASTPrefixDecl> prefixDeclList = qc.getPrefixDeclList();
 
         // Build a prefix --> IRI map
         Map<String, String> prefixMap = new LinkedHashMap<String, String>();
+
         for (ASTPrefixDecl prefixDecl : prefixDeclList) {
             String prefix = prefixDecl.getPrefix();
             String iri = prefixDecl.getIRI().getValue();
@@ -72,6 +97,37 @@ public class PrefixDeclProcessor {
             prefixMap.put(prefix, iri);
         }
 
+        // insert some default prefixes (if not explicitly defined in the query)
+//      insertDefaultPrefix(prefixMap, "rdf", RDF.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "rdfs", RDFS.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "sesame", SESAME.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "owl", OWL.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "xsd", XMLSchema.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "fn", FN.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "hint", QueryHints.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "bd", BD.NAMESPACE);
+//      insertDefaultPrefix(prefixMap, "bds", BDS.NAMESPACE);
+        for (Map.Entry<String, String> e : defaultDecls.entrySet()) {
+            insertDefaultPrefix(prefixMap, e.getKey(), e.getValue());
+        }
+
+        ASTUnparsedQuadDataBlock dataBlock = null;
+        if (qc.getOperation() instanceof ASTInsertData) {
+            ASTInsertData insertData = (ASTInsertData)qc.getOperation();
+            dataBlock = insertData.jjtGetChild(ASTUnparsedQuadDataBlock.class);
+
+        }
+        else if (qc.getOperation() instanceof ASTDeleteData) {
+            ASTDeleteData deleteData = (ASTDeleteData)qc.getOperation();
+            dataBlock = deleteData.jjtGetChild(ASTUnparsedQuadDataBlock.class);
+        }
+
+        if (dataBlock != null) {
+            String prefixes = createPrefixesInSPARQLFormat(prefixMap);
+            // TODO optimize string concat?
+            dataBlock.setDataBlock(prefixes + dataBlock.getDataBlock());
+        }
+        else {
         QNameProcessor visitor = new QNameProcessor(prefixMap);
         try {
             qc.jjtAccept(visitor, null);
@@ -79,8 +135,29 @@ public class PrefixDeclProcessor {
         catch (VisitorException e) {
             throw new MalformedQueryException(e);
         }
+        }
 
         return prefixMap;
+    }
+
+    private static void insertDefaultPrefix(Map<String, String> prefixMap, String prefix, String namespace) {
+        if (!prefixMap.containsKey(prefix) && !prefixMap.containsValue(namespace)) {
+            prefixMap.put(prefix, namespace);
+        }
+    }
+
+    private static String createPrefixesInSPARQLFormat(Map<String, String> prefixMap) {
+        StringBuilder sb = new StringBuilder();
+        for (Entry<String, String> entry : prefixMap.entrySet()) {
+            sb.append("PREFIX");
+            final String prefix = entry.getKey();
+            if (prefix != null) {
+                sb.append(" " + prefix);
+            }
+            sb.append(":");
+            sb.append(" <" + entry.getValue() + "> \n");
+        }
+        return sb.toString();
     }
 
     private static class QNameProcessor extends ASTVisitorBase {
@@ -92,96 +169,71 @@ public class PrefixDeclProcessor {
         }
 
         @Override
-        public Object visit(final ASTQName qnameNode, final Object data)
+        public Object visit(ASTQName qnameNode, Object data)
             throws VisitorException
         {
-            final String qname = qnameNode.getValue();
+            String qname = qnameNode.getValue();
 
-            final int colonIdx = qname.indexOf(':');
+            int colonIdx = qname.indexOf(':');
             assert colonIdx >= 0 : "colonIdx should be >= 0: " + colonIdx;
 
-            final String prefix = qname.substring(0, colonIdx);
-            final String localName0 = qname.substring(colonIdx + 1);
-            final String localName = processEscapesAndHex(localName0);
+            String prefix = qname.substring(0, colonIdx);
+            String localName = qname.substring(colonIdx + 1);
 
-            // Attempt to resolve the prefix to a namespace.
             String namespace = prefixMap.get(prefix);
-
             if (namespace == null) {
-                // Check for well-known namespace prefix (implicit decl).
-                if ((namespace = checkForWellKnownNamespacePrefix(prefix)) == null) {
-                    throw new VisitorException("QName '" + qname
-                            + "' uses an undefined prefix");
-                }
+                throw new VisitorException("QName '" + qname + "' uses an undefined prefix");
             }
 
+            localName = processEscapesAndHex(localName);
+
             // Replace the qname node with a new IRI node in the parent node
-            final ASTIRI iriNode = new ASTIRI(SyntaxTreeBuilderTreeConstants.JJTIRI);
+            ASTIRI iriNode = new ASTIRI(SyntaxTreeBuilderTreeConstants.JJTIRI);
             iriNode.setValue(namespace + localName);
             qnameNode.jjtReplaceWith(iriNode);
 
             return null;
         }
     
-        private static final Pattern hexPattern = Pattern.compile(
-                "([^\\\\]|^)(%[A-F\\d][A-F\\d])", Pattern.CASE_INSENSITIVE);
-
-        private static final Pattern escapedCharPattern = Pattern
-                .compile("\\\\[_~\\.\\-!\\$\\&\\'\\(\\)\\*\\+\\,\\;\\=\\:\\/\\?#\\@\\%]");
-
-        /**
-         * Buffer is reused for the unencode and unescape of each localName
-         * within the scope of a given Query.
-         */
-        private final StringBuffer tmp = new StringBuffer();
-        
-        private String processEscapesAndHex(final String localName) {
+        private String processEscapesAndHex(String localName) {
             
             // first process hex-encoded chars.
-            final String unencodedStr;
-            {
-                final StringBuffer unencoded = tmp; tmp.setLength(0);//new StringBuffer();
-                final Matcher m = hexPattern.matcher(localName);
+            StringBuffer unencoded = new StringBuffer();
+            Pattern hexPattern = Pattern.compile("([^\\\\]|^)(%[A-F\\d][A-F\\d])", Pattern.CASE_INSENSITIVE);
+            Matcher m = hexPattern.matcher(localName);
                 boolean result = m.find();
                 while (result) {
-                    // we match the previous char because we need to be sure we are not processing an escaped % char rather than
+                // we match the previous char because we need to be sure we are not
+                // processing an escaped % char rather than
                     // an actual hex encoding, for example: 'foo\%bar'.
-                    final String previousChar = m.group(1);
-                    final String encoded = m.group(2);
+                String previousChar = m.group(1);
+                String encoded = m.group(2);
     
-                    final int codePoint = Integer.parseInt(encoded.substring(1), 16);
-                    final String decoded = String.valueOf( Character.toChars(codePoint));
+                int codePoint = Integer.parseInt(encoded.substring(1), 16);
+                String decoded = String.valueOf(Character.toChars(codePoint));
                     
                     m.appendReplacement(unencoded, previousChar + decoded);
                     result = m.find();
                 }
                 m.appendTail(unencoded);
-                unencodedStr = unencoded.toString();
-            }
 
             // then process escaped special chars.
-            final String unescapedStr;
-            {
-                final StringBuffer unescaped = tmp; tmp.setLength(0);// new StringBuffer();
-                final Matcher m = escapedCharPattern.matcher(unencodedStr);
-                boolean result = m.find();
+            StringBuffer unescaped = new StringBuffer();
+            Pattern escapedCharPattern = Pattern.compile("\\\\[_~\\.\\-!\\$\\&\\'\\(\\)\\*\\+\\,\\;\\=\\:\\/\\?#\\@\\%]");
+            m = escapedCharPattern.matcher(unencoded.toString());
+            result = m.find();
                 while (result) {
-                    final String escaped = m.group();
+                String escaped = m.group();
                     m.appendReplacement(unescaped, escaped.substring(1));
                     result = m.find();
                 }
                 m.appendTail(unescaped);
-                unescapedStr = unescaped.toString();
-   }
             
-            return unescapedStr;
+            return unescaped.toString();
         }
 
-        /**
-         * Attach the prefix declarations to the SERVICE node.
-         */
         @Override
-        public Object visit(final ASTServiceGraphPattern node, Object data)
+        public Object visit(ASTServiceGraphPattern node, Object data)
             throws VisitorException
         {
             node.setPrefixDeclarations(prefixMap);

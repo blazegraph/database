@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.CloseableIteration;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -80,9 +81,14 @@ import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.cache.DescribeBindingsCollector;
@@ -829,42 +835,53 @@ public class ASTEvalHelper {
         if (src == null)
             throw new IllegalArgumentException();
         
-        final List<IBindingSet> bindingsClause;
+        final List<List<IBindingSet>> bindingsClauses;
         {
             
-            final BindingsClause x = astContainer.getOriginalAST()
-                    .getBindingsClause();
+//            final BindingsClause x = astContainer.getOriginalAST()
+//                    .getBindingsClause();
+            final List<BindingsClause> x = getDefinitelyProducedBindingsClauses(
+                    astContainer.getOriginalAST());
          
             if (x == null) {
             
-                bindingsClause = null;
+                bindingsClauses = null;
                 
             } else {
                 
-                bindingsClause = x.getBindingSets();
+//                bindingsClause = x.getBindingSets();
+                bindingsClauses = new LinkedList<List<IBindingSet>>();
+                
+                for (BindingsClause bc : x) {
+                    
+                    bindingsClauses.add(bc.getBindingSets());
+                    
+                }
                 
             }
 
         }
 
-        if (bindingsClause == null || bindingsClause.isEmpty()) {
+        if (bindingsClauses == null || bindingsClauses.isEmpty()) {
 
             // Just the solution provided through the API.
             return new IBindingSet[] { src };
             
         }
         
-        if (src.isEmpty()) {
+        if (src.isEmpty() && bindingsClauses.size() == 1) {
 
             /*
              * No source solution, so just use the BINDINGS clause solutions.
              */
             
-            return bindingsClause
-                    .toArray(new IBindingSet[bindingsClause.size()]);
+            return bindingsClauses.get(0)
+                    .toArray(new IBindingSet[bindingsClauses.get(0).size()]);
             
         }
 
+        bindingsClauses.add(0, Arrays.asList(src));
+        
         /*
          * We have to merge the source solution given through the openrdf API
          * with the solutions in the BINDINGS clause. This "merge" is a join. If
@@ -872,30 +889,119 @@ public class ASTEvalHelper {
          * there is only one solution from the API, the cardinality of the join
          * is at most [1 x |BINDINGS|].
          */
-        final List<IBindingSet> out = new LinkedList<IBindingSet>();
-        {
+        List<IBindingSet> left = new LinkedList<IBindingSet>();
         
-            final Iterator<IBindingSet> itr = bindingsClause.iterator();
+        for (List<IBindingSet> bindingsClause : bindingsClauses) {
 
-            while (itr.hasNext()) {
-
-                final IBindingSet right = itr.next();
-
-                final IBindingSet tmp = BOpContext.bind(src/* left */, right,
-                        null/* constraints */, null/* varsToKeep */);
-
-                if (tmp != null) {
-
-                    out.add(tmp);
-
+            final List<IBindingSet> tmp = new LinkedList<IBindingSet>();
+            
+            for (IBindingSet l : left) {
+            
+                final Iterator<IBindingSet> itr = bindingsClause.iterator();
+    
+                while (itr.hasNext()) {
+    
+                    final IBindingSet right = itr.next();
+    
+                    final IBindingSet join = BOpContext.bind(l/* left */, right,
+                            null/* constraints */, null/* varsToKeep */);
+    
+                    if (join != null) {
+    
+                        tmp.add(join);
+    
+                    }
+    
                 }
-
+                
             }
+            
+            left = tmp;
 
         }
 
         // Return the results of that join.
-        return out.toArray(new IBindingSet[bindingsClause.size()]);
+        return left.toArray(new IBindingSet[left.size()]);
+        
+    }
+    
+    static List<BindingsClause> getDefinitelyProducedBindingsClauses(final QueryRoot query) {
+        
+        final List<BindingsClause> bindingsClauses = new LinkedList<BindingsClause>();
+        
+        if (query.getBindingsClause() != null) {
+            
+            bindingsClauses.add(query.getBindingsClause());
+            
+        }
+
+//        final Map<String, BindingsClause> nsBindingsClauses = 
+//                new LinkedHashMap<String, List<BindingsClause>>();
+//        for (NamedSubqueryRoot ns : query.getNamedSubqueriesNotNull()) {
+//            if (ns.getBindingsClause() != null)
+//                nsBindingsClauses.put(ns.getName(), ns.getBindingsClause());
+//        }
+        
+        getDefinitelyProducedBindingsClauses(query.getWhereClause(), bindingsClauses);
+        
+        return bindingsClauses;
+        
+    }
+    
+    static void getDefinitelyProducedBindingsClauses(
+            final GroupNodeBase<?> group, 
+//            final Map<String, BindingsClause> nsBindingsClauses,
+            final List<BindingsClause> bindingsClauses) {
+        
+        if (group == null) {
+            return;
+        }
+        
+        if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
+            return;
+        }
+        
+        if (group instanceof UnionNode) {
+            return;
+        }
+        
+        for (IGroupMemberNode child : group) {
+            
+            if (child instanceof SubqueryRoot) {
+                
+                final SubqueryRoot subquery = (SubqueryRoot) child;
+                
+                if (subquery.getBindingsClause() != null) {
+                    
+                    bindingsClauses.add(subquery.getBindingsClause());
+                    
+                }
+                
+                getDefinitelyProducedBindingsClauses(subquery.getWhereClause(), bindingsClauses);
+                
+            } else if (child instanceof BindingsClause) {
+                
+                bindingsClauses.add((BindingsClause) child);
+                
+            }
+
+        }        
+        
+        // recurse into the childen
+        for (IGroupMemberNode child : group) {
+
+            if (child instanceof GroupNodeBase) {
+                
+                getDefinitelyProducedBindingsClauses((GroupNodeBase<?>) child, bindingsClauses);
+                
+            } 
+//            else if (child instanceof SubqueryRoot) {
+//                
+//                getDefinitelyBindingsClauses(((SubqueryRoot) child).getWhereClause(), bindingsClauses);
+//                
+//            }
+            
+        }
         
     }
     
@@ -1138,7 +1244,8 @@ public class ASTEvalHelper {
             final BigdataSailRepositoryConnection conn,//
             final ASTContainer astContainer,//
             final Dataset dataset,
-            final boolean includeInferred//
+            final boolean includeInferred,//
+            final QueryBindingSet bs
             ) throws UpdateExecutionException {
 
         if(conn == null)
@@ -1166,6 +1273,16 @@ public class ASTEvalHelper {
 
             // Propagate attribute.
             ctx.setIncludeInferred(includeInferred);
+            
+            // Batch resolve Values to IVs and convert to bigdata binding set.
+            final IBindingSet[] bindingSets = //mergeBindingSets(astContainer,
+                    new IBindingSet[] {
+                        batchResolveIVs(conn.getTripleStore(), bs)
+                    };
+            
+            // Propogate bindings
+            ctx.setQueryBindingSet(bs);
+            ctx.setBindings(bindingSets);
 
             /*
              * Convert the query (generates an optimized AST as a side-effect).
@@ -1181,6 +1298,8 @@ public class ASTEvalHelper {
             
         } catch (Exception ex) {
 
+            ex.printStackTrace();
+            
             throw new UpdateExecutionException(ex);
 
         }
