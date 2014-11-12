@@ -36,6 +36,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -293,6 +294,22 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 		// The single triple pattern.
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
+
+		if (context.getAbstractTripleStore().isQuads()) {
+			final DatasetNode dataset = sa.getQueryRoot().getDataset();
+			boolean ok = false;
+			if (dataset == null || dataset.getNamedGraphs() == null) {
+				/*
+				 * The dataset is all graphs.
+				 */
+				ok = true;
+			}
+
+			if (!ok) {
+				// Can not rewrite.
+				return;
+			}
+		}
 
 		/**
 		 * Figure out if this is COUNT(*) or semantically equivalent to
