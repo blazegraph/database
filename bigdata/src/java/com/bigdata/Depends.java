@@ -244,9 +244,9 @@ public class Depends {
             "http://site.icu-project.org/",
             "http://source.icu-project.org/repos/icu/icu/trunk/license.html");
 
-    private final static Dep nxparser = new Dep("nxparser",
-            "http://sw.deri.org/2006/08/nxparser/",
-            "http://sw.deri.org/2006/08/nxparser/license.txt");
+//    private final static Dep nxparser = new Dep("nxparser",
+//            "http://sw.deri.org/2006/08/nxparser/",
+//            "http://sw.deri.org/2006/08/nxparser/license.txt");
 
     private final static Dep nanohttp = new Dep("nanohttp",
             "http://elonen.iki.fi/code/nanohttpd/",
@@ -304,7 +304,7 @@ public class Depends {
             slf4j,//
             sesame,//
             icu,//
-            nxparser,//
+//            nxparser,//
             nanohttp,//
             jetty,//
             servletApi,//

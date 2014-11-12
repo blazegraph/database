@@ -39,10 +39,10 @@ import org.openrdf.model.BNode;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.vocabulary.DC;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.query.impl.MapBindingSet;
-import org.openrdf.query.parser.sparql.DC;
 
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -56,6 +56,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.AbstractBigdataExprBuilderTestCase;
+import com.bigdata.rdf.sail.sparql.PrefixDeclProcessor;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -169,7 +170,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
         {
             prefixDecls.put("foo", "http://www.bigdata.com/foo");
         }
@@ -249,7 +250,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
         {
             prefixDecls.put("foo", "http://www.bigdata.com/foo");
         }
@@ -345,7 +346,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
         {
             prefixDecls.put("foo", "http://www.bigdata.com/foo");
         }
@@ -477,7 +478,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?book ?p ?o}";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
         {
             prefixDecls.put("", "http://example.org/book/");
         }
@@ -624,7 +625,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);
@@ -728,7 +729,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);
@@ -854,7 +855,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o . ?s ?p ?o1 }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);
@@ -985,7 +986,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);
@@ -1073,7 +1074,7 @@ public class TestRemoteSparql11QueryBuilder extends
         
         final String exprImage = "SERVICE <" + serviceURI + "> { ?s ?p ?o }";
         
-        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>();
+        final Map<String,String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 
         final ServiceNode serviceNode = new ServiceNode(new ConstantNode(
                 makeIV(serviceURI)), groupNode);

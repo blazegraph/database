@@ -51,7 +51,6 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailConnection;
 
 import com.bigdata.rdf.model.BigdataStatementImpl;
-import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 

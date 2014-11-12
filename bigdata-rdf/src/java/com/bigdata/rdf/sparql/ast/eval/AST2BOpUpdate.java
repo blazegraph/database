@@ -267,7 +267,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
 				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
-						op/* queryNode */, null/* bindingSets */);
+						op/* queryNode */, context.getBindings()/* bindingSets */);
 
 			}
 			
@@ -486,6 +486,19 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                                 new LinkedHashSet<IVariable<?>>()/* vars */,
                                 true/* recursive */);
 
+                for (IBindingSet bs : context.getBindings()) {
+                    
+                    @SuppressWarnings("rawtypes")
+                    final Iterator<IVariable> it = bs.vars();
+                    
+                    while (it.hasNext()) {
+                        
+                        projectedVars.add(it.next());
+                        
+                    }
+                    
+                }
+
                 final ProjectionNode projection = new ProjectionNode();
 
                 for (IVariable<?> var : projectedVars) {
@@ -493,7 +506,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     projection.addProjectionVar(new VarNode(var.getName()));
 
                 }
-
+                
                 queryRoot.setProjection(projection);
                 
             }
@@ -603,7 +616,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				final MutableTupleQueryResult result = new MutableTupleQueryResult(
 						ASTEvalHelper.evaluateTupleQuery(
 								context.conn.getTripleStore(), astContainer,
-								null/* bindingSets */));
+								context.getQueryBindingSet()/* bindingSets */));
 				
 				boolean nativeDistinct = astContainer.getOptimizedAST().getProperty(ConstructNode.Annotations.NATIVE_DISTINCT,
 						ConstructNode.Annotations.DEFAULT_NATIVE_DISTINCT);
@@ -716,7 +729,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 										.evaluateTupleQuery2(
 												context.conn.getTripleStore(),
 												astContainer,
-												null/* bindingSets */, false/* materialize */);
+												context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
 
 								try {
 
@@ -861,6 +874,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             } else {
 
+                
                 /*
                  * DELETE/INSERT.
                  * 
@@ -916,7 +930,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					 */
 					final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
 							.evaluateTupleQuery2(context.conn.getTripleStore(),
-									astContainer, null/* bindingSets */, false/* materialize */);
+									astContainer, context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
 
                     try {
 
@@ -947,7 +961,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
                     // Set the CONSTRUCT template (quads patterns).
                     queryRoot.setConstruct(template);
-
+                    
                     /*
 					 * Run as a CONSTRUCT query
 					 * 
@@ -963,8 +977,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					 */
                     final GraphQueryResult result = ASTEvalHelper
 							.evaluateGraphQuery(context.conn.getTripleStore(),
-									astContainer, null/* bindingSets */);
-
+									astContainer, context.getQueryBindingSet()/* bindingSets */);
+                    
                     try {
 
                         while (result.hasNext()) {
@@ -1149,7 +1163,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
         if (!silent) {
 
-            assertGraphNotEmpty(context, sourceGraph);
+//            assertGraphNotEmpty(context, sourceGraph);
 
         }
         
@@ -1357,7 +1371,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         /*
          * Execute the update.
          */
-        executeUpdate(left, null/* bindingSets */, context);
+        executeUpdate(left, context.getBindings()/* bindingSets */, context);
 
         // Return null since pipeline was evaluated.
         return null;

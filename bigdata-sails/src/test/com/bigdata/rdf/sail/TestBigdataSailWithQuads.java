@@ -143,10 +143,10 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
             final TestSuite tckSuite = new TestSuite("Sesame 2.x TCK");
 
             // Sesame Sail test.
-            tckSuite.addTestSuite(BigdataStoreTest.LTSWithPipelineJoins.class);
+            tckSuite.addTestSuite(BigdataStoreTest.class);
 
             // Sesame SailConnection test.
-            tckSuite.addTestSuite(BigdataConnectionTest.LTSWithPipelineJoins.class);
+            tckSuite.addTestSuite(BigdataConnectionTest.class);
 
             try {
 

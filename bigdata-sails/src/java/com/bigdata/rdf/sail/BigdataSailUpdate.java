@@ -23,20 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
-import org.openrdf.query.Dataset;
 import org.openrdf.query.UpdateExecutionException;
+import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.parser.ParsedUpdate;
 import org.openrdf.repository.sail.SailUpdate;
 
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
-import com.bigdata.rdf.sparql.ast.IDataSetNode;
-import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
- * Extension API for bigdata queries.
+ * Extension API for bigdata.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -45,6 +42,7 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     private final ASTContainer astContainer;
 
+    @Override
     public ASTContainer getASTContainer() {
         
         return astContainer;
@@ -63,6 +61,7 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     }
 
+    @Override
     public ParsedUpdate getParsedUpdate() {
         
         throw new UnsupportedOperationException();
@@ -76,6 +75,7 @@ public class BigdataSailUpdate extends SailUpdate implements
         
     }
 
+    @Override
     public AbstractTripleStore getTripleStore() {
 
         return ((BigdataSailRepositoryConnection) getConnection())
@@ -83,47 +83,47 @@ public class BigdataSailUpdate extends SailUpdate implements
 
     }
 
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The openrdf API here is somewhat at odds with the current LCWD for SPARQL
-     * UPDATE. In order to align them, setting the {@link Dataset} here causes
-     * it to be applied to each {@link DeleteInsertGraph} operation in the
-     * {@link UpdateRoot}. Note that the {@link Dataset} has no effect exception
-     * for the {@link DeleteInsertGraph} operation in SPARQL 1.1 UPDATE (that is
-     * the only operation which has a WHERE clause and which implements the
-     * {@link IDataSetNode} interface).
-     * 
-     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
-     *      assignment in update sequences not properly scoped </a>
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593">
-     *      Upgrade to Sesame 2.6.9 </a>
-     */
-    // @Override
-    @Deprecated // Remove once we upgrade to Sesame 2.6.9
-    public void setDataset(final Dataset dataset) {
-
-        this.dataset = dataset;
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * 
-     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
-     *      assignment in update sequences not properly scoped </a>
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593">
-     *      Upgrade to Sesame 2.6.9 </a>
-     */
-//    @Override
-    @Deprecated // Remove once we upgrade to Sesame 2.6.9
-    public Dataset getActiveDataset() {
-
-        return dataset;
-        
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * The openrdf API here is somewhat at odds with the current LCWD for SPARQL
+//     * UPDATE. In order to align them, setting the {@link Dataset} here causes
+//     * it to be applied to each {@link DeleteInsertGraph} operation in the
+//     * {@link UpdateRoot}. Note that the {@link Dataset} has no effect exception
+//     * for the {@link DeleteInsertGraph} operation in SPARQL 1.1 UPDATE (that is
+//     * the only operation which has a WHERE clause and which implements the
+//     * {@link IDataSetNode} interface).
+//     * 
+//     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
+//     *      assignment in update sequences not properly scoped </a>
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593">
+//     *      Upgrade to Sesame 2.6.9 </a>
+//     */
+//    // @Override
+//    @Deprecated // Remove once we upgrade to Sesame 2.6.9
+//    public void setDataset(final Dataset dataset) {
+//
+//        this.dataset = dataset;
+//
+//    }
+//
+//    /**
+//     * {@inheritDoc}
+//     * 
+//     * @see <a href="http://www.openrdf.org/issues/browse/SES-963"> Dataset
+//     *      assignment in update sequences not properly scoped </a>
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593">
+//     *      Upgrade to Sesame 2.6.9 </a>
+//     */
+////    @Override
+//    @Deprecated // Remove once we upgrade to Sesame 2.6.9
+//    public Dataset getActiveDataset() {
+//
+//        return dataset;
+//        
+//    }
 
     @Override
     public void execute() throws UpdateExecutionException {
@@ -153,9 +153,17 @@ public class BigdataSailUpdate extends SailUpdate implements
                 ((BigdataSailRepositoryConnection) getConnection()),
                 astContainer,//
                 dataset,//
-                getIncludeInferred()//
+                getIncludeInferred(),//
+                new QueryBindingSet(getBindings())
                 );
 
     }
+
+//    @Override
+//    public BindingSet getBindings() {
+//
+//    	return super.getBindings();
+//    	
+//    }
 
 }

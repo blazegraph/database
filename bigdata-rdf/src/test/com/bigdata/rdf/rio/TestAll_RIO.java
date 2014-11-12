@@ -61,13 +61,6 @@ public class TestAll_RIO extends TestCase {
 
         final TestSuite suite = new TestSuite("RIO Extensions");
 
-        // bigdata RDF/XML parser/writer extension.
-        suite.addTest(com.bigdata.rdf.rio.rdfxml.TestAll.suite());
-
-        // bigdata nquads interchange integration.
-        suite.addTest(com.bigdata.rdf.rio.nquads.TestAll.suite());
-
-        // bigdata support for SIDS in ntriples.
         suite.addTest(com.bigdata.rdf.rio.ntriples.TestAll.suite());
 
         return suite;

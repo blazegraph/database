@@ -36,6 +36,7 @@ import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.sparql.PrefixDeclProcessor;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -511,7 +512,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
             
             // Prefix declarations.
             {
-                expected.setPrefixDecls((Map)Collections.emptyMap());
+                expected.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
             }
             
             // Top-level projection.

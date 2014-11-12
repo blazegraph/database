@@ -60,6 +60,7 @@ import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
+import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
@@ -92,6 +93,7 @@ import com.bigdata.rdf.internal.constraints.IsBoundBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
+import com.bigdata.rdf.internal.constraints.UUIDBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -99,6 +101,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -150,6 +153,7 @@ import com.bigdata.rdf.spo.ExplicitSPOFilter;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.ElementFilter;
+import com.bigdata.striterator.Chunkerator;
 
 import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.IFilter;
@@ -509,7 +513,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
         }
 
         if (projection != null) {
-         
+
+        	/**
+			 * The projection after the ORDER BY needs to preserve the ordering.
+			 * So does the chunked materialization operator. The code above
+			 * handles this for ORDER_BY + DISTINCT, but does not go far enough
+			 * to impose order preserving evaluation on the PROJECTION and
+			 * chunked materialization, both of which are downstream from the
+			 * ORDER_BY operator.
+			 * 
+			 * @see #1044 (PROJECTION after ORDER BY does not preserve order)
+			 */
+        	final boolean preserveOrder = orderBy != null;
+        	
             /*
              * Append operator to drop variables which are not projected by the
              * subquery.
@@ -523,16 +539,29 @@ public class AST2BOpUtility extends AST2BOpRTO {
              * to be dropped.)
              */
 
-            // The variables projected by the subquery.
-            final IVariable<?>[] projectedVars = projection.getProjectionVars();
+			{
+				// The variables projected by the subquery.
+				final IVariable<?>[] projectedVars = projection
+						.getProjectionVars();
 
-            left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-                    new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
-            ), queryBase, ctx);
+				final List<NV> anns = new LinkedList<NV>();
+				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+				anns.add(new NV(BOp.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.CONTROLLER));
+				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, true));// live stats
+				anns.add(new NV(ProjectionOp.Annotations.SELECT, projectedVars));
+				if (preserveOrder) {
+					/**
+					 * @see #563 (ORDER BY + DISTINCT)
+					 * @see #1044 (PROJECTION after ORDER BY does not preserve
+					 *      order)
+					 */
+					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+				}
+				left = applyQueryHints(new ProjectionOp(leftOrEmpty(left),//
+						anns.toArray(new NV[anns.size()])//
+						), queryBase, ctx);
+			}
             
             if (materializeProjection) {
                 
@@ -565,15 +594,34 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     final IVariable<?>[] vars = tmp.toArray(new IVariable[tmp
                             .size()]);
                     
-                    left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
-                            new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
-                            new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
-                            new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
-                            new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true), //
-                            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
-                            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
-                            ), queryBase, ctx);
+    				final List<NV> anns = new LinkedList<NV>();
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.VARS, vars));
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns })); //
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp)); //
+    				anns.add(new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true));
+    				anns.add(new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()));// live stats, but not on the cluster.
+    				anns.add(new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+    				if (preserveOrder) {
+    					/**
+    					 * @see #563 (ORDER BY + DISTINCT)
+    					 * @see #1044 (PROJECTION after ORDER BY does not preserve
+    					 *      order)
+    					 */
+    					anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+    					anns.add(new NV(SliceOp.Annotations.REORDER_SOLUTIONS, false));
+    				}
+    				left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),//
+    						anns.toArray(new NV[anns.size()])//
+    						), queryBase, ctx);
 
+//                    left = applyQueryHints(new ChunkedMaterializationOp(leftOrEmpty(left),
+//                            new NV(ChunkedMaterializationOp.Annotations.VARS, vars),//
+//                            new NV(ChunkedMaterializationOp.Annotations.RELATION_NAME, new String[] { ns }), //
+//                            new NV(ChunkedMaterializationOp.Annotations.TIMESTAMP, timestamp), //
+//                            new NV(ChunkedMaterializationOp.Annotations.MATERIALIZE_INLINE_IVS, true), //
+//                            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
+//                            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+//                            ), queryBase, ctx);
 //                    left = (PipelineOp) new ChunkedMaterializationOp(
 //                            leftOrEmpty(left), vars, ns, timestamp)
 //                            .setProperty(BOp.Annotations.BOP_ID, ctx.nextId());
@@ -1462,6 +1510,189 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         return left;
 
+    }
+
+    /**
+     * This handles a VALUES clause. It grabs the binding sets from the
+     * BindingsClause, attach them to the query as a named subquery with a hash
+     * index, and then add a named subquery include to the pipeline right here.
+     * <p>
+     * The VALUES are interpreted using a solution set hash join. The "plan" for
+     * the hash join of the VALUES with the solutions flowing through the
+     * pipeline is: (a) we take the IBindingSet[] and use a {@link HashIndexOp}
+     * to generate the hash index; and (b) we use a
+     * {@link SolutionSetHashJoinOp} to join the solutions from the pipeline
+     * with those in the hash index. Both JVM and HTree versions of this plan
+     * are supported.
+     * <p>
+     * 1. {@link HashIndexOp} (JVM or HTree): Specify the IBindingSet[] as the
+     * source. When the HashIndexOp runs, it will build a hash index from the
+     * IBindingSet[].
+     * <p>
+     * Note: The join variables need to be set based on the known bound
+     * variables in the context where we will evaluate the solution set hash
+     * join (head of the sub-SELECT, OPTIONAL) and those that are bound by the
+     * solution set hash join.
+     * <p>
+     * Note: The static analysis code needs to examine the definitely, and maybe
+     * produced bindings for the {@link BindingsClause}. See the
+     * {@link ISolutionSetStats} interface and
+     * {@link SolutionSetStatserator#get(IBindingSet[])} for a convenience
+     * method.
+     * <p>
+     * 2. {@link SolutionSetHashJoinOp} (JVM or HTree): Joins the solutions
+     * flowing into the sub-query or update with the solutions from the
+     * HashIndexOp. This will take each solution from the pipeline, probe the
+     * hash index for solutions specified by the VALUES clause, and then do a
+     * JOIN for each such solution that is discovered.
+     */
+    private static PipelineOp addValues(PipelineOp left,
+            final BindingsClause bindingsClause,
+            final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
+
+        // Convert solutions from VALUES clause to an IBindingSet[].
+        final IBindingSet[] bindingSets = BOpUtility.toArray(
+                new Chunkerator<IBindingSet>(bindingsClause.getBindingSets().iterator()),//
+                null/*stats*/
+                );
+        
+        // Static analysis of the VALUES solutions.
+        final ISolutionSetStats bindingsClauseStats = SolutionSetStatserator
+                .get(bindingSets);
+        
+        @SuppressWarnings("rawtypes")
+        final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
+
+        /*
+         * BindingsClause is an IBindingsProducer, but it should also be
+         * an IJoinNode. That will let us attach constraints
+         * (getJoinConstraints()) and identify the join variables for the VALUES
+         * sub-plan (getJoinVars()).
+         */
+        final IConstraint[] joinConstraints = getJoinConstraints(
+                getJoinConstraints(bindingsClause), needsMaterialization);
+
+        /*
+         * Model the VALUES JOIN by building a hash index over the IBindingSet[]
+         * from the VALUES clause. Then use a solution set hash join to join the
+         * solutions flowing through the pipeline with those in the hash index.
+         */
+        final String solutionSetName = "--values-" + ctx.nextId(); // Unique name.
+
+        final Set<IVariable<?>> joinVarSet = ctx.sa.getJoinVars(bindingsClause,
+                bindingsClauseStats, new LinkedHashSet<IVariable<?>>());
+
+        @SuppressWarnings("rawtypes")
+        final IVariable[] joinVars = joinVarSet.toArray(new IVariable[0]);
+
+//            if (joinVars.length == 0) {
+//
+//                /*
+//                 * Note: If there are no join variables then the join will
+//                 * examine the full N x M cross product of solutions. That is
+//                 * very inefficient, so we are logging a warning.
+//                 */
+//
+//                log.warn("No join variables: " + subqueryRoot);
+//                
+//            }
+        
+        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
+                ctx.queryId, solutionSetName, joinVars);
+
+        // VALUES is not optional.
+        final JoinTypeEnum joinType = JoinTypeEnum.Normal;
+
+        // lastPass is required except for normal joins.
+        final boolean lastPass = false; 
+
+        // true if we will release the HTree as soon as the join is done.
+        // Note: also requires lastPass.
+        final boolean release = lastPass;
+
+        // join can be pipelined unless last pass evaluation is required
+        final int maxParallel = lastPass ? 1
+                : ctx.maxParallelForSolutionSetHashJoin;
+
+        // Generate the hash index operator.
+        if(ctx.nativeHashJoins) {
+            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
+            ), bindingsClause, ctx);
+        } else {
+            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HTreeHashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
+                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
+            ), bindingsClause, ctx);
+        }
+
+        // Generate the solution set hash join operator.
+        if(ctx.nativeHashJoins) {
+            left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),// 
+//                    new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ), bindingsClause, ctx);
+        } else {
+            left = applyQueryHints(new JVMSolutionSetHashJoinOp(
+                leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, maxParallel),//
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.OPTIONAL, optional),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.JOIN_VARS, joinVars),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.SELECT, null/*all*/),//
+//                    new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, joinConstraints),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, release),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, lastPass),//
+                new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            ), bindingsClause, ctx);
+        }
+
+        /*
+         * For each filter which requires materialization steps, add the
+         * materializations steps to the pipeline and then add the filter to the
+         * pipeline.
+         */
+        left = addMaterializationSteps3(left, doneSet, needsMaterialization,
+                bindingsClause.getQueryHints(), ctx);
+
+        return left;
+        
     }
 
     /**
@@ -2653,6 +2884,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 left = addNamedSubqueryInclude(left,
                         (NamedSubqueryInclude) child, doneSet, ctx);
                 continue;
+            } else if (child instanceof BindingsClause) {
+                /*
+                 * FIXME Support VALUES clause
+                 */
+                left = addValues(left,
+                        (BindingsClause) child, doneSet, ctx);
+                continue;
             } else if (child instanceof SubqueryRoot) {
                 final SubqueryRoot subquery = (SubqueryRoot) child;
                 switch (subquery.getQueryType()) {
@@ -2726,6 +2964,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 // LET / BIND
                 left = addAssignment(left, (AssignmentNode) child, doneSet,
                         joinGroup.getQueryHints(), ctx, false/* projection */);
+                continue;
+            } else if (child instanceof BindingsClause) {
+//                // LET / BIND
+//                left = addAssignment(left, (AssignmentNode) child, doneSet,
+//                        joinGroup.getQueryHints(), ctx, false/* projection */);
                 continue;
             } else {
                 throw new UnsupportedOperationException("child: " + child);
@@ -4632,6 +4875,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 	
                 	return ve;
                 	
+                }
+                
+                if (op instanceof UUIDBOp) {// || op instanceof NowBOp) {
+                    
+                    /*
+                     * We cannot pre-generate these, they need to be unique
+                     * for each call.
+                     */
+                    return ve;
+                    
                 }
 
             }

@@ -33,18 +33,27 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTBasicGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTBind;
+import com.bigdata.rdf.sail.sparql.ast.ASTBindingSet;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstraint;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstruct;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTHavingClause;
+import com.bigdata.rdf.sail.sparql.ast.ASTInlineData;
 import com.bigdata.rdf.sail.sparql.ast.ASTLet;
 import com.bigdata.rdf.sail.sparql.ast.ASTMinusGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTNamedSubqueryInclude;
@@ -57,6 +66,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTWhereClause;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -558,6 +568,64 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         
     }
     
+    /**
+     * @return An object which encapsulates both the ordered set of variables
+     *         for which bindings exist and the set of binding sets. The
+     *         bindings are {@link BigdataValue}s. They must be translated into
+     *         {@link IV} through a batch resolution process before they can be
+     *         passed into the query engine.
+     */
+    @Override
+    final public BindingsClause visit(final ASTInlineData node, Object data)
+            throws VisitorException
+    {
+
+        // The ordered list of variable bindings.
+        final List<ASTVar> varNodes = node.jjtGetChildren(ASTVar.class); 
+        final int nvars = varNodes.size(); 
+        final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>(nvars);
+
+        {
+            for (ASTVar varNode : varNodes) {
+                final VarNode var = (VarNode) varNode.jjtAccept(this, data);
+                final IVariable<?> v = var.getValueExpression();
+                if (!vars.add(v)) {
+                    throw new VisitorException("duplicate variable in BINDINGS");
+                }
+            }
+        }
+
+        /*
+         * Collect binding sets.
+         */
+        {
+
+            final List<ASTBindingSet> bindingNodes = node.jjtGetChildren(ASTBindingSet.class);
+
+            final List<IBindingSet> bindingSets = new LinkedList<IBindingSet>();
+
+            final IVariable<?>[] declaredVars = vars
+                    .toArray(new IVariable[nvars]);
+
+            for (ASTBindingSet bindingNode : bindingNodes) {
+
+                final IBindingSet bindingSet = (IBindingSet) bindingNode
+                        .jjtAccept(this, declaredVars);
+
+                bindingSets.add(bindingSet);
+
+            }
+
+            final BindingsClause bind = new BindingsClause(vars, bindingSets);
+
+            graphPattern.add(bind);
+            
+            return bind;
+
+        }
+        
+    }
+
     /**
      * A LET is just an alternative syntax for BIND
      * 
