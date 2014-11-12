@@ -63,7 +63,6 @@ import com.bigdata.relation.accesspath.AccessPath;
  * database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DistinctTermAdvancer extends Advancer<SPO> {
 
@@ -104,6 +103,7 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
         final byte[] key = tuple.getKey();
         
         keyBuilder.reset();
+
         IVUtility.decode(key).encode(keyBuilder);
         
         final byte[] fromKey = keyBuilder.getKey();

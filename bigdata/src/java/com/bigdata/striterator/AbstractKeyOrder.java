@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.striterator;
 
+import java.util.Iterator;
+
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
@@ -35,12 +38,15 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * Abstract base class provides default behavior for generating keys for a given
  * index order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
 
@@ -51,6 +57,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
      *       {@link ITupleSerializer#serializeKey(Object)}. For example, this
      *       does not play well with the {@link DefaultTupleSerializer}.
      */
+	@Override
     public byte[] getKey(final IKeyBuilder keyBuilder, final E element) {
         
         keyBuilder.reset();
@@ -72,6 +79,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         
     }
 
+	@Override
     public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 
@@ -105,6 +113,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         
     }
 
+	@Override
     public byte[] getToKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 
@@ -149,5 +158,93 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         keyBuilder.append(keyComponent);
 
     }
+
+	/**
+	 * Return the {@link IKeyOrder} values having key components in their first
+	 * N positions that correspond to the N constants bound on the given
+	 * predicate.
+	 * 
+	 * @param pred
+	 *            The predicate
+	 * @param src
+	 *            The set of possible {@link IKeyOrder}s to filter.
+	 * 
+	 * @return An iterator visiting only those {@link IKeyOrder}s that have a
+	 *         prefix key composed entirely of contants bound in the
+	 *         {@link IPredicate}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+	 *      query is slow </a>
+	 * 
+	 *      FIXME Keep or drop?
+	 */
+	@SuppressWarnings("unchecked")
+	public static <E> Iterator<IKeyOrder<E>> getFilteredKeyOrderIterator(
+			final IPredicate<E> pred,//
+			final Iterator<IKeyOrder<E>> src//
+	) {
+
+		final int keyArity = pred.arity();
+
+		// The #of variables in the as-bound predicate.
+		final int nvars = BOpUtility.getArgumentVariableCount(pred);
+
+		// The #of constants in the as-bound predicate.
+		final int nconst = keyArity - nvars;
+
+		if (nconst < 0) {
+			// If there are more variables than the key arity then something is
+			// wrong.
+			throw new RuntimeException("Wrong keyArity? keyArity=" + keyArity
+					+ ", but nvars=" + nvars + " for pred=" + pred);
+
+		}
+
+		IStriterator itr = new Striterator(src);
+
+		itr.addFilter(new Filter() {
+
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public boolean isValid(final Object obj) {
+
+				@SuppressWarnings({ "rawtypes" })
+				final IKeyOrder<E> keyOrder = (IKeyOrder) obj;
+
+				if (keyOrder.getKeyArity() != keyArity) {
+					// The caller got something wrong.
+					throw new IllegalArgumentException();
+				}
+
+				/*
+				 * The key order will be accepted IFF all positions in the
+				 * predicate that are bound as constants appear within the first
+				 * [nconst] positions in the key order.
+				 */
+
+				// keyPos is the ordered position of a component in the key.
+				for (int keyPos = 0; keyPos < nconst; keyPos++) {
+
+					// Find the position in the predicate for that key position.
+					final int j = keyOrder.getKeyOrder(keyPos);
+
+					if (pred.get(j).isVar()) {
+
+						// The predicate has variable in that key position.
+						return false;
+
+					}
+
+				} // next key component.
+
+				return true;
+
+			}
+		});
+
+		return itr;
+
+	}
 
 }

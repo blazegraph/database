@@ -75,6 +75,7 @@ public class TestAll extends TestCase {
 
         // @todo test IKeyOrder impl (comparators).
         suite.addTestSuite(TestSPOKeyOrder.class);
+        suite.addTestSuite(TestAbstractKeyOrderFilter.class);
 
         // key/value coders
         suite.addTestSuite(TestSPOKeyCoders.class);

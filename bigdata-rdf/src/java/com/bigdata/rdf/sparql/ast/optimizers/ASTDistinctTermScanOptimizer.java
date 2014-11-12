@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +36,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -48,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -83,13 +86,29 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
     }
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
-    	
-        final QueryRoot queryRoot = (QueryRoot) queryNode;
+	public IQueryNode optimize(final AST2BOpContext context,
+			final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-        final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
+		final QueryRoot queryRoot = (QueryRoot) queryNode;
 
+		final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
+
+		final DatasetNode dataset = queryRoot.getDataset();
+
+		if (context.getAbstractTripleStore().isQuads()) {
+			boolean ok = false;
+			if (dataset == null || dataset.getNamedGraphs() == null) {
+				/*
+				 * The dataset is all graphs.
+				 */
+				ok = true;
+			}
+
+			if (!ok) {
+				return queryNode;
+			}
+		}
+        
         // First, process any pre-existing named subqueries.
         {
             
@@ -232,7 +251,82 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		// The single triple pattern.
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
+		
+		if (context.isQuads()) {
+			
+			final TermNode c = sp.c();
+			
+			if (c != null && c.isConstant()) {
+			
+				/**
+				 * We do not have an index that will let us use a distinct term
+				 * scan with C bound other than CSPO. Thus we can not optimize
+				 * SPs where the named graph position is bound.
+				 * 
+				 * If we really wanted to, we could optimize the following using
+				 * the CSPO index. This is an edge case though, which is why I
+				 * have not implemented it.
+				 * 
+				 * <pre>
+				 * DISTINCT ?s { graph :g {?s ?p ?o} }
+				 * </pre>
+				 */
+				
+				return;
+				
+			}
 
+			/*
+			 * Count arguments that are variables vs constants.
+			 * 
+			 * Note: For these purposes, we count the absence of c() for a quads
+			 * mode access pattern as a variable.
+			 */
+			final int nvars = BOpUtility.toList(sp, VarNode.class).size()
+					+ (c == null ? 1 : 0);
+			
+			// #of constants.
+			final int ncons = sp.arity() - nvars;
+
+			if (ncons > 0) {
+				
+				/*
+				 * Do not process SPs that have constants.
+				 * 
+				 * TODO This is overly broad. There are some cases that we could
+				 * translate but it depends on there being an index with a pre
+				 * prefix match formed from [Const + DistinctVar] and those are
+				 * rare.
+				 */
+				
+				return;
+				
+			}
+			
+//			// #of distinct variables (does not count duplicates)
+//			final int ndistinctvars = sp.getProducedBindings().size();
+			
+		}
+		
+		/*
+		 * Make sure that there are no correlated variables in the SP.
+		 */
+		{
+			final Set<VarNode> vars = new LinkedHashSet<VarNode>();
+
+			for (VarNode varNode : BOpUtility.toList(sp, VarNode.class)) {
+
+				if (!vars.add(varNode)) {
+
+					// This variable appears more than once.
+					return;
+
+				}
+
+			}
+			
+		}
+		
 		final Set<IVariable<?>> producedBindings = sp.getProducedBindings();
 
 		if (!producedBindings.contains(projectedVar)) {
@@ -316,4 +410,3 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 	}
 
 }
-
