@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -284,7 +283,8 @@ public class AST2BOpJoins extends AST2BOpFilters {
 
     /**
 	 * FIXME We need to handle cutoff joins here or the distinct-term-scan will
-	 * not work with the RTO.
+	 * not work with the RTO (alternatively, make sure the RTO is only using
+	 * pipeline joins when sampling the join graph).
 	 * 
 	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
 	 *      query is slow </a>
@@ -306,42 +306,19 @@ public class AST2BOpJoins extends AST2BOpFilters {
 		anns.add(new NV(DistinctTermScanOp.Annotations.DISTINCT_VAR,
 				distinctVar));
 
-//		// Find the index in the predicate of the DISTINCT var.
-//		final int distinctVarPos;
-//		final Iterator<BOp> itr = pred.argIterator();
-//		{
-//			int i = 0;
-//			boolean found = false;
-//			while (itr.hasNext()) {
-//				if (itr.next() == distinctVar) {
-//					found = true;
-//					break;
-//				}
-//				i++;
-//			}
-//			if (!found)
-//				throw new RuntimeException(
-//						"distinctTermScanVar does not appear in predicate: distinctVar="
-//								+ distinctTermScanVar + ", pred=" + pred);
-//			distinctVarPos = i;
-//		}
-
-        // A mock constant used for predicate in which the distinctVar is not yet bound.
-        final Constant<IV> mockConst = new Constant<IV>(TermId.mockIV(VTE.URI));
+		// A mock constant used for predicate in which the distinctVar is not
+		// yet bound.
+		final Constant<IV> mockConst = new Constant<IV>(TermId.mockIV(VTE.URI));
 
 		// ensure distinctVar is bound in mockPred.
 		final IPredicate mockPred = pred.asBound(distinctVar, mockConst);
 
 		final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(mockPred,
 				ctx.isQuads() ? 4 : 3);
-		
-		// Override the key order.
-		pred = (Predicate) pred.setProperty(IPredicate.Annotations.KEY_ORDER, keyOrder);
 
-//		// FIXME Do we need this? Can't we just decide the index based on the
-//		// distinctVar alone and do so here and now?
-//		anns.add(new NV(DistinctTermScanOp.Annotations.DISTINCT_VAR_POS,
-//				distinctVarPos));
+		// Override the key order.
+		pred = (Predicate) pred.setProperty(IPredicate.Annotations.KEY_ORDER,
+				keyOrder);
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
