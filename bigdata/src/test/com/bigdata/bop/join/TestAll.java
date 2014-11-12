@@ -86,7 +86,14 @@ public class TestAll extends TestCase {
 		suite.addTestSuite(TestNestedLoopJoinOp.class);
 
 		suite.addTestSuite(TestFastRangeCountOp.class);
-		suite.addTestSuite(TestDistinctTermScanOp.class);
+		
+		/*
+		 * TODO These tests must be specific to the IV layer. They can not be
+		 * written for a relation whose elements are (String,String) tuples.
+		 * However, we now have test coverage for this at the AST / SPARQL QUERY
+		 * execution layer.
+		 */
+//		suite.addTestSuite(TestDistinctTermScanOp.class);
 
         return suite;
         
