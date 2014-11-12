@@ -30,6 +30,7 @@ import junit.framework.TestSuite;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.join.DistinctTermScanOp;
+import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -41,10 +42,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
  *      query is slow </a>
  * 
- *      FIXME Write SPARQL layer tests for nested sub-queries that embedded an
- *      appropriate SELECT DISTINCT. Make sure that they are lifted out as named
- *      subqueries. Also include correct rejection tests for sub-queries that
- *      should not have been rewritten.
+ *      FIXME Write SPARQL layer tests correct rejection tests for DISTINCT ?var
+ *      that should not have been rewritten (those that have more than one BPG).
  */
 public class TestDistinctTermScanOptimizer extends
 		AbstractDataDrivenSPARQLTestCase {
@@ -68,7 +67,9 @@ public class TestDistinctTermScanOptimizer extends
         return suite;
     }
 
-
+    /**
+     * Triples mode test suite.
+     */
 	public static class TestTriplesModeAPs extends TestDistinctTermScanOptimizer {
 
 		@Override
@@ -156,7 +157,6 @@ public class TestDistinctTermScanOptimizer extends
 
 		}
 
-
 		/**
 		 * Correct rejection test where a variable in the triple pattern appears
 		 * more than once. We have to actually run the key-range scan in order
@@ -181,6 +181,41 @@ public class TestDistinctTermScanOptimizer extends
 					0,
 					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
 							DistinctTermScanOp.class).size());
+
+		}
+
+		/**
+		 * <pre>
+		 * SELECT ?p {
+		 * 
+		 *    { SELECT DISTINCT ?p WHERE { ?s ?p ?o . } } .
+		 *    
+		 *    <http://bigdata.com#s1> ?p ?o .
+		 *    
+		 * }
+		 * </pre>
+		 */
+		public void test_distinctTermScan_triples_subQuery_01() throws Exception {
+
+			final TestHelper h = new TestHelper("distinctTermScan_triples_subQuery_01", // testURI,
+					"distinctTermScan_triples_subQuery_01.rq",// queryFileURL
+					"distinctTermScan_triples_01.ttl",// dataFileURL
+					"distinctTermScan_triples_subQuery_01.srx"// resultFileURL
+			);
+			
+			h.runTest();
+
+			// Verify that the DistinctTermScanOp was used in the query plan.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+							DistinctTermScanOp.class).size());
+
+			// Verify that the DISTINCT ?p was lifted out as a named subquery.
+			assertEquals(
+					1,
+					BOpUtility.toList(h.getASTContainer().getOptimizedAST(),
+							NamedSubqueryInclude.class).size());
 
 		}
 
