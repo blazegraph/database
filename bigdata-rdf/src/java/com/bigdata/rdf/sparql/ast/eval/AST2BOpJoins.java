@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -66,10 +67,11 @@ import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
@@ -291,7 +293,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
     private static PipelineOp distinctTermScanJoin(//
 			final PipelineOp left,//
 			final List<NV> anns, //
-			final Predicate pred,//
+			Predicate pred,//
 			final DatasetNode dataset, //
 			final Long cutoffLimitIsIgnored,//
 			final VarNode distinctTermScanVar, //
@@ -299,29 +301,47 @@ public class AST2BOpJoins extends AST2BOpFilters {
 			final AST2BOpContext ctx//
 			) {
 
-		/*
-		 * Figure out which index to use. We want whatever index has the
-		 * [distinctVar] in the first key component for this predicate. So we
-		 * need to look for the ordinal position of the [distinctVar] in the
-		 * predicate and then choose the corresponding triples or quads mode
-		 * index.
-		 * 
-		 * FIXME We also need to look at the constants that are already bound
-		 * in the predicate (if any) and use them to restrict the range.
-		 * 
-		 * TODO We should do this at runtime in case something will
-		 * be bound before we actually execute this join.  (Alternatively,
-		 * we can look at the knownBound incoming variables and use them to
-		 * choose the index.)
-		 */
-		
-//		for(BOp t : pred.args()) {
-//			if(!(t instanceof IVariable))
-//		}
-		if(true)
-			throw new UnsupportedOperationException();
+		final IVariable distinctVar = distinctTermScanVar.getValueExpression();
+
 		anns.add(new NV(DistinctTermScanOp.Annotations.DISTINCT_VAR,
-				distinctTermScanVar.getValueExpression()));
+				distinctVar));
+
+//		// Find the index in the predicate of the DISTINCT var.
+//		final int distinctVarPos;
+//		final Iterator<BOp> itr = pred.argIterator();
+//		{
+//			int i = 0;
+//			boolean found = false;
+//			while (itr.hasNext()) {
+//				if (itr.next() == distinctVar) {
+//					found = true;
+//					break;
+//				}
+//				i++;
+//			}
+//			if (!found)
+//				throw new RuntimeException(
+//						"distinctTermScanVar does not appear in predicate: distinctVar="
+//								+ distinctTermScanVar + ", pred=" + pred);
+//			distinctVarPos = i;
+//		}
+
+        // A mock constant used for predicate in which the distinctVar is not yet bound.
+        final Constant<IV> mockConst = new Constant<IV>(TermId.mockIV(VTE.URI));
+
+		// ensure distinctVar is bound in mockPred.
+		final IPredicate mockPred = pred.asBound(distinctVar, mockConst);
+
+		final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(mockPred,
+				ctx.isQuads() ? 4 : 3);
+		
+		// Override the key order.
+		pred = (Predicate) pred.setProperty(IPredicate.Annotations.KEY_ORDER, keyOrder);
+
+//		// FIXME Do we need this? Can't we just decide the index based on the
+//		// distinctVar alone and do so here and now?
+//		anns.add(new NV(DistinctTermScanOp.Annotations.DISTINCT_VAR_POS,
+//				distinctVarPos));
 
         anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
 
@@ -450,7 +470,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                     BOpEvaluationContext.ANY));
         }
 
-        if (dataset == null || dataset.getNamedGraphs()==null) {
+		if (dataset == null || dataset.getNamedGraphs() == null) {
 
             /*
              * The dataset is all graphs. C is left unbound and the unmodified

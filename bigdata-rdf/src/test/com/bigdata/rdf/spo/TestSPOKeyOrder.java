@@ -52,7 +52,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * Test suite for {@link SPOKeyOrder}. 
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestSPOKeyOrder extends TestCase2 {
 
@@ -71,6 +70,7 @@ public class TestSPOKeyOrder extends TestCase2 {
 
     private MockTermIdFactory factory;
     
+    @Override
     protected void setUp() throws Exception {
         
         super.setUp();
@@ -79,6 +79,7 @@ public class TestSPOKeyOrder extends TestCase2 {
         
     }
 
+    @Override
     protected void tearDown() throws Exception {
 
         super.tearDown();

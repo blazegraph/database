@@ -499,7 +499,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
 		 *      PREDICATEs query is slow </a>
 		 */
-//        add(new ASTDistinctTermScanOptimizer());
+        add(new ASTDistinctTermScanOptimizer());
         
         /**
          * Run the static join order optimizer. This attaches the estimated

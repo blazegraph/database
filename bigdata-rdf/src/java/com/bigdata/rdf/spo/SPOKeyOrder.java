@@ -61,7 +61,6 @@ import com.bigdata.striterator.AbstractKeyOrder;
  *         optimization.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable {
 
@@ -1002,7 +1001,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         } else {
 
-            @SuppressWarnings("unchecked")
+            @SuppressWarnings({ "unchecked", "rawtypes" })
             final IVariableOrConstant<IV> t = predicate.get(3);
             
             final boolean c = t != null && !t.isVar();

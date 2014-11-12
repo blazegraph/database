@@ -1,0 +1,1 @@
+SELECT DISTINCT ?p WHERE { GRAPH ?g { <http://bigdata.com#s1> ?p ?o . } }

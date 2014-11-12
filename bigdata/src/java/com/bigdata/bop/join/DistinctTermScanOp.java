@@ -86,14 +86,15 @@ public class DistinctTermScanOp<E> extends PipelineOp {
      */
     private static final long serialVersionUID = 1L;
 
-    public interface Annotations extends AccessPathJoinAnnotations {
+	public interface Annotations extends AccessPathJoinAnnotations {
 
 		/**
 		 * The name of the variable whose distinct projection against the
 		 * {@link IAccessPath} associated with the as-bound {@link IPredicate}
 		 * is output by this operator.
 		 */
-		String DISTINCT_VAR = DistinctTermScanOp.class.getName() + ".distinctVar";
+		String DISTINCT_VAR = DistinctTermScanOp.class.getName()
+				+ ".distinctVar";
 
     }
 
@@ -183,8 +184,7 @@ public class DistinctTermScanOp<E> extends PipelineOp {
      */
 	private boolean isOptional() {
 
-//		return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
-        return getPredicate().isOptional();
+		return getPredicate().isOptional();
 
 	}
 
@@ -227,7 +227,7 @@ public class DistinctTermScanOp<E> extends PipelineOp {
             this.context = context;
 
             this.distinctVar = op.getDistinctVar();
-            
+   
 			this.predicate = op.getPredicate();
 			
 			this.relation = context.getRelation(predicate);
@@ -303,6 +303,96 @@ public class DistinctTermScanOp<E> extends PipelineOp {
 //
 //					}
 
+//            		/*
+//					 * Figure out which index to use. We want whatever index has
+//					 * the [distinctVar] appearing in the first non-constant key
+//					 * component for this predicate.
+//					 * 
+//					 * To do this, we first bind a mock constant to the
+//					 * distinctVar in the predicate (unless it is already
+//					 * bound).
+//					 * 
+//					 * Next, we scan the indices (IKeyOrders) that are have a
+//					 * key component for each constant in the mock predicate.
+//					 * 
+//					 * Of those, we take whichever one has the distinctVar in
+//					 * the predicate position having the greatest ordinal index
+//					 * since that will impose the most locality on the index.
+//					 */
+//					{
+
+//						// ensure distinctVar is bound in mockPred.
+//						final IPredicate<E> mockPred;
+//						if(asBound.get(distinctVarPos).isVar()) {
+//							// distinctVar is not bound, so bind to mock const.
+//							mockPred = asBound.asBound(distinctVar,mockConst);
+//						} else {
+//							// distinctVar is already bound.
+//							mockPred = asBound;
+//						}
+						
+//						/**
+//						 * Visit the set of possible key orders for [mockPred].
+//						 * 
+//						 * Note: Since [distinctVar] is bound in the [mockPred]
+//						 * these key orders will all have the [distinctVar]
+//						 * appearing in the part of the key that will be bound.
+//						 * 
+//						 * FIXME This is not enough. Here is a counter example.
+//						 * D is the distinct variable. Integers are constants. _
+//						 * is a variable that we do not care about. (*) marks
+//						 * the best choice.
+//						 * 
+//						 * <pre>
+//						 * triple pattern => possible indices
+//						 * SPO(_,D,_)     => (*) POS
+//						 * SPO(1,D,_)     => (*) SPO; POS + filter(S:=1).
+//						 * SPO(_,D,3)     => (*) POS
+//						 * SPO(D,_,_)     => (*) SPO
+//						 * SPO(D,2,_)     => (*) SPO + filter(P:=2) <== This is the counter example. POS/OSP do not work since O is not bound.  We must use SPO and filter.
+//						 * </pre>
+//						 * 
+//						 * FIXME The other problem is that the [distinctVar]
+//						 * MUST appear in the last component of the prefix for
+//						 * the key. If is NOT Ok to have a constant after that
+//						 * since we are using the fixed length successor of the
+//						 * prefix to find the next possible match. If we are
+//						 * going to wind up with a bunch of constants, then we
+//						 * should not bother to use the distinct-term-scan. The
+//						 * cost of the distinct term scan is O(N), where N is
+//						 * the number of distinct terms appearing in the index,
+//						 * vs O(card(asBound)). Once we get one or two constants
+//						 * it is cheaper to probe the index with those as-bound
+//						 * values rather than using the distinct term scan.
+//						 */
+//						final Iterator<IKeyOrder<E>> keyOrderItr = AbstractKeyOrder
+//								.getFilteredKeyOrderIterator(mockPred,
+//										relation.getKeyOrders());
+//
+//						// find the one with the greatest ordinal position for the distinctVar.
+//						IKeyOrder<E> bestKeyOrder = null;
+//						int indexOfDistinctVarInBestKeyOrder = -1;
+//						while (keyOrderItr.hasNext()) {
+//							final IKeyOrder<E> aKeyOrder = keyOrderItr.next();
+//							int indexOf = aKeyOrder.getKeyOrder(distinctVarPos);
+//							if (bestKeyOrder == null
+//									|| indexOf > indexOfDistinctVarInBestKeyOrder) {
+//								bestKeyOrder = aKeyOrder;
+//								indexOfDistinctVarInBestKeyOrder = indexOf;
+//							}
+//						}
+//
+//						if (bestKeyOrder == null)
+//							throw new RuntimeException("No index found? pred="
+//									+ asBound);
+//
+//						// Override the key order for the AP associated with the
+//						// asBound predicate.
+//						asBound.setProperty(IPredicate.Annotations.KEY_ORDER,
+//								bestKeyOrder);
+//
+//					}
+                    
         			/**
 					 * The {@link IAccessPath} corresponding to the asBound
 					 * {@link IPredicate} for this join dimension. The asBound
@@ -314,7 +404,7 @@ public class DistinctTermScanOp<E> extends PipelineOp {
 					 * filters....
 					 */
 					final IAccessPath<E> accessPath = context.getAccessPath(
-							relation, predicate);
+							relation, asBound);
 
 					if (accessPath.getPredicate().getIndexLocalFilter() != null) {
 						// index has local filter. requires scan.
