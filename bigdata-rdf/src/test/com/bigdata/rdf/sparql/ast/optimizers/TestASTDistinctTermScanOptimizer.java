@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.junit.Ignore;
+
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
@@ -34,6 +36,9 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
+
+import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.*;
+
 
 /**
  * Test suite for {@link ASTDistinctTermScanOptimizer}.
@@ -71,14 +76,9 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
         
         return suite;
     }
-
-	/**
-	 * Quads mode specific test suite.
-	 */
-	public static class TestQuadsModeAPs extends
-			TestASTDistinctTermScanOptimizer {
+    
+    protected static abstract class AbstractASTDistinctTermScanTest extends TestASTDistinctTermScanOptimizer {
 		/**
-		 * FIXME Handle these cases.
 		 * 
 		 * This is translated into a {@link DistinctTermAdvancer} and the
 		 * distinct terms are simply bound onto ?s. The DISTINCT or REDUCED
@@ -106,19 +106,6 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 		 * advancer will automatically possess the appropriate RDF Merge
 		 * semantics.
 		 * 
-		 * FIXME Write an explicit test for a named graph access path. The graph
-		 * may be either bound to a constant or be a variable. If it is a
-		 * variable, then it may be either projected out or not. If it is not
-		 * projected out, then it is simply ignored.
-		 * 
-		 * TODO Write test. The triple pattern can be OPTIONAL (simple
-		 * optional). This just means that we produce no bindings for ?s, which
-		 * is exactly what would happen anyway in a SELECT with a single
-		 * required triple pattern.
-		 * 
-		 * <pre>
-		 * SELECT (DISTINCT|REDUCED) ?s { OPTIONAL { ?s ?p ?o} }
-		 * </pre>
 		 */
 		public void test_distinctTermScanOptimizer_01() {
 
@@ -220,26 +207,216 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 			}.test();
 
 		}
-
-		/**
-		 * Unit test with a projected prefix consisting of 2 out of 4 components
-		 * of the key (e.g., ?s and ?p).
+    	
+    	/**
+		 * The triple pattern can be OPTIONAL (simple
+		 * optional). This just means that we produce no bindings for ?s, which
+		 * is exactly what would happen anyway in a SELECT with a single
+		 * required triple pattern.
 		 * 
 		 * <pre>
-		 * SELECT ?s ?p { graph ?g {?s ?p ?o} }
+		 * SELECT (DISTINCT|REDUCED) ?s { OPTIONAL { ?s ?p ?o} }
 		 * </pre>
-		 * 
-		 * Note: There is no advantage to using the {@link DistinctTermAdvancer}
-		 * when the triple pattern is all-but one-bound or even all but
-		 * two-bound. In these cases the application of the standard pipeline
-		 * join operator should be as efficient and might even be more efficient
-		 * if we wind up evaluating the triple pattern "as-bound" with a fully
-		 * bound pattern since that turns into a point test.
 		 */
-		public void test_distinctTermScanOptimizer_02() {
+		public void test_distinctTermScanOptimizer_optional_pattern() {
 
-			fail("write tests");
+			new Helper() {
+				{
 
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), varNode(z), OPTIONAL,
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						final long newRangeCount = (long) (1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						
+						expected = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), varNode(z), OPTIONAL,
+											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s))
+										)
+									), NOT_DISTINCT, NOT_REDUCED
+								);
+					}
+
+				}
+			}.test();
+		}
+    }
+
+	/**
+	 * Quads mode specific test suite.
+	 */
+	public static class TestQuadsModeAPs extends
+		AbstractASTDistinctTermScanTest {
+		
+		/**
+		 * SELECT DISTINCT ?s { graph ?g {?s ?p ?o} }
+		 */
+		public void test_distinctTermScanOptimizer_variable_context_not_projected() {
+
+			new Helper() {
+				{
+
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), varNode(z),
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						final long newRangeCount = (long) (1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						
+						expected = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), varNode(z),
+											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s))
+										)
+									), NOT_DISTINCT, NOT_REDUCED
+								);
+					}
+
+				}
+			}.test();
+		}
+		
+		/**
+		 * SELECT DISTINCT ?g { graph ?g {?s ?p ?o} }
+		 */
+		public void test_distinctTermScanOptimizer_variable_context_projected() {
+
+			new Helper() {
+				{
+
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(z)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), varNode(z),
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						final long newRangeCount = (long) (1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						
+						expected = 
+								select(
+									projection(
+										varNode(z)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), varNode(z),
+											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(z))
+										)
+									), NOT_DISTINCT, NOT_REDUCED
+								);
+					}
+
+				}
+			}.test();
+		}
+		
+		/**
+		 * SELECT DISTINCT ?s { graph :g {?s ?p ?o} }
+		 */
+		@Ignore("edge case, not implemented yet")
+		public void test_distinctTermScanOptimizer_bound_context() {
+
+			new Helper() {
+				{
+
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), constantNode(a),
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						final long newRangeCount = (long) (1.0 / (store
+								.isQuads() ? 4 : 3)) * rangeCount_sp1;
+						
+						expected = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), constantNode(a),
+											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s))
+										)
+									), NOT_DISTINCT, NOT_REDUCED
+								);
+					}
+
+				}
+			};
 		}
 
 	} // quads
@@ -248,7 +425,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 	 * Quads mode specific test suite.
 	 */
 	public static class TestTriplesModeAPs extends
-			TestASTDistinctTermScanOptimizer {
+		AbstractASTDistinctTermScanTest {
 
 	} // triples
 
