@@ -28,12 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -304,7 +308,34 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 				 */
 				ok = true;
 			}
-
+			if (sp.getScope() == Scope.DEFAULT_CONTEXTS) {
+				final Map<String, Object> scalarValues = functionNode
+						.getScalarValues();
+				if (scalarValues != null) {
+					final Boolean isDistinct = (Boolean) scalarValues
+							.get(AggregateBase.Annotations.DISTINCT);
+					if (isDistinct != null && isDistinct) {
+						/*
+						 * We can not use the fast-range-count for a quads-mode
+						 * default graph query. If there are multiple graphs in
+						 * the default graph query, then we need to take the RDF
+						 * merge of those named graphs. This is done by feeding
+						 * the quads into a filter that stripes off the context
+						 * position and then imposes a DISTINCT-SPO filter. The
+						 * result of that DISTINCT-SPO filter are then the
+						 * distinct triples (vs distinct quads). The count of
+						 * those distinct triples is what is required for
+						 * COUNT(DISTINCT) for a quads mode default graph query.
+						 * 
+						 * TODO We can do this for the case where there is only
+						 * a single named graph that is being considered by the
+						 * default graph query since that case reduces to the
+						 * same as having the graph be a constant.
+						 */
+						ok = false;
+					}
+				}
+			}
 			if (!ok) {
 				// Can not rewrite.
 				return;
