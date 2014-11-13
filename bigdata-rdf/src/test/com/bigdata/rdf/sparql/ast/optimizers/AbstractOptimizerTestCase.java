@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 
+import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
@@ -87,7 +88,8 @@ public abstract class AbstractOptimizerTestCase extends
 	public interface Annotations extends
 			com.bigdata.rdf.sparql.ast.GraphPatternGroup.Annotations,
 			com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode.Annotations,
-			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations
+			com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.Annotations,
+			com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations
 			{
 	}
 
@@ -137,6 +139,24 @@ public abstract class AbstractOptimizerTestCase extends
 			@Override
 			public void apply(ASTBase rslt) {
 				((QueryBase) rslt).getProjection().setDistinct(true);
+			}
+		},
+		REDUCED {
+			@Override
+			public void apply(ASTBase rslt) {
+				((QueryBase) rslt).getProjection().setReduced(true);
+			}
+		},
+		NOT_DISTINCT {
+			@Override
+			public void apply(ASTBase rslt) {
+				((QueryBase) rslt).getProjection().setDistinct(false);
+			}
+		},
+		NOT_REDUCED {
+			@Override
+			public void apply(ASTBase rslt) {
+				((QueryBase) rslt).getProjection().setReduced(false);
 			}
 		};
 
@@ -196,6 +216,27 @@ public abstract class AbstractOptimizerTestCase extends
 	public abstract class Helper {
 
 		/**
+		 * Wrapper for the annotation property name-value.
+		 */
+		protected class StatementPatternProperty {
+			private String annotation;
+			private Object value;
+			
+			public StatementPatternProperty(String annotation, Object value) {
+				this.annotation = annotation;
+				this.value = value;
+			}
+
+			public String getAnnotation() {
+				return annotation;
+			}
+
+			public Object getValue() {
+				return value;
+			}
+		}
+		
+		/**
 		 * The given AST is the input to the {@link IASTOptimizer}.
 		 */
 		protected QueryRoot given;
@@ -245,6 +286,10 @@ public abstract class AbstractOptimizerTestCase extends
 			
 			return makeIV(new URIImpl("http://example/" + id));
 
+		}
+		
+		protected VarNode wildcard() {
+			return varNode("*");
 		}
 
 		/**
@@ -354,22 +399,8 @@ public abstract class AbstractOptimizerTestCase extends
 		 */
 		protected QueryRoot select(final ProjectionNode projection,
 				final JoinGroupNode where, final HelperFlag... flags) {
-
-			assert projection != null;
-			
-			// Create QueryRoot.
 			final QueryRoot select = new QueryRoot(QueryType.SELECT);
-
-			// Set Projection and Where clause on QueryRoot.
-			select.setProjection(projection);
-			select.setWhereClause(where);
-			
-			// Apply helper flags.
-			for (HelperFlag flag : flags)
-				flag.apply(select);
-			
-			return select;
-			
+			return select(select, projection, where, flags);
 		}
 
 		protected QueryRoot select(final VarNode varNode,
@@ -386,6 +417,27 @@ public abstract class AbstractOptimizerTestCase extends
 
 			return select(new VarNode[] { varNode }, where, flags);
 			
+		}
+		
+		protected SubqueryRoot selectSubQuery(final ProjectionNode projection,
+				final JoinGroupNode where, final HelperFlag... flags) {
+			final SubqueryRoot rslt = new SubqueryRoot(QueryType.SELECT);
+			return select(rslt, projection, where, flags);
+		}
+		
+		private <T extends QueryBase> T select(T select, final ProjectionNode projection,
+				final JoinGroupNode where, final HelperFlag... flags) {
+			assert projection != null;
+			
+			// Set Projection and Where clause on QueryRoot.
+			select.setProjection(projection);
+			select.setWhereClause(where);
+			
+			// Apply helper flags.
+			for (HelperFlag flag : flags)
+				flag.apply(select);
+			
+			return select;
 		}
 
 		/**
@@ -543,6 +595,10 @@ public abstract class AbstractOptimizerTestCase extends
 			return new PathNode(new PathAlternative(new PathSequence(elements)));
 		}
 
+		protected StatementPatternProperty property(String name, Object value) {
+			return new StatementPatternProperty(name, value);
+		}
+
 		/**
 		 * Create a statement pattern node. The additional arguments after the s, p, o,
 		 * are:
@@ -575,6 +631,9 @@ public abstract class AbstractOptimizerTestCase extends
 					if (more[i] instanceof Integer) {
 						rslt.setProperty(Annotations.ESTIMATED_CARDINALITY,
 								Long.valueOf((Integer) more[i]));
+					} else if(more[i] instanceof StatementPatternProperty) {
+						StatementPatternProperty prop = (StatementPatternProperty) more[i];
+						rslt.setProperty(prop.annotation, prop.value);
 					} else {
 						final HelperFlag flag = (HelperFlag) more[i];
 						flag.apply(rslt);
@@ -641,7 +700,7 @@ public abstract class AbstractOptimizerTestCase extends
 		 *            
 		 * @return The {@link JoinGroupNode}
 		 */
-		protected JoinGroupNode where(final GroupMemberNodeBase... statements) {
+		protected JoinGroupNode where(final IGroupMemberNode... statements) {
 
 			return joinGroupNode((Object[]) statements);
 			
@@ -706,7 +765,27 @@ public abstract class AbstractOptimizerTestCase extends
 				final ValueExpressionNode... args//
 				) {
 
-			return new FunctionNode(new URIImpl(uri), null, args);
+			return functionNode(new URIImpl(uri), args);
+
+		}
+		
+		/**
+		 * Return a {@link FunctionNode}
+		 * 
+		 * @param uri
+		 *            the function URI. see {@link FunctionRegistry}
+		 * @param args
+		 *            the arguments to the function.
+		 * @return
+		 */
+		// * @param scalarValues
+		// * One or more scalar values that are passed to the function
+		protected IValueExpressionNode functionNode(//
+				final URI uri,//
+				final ValueExpressionNode... args//
+				) {
+
+			return new FunctionNode(uri, null, args);
 
 		}
 
