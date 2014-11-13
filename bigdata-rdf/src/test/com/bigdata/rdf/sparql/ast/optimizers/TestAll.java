@@ -159,7 +159,7 @@ public class TestAll extends TestCase {
 		 */
         suite.addTest(TestASTFastRangeCountOptimizer.suite());
 
-        suite.addTestSuite(TestASTDistinctTermScanOptimizer.class);
+        suite.addTest(TestASTDistinctTermScanOptimizer.suite());
 
         return suite;
 
