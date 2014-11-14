@@ -33,6 +33,7 @@ import junit.framework.Test;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
@@ -263,6 +264,41 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 				}
 			}.test();
 		}
+		
+		/**
+		 * Reject optimization in case of the constant in SP.
+		 * <pre>SELECT DISTINCT ?s {?s :p ?o} </pre>
+		 */
+		public void test_distinctTermScanOptimizer_reject_constant_in_sp() {
+
+			new Helper() {
+				{
+
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), constantNode(a), varNode(o),
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						expected = new QueryRoot(given);
+					}
+
+				}
+			};
+		}
     }
 
 	/**
@@ -418,6 +454,76 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 				}
 			};
 		}
+		
+		/**
+		 * Reject optimization in case of the constant in SP.
+		 * <pre>SELECT DISTINCT ?s { GPRAPH ?g {?s :p ?o}} </pre>
+		 */
+		public void test_distinctTermScanOptimizer_reject_quads_constant_in_sp() {
+
+			new Helper() {
+				{
+
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), constantNode(a), varNode(o), varNode(y),
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						expected = new QueryRoot(given);
+					}
+
+				}
+			};
+		}
+		
+		/**
+		 * Reject optimization in case of the constant context.
+		 * <pre>SELECT DISTINCT ?s { GPRAPH :g {?s ?p ?o}} </pre>
+		 */
+		public void test_distinctTermScanOptimizer_reject_constant_context() {
+
+			new Helper() {
+				{
+
+					final long rangeCount_sp1 = 1000L;
+
+					{
+						given = 
+								select(
+									projection(
+										varNode(s)
+									),
+									where(
+										statementPatternNode(
+											varNode(s), varNode(p), varNode(o), constantNode(a),
+											property(Annotations.ESTIMATED_CARDINALITY, rangeCount_sp1)
+										)
+									), DISTINCT
+								);
+						
+					}
+					
+					{
+						expected = new QueryRoot(given);
+					}
+
+				}
+			};
+		}
 
 	} // quads
 
@@ -426,7 +532,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 	 */
 	public static class TestTriplesModeAPs extends
 		AbstractASTDistinctTermScanTest {
-
+		
 	} // triples
 
 }

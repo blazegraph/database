@@ -252,61 +252,15 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
 		
-		if (context.isQuads()) {
-			
-			final TermNode c = sp.c();
-			
-			if (c != null && c.isConstant()) {
-			
-				/**
-				 * We do not have an index that will let us use a distinct term
-				 * scan with C bound other than CSPO. Thus we can not optimize
-				 * SPs where the named graph position is bound.
-				 * 
-				 * If we really wanted to, we could optimize the following using
-				 * the CSPO index. This is an edge case though, which is why I
-				 * have not implemented it.
-				 * 
-				 * <pre>
-				 * DISTINCT ?s { graph :g {?s ?p ?o} }
-				 * </pre>
-				 */
-				
-				return;
-				
-			}
-
-			/*
-			 * Count arguments that are variables vs constants.
-			 * 
-			 * Note: For these purposes, we count the absence of c() for a quads
-			 * mode access pattern as a variable.
-			 */
-			final int nvars = BOpUtility.toList(sp, VarNode.class).size()
-					+ (c == null ? 1 : 0);
-			
-			// #of constants.
-			final int ncons = sp.arity() - nvars;
-
-			if (ncons > 0) {
-				
-				/*
-				 * Do not process SPs that have constants.
-				 * 
-				 * TODO This is overly broad. There are some cases that we could
-				 * translate but it depends on there being an index with a pre
-				 * prefix match formed from [Const + DistinctVar] and those are
-				 * rare.
-				 */
-				
-				return;
-				
-			}
-			
-//			// #of distinct variables (does not count duplicates)
-//			final int ndistinctvars = sp.getProducedBindings().size();
-			
-		}
+		/*
+		 * Do not process SPs that have constants.
+		 * 
+		 * TODO This is overly broad. There are some cases that we could
+		 * translate but it depends on there being an index with a pre
+		 * prefix match formed from [Const + DistinctVar] and those are
+		 * rare.
+		 */
+		if(hasConstantInSp(context, sp)) return;
 		
 		/*
 		 * Make sure that there are no correlated variables in the SP.
@@ -407,6 +361,46 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 
 		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
 
+	}
+	
+	private boolean hasConstantInSp(AST2BOpContext context, StatementPatternNode sp) {
+		if (context.isQuads()) {
+			
+			final TermNode c = sp.c();
+			
+			if (c != null && c.isConstant()) {
+			
+				/**
+				 * We do not have an index that will let us use a distinct term
+				 * scan with C bound other than CSPO. Thus we can not optimize
+				 * SPs where the named graph position is bound.
+				 * 
+				 * If we really wanted to, we could optimize the following using
+				 * the CSPO index. This is an edge case though, which is why I
+				 * have not implemented it.
+				 * 
+				 * <pre>
+				 * DISTINCT ?s { graph :g {?s ?p ?o} }
+				 * </pre>
+				 */
+				
+				return true;
+			}	
+		}
+		
+
+		/*
+		 * Count arguments that are variables vs constants.
+		 * 
+		 * Note: For these purposes, we count the absence of c() for a quads
+		 * mode access pattern as a variable.
+		 */
+		final int nvars = BOpUtility.toList(sp, VarNode.class).size()
+				+ (context.isQuads() && sp.c() == null ? 1 : 0);
+		
+		// #of constants.
+		final int ncons = sp.arity() - nvars;
+		return ncons > 0;	
 	}
 
 }
