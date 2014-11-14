@@ -61,7 +61,6 @@ import com.bigdata.striterator.AbstractKeyOrder;
  *         optimization.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable {
 
@@ -271,6 +270,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     /**
      * The base name for the index.
      */
+    @Override
     final public String getIndexName() {
 
         return names[index];
@@ -280,6 +280,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
     /**
      * Return {@link #getIndexName()}'s value.
      */
+    @Override
     public String toString() {
         
         return names[index];
@@ -290,6 +291,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * Return either 3 or 4 depending on the #of components in the key for
      * this natural key ordering.
      */
+    @Override
     final public int getKeyArity() {
 
         switch (index) {
@@ -319,6 +321,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      *            
      * @return The index of the slot in the {@link ISPO}.
      */
+    @Override
     final public int getKeyOrder(final int keyPos) {
 
         return orders[index][keyPos];
@@ -342,6 +345,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * Return the comparator that places {@link ISPO}s into the natural order
      * for the associated index.
      */
+    @Override
     final public Comparator<ISPO> getComparator() {
 
         switch (index) {
@@ -377,6 +381,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         }
 
+        @Override
         public int compare(final ISPO o1, final ISPO o2) {
 
             if (o1 == o2) {
@@ -519,6 +524,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/238 (lift range
      *      constraints onto AP).
      */
+    @Override
     public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<ISPO> predicate) {
 
@@ -660,7 +666,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
     }
 
-
+    @Override
     protected void appendKeyComponent(final IKeyBuilder keyBuilder,
             final int index, final Object keyComponent) {
 
@@ -995,7 +1001,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
 
         } else {
 
-            @SuppressWarnings("unchecked")
+            @SuppressWarnings({ "unchecked", "rawtypes" })
             final IVariableOrConstant<IV> t = predicate.get(3);
             
             final boolean c = t != null && !t.isVar();
@@ -1058,17 +1064,18 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * Iterator visits {@link #SPO}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static private class SPOOnlyKeyOrderIterator implements
             Iterator<SPOKeyOrder> {
 
         boolean exhausted = false;
 
+        @Override
         public boolean hasNext() {
             return !exhausted;
         }
 
+        @Override
         public SPOKeyOrder next() {
             if (!hasNext())
                 throw new NoSuchElementException();
@@ -1076,6 +1083,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             return SPOKeyOrder.SPO;
         }
 
+        @Override
         public void remove() {
             throw new UnsupportedOperationException();
         }
@@ -1087,17 +1095,18 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     static private class SPOCOnlyKeyOrderIterator implements
             Iterator<SPOKeyOrder> {
 
         boolean exhausted = false;
 
+        @Override
         public boolean hasNext() {
             return !exhausted;
         }
 
+        @Override
         public SPOKeyOrder next() {
             if (!hasNext())
                 throw new NoSuchElementException();
@@ -1105,6 +1114,7 @@ public class SPOKeyOrder extends AbstractKeyOrder<ISPO> implements Serializable 
             return SPOKeyOrder.SPOC;
         }
 
+        @Override
         public void remove() {
             throw new UnsupportedOperationException();
         }

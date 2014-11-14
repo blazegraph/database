@@ -996,13 +996,15 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+    @Override
     public Set<String> getIndexNames() {
 
         return indexNames;
         
     }
 
-    @SuppressWarnings("unchecked")
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<IKeyOrder<ISPO>> getKeyOrders() {
 
         return (Iterator) keyOrders.iterator();
