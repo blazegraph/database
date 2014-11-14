@@ -36,6 +36,7 @@ import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
@@ -481,8 +482,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 		 *      </a>
 		 */
-        add(new ASTFastRangeCountOptimizer());
-        
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			add(new ASTFastRangeCountOptimizer());
+
         /**
 		 * Optimizes
 		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
@@ -499,7 +501,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
 		 *      PREDICATEs query is slow </a>
 		 */
-        add(new ASTDistinctTermScanOptimizer());
+		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
+			add(new ASTDistinctTermScanOptimizer());
         
         /**
          * Run the static join order optimizer. This attaches the estimated

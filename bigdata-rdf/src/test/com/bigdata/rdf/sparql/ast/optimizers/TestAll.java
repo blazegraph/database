@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -157,9 +159,11 @@ public class TestAll extends TestCase {
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 		 *      </a>
 		 */
-        suite.addTest(TestASTFastRangeCountOptimizer.suite());
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			suite.addTest(TestASTFastRangeCountOptimizer.suite());
 
-        suite.addTest(TestASTDistinctTermScanOptimizer.suite());
+		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
+			suite.addTest(TestASTDistinctTermScanOptimizer.suite());
 
         return suite;
 
