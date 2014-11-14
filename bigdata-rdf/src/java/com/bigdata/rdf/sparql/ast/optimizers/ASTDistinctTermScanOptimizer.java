@@ -344,7 +344,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 * The new cardinality is:
 		 * 
 		 * <pre>
-		 * newCard = oldCard * 1.0 / sp.arity()
+		 * newCard = oldCard * 1.0 / arity(context,sp)
 		 * </pre>
 		 * 
 		 * where arity() is 3 for triples and 4 for quads.
@@ -356,8 +356,8 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 			throw new AssertionError(
 					"Expecting estimated-cardinality to be bound: sp=" + sp);
 		}
-
-		final long newCard = (long) (1.0 / sp.arity());
+		final int arity = context.isQuads() ? 4 : 3;
+		final long newCard = (long) (1.0 / arity);
 
 		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
 
@@ -399,7 +399,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 				+ (context.isQuads() && sp.c() == null ? 1 : 0);
 		
 		// #of constants.
-		final int ncons = sp.arity() - nvars;
+		final int ncons = (context.isQuads() ? 4 : 3) - nvars;
 		return ncons > 0;	
 	}
 
