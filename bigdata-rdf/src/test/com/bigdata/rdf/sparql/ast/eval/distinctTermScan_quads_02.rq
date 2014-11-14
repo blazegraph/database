@@ -1,0 +1,1 @@
+SELECT DISTINCT ?p WHERE { GRAPH ?g { ?s ?p ?o . } }

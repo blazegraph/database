@@ -1800,7 +1800,7 @@ public class PipelineJoin<E> extends PipelineOp implements
                         for (IBindingSet left : bindingSets) { // upstream pipeline solutions.
 
                             // join solutions.
-                            final IBindingSet bset = context.bind(left, right,
+                            final IBindingSet bset = BOpContext.bind(left, right,
 //                                    true/* leftIsPipeline */,
                                     constraints,
                                     variablesToKeep);

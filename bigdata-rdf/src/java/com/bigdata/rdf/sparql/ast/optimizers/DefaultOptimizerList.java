@@ -36,6 +36,7 @@ import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
@@ -98,9 +99,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * BY in which duplicate solutions are discarded after the sort by a filter
  * which compares the current solution with the prior solution.
  * 
- * TODO AST optimizer to turn SELECT DISTINCT ?p WHERE { ?s ?p ?o } into a
- * DistinctTermScan? (We are doing something very similar for GRAPH ?g {}).
- * 
  * TODO A query with a LIMIT of ZERO (0) should be failed as there will be no
  * solutions.
  * 
@@ -146,7 +144,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
-    	 * into an IN filter using the full text index to determine the IN
+    	 * into an7 full text index to determine the IN
     	 * set.
     	 * 
     	 * Convert:
@@ -474,6 +472,37 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Add range counts to all statement patterns.
          */
         add(new ASTRangeCountOptimizer());
+        
+		/**
+		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
+		 * count mechanisms when that feature would produce exact results for
+		 * the KB instance.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+		 *      </a>
+		 */
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			add(new ASTFastRangeCountOptimizer());
+
+        /**
+		 * Optimizes
+		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
+		 * and similar patterns using an O(N) algorithm, where N is the number
+		 * of distinct solutions.
+		 * <p>
+		 * Note: Either this must run after the {@link ASTRangeCountOptimizer}
+		 * in order to modify the estimated cardinality associated with using
+		 * the {@link DistinctTermAdvancer} (which does less work than a scan)
+		 * or the {@link ASTRangeCountOptimizer} must not overwrite the
+		 * cardinality estimates attached by this optimizer and this optimizer
+		 * could run first.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
+		 *      PREDICATEs query is slow </a>
+		 */
+		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
+			add(new ASTDistinctTermScanOptimizer());
         
         /**
          * Run the static join order optimizer. This attaches the estimated

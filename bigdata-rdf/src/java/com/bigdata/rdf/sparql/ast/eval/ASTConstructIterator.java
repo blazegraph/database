@@ -336,8 +336,14 @@ public class ASTConstructIterator implements
         
 	}
 
+	/**
+	 * FIXME This method needs to be written. It should scale, whereas the
+	 * current implementation does not.  
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/807"> native distinct in
+	 *      quad mode (insert/delete) </a>
+	 */
 	private IFilterTest createNativeDistinctQuadsFilter(ConstructNode construct) {
-		// TODO This method needs to be written. It should scale, whereas the current implementation does not.
 		return createHashDistinctQuadsFilter(construct);
 	}
 

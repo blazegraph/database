@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import com.bigdata.rdf.sparql.ast.QueryHints;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -147,6 +149,21 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestASTFlattenJoinGroupsOptimizer.class);
         
         suite.addTestSuite(TestALPPinTrac773.class);
+        
+        /**
+		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
+		 * count mechanisms when that feature would produce exact results for
+		 * the KB instance.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+		 *      </a>
+		 */
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			suite.addTest(TestASTFastRangeCountOptimizer.suite());
+
+		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
+			suite.addTest(TestASTDistinctTermScanOptimizer.suite());
 
         return suite;
 

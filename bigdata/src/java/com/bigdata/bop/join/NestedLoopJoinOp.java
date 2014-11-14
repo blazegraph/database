@@ -178,6 +178,7 @@ public class NestedLoopJoinOp extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             final BOpStats stats = context.getStats();

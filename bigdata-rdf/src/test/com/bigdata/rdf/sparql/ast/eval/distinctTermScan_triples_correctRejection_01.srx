@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='p'/>
+    </head>
+    <results>
+        <result>
+            <binding name='p'>
+			   <uri>http://bigdata.com#p1</uri>
+            </binding>
+        </result>
+        <result>
+            <binding name='p'>
+			   <uri>http://bigdata.com#p3</uri>
+            </binding>
+        </result>
+    </results>
+</sparql>
