@@ -32,6 +32,9 @@ import com.bigdata.rdf.model.BigdataStatement;
  * A TupleQueryResultWriter that writes query results in the <a
  * href="http://www.w3.org/TR/rdf-sparql-json-res/">SPARQL Query Results JSON
  * Format</a>.
+ * 
+ * @deprecated We now use the openrdf versions of the JSON parser / writer. The
+ *             bigdata specific versions will go away in the future.
  */
 public class BigdataSPARQLResultsJSONWriter extends SPARQLJSONWriterBase implements TupleQueryResultWriter {
 
