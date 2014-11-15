@@ -62,7 +62,6 @@ import info.aduna.iteration.CloseableIteration;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -77,7 +76,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
-import org.openrdf.model.Model;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -85,16 +83,11 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ContextStatementImpl;
-import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.NamespaceImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.algebra.DeleteData;
-import org.openrdf.query.algebra.InsertData;
-import org.openrdf.query.algebra.Modify;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
@@ -3994,24 +3987,76 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        /*
+		 * These methods are new with openrdf 2.7. Bigdata uses either
+		 * MVCC (full read-write tx) or simply a single writer on the live
+		 * indices (unisolated). The latter has more throughput.
+		 * 
+		 * The MVCC semantics in bigdata do use a prepare()/commit(), but the
+		 * prepare() operation is not exposed to the SailConnection.
+		 * 
+		 * BBT - 11/15/2015
+		 * 
+		 * (non-Javadoc)
+		 * @see org.openrdf.sail.SailConnection#begin()
+		 */
+        
+        /**
+         * NOP.
+         * <p>
+         * {@inheritDoc}
+         */
         @Override
         public void begin() throws SailException {
-            // TODO Auto-generated method stub
             
         }
 
+        /**
+		 * Always returns <code>true</code>.
+		 * <p>
+		 * Note: Bigdata does not expose its internal transaction state to the
+		 * sail (the concept of active and inactive transactions exists for full
+		 * read/write transactions and but those semantics are not exposed to
+		 * the sail).
+		 * <p>
+		 * {@inheritDoc}
+		 */
         @Override
         public boolean isActive() throws UnknownSailTransactionStateException {
-            // TODO Auto-generated method stub
-            return true;
+            
+        	return true;
+        	
         }
 
+		/**
+		 * NOP - the internal transaction model is not exposed to the
+		 * {@link SailConnection}.
+		 * <p>
+		 * Note: Full read/write transactions do have a prepare()/commit() model
+		 * interallly based on MVCC, but unisolated connections do not.
+		 * <p>
+		 * {@inheritDoc}
+		 */
         @Override
         public void prepare() throws SailException {
-            // TODO Auto-generated method stub
             
         }
 
+        /*
+		 * This API is new with openrdf 2.7. It is not supported. Bigdata has a
+		 * different logical operator model from openrdf. The UpdateContext is
+		 * expressed in terms of the openrdf logical operator model
+		 * (UpdateExpr). Therefore it can not be used with bigdata.
+		 * 
+		 * (non-Javadoc)
+		 * 
+		 * @see org.openrdf.sail.SailConnection#startUpdate(org.openrdf.sail.
+		 * UpdateContext)
+		 */
+        
+        /**
+         * Unsupported API.
+         */
         @Override
         public void startUpdate(UpdateContext op)
             throws SailException
@@ -4021,6 +4066,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        /**
+         * Unsupported API.
+         */
         @Override
         public void addStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
             throws SailException
@@ -4030,6 +4078,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        /**
+         * Unsupported API.
+         */
         @Override
         public void removeStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
             throws SailException
@@ -4039,6 +4090,9 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        /**
+         * Unsupported API.
+         */
         @Override
         public void endUpdate(UpdateContext op)
             throws SailException
