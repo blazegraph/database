@@ -1859,8 +1859,8 @@ ${postInstallMessage}</echo>
       <!-- is available, change the corresponding property value set  -->
       <!-- below.                                                     -->
 
-      <property name="junit.jar" location="${bigdata.lib}/junit-4.11.jar" />
-      <property name="hamcrest.jar" location="${bigdata.lib}/hamcrest-core-1.3.jar" />
+      <property name="junit.jar" location="${bigdata.lib}/junit-${junit.version}.jar" />
+      <property name="hamcrest.jar" location="${bigdata.lib}/hamcrest-core-${hamcrest.version}.jar" />
       <property name="junit-ext.jar" location="${bigdata.lib}/junit-ext-1.1-b3-dev.jar" />
       <property name="sesame-sparql-test.jar" location="${bigdata-sails.lib}/sesame-sparql-testsuite-${sesame.version}.jar" />
       <property name="sesame-store-test.jar" location="${bigdata-sails.lib}/sesame-store-testsuite-${sesame.version}.jar" />
