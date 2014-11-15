@@ -283,7 +283,8 @@ public class Depends {
             "https://github.com/tinkerpop/rexster/blob/master/LICENSE.txt");
 
     // Note: This is a test-only dependency at this time.
-    private final static Dep hamcrestCore = new Dep("hamcrest-core", 
+    @SuppressWarnings("unused")
+	private final static Dep hamcrestCore = new Dep("hamcrest-core", 
             "https://code.google.com/p/hamcrest/",
     		"http://opensource.org/licenses/BSD-3-Clause");
     
