@@ -3992,12 +3992,16 @@ public class BigdataSail extends SailBase implements Sail {
 		 * MVCC (full read-write tx) or simply a single writer on the live
 		 * indices (unisolated). The latter has more throughput.
 		 * 
-		 * The MVCC semantics in bigdata do use a prepare()/commit(), but the
-		 * prepare() operation is not exposed to the SailConnection.
+		 * TODO The MVCC semantics in bigdata do use a prepare()/commit()
+		 * pattern and have the notion of active and inactive transactions. This
+		 * transaction statement metadata could be exposed to the SailConnection
+		 * for the BigdataSailReadOnlyConnection and BigdataSailRWConnection,
+		 * but not for the BigdataSailConnection (unisolated connection).
 		 * 
 		 * BBT - 11/15/2015
 		 * 
 		 * (non-Javadoc)
+		 * 
 		 * @see org.openrdf.sail.SailConnection#begin()
 		 */
         
