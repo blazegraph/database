@@ -1164,7 +1164,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
          *         reference.
          */
 		private boolean nextChild() {
-		    final boolean isOverflowDirectory = isOverflowDirectory();
+//		    final boolean isOverflowDirectory = isOverflowDirectory();
 			for (; slot < slotsPerPage; slot++) {
 			    AbstractPage tmp = deref(slot);
                 if (tmp == null
@@ -1181,6 +1181,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			return false;
 		}
 
+		@Override
 		public boolean hasNext() {
 			/*
 			 * Return true if there is another child to be visited.
@@ -1191,6 +1192,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			return slot < slotsPerPage;
 		}
 
+		@Override
 		public AbstractPage next() {
 			if (!hasNext())
 				throw new NoSuchElementException();
@@ -1199,6 +1201,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			return tmp;
 		}
 
+		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
@@ -1396,8 +1399,8 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 * @see HTree#validatePointersInParent(DirectoryPage, int, AbstractPage)
 	 */
 	@Override
-	protected boolean dump(Level level, PrintStream out, int height,
-			boolean recursive, boolean materialize) {
+	protected boolean dump(final Level level, final PrintStream out, final int height,
+			final boolean recursive, final boolean materialize) {
 
 		// True iff we will write out the node structure.
 		final boolean debug = level.toInt() <= Level.DEBUG.toInt();
@@ -1605,6 +1608,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	}
 
+	@Override
     public void dumpPages(final HTreePageStats stats) {
 
         stats.visit(htree, this);
@@ -2050,6 +2054,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	}
 	
+	@Override
 	public boolean isOverflowDirectory() {
 	    
 	    return data.isOverflowDirectory();
@@ -2060,6 +2065,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	 * If this is an overflow directory then the depth-based hashCode is irrelevant
 	 * since it is used as a blob container for BucketPage references.
 	 */
+	@Override
 	public int getLocalHashCode(final byte[] key, final int prefixLength) {
 		if (isOverflowDirectory()) {
 			/*
