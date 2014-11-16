@@ -29,6 +29,8 @@ package com.bigdata.rdf;
 
 import info.aduna.lang.service.ServiceRegistry;
 
+import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.ServiceLoader;
 
 import org.openrdf.query.QueryLanguage;
@@ -80,7 +82,6 @@ import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
  *      loader problems </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ServiceProviderHook {
 
@@ -88,7 +89,19 @@ public class ServiceProviderHook {
     static {
         forceLoad();
     }
-    
+
+    /**
+     * The extension MIME type for RDR data interchange using the RDR extension
+     * of TURTLE.
+     * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 *      always discovered </a>
+	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+	 */
+	public static final RDFFormat TURTLE_RDR = new RDFFormat("Turtle-RDR",
+			Arrays.asList("application/x-turtle-RDR"),
+			Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
+
     /**
      * This hook may be used to force the load of this class so it can ensure
      * that the bigdata version of a service provider is used instead of the
