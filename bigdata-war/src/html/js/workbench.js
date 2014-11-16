@@ -20,7 +20,8 @@ var RDF_MODES = {
    'n-triples': 'ntriples',
    'rdf/xml': 'xml',
    'json': 'json',
-   'turtle': 'turtle'
+   'turtle': 'turtle',
+   'turtle-RDR': 'turtle'
 };
 var FILE_CONTENTS = null;
 // file/update editor type handling
@@ -38,7 +39,8 @@ var RDF_TYPES = {
    'trig': 'trig',
    'trix': 'trix',
    //'xml': 'trix',
-   'ttl': 'turtle'
+   'ttl': 'turtle',
+   'ttlx': 'turtle-RDR'
 };
 var RDF_CONTENT_TYPES = {
    'n-quads': 'text/x-nquads',
@@ -48,7 +50,8 @@ var RDF_CONTENT_TYPES = {
    'json': 'application/sparql-results+json',
    'trig': 'application/x-trig',
    'trix': 'application/trix',
-   'turtle': 'application/x-turtle'
+   'turtle': 'application/x-turtle',
+   'turtle-RDR': 'application/x-turtle-RDR'
 };
 var SPARQL_UPDATE_COMMANDS = [
    'INSERT',
@@ -105,6 +108,7 @@ var EXPORT_EXTENSIONS = {
    'application/rdf+xml': ['RDF/XML', 'rdf', true],
    'application/n-triples': ['N-Triples', 'nt', true],
    'application/x-turtle': ['Turtle', 'ttl', true],
+   'application/x-turtle-RDR': ['Turtle-RDR', 'ttlx', true],
    'text/rdf+n3': ['N3', 'n3', true],
    'application/trix': ['TriX', 'trix', true],
    'application/x-trig': ['TRIG', 'trig', true],
