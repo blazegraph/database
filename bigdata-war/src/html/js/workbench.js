@@ -787,6 +787,7 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
    if(jqXHR.status === 0) {
       message += 'Could not contact server';
    } else {
+      var response = $('<div>').append(jqXHR.responseText);
       if(response.find('pre').length === 0) {
          message += response.text();
       } else {
