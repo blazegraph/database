@@ -33,6 +33,7 @@ public class BigdataSPARQLResultsJSONWriterFactory implements TupleQueryResultWr
 	/**
 	 * Returns {@link TupleQueryResultFormat#JSON}.
 	 */
+	@Override
 	public TupleQueryResultFormat getTupleQueryResultFormat() {
 		return TupleQueryResultFormat.JSON;
 	}
@@ -40,6 +41,7 @@ public class BigdataSPARQLResultsJSONWriterFactory implements TupleQueryResultWr
 	/**
 	 * Returns a new instance of SPARQLResultsJSONWriter.
 	 */
+	@Override
 	public TupleQueryResultWriter getWriter(OutputStream out) {
 		return new BigdataSPARQLResultsJSONWriter(out);
 	}
