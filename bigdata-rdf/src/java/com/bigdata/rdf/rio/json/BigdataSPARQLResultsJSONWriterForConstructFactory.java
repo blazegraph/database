@@ -18,13 +18,13 @@ package com.bigdata.rdf.rio.json;
 
 import java.io.OutputStream;
 import java.io.Writer;
-import java.nio.charset.Charset;
-import java.util.Arrays;
 
 import org.openrdf.query.resultio.TupleQueryResultWriterFactory;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
+
+import com.bigdata.rdf.ServiceProviderHook;
 
 
 /**
@@ -38,18 +38,10 @@ public class BigdataSPARQLResultsJSONWriterForConstructFactory implements RDFWri
 //    public static final RDFFormat JSON = new RDFFormat("N-Triples", "text/plain",
 //            Charset.forName("US-ASCII"), "nt", NO_NAMESPACES, NO_CONTEXTS);
     
-    /**
-     * SPARQL Query Results JSON Format.
-     */
-    public static final RDFFormat JSON = new RDFFormat("SPARQL/JSON", Arrays.asList(
-            "application/sparql-results+json", "application/json"), Charset.forName("UTF-8"), Arrays.asList(
-            "srj", "json"), RDFFormat.NO_NAMESPACES, RDFFormat.SUPPORTS_CONTEXTS);
-
-    
     @Override
     public RDFFormat getRDFFormat() {
-        return JSON;
-    }
+    	return ServiceProviderHook.JSON_RDR;
+	}
 
     @Override
     public RDFWriter getWriter(final Writer writer) {
@@ -60,4 +52,5 @@ public class BigdataSPARQLResultsJSONWriterForConstructFactory implements RDFWri
     public RDFWriter getWriter(final OutputStream out) {
         return new BigdataSPARQLResultsJSONWriterForConstruct(out);
     }
+    
 }
