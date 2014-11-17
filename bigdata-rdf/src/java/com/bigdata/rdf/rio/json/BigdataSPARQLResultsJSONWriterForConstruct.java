@@ -82,8 +82,11 @@ public class BigdataSPARQLResultsJSONWriterForConstruct implements RDFWriter {
     @Override
     public void endRDF() throws RDFHandlerException {
         try {
-            writer.endDocument();
-        } catch (IOException e) {
+            writer.endQueryResult();
+//            writer.endDocument();
+//        } catch (IOException e) {
+//            throw new RDFHandlerException(e);
+        } catch (TupleQueryResultHandlerException e) {
             throw new RDFHandlerException(e);
         }
     }
