@@ -45,9 +45,6 @@ import com.fasterxml.jackson.core.JsonToken;
  * @see <a href="http://www.w3.org/TR/sparql11-results-json/">SPARQL 1.1 Query
  *      Results JSON Format</a>
  * @author Peter Ansell
- * 
- * @deprecated We now use the openrdf versions of the JSON parser / writer. The
- *             bigdata specific versions will go away in the future.
  */
 public class BigdataSPARQLResultsJSONParser extends SPARQLJSONParserBase implements TupleQueryResultParser {
 
