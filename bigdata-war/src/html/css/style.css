@@ -153,6 +153,13 @@ h2 {
    overflow-x: scroll;
 }
 
+.error-box {
+   margin: 20px;
+   overflow-x: scroll;
+   font-family: monospace;
+   white-space: pre;
+}
+
 .box:last-of-type {
 }
 
