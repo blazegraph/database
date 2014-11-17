@@ -926,7 +926,7 @@ function submitQuery(e) {
    var settings = {
       type: 'POST',
       data: $('#query-form').serialize(),
-      headers: { 'Accept': 'application/sparql-results+json, application/rdf+xml' },
+      headers: { 'Accept': 'application/sparql-results+json' },
       success: showQueryResults,
       error: queryResultsError
    };

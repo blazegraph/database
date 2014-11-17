@@ -38,6 +38,7 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriterRegistry;
 
@@ -90,6 +91,15 @@ public class ServiceProviderHook {
 	
     static private boolean loaded = false;
     static {
+
+    	TURTLE_RDR = new RDFFormat("Turtle-RDR",
+				Arrays.asList("application/x-turtle-RDR"),
+				Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
+		
+    	NTRIPLES_RDR = new RDFFormat("N-Triples-RDR",
+				"application/x-n-triples-RDR", Charset.forName("US-ASCII"),
+				"ntx", false, false);
+
         forceLoad();
     }
 
@@ -101,9 +111,7 @@ public class ServiceProviderHook {
 	 *      always discovered </a>
 	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
 	 */
-	public static final RDFFormat TURTLE_RDR = new RDFFormat("Turtle-RDR",
-			Arrays.asList("application/x-turtle-RDR"),
-			Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
+	public static final RDFFormat TURTLE_RDR; //RDFFormat.TURTLE; 
 
     /**
      * The extension MIME type for RDR data interchange using the RDR extension
@@ -113,9 +121,7 @@ public class ServiceProviderHook {
 	 *      always discovered </a>
 	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
 	 */
-	public static final RDFFormat NTRIPLES_RDR = new RDFFormat("N-Triples-RDR",
-			"application/x-n-triples-RDR", Charset.forName("US-ASCII"), "ntx",
-			false, false);
+	public static final RDFFormat NTRIPLES_RDR; //RDFFormat.NTRIPLES;
 
     /**
 	 * This hook may be used to force the load of this class so it can ensure
@@ -136,20 +142,35 @@ public class ServiceProviderHook {
 
         log.warn("Running.");
 
-//		/*
-//		 * Force load of the openrdf service registry before we load our own
-//		 * classes.
-//		 */
-//		{
-//			final String className = "info.aduna.lang.service.ServiceRegistry";
-//			try {
-//				Class.forName(className);
-//			} catch (ClassNotFoundException ex) {
-//				log.error(ex);
-//			}
-//		}
+		/*
+		 * Force load of the openrdf service registry before we load our own
+		 * classes.
+		 */
+		{
+			final String className = "info.aduna.lang.service.ServiceRegistry";
+			try {
+				Class.forName(className);
+			} catch (ClassNotFoundException ex) {
+				log.error(ex);
+			}
+		}
         
-        /*
+		{
+			{
+				for (RDFFormat f : RDFFormat.values()) {
+					log.warn("before: " + f);
+				}
+			}
+			RDFFormat.register(NTRIPLES_RDR);
+			RDFFormat.register(TURTLE_RDR);
+			{
+				for (RDFFormat f : RDFFormat.values()) {
+					log.warn("after: " + f);
+				}
+			}
+		}
+		
+		/*
          * Force the class loader to resolve the register, which will cause it
          * to be populated with the service provides as declared in the various
          * META-INF/services/serviceIface files.
@@ -160,17 +181,30 @@ public class ServiceProviderHook {
         {
 
             final RDFParserRegistry r = RDFParserRegistry.getInstance();
+			{
+				for (RDFParserFactory f : r.getAll()) {
+					log.warn("before: " + f);
+				}
+			}
 
 //			final RDFParserFactory oldValue = RDFParserRegistry.getInstance().get(RDFFormat.NTRIPLES);
 			
-//			log.warn("Old value: " + oldValue + " for format="
-//					+ RDFFormat.NTRIPLES);
-
+//			log.warn("Old value: " + oldValue + " for format=" + RDFFormat.NTRIPLES);
+            
+            // RDR-enabled
 			r.add(new BigdataNTriplesParserFactory());
+			assert r.has(new BigdataNTriplesParserFactory().getRDFFormat());
             
-            // subclassed the turtle parser for RDR
+            // RDR-enabled
             r.add(new BigdataTurtleParserFactory());
+            assert r.has(new BigdataTurtleParserFactory().getRDFFormat());
             
+			{
+				for (RDFParserFactory f : r.getAll()) {
+					log.warn("after: " + f);
+				}
+			}
+			
             /*
              * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
              * RDR-enabled.
