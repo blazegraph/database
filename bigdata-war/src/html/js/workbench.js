@@ -1746,7 +1746,7 @@ function loadPerformance(path) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<<\n ' + abbreviate(binding.value.s.value) + '\n ' + abbreviate(binding.value.p.value) + '\n ' + abbreviate(binding.value.o.value) + '\n>>';
+   return '<<\n ' + abbreviate(binding.subject.value) + '\n ' + abbreviate(binding.predicate.value) + '\n ' + abbreviate(binding.object.value) + '\n>>';
 }
 
 function abbreviate(uri) {

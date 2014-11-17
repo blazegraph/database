@@ -36,10 +36,12 @@ import java.util.ServiceLoader;
 import org.apache.log4j.Logger;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.query.resultio.TupleQueryResultWriterFactory;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
@@ -92,6 +94,11 @@ public class ServiceProviderHook {
     static private boolean loaded = false;
     static {
 
+		/*
+		 * Note: These MUST be declared before the forceLoad() call or they will
+		 * be NULL when that method runs.
+		 */
+    	
     	TURTLE_RDR = new RDFFormat("Turtle-RDR",
 				Arrays.asList("application/x-turtle-RDR"),
 				Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
@@ -101,6 +108,7 @@ public class ServiceProviderHook {
 				"ntx", false, false);
 
         forceLoad();
+
     }
 
     /**
@@ -111,7 +119,7 @@ public class ServiceProviderHook {
 	 *      always discovered </a>
 	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
 	 */
-	public static final RDFFormat TURTLE_RDR; //RDFFormat.TURTLE; 
+	public static final RDFFormat TURTLE_RDR;  
 
     /**
      * The extension MIME type for RDR data interchange using the RDR extension
@@ -121,7 +129,7 @@ public class ServiceProviderHook {
 	 *      always discovered </a>
 	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
 	 */
-	public static final RDFFormat NTRIPLES_RDR; //RDFFormat.NTRIPLES;
+	public static final RDFFormat NTRIPLES_RDR; 
 
     /**
 	 * This hook may be used to force the load of this class so it can ensure
@@ -142,6 +150,23 @@ public class ServiceProviderHook {
 
         log.warn("Running.");
 
+        if(log.isInfoEnabled()){
+		{
+			for (RDFFormat f : RDFFormat.values()) {
+				log.info("before: " + f);
+			}
+			for (RDFParserFactory f : RDFParserRegistry.getInstance().getAll()) {
+				log.info("before: " + f);
+			}
+			for (RDFWriterFactory f : RDFWriterRegistry.getInstance().getAll()) {
+				log.info("before: " + f);
+			}
+			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry.getInstance().getAll()) {
+				log.info("before: " + f);
+			}
+			
+		}
+
 		/*
 		 * Force load of the openrdf service registry before we load our own
 		 * classes.
@@ -155,19 +180,8 @@ public class ServiceProviderHook {
 			}
 		}
         
-		{
-			{
-				for (RDFFormat f : RDFFormat.values()) {
-					log.warn("before: " + f);
-				}
-			}
 			RDFFormat.register(NTRIPLES_RDR);
 			RDFFormat.register(TURTLE_RDR);
-			{
-				for (RDFFormat f : RDFFormat.values()) {
-					log.warn("after: " + f);
-				}
-			}
 		}
 		
 		/*
@@ -181,17 +195,8 @@ public class ServiceProviderHook {
         {
 
             final RDFParserRegistry r = RDFParserRegistry.getInstance();
-			{
-				for (RDFParserFactory f : r.getAll()) {
-					log.warn("before: " + f);
-				}
-			}
-
-//			final RDFParserFactory oldValue = RDFParserRegistry.getInstance().get(RDFFormat.NTRIPLES);
 			
-//			log.warn("Old value: " + oldValue + " for format=" + RDFFormat.NTRIPLES);
-            
-            // RDR-enabled
+			// RDR-enabled
 			r.add(new BigdataNTriplesParserFactory());
 			assert r.has(new BigdataNTriplesParserFactory().getRDFFormat());
             
@@ -199,12 +204,6 @@ public class ServiceProviderHook {
             r.add(new BigdataTurtleParserFactory());
             assert r.has(new BigdataTurtleParserFactory().getRDFFormat());
             
-			{
-				for (RDFParserFactory f : r.getAll()) {
-					log.warn("after: " + f);
-				}
-			}
-			
             /*
              * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
              * RDR-enabled.
@@ -262,6 +261,21 @@ public class ServiceProviderHook {
 //            r.add(new PropertiesTextWriterFactory());
 //            
 //        }
+
+		if (log.isInfoEnabled()) {
+			for (RDFFormat f : RDFFormat.values()) {
+				log.info("after: " + f);
+			}
+			for (RDFParserFactory f : RDFParserRegistry.getInstance().getAll()) {
+				log.info("after: " + f);
+			}
+			for (RDFWriterFactory f : RDFWriterRegistry.getInstance().getAll()) {
+				log.info("after: " + f);
+			}
+			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry.getInstance().getAll()) {
+				log.info("after: " + f);
+			}
+		}
 
         loaded = true;
         
