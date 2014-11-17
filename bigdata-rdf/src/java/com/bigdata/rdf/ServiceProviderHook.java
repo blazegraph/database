@@ -38,7 +38,6 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriterRegistry;
 
@@ -106,8 +105,16 @@ public class ServiceProviderHook {
 			Arrays.asList("application/x-turtle-RDR"),
 			Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
 
+    /**
+     * The extension MIME type for RDR data interchange using the RDR extension
+     * of N-TRIPLES.
+     * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 *      always discovered </a>
+	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+	 */
 	public static final RDFFormat NTRIPLES_RDR = new RDFFormat("N-Triples-RDR",
-			"application/n-triples-RDR", Charset.forName("US-ASCII"), "ntx",
+			"application/x-n-triples-RDR", Charset.forName("US-ASCII"), "ntx",
 			false, false);
 
     /**
