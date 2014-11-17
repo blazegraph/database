@@ -18,6 +18,7 @@ var CODEMIRROR_DEFAULTS = {
 // key is value of RDF type selector, value is name of CodeMirror mode
 var RDF_MODES = {
    'n-triples': 'ntriples',
+   'n-triples-RDR': 'ntriples-RDR',
    'rdf/xml': 'xml',
    'json': 'json',
    'turtle': 'turtle',
@@ -30,6 +31,7 @@ var FILE_CONTENTS = null;
 var RDF_TYPES = {
    'nq': 'n-quads',
    'nt': 'n-triples',
+   'ntx': 'n-triples-RDR',
    'n3': 'n3',
    'rdf': 'rdf/xml',
    'rdfs': 'rdf/xml',
@@ -45,6 +47,7 @@ var RDF_TYPES = {
 var RDF_CONTENT_TYPES = {
    'n-quads': 'text/x-nquads',
    'n-triples': 'text/plain',
+   'n-triples-RDR': 'application/x-n-triples-RDR',
    'n3': 'text/rdf+n3',
    'rdf/xml': 'application/rdf+xml',
    'json': 'application/sparql-results+json',
@@ -107,6 +110,7 @@ var NAMESPACE_SHORTCUTS = {
 var EXPORT_EXTENSIONS = {
    'application/rdf+xml': ['RDF/XML', 'rdf', true],
    'application/n-triples': ['N-Triples', 'nt', true],
+   'application/x-n-triples-RDR': ['N-Triples-RDR', 'ntx', true],
    'application/x-turtle': ['Turtle', 'ttl', true],
    'application/x-turtle-RDR': ['Turtle-RDR', 'ttlx', true],
    'text/rdf+n3': ['N3', 'n3', true],
