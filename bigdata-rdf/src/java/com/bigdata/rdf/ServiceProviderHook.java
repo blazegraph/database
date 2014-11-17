@@ -29,13 +29,19 @@ package com.bigdata.rdf;
 
 import info.aduna.lang.service.ServiceRegistry;
 
+import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.ServiceLoader;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.query.resultio.TupleQueryResultWriterFactory;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.model.StatementEnum;
@@ -80,28 +86,105 @@ import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
  *      loader problems </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ServiceProviderHook {
 
+	private static final Logger log = Logger.getLogger(ServiceProviderHook.class);
+	
     static private boolean loaded = false;
     static {
+
+		/*
+		 * Note: These MUST be declared before the forceLoad() call or they will
+		 * be NULL when that method runs.
+		 */
+    	
+    	TURTLE_RDR = new RDFFormat("Turtle-RDR",
+				Arrays.asList("application/x-turtle-RDR"),
+				Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
+		
+    	NTRIPLES_RDR = new RDFFormat("N-Triples-RDR",
+				"application/x-n-triples-RDR", Charset.forName("US-ASCII"),
+				"ntx", false, false);
+
         forceLoad();
+
     }
-    
+
     /**
-     * This hook may be used to force the load of this class so it can ensure
-     * that the bigdata version of a service provider is used instead of the
-     * openrdf version. This is NOT optional. Without this hook, we do not have
-     * control over which version is resolved last in the processed
-     * <code>META-INF/services</code> files.
-     */
+     * The extension MIME type for RDR data interchange using the RDR extension
+     * of TURTLE.
+     * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 *      always discovered </a>
+	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+	 */
+	public static final RDFFormat TURTLE_RDR;  
+
+    /**
+     * The extension MIME type for RDR data interchange using the RDR extension
+     * of N-TRIPLES.
+     * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 *      always discovered </a>
+	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+	 */
+	public static final RDFFormat NTRIPLES_RDR; 
+
+    /**
+	 * This hook may be used to force the load of this class so it can ensure
+	 * that the bigdata version of a service provider is used instead of the
+	 * openrdf version. This is NOT optional. Without this hook, we do not have
+	 * control over which version is resolved last in the processed
+	 * <code>META-INF/services</code> files.
+	 * <p>
+	 * Note: We need to use a synchronized pattern in order to ensure that any
+	 * threads contending for this method awaits its completion. It would not
+	 * be enough for a thread to know that the method was running. The thread
+	 * needs to wait until the method is done.
+	 */
     synchronized static public void forceLoad() {
         
         if (loaded)
             return;
 
-        /*
+        log.warn("Running.");
+
+        if(log.isInfoEnabled()){
+		{
+			for (RDFFormat f : RDFFormat.values()) {
+				log.info("before: " + f);
+			}
+			for (RDFParserFactory f : RDFParserRegistry.getInstance().getAll()) {
+				log.info("before: " + f);
+			}
+			for (RDFWriterFactory f : RDFWriterRegistry.getInstance().getAll()) {
+				log.info("before: " + f);
+			}
+			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry.getInstance().getAll()) {
+				log.info("before: " + f);
+			}
+			
+		}
+
+		/*
+		 * Force load of the openrdf service registry before we load our own
+		 * classes.
+		 */
+		{
+			final String className = "info.aduna.lang.service.ServiceRegistry";
+			try {
+				Class.forName(className);
+			} catch (ClassNotFoundException ex) {
+				log.error(ex);
+			}
+		}
+        
+			RDFFormat.register(NTRIPLES_RDR);
+			RDFFormat.register(TURTLE_RDR);
+		}
+		
+		/*
          * Force the class loader to resolve the register, which will cause it
          * to be populated with the service provides as declared in the various
          * META-INF/services/serviceIface files.
@@ -112,16 +195,14 @@ public class ServiceProviderHook {
         {
 
             final RDFParserRegistry r = RDFParserRegistry.getInstance();
-
-//            r.add(new BigdataRDFXMLParserFactory());
-
-//            // Note: This ensures that the RDFFormat for NQuads is loaded.
-//            r.get(RDFFormat.NQUADS);
-
-            r.add(new BigdataNTriplesParserFactory());
+			
+			// RDR-enabled
+			r.add(new BigdataNTriplesParserFactory());
+			assert r.has(new BigdataNTriplesParserFactory().getRDFFormat());
             
-            // subclassed the turtle parser for RDR
+            // RDR-enabled
             r.add(new BigdataTurtleParserFactory());
+            assert r.has(new BigdataTurtleParserFactory().getRDFFormat());
             
             /*
              * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
@@ -180,9 +261,26 @@ public class ServiceProviderHook {
 //            r.add(new PropertiesTextWriterFactory());
 //            
 //        }
-        
+
+		if (log.isInfoEnabled()) {
+			for (RDFFormat f : RDFFormat.values()) {
+				log.info("after: " + f);
+			}
+			for (RDFParserFactory f : RDFParserRegistry.getInstance().getAll()) {
+				log.info("after: " + f);
+			}
+			for (RDFWriterFactory f : RDFWriterRegistry.getInstance().getAll()) {
+				log.info("after: " + f);
+			}
+			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry.getInstance().getAll()) {
+				log.info("after: " + f);
+			}
+		}
+
         loaded = true;
         
     }
 
+//    private static void registerFactory
+    
 }

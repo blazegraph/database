@@ -54,6 +54,7 @@ Change log:
 - http://trac.bigdata.com/ticket/714	(Migrate to openrdf 2.7)
 - http://trac.bigdata.com/ticket/745	(BackgroundTupleResult overrides final method close)
 - http://trac.bigdata.com/ticket/813	(Documentation on BigData Reasoning)
+- http://trac.bigdata.com/ticket/911    (workbench does not display errors well)
 - http://trac.bigdata.com/ticket/1035	(DISTINCT PREDICATEs query is slow)
 - http://trac.bigdata.com/ticket/1037	(SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} is slow)
 - http://trac.bigdata.com/ticket/1044	(ORDER_BY ordering not preserved by projection operator)

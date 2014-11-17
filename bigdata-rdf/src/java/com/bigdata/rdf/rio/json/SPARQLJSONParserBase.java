@@ -42,12 +42,14 @@ import com.fasterxml.jackson.core.JsonToken;
 /**
  * Abstract base class for SPARQL Results JSON Parsers. Provides a common
  * implementation of both boolean and tuple parsing.
- * 
+ * <p>
  * Bigdata Changes:
- * - Changed the visibility of the method parseValue() from private to protected
- *   so we could override it.
- * - Pulled some code out of parseQueryResultInternal into its own method so
- *   that we can override it.
+ * <ul>
+ * <li>Changed the visibility of the method parseValue() from private to
+ * protected so we could override it.</li>
+ * <li>Pulled some code out of parseQueryResultInternal into its own method so
+ * that we can override it.</li>
+ * </ul>
  * 
  * @author Peter Ansell
  * @author Sebastian Schaffert
