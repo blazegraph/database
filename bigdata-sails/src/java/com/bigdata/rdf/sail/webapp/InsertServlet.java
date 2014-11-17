@@ -150,8 +150,9 @@ public class InsertServlet extends BigdataRDFServlet {
          * UpdateServlet fails to parse MIMEType when doing conneg. </a>
          */
 
-        final RDFFormat format = RDFFormat
-                .forMIMEType(new MiniMime(contentType).getMimeType());
+		final String mimeTypeStr = new MiniMime(contentType).getMimeType();
+
+		final RDFFormat format = RDFFormat.forMIMEType(mimeTypeStr);
 
         if (format == null) {
 
