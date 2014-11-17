@@ -33,10 +33,12 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.ServiceLoader;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriterRegistry;
 
@@ -85,6 +87,8 @@ import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
  */
 public class ServiceProviderHook {
 
+	private static final Logger log = Logger.getLogger(ServiceProviderHook.class);
+	
     static private boolean loaded = false;
     static {
         forceLoad();
@@ -102,18 +106,42 @@ public class ServiceProviderHook {
 			Arrays.asList("application/x-turtle-RDR"),
 			Charset.forName("UTF-8"), Arrays.asList("ttlx"), true, false);
 
+	public static final RDFFormat NTRIPLES_RDR = new RDFFormat("N-Triples-RDR",
+			"application/n-triples-RDR", Charset.forName("US-ASCII"), "ntx",
+			false, false);
+
     /**
-     * This hook may be used to force the load of this class so it can ensure
-     * that the bigdata version of a service provider is used instead of the
-     * openrdf version. This is NOT optional. Without this hook, we do not have
-     * control over which version is resolved last in the processed
-     * <code>META-INF/services</code> files.
-     */
+	 * This hook may be used to force the load of this class so it can ensure
+	 * that the bigdata version of a service provider is used instead of the
+	 * openrdf version. This is NOT optional. Without this hook, we do not have
+	 * control over which version is resolved last in the processed
+	 * <code>META-INF/services</code> files.
+	 * <p>
+	 * Note: We need to use a synchronized pattern in order to ensure that any
+	 * threads contending for this method awaits its completion. It would not
+	 * be enough for a thread to know that the method was running. The thread
+	 * needs to wait until the method is done.
+	 */
     synchronized static public void forceLoad() {
         
         if (loaded)
             return;
 
+        log.warn("Running.");
+
+//		/*
+//		 * Force load of the openrdf service registry before we load our own
+//		 * classes.
+//		 */
+//		{
+//			final String className = "info.aduna.lang.service.ServiceRegistry";
+//			try {
+//				Class.forName(className);
+//			} catch (ClassNotFoundException ex) {
+//				log.error(ex);
+//			}
+//		}
+        
         /*
          * Force the class loader to resolve the register, which will cause it
          * to be populated with the service provides as declared in the various
@@ -126,12 +154,12 @@ public class ServiceProviderHook {
 
             final RDFParserRegistry r = RDFParserRegistry.getInstance();
 
-//            r.add(new BigdataRDFXMLParserFactory());
+//			final RDFParserFactory oldValue = RDFParserRegistry.getInstance().get(RDFFormat.NTRIPLES);
+			
+//			log.warn("Old value: " + oldValue + " for format="
+//					+ RDFFormat.NTRIPLES);
 
-//            // Note: This ensures that the RDFFormat for NQuads is loaded.
-//            r.get(RDFFormat.NQUADS);
-
-            r.add(new BigdataNTriplesParserFactory());
+			r.add(new BigdataNTriplesParserFactory());
             
             // subclassed the turtle parser for RDR
             r.add(new BigdataTurtleParserFactory());
@@ -193,9 +221,11 @@ public class ServiceProviderHook {
 //            r.add(new PropertiesTextWriterFactory());
 //            
 //        }
-        
+
         loaded = true;
         
     }
 
+//    private static void registerFactory
+    
 }
