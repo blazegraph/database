@@ -75,11 +75,12 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
     </path>
 
     <!-- runtime classpath w/o install. -->
-    <path id="runtime.classpath">
-        <pathelement location="${build.dir}/classes" />
-        <path refid="build.classpath" />
+	<path id="runtime.classpath">
+	   	<fileset file="${bigdata.dir}/bigdata-rdf/lib/openrdf-sesame-${sesame.version}-onejar.jar"/>
+	        <pathelement location="${build.dir}/classes" />
+	        <path refid="build.classpath" />
     </path>
-
+	
     <!-- classpath as installed. -->
     <!-- @todo .so and .dll -->
     <path id="install.classpath">
