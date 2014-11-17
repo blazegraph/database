@@ -41,7 +41,6 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -296,6 +295,10 @@ public class SD {
     static public final URI TURTLE = new URIImpl(
             "http://www.w3.org/ns/formats/Turtle");
 
+    // RDR specific extension of TURTLE.
+    static public final URI TURTLE_RDR = new URIImpl(
+            "http://www.bigdata.com/ns/formats/Turtle-RDR");
+
     /**
      * Unique URI for N3.
      * 
@@ -336,7 +339,11 @@ public class SD {
      */
     static public final URI NQUADS = new URIImpl(
             "http://sw.deri.org/2008/07/n-quads/#n-quads");
-    
+
+    // RDR specific extension of N-Triples.
+    static public final URI NTRIPLES_RDR = new URIImpl(
+            "http://www.bigdata.com/ns/formats/N-Triples-RDR");
+
     /*
      * SPARQL results
      */
@@ -567,12 +574,8 @@ public class SD {
         g.add(aService, SD.inputFormat, SD.NQUADS);
 		if (tripleStore.getStatementIdentifiers()) {
 			// RDR specific data interchange.
-			for (String s : ServiceProviderHook.NTRIPLES_RDR.getMIMETypes()) {
-				g.add(aService, SD.inputFormat, new URIImpl(s));
-			}
-			for (String s : ServiceProviderHook.TURTLE_RDR.getMIMETypes()) {
-				g.add(aService, SD.inputFormat, new URIImpl(s));
-			}
+			g.add(aService, SD.inputFormat, SD.NTRIPLES_RDR);
+			g.add(aService, SD.inputFormat, SD.TURTLE_RDR);
         }
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_XML);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
