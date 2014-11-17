@@ -41,6 +41,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -553,8 +554,6 @@ public class SD {
      *      URIs)
      * 
      * @see #inputFormat
-     * 
-     *      TODO Add an explicit declaration for SIDS mode data interchange?
      */
     protected void describeInputFormats() {
         
@@ -566,7 +565,15 @@ public class SD {
         g.add(aService, SD.inputFormat, SD.TRIG);
         // g.add(service, SD.inputFormat, SD.BINARY); // TODO BINARY
         g.add(aService, SD.inputFormat, SD.NQUADS);
-
+		if (tripleStore.getStatementIdentifiers()) {
+			// RDR specific data interchange.
+			for (String s : ServiceProviderHook.NTRIPLES_RDR.getMIMETypes()) {
+				g.add(aService, SD.inputFormat, new URIImpl(s));
+			}
+			for (String s : ServiceProviderHook.TURTLE_RDR.getMIMETypes()) {
+				g.add(aService, SD.inputFormat, new URIImpl(s));
+			}
+        }
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_XML);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_CSV);
