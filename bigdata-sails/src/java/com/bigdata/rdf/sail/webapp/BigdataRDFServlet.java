@@ -51,6 +51,7 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.journal.IAtomicStore;
@@ -435,14 +436,37 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         if (format == null)
             format = RDFFormat.RDFXML;
 
+		RDFWriterFactory writerFactory = RDFWriterRegistry.getInstance().get(
+				format);
+
+		if (writerFactory == null) {
+
+			log.warn("No writer for format: format=" + format + ", Accept=\""
+					+ acceptStr + "\"");
+
+			format = RDFFormat.RDFXML;
+			
+			writerFactory = RDFWriterRegistry.getInstance().get(format);
+			
+		}
+
+//        if (writerFactory == null) {
+//
+//			buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+//					"No writer for format: Accept=\"" + acceptStr
+//							+ "\", format=" + format);
+//			
+//			return;
+//
+//		}
+		
         resp.setStatus(HTTP_OK);
 
         resp.setContentType(format.getDefaultMIMEType());
 
         final OutputStream os = resp.getOutputStream();
         try {
-            final RDFWriter writer = RDFWriterRegistry.getInstance()
-                    .get(format).getWriter(os);
+            final RDFWriter writer = writerFactory.getWriter(os);
             writer.startRDF();
             final Iterator<Statement> itr = g.iterator();
             while (itr.hasNext()) {
