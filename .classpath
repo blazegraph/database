@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar"/>
 	<classpathentry kind="src" path="bigdata/src/java"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
 	<classpathentry kind="src" path="bigdata-sails/src/java"/>
@@ -98,6 +99,5 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.7.13.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.7.13.jar" sourcepath="/Users/mikepersonick/.m2/repository/org/openrdf/sesame/sesame-sparql-testsuite/2.7.13/sesame-sparql-testsuite-2.7.13-sources.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.7.13.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

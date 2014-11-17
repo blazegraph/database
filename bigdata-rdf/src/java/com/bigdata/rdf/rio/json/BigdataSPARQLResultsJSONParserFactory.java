@@ -25,9 +25,6 @@ import org.openrdf.query.resultio.TupleQueryResultParserFactory;
  * Query Results.
  * 
  * @author Peter Ansell
- * 
- * @deprecated We now use the openrdf versions of the JSON parser / writer. The
- *             bigdata specific versions will go away in the future.
  */
 public class BigdataSPARQLResultsJSONParserFactory implements TupleQueryResultParserFactory {
 

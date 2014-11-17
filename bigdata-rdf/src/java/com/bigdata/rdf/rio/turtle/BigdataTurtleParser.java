@@ -15,7 +15,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
-import org.openrdf.rio.helpers.BasicParserSettings;
 import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.rio.turtle.TurtleUtil;
 
