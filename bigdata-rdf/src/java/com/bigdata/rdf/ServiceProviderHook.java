@@ -106,7 +106,12 @@ public class ServiceProviderHook {
     	NTRIPLES_RDR = new RDFFormat("N-Triples-RDR",
 				"application/x-n-triples-RDR", Charset.forName("US-ASCII"),
 				"ntx", false, false);
-
+        
+		JSON_RDR = new RDFFormat("SPARQL/JSON", Arrays.asList(
+				"application/sparql-results+json", "application/json"),
+				Charset.forName("UTF-8"), Arrays.asList("srj", "json"),
+				RDFFormat.NO_NAMESPACES, RDFFormat.SUPPORTS_CONTEXTS);        
+		
         forceLoad();
 
     }
@@ -132,6 +137,12 @@ public class ServiceProviderHook {
 	public static final RDFFormat NTRIPLES_RDR; 
 
     /**
+     * The extension MIME type for RDR aware data interchange of RDF and SPARQL
+     * result stes using JSON.
+     */
+    public static final RDFFormat JSON_RDR;
+    
+    /**
 	 * This hook may be used to force the load of this class so it can ensure
 	 * that the bigdata version of a service provider is used instead of the
 	 * openrdf version. This is NOT optional. Without this hook, we do not have
@@ -150,39 +161,47 @@ public class ServiceProviderHook {
 
         log.warn("Running.");
 
-        if(log.isInfoEnabled()){
-		{
+		if (log.isInfoEnabled()) {
+
 			for (RDFFormat f : RDFFormat.values()) {
-				log.info("before: " + f);
+				log.info("RDFFormat: before: " + f);
 			}
 			for (RDFParserFactory f : RDFParserRegistry.getInstance().getAll()) {
-				log.info("before: " + f);
+				log.info("RDFParserFactory: before: " + f);
 			}
 			for (RDFWriterFactory f : RDFWriterRegistry.getInstance().getAll()) {
-				log.info("before: " + f);
+				log.info("RDFWriterFactory: before: " + f);
 			}
-			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry.getInstance().getAll()) {
-				log.info("before: " + f);
+			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry
+					.getInstance().getAll()) {
+				log.info("TupleQueryResultWriterFactory: before: " + f);
 			}
-			
-		}
 
+		}
+//		/*
+//		 * Force load of the openrdf service registry before we load our own
+//		 * classes.
+//		 */
+//		{
+//			final String className = "info.aduna.lang.service.ServiceRegistry";
+//			try {
+//				Class.forName(className);
+//			} catch (ClassNotFoundException ex) {
+//				log.error(ex);
+//			}
+//		}
+//        
+//			RDFFormat.register(NTRIPLES_RDR);
+//			RDFFormat.register(TURTLE_RDR);
+		
 		/*
-		 * Force load of the openrdf service registry before we load our own
-		 * classes.
+		 * Register our RDFFormats.
+		 * 
+		 * Note: They are NOT registered automatically by their constructors.
 		 */
-		{
-			final String className = "info.aduna.lang.service.ServiceRegistry";
-			try {
-				Class.forName(className);
-			} catch (ClassNotFoundException ex) {
-				log.error(ex);
-			}
-		}
-        
-			RDFFormat.register(NTRIPLES_RDR);
-			RDFFormat.register(TURTLE_RDR);
-		}
+		RDFFormat.register(TURTLE_RDR);
+		RDFFormat.register(NTRIPLES_RDR);
+		RDFFormat.register(JSON_RDR);
 		
 		/*
          * Force the class loader to resolve the register, which will cause it
@@ -264,16 +283,16 @@ public class ServiceProviderHook {
 
 		if (log.isInfoEnabled()) {
 			for (RDFFormat f : RDFFormat.values()) {
-				log.info("after: " + f);
+				log.info("RDFFormat: after: " + f);
 			}
 			for (RDFParserFactory f : RDFParserRegistry.getInstance().getAll()) {
-				log.info("after: " + f);
+				log.info("RDFParserFactory: after: " + f);
 			}
 			for (RDFWriterFactory f : RDFWriterRegistry.getInstance().getAll()) {
-				log.info("after: " + f);
+				log.info("RDFWriterFactory: after: " + f);
 			}
 			for (TupleQueryResultWriterFactory f : TupleQueryResultWriterRegistry.getInstance().getAll()) {
-				log.info("after: " + f);
+				log.info("TupleQueryResultWriterFactory: after: " + f);
 			}
 		}
 

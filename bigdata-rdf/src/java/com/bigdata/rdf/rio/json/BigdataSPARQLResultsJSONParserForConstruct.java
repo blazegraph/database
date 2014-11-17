@@ -38,6 +38,8 @@ import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.helpers.RDFParserBase;
 
+import com.bigdata.rdf.ServiceProviderHook;
+
 /**
  * Parser for SPARQL-1.1 JSON Results Format documents
  * 
@@ -61,7 +63,7 @@ public class BigdataSPARQLResultsJSONParserForConstruct extends RDFParserBase
     
     @Override
     public RDFFormat getRDFFormat() {
-        return BigdataSPARQLResultsJSONWriterForConstructFactory.JSON;
+        return ServiceProviderHook.JSON_RDR;
     }
 
     @Override

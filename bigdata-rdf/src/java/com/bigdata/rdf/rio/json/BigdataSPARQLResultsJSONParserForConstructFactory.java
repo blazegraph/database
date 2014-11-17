@@ -21,6 +21,8 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 
+import com.bigdata.rdf.ServiceProviderHook;
+
 /**
  * A {@link TupleQueryResultParserFactory} for parsers of SPARQL-1.1 JSON Tuple
  * Query Results.
@@ -28,8 +30,6 @@ import org.openrdf.rio.RDFParserFactory;
  * @author Peter Ansell
  */
 public class BigdataSPARQLResultsJSONParserForConstructFactory implements RDFParserFactory {
-
-    public static final RDFFormat JSON = BigdataSPARQLResultsJSONWriterForConstructFactory.JSON;
     
 	@Override
 	public RDFParser getParser() {
@@ -38,7 +38,7 @@ public class BigdataSPARQLResultsJSONParserForConstructFactory implements RDFPar
 
 	@Override
 	public RDFFormat getRDFFormat() {
-		return JSON;
+		return ServiceProviderHook.JSON_RDR;
 	}
 
 }
