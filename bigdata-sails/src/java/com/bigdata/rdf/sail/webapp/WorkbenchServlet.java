@@ -87,8 +87,9 @@ public class WorkbenchServlet extends BigdataRDFServlet {
     private void doConvert(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
-    	    final String baseURI = req.getRequestURL().toString();
+    	final String baseURI = req.getRequestURL().toString();
     	
+    	// The content type of the request.
         final String contentType = req.getContentType();
 
         if (log.isInfoEnabled())
@@ -155,6 +156,10 @@ public class WorkbenchServlet extends BigdataRDFServlet {
 	         */
 	        rdfParser.parse(req.getInputStream(), baseURI);
 	
+	        /*
+			 * Send back the graph using CONNEG to decide the MIME Type of the
+			 * response.
+			 */
 	        sendGraph(req, resp, g);
 	        
         } catch (Throwable t) {
