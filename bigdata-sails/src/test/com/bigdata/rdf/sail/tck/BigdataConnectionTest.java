@@ -35,9 +35,18 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.QueryInterruptedException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnectionTest;
 
@@ -669,153 +678,153 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 //		}
 //	}
 //
-//    /**
-//     * {@inheritDoc}
-//     * <p>
-//     * This test was failing historically for two reasons. First, it would
-//     * sometimes encounter a full GC pause that would suspend the JVM for longer
-//     * than the query timeout. This would fail the test. Second, the query
-//     * engine code used to only check for a deadline when a query operator would
-//     * start or stop. This meant that a compute bound operator would not be
-//     * interrupted if there was no other concurrent operators for that query
-//     * that were starting and stoping. This was fixed in #722.
-//     * 
-//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
-//     *      Query timeout only checked at operator start/stop. </a>
-//     */
-//    @Override
-//    public void testOrderByQueriesAreInterruptable() throws Exception {
-//
-//        /*
-//         * Note: Test failures arise from length GC pauses. Such GC pauses
-//         * suspend the application for longer than the query should run and
-//         * cause it to miss its deadline. In order to verify that the deadline
-//         * is being applied correctly, we can only rely on those test trials
-//         * where the GC pause was LT the target query time. Other trials need to
-//         * be thrown out. We do this using a Sun specific management API. The
-//         * test will throw a ClassNotFoundException for other JVMs.
-//         */
-//        final Class cls1 = Class
-//                .forName("com.sun.management.GarbageCollectorMXBean");
-//
-//        final Class cls2 = Class.forName("com.sun.management.GcInfo");
-//
-//        final Method method1 = cls1.getMethod("getLastGcInfo", new Class[] {});
-//
-//        final Method method2 = cls2.getMethod("getDuration", new Class[] {});
-//
-//        /*
-//         * Load data.
-//         */
-//        testCon.setAutoCommit(false);
-//        for (int index = 0; index < 512; index++) {
-//            testCon.add(RDFS.CLASS, RDFS.COMMENT, testCon.getValueFactory()
-//                    .createBNode());
-//        }
-//        testCon.setAutoCommit(true);
-//        testCon.commit();
-//
-//        final long MAX_QUERY_TIME = 2000;
-//        final long MAX_TIME_MILLIS = 5000;
-//        final int NTRIALS = 20;
-//        int nok = 0, ngcfail = 0;
-//
-//        for (int i = 0; i < NTRIALS; i++) {
-//        
-//            if (log.isInfoEnabled())
-//                log.info("RUN-TEST-PASS #" + i);
-//            
-//            final TupleQuery query = testCon
-//                    .prepareTupleQuery(
-//                            QueryLanguage.SPARQL,
-//                            "SELECT * WHERE { ?s ?p ?o . ?s1 ?p1 ?o1 . ?s2 ?p2 ?o2 . ?s3 ?p3 ?o3 . } ORDER BY ?s1 ?p1 ?o1 LIMIT 1000");
-//            
-//            query.setMaxQueryTime((int) (MAX_QUERY_TIME / 1000));
-//
-//            final long startTime = System.currentTimeMillis();
-//            
-//            final TupleQueryResult result = query.evaluate();
-//            
-//            if (log.isInfoEnabled())
-//                log.info("Query evaluation has begin");
-//            
-//            try {
-//            
-//                result.hasNext();
-//                fail("Query should have been interrupted on pass# " + i);
-//                
-//            } catch (QueryInterruptedException e) {
-//                
-//                // Expected
-//                final long duration = System.currentTimeMillis() - startTime;
-//                
-//                if (log.isInfoEnabled())
-//                    log.info("Actual query duration: " + duration
-//                            + "ms on pass#" + i);
-//                
-//                final boolean ok = duration < MAX_TIME_MILLIS;
-//
-//                if (ok) {
-//                    
-//                    nok++;
-//                    
-//                } else {
-//                    
-//                    boolean failedByGCPause = false;
-//
-//                    final List<GarbageCollectorMXBean> mbeans = ManagementFactory
-//                            .getGarbageCollectorMXBeans();
-//
-//                    for (GarbageCollectorMXBean m : mbeans) {
-//                        /*
-//                         * Note: This relies on a sun specific interface.
-//                         * 
-//                         * Note: This test is not strickly diagnostic. We should
-//                         * really be comparing the full GC time since we started
-//                         * to evaluate the query. However, in practice this is a
-//                         * pretty good proxy for that (as observed with
-//                         * -verbose:gc when you run this test).
-//                         */
-//                        if (cls1.isAssignableFrom(m.getClass())) {
-//                            // Information from the last GC.
-//                            final Object lastGcInfo = method1.invoke(m,
-//                                    new Object[] {});
-//                            // Duration of that last GC.
-//                            final long lastDuration = (Long) method2.invoke(
-//                                    lastGcInfo, new Object[] {});
-//                            if (lastDuration >= MAX_QUERY_TIME) {
-//                                log.warn("Large GC pause caused artifical liveness problem: duration="
-//                                        + duration + "ms");
-//                                failedByGCPause = true;
-//                                break;
-//                            }
-//                        }
-//                    }
-//                    
-//                    if (!failedByGCPause)
-//                        fail("Query not interrupted quickly enough, should have been ~2s, but was "
-//                                + (duration / 1000) + "s on pass#" + i);
-//                    
-//                    ngcfail++;
-//
-//                }
-//            }
-//        }
-//
-//        /*
-//         * Fail the test if we do not get enough good trials.
-//         */
-//        final String msg = "NTRIALS=" + NTRIALS + ", nok=" + nok + ", ngcfail="
-//                + ngcfail;
-//
-//        log.warn(msg);
-//        
-//        if (nok < 5) {
-//
-//            fail(msg);
-//
-//        }
-//
-//    }
-//
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This test was failing historically for two reasons. First, it would
+     * sometimes encounter a full GC pause that would suspend the JVM for longer
+     * than the query timeout. This would fail the test. Second, the query
+     * engine code used to only check for a deadline when a query operator would
+     * start or stop. This meant that a compute bound operator would not be
+     * interrupted if there was no other concurrent operators for that query
+     * that were starting and stoping. This was fixed in #722.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/772">
+     *      Query timeout only checked at operator start/stop. </a>
+     */
+    @Override
+    public void testOrderByQueriesAreInterruptable() throws Exception {
+
+        /*
+         * Note: Test failures arise from length GC pauses. Such GC pauses
+         * suspend the application for longer than the query should run and
+         * cause it to miss its deadline. In order to verify that the deadline
+         * is being applied correctly, we can only rely on those test trials
+         * where the GC pause was LT the target query time. Other trials need to
+         * be thrown out. We do this using a Sun specific management API. The
+         * test will throw a ClassNotFoundException for other JVMs.
+         */
+        final Class cls1 = Class
+                .forName("com.sun.management.GarbageCollectorMXBean");
+
+        final Class cls2 = Class.forName("com.sun.management.GcInfo");
+
+        final Method method1 = cls1.getMethod("getLastGcInfo", new Class[] {});
+
+        final Method method2 = cls2.getMethod("getDuration", new Class[] {});
+
+        /*
+         * Load data.
+         */
+        testCon.setAutoCommit(false);
+        for (int index = 0; index < 512; index++) {
+            testCon.add(RDFS.CLASS, RDFS.COMMENT, testCon.getValueFactory()
+                    .createBNode());
+        }
+        testCon.setAutoCommit(true);
+        testCon.commit();
+
+        final long MAX_QUERY_TIME = 2000;
+        final long MAX_TIME_MILLIS = 5000;
+        final int NTRIALS = 20;
+        int nok = 0, ngcfail = 0;
+
+        for (int i = 0; i < NTRIALS; i++) {
+        
+            if (log.isInfoEnabled())
+                log.info("RUN-TEST-PASS #" + i);
+            
+            final TupleQuery query = testCon
+                    .prepareTupleQuery(
+                            QueryLanguage.SPARQL,
+                            "SELECT * WHERE { ?s ?p ?o . ?s1 ?p1 ?o1 . ?s2 ?p2 ?o2 . ?s3 ?p3 ?o3 . } ORDER BY ?s1 ?p1 ?o1 LIMIT 1000");
+            
+            query.setMaxQueryTime((int) (MAX_QUERY_TIME / 1000));
+
+            final long startTime = System.currentTimeMillis();
+            
+            final TupleQueryResult result = query.evaluate();
+            
+            if (log.isInfoEnabled())
+                log.info("Query evaluation has begin");
+            
+            try {
+            
+                result.hasNext();
+                fail("Query should have been interrupted on pass# " + i);
+                
+            } catch (QueryInterruptedException e) {
+                
+                // Expected
+                final long duration = System.currentTimeMillis() - startTime;
+                
+                if (log.isInfoEnabled())
+                    log.info("Actual query duration: " + duration
+                            + "ms on pass#" + i);
+                
+                final boolean ok = duration < MAX_TIME_MILLIS;
+
+                if (ok) {
+                    
+                    nok++;
+                    
+                } else {
+                    
+                    boolean failedByGCPause = false;
+
+                    final List<GarbageCollectorMXBean> mbeans = ManagementFactory
+                            .getGarbageCollectorMXBeans();
+
+                    for (GarbageCollectorMXBean m : mbeans) {
+                        /*
+                         * Note: This relies on a sun specific interface.
+                         * 
+                         * Note: This test is not strickly diagnostic. We should
+                         * really be comparing the full GC time since we started
+                         * to evaluate the query. However, in practice this is a
+                         * pretty good proxy for that (as observed with
+                         * -verbose:gc when you run this test).
+                         */
+                        if (cls1.isAssignableFrom(m.getClass())) {
+                            // Information from the last GC.
+                            final Object lastGcInfo = method1.invoke(m,
+                                    new Object[] {});
+                            // Duration of that last GC.
+                            final long lastDuration = (Long) method2.invoke(
+                                    lastGcInfo, new Object[] {});
+                            if (lastDuration >= MAX_QUERY_TIME) {
+                                log.warn("Large GC pause caused artifical liveness problem: duration="
+                                        + duration + "ms");
+                                failedByGCPause = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!failedByGCPause)
+                        fail("Query not interrupted quickly enough, should have been ~2s, but was "
+                                + (duration / 1000) + "s on pass#" + i);
+                    
+                    ngcfail++;
+
+                }
+            }
+        }
+
+        /*
+         * Fail the test if we do not get enough good trials.
+         */
+        final String msg = "NTRIALS=" + NTRIALS + ", nok=" + nok + ", ngcfail="
+                + ngcfail;
+
+        log.warn(msg);
+        
+        if (nok < 5) {
+
+            fail(msg);
+
+        }
+
+    }
+
 }
