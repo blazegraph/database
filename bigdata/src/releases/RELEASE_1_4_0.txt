@@ -20,8 +20,10 @@ https://svn.code.sf.net/p/bigdata/code/tags/BIGDATA_RELEASE_1_4_0
 
 New features in 1.4.x:
 
-- Openrdf 2.7 support.
-- Numerous bug fixes and performance enhancements.
+- Openrdf 2.7 support (#714).
+- Workbench error handling improvements (#911)
+- Various RDR specific bug fixes for the workbench and server (#1038, #1058, #1061)
+- Numerous other bug fixes and performance enhancements.
 
 Feature summary:
 
