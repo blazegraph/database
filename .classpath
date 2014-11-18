@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar" sourcepath="/Users/bryan/cuda-workspace/openrdf-sesame-2.7.13"/>
 	<classpathentry kind="src" path="bigdata/src/java"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
 	<classpathentry kind="src" path="bigdata-sails/src/java"/>
