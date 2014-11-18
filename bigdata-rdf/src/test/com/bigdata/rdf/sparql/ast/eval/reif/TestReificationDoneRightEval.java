@@ -82,7 +82,6 @@ import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
  *      Reification Done Right</a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestTCK.java 6261 2012-04-09 10:28:48Z thompsonbry $
  */
 public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCase {
 
@@ -165,6 +164,20 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		h.runTest();
 
     }
+
+    /**
+     * Version of the above where the data are read from a file rather than being
+     * built up by hand.
+     */
+    public void test_reificationDoneRight_00_loadDataFromFile() throws Exception {
+
+    	new TestHelper("reif/rdr-00-loadFromFile", // testURI,
+				"reif/rdr-02.rq",// queryFileURL
+				"reif/rdr-02.ttlx",// dataFileURL
+				"reif/rdr-02.srx"// resultFileURL
+		).runTest();
+
+    }
     
 	/**
 	 * Bootstrap test. The data are explicitly entered into the KB by hand. This
@@ -221,18 +234,32 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		 * matching lexical items.)
 		 */
 
-		final TestHelper h = new TestHelper("reif/rdr-00a", // testURI,
+		new TestHelper("reif/rdr-00a", // testURI,
 				"reif/rdr-02a.rq",// queryFileURL
 				"reif/empty.ttl",// dataFileURL
 				"reif/rdr-02a.srx"// resultFileURL
-		);
-
-		h.runTest();
+		).runTest();
 
     }
     
     /**
-	 * Simple query involving alice, bob, and an information extractor.
+     * Version of the above where the data are read from a file rather than being
+     * built up by hand.
+     */
+    public void test_reificationDoneRight_00a_loadFromFile() throws Exception {
+
+		new TestHelper("reif/rdr-00a-loadFromFile", // testURI,
+				"reif/rdr-02a.rq",// queryFileURL
+				"reif/rdr-02.ttlx",// dataFileURL
+				"reif/rdr-02a.srx"// resultFileURL
+		).runTest();
+
+    }
+    
+    /**
+	 * Simple query involving alice, bob, and an information extractor. For this
+	 * version of the test the data are modeled in the source file using RDF
+	 * reification.
 	 * 
 	 * <pre>
 	 * select ?src where {
@@ -247,6 +274,29 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		new TestHelper("reif/rdr-01", // testURI,
                 "reif/rdr-01.rq",// queryFileURL
                 "reif/rdr-01.ttl",// dataFileURL
+                "reif/rdr-01.srx"// resultFileURL
+                ).runTest();
+
+	}
+
+    /**
+	 * Simple query involving alice, bob, and an information extractor. For this
+	 * version of the test the data are modeled in the source file using the RDR
+	 * syntax.
+	 * 
+	 * <pre>
+	 * select ?src where {
+	 *   ?x foaf:name "Alice" .
+	 *   ?y foaf:name "Bob" .
+	 *   <<?x foaf:knows ?y>> dc:source ?src .
+	 * }
+	 * </pre>
+	 */
+	public void test_reificationDoneRight_01_usingRDRData() throws Exception {
+
+		new TestHelper("reif/rdr-01-usingRDRData", // testURI,
+                "reif/rdr-01.rq",// queryFileURL
+                "reif/rdr-01.ttlx",// dataFileURL
                 "reif/rdr-01.srx"// resultFileURL
                 ).runTest();
 
@@ -277,6 +327,30 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	}
 
 	/**
+	 * Same data, but the query uses the BIND() syntax and pulls out some more
+	 * information and RDR syntax for the data.
+	 * 
+	 * <pre>
+	 * select ?who ?src ?conf where {
+	 *   ?x foaf:name "Alice" .
+	 *   ?y foaf:name ?who .
+	 *   BIND( <<?x foaf:knows ?y>> as ?sid ) .
+	 *   ?sid dc:source ?src .
+	 *   ?sid rv:confidence ?src .
+	 * }
+	 * </pre>
+	 */
+	public void test_reificationDoneRight_01a_usingRDRData() throws Exception {
+
+		new TestHelper("reif/rdr-01a-usingRDRData", // testURI,
+                "reif/rdr-01a.rq",// queryFileURL
+                "reif/rdr-01.ttlx",// dataFileURL
+                "reif/rdr-01a.srx"// resultFileURL
+                ).runTest();
+
+	}
+
+	/**
 	 * Simple query ("who bought sybase").
 	 * 
 	 * <pre>
@@ -290,6 +364,25 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		new TestHelper("reif/rdr-02", // testURI,
                 "reif/rdr-02.rq",// queryFileURL
                 "reif/rdr-02.ttl",// dataFileURL
+                "reif/rdr-02.srx"// resultFileURL
+                ).runTest();
+
+	}
+
+	/**
+	 * Simple query ("who bought sybase") using RDR syntax for the data.
+	 * 
+	 * <pre>
+	 * SELECT ?src ?who {
+	 *    <<?who :bought :sybase>> dc:source ?src
+	 * }
+	 * </pre>
+	 */
+	public void test_reificationDoneRight_02_usingRDRData() throws Exception {
+
+		new TestHelper("reif/rdr-02", // testURI,
+                "reif/rdr-02.rq",// queryFileURL
+                "reif/rdr-02.ttlx",// dataFileURL
                 "reif/rdr-02.srx"// resultFileURL
                 ).runTest();
 
@@ -312,6 +405,28 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		new TestHelper("reif/rdr-02a", // testURI,
                 "reif/rdr-02a.rq",// queryFileURL
                 "reif/rdr-02a.ttl",// dataFileURL
+                "reif/rdr-02a.srx"// resultFileURL
+                ).runTest();
+
+	}
+	
+	/**
+	 * Same data, but the query uses the BIND() syntax and pulls out some more
+	 * information and RDR syntax for the data.
+	 * 
+	 * <pre>
+	 * SELECT ?src ?who ?created {
+	 *    BIND( <<?who :bought :sybase>> as ?sid ) .
+	 *    ?sid dc:source ?src .
+	 *    OPTIONAL {?sid dc:created ?created}
+	 * }
+	 * </pre>
+	 */
+	public void test_reificationDoneRight_02a_usingRDRData() throws Exception {
+
+		new TestHelper("reif/rdr-02a", // testURI,
+                "reif/rdr-02a.rq",// queryFileURL
+                "reif/rdr-02a.ttlx",// dataFileURL
                 "reif/rdr-02a.srx"// resultFileURL
                 ).runTest();
 
@@ -397,7 +512,7 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 
         new TestHelper("reif/rdr-04", // testURI,
                 "reif/rdr-04.rq",// queryFileURL
-                "reif/rdr-04.ttl",// dataFileURL
+                "reif/rdr-04.ttlx",// dataFileURL
                 "reif/rdr-04.srx"// resultFileURL
                 ).runTest();
 
