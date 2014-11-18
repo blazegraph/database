@@ -53,14 +53,17 @@ Change log:
 
 - http://trac.bigdata.com/ticket/714  (Migrate to openrdf 2.7)
 - http://trac.bigdata.com/ticket/745  (BackgroundTupleResult overrides final method close)
+- http://trac.bigdata.com/ticket/751  (explicit bindings get ignored in subselect (duplicate of #714))
 - http://trac.bigdata.com/ticket/813  (Documentation on BigData Reasoning)
 - http://trac.bigdata.com/ticket/911  (workbench does not display errors well)
 - http://trac.bigdata.com/ticket/1035 (DISTINCT PREDICATEs query is slow)
 - http://trac.bigdata.com/ticket/1037 (SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} is slow)
+- http://trac.bigdata.com/ticket/1038 (RDR RDF parsers are not always discovered)
 - http://trac.bigdata.com/ticket/1044 (ORDER_BY ordering not preserved by projection operator)
 - http://trac.bigdata.com/ticket/1047 (NQuadsParser hangs when loading latest dbpedia dump.)
 - http://trac.bigdata.com/ticket/1052 (ASTComplexOptionalOptimizer did not account for Values clauses)
 - http://trac.bigdata.com/ticket/1054 (BigdataGraphFactory create method cannot be invoked from the gremlin command line due to a Boolean vs boolean type mismatch.)
+- http://trac.bigdata.com/ticket/1058 (update RDR documentation on wiki)
 - http://trac.bigdata.com/ticket/1061 (Server does not generate RDR aware JSON for RDF/SPARQL RESULTS)
 
 1.3.4:

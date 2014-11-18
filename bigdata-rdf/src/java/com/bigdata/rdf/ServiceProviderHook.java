@@ -235,7 +235,7 @@ public class ServiceProviderHook {
         	
         	final TupleQueryResultWriterRegistry r = TupleQueryResultWriterRegistry.getInstance();
 
-        	// add our custom RDR-enabled JSON writer
+        	// add our custom RDR-enabled JSON writer for SPARQL result sets.
         	r.add(new BigdataSPARQLResultsJSONWriterFactory());
         	
         }
@@ -244,7 +244,7 @@ public class ServiceProviderHook {
             
             final TupleQueryResultParserRegistry r = TupleQueryResultParserRegistry.getInstance();
 
-            // add our custom RDR-enabled JSON parser
+            // add our custom RDR-enabled JSON parser for SPARQL result sets.
             r.add(new BigdataSPARQLResultsJSONParserFactory());
             
         }

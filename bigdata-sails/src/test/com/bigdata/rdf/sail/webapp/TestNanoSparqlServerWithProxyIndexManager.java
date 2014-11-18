@@ -270,6 +270,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
             break;
         case sids:
             // TODO SIDS mode UPDATE test suite.
+        	suite.addTestSuite(TestRDROperations.class);
             break;
         case quads:
             // QUADS mode UPDATE test suite. 
