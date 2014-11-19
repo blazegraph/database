@@ -76,7 +76,7 @@ dependencies.
       <!--                                                            -->
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
-      <sesame.version>2.6.10</sesame.version>
+      <sesame.version>2.7.13</sesame.version>
       <slf4j.version>1.6.1</slf4j.version>
       <jetty.version>9.1.4.v20140401</jetty.version>
       <servlet.version>3.1.0</servlet.version>
