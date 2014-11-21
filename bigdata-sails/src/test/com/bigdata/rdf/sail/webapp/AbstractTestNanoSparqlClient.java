@@ -258,7 +258,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	    
 		super.setUp();
 
-		log.warn("Setting up test:" + getName());
+		if (log.isTraceEnabled())
+			log.trace("Setting up test:" + getName());
 		
 		final Properties properties = getProperties();
 
@@ -345,8 +346,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     @Override
 	public void tearDown() throws Exception {
 
-//		if (log.isInfoEnabled())
-			log.warn("tearing down test: " + getName());
+		if (log.isInfoEnabled())
+			log.info("tearing down test: " + getName());
 
 		if (m_fixture != null) {
 
