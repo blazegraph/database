@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
 package com.bigdata.rdf.sail.webapp.client;
 
 import info.aduna.io.IOUtil;
