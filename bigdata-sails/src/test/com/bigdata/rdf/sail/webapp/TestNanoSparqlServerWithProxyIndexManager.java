@@ -87,7 +87,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager() {
 
-		this(null/* name */, getTemporaryJournal(), TestMode.triples);
+		this(null/* name */, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
 
 	}
 
@@ -96,13 +96,13 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager(String name) {
 
-		this(name, getTemporaryJournal(), TestMode.triples);
+		this(name, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
 
 	}
 
 	static Journal getTemporaryJournal() {
 	
-		return getTemporaryJournal(false/*use_rwstore*/);
+		return getTemporaryJournal(true/*use_rwstore*/);
 		
 	}
 	

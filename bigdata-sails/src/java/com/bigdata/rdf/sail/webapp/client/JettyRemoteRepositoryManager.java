@@ -9,9 +9,11 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.util.EntityUtils;
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.GraphQueryResult;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
@@ -21,6 +23,9 @@ import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 
 public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
+    private static final transient Logger log = Logger
+            .getLogger(JettyRemoteRepositoryManager.class);
+    
     /**
      * The path to the root of the web application (without the trailing "/").
      * <p>
@@ -45,7 +50,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         
     }
     
-    public JettyRemoteRepositoryManager(final String serviceURL,
+    protected JettyRemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
         this(serviceURL, true/* useLBS */, httpClient, executor);
@@ -67,7 +72,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      * @param httpClient
      * @param executor
      */
-    public JettyRemoteRepositoryManager(final String serviceURL,
+    protected JettyRemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
 
@@ -77,7 +82,43 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     }
 
+    public JettyRemoteRepositoryManager(String serviceURL,
+			IIndexManager indexManager) {
+		this(serviceURL, DefaultClient(), indexManager.getExecutorService());
+	}
+
+    public JettyRemoteRepositoryManager(String serviceURL,
+    		final Executor executor) {
+		this(serviceURL, DefaultClient(), executor);
+	}
+
     /**
+     * Utility to create a default jetty HttpClient to simplify initialization
+     * 
+     * @return the new HttpClient
+     */
+    public static HttpClient DefaultClient() {
+	    final HttpClient httpClient = new HttpClient();
+	    
+	    try {
+			httpClient.start();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	    
+	    /*
+	     * Ensure that the client follows redirects using a standard policy.
+	     * 
+	     * Note: This is necessary for tests of the webapp structure since the
+	     * container may respond with a redirect (302) to the location of the
+	     * webapp when the client requests the root URL.
+	     */
+	    httpClient.setFollowRedirects(true);
+	    
+	    return httpClient;
+    }
+    
+	/**
      * Return the base URL for a remote repository (less the /sparql path
      * component).
      * 
@@ -164,7 +205,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      */
     public GraphQueryResult getRepositoryDescriptions() throws Exception {
 
-        final JettyConnectOptions opts = new JettyConnectOptions(baseServiceURL + "/namespace", httpClient);
+        final ConnectOptions opts = new ConnectOptions(baseServiceURL + "/namespace");
         
         opts.method = "GET";
 
@@ -214,8 +255,11 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
             throw new IllegalArgumentException("Property not defined: "
                     + OPTION_CREATE_KB_NAMESPACE);
 
-        final JettyConnectOptions opts = new JettyConnectOptions(baseServiceURL
-                + "/namespace", httpClient);
+//        final ConnectOptions opts = new ConnectOptions(baseServiceURL
+//                + "/namespace", httpClient);
+
+        final ConnectOptions opts = new ConnectOptions(baseServiceURL
+                + "/namespace");
 
         opts.method = "POST";
 
@@ -272,7 +316,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      */
     public void deleteRepository(final String namespace) throws Exception {
 
-        final JettyConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace));
+        final ConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace));
 
         opts.method = "DELETE";
 
@@ -314,7 +358,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     public Properties getRepositoryProperties(final String namespace)
             throws Exception {
 
-        final JettyConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace)
+        final ConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace)
                 + "/properties");
 
         opts.method = "GET";
@@ -370,5 +414,15 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         }
 
     }
+
+	public void close() {
+		try {
+			httpClient.stop();
+		} catch (Exception e) {
+			log.warn("Problem stopping httpClient", e);
+			
+			throw new RuntimeException(e);
+		}
+	}
 
 }

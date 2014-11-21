@@ -4,6 +4,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpFields;
@@ -11,12 +12,22 @@ import org.eclipse.jetty.http.HttpHeader;
 
 public class JettyResponseListener extends InputStreamResponseListener {
 	
+    private static final transient Logger log = Logger
+            .getLogger(JettyResponseListener.class);
+    
 	Response m_response;
 	
 	private void ensureResponse() {
 		if (m_response == null) {
 			try {
-				m_response = get(20, TimeUnit.SECONDS);
+				final boolean traceEnabled = log.isTraceEnabled();
+				
+				final long start = traceEnabled ? System.currentTimeMillis() : 0;
+				
+				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes!
+				
+				if (traceEnabled)
+					log.trace("Response in " + (System.currentTimeMillis()-start) + "ms");
 			} catch (InterruptedException | TimeoutException
 					| ExecutionException e) {
 				throw new RuntimeException(e);

@@ -125,11 +125,6 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
      */
 	// private ClientConnectionManager m_cm;
 	
-	/**
-	 * A Jetty HttpClient exposed to tests that do direct HTTP GET/POST operations.
-	 */
-    protected HttpClient m_httpClient = null;
-
     /**
      * The client-API wrapper to the NSS.
      */
@@ -320,10 +315,6 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 //        m_cm = DefaultClientConnectionManagerFactory.getInstance()
 //                .newInstance();
 
-        m_httpClient = new HttpClient();
-        
-        m_httpClient.start();
-        
         /*
          * Ensure that the client follows redirects using a standard policy.
          * 
@@ -331,13 +322,11 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
          * container may respond with a redirect (302) to the location of the
          * webapp when the client requests the root URL.
          */
-        m_httpClient.setFollowRedirects(true);
 
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
-                m_httpClient,
-                m_indexManager.getExecutorService());
+                m_indexManager);
 
-        System.err.println("Setup Active Threads: " + Thread.activeCount());
+        log.info("Setup Active Threads: " + Thread.activeCount());
     }
 
     @Override
@@ -374,21 +363,22 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 //            m_cm = null;
 //        }
 		
-		log.error("Connection Shutdown Check");
+		log.info("Connection Shutdown Check");
 		
-		m_httpClient.stop();
-
-        m_httpClient = null;
+        m_repo.close(); // will also stop the HttpClient
+        
         m_repo = null;
         
         log.info("tear down done");
 
         super.tearDown();
-
-        System.err.println("Teardown Active Threads: " + Thread.activeCount());
         
-        if (Thread.activeCount() > 300) {
-        	System.err.println("WTF?");
+        final int nthreads = Thread.activeCount();
+
+        log.info("Teardown Active Threads: " + nthreads);
+        
+        if (nthreads > 300) {
+        	log.error("High residual thread count: " + nthreads);
         }
 	}
 
@@ -1545,9 +1535,6 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 			            final Graph actual = asGraph(query.evaluate());
 			
 			            assertTrue(!actual.isEmpty());
-			            // System.err.println("Done: " + ai.incrementAndGet());
-			            
-			            // System.err.println("Evaluated " + actual.size() + " statements");
 			            
 						return null;
 					} catch (Exception e) {

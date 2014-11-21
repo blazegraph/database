@@ -475,7 +475,7 @@ public class JettyRemoteRepository {
      */
     public long postGraphML(final String path) throws Exception {
         
-        final JettyConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newConnectOptions();
 
         opts.addRequestParam("blueprints");
 
@@ -523,7 +523,7 @@ public class JettyRemoteRepository {
      */
     public GraphQueryResult getServiceDescription() throws Exception {
 
-        final JettyConnectOptions opts = newConnectOptions();
+        final ConnectOptions opts = newConnectOptions();
 
         opts.method = "GET";
 
@@ -753,7 +753,7 @@ public class JettyRemoteRepository {
     	if (queryId == null)
     		return;
     	
-        final JettyConnectOptions opts = newUpdateConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
 
         opts.addRequestParam("cancelQuery");
 
@@ -793,7 +793,7 @@ public class JettyRemoteRepository {
     public long rangeCount(final Resource s, final URI p, final Value o, final Resource... c) 
             throws Exception {
 
-        final JettyConnectOptions opts = newQueryConnectOptions();
+        final ConnectOptions opts = newQueryConnectOptions();
 
         opts.addRequestParam("ESTCARD");
         if (s != null) {
@@ -858,7 +858,7 @@ public class JettyRemoteRepository {
      */
     public Collection<Resource> getContexts() throws Exception {
     	
-        final JettyConnectOptions opts = newQueryConnectOptions();
+        final ConnectOptions opts = newQueryConnectOptions();
 
         opts.addRequestParam("CONTEXTS");
 
@@ -897,7 +897,7 @@ public class JettyRemoteRepository {
      */
     public long add(final AddOp add) throws Exception {
         
-        final JettyConnectOptions opts = newUpdateConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
         
         add.prepareForWire();
         
@@ -955,7 +955,7 @@ public class JettyRemoteRepository {
      */
     public long remove(final com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp remove) throws Exception {
         
-        final JettyConnectOptions opts = newUpdateConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
         
         remove.prepareForWire();
             
@@ -1043,7 +1043,7 @@ public class JettyRemoteRepository {
      */
     public long update(final RemoveOp remove, final AddOp add) throws Exception {
         
-        final JettyConnectOptions opts = newUpdateConnectOptions();
+        final ConnectOptions opts = newUpdateConnectOptions();
         
         remove.prepareForWire();
         add.prepareForWire();
@@ -1120,7 +1120,7 @@ public class JettyRemoteRepository {
      */
     protected abstract class Query implements IPreparedOperation, IPreparedQuery {
         
-        protected final JettyConnectOptions opts;
+        protected final ConnectOptions opts;
         
         protected final UUID id;
 
@@ -1128,7 +1128,7 @@ public class JettyRemoteRepository {
 
         private final boolean update;
 
-        public Query(final JettyConnectOptions opts, final UUID id,
+        public Query(final ConnectOptions opts, final UUID id,
                 final String query) {
 
             this(opts, id, query, false/* update */);
@@ -1144,7 +1144,7 @@ public class JettyRemoteRepository {
          * @param update
          *            <code>true</code> iff this is a SPARQL update.
          */
-        public Query(final JettyConnectOptions opts, final UUID id,
+        public Query(final ConnectOptions opts, final UUID id,
                 final String query, final boolean update) {
 
             if (opts == null)
@@ -1251,7 +1251,7 @@ public class JettyRemoteRepository {
 
     private final class TupleQuery extends Query implements IPreparedTupleQuery {
         
-        public TupleQuery(final JettyConnectOptions opts, final UUID id,
+        public TupleQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
 
             super(opts, id, query);
@@ -1289,7 +1289,7 @@ public class JettyRemoteRepository {
 
     private final class GraphQuery extends Query implements IPreparedGraphQuery {
 
-        public GraphQuery(final JettyConnectOptions opts, final UUID id,
+        public GraphQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
 
             super(opts, id, query);
@@ -1328,7 +1328,7 @@ public class JettyRemoteRepository {
     private final class BooleanQuery extends Query implements
             IPreparedBooleanQuery {
         
-        public BooleanQuery(final JettyConnectOptions opts, final UUID id,
+        public BooleanQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
         
             super(opts, id, query);
@@ -1392,7 +1392,7 @@ public class JettyRemoteRepository {
     private final class SparqlUpdate extends Query implements
             IPreparedSparqlUpdate {
         
-        public SparqlUpdate(final JettyConnectOptions opts, final UUID id,
+        public SparqlUpdate(final ConnectOptions opts, final UUID id,
                 final String updateStr) {
 
             super(opts, id, updateStr, true/*update*/);
@@ -1600,7 +1600,7 @@ public class JettyRemoteRepository {
      *      RemoteRepository class should use application/x-www-form-urlencoded
      *      for large POST requests </a>
      */
-    public JettyResponseListener doConnect(final JettyConnectOptions opts) throws Exception {
+    public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
 
         /*
          * Generate the fully formed and encoded URL.
@@ -1869,7 +1869,7 @@ public class JettyRemoteRepository {
      * @throws Exception
      *             If anything goes wrong.
      */
-    public TupleQueryResult tupleResults(final JettyConnectOptions opts, 
+    public TupleQueryResult tupleResults(final ConnectOptions opts, 
             final UUID queryId, final IPreparedQueryListener listener)
             throws Exception {
 
@@ -2011,7 +2011,7 @@ public class JettyRemoteRepository {
      * @throws Exception
      *             If anything goes wrong.
      */
-    public GraphQueryResult graphResults(final JettyConnectOptions opts,
+    public GraphQueryResult graphResults(final ConnectOptions opts,
             final UUID queryId, final IPreparedQueryListener listener) throws Exception {
 
     	JettyResponseListener response = null;
@@ -2171,7 +2171,7 @@ public class JettyRemoteRepository {
      *             If anything goes wrong, including if the result set does not
      *             encode a single boolean value.
      */
-    protected boolean booleanResults(final JettyConnectOptions opts, 
+    protected boolean booleanResults(final ConnectOptions opts, 
             final UUID queryId, final IPreparedQueryListener listener) throws Exception {
 
     	JettyResponseListener response = null;
@@ -2512,9 +2512,9 @@ public class JettyRemoteRepository {
      * Return the {@link ConnectOptions} which will be used by default for the
      * SPARQL end point for a QUERY or other idempotent operation.
      */
-    final protected JettyConnectOptions newQueryConnectOptions() {
+    final protected ConnectOptions newQueryConnectOptions() {
 
-        final JettyConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
 
         opts.method = getQueryMethod();
         
@@ -2528,9 +2528,9 @@ public class JettyRemoteRepository {
      * Return the {@link ConnectOptions} which will be used by default for the
      * SPARQL end point for an UPDATE or other non-idempotant operation.
      */
-    final protected JettyConnectOptions newUpdateConnectOptions() {
+    final protected ConnectOptions newUpdateConnectOptions() {
 
-        final JettyConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
         
         opts.method = "POST";
         
@@ -2544,7 +2544,7 @@ public class JettyRemoteRepository {
      * Return the {@link ConnectOptions} which will be used by default for the
      * SPARQL end point.
      */
-    final protected JettyConnectOptions newConnectOptions() {
+    final protected ConnectOptions newConnectOptions() {
     
         return newConnectOptions(sparqlEndpointURL);
         
@@ -2557,9 +2557,9 @@ public class JettyRemoteRepository {
      * @param serviceURL
      *            The URL of the service for the request.
      */
-    protected JettyConnectOptions newConnectOptions(final String serviceURL) {
+    protected ConnectOptions newConnectOptions(final String serviceURL) {
 
-        final JettyConnectOptions opts = new JettyConnectOptions(serviceURL, httpClient);
+        final ConnectOptions opts = new ConnectOptions(serviceURL);
 
         return opts;
 
