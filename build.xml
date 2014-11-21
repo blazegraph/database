@@ -2111,9 +2111,9 @@ ${postInstallMessage}</echo>
     </target>
     
     <target name="startHttpd">
-      <echo>java -jar ${dist.lib}/jini/lib/classserver.jar -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
+      <echo>java -jar ${dist.lib}/classserver.jar -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 </echo>
-      <java jar="${dist.lib}/jini/lib/classserver.jar"
+      <java jar="${dist.lib}/classserver.jar"
             fork="true"
             spawn="true">
         <arg value="-verbose" />
@@ -2124,9 +2124,9 @@ ${postInstallMessage}</echo>
     </target>
 
     <target name="stopHttpd">
-      <echo>java -jar ${dist.lib}/jini/lib/classserver.jar -port ${test.codebase.port} -dir ${test.codebase.dir} -stop
+      <echo>java -jar ${dist.lib}/classserver.jar -port ${test.codebase.port} -dir ${test.codebase.dir} -stop
 </echo>
-      <java jar="${dist.lib}/jini/lib/classserver.jar"
+      <java jar="${dist.lib}/classserver.jar"
             fork="true"
             failonerror="true">
         <arg line="-port ${test.codebase.port}" />
