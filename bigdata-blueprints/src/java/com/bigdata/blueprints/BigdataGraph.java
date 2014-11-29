@@ -41,8 +41,10 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
@@ -50,6 +52,8 @@ import org.openrdf.query.Update;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryResult;
 
+import com.bigdata.blueprints.BigdataGraphAtom.ElementType;
+import com.bigdata.blueprints.BigdataSelection.Bindings;
 import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Features;
@@ -554,36 +558,19 @@ public abstract class BigdataGraph implements Graph {
     }
     
     /**
-     * Set an edge (overwrite the to vertex).
-     */
-    public Edge setEdge(final Object key, final Vertex from, final Vertex to, 
-            final String label) {
-        
-        return addEdge(key, from, to, label, true);
-
-    }
-    
-    /**
      * Add an edge.
      */
     @Override
     public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
             final String label) {
         
-        return addEdge(key, from, to, label, false);
-        
-    }
-        
-	/**
-	 * Add an edge , possibly removing the old to vertex value.
-	 */
-	public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
-			final String label, final boolean clean) {
-		
 	    if (log.isInfoEnabled())
 	        log.info("("+key+", "+from+", "+to+", "+label+")");
 	    
-		if (label == null) {
+	    /*
+	     * Null edge labels allowed for anonymous edges (in laxEdges mode).
+	     */
+		if (label == null && !laxEdges) {
 			throw new IllegalArgumentException();
 		}
 		
@@ -616,13 +603,16 @@ public abstract class BigdataGraph implements Graph {
 			
 			final RepositoryConnection cxn = getWriteConnection();
 			
-			if (clean) {
-			    cxn.remove(fromURI, edgeURI, null);
-			}
-			
 			cxn.add(fromURI, edgeURI, toURI);
-			cxn.add(edgeURI, TYPE, EDGE);
-			cxn.add(edgeURI, LABEL, factory.toLiteral(label));
+            if (label != null) {
+                /*
+                 * TODO FIXME Add an "anonymous" argument to specify that we
+                 * don't want the (e, TYPE, EDGE) statement rather than
+                 * bundling that decision with a null label. 
+                 */
+                cxn.add(edgeURI, TYPE, EDGE);
+			    cxn.add(edgeURI, LABEL, factory.toLiteral(label));
+			}
 			
 			return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
 			
@@ -1287,7 +1277,8 @@ public abstract class BigdataGraph implements Graph {
 	/**
 	 * Project a subgraph using a SPARQL query.
 	 */
-	public BigdataGraphlet project(final String queryStr) throws Exception {
+	public Iterator<BigdataGraphAtom> project(final String queryStr) 
+	        throws Exception {
 	    
         try {
             
@@ -1300,16 +1291,41 @@ public abstract class BigdataGraph implements Graph {
                         cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
                 
                 final GraphQueryResult result = query.evaluate();
-                try {
+
+                return new Iterator<BigdataGraphAtom>() {
+
+                    @Override
+                    public boolean hasNext() {
+                        try {
+                            return result.hasNext();
+                        } catch (QueryEvaluationException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+
+                    @Override
+                    public BigdataGraphAtom next() {
+                        try {
+                            return toGraphAtom(result.next());
+                        } catch (QueryEvaluationException e) {
+                            throw new RuntimeException(e);
+                        } finally {
+                            if (!hasNext()) {
+                                try {
+                                    result.close();
+                                } catch (QueryEvaluationException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void remove() {
+                        throw new UnsupportedOperationException();
+                    }
                     
-                    final BigdataQueryProjection projection = 
-                            new BigdataQueryProjection(factory);
-                    
-                    return projection.convert(result);
-                
-                } finally {
-                    result.close();
-                }
+                };
                 
             } finally {
             
@@ -1322,6 +1338,62 @@ public abstract class BigdataGraph implements Graph {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+
+	}
+	
+	/**
+	 * Convert a unit of RDF data to an atomic unit of PG data.
+	 */
+	protected BigdataGraphAtom toGraphAtom(final Statement stmt) {
+	    
+        final URI s = (URI) stmt.getSubject();
+        final String sid = factory.fromURI(s);
+        final URI p = (URI) stmt.getPredicate();
+        final String pid = factory.fromURI(p);
+        final Value o = stmt.getObject();
+        
+        final BigdataGraphAtom atom;
+        if (o instanceof URI) {
+            
+            /*
+             * Either an edge or a type statement.
+             */
+            if (p.equals(factory.getTypeURI()) && 
+                (o.equals(factory.getVertexURI()) || o.equals(factory.getEdgeURI()))) {
+                
+                if (o.equals(factory.getVertexURI())) {
+                    atom = new BigdataGraphAtom(sid, ElementType.VERTEX, null, null, null, null, null);
+                } else {
+                    atom = new BigdataGraphAtom(sid, ElementType.EDGE, null, null, null, null, null);
+                }
+                
+            } else {
+                
+                final String oid = factory.fromURI((URI) o);
+                atom = new BigdataGraphAtom(pid, null, sid, oid, null, null, null);
+                
+            }
+            
+        } else {
+            
+            /*
+             * A property or the edge label.
+             */
+            if (p.equals(factory.getLabelURI())) {
+                
+                final String label = factory.fromLiteral((Literal) o).toString();
+                atom = new BigdataGraphAtom(sid, null, null, null, label, null, null);
+                
+            } else {
+                
+                final Object oval = factory.fromLiteral((Literal) o);
+                atom = new BigdataGraphAtom(sid, null, null, null, null, pid, oval);
+            
+            }
+            
+        }
+        
+        return atom;
 
 	}
 	
@@ -1343,10 +1415,7 @@ public abstract class BigdataGraph implements Graph {
                 final TupleQueryResult result = query.evaluate();
                 try {
                     
-                    final BigdataQueryProjection projection = 
-                            new BigdataQueryProjection(factory);
-                    
-                    return projection.convert(result);
+                    return convert(result);
                     
                 } finally {
                     result.close();
@@ -1366,6 +1435,45 @@ public abstract class BigdataGraph implements Graph {
 
     }
     
+    /**
+     * Convert SPARQL/RDF results into PG form.
+     * 
+     * TODO FIXME Make this a streaming API like project()
+     */
+    protected BigdataSelection convert(final TupleQueryResult result) 
+            throws Exception {
+        
+        final BigdataSelection selection = new BigdataSelection();
+        
+        while (result.hasNext()) {
+            
+            final BindingSet bs = result.next();
+            
+            final Bindings bindings = selection.newBindings();
+            
+            for (String key : bs.getBindingNames()) {
+                
+                final Value val= bs.getBinding(key).getValue();
+                
+                final Object o;
+                if (val instanceof Literal) {
+                    o = factory.fromLiteral((Literal) val);
+                } else if (val instanceof URI) {
+                    o = factory.fromURI((URI) val);
+                } else {
+                    throw new RuntimeException("bnodes not legal: " + val);
+                }
+                
+                bindings.put(key, o);
+                
+            }
+            
+        }
+        
+        return selection;
+        
+    }
+
     /**
      * Select results using a SPARQL query.
      */
