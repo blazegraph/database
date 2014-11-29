@@ -295,30 +295,9 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
             return null;
         }
         
-        final ISPO spo = record.getStatement();
-        final URI s = (URI) spo.getSubject();
-        final String sid = super.getValueFactory().fromURI(s);
-        final URI p = (URI) spo.getPredicate();
-        final String pid = super.getValueFactory().fromURI(p);
-        final Value o = spo.getObject();
+        final BigdataGraphAtom atom = super.toGraphAtom(record.getStatement());
         
-        if (o instanceof URI) {
-            /*
-             * Either an edge or a type statement.
-             */
-            final String oid = super.getValueFactory().fromURI((URI) o);
-            if (p.equals(super.getValueFactory().getTypeURI())) {
-                return new BigdataGraphEdit(action, sid, oid, null, null, null, null);
-            } else {
-                return new BigdataGraphEdit(action, pid, null, sid, oid, null, null);
-            }
-        } else {
-            /*
-             * A property.
-             */
-            final Object oval = super.getValueFactory().fromLiteral((Literal) o);
-            return new BigdataGraphEdit(action, sid, null, null, null, pid, oval);
-        }
+        return new BigdataGraphEdit(action, atom);
         
     }
     

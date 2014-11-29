@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import com.bigdata.blueprints.BigdataGraphAtom.ElementType;
+
 
 
 /**
@@ -46,71 +48,59 @@ public interface BigdataGraphListener {
         
         public static enum Action {
             
-            Add,
-            
-            Remove;
+            Add, Remove;
             
         }
 
         private final Action action;
+
+        private final BigdataGraphAtom atom;
         
-        private final String id;
-        
-        private final String type;
-        
-        private final String fromId;
-        
-        private final String toId;
-        
-        private final String key;
-        
-        private final Object val;
-        
-        public BigdataGraphEdit(final Action action, final String id,
-                final String type, final String fromId, 
-                final String toId, final String key, final Object val) {
+        public BigdataGraphEdit(final Action action, final BigdataGraphAtom atom) {
             this.action = action;
-            this.id = id;
-            this.type = type;
-            this.fromId = fromId;
-            this.toId = toId;
-            this.key = key;
-            this.val = val;
+            this.atom = atom;
         }
 
         public Action getAction() {
             return action;
         }
 
-        public String getId() {
-            return id;
+        public BigdataGraphAtom getAtom() {
+            return atom;
         }
 
-        public String getType() {
-            return type;
+        public String getId() {
+            return atom.getId();
+        }
+
+        public ElementType getType() {
+            return atom.getType();
         }
 
         public String getFromId() {
-            return fromId;
+            return atom.getFromId();
         }
 
         public String getToId() {
-            return toId;
+            return atom.getToId();
+        }
+
+        public String getLabel() {
+            return atom.getLabel();
         }
 
         public String getKey() {
-            return key;
+            return atom.getKey();
         }
 
         public Object getVal() {
-            return val;
+            return atom.getVal();
         }
 
         @Override
         public String toString() {
-            return "BigdataGraphEdit [action=" + action + ", id=" + id
-                    + ", type=" + type + ", fromId=" + fromId
-                    + ", toId=" + toId + ", key=" + key + ", val=" + val + "]";
+            return "BigdataGraphEdit [action=" + action + ", atom=" + atom
+                    + "]";
         }
 
     }
