@@ -23,6 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringWriter;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -96,5 +101,50 @@ public class JettyResponseListener extends InputStreamResponseListener {
 		
 		return m_response.getHeaders();
 	}
+
+	public String getResponseBody() throws IOException {
+        final Reader r = new InputStreamReader(getInputStream());
+
+        try {
+
+            final StringWriter w = new StringWriter();
+
+            int ch;
+            while ((ch = r.read()) != -1) {
+                w.append((char) ch);
+            }
+
+            return w.toString();
+
+        } finally {
+
+            r.close();
+
+        }
+	}
+
+    public void consume()
+            throws IOException {
+    	
+        final InputStream r = getInputStream();
+
+        try {
+
+            final byte[] data = new byte[4096];
+
+            int ch;
+            while ((ch = r.read(data)) != -1) {
+            	if (log.isTraceEnabled())
+            		log.trace("Read " + ch + " bytes");
+            }
+
+
+        } finally {
+
+            r.close();
+
+        }
+
+    }
 
 }

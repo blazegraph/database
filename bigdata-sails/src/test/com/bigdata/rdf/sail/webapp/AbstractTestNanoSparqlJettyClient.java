@@ -243,24 +243,14 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 	
 	TestMode testMode = null;
 	
-	@Override
-	public void setUp() throws Exception {
-	    
-		super.setUp();
-
-		if (log.isTraceEnabled())
-			log.trace("Setting up test:" + getName());
+	protected Server newFixture(final String lnamespace) throws Exception {
+		final IIndexManager m_indexManager = getIndexManager();
 		
 		final Properties properties = getProperties();
 
-		// guaranteed distinct namespace for the KB instance.
-		namespace = getName() + UUID.randomUUID();
-
-		final IIndexManager m_indexManager = getIndexManager();
-		
 		// Create the triple store instance.
         final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
-                namespace, properties);
+        		lnamespace, properties);
         
         if (tripleStore.isStatementIdentifiers()) {
             testMode = TestMode.sids;
@@ -273,16 +263,62 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 
-            initParams.put(ConfigParams.NAMESPACE, namespace);
+            initParams.put(ConfigParams.NAMESPACE, lnamespace);
 
             initParams.put(ConfigParams.CREATE, "false");
             
         }
         // Start server for that kb instance.
-        m_fixture = NanoSparqlServer.newInstance(0/* port */,
+        final Server fixture = NanoSparqlServer.newInstance(0/* port */,
                 m_indexManager, initParams);
 
-        m_fixture.start();
+        fixture.start();
+		
+        return fixture;
+	}
+	
+	@Override
+	public void setUp() throws Exception {
+	    
+		super.setUp();
+
+		if (log.isTraceEnabled())
+			log.trace("Setting up test:" + getName());
+		
+		final Properties properties = getProperties();
+
+		// guaranteed distinct namespace for the KB instance.
+		namespace = getName() + UUID.randomUUID();
+		
+		m_fixture = newFixture(namespace);
+
+//		final IIndexManager m_indexManager = getIndexManager();
+//		
+//		// Create the triple store instance.
+//        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
+//                namespace, properties);
+//        
+//        if (tripleStore.isStatementIdentifiers()) {
+//            testMode = TestMode.sids;
+//        } else if (tripleStore.isQuads()) {
+//            testMode = TestMode.quads;
+//        } else {
+//            testMode = TestMode.triples;
+//        }
+//		
+//        final Map<String, String> initParams = new LinkedHashMap<String, String>();
+//        {
+//
+//            initParams.put(ConfigParams.NAMESPACE, namespace);
+//
+//            initParams.put(ConfigParams.CREATE, "false");
+//            
+//        }
+//        // Start server for that kb instance.
+//        m_fixture = NanoSparqlServer.newInstance(0/* port */,
+//                m_indexManager, initParams);
+//
+//        m_fixture.start();
 
 		final int port = NanoSparqlServer.getLocalPort(m_fixture);
 
@@ -324,7 +360,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
          */
 
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
-                m_indexManager);
+                getIndexManager());
 
         log.info("Setup Active Threads: " + Thread.activeCount());
     }
@@ -1562,10 +1598,12 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
         	int loops = 20;
         	while (Thread.activeCount() > threadCount && --loops > 0) {
         		Thread.sleep(500);
-        		System.err.println("Extra threads: " + (Thread.activeCount() - threadCount));
+            	if (log.isTraceEnabled())
+            		log.trace("Extra threads: " + (Thread.activeCount() - threadCount));
         	}
             
-    		System.err.println("Return with extra threads: " + (Thread.activeCount() - threadCount));
+        	if (log.isInfoEnabled())
+        		log.info("Return with extra threads: " + (Thread.activeCount() - threadCount));
     		
         	assertTrue(errorCount.get() == 0);
         }

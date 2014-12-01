@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -73,6 +74,7 @@ import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response.ResponseListener;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
@@ -223,7 +225,7 @@ public class JettyRemoteRepository {
     /**
      * The client used for http connections.
      */
-    protected final HttpClient httpClient;
+    protected final JettyHttpClient httpClient;
 
     /**
      * Thread pool for processing HTTP responses in background.
@@ -331,7 +333,7 @@ public class JettyRemoteRepository {
      *             can not use the LBS prefix.
      */
     public JettyRemoteRepository(final String sparqlEndpointURL,
-            final HttpClient httpClient, final Executor executor) {
+            final JettyHttpClient httpClient, final Executor executor) {
 
         // FIXME Should default useLBS:=true. it is basically free.
         this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
@@ -376,7 +378,7 @@ public class JettyRemoteRepository {
      *      HALoadBalancer </a>
      */
     public JettyRemoteRepository(final String sparqlEndpointURL,
-            final boolean useLBS, final HttpClient httpClient,
+            final boolean useLBS, final JettyHttpClient httpClient,
             final Executor executor) {
         
         if (sparqlEndpointURL == null)
@@ -395,7 +397,7 @@ public class JettyRemoteRepository {
         this.httpClient = httpClient;
         
         if (httpClient.isStopped()) {
-        	throw new IllegalArgumentException("WTF? Client is not started!");
+        	throw new IllegalArgumentException("Client is not running");
         }
         
         this.executor = executor;
@@ -408,7 +410,43 @@ public class JettyRemoteRepository {
         
     }
 
-    @Override
+	public JettyRemoteRepository(String sparqlEndpointURL, boolean useLBS,
+			ExecutorService executor) {
+		this(sparqlEndpointURL,useLBS, DefaultClient(false /*force new*/), executor);
+	}
+
+    static JettyHttpClient s_sharedClient = null;
+    static Object s_sharedClientLock = new Object();
+
+	/**
+     * Utility to create a default jetty HttpClient to simplify initialization
+     * 
+     * @return the new HttpClient
+     */
+	public static JettyHttpClient DefaultClient(final boolean forceNew) {
+		final JettyHttpClient httpClient;
+
+		if (forceNew) {
+			httpClient = new JettyHttpClient(forceNew/* autoClose */);
+		} else {
+			synchronized (s_sharedClientLock) {
+				if (s_sharedClient == null || s_sharedClient.isStopped()) {
+					s_sharedClient = new JettyHttpClient(false/* autoclose */);
+				}
+				httpClient = s_sharedClient;
+			}
+		}
+
+		try {
+			httpClient.start();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+		return httpClient;
+	}
+    
+	@Override
     public String toString() {
 
         return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
@@ -1815,7 +1853,7 @@ public class JettyRemoteRepository {
         
             throw new HttpException(rc, "Status Code=" + rc + ", Status Line="
                     + responseListener.getReason() + ", Response="
-                    + getResponseBody(responseListener));
+                    + responseListener.getResponseBody());
 
         }
 
@@ -1829,31 +1867,6 @@ public class JettyRemoteRepository {
 
         return responseListener;
         
-    }
-
-    // TODO EntityUtils.toString(response.getEntity())?
-    protected static String getResponseBody(final JettyResponseListener contentResponse)
-            throws IOException {
-
-        final Reader r = new InputStreamReader(contentResponse.getInputStream());
-
-        try {
-
-            final StringWriter w = new StringWriter();
-
-            int ch;
-            while ((ch = r.read()) != -1) {
-                w.append((char) ch);
-            }
-
-            return w.toString();
-
-        } finally {
-
-            r.close();
-
-        }
-
     }
 
     /**
@@ -1895,7 +1908,7 @@ public class JettyRemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
                     .getInstance().get(format);
@@ -1905,7 +1918,7 @@ public class JettyRemoteRepository {
                         "No parser for format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
                                 + ", format=" + format + " : response="
-                                + getResponseBody(response));
+                                + response.getResponseBody());
 
             final TupleQueryResultParser parser = parserFactory.getParser();
     
@@ -2039,7 +2052,7 @@ public class JettyRemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
 
@@ -2194,7 +2207,7 @@ public class JettyRemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final BooleanQueryResultParserFactory factory = BooleanQueryResultParserRegistry
                     .getInstance().get(format);
@@ -2256,7 +2269,7 @@ public class JettyRemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final TupleQueryResultParserFactory factory = TupleQueryResultParserRegistry
                     .getInstance().get(format);
@@ -2613,7 +2626,7 @@ public class JettyRemoteRepository {
     	
     }
 
-	public HttpClient getClient() {
+	public JettyHttpClient getClient() {
 		return this.httpClient;
 	}
 
