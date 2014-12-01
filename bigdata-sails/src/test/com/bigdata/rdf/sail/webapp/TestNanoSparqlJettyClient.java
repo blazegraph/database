@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,6 +28,7 @@ import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.util.EntityUtils;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -46,6 +48,7 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -61,6 +64,7 @@ import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.util.config.NicUtil;
 
 public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		AbstractTestNanoSparqlJettyClient<S> {
@@ -82,7 +86,8 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlJettyClient.class,
 //        "test9.*", TestMode.quads);
-        "test.*.*", TestMode.quads, TestMode.sids,
+		   "test.*.*", TestMode.quads, TestMode.sids,
+//		   "testMultipleFixtures", TestMode.quads, TestMode.sids,
         TestMode.triples);
 
 	}
@@ -91,6 +96,47 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 		assertTrue("open", m_fixture.isRunning());
 
+	}
+	
+	public void testMultipleFixtures() throws Exception {
+		
+		assertTrue("open", m_fixture.isRunning());
+		
+		// create second fixture
+		final String lnamespace = getName() + UUID.randomUUID();
+		final Server altfixture = newFixture(lnamespace);
+		try {
+			final int altport = NanoSparqlServer.getLocalPort(altfixture);
+			
+	        final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
+	                true/* loopbackOk */);
+
+	        if (hostAddr == null) {
+
+	            fail("Could not identify network address for this host.");
+
+	        }
+
+	        final String altrootURL = new URL("http", hostAddr, altport, ""/* contextPath */
+	        ).toExternalForm();
+
+	        final String altserviceURL = new URL("http", hostAddr, altport,
+	                BigdataStatics.getContextPath()).toExternalForm();
+	        
+	        final String resp1 = doGET(m_serviceURL + "/status");
+	        final String resp2 = doGET(altserviceURL + "/status");
+	        
+	        // System.err.println("STANDARD:\n" + resp1);
+	        // System.err.println("ALT:\n" + resp2);
+
+	        // the status responses should not match since the ports of the servers are different
+	        assertFalse(resp1.equals(resp2));
+	        
+	        
+		} finally {
+			altfixture.stop();
+		}
+		
 	}
 
 	/*
@@ -234,28 +280,15 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 	private String doGET(final String url) throws Exception {
 
 		JettyResponseListener response = null;
-		HttpEntity entity = null;
 
-		try {
+		final ConnectOptions opts = new ConnectOptions(url);
+		opts.method = "GET";
 
-			final ConnectOptions opts = new ConnectOptions(url);
-			opts.method = "GET";
+		response = doConnect(opts);
 
-			response = doConnect(opts);
+		checkResponseCode(url, response);
 
-			checkResponseCode(url, response);
-
-			return streamToString(response.getInputStream());
-
-		} finally {
-
-			try {
-				EntityUtils.consume(entity);
-			} catch (IOException ex) {
-				log.warn(ex, ex);
-			}
-
-		}
+		return streamToString(response.getInputStream());
 
 	}
 

@@ -57,6 +57,8 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.server.Request;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
@@ -82,9 +84,14 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -395,7 +402,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected void doNSSStatusRequest(final HAGlue haGlue) throws Exception {
 
         // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
+//        final HttpClient httpClient = new DefaultHttpClient(ccm);
 
         // The NSS service URL (NOT the SPARQL end point).
         final String serviceURL = getNanoSparqlServerURL(haGlue);
@@ -404,15 +411,29 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         opts.method = "GET";
 
-        try {
-            final HttpResponse response;
+		try {
+			// final HttpResponse response;
+			//
+			// RemoteRepository.checkResponseCode(response =
+			// doConnect(httpClient,
+			// opts));
+			//
+			// EntityUtils.consume(response.getEntity());
 
-            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
-                    opts));
+			final JettyResponseListener response;
 
-            EntityUtils.consume(response.getEntity());
+			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
+					serviceURL, executorService);
+			try {
+				JettyRemoteRepository.checkResponseCode(response = rpm
+						.doConnect(opts));
 
-        } catch (IOException ex) {
+				response.consume();
+			} finally {
+				rpm.close();
+			}
+
+		} catch (IOException ex) {
 
             log.error(ex, ex);
 
@@ -465,7 +486,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
                 }
                 return s;
             } catch (HttpException httpe) {
-                log.warn("HTTP Error: " + httpe.getStatusCode());
                 if (httpe.getStatusCode() == 404 && --retryCount > 0) {
                     Thread.sleep(200/* ms */);
                     continue;
@@ -489,37 +509,61 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected HAStatusEnum getNSSHAStatus(final HAGlue haGlue)
             throws Exception, IOException {
 
-        // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
-
         // The NSS service URL (NOT the SPARQL end point).
         final String serviceURL = getNanoSparqlServerURL(haGlue);
 
-        final ConnectOptions opts = new ConnectOptions(serviceURL
-                + "/status?HA");
+        final ConnectOptions opts = new ConnectOptions(serviceURL + "/status?HA");
 
         opts.method = "GET";
 
         try {
+        	final JettyRemoteRepositoryManager rpm = getRemoteRepository(haGlue);
+			try {
+	            final JettyResponseListener response = rpm.doConnect(opts);
+				JettyRemoteRepository.checkResponseCode(response);
 
-            final HttpResponse response;
-
-            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
-                    opts));
-
-            final String s = EntityUtils.toString(response.getEntity());
-
-            return HAStatusEnum.valueOf(s);
+				final String s = response.getResponseBody();
+				
+				return HAStatusEnum.valueOf(s);
+			} finally {
+				rpm.close();
+			}
 
         } catch (IOException ex) {
-
             log.error(ex, ex);
-
             throw ex;
-
         }
 
     }
+
+    protected HAStatusEnum getNSSHAStatusAlt(final HAGlue haGlue)
+			throws Exception, IOException {
+
+		// The NSS service URL (NOT the SPARQL end point).
+		final String serviceURL = getNanoSparqlServerURL(haGlue);
+		final String query = serviceURL + "/status?HA";
+
+		final JettyHttpClient client = JettyRemoteRepositoryManager.DefaultClient(true);
+		try {
+			final org.eclipse.jetty.client.api.Request request = client
+					.newRequest(query).method(HttpMethod.GET);
+
+			final JettyResponseListener response = new JettyResponseListener();
+			request.send(response);
+			JettyRemoteRepository.checkResponseCode(response);
+			
+			final String s = response.getResponseBody();
+
+			return HAStatusEnum.valueOf(s);
+
+		} catch (IOException ex) {
+			log.error(ex, ex);
+			throw ex;
+		} finally {
+			client.close();
+		}
+
+	}
 
     /**
      * Return the {@link NanoSparqlServer} end point (NOT the SPARQL end point)
@@ -547,7 +591,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * 
      * @throws IOException
      */
-    protected RemoteRepository getRemoteRepository(final HAGlue haGlue)
+    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue)
             throws IOException {
 
         return getRemoteRepository(haGlue, false/* useLoadBalancer */);
@@ -568,33 +612,27 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * 
      * @throws IOException
      */
-    protected RemoteRepository getRemoteRepository(final HAGlue haGlue,
+    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue,
             final boolean useLoadBalancer) throws IOException {
 
-        final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue)
+        final String serviceURL = getNanoSparqlServerURL(haGlue);
 //                + (useLoadBalancer ? "/LBS" : "") 
-                + "/sparql";
+//                + "/sparql";
 
-        // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
-
-        final RemoteRepository repo = new RemoteRepository(sparqlEndpointURL,
-                useLoadBalancer, httpClient, executorService);
+        final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(serviceURL,
+                useLoadBalancer, executorService);
 
         return repo;
         
     }
 
-    protected RemoteRepositoryManager getRemoteRepositoryManager(
+    protected JettyRemoteRepositoryManager getRemoteRepositoryManager(
             final HAGlue haGlue, final boolean useLBS) throws IOException {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
-        // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
-
-        final RemoteRepositoryManager repo = new RemoteRepositoryManager(
-                endpointURL, useLBS, httpClient, executorService);
+        final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(
+                endpointURL, useLBS, executorService);
 
         return repo;
         
@@ -684,7 +722,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         /**
          * The SPARQL end point for that service.
          */
-        private final RemoteRepository remoteRepo;
+        private final JettyRemoteRepositoryManager remoteRepo;
 
         /**
          * Format for timestamps that may be used to correlate with the
@@ -809,19 +847,23 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected void awaitKBExists(final HAGlue haGlue) throws IOException {
       
-        final RemoteRepository repo = getRemoteRepository(haGlue);
+        final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue);
         
-        assertCondition(new Runnable() {
-            public void run() {
-                try {
-                    repo.size();
-                } catch (Exception e) {
-                    // KB does not exist.
-                    fail();
-                }
-            }
-
-        }, 5, TimeUnit.SECONDS);
+        try {
+	        assertCondition(new Runnable() {
+	            public void run() {
+	                try {
+	                    repo.size();
+	                } catch (Exception e) {
+	                    // KB does not exist.
+	                    fail();
+	                }
+	            }
+	
+	        }, 5, TimeUnit.SECONDS);
+        } finally {
+        	repo.close();
+        }
         
     }
     

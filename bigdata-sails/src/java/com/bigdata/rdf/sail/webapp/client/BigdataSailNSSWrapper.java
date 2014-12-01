@@ -61,7 +61,7 @@ public class BigdataSailNSSWrapper {
     /**
      * Exposed to tests that do direct HTTP GET/POST operations.
      */
-    protected HttpClient m_httpClient = null;
+    // protected HttpClient m_httpClient = null;
 
     /**
      * The client-API wrapper to the NSS.
@@ -135,21 +135,7 @@ public class BigdataSailNSSWrapper {
 //        m_cm = DefaultClientConnectionManagerFactory.getInstance()
 //                .newInstance();
 
-        m_httpClient = new HttpClient();
-        
-        /*
-         * Ensure that the client follows redirects using a standard policy.
-         * 
-         * Note: This is necessary for tests of the webapp structure since the
-         * container may respond with a redirect (302) to the location of the
-         * webapp when the client requests the root URL.
-         */
-        m_httpClient.setFollowRedirects(true);
-        
-        m_httpClient.start();
-        
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
-                m_httpClient,
                 sail.getDatabase().getIndexManager().getExecutorService());
 
     }
@@ -169,9 +155,10 @@ public class BigdataSailNSSWrapper {
         
         log.warn("Stopping", new StackInfoReport("Stopping HTTPClient"));
         
-        m_httpClient.stop();
+        // m_httpClient.stop();
         
-        m_httpClient = null;
+        // m_httpClient = null;
+        m_repo.close();
         m_repo = null;
         
         if (log.isInfoEnabled())

@@ -46,6 +46,9 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
@@ -98,7 +101,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
             final Integer percentLogSize) throws Exception {
 
         // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
+        // final HttpClient httpClient = new DefaultHttpClient(ccm);
 
         // The NSS service URL (NOT the SPARQL end point).
         final String serviceURL = getNanoSparqlServerURL(haGlue);
@@ -111,12 +114,17 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 
         try {
 
-            final HttpResponse response;
+            final JettyResponseListener response;
 
-            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
-                    opts));
-
-            EntityUtils.consume(response.getEntity());
+			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
+					serviceURL, executorService);
+			try {
+	            JettyRemoteRepository.checkResponseCode(response = rpm.doConnect(opts));
+	
+	            response.consume();
+			} finally {
+				rpm.close();
+			}
 
         } catch (IOException ex) {
 

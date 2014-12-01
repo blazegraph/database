@@ -36,6 +36,8 @@ import org.apache.http.impl.client.DefaultHttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
@@ -106,7 +108,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
          */
         {
             // Get RemoteRepository for each service.
-            final RemoteRepository[] repo = new RemoteRepository[3];
+            final JettyRemoteRepositoryManager[] repo = new JettyRemoteRepositoryManager[3];
 
             repo[0] = getRemoteRepository(serverA);
             repo[1] = getRemoteRepository(serverB);
@@ -128,7 +130,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
             final String namespace = "kb";
 
             // Get RemoteRepository for each service.
-            final RemoteRepository[] repo = new RemoteRepository[3];
+            final JettyRemoteRepository[] repo = new JettyRemoteRepository[3];
             
             repo[0] = getRemoteRepositoryForNamespace(serverA, namespace);
             repo[1] = getRemoteRepositoryForNamespace(serverB, namespace);
@@ -161,18 +163,18 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
      *             with the RDR branch which has changes to the abstract base
      *             class to support the LBS.
      */
-    protected RemoteRepository getRemoteRepositoryForNamespace(
+    protected JettyRemoteRepository getRemoteRepositoryForNamespace(
             final HAGlue haGlue, final String namespace) throws IOException {
 
         final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue);
 
         // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
+       //  final HttpClient httpClient = new DefaultHttpClient(ccm);
 
-        final RemoteRepositoryManager repositoryManager = new RemoteRepositoryManager(
-                sparqlEndpointURL, httpClient, executorService);
+        final JettyRemoteRepositoryManager repositoryManager = new JettyRemoteRepositoryManager(
+                sparqlEndpointURL, executorService);
 
-        final RemoteRepository repo = repositoryManager
+        final JettyRemoteRepository repo = repositoryManager
                 .getRepositoryForNamespace(namespace);
 
         // Note: This is not required in order to demonstrate the problem.

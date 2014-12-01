@@ -98,6 +98,7 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -2883,10 +2884,13 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        final RemoteRepository repo = getRemoteRepository(haGlue,
+        final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer);
-
-        repo.prepareUpdate(updateStr).evaluate();
+        try {
+        	repo.prepareUpdate(updateStr).evaluate();
+        } finally {
+        	repo.close();
+        }
 
     }
     
@@ -2908,9 +2912,16 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         try {
 
-            getRemoteRepository(haGlue).prepareUpdate(updateStr).evaluate();
+        	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue);
+        	try {
+        		repo.prepareUpdate(updateStr).evaluate();
+        	} finally {
+        		repo.close();
+        	}
 
         } catch (HttpException ex) {
+        	
+        	log.warn("Status Code: " + ex.getStatusCode(), ex);
 
             assertEquals("statusCode", 405, ex.getStatusCode());
 
@@ -2927,8 +2938,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-         
-            getRemoteRepository(haGlue).prepareTupleQuery(queryStr).evaluate();
+        	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue);
+        	try {
+        		repo.prepareTupleQuery(queryStr).evaluate();
+        	} finally {
+        		repo.close();
+        	}
             
         } catch (HttpException ex) {
             
@@ -3039,7 +3054,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
 
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+            final JettyRemoteRepositoryManager repo = getRemoteRepository(leader);
+        	try {
+        		repo.prepareUpdate(updateStr).evaluate();
+        	} finally {
+        		repo.close();
+        	}
 
             // Verify quorum is still valid.
             quorum.assertQuorum(token);

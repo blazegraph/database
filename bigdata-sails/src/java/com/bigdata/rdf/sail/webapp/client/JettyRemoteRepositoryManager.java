@@ -27,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.log4j.Logger;
@@ -71,9 +72,9 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
     
     protected JettyRemoteRepositoryManager(final String serviceURL,
-            final HttpClient httpClient, final Executor executor) {
+            final JettyHttpClient httpClient, final Executor executor) {
 
-        this(serviceURL, true/* useLBS */, httpClient, executor);
+        this(serviceURL, false/* useLBS */, httpClient, executor);
 
     }
     
@@ -93,7 +94,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      * @param executor
      */
     protected JettyRemoteRepositoryManager(final String serviceURL,
-            final boolean useLBS, final HttpClient httpClient,
+            final boolean useLBS, final JettyHttpClient httpClient,
             final Executor executor) {
 
         super(serviceURL + "/sparql", useLBS, httpClient, executor);
@@ -104,39 +105,18 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     public JettyRemoteRepositoryManager(String serviceURL,
 			IIndexManager indexManager) {
-		this(serviceURL, DefaultClient(), indexManager.getExecutorService());
+		this(serviceURL, DefaultClient(false), indexManager.getExecutorService());
 	}
 
     public JettyRemoteRepositoryManager(String serviceURL,
     		final Executor executor) {
-		this(serviceURL, DefaultClient(), executor);
+		this(serviceURL, DefaultClient(true), executor);
 	}
 
-    /**
-     * Utility to create a default jetty HttpClient to simplify initialization
-     * 
-     * @return the new HttpClient
-     */
-    public static HttpClient DefaultClient() {
-	    final HttpClient httpClient = new HttpClient();
-	    
-	    try {
-			httpClient.start();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	    
-	    /*
-	     * Ensure that the client follows redirects using a standard policy.
-	     * 
-	     * Note: This is necessary for tests of the webapp structure since the
-	     * container may respond with a redirect (302) to the location of the
-	     * webapp when the client requests the root URL.
-	     */
-	    httpClient.setFollowRedirects(true);
-	    
-	    return httpClient;
-    }
+    public JettyRemoteRepositoryManager(String serviceURL, boolean useLBS,
+			ExecutorService executorService) {
+		this(serviceURL, useLBS, DefaultClient(false), executorService);
+	}
     
 	/**
      * Return the base URL for a remote repository (less the /sparql path
@@ -312,13 +292,8 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
             checkResponseCode(response = doConnect(opts));
 
         } finally {
-
-//            if (response != null) {
-//                try {
-//                    EntityUtils.consume(response.getEntity());
-//                } catch (IOException ex) {
-//                }
-//            }
+        	if (response != null)
+        		response.consume();
 
         }
         
@@ -406,7 +381,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType="
                                 + contentType + " : response="
-                                + getResponseBody(response));
+                                + response.getResponseBody());
 
             final PropertiesParserFactory factory = PropertiesParserRegistry
                     .getInstance().get(format);
@@ -437,7 +412,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
 	public void close() {
 		try {
-			httpClient.stop();
+			httpClient.close();
 		} catch (Exception e) {
 			log.warn("Problem stopping httpClient", e);
 			

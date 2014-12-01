@@ -33,6 +33,7 @@ import net.jini.config.Configuration;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
  * HA5 test suite.
@@ -622,9 +623,14 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-								getRemoteRepository(leader).prepareUpdate(
+							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader);
+				        	try {
+				        		repo.prepareUpdate(
 										updateStr).evaluate();
 								log.warn("COMPLETED TRANSACTION " + count);
+				        	} finally {
+				        		repo.close();
+				        	}
 
 								Thread.sleep(transactionDelay);
 						}

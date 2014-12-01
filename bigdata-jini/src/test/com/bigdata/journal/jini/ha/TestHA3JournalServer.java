@@ -52,6 +52,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.AbstractHA3JournalServerTestCase.ABC;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.util.NV;
@@ -321,158 +322,169 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * that there are no HALog files since the quorum was fully met at the
      * commit point.
      */
-    public void testABC_LargeLoad() throws Exception {
-        
-        final HAGlue serverA = startA();
-        final HAGlue serverB = startB();
-        
-        // wait for a quorum met.
-        final long token = awaitMetQuorum();
+	public void testABC_LargeLoad() throws Exception {
 
-        // Current commit point.
-        final long lastCommitCounter = 1L;
+		final HAGlue serverA = startA();
+		final HAGlue serverB = startB();
 
-        // Verify 1st commit point is visible on A + B.
-        awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB });
-        
-        // start C.
-        final HAGlue serverC = startC();
+		// wait for a quorum met.
+		final long token = awaitMetQuorum();
 
-        // wait for a fully met quorum.
-        assertEquals(token, awaitFullyMetQuorum());
+		// Current commit point.
+		final long lastCommitCounter = 1L;
 
-        // Verify 1st commit point is visible on all services.
-        awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB,
-                serverC });
+		// Verify 1st commit point is visible on A + B.
+		awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB });
 
-        /*
-         * Verify that HALog files were generated and are available for commit
-         * point ONE (1) on the services joined with the met quorum (we have not
-         * gone through a 2-phase commit with a fully met quorum).
-         */
-        assertHALogDigestsEquals(1L/* firstCommitCounter */, lastCommitCounter,
-                new HAGlue[] { serverA, serverB, serverC });
+		// start C.
+		final HAGlue serverC = startC();
 
-        // Verify binary equality of journals.
-        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+		// wait for a fully met quorum.
+		assertEquals(token, awaitFullyMetQuorum());
 
-        // The joined services, in their service join order.
-        final UUID[] joined = quorum.getJoined();
+		// Verify 1st commit point is visible on all services.
+		awaitCommitCounter(lastCommitCounter, new HAGlue[] { serverA, serverB,
+				serverC });
 
-        // The HAGlue interfaces for those joined services, in join order.
-        final HAGlue[] services = new HAGlue[joined.length];
+		/*
+		 * Verify that HALog files were generated and are available for commit
+		 * point ONE (1) on the services joined with the met quorum (we have not
+		 * gone through a 2-phase commit with a fully met quorum).
+		 */
+		assertHALogDigestsEquals(1L/* firstCommitCounter */,
+				lastCommitCounter, new HAGlue[] { serverA, serverB, serverC });
 
-        final RemoteRepository[] repos = new RemoteRepository[joined.length];
-        
-        for (int i = 0; i < joined.length; i++) {
+		// Verify binary equality of journals.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
-            services[i] = quorum.getClient().getService(joined[i]);
+		// The joined services, in their service join order.
+		final UUID[] joined = quorum.getJoined();
 
-            repos[i] = getRemoteRepository(services[i]);
-            
-        }
-        
-        /*
-         * Verify that query on all nodes is allowed and produces nothing
-         * before we write anything.
-         */
-        for (RemoteRepository r : repos) {
+		// The HAGlue interfaces for those joined services, in join order.
+		final HAGlue[] services = new HAGlue[joined.length];
 
-            // Should be empty.
-            assertEquals(0L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
-                            .evaluate()));
+		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
 
-        }
+		try {
 
-        /*
-         * LOAD data on leader.
-         */
-        final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
-                token, true/* reallyLargeLoad */));
+			for (int i = 0; i < joined.length; i++) {
 
-        // Start LOAD.
-        executorService.submit(ft);
-        
-        // Await LOAD, but with a timeout.
-        ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+				services[i] = quorum.getClient().getService(joined[i]);
 
-        /*
-         * Verify that query on all nodes is allowed and now provides a
-         * non-empty result.
-         */
-        for (RemoteRepository r : repos) {
+				repos[i] = getRemoteRepository(services[i]);
 
-            // Should have data.
-            assertEquals(100L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c} LIMIT 100")
-                            .evaluate()));
+			}
 
-        }
+			/*
+			 * Verify that query on all nodes is allowed and produces nothing
+			 * before we write anything.
+			 */
+			for (JettyRemoteRepositoryManager r : repos) {
 
-        // Current commit point.
-        final long lastCommitCounter2 = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+				// Should be empty.
+				assertEquals(0L,
+						countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+								.evaluate()));
 
-        // There are now TWO (2) commit points.
-        assertEquals(2L,lastCommitCounter2);
-        
-        // Verify binary equality.
-        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+			}
 
-        // Verify no HALog files since fully met quorum @ commit.
-        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter2,
-                new HAGlue[] { serverA, serverB, serverC });
+			/*
+			 * LOAD data on leader.
+			 */
+			final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
+					token, true/* reallyLargeLoad */));
 
-        /*
-         * Do a "DROP ALL" and reverify that no solutions are found on each
-         * service.
-         */
-        {
-            
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
+			// Start LOAD.
+			executorService.submit(ft);
 
-            repos[0].prepareUpdate("DROP ALL").evaluate();
+			// Await LOAD, but with a timeout.
+			ft.get(longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
-        }
-        
-        /*
-         * Verify that query on all nodes is allowed and now provides an empty
-         * result.
-         */
-        for (RemoteRepository r : repos) {
+			/*
+			 * Verify that query on all nodes is allowed and now provides a
+			 * non-empty result.
+			 */
+			for (JettyRemoteRepositoryManager r : repos) {
 
-            // Should be empty.
-            assertEquals(
-                    0L,
-                    countResults(r.prepareTupleQuery(
-                            "SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
+				// Should have data.
+				assertEquals(
+						100L,
+						countResults(r.prepareTupleQuery(
+								"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
 
-        }
+			}
 
-        // Current commit point.
-        final long lastCommitCounter3 = serverA
-                .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
-                .getRootBlock().getCommitCounter();
+			// Current commit point.
+			final long lastCommitCounter2 = serverA
+					.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+					.getRootBlock().getCommitCounter();
 
-        // There are now THREE (3) commit points.
-        assertEquals(3L, lastCommitCounter3);
+			// There are now TWO (2) commit points.
+			assertEquals(2L, lastCommitCounter2);
 
-        // Verify binary equality.
-        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+			// Verify binary equality.
+			assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
-        // Verify no HALog files since fully met quorum @ commit.
-        assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter2,
-                new HAGlue[] { serverA, serverB, serverC });
+			// Verify no HALog files since fully met quorum @ commit.
+			assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter2,
+					new HAGlue[] { serverA, serverB, serverC });
 
-        /*
-         * TODO Continue test and verify restart? Or verify restart before we do
-         * the DROP ALL?
-         */
-        
-    }
+			/*
+			 * Do a "DROP ALL" and reverify that no solutions are found on each
+			 * service.
+			 */
+			{
+
+				// Verify quorum is still valid.
+				quorum.assertQuorum(token);
+
+				repos[0].prepareUpdate("DROP ALL").evaluate();
+
+			}
+
+			/*
+			 * Verify that query on all nodes is allowed and now provides an
+			 * empty result.
+			 */
+			for (JettyRemoteRepositoryManager r : repos) {
+
+				// Should be empty.
+				assertEquals(
+						0L,
+						countResults(r.prepareTupleQuery(
+								"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
+
+			}
+
+			// Current commit point.
+			final long lastCommitCounter3 = serverA
+					.getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+					.getRootBlock().getCommitCounter();
+
+			// There are now THREE (3) commit points.
+			assertEquals(3L, lastCommitCounter3);
+
+			// Verify binary equality.
+			assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+
+			// Verify no HALog files since fully met quorum @ commit.
+			assertHALogNotFound(0L/* firstCommitCounter */, lastCommitCounter2,
+					new HAGlue[] { serverA, serverB, serverC });
+
+			/*
+			 * TODO Continue test and verify restart? Or verify restart before
+			 * we do the DROP ALL?
+			 */
+		} finally {
+			// close all created repos
+			for (JettyRemoteRepositoryManager r : repos) {
+				if (r != null)
+					r.close();
+
+			}
+
+		}
+	}
     
     /**
      * Test Resync of late starting C service
@@ -1003,9 +1015,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-								getRemoteRepository(leader).prepareUpdate(
+							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader);
+				        	try {
+				        		repo.prepareUpdate(
 										updateStr).evaluate();
 								log.warn("COMPLETED TRANSACTION " + count);
+				        	} finally {
+				        		repo.close();
+				        	}
 
 								Thread.sleep(transactionDelay);
 						}
@@ -2197,49 +2214,52 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: We need to actually modify the KB for each UPDATE but not
              * drop all the statemets each time.
              */
-            class UpdateTask implements Callable<Void> {
+			class UpdateTask implements Callable<Void> {
 
-                private final RemoteRepository remoteRepo;
+				public UpdateTask() throws IOException {
 
-                public UpdateTask() throws IOException {
+				}
 
-                    remoteRepo = getRemoteRepository(leader);
+				public Void call() throws Exception {
 
-                }
+					final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(leader);
+					try {
+						for (int n = 0; n < nTransactions; n++) {
 
-                public Void call() throws Exception {
-                    
-                    for (int n = 0; n < nTransactions; n++) {
+							// Verify quorum is still valid.
+							quorum.assertQuorum(token);
 
-                        // Verify quorum is still valid.
-                        quorum.assertQuorum(token);
+							// Do a simple UPDATE transaction.
+							final StringBuilder sb = new StringBuilder();
+							sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+							sb.append("INSERT DATA {\n");
+							sb.append("  <http://example/book" + n // Note:
+																	// distinct
+																	// triple!
+									+ "> dc:title \"A new book\" ;\n");
+							sb.append("  dc:creator \"A.N.Other\" .\n");
+							sb.append("}\n");
 
-                        // Do a simple UPDATE transaction.
-                        final StringBuilder sb = new StringBuilder();
-                        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-                        sb.append("INSERT DATA {\n");
-                        sb.append("  <http://example/book" + n // Note: distinct triple!
-                                + "> dc:title \"A new book\" ;\n");
-                        sb.append("  dc:creator \"A.N.Other\" .\n");
-                        sb.append("}\n");
+							final String updateStr = sb.toString();
 
-                        final String updateStr = sb.toString();
+							remoteRepo.prepareUpdate(updateStr).evaluate();
 
-                        remoteRepo.prepareUpdate(updateStr).evaluate();
-                        
-                        if(log.isInfoEnabled())
-                            log.info("COMPLETED TRANSACTION " + n);
+							if (log.isInfoEnabled())
+								log.info("COMPLETED TRANSACTION " + n);
 
-                        Thread.sleep(transactionDelay);
+							Thread.sleep(transactionDelay);
 
-                    }
-                    
-                    // done.
-                    return null;
-                    
-                }
+						}
 
-            };
+						// done.
+						return null;
+					} finally {
+						remoteRepo.close();
+					}
+
+				}
+
+			};
             
             /*
              * Future for the task executing a series of UPDATES.
@@ -2263,7 +2283,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 /**
                  * The SPARQL end point for that service.
                  */
-                final RemoteRepository remoteRepo;
+                final JettyRemoteRepositoryManager remoteRepo;
 
                 /**
                  * Format for timestamps that may be used to correlate with the
@@ -3484,59 +3504,69 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
      * @see <a href="http://trac.bigdata.com/ticket/853"> Follower does not
      *      accept POST of idempotent operations (HA) </a>
      */
-    public void test_postQueryOnFollowers() throws Exception {
-        
-        final ABC abc = new ABC(false/*sequential*/); // simultaneous start.
+	public void test_postQueryOnFollowers() throws Exception {
 
-        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
+		final ABC abc = new ABC(false/* sequential */); // simultaneous start.
 
-        // Verify quorum is FULLY met.
-        awaitFullyMetQuorum();
+		final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
 
-        // await the KB create commit point to become visible on each service.
-        awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
+		// Verify quorum is FULLY met.
+		awaitFullyMetQuorum();
 
-        // Verify binary equality of ALL journals.
-        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+		// await the KB create commit point to become visible on each service.
+		awaitCommitCounter(1L, new HAGlue[] { serverA, serverB, serverC });
 
-        final RemoteRepository[] repos = new RemoteRepository[3];
-        repos[0] = getRemoteRepository(serverA);
-        repos[1] = getRemoteRepository(serverB);
-        repos[2] = getRemoteRepository(serverC);
-        
-        /*
-         * Verify that query on all nodes is allowed.
-         */
-        for (RemoteRepository r : repos) {
+		// Verify binary equality of ALL journals.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
-            r.setQueryMethod("GET");
-            
-            // Should be empty.
-            assertEquals(0L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
-                            .evaluate()));
+		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
+		try {
+			repos[0] = getRemoteRepository(serverA);
+			repos[1] = getRemoteRepository(serverB);
+			repos[2] = getRemoteRepository(serverC);
 
-        }
+			/*
+			 * Verify that query on all nodes is allowed.
+			 */
+			for (JettyRemoteRepositoryManager r : repos) {
 
-        // Change the maximum length of a GET for a Query.
-        for(RemoteRepository r : repos) {
+				r.setQueryMethod("GET");
 
-            r.setMaxRequestURLLength(1);
-            
-        }
-        
-        // Run with the new length. All requests should be POSTs.
-        for (RemoteRepository r : repos) {
+				// Should be empty.
+				assertEquals(0L,
+						countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+								.evaluate()));
 
-            r.setQueryMethod("POST");
+			}
 
-            // Should be empty.
-            assertEquals(0L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
-                            .evaluate()));
+			// Change the maximum length of a GET for a Query.
+			for (JettyRemoteRepositoryManager r : repos) {
 
-        }
+				r.setMaxRequestURLLength(1);
 
-    }
+			}
+
+			// Run with the new length. All requests should be POSTs.
+			for (JettyRemoteRepositoryManager r : repos) {
+
+				r.setQueryMethod("POST");
+
+				// Should be empty.
+				assertEquals(0L,
+						countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+								.evaluate()));
+
+			}
+
+		} finally {
+
+			for (JettyRemoteRepositoryManager r : repos) {
+				if (r != null) {
+					r.close();
+				}
+			}
+		}
+
+	}
 
 }

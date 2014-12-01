@@ -37,6 +37,8 @@ import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -139,17 +141,10 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         o.addRequestParam("query", queryStr);
         
         o.addRequestParam("queryId", queryId.toString());
-
-        final DefaultHttpClient httpClient = new DefaultHttpClient(
-                params.getClientConnectionManager());
-
-        // Setup a standard strategy for following redirects.
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
         
-        final RemoteRepository repo = new RemoteRepository(//
+        final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(//
                 uriStr,//
                 params.getServiceOptions().isBigdataLBS(),// useLBS
-                httpClient,//
                 params.getTripleStore().getExecutorService()
                 );
         

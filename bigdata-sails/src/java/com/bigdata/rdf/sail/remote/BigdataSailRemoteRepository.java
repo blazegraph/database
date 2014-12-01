@@ -34,6 +34,7 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 
 /**
@@ -59,7 +60,7 @@ public class BigdataSailRemoteRepository implements Repository {
     
     private final JettyRemoteRepository nss;
     
-    private final HttpClient httpClient;
+    private final JettyHttpClient httpClient;
 
     /**
      * Ctor that simply specifies an endpoint and lets this class manage the
@@ -91,24 +92,11 @@ public class BigdataSailRemoteRepository implements Repository {
 		
         this.executor = Executors.newCachedThreadPool();
 
-        this.httpClient = new HttpClient();
 
-        /*
-         * Enable a standard http redirect policy. This allows references to
-         * http://localhost:8080 to be redirected to
-         * http://localhost:8080/bigdata.
-         */
-        httpClient.setFollowRedirects(true);
-        
-        try {
-			httpClient.start();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
-        this.nss = new JettyRemoteRepository(sparqlEndpointURL, useLBS, httpClient,
+        this.nss = new JettyRemoteRepository(sparqlEndpointURL, useLBS,
                 executor);
 
+        this.httpClient = nss.getClient();
 	}
 
 	/**
