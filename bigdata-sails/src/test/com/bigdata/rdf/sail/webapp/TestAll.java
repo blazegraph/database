@@ -58,9 +58,6 @@ public class TestAll extends TestCase {
         // Test suite of NSS startup behavior and overrides.
         suite.addTestSuite(TestNanoSparqlServer.class);
 
-        // Test suite of NSS startup behavior and overrides.
-        suite.addTestSuite(TestNanoSparqlJettyClient.class);
-
         /*
          * WebApp Client.
          */
