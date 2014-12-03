@@ -516,12 +516,6 @@ public class MemoryGroupByOp extends GroupByOp {
          *         constraint).
          */
         private IBindingSet aggregate(final Iterable<IBindingSet> solutions) {
-
-            if (!solutions.iterator().hasNext()) {
-                // Drop empty group.
-                return null;
-            }
-
             /**
              * The intermediate solution with all bindings produced when
              * evaluating this solution group. Evaluation begins by binding any

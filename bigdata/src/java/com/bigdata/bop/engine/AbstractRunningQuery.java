@@ -909,7 +909,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     /**
      * Method handles the case where there are downstream operators awaiting
-     * last pass evaluation is not re-triggered by the last
+     * last pass evaluation or at-once evaluation is not re-triggered by the last
      * {@link IChunkMessage} output from an upstream operator. If this situation
      * arises the query will just sit there waiting for a trigger to kick of
      * last pass evaluation. This method works around that by sending an empty
@@ -917,9 +917,38 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * triggered.
      * 
      * @param msg
+     *
+     * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
      */
     private void triggerOperatorsAwaitingLastPass() {
 
+        /*
+         * Examine all downstream operators. Find any at-once operators that
+         * can no longer be triggered and which have not yet executed. Then
+         * trigger them with an empty chunk message so they will run once
+         * and only once.
+         */
+
+        // Consider the operators which require at-once evaluation.
+        for (Integer bopId : runState.getAtOnceRequired()) {
+
+            if (runState.getOperatorRunState(bopId) == RunStateEnum.StartLastPass) {
+
+                if (log.isInfoEnabled())
+                    log.info("Triggering at-once (no solutions in): " + bopId);
+
+                /*
+                 * Since evaluation is purely local, we specify -1 as the shardId.
+                 */
+                final IChunkMessage<IBindingSet> emptyMessage = new EmptyChunkMessage<IBindingSet>(
+                        getQueryController(), queryId, bopId, -1/* shardId */, true/* lastInvocation */);
+
+                acceptChunk(emptyMessage);
+
+            }
+
+        }
+    	
         if (runState.getTotalLastPassRemainingCount() == 0) {
 
             return;
