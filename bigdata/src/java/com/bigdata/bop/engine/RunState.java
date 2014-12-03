@@ -330,6 +330,15 @@ class RunState {
          */
         final Set<Integer/* bopId */> lastPassRequested = new LinkedHashSet<Integer>();
 
+        /**
+         * The set of operators for which at-once evaluation is required. The operator
+         * is removed from this set as soon as it is started.
+         * 
+         * @see #startOp(IStartOpMessage, boolean)
+         * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
+         */
+        final Set<Integer/* bopId */> atOnceRequired = new LinkedHashSet<Integer>();
+
         @Override
         public String toString() {
 
@@ -349,6 +358,7 @@ class RunState {
             sb.append(",running=" + runningMap);
             sb.append(",available=" + availableMap);
             sb.append(",lastPassRequested=" + lastPassRequested);
+            sb.append(",atOnceRequired=" + atOnceRequired);
             sb.append("}");
             return sb;
         }
@@ -549,6 +559,16 @@ class RunState {
         
     }
     
+	/**
+	 * Return the set of bopIds for operators that must be evaluated once and
+	 * only once.
+	 */
+    final Set<Integer/*bopId*/> getAtOnceRequired() {
+
+        return Collections.unmodifiableSet(innerState.atOnceRequired);
+        
+    }
+    
     /**
      * Constructor.
      * 
@@ -618,11 +638,12 @@ class RunState {
 
         /*
          * Any operator requesting last pass evaluation on the controller needs
-         * to be added to the last pass evaluation set now. This provides the
+         * to be added to the last pass evaluation or at-once evaluation set now. This provides the
          * guarantee that such operators will be run at least once (assuming
          * that the query terminates normally).
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:12
+         * @see http://trac.bigdata.com/ticket/868
          */
         final UUID controllerId = msg.getQueryControllerId();
         {
@@ -631,25 +652,32 @@ class RunState {
                 final BOp op = itr.next();
                 if (op.getEvaluationContext() != BOpEvaluationContext.CONTROLLER)
                     continue;
-                if(!((PipelineOp) op).isLastPassRequested())
-                    continue;
-                final Integer id = (Integer) op.getProperty(BOp.Annotations.BOP_ID);
-                if (id == null)
-                    throw new NoBOpIdException(op.toString());
-                if (innerState.lastPassRequested.add(id)) {
-                    innerState.totalLastPassRemainingCount.incrementAndGet();
-                    /*
-                     * Mock an evaluation pass for this operator. It will look
-                     * as if the operator has been evaluated (various
-                     * collections have entries for that bopId) but that it was
-                     * evaluated ZERO (0) times (various counters are zero).
-                     */
-                    innerState.runningMap.put(id.intValue(), new AtomicLong());
-                    @SuppressWarnings("rawtypes")
-                    final Set set = new LinkedHashSet();
-                    set.add(controllerId);
-                    innerState.startedOn.put(id, set);
-                    messagesConsumed(id.intValue(), 0/*nmessages*/);
+                final boolean lastPassRequested = ((PipelineOp) op).isLastPassRequested();
+                final boolean atOnceRequired = ((PipelineOp) op).isAtOnceEvaluation();
+                if(atOnceRequired || lastPassRequested) {
+	                final Integer id = (Integer) op.getProperty(BOp.Annotations.BOP_ID);
+	                if (id == null)
+	                    throw new NoBOpIdException(op.toString());
+	                boolean didAdd = false;
+					if (atOnceRequired)
+						didAdd = innerState.atOnceRequired.add(id);
+					if (lastPassRequested)
+						if(didAdd = innerState.lastPassRequested.add(id))
+							innerState.totalLastPassRemainingCount.incrementAndGet();
+	                if (didAdd) {
+	                    /*
+	                     * Mock an evaluation pass for this operator. It will look
+	                     * as if the operator has been evaluated (various
+	                     * collections have entries for that bopId) but that it was
+	                     * evaluated ZERO (0) times (various counters are zero).
+	                     */
+	                    innerState.runningMap.put(id.intValue(), new AtomicLong());
+	                    @SuppressWarnings("rawtypes")
+	                    final Set set = new LinkedHashSet();
+	                    set.add(controllerId);
+	                    innerState.startedOn.put(id, set);
+	                    messagesConsumed(id.intValue(), 0/*nmessages*/);
+	                }
                 }
             }
         }
@@ -717,6 +745,7 @@ class RunState {
         
         final PipelineOp bop = (PipelineOp) innerState.bopIndex.get(bopId);
 
+        // Note: This is an effective NOP since we init the last pass data structures in startQuery().
         if (bop.isLastPassRequested())
             if (innerState.lastPassRequested.add(bopId))
                 innerState.totalLastPassRemainingCount.incrementAndGet();
@@ -899,6 +928,7 @@ class RunState {
         final boolean isAllDone = innerState.totalRunningCount.get() == 0
                 && innerState.totalAvailableCount.get() == 0
                 && innerState.totalLastPassRemainingCount.get() == 0
+                && innerState.atOnceRequired.isEmpty()
                 ;
 
         if (isAllDone)
@@ -988,6 +1018,7 @@ class RunState {
         if (op == null)
             throw new NoSuchBOpException(bopId);
 
+        // look at the operators that could feed chunks into this operator.
         final Iterator<BOp> itr = BOpUtility.preOrderIterator(op);
 
         while (itr.hasNext()) {
@@ -1047,43 +1078,63 @@ class RunState {
 
             }
 
-            if (bopId != id.intValue() && innerState.lastPassRequested.contains(id)) {
+            if (bopId != id.intValue()) {
+            	
+            	if (innerState.atOnceRequired.contains(id)) {
+                
+					/*
+					 * Any predecessor of the operator (but not the operator
+					 * itself) requires at-once evaluation and has not yet run.
+					 */
 
-                /*
-                 * Any predecessor of the operator (but not the operator itself)
-                 * requested a last pass evaluation phase and that last pass
-                 * evaluation phase is still in progress (as recognized by a
-                 * non-null entry in [doneOn] for that operator).
-                 */
-
-                // Examine the doneSet for this operator.
-                final Set doneSet = innerState.doneOn.get(id);
-
-                // If null, then has not started lastPass evaluation.
-                if (doneSet == null) {
-
-                    if (log.isDebugEnabled())
+            		if (log.isDebugEnabled())
                         log.debug("Operator can be triggered: op=" + op
                                 + ", possible trigger=" + t
-                                + " has not started last pass evaluation.");
+                                + " awaiting at-once evaluation of predecessor.");
 
                     return RunStateEnum.Running;
+                    
+            	}
 
-                }
+            	if (innerState.lastPassRequested.contains(id)) {
 
-                // If non-empty, then has not finished lastPass evaluation.
-                if (!doneSet.isEmpty()) {
+	                /*
+	                 * Any predecessor of the operator (but not the operator itself)
+	                 * requested a last pass evaluation phase and that last pass
+	                 * evaluation phase is still in progress (as recognized by a
+	                 * non-null entry in [doneOn] for that operator).
+	                 */
+	
+	                // Examine the doneSet for this operator.
+	                final Set doneSet = innerState.doneOn.get(id);
+	
+	                // If null, then has not started lastPass evaluation.
+	                if (doneSet == null) {
+	
+	                    if (log.isDebugEnabled())
+	                        log.debug("Operator can be triggered: op=" + op
+	                                + ", possible trigger=" + t
+	                                + " has not started last pass evaluation.");
+	
+	                    return RunStateEnum.Running;
+	
+	                }
+	
+	                // If non-empty, then has not finished lastPass evaluation.
+	                if (!doneSet.isEmpty()) {
+	
+	                    if (log.isDebugEnabled())
+	                        log.debug("Operator can be triggered: op=" + op
+	                                + ", possible trigger=" + t
+	                                + " awaiting last pass evaluation for doneSet="
+	                                + doneSet);
+	
+	                    return RunStateEnum.Running;
+	
+	                }
 
-                    if (log.isDebugEnabled())
-                        log.debug("Operator can be triggered: op=" + op
-                                + ", possible trigger=" + t
-                                + " awaiting last pass evaluation for doneSet="
-                                + doneSet);
-
-                    return RunStateEnum.Running;
-
-                }
-
+            	}
+            	
             }
 
         }
@@ -1093,19 +1144,25 @@ class RunState {
          * already generated by upstream operators.
          */
         
-        if (innerState.lastPassRequested.contains(bopId)
-                && innerState.runningMap.containsKey(bopId)) {
+        // handle at-once operator.
+        final boolean atOnceRequired = innerState.atOnceRequired.contains(bopId); 
+        
+        // handle pipeline operator with last-pass evaluation requested.
+        final boolean lastPassRequest = innerState.lastPassRequested.contains(bopId);
+        
+		if ((atOnceRequired || lastPassRequest)
+				&& innerState.runningMap.containsKey(bopId)) {
 
             /*
-             * The operator has requested last pass evaluation AND (either has
-             * in fact been evaluated (the running count map has an entry for
-             * this operator) -OR- is an operator which runs on the query
-             * controller).
-             * 
-             * Now we need to determine whether or not the operator should start
-             * its last pass evaluation phase or if it is waiting for the last
-             * pass evaluation phase to terminate.
-             */
+			 * The operator has requested either (last pass evaluation -or-
+			 * at-once evaluation) AND (either has in fact been evaluated (the
+			 * running count map has an entry for this operator) -OR- is an
+			 * operator which runs on the query controller).
+			 * 
+			 * Now we need to determine whether or not the operator should start
+			 * its last pass evaluation phase or if it is waiting for the last
+			 * pass evaluation phase to terminate.
+			 */
             
             // Examine the doneSet for this operator.
             final Set doneSet = innerState.doneOn.get(bopId);
@@ -1193,9 +1250,10 @@ class RunState {
         if (op == null)
             throw new NoSuchBOpException(bopId);
 
-        final boolean didStart = innerState.runningMap.get(bopId) != null;
+		final AtomicLong counter = innerState.runningMap.get(bopId);
+		final boolean didStart = counter != null && counter.get() != 0L;
         
-        if(didStart) {
+		if (didStart) {
             
             // Evaluation has already run (or begun) for this operator.
             if (log.isInfoEnabled())
@@ -1216,7 +1274,7 @@ class RunState {
             if (id == null)
                 throw new NoBOpIdException(t.toString());
 
-            if(bopId == id.intValue()) {
+			if (bopId == id.intValue()) {
 
                 // Ignore self.
                 continue;
@@ -1376,6 +1434,12 @@ class RunState {
 
         }
 
+        //if it is halt for at-once operator than we need to remove it from
+        //the set of at-once operators that we still need to run
+        if(innerState.atOnceRequired.contains(bopId)) {
+            innerState.atOnceRequired.remove(bopId);
+        }
+
         /*
          * If we are processing our doneSet, then handle that first so the
          * changes will be reflected when we decide the new run state for the
@@ -1399,10 +1463,10 @@ class RunState {
                 }
 
                 if (set.isEmpty()) {
-
-                    // End of last pass evaluation for this operator.
-                    innerState.totalLastPassRemainingCount.decrementAndGet();
-
+                    if(innerState.lastPassRequested.contains(bopId)) {
+                        // End of last pass evaluation for this operator.
+                        innerState.totalLastPassRemainingCount.decrementAndGet();
+                    }
                 }
                 
             }
