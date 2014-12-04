@@ -90,21 +90,29 @@ public class BigdataVertex extends BigdataElement implements Vertex {
         
 		final URI wild = null;
 		
-		if (dir == Direction.OUT) {
+		try {
 		    
-			return graph.getEdges(uri, wild, labels);
-			
-		} else if (dir == Direction.IN) {
-		    
-			return graph.getEdges(wild, uri, labels);
-			
-		} else {
-		    
-			return graph.fuse(
-					graph.getEdges(uri, wild, labels),
-					graph.getEdges(wild, uri, labels));
-			
-		}
+    		if (dir == Direction.OUT) {
+    		    
+    			return graph.getEdges(uri, wild, labels);
+    			
+    		} else if (dir == Direction.IN) {
+    		    
+    			return graph.getEdges(wild, uri, labels);
+    			
+    		} else {
+    		    
+    			return graph.fuse(
+    					graph.getEdges(uri, wild, labels),
+    					graph.getEdges(wild, uri, labels));
+    			
+    		}
+    		
+        } catch (RuntimeException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
 		
 	}
 
@@ -119,22 +127,30 @@ public class BigdataVertex extends BigdataElement implements Vertex {
         
 		final URI wild = null;
 		
-		if (dir == Direction.OUT) {
+		try {
 		    
-			return graph.getVertices(uri, wild, labels);
-			
-		} else if (dir == Direction.IN) {
-		    
-			return graph.getVertices(wild, uri, labels);
-			
-		} else {
-		    
-			return graph.fuse(
-					graph.getVertices(uri, wild, labels),
-					graph.getVertices(wild, uri, labels));
-			
-		}
-		
+    		if (dir == Direction.OUT) {
+    		    
+    			return graph.getVertices(uri, wild, labels);
+    			
+    		} else if (dir == Direction.IN) {
+    		    
+    			return graph.getVertices(wild, uri, labels);
+    			
+    		} else {
+    		    
+    			return graph.fuse(
+    					graph.getVertices(uri, wild, labels),
+    					graph.getVertices(wild, uri, labels));
+    			
+    		}
+
+        } catch (RuntimeException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+
 	}
 
 	/**
