@@ -57,7 +57,7 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/start.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/sun-util.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/tools.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-5.1.5.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-3.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-3.0.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-jmx-9.1.4.v20140401.jar"/>
