@@ -53,6 +53,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -383,7 +384,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * The {@link ClientConnectionManager} is used to make remote HTTP
      * connections (SPARQL SERVICE call joins).
      */
-    private final AtomicReference<ClientConnectionManager> clientConnectionManagerRef = new AtomicReference<ClientConnectionManager>();
+    private final AtomicReference<HttpClient> clientConnectionManagerRef = new AtomicReference<HttpClient>();
     
 //    /**
 //     * A pool used to service IO requests (reads on access paths).
@@ -473,9 +474,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Return the {@link ClientConnectionManager} used to make remote SERVICE
      * call requests.
      */
-    public ClientConnectionManager getClientConnectionManager() {
+    public HttpClient getClientConnectionManager() {
 
-        ClientConnectionManager cm = clientConnectionManagerRef.get();
+    	HttpClient cm = clientConnectionManagerRef.get();
         
         if (cm == null) {
 
@@ -1183,11 +1184,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
-        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
                 log.info("Terminating ClientConnectionManager: " + this);
-            cm.shutdown();
+            try {
+				cm.stop();
+			} catch (Exception e) {
+				log.error("Problem shutting down HttpClient", e);
+			}
         }
         
         // clear the queues
@@ -1236,11 +1241,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
-        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
                 log.info("Terminating ClientConnectionManager: " + this);
-            cm.shutdown();
+            try {
+				cm.stop();
+			} catch (Exception e) {
+				log.error("Problem stopping HttpClient", e);
+			}
         }
 
         // halt any running queries.

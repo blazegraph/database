@@ -102,7 +102,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
 	static Journal getTemporaryJournal() {
 	
-		return getTemporaryJournal(true/*use_rwstore*/);
+		return getTemporaryJournal(false/*use_rwstore*/);
 		
 	}
 	

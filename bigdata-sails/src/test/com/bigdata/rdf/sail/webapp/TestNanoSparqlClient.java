@@ -71,10 +71,9 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.RemoveOp;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -383,7 +382,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         HttpUriRequest request = null;
         try {
 
-            request = RemoteRepository.newRequest(urlString.toString(), opts.method);
+            request = ApacheRemoteRepository.newRequest(urlString.toString(), opts.method);
 
             if (opts.requestHeaders != null) {
 
@@ -477,7 +476,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
      */
     public void test_SERVICE_DESCRIPTION() throws Exception {
 
-        final Graph g = RemoteRepository
+        final Graph g = ApacheRemoteRepository
                 .asGraph(m_repo.getServiceDescription());
 
         final ValueFactory f = g.getValueFactory();
@@ -2028,7 +2027,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 						stmts.add(generateTriple());
 					}
 					log.info(String.format("Loading package into %s namespace...", namespace));
-					m_repo.getRepositoryForNamespace(namespace).add(new RemoteRepository.AddOp(stmts));
+					m_repo.getRepositoryForNamespace(namespace).add(new ApacheRemoteRepository.AddOp(stmts));
 					log.warn(String.format("Loading package into %s namespace done", namespace));
 				} catch (final Exception e) {
 					log.error(String.format("Failed to load package into namespace %s:", namespace), e);

@@ -39,8 +39,6 @@ import org.slf4j.LoggerFactory;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.TestSparqlUpdate;
-import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Tests for SPARQL 1.1 Update functionality.
@@ -2067,7 +2065,7 @@ public abstract class SPARQLUpdateTest extends TestCase {
         assertEquals(2L, countSolutions(queryStr));
 
         /*
-         * Then I still get only one result for the query, the triple with 'Š'
+         * Then I still get only one result for the query, the triple with '?'
          * which is \u00E4. But if I now add the 'u' flag to the regex, I get
          * both triples as result, so this seems to be a viable workaround.
          * Always setting the UNICODE_CASE flag sounds like a good idea, and in

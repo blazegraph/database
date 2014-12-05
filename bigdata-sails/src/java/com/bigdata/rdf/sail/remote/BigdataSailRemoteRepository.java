@@ -59,8 +59,6 @@ public class BigdataSailRemoteRepository implements Repository {
     private final ExecutorService executor;
     
     private final JettyRemoteRepository nss;
-    
-    private final JettyHttpClient httpClient;
 
     /**
      * Ctor that simply specifies an endpoint and lets this class manage the
@@ -95,8 +93,6 @@ public class BigdataSailRemoteRepository implements Repository {
 
         this.nss = new JettyRemoteRepository(sparqlEndpointURL, useLBS,
                 executor);
-
-        this.httpClient = nss.getClient();
 	}
 
 	/**
@@ -108,8 +104,6 @@ public class BigdataSailRemoteRepository implements Repository {
 		this.executor = null;
 		
 		this.nss = nss;
-		
-		this.httpClient = nss.getClient();
 		
 	}
 	
@@ -124,12 +118,6 @@ public class BigdataSailRemoteRepository implements Repository {
 
 		if (executor != null)
 			executor.shutdownNow();
-		
-		try {
-			httpClient.stop();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
 		
 	}
 

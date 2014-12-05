@@ -25,8 +25,6 @@ package com.bigdata.blueprints;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.tinkerpop.blueprints.Features;
 
 /**
@@ -40,7 +38,7 @@ import com.tinkerpop.blueprints.Features;
  * 
  * @see {@link BigdataSailRemoteRepository}
  * @see {@link BigdataSailRemoteRepositoryConnection}
- * @see {@link RemoteRepository}
+ * @see {@link JettyRemoteRepository}
  * 
  * @author mikepersonick
  * 

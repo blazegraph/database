@@ -67,8 +67,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.config.NicUtil;
 
@@ -85,11 +84,9 @@ public class TestRemoteGOM extends TestCase {
 
 	private Server m_server;
 
-	private RemoteRepository m_repo;
+	private JettyRemoteRepositoryManager m_repo;
 	
 	private String m_serviceURL;
-
-	private ClientConnectionManager m_cm;
 
 	private IIndexManager m_indexManager;
 
@@ -182,11 +179,7 @@ public class TestRemoteGOM extends TestCase {
 
         // m_cm = httpClient.getConnectionManager();
 
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
-
-        m_repo = new RemoteRepository(m_serviceURL,
-                new DefaultHttpClient(m_cm), m_indexManager.getExecutorService());
+        m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_indexManager.getExecutorService());
 
     }
 
@@ -204,17 +197,13 @@ public class TestRemoteGOM extends TestCase {
 
         }
 
-        m_repo = null;
+        if (m_repo != null) {
+	        m_repo.close();
+	        
+	        m_repo = null;
+        }
 
         m_serviceURL = null;
-
-        if (m_cm != null) {
-
-            m_cm.shutdown();
-
-            m_cm = null;
-
-        }
 
         if (m_indexManager != null && m_namespace != null) {
 

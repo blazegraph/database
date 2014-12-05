@@ -104,11 +104,6 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
 
     public JettyRemoteRepositoryManager(String serviceURL,
-			IIndexManager indexManager) {
-		this(serviceURL, DefaultClient(false), indexManager.getExecutorService());
-	}
-
-    public JettyRemoteRepositoryManager(String serviceURL,
     		final Executor executor) {
 		this(serviceURL, DefaultClient(true), executor);
 	}
@@ -137,7 +132,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for a data set managed by the remote
+     * Obtain a {@link JettyRemoteRepository} for a data set managed by the remote
      * service.
      * 
      * @param namespace
@@ -153,7 +148,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * Obtain a {@link JettyRemoteRepository} for the data set having the specified
      * SPARQL end point.
      * 
      * @param sparqlEndpointURL
@@ -176,9 +171,9 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * Obtain a {@link JettyRemoteRepository} for the data set having the specified
      * SPARQL end point. The load balancer will be used or not as per the
-     * parameters to the {@link RemoteRepositoryManager} constructor.
+     * parameters to the {@link JettyRemoteRepositoryManager} constructor.
      * 
      * @param sparqlEndpointURL
      *            The URL of the SPARQL end point.
@@ -410,8 +405,13 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     }
 
+    volatile boolean m_closed = false;
+    
 	public void close() {
+		if (m_closed)
+			throw new AssertionError("Already closed");
 		try {
+			m_closed = true;
 			httpClient.close();
 		} catch (Exception e) {
 			log.warn("Problem stopping httpClient", e);

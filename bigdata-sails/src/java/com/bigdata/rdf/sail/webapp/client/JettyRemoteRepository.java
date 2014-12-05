@@ -25,14 +25,11 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import info.aduna.io.IOUtil;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -44,37 +41,22 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
-import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.ContentProvider;
-import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.api.Response.ResponseListener;
-import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
@@ -118,7 +100,7 @@ import org.xml.sax.ext.DefaultHandler2;
 /**
  * Java API to the Nano Sparql Server.
  * <p>
- * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
+ * Note: The {@link JettyRemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
  * 
  * @see <a href=
@@ -161,7 +143,7 @@ public class JettyRemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String QUERY_METHOD = RemoteRepository.class
+    static public final String QUERY_METHOD = JettyRemoteRepository.class
             .getName() + ".queryMethod";
     
     /**
@@ -183,7 +165,7 @@ public class JettyRemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
+    static public final String MAX_REQUEST_URL_LENGTH = JettyRemoteRepository.class
             .getName() + ".maxRequestURLLength";
     
     /**
@@ -372,7 +354,7 @@ public class JettyRemoteRepository {
      * @param executor
      *            The thread pool for processing HTTP responses.
      * 
-     * @see RemoteRepositoryManager
+     * @see JettyRemoteRepositoryManager
      * @see DefaultClientConnectionManagerFactory
      * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
@@ -420,6 +402,7 @@ public class JettyRemoteRepository {
 
 	/**
      * Utility to create a default jetty HttpClient to simplify initialization
+     * <p>
      * 
      * @return the new HttpClient
      */
@@ -427,7 +410,7 @@ public class JettyRemoteRepository {
 		final JettyHttpClient httpClient;
 
 		if (forceNew) {
-			httpClient = new JettyHttpClient(forceNew/* autoClose */);
+			httpClient = new JettyHttpClient(true/* autoClose */);
 		} else {
 			synchronized (s_sharedClientLock) {
 				if (s_sharedClient == null || s_sharedClient.isStopped()) {
@@ -1817,6 +1800,20 @@ public class JettyRemoteRepository {
     
     public Request newRequest(final String uri,
             final String method) {
+    	if (httpClient.isStopped()) {
+    		throw new AssertionError("The Client has been stopped", httpClient.m_stopped);
+    	}
+    	
+    	return newRequest(httpClient, uri, method);
+    }
+    
+    public static Request newRequest(final HttpClient httpClient, final String uri,
+            final String method) {
+    	
+    	if (httpClient.isStopped()) {
+    		throw new AssertionError("The Client has been stopped");
+    	}
+    	
     	return httpClient.newRequest(uri).method(getMethod(method));
     }
     

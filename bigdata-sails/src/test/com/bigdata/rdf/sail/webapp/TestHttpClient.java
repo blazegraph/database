@@ -26,26 +26,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+
+import junit.framework.TestCase;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpContentResponse;
 import org.eclipse.jetty.client.HttpResponse;
 import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.api.Response;
-import org.eclipse.jetty.client.util.InputStreamResponseListener;
 
 import com.bigdata.rdf.sail.webapp.client.ApacheConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.EntityContentProvider;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.util.http.ApacheHttpClient;
-import com.bigdata.util.http.DefaultHttpClient;
 import com.bigdata.util.http.JettyHttpClient;
-
-import junit.framework.TestCase;
 
 /**
  * Tests used for the HttpClient refactor to move from
@@ -55,6 +52,8 @@ import junit.framework.TestCase;
  *
  */
 public class TestHttpClient extends TestCase {
+	
+	private static final Logger log = Logger.getLogger(TestHttpClient.class);
 	
 	/**
 	 * Just create client to connect to google.com with simple query
@@ -93,7 +92,7 @@ public class TestHttpClient extends TestCase {
 	public void _testSimpleApacheRepository() {
 		org.apache.http.client.HttpClient client = new org.apache.http.impl.client.DefaultHttpClient();
 		
-		final RemoteRepository repo = new RemoteRepository("http://ctc.io/", false, client, null);
+		final ApacheRemoteRepository repo = new ApacheRemoteRepository("http://ctc.io/", false, client, null);
 		
 	}
 
@@ -180,10 +179,7 @@ public class TestHttpClient extends TestCase {
 			 
 			// Waits until the exchange is terminated
 			if (response.getStatus() != org.apache.http.HttpStatus.SC_OK) {
-				System.err.println("Method failed: " + response.toString());
-			} else {
-				System.out.println("Success: " + response.toString());
-	
+				log.warn("Method failed: " + response.toString());
 			}
 			
 			final Request clientRequest = client.POST("http://ctc.io/");
@@ -198,17 +194,13 @@ public class TestHttpClient extends TestCase {
 			response = (HttpContentResponse) clientRequest.send();
 			
 			if (response.getStatus() != org.apache.http.HttpStatus.SC_OK) {
-				System.err.println("Method failed: " + response.toString());
-			} else {
-				System.out.println("Success: " + response.toString() + ", type: " + response.getMediaType());	
+				log.warn("Method failed: " + response.toString());
 			}
 			
 			response = (HttpContentResponse) clientRequest.send();
 			
 			if (response.getStatus() != org.apache.http.HttpStatus.SC_OK) {
-				System.err.println("Method failed: " + response.toString());
-			} else {
-				System.out.println("Second Success: " + response.toString() + ", type: " + response.getMediaType() + ", encoding: " + response.getEncoding());	
+				log.warn("Method failed: " + response.toString());
 			}
 			
 			final JettyResponseListener listener = new JettyResponseListener();
@@ -217,9 +209,9 @@ public class TestHttpClient extends TestCase {
 			
 			final HttpResponse lresp = (HttpResponse) listener.get(5, TimeUnit.SECONDS);
 			if (lresp.getStatus() != org.apache.http.HttpStatus.SC_OK) {
-				System.err.println("Method failed: " + lresp.toString());
+				log.warn("Method failed: " + lresp.toString());
 			} else {
-				System.out.println("Third Listener Success: " + lresp.getReason() 
+				log.info("Third Listener Success: " + lresp.getReason() 
 						+ "\nheaders: " + lresp.getHeaders() 
 						+ "\ntype: " + listener.getContentType()
 						+ "\nencoding: " + listener.getContentEncoding());	
@@ -236,9 +228,9 @@ public class TestHttpClient extends TestCase {
 		com.bigdata.util.http.IHttpResponse response = client.GET("http://ctc.io/");
 		
 		if (response.getStatusCode() == 200) {
-			System.out.println("Jetty Success: " + response);
+			log.info("Jetty Success: " + response);
 		} else {
-			System.err.println("Jetty Failure: " + response);
+			log.warn("Jetty Failure: " + response);
 		}
 	}
 	
