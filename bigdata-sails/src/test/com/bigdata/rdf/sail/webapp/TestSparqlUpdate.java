@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) ï¿½ 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) 2001-2007
 
 All rights reserved.
 
@@ -73,9 +73,8 @@ import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
  * Proxied test suite.
@@ -91,7 +90,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  * @see SPARQLUpdateTest
  */
 public class TestSparqlUpdate<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+        AbstractTestNanoSparqlJettyClient<S> {
     
     public TestSparqlUpdate() {
 
@@ -1697,7 +1696,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertEquals(2L, countResults(query.evaluate()));
 
         /*
-         * Then I still get only one result for the query, the triple with 'Š'
+         * Then I still get only one result for the query, the triple with ?
          * which is \u00E4. But if I now add the 'u' flag to the regex, I get
          * both triples as result, so this seems to be a viable workaround.
          * Always setting the UNICODE_CASE flag sounds like a good idea, and in

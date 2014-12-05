@@ -36,6 +36,8 @@ import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.HttpParams;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 
 /**
  * Factory for {@link ClientConnectionManager}.
@@ -62,21 +64,17 @@ public class DefaultClientConnectionManagerFactory
         
     }
     
-    public ClientConnectionManager newInstance() {
+    public HttpClient newInstance() {
 
-        final ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(
-                newSchemeRegistry());
-
-        // Increase max total connection to 200
-        cm.setMaxTotal(200);
-
-        // Increase default max connection per route to 20
-        cm.setDefaultMaxPerRoute(20);
-
-        // Increase max connections for localhost to 50
-        final HttpHost localhost = new HttpHost("locahost");
-
-        cm.setMaxForRoute(new HttpRoute(localhost), 50);
+        final HttpClient cm = new HttpClient(new SslContextFactory(true));
+        
+        try {
+    		cm.setFollowRedirects(true);
+    		
+			cm.start();
+		} catch (Exception e) {
+			throw new RuntimeException("Unable to start HttpClient", e);
+		}
 
         return cm;
 

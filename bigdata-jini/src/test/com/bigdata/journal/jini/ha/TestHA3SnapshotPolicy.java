@@ -45,7 +45,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Test suite for the {@link ISnapshotPolicy}. This test suite is focused on the

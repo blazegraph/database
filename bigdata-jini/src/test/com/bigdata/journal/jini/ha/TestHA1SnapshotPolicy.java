@@ -16,7 +16,6 @@ import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Test suite for the restore of the HA1 Journal from a snapshot and transaction

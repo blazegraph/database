@@ -39,7 +39,6 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor

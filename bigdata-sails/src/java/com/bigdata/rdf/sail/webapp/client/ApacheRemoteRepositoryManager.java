@@ -45,7 +45,7 @@ import com.bigdata.rdf.properties.PropertiesWriterRegistry;
  * Java client for the Multi-Tenancy API on a remote Nano Sparql Server.
  * 
  * <p>
- * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
+ * Note: The {@link ApacheRemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
  * 
  * @see <a href=
@@ -60,7 +60,7 @@ import com.bigdata.rdf.properties.PropertiesWriterRegistry;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class RemoteRepositoryManager extends RemoteRepository {
+public class ApacheRemoteRepositoryManager extends ApacheRemoteRepository {
 
     /**
      * The path to the root of the web application (without the trailing "/").
@@ -86,7 +86,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
     }
     
-    public RemoteRepositoryManager(final String serviceURL,
+    public ApacheRemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
         this(serviceURL, true/* useLBS */, httpClient, executor);
@@ -108,7 +108,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
      * @param httpClient
      * @param executor
      */
-    public RemoteRepositoryManager(final String serviceURL,
+    public ApacheRemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
 
@@ -137,7 +137,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for a data set managed by the remote
+     * Obtain a {@link ApacheRemoteRepository} for a data set managed by the remote
      * service.
      * 
      * @param namespace
@@ -145,15 +145,15 @@ public class RemoteRepositoryManager extends RemoteRepository {
      *            
      * @return An interface which may be used to talk to that data set.
      */
-    public RemoteRepository getRepositoryForNamespace(final String namespace) {
+    public ApacheRemoteRepository getRepositoryForNamespace(final String namespace) {
 
-        return new RemoteRepository(getRepositoryBaseURLForNamespace(namespace)
+        return new ApacheRemoteRepository(getRepositoryBaseURLForNamespace(namespace)
                 + "/sparql", useLBS, httpClient, executor);
         
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * Obtain a {@link ApacheRemoteRepository} for the data set having the specified
      * SPARQL end point.
      * 
      * @param sparqlEndpointURL
@@ -167,25 +167,25 @@ public class RemoteRepositoryManager extends RemoteRepository {
      * 
      * @return An interface which may be used to talk to that data set.
      */
-    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+    public ApacheRemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
             final boolean useLBS) {
 
-        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient,
+        return new ApacheRemoteRepository(sparqlEndpointURL, useLBS, httpClient,
                 executor);
 
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * Obtain a {@link ApacheRemoteRepository} for the data set having the specified
      * SPARQL end point. The load balancer will be used or not as per the
-     * parameters to the {@link RemoteRepositoryManager} constructor.
+     * parameters to the {@link ApacheRemoteRepositoryManager} constructor.
      * 
      * @param sparqlEndpointURL
      *            The URL of the SPARQL end point.
      * 
      * @return An interface which may be used to talk to that data set.
      */
-    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
+    public ApacheRemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
 
         return getRepositoryForURL(sparqlEndpointURL, useLBS);
 

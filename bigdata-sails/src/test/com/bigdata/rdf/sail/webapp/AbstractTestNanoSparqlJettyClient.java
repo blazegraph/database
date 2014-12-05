@@ -244,12 +244,12 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 	TestMode testMode = null;
 	
 	protected Server newFixture(final String lnamespace) throws Exception {
-		final IIndexManager m_indexManager = getIndexManager();
+		final IIndexManager indexManager = getIndexManager();
 		
 		final Properties properties = getProperties();
 
 		// Create the triple store instance.
-        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
+        final AbstractTripleStore tripleStore = createTripleStore(indexManager,
         		lnamespace, properties);
         
         if (tripleStore.isStatementIdentifiers()) {
@@ -270,7 +270,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
         }
         // Start server for that kb instance.
         final Server fixture = NanoSparqlServer.newInstance(0/* port */,
-                m_indexManager, initParams);
+                indexManager, initParams);
 
         fixture.start();
 		
@@ -344,13 +344,6 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
                     + namespace + "\nrootURL=" + m_rootURL + "\nserviceURL="
                     + m_serviceURL);
 
-//        final HttpClient httpClient = new DefaultHttpClient();
-
-//        m_cm = httpClient.getConnectionManager();
-        
-//        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-//                .newInstance();
-
         /*
          * Ensure that the client follows redirects using a standard policy.
          * 
@@ -360,7 +353,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
          */
 
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
-                getIndexManager());
+                getIndexManager().getExecutorService());
 
         log.info("Setup Active Threads: " + Thread.activeCount());
     }

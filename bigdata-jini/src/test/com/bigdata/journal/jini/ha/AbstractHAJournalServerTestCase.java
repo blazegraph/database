@@ -52,13 +52,9 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.server.Request;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
@@ -88,10 +84,7 @@ import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -158,7 +151,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     /**
      * Used to talk to the {@link NanoSparqlServer}.
      */
-    protected ClientConnectionManager ccm = null;
+    protected org.eclipse.jetty.client.HttpClient ccm = null;
     
     private Level oldProcessHelperLevel = null;
     
@@ -198,7 +191,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         if (ccm != null) {
 
-            ccm.shutdown();
+            ccm.stop();
 
             ccm = null;
 
@@ -585,7 +578,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     }
 
     /**
-     * Return a {@link RemoteRepository} for talking to the
+     * Return a {@link JettyRemoteRepositoryManager} for talking to the
      * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
      * interface.
      * 
@@ -599,7 +592,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     }
 
     /**
-     * Return a {@link RemoteRepository} for talking to the
+     * Return a {@link JettyRemoteRepositoryManager} for talking to the
      * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
      * interface.
      * 

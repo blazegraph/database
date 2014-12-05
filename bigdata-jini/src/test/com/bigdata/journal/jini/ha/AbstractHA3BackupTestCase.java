@@ -32,11 +32,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Calendar;
 import java.util.Properties;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
@@ -49,7 +44,6 @@ import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 
 /**
  * Abstract base class for testing the {@link ISnapshotPolicy} and

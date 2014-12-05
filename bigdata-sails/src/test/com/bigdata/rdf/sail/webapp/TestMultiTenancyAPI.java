@@ -25,7 +25,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 import com.bigdata.relation.RelationSchema;
@@ -166,7 +165,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         final Map<Resource, VoidSummary> summaries = new LinkedHashMap<Resource, VoidSummary>();
 
         // Do the discovery.
-        final Graph g = RemoteRepository.asGraph(m_repo
+        final Graph g = JettyRemoteRepository.asGraph(m_repo
                 .getRepositoryDescriptions());
 
         final Statement[] a = getMatches(g, null/* dataset */, RDF.TYPE,
@@ -289,6 +288,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          * CREATE operation.
          */
         final String namespace2 = "kb2-" + UUID.randomUUID();
+        
+        System.err.println("TEST_CREATE01");
 
         doTestCreate(namespace2);
         
@@ -314,12 +315,22 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 //        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
         final String namespace2 = "kb2-" + UUID.randomUUID() + "-&<>-foo";
 
+        System.err.println("TEST_CREATE02");
+
         doTestCreate(namespace2);
         
     }
     
     private void doTestCreate(final String namespace2) throws Exception {
         
+    	System.err.println("DO_TEST_CREATE - default namespace " + namespace);
+    	
+    	{
+    		// ensure default namespace is ready
+    		m_repo.getRepositoryProperties(namespace);
+    	}
+
+    	
         final Properties properties = new Properties();
 
         properties.setProperty(BigdataSail.Options.NAMESPACE, namespace2);
@@ -339,6 +350,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         { // verify exists.
             final Properties p = m_repo.getRepositoryProperties(namespace2);
             assertNotNull(p);
+            
+            System.err.println("Found properties for namespace " + namespace2);
         }
 
         /*
@@ -375,6 +388,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         assertNotNull(otherKb);
         assertFalse(otherKb.sparqlEndpoint.isEmpty());
 
+        System.err.println("Found summaries for namespaces: " + namespace + " & " + namespace2);
         /*
          * Remove any other KBs from the map so we do not have side-effects.
          */
@@ -411,9 +425,11 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             
             // GET the properties for that data set.
             {
+                System.err.println("Looking for namespace " + ns);
                 final Properties p = m_repo.getRepositoryProperties(ns);
 
                 assertEquals(ns, p.getProperty(RelationSchema.NAMESPACE));
+                System.err.println("Found schema for " + ns);
             }
 
             final JettyRemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
@@ -423,7 +439,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 // GET the Service Description for the data set.
                 {
 
-                    RemoteRepository.asGraph(tmp.getServiceDescription());
+                	JettyRemoteRepository.asGraph(tmp.getServiceDescription());
 
                 }
 

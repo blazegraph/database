@@ -153,7 +153,7 @@ public class BigdataSailNSSWrapper {
         m_rootURL = null;
         m_serviceURL = null;
         
-        log.warn("Stopping", new StackInfoReport("Stopping HTTPClient"));
+        // log.warn("Stopping", new StackInfoReport("Stopping HTTPClient"));
         
         // m_httpClient.stop();
         

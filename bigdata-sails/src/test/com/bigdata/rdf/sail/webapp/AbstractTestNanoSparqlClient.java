@@ -43,10 +43,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.http.HttpHost;
 import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.client.DefaultRedirectStrategy;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -84,13 +91,12 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -125,8 +131,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	
     /**
      * The {@link ClientConnectionManager} for the {@link HttpClient} used by
-     * the {@link RemoteRepository}. This is used when we tear down the
-     * {@link RemoteRepository}.
+     * the {@link JettyRemoteRepository}. This is used when we tear down the
+     * {@link JettyRemoteRepository}.
      */
 	private ClientConnectionManager m_cm;
 	
@@ -138,7 +144,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     /**
      * The client-API wrapper to the NSS.
      */
-    protected RemoteRepositoryManager m_repo;
+    protected ApacheRemoteRepositoryManager m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -322,8 +328,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 //        m_cm = httpClient.getConnectionManager();
         
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
+        m_cm = newInstance();
 
         final DefaultHttpClient httpClient = new DefaultHttpClient(m_cm);
         m_httpClient = httpClient;
@@ -337,9 +342,44 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
          */
         httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
 
-        m_repo = new RemoteRepositoryManager(m_serviceURL,
+        m_repo = new ApacheRemoteRepositoryManager(m_serviceURL,
                 m_httpClient,
                 m_indexManager.getExecutorService());
+
+    }
+	
+    protected ClientConnectionManager newInstance() {
+
+        final ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(
+                newSchemeRegistry());
+
+        // Increase max total connection to 200
+        cm.setMaxTotal(200);
+
+        // Increase default max connection per route to 20
+        cm.setDefaultMaxPerRoute(20);
+
+        // Increase max connections for localhost to 50
+        final HttpHost localhost = new HttpHost("locahost");
+
+        cm.setMaxForRoute(new HttpRoute(localhost), 50);
+
+        return cm;
+
+    }
+
+
+    protected SchemeRegistry newSchemeRegistry() {
+        
+        final SchemeRegistry schemeRegistry = new SchemeRegistry();
+
+        schemeRegistry.register(new Scheme("http", 80, PlainSocketFactory
+                .getSocketFactory()));
+        
+        schemeRegistry.register(new Scheme("https", 443, SSLSocketFactory
+                .getSocketFactory()));
+
+        return schemeRegistry;
 
     }
 

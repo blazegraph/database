@@ -107,7 +107,7 @@ import org.xml.sax.ext.DefaultHandler2;
 /**
  * Java API to the Nano Sparql Server.
  * <p>
- * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
+ * Note: The {@link ApacheRemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
  * 
  * @see <a href=
@@ -117,10 +117,10 @@ import org.xml.sax.ext.DefaultHandler2;
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" > Create
  *      a bigdata-client jar for the NSS REST API </a>
  */
-public class RemoteRepository {
+public class ApacheRemoteRepository {
 
     private static final transient Logger log = Logger
-            .getLogger(RemoteRepository.class);
+            .getLogger(ApacheRemoteRepository.class);
 
     /*
      * Note: These fields are replicated from the com.bigdata.rdf.store.BD
@@ -150,7 +150,7 @@ public class RemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String QUERY_METHOD = RemoteRepository.class
+    static public final String QUERY_METHOD = ApacheRemoteRepository.class
             .getName() + ".queryMethod";
     
     /**
@@ -172,7 +172,7 @@ public class RemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
+    static public final String MAX_REQUEST_URL_LENGTH = ApacheRemoteRepository.class
             .getName() + ".maxRequestURLLength";
     
     /**
@@ -321,7 +321,7 @@ public class RemoteRepository {
      *             we can not assume that the end point is bigdata and thus we
      *             can not use the LBS prefix.
      */
-    public RemoteRepository(final String sparqlEndpointURL,
+    public ApacheRemoteRepository(final String sparqlEndpointURL,
             final HttpClient httpClient, final Executor executor) {
 
         // FIXME Should default useLBS:=true. it is basically free.
@@ -361,12 +361,12 @@ public class RemoteRepository {
      * @param executor
      *            The thread pool for processing HTTP responses.
      * 
-     * @see RemoteRepositoryManager
+     * @see ApacheRemoteRepositoryManager
      * @see DefaultClientConnectionManagerFactory
      * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
-    public RemoteRepository(final String sparqlEndpointURL,
+    public ApacheRemoteRepository(final String sparqlEndpointURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
         

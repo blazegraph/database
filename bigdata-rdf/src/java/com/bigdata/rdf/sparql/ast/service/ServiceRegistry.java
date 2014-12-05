@@ -7,6 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.http.conn.ClientConnectionManager;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
@@ -351,7 +352,7 @@ public class ServiceRegistry {
      * @return A {@link ServiceCall} for that service.
      */
     public final ServiceCall<? extends Object> toServiceCall(
-            final AbstractTripleStore store, final ClientConnectionManager cm,
+            final AbstractTripleStore store, final HttpClient cm,
             URI serviceURI, final ServiceNode serviceNode) {
 
         if (serviceURI == null)
@@ -397,12 +398,12 @@ public class ServiceRegistry {
         private final URI serviceURI;
         private final AbstractTripleStore store; 
         private final ServiceNode serviceNode;
-        private final ClientConnectionManager cm;
+        private final HttpClient cm;
         private final IServiceOptions serviceOptions;
         
         public ServiceCallCreateParamsImpl(final URI serviceURI,
                 final AbstractTripleStore store, final ServiceNode serviceNode,
-                final ClientConnectionManager cm,
+                final HttpClient cm,
                 final IServiceOptions serviceOptions) {
 
             this.serviceURI = serviceURI;
@@ -433,7 +434,7 @@ public class ServiceRegistry {
         }
 
         @Override
-        public ClientConnectionManager getClientConnectionManager() {
+        public HttpClient getClientConnectionManager() {
             return cm;
         }
 

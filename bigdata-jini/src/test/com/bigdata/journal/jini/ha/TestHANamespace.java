@@ -36,7 +36,6 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test case for concurrent list namespace and create namespace operations.

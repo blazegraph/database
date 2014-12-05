@@ -6,14 +6,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -22,11 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.util.EntityUtils;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
@@ -50,16 +43,12 @@ import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
@@ -86,10 +75,9 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlJettyClient.class,
 //        "test9.*", TestMode.quads);
-		   "test.*.*", TestMode.quads, TestMode.sids,
-//		   "testMultipleFixtures", TestMode.quads, TestMode.sids,
-        TestMode.triples);
-
+		   "test.*.*", TestMode.quads, TestMode.sids, TestMode.triples);
+//		   "testMultipleFixtures", TestMode.quads, TestMode.sids, TestMode.triples);
+       
 	}
 
 	public void test_startup() throws Exception {
@@ -130,8 +118,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 	        // System.err.println("ALT:\n" + resp2);
 
 	        // the status responses should not match since the ports of the servers are different
-	        assertFalse(resp1.equals(resp2));
-	        
+	        assertFalse(resp1.equals(resp2));	        
 	        
 		} finally {
 			altfixture.stop();

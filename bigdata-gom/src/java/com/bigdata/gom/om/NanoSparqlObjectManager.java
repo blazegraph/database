@@ -39,9 +39,9 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -58,9 +58,9 @@ public class NanoSparqlObjectManager extends ObjectMgrModel {
     private static final Logger log = Logger
             .getLogger(NanoSparqlObjectManager.class);
 
-    private final RemoteRepository m_repo;
+    private final JettyRemoteRepository m_repo;
 	
-	public NanoSparqlObjectManager(final RemoteRepository repo, final String namespace) {
+	public NanoSparqlObjectManager(final JettyRemoteRepository repo, final String namespace) {
 		
         super(repo.getSparqlEndPoint(), BigdataValueFactoryImpl
                 .getInstance(namespace));
