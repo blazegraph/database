@@ -53,7 +53,7 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	public Object getId() {
 	    
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
 	    
 		return graph.factory.fromURI(uri);
 		
@@ -63,7 +63,7 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	public void remove() {
 	    
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
 
 		graph.removeVertex(this);
 		
@@ -162,7 +162,7 @@ public class BigdataVertex extends BigdataElement implements Vertex {
 	public VertexQuery query() {
 	    
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
 		return new DefaultVertexQuery(this);
 		
@@ -188,7 +188,7 @@ public class BigdataVertex extends BigdataElement implements Vertex {
     public Set<String> getPropertyKeys() {
         
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
         return super.getPropertyKeys();
         

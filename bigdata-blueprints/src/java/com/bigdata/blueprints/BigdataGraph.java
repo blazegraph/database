@@ -741,7 +741,7 @@ public abstract class BigdataGraph implements Graph {
 	public Iterable<Edge> getEdges() {
 		
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
         try {
             
@@ -1017,7 +1017,7 @@ public abstract class BigdataGraph implements Graph {
 	public Iterable<Vertex> getVertices() {
 		
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
 		try {
 		    
@@ -1081,7 +1081,7 @@ public abstract class BigdataGraph implements Graph {
 	public GraphQuery query() {
 
 	    if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
 //		return new DefaultGraphQuery(this);
 	    return new BigdataGraphQuery(this);
