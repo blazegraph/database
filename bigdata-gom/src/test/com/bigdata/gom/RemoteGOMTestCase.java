@@ -191,7 +191,8 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
         }
 
         m_serviceURL = new URL("http", hostAddr, port,
-                BigdataStatics.getContextPath() + "/sparql"/* file */)
+                BigdataStatics.getContextPath() /* file */)
+        		// BigdataStatics.getContextPath() + "/sparql"/* file */)
                 .toExternalForm();
 
         // final HttpClient httpClient = new DefaultHttpClient();
