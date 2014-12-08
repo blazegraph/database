@@ -412,12 +412,13 @@ public class JettyRemoteRepository {
 		if (forceNew) {
 			httpClient = new JettyHttpClient(true/* autoClose */);
 		} else {
-			synchronized (s_sharedClientLock) {
-				if (s_sharedClient == null || s_sharedClient.isStopped()) {
-					s_sharedClient = new JettyHttpClient(false/* autoclose */);
-				}
-				httpClient = s_sharedClient;
-			}
+//			synchronized (s_sharedClientLock) {
+//				if (s_sharedClient == null || s_sharedClient.isStopped()) {
+//					s_sharedClient = new JettyHttpClient(false/* autoclose */);
+//				}
+//				httpClient = s_sharedClient;
+//			}
+			httpClient = new JettyHttpClient(false/* autoClose */);
 		}
 
 		try {
