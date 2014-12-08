@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
@@ -32,6 +34,7 @@ public class JettyHttpClient extends HttpClient {
 		 * webapp when the client requests the root URL.
 		 */
 		setFollowRedirects(true);
+		
 	}
 	
 	/**
@@ -50,9 +53,16 @@ public class JettyHttpClient extends HttpClient {
 			
 			stop();
 			
+			// s_active.decrementAndGet();
+			
 			// for debug
 			m_stopped = new StackInfoReport();
 		}
 	}
+
+//	final static AtomicInteger s_active = new AtomicInteger();
+//	public static int activeCount() {
+//		return s_active.get();
+//	}
 	
 }

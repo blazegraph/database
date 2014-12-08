@@ -57,6 +57,7 @@ import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.ContentProvider;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.util.component.LifeCycle;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
@@ -422,6 +423,13 @@ public class JettyRemoteRepository {
 
 		try {
 			httpClient.start();
+			
+			// System.err.println("Started DefaultClient() " + JettyHttpClient.activeCount());
+
+			while (!httpClient.isStarted()) {
+				// FIXME: use listener pattern
+				Thread.sleep(5);
+			}
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
