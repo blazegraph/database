@@ -105,7 +105,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     public JettyRemoteRepositoryManager(String serviceURL,
     		final Executor executor) {
-		this(serviceURL, DefaultClient(true), executor);
+		this(serviceURL, DefaultClient(false), executor);
 	}
 
     public JettyRemoteRepositoryManager(String serviceURL, boolean useLBS,
