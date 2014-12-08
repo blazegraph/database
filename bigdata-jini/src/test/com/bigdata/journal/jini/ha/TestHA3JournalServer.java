@@ -2278,7 +2278,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                 /**
                  * The SPARQL end point for that service.
                  */
-                final JettyRemoteRepositoryManager remoteRepo;
+                final HAGlue haGlue;
 
                 /**
                  * Format for timestamps that may be used to correlate with the
@@ -2294,7 +2294,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                  */
                 public QueryTask(final HAGlue haGlue) throws IOException {
                 
-//                    this.haGlue = haGlue;
+                    this.haGlue = haGlue;
                     
                     /*
                      * Run query against one of the followers.
@@ -2303,7 +2303,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                      * 
                      * 10109 queries for 2000 transactions (follower)
                      */
-                    remoteRepo = getRemoteRepository(haGlue);
 
                 }
 
@@ -2311,32 +2310,38 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                     
                     long queryCount = 0;
                     
-                    while (!updateTaskFuture.isDone()) {
+                    final JettyRemoteRepositoryManager remoteRepo;
+                    remoteRepo = getRemoteRepository(haGlue);
+					try {
+						while (!updateTaskFuture.isDone()) {
 
-                        final String query;
-                        if (queryCount % 2 == 0) {
-                            // Shorter query. Counts all tuples.
-                            query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
-                        } else {
-                            // Longer query. Materializies up to N tuples.
-                            query = "SELECT * WHERE { ?s ?p ?o } LIMIT 100000";
-                        }
+							final String query;
+							if (queryCount % 2 == 0) {
+								// Shorter query. Counts all tuples.
+								query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
+							} else {
+								// Longer query. Materializies up to N tuples.
+								query = "SELECT * WHERE { ?s ?p ?o } LIMIT 100000";
+							}
 
-                        // Verify quorum is still valid.
-                        quorum.assertQuorum(token);
+							// Verify quorum is still valid.
+							quorum.assertQuorum(token);
 
-                        // Run query.
-                        final long nresults = countResults(remoteRepo
-                                .prepareTupleQuery(query).evaluate());
+							// Run query.
+							final long nresults = countResults(remoteRepo
+									.prepareTupleQuery(query).evaluate());
 
-                        queryCount++;
+							queryCount++;
 
-                        // add date time format for comparison with HA logs
-                        if (log.isInfoEnabled())
-                            log.info(df.format(new Date())
-                                    + " - completed query: " + queryCount
-                                    + ", nresults=" + nresults);
-                        
+							// add date time format for comparison with HA logs
+							if (log.isInfoEnabled())
+								log.info(df.format(new Date())
+										+ " - completed query: " + queryCount
+										+ ", nresults=" + nresults);
+
+						}
+					} finally {
+                    	remoteRepo.close();
                     }
  
                     // done.

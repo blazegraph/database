@@ -72,7 +72,8 @@ public class DefaultClientConnectionManagerFactory
     		cm.setFollowRedirects(true);
     		
 			cm.start();
-		} catch (Exception e) {
+
+        } catch (Exception e) {
 			throw new RuntimeException("Unable to start HttpClient", e);
 		}
 

@@ -715,7 +715,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         /**
          * The SPARQL end point for that service.
          */
-        private final JettyRemoteRepositoryManager remoteRepo;
+        final HAGlue haGlue;
+        final boolean useLBS;
 
         /**
          * Format for timestamps that may be used to correlate with the
@@ -738,7 +739,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             /*
              * Run query against one of the services.
              */
-            remoteRepo = getRemoteRepository(haGlue, useLBS);
+            this.haGlue = haGlue;
+            this.useLBS = useLBS;
 
         }
 
@@ -752,15 +754,20 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
 
             // Run query.
-            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
-                    .evaluate();
-
-            final BindingSet bs = result.next();
-
-            // done.
-            final Value v = bs.getBinding("count").getValue();
-            
-            return ((org.openrdf.model.Literal) v).longValue();
+            final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS);
+            try {
+	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
+	                    .evaluate();
+	
+	            final BindingSet bs = result.next();
+	
+	            // done.
+	            final Value v = bs.getBinding("count").getValue();
+	            
+	            return ((org.openrdf.model.Literal) v).longValue();
+            } finally {
+            	remoteRepo.close();
+            }
 
         }
 
