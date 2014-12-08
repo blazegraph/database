@@ -426,8 +426,12 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             // GET the properties for that data set.
             {
                 System.err.println("Looking for namespace " + ns);
-                final Properties p = m_repo.getRepositoryProperties(ns);
-
+                /*final*/ Properties p = null;
+                try {
+                	p = m_repo.getRepositoryProperties(ns);
+                } catch (Throwable t) {
+                	fail("Couldn't get the properties", t);
+                }
                 assertEquals(ns, p.getProperty(RelationSchema.NAMESPACE));
                 System.err.println("Found schema for " + ns);
             }

@@ -52,6 +52,10 @@ public class JettyResponseListener extends InputStreamResponseListener {
 				
 				final long start = traceEnabled ? System.currentTimeMillis() : 0;
 				
+				// FIXME: added only to see if this removes the EOFException in CI!
+				log.debug("REMOVE SLEEP ONCE FIXED");
+				Thread.sleep(20);
+				
 				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes!
 				
 				if (traceEnabled)

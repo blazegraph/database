@@ -409,16 +409,15 @@ public class JettyRemoteRepository {
 	public static JettyHttpClient DefaultClient(final boolean forceNew) {
 		final JettyHttpClient httpClient;
 
-		if (forceNew) {
+		if (true /* always force new to see if this fixes CI problem*/ || forceNew) {
 			httpClient = new JettyHttpClient(true/* autoClose */);
 		} else {
-//			synchronized (s_sharedClientLock) {
-//				if (s_sharedClient == null || s_sharedClient.isStopped()) {
-//					s_sharedClient = new JettyHttpClient(false/* autoclose */);
-//				}
-//				httpClient = s_sharedClient;
-//			}
-			httpClient = new JettyHttpClient(false/* autoClose */);
+			synchronized (s_sharedClientLock) {
+				if (s_sharedClient == null || s_sharedClient.isStopped()) {
+					s_sharedClient = new JettyHttpClient(false/* autoclose */);
+				}
+				httpClient = s_sharedClient;
+			}
 		}
 
 		try {
