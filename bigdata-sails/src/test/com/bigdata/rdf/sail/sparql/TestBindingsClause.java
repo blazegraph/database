@@ -113,7 +113,7 @@ public class TestBindingsClause extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("", "http://example.org/book/");
                 expected.setPrefixDecls(prefixDecls);
             }
@@ -196,7 +196,7 @@ public class TestBindingsClause extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("", "http://example.org/book/");
                 expected.setPrefixDecls(prefixDecls);
             }
@@ -282,7 +282,7 @@ public class TestBindingsClause extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("", "http://example.org/book/");
                 expected.setPrefixDecls(prefixDecls);
             }
@@ -374,7 +374,7 @@ public class TestBindingsClause extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("", "http://example.org/book/");
                 expected.setPrefixDecls(prefixDecls);
             }
@@ -463,7 +463,7 @@ public class TestBindingsClause extends AbstractBigdataExprBuilderTestCase {
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("", "http://example.org/book/");
                 expected.setPrefixDecls(prefixDecls);
             }

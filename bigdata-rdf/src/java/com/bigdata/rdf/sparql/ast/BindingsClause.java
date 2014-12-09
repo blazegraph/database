@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,6 +36,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations;
 
 /**
  * The solutions declared by a BINDINGS clause.
@@ -42,14 +44,16 @@ import com.bigdata.bop.IVariable;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class BindingsClause extends ASTBase {
+public class BindingsClause extends GroupMemberNodeBase<BindingsClause> 
+        implements IBindingProducerNode, IJoinNode {
 
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
     
-    public interface Annotations extends ASTBase.Annotations {
+    public interface Annotations extends ASTBase.Annotations, 
+            IJoinNode.Annotations {
 
         /**
          * The ordered set of declared variables for which there MIGHT be a
@@ -162,6 +166,7 @@ public class BindingsClause extends ASTBase {
 
     }
 
+    @Override
     public String toString(final int indent) {
 
         final LinkedHashSet<IVariable<?>> declaredVars = getDeclaredVariables();
@@ -178,7 +183,7 @@ public class BindingsClause extends ASTBase {
         
         sb.append(s);
         
-        sb.append("BINDINGS");
+        sb.append("BindingsClause");
 
         for(IVariable<?> var : declaredVars) {
             
@@ -226,4 +231,37 @@ public class BindingsClause extends ASTBase {
         
     }
     
+    @Override
+    final public List<FilterNode> getAttachedJoinFilters() {
+
+        @SuppressWarnings("unchecked")
+        final List<FilterNode> filters = (List<FilterNode>) getProperty(Annotations.FILTERS);
+
+        if (filters == null) {
+
+            return Collections.emptyList();
+
+        }
+
+        return Collections.unmodifiableList(filters);
+
+    }
+
+    @Override
+    final public void setAttachedJoinFilters(final List<FilterNode> filters) {
+
+        setProperty(Annotations.FILTERS, filters);
+
+    }
+
+    @Override
+    public boolean isOptional() {
+        return false;
+    }
+
+    @Override
+    public boolean isMinus() {
+        return false;
+    }
+
 }

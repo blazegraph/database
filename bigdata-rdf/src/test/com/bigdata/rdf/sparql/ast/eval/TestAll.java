@@ -173,7 +173,15 @@ public class TestAll extends TestCase {
 
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);
-        
+
+        // SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern}
+        // @see #1037 (fast-range-count optimizer)
+        suite.addTest(TestFastRangeCountOptimizer.suite());
+
+        // SELECT (DISTINCT|REDUCED) ?property WHERE { ?x ?property ?y . }
+        // @see #1035 (distinct-term-scan optimizer)
+        suite.addTest(TestDistinctTermScanOptimizer.suite());
+
         /*
          * Runtime Query Optimizer (RTO).
          */

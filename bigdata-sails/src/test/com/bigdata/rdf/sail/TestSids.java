@@ -37,8 +37,8 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
-import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -98,7 +98,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
 
             cxn.setAutoCommit(false);
     
-            cxn.add(getClass().getResourceAsStream("sids.ttl"), "", RDFFormat.TURTLE);
+            cxn.add(getClass().getResourceAsStream("sids.ttl"), "", ServiceProviderHook.TURTLE_RDR);
 
             /*
              * Note: The either flush() or commit() is required to flush the
@@ -118,7 +118,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
 //            	final String s = "http://localhost/host1";
 //            	final String s = "http://localhost/switch1";
             	
-                String query = 
+                final String query = 
                     "PREFIX myns: <http://mynamespace.com#> " +
                     "SELECT distinct ?s ?p ?o " +
                     " { " +
@@ -138,7 +138,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
 	                	log.info("no bindings");
 	                } else {
 		                while (result.hasNext()) {
-		                    BindingSet bs = result.next();
+		                    final BindingSet bs = result.next();
 	//	                    log.info(bs.getBinding("s").getValue() + " " + bs.getBinding("p").getValue() + " " + bs.getBinding("o").getValue() + " .");
 		                    log.info((s == null ? bs.getBinding("s").getValue() : s) + " " + bs.getBinding("p").getValue() + " " + bs.getBinding("o").getValue() + " .");
 		                }
@@ -149,7 +149,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
                 
 	                final TupleQueryResult result = tupleQuery.evaluate();
 	            	
-	                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+	                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
 	                solution.add(createBindingSet(new Binding[] {
 	                        new BindingImpl("s", new URIImpl("http://localhost/host1")),
 	                        new BindingImpl("p", new URIImpl("http://mynamespace.com#connectedTo")),

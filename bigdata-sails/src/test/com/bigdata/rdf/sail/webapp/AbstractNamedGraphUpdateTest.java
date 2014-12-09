@@ -86,12 +86,12 @@ public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 				    " GRAPH <eg:a> {\n" +
 				    "   [ a \"Blank\" ] .\n" +
 				    "   <eg:b> rdf:type <eg:c> ; rdf:value [] .\n" +
-				    "   [ rdf:value [] ]\n" +
+				    "   [ rdf:value [] ] .\n" +
 				    " }\n" +
 				    " GRAPH <eg:tmp> {\n" +
 				    "   [ a \"Blankx\" ] .\n" +
 				    "   <eg:B> rdf:type <eg:C> ; rdf:value [] .\n" +
-				    "   [ rdf:value [] ]\n" +
+				    "   [ rdf:value [] ] .\n" +
 				    " }\n" +
 				    "}\n";
 	

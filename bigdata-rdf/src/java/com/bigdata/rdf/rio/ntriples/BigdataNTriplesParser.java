@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Stack;
 
+import org.apache.commons.io.input.BOMInputStream;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -25,11 +26,12 @@ import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
+import org.openrdf.rio.RioSetting;
+import org.openrdf.rio.helpers.NTriplesParserSettings;
 import org.openrdf.rio.helpers.RDFParserBase;
 import org.openrdf.rio.ntriples.NTriplesUtil;
 
 import com.bigdata.rdf.model.BigdataBNode;
-import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 
@@ -93,32 +95,10 @@ public class BigdataNTriplesParser extends RDFParserBase {
 
 		private Value object;
 		
-//		/**
-//		 * The most recently parsed embedded statement. This is used to "cache"
-//		 * the blank node assigned to that embedded statement.
-//		 * 
-//		 * TODO This is redundant with {@link #lastSID} since the statement
-//		 * which is being represented by the blank node is attached to the blank
-//		 * node and available from {@link BigdataBNodeImpl#getStatement()}.
-//		 */
-//		private BigdataStatement lastEmbeddedStatement = null;
-
 		/**
 		 * The SID corresponding to the most recently parsed embedded statement.
 		 */
 		private BigdataBNode lastSID;
-		
-		void clear() {
-			subject = null;
-			predicate = null;
-			object = null;
-		}
-		
-//		void clearAll() {
-//			clear();
-//			lastEmbeddedStatement = null;
-//			lastSID = null;
-//		}
 		
 	};
 	
@@ -212,173 +192,177 @@ public class BigdataNTriplesParser extends RDFParserBase {
 		return RDFFormat.NTRIPLES;
 	}
 
-	/**
-	 * Implementation of the <tt>parse(InputStream, String)</tt> method defined
-	 * in the RDFParser interface.
-	 * 
-	 * @param in
-	 *        The InputStream from which to read the data, must not be
-	 *        <tt>null</tt>. The InputStream is supposed to contain 7-bit
-	 *        US-ASCII characters, as per the N-Triples specification.
-	 * @param baseURI
-	 *        The URI associated with the data in the InputStream, must not be
-	 *        <tt>null</tt>.
-	 * @throws IOException
-	 *         If an I/O error occurred while data was read from the InputStream.
-	 * @throws RDFParseException
-	 *         If the parser has found an unrecoverable parse error.
-	 * @throws RDFHandlerException
-	 *         If the configured statement handler encountered an unrecoverable
-	 *         error.
-	 * @throws IllegalArgumentException
-	 *         If the supplied input stream or base URI is <tt>null</tt>.
-	 */
-	public synchronized void parse(final InputStream in, final String baseURI)
-		throws IOException, RDFParseException, RDFHandlerException
-	{
-		if (in == null) {
-			throw new IllegalArgumentException("Input stream can not be 'null'");
-		}
-		// Note: baseURI will be checked in parse(Reader, String)
+    /**
+     * Implementation of the <tt>parse(InputStream, String)</tt> method defined
+     * in the RDFParser interface.
+     * 
+     * @param in
+     *        The InputStream from which to read the data, must not be
+     *        <tt>null</tt>. The InputStream is supposed to contain 7-bit
+     *        US-ASCII characters, as per the N-Triples specification.
+     * @param baseURI
+     *        The URI associated with the data in the InputStream, must not be
+     *        <tt>null</tt>.
+     * @throws IOException
+     *         If an I/O error occurred while data was read from the InputStream.
+     * @throws RDFParseException
+     *         If the parser has found an unrecoverable parse error.
+     * @throws RDFHandlerException
+     *         If the configured statement handler encountered an unrecoverable
+     *         error.
+     * @throws IllegalArgumentException
+     *         If the supplied input stream or base URI is <tt>null</tt>.
+     */
+    @Override
+    public synchronized void parse(InputStream in, String baseURI)
+        throws IOException, RDFParseException, RDFHandlerException
+    {
+        if (in == null) {
+            throw new IllegalArgumentException("Input stream can not be 'null'");
+        }
+        // Note: baseURI will be checked in parse(Reader, String)
 
-		try {
-			parse(new InputStreamReader(in, "US-ASCII"), baseURI);
-		}
-		catch (UnsupportedEncodingException e) {
-			// Every platform should support the US-ASCII encoding...
-			throw new RuntimeException(e);
-		}
-	}
+        try {
+            parse(new InputStreamReader(new BOMInputStream(in, false), "US-ASCII"), baseURI);
+        }
+        catch (UnsupportedEncodingException e) {
+            // Every platform should support the US-ASCII encoding...
+            throw new RuntimeException(e);
+        }
+    }
 
-	/**
-	 * Implementation of the <tt>parse(Reader, String)</tt> method defined in
-	 * the RDFParser interface.
-	 * 
-	 * @param reader
-	 *        The Reader from which to read the data, must not be <tt>null</tt>.
-	 * @param baseURI
-	 *        The URI associated with the data in the Reader, must not be
-	 *        <tt>null</tt>.
-	 * @throws IOException
-	 *         If an I/O error occurred while data was read from the InputStream.
-	 * @throws RDFParseException
-	 *         If the parser has found an unrecoverable parse error.
-	 * @throws RDFHandlerException
-	 *         If the configured statement handler encountered an unrecoverable
-	 *         error.
-	 * @throws IllegalArgumentException
-	 *         If the supplied reader or base URI is <tt>null</tt>.
-	 */
-	public synchronized void parse(final Reader reader, final String baseURI)
-		throws IOException, RDFParseException, RDFHandlerException
-	{
-		if (reader == null) {
-			throw new IllegalArgumentException("Reader can not be 'null'");
-		}
-		if (baseURI == null) {
-			throw new IllegalArgumentException("base URI can not be 'null'");
-		}
+    /**
+     * Implementation of the <tt>parse(Reader, String)</tt> method defined in
+     * the RDFParser interface.
+     * 
+     * @param reader
+     *        The Reader from which to read the data, must not be <tt>null</tt>.
+     * @param baseURI
+     *        The URI associated with the data in the Reader, must not be
+     *        <tt>null</tt>.
+     * @throws IOException
+     *         If an I/O error occurred while data was read from the InputStream.
+     * @throws RDFParseException
+     *         If the parser has found an unrecoverable parse error.
+     * @throws RDFHandlerException
+     *         If the configured statement handler encountered an unrecoverable
+     *         error.
+     * @throws IllegalArgumentException
+     *         If the supplied reader or base URI is <tt>null</tt>.
+     */
+    public synchronized void parse(final Reader reader, final String baseURI)
+        throws IOException, RDFParseException, RDFHandlerException
+    {
+        if (reader == null) {
+            throw new IllegalArgumentException("Reader can not be 'null'");
+        }
+        if (baseURI == null) {
+            throw new IllegalArgumentException("base URI can not be 'null'");
+        }
 
-		rdfHandler.startRDF();
+        rdfHandler.startRDF();
 
-		// We need pushback for '<<' versus '<'.
-		this.reader = new PushbackReader(reader, 1/* size */);
-		lineNo = 1;
+        // We need pushback for '<<' versus '<'.
+        this.reader = new PushbackReader(reader, 1/* size */);
+        lineNo = 1;
 
-		reportLocation(lineNo, 1);
-		push(new State());
-		try {
-			int c = reader.read();
-			c = skipWhitespace(c);
+        reportLocation(lineNo, 1);
+        push(new State());
+        try {
+            int c = reader.read();
+            c = skipWhitespace(c);
 
-			while (c != -1) {
-				if (c == '#') {
-					// Comment, ignore
-					c = skipLine(c);
-				}
-				else if (c == '\r' || c == '\n') {
-					// Empty line, ignore
-					c = skipLine(c);
-				}
-				else {
-					c = parseTriple(c, false/* embedded */);
-				}
+            while (c != -1) {
+                if (c == '#') {
+                    // Comment, ignore
+                    c = skipLine(c);
+                }
+                else if (c == '\r' || c == '\n') {
+                    // Empty line, ignore
+                    c = skipLine(c);
+                }
+                else {
+                    c = parseTriple(c, false/* embedded */);
+                }
 
-				c = skipWhitespace(c);
-			}
-		}
-		finally {
-			clear();
-		}
+                c = skipWhitespace(c);
+            }
+        }
+        finally {
+            clear();
+        }
 
-		rdfHandler.endRDF();
-	}
+        rdfHandler.endRDF();
+    }
 
-	@Override
-	protected void clear() {
-		super.clear();
-		// get rid of anything large left in the buffers.
-		buffer.setLength(0);
-		buffer.trimToSize();
-		languageTagBuffer.setLength(0);
-		languageTagBuffer.trimToSize();
-		datatypeUriBuffer.setLength(0);
-		datatypeUriBuffer.trimToSize();
-		stack.clear();
-		sids.clear();
-	}
-	
-	/**
-	 * Reads characters from reader until it finds a character that is not a
-	 * space or tab, and returns this last character. In case the end of the
-	 * character stream has been reached, -1 is returned.
-	 */
-	private int skipWhitespace(int c)
-		throws IOException
-	{
-		while (c == ' ' || c == '\t') {
-			c = reader.read();
-		}
+    /**
+     * Reads characters from reader until it finds a character that is not a
+     * space or tab, and returns this last character. In case the end of the
+     * character stream has been reached, -1 is returned.
+     */
+    protected int skipWhitespace(int c)
+        throws IOException
+    {
+        while (c == ' ' || c == '\t') {
+            c = reader.read();
+        }
 
-		return c;
-	}
+        return c;
+    }
 
-	/**
-	 * Reads characters from reader until the first EOL has been read. The first
-	 * character after the EOL is returned. In case the end of the character
-	 * stream has been reached, -1 is returned.
-	 */
-	private int skipLine(int c)
-		throws IOException
-	{
-		while (c != -1 && c != '\r' && c != '\n') {
-			c = reader.read();
-		}
+    /**
+     * Verifies that there is only whitespace until the end of the line.
+     */
+    protected int assertLineTerminates(int c)
+        throws IOException, RDFParseException
+    {
+        c = reader.read();
 
-		// c is equal to -1, \r or \n. In case of a \r, we should
-		// check whether it is followed by a \n.
+        c = skipWhitespace(c);
 
-		if (c == '\n') {
-			c = reader.read();
+        if (c != -1 && c != '\r' && c != '\n') {
+            reportFatalError("Content after '.' is not allowed");
+        }
 
-			lineNo++;
+        return c;
+    }
 
-			reportLocation(lineNo, 1);
-		}
-		else if (c == '\r') {
-			c = reader.read();
+    /**
+     * Reads characters from reader until the first EOL has been read. The first
+     * character after the EOL is returned. In case the end of the character
+     * stream has been reached, -1 is returned.
+     */
+    protected int skipLine(int c)
+        throws IOException
+    {
+        while (c != -1 && c != '\r' && c != '\n') {
+            c = reader.read();
+        }
 
-			if (c == '\n') {
-				c = reader.read();
-			}
+        // c is equal to -1, \r or \n. In case of a \r, we should
+        // check whether it is followed by a \n.
 
-			lineNo++;
+        if (c == '\n') {
+            c = reader.read();
 
-			reportLocation(lineNo, 1);
-		}
+            lineNo++;
 
-		return c;
-	}
+            reportLocation(lineNo, 1);
+        }
+        else if (c == '\r') {
+            c = reader.read();
+
+            if (c == '\n') {
+                c = reader.read();
+            }
+
+            lineNo++;
+
+            reportLocation(lineNo, 1);
+        }
+
+        return c;
+    }
 
 	private int parseTriple(int c,final boolean embedded)
 		throws IOException, RDFParseException, RDFHandlerException
@@ -632,7 +616,7 @@ public class BigdataNTriplesParser extends RDFParserBase {
 			throwEOFException();
 		}
 		else if (c != ':') {
-			reportError("Expected ':', found: " + (char)c);
+			reportError("Expected ':', found: " + (char)c, NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
 		}
 
 		c = reader.read();
@@ -731,7 +715,8 @@ public class BigdataNTriplesParser extends RDFParserBase {
 				throwEOFException();
 			}
 			else if (c != '^') {
-				reportError("Expected '^', found: " + (char)c);
+				reportError("Expected '^', found: " + (char)c,
+				        NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
 			}
 
 			c = reader.read();
@@ -741,7 +726,8 @@ public class BigdataNTriplesParser extends RDFParserBase {
 				throwEOFException();
 			}
 			else if (c != '<') {
-				reportError("Expected '<', found: " + (char)c);
+				reportError("Expected '<', found: " + (char)c,
+				        NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
 			}
 
 			c = parseUriRef(c, datatype);
@@ -758,7 +744,7 @@ public class BigdataNTriplesParser extends RDFParserBase {
 			uri = NTriplesUtil.unescapeString(uri);
 		}
 		catch (IllegalArgumentException e) {
-			reportError(e.getMessage());
+			reportError(e.getMessage(),  NTriplesParserSettings.FAIL_ON_NTRIPLES_INVALID_LINES);
 		}
 
 		return super.createURI(uri);
@@ -771,7 +757,7 @@ public class BigdataNTriplesParser extends RDFParserBase {
 			label = NTriplesUtil.unescapeString(label);
 		}
 		catch (IllegalArgumentException e) {
-			reportError(e.getMessage());
+		    reportFatalError(e.getMessage());
 		}
 
 		if (lang.length() == 0) {
@@ -800,16 +786,22 @@ public class BigdataNTriplesParser extends RDFParserBase {
 		reportWarning(msg, lineNo, -1);
 	}
 
-	/**
-	 * Overrides {@link RDFParserBase#reportError(String)}, adding line number
-	 * information to the error.
-	 */
-	@Override
-	protected void reportError(String msg)
-		throws RDFParseException
-	{
-		reportError(msg, lineNo, -1);
-	}
+    /**
+     * Overrides {@link RDFParserBase#reportError(String)}, adding line number
+     * information to the error.
+     */
+    @Override
+    protected void reportError(String msg, RioSetting<Boolean> setting)
+        throws RDFParseException
+    {
+        reportError(msg, lineNo, -1, setting);
+    }
+
+    protected void reportError(Exception e, RioSetting<Boolean> setting)
+        throws RDFParseException
+    {
+        reportError(e, lineNo, -1, setting);
+    }
 
 	/**
 	 * Overrides {@link RDFParserBase#reportFatalError(String)}, adding line

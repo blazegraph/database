@@ -174,7 +174,8 @@ public class CreateKBTask implements Callable<Void> {
                 if (indexManager.getResourceLocator().locate(namespace,
                         ITx.UNISOLATED) == null) {
 
-                    log.warn("Creating KB instance: namespace=" + namespace);
+                    if(log.isInfoEnabled())
+                    	log.info("Creating KB instance: namespace=" + namespace);
 
                     final Properties properties = new Properties(
                             jnl.getProperties());
@@ -201,7 +202,8 @@ public class CreateKBTask implements Callable<Void> {
                  * Register triple store for scale-out.
                  */
 
-                log.warn("Creating KB instance: namespace=" + namespace);
+				if (log.isInfoEnabled())
+					log.info("Creating KB instance: namespace=" + namespace);
 
                 final JiniFederation<?> fed = (JiniFederation<?>) indexManager;
 

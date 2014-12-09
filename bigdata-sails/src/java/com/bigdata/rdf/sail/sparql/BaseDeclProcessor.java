@@ -10,10 +10,13 @@ import info.aduna.net.ParsedURI;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
+import com.bigdata.rdf.sail.sparql.ast.ASTDeleteData;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRIFunc;
+import com.bigdata.rdf.sail.sparql.ast.ASTInsertData;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTServiceGraphPattern;
+import com.bigdata.rdf.sail.sparql.ast.ASTUnparsedQuadDataBlock;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 
 /**
@@ -70,6 +73,22 @@ public class BaseDeclProcessor {
 		}
 
 		if (parsedBaseURI != null) {
+			ASTUnparsedQuadDataBlock dataBlock = null;
+			if (qc.getOperation() instanceof ASTInsertData) {
+				ASTInsertData insertData = (ASTInsertData)qc.getOperation();
+				dataBlock = insertData.jjtGetChild(ASTUnparsedQuadDataBlock.class);
+
+			}
+			else if (qc.getOperation() instanceof ASTDeleteData) {
+				ASTDeleteData deleteData = (ASTDeleteData)qc.getOperation();
+				dataBlock = deleteData.jjtGetChild(ASTUnparsedQuadDataBlock.class);
+			}
+
+			if (dataBlock != null) {
+				final String baseURIDeclaration = "BASE <" + parsedBaseURI + "> \n";
+				dataBlock.setDataBlock(baseURIDeclaration + dataBlock.getDataBlock());
+			}
+			else {
 			RelativeIRIResolver visitor = new RelativeIRIResolver(parsedBaseURI);
 			try {
 				qc.jjtAccept(visitor, null);
@@ -78,6 +97,7 @@ public class BaseDeclProcessor {
 				throw new MalformedQueryException(e);
 			}
 		}
+	}
 	}
 
 	private static class RelativeIRIResolver extends ASTVisitorBase {

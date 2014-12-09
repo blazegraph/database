@@ -478,7 +478,7 @@ public class UpdateServlet extends BigdataRDFServlet {
         
         try {
         
-        	    final List<FileItem> items = upload.parseRequest(req);
+    	    final List<FileItem> items = upload.parseRequest(req);
 
             for (FileItem item : items) {
 

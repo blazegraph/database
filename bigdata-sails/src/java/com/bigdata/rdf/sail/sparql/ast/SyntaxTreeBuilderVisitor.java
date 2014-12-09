@@ -21,8 +21,7 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTDatasetClause node, Object data) throws VisitorException;
   public Object visit(ASTWhereClause node, Object data) throws VisitorException;
   public Object visit(ASTBindingsClause node, Object data) throws VisitorException;
-  public Object visit(ASTBindingVars node, Object data) throws VisitorException;
-  public Object visit(ASTBindingSets node, Object data) throws VisitorException;
+  public Object visit(ASTInlineData node, Object data) throws VisitorException;
   public Object visit(ASTBindingSet node, Object data) throws VisitorException;
   public Object visit(ASTBindingValue node, Object data) throws VisitorException;
   public Object visit(ASTGroupClause node, Object data) throws VisitorException;
@@ -120,6 +119,8 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTIRIFunc node, Object data) throws VisitorException;
   public Object visit(ASTStrDt node, Object data) throws VisitorException;
   public Object visit(ASTStrLang node, Object data) throws VisitorException;
+  public Object visit(ASTUUID node, Object data) throws VisitorException;
+  public Object visit(ASTSTRUUID node, Object data) throws VisitorException;
   public Object visit(ASTBind node, Object data) throws VisitorException;
   public Object visit(ASTLet node, Object data) throws VisitorException;
   public Object visit(ASTRegexExpression node, Object data) throws VisitorException;
@@ -134,6 +135,7 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTGraphRefAll node, Object data) throws VisitorException;
   public Object visit(ASTGraphOrDefault node, Object data) throws VisitorException;
   public Object visit(ASTSolutionsRef node, Object data) throws VisitorException;
+  public Object visit(ASTUnparsedQuadDataBlock node, Object data) throws VisitorException;
   public Object visit(ASTQuadsNotTriples node, Object data) throws VisitorException;
   public Object visit(ASTLoad node, Object data) throws VisitorException;
   public Object visit(ASTClear node, Object data) throws VisitorException;
@@ -150,4 +152,4 @@ public interface SyntaxTreeBuilderVisitor
   public Object visit(ASTModify node, Object data) throws VisitorException;
   public Object visit(ASTTRefPattern node, Object data) throws VisitorException;
 }
-/* JavaCC - OriginalChecksum=5c7996404a5582204d66de93719700e7 (do not edit this line) */
+/* JavaCC - OriginalChecksum=9af0ea5c75d03ecc7cb9d9ff3679a436 (do not edit this line) */

@@ -912,8 +912,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             // NOP.
 
-        } else {
+        } else if(node instanceof BindingsClause) {
+
+            final BindingsClause bc = (BindingsClause) node;
             
+            vars.addAll(bc.getDeclaredVariables());
+            
+        } else {
+
             throw new AssertionError(node.toString());
             
         }
@@ -1073,6 +1079,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             // NOP
 
+        } else if(node instanceof BindingsClause) {
+
+            final BindingsClause bc = (BindingsClause) node;
+            
+            vars.addAll(bc.getDeclaredVariables());
+
         } else {
             
             throw new AssertionError(node.toString());
@@ -1172,6 +1184,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 // NOP
                 
+            } else if(child instanceof BindingsClause) {
+
+                final BindingsClause bc = (BindingsClause) child;
+                
+                vars.addAll(bc.getDeclaredVariables());
+
             } else {
 
                 throw new AssertionError(child.toString());
@@ -2102,6 +2120,50 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         boundByService.retainAll(incomingBindings);
             
         vars.addAll(boundByService);
+
+        return vars;
+
+    }
+    
+    /**
+     * Return the join variables for a VALUES clause (embedded only - not
+     * top-level).
+     * 
+     * @param bc The VALUES clause (a bunch of solutions)
+     * @param stats A static analysis of those solutions.
+     * @param vars
+     * @return 
+     */
+    public Set<IVariable<?>> getJoinVars(final BindingsClause bc,
+            final ISolutionSetStats stats,
+            final Set<IVariable<?>> vars) {
+
+        /*
+         * The variables which will be definitely bound based on the solutions
+         * in the VALUES clause.
+         * 
+         * Note: Collection is not modifyable, so we copy it.
+         */
+        final Set<IVariable<?>> boundByBindingsClause = new LinkedHashSet<IVariable<?>>(
+                stats.getAlwaysBound());
+
+        /*
+         * The variables which are definitely bound on entry to the join group
+         * in which the VALUES clause appears.
+         */
+        final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
+                bc, new LinkedHashSet<IVariable<?>>());
+        
+        /*
+         * This is only those variables which are bound on entry into the group
+         * in which the VALUES join appears *and* which are "must" bound
+         * variables projected by the VALUES.
+         * 
+         * FIXME Is this the correct semantics? I followed the pattern for SERVICE.
+         */
+        boundByBindingsClause.retainAll(incomingBindings);
+            
+        vars.addAll(boundByBindingsClause);
 
         return vars;
 

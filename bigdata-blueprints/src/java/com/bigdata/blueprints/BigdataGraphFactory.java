@@ -74,6 +74,17 @@ public class BigdataGraphFactory  {
     }
 
     /**
+	 * Create a persistent local bigdata instance. If a journal does not exist
+	 * at the specified location, then a journal will be created at that
+	 * location.
+	 */
+    public static BigdataGraph create(final String file) throws Exception {
+        final BigdataSail sail = BigdataSailFactory.openSail(file, true);
+        sail.initialize();
+        return new BigdataGraphEmbedded(sail);
+    }
+
+    /**
      * Create a new local in-memory bigdata instance.
      */
     public static BigdataGraph create() throws Exception {

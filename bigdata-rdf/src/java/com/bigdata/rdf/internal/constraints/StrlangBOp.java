@@ -67,6 +67,11 @@ public class StrlangBOp extends IVValueExpression<IV> implements INeedsMateriali
     public IV get(final IBindingSet bs) throws SparqlTypeErrorException {
 
         final Literal lit = getAndCheckLiteralValue(0, bs);
+        
+        if (lit.getDatatype() != null || lit.getLanguage() != null) {
+            throw new SparqlTypeErrorException();
+        }
+
         final Literal l = getAndCheckLiteralValue(1, bs);
         String label = lit.getLabel();
         String langLit = l.getLabel();

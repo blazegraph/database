@@ -46,7 +46,6 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.rio.IRDFParserOptions;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
@@ -151,8 +150,9 @@ public class InsertServlet extends BigdataRDFServlet {
          * UpdateServlet fails to parse MIMEType when doing conneg. </a>
          */
 
-        final RDFFormat format = RDFFormat
-                .forMIMEType(new MiniMime(contentType).getMimeType());
+		final String mimeTypeStr = new MiniMime(contentType).getMimeType();
+
+		final RDFFormat format = RDFFormat.forMIMEType(mimeTypeStr);
 
         if (format == null) {
 
@@ -216,13 +216,12 @@ public class InsertServlet extends BigdataRDFServlet {
     }
 
     /**
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     *         
-     *         TODO The {@link IRDFParserOptions} defaults should be coming from
-     *         the KB instance, right? What does the REST API say about this?
-     */
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * 
+	 * TODO #1056 (Add ability to set RIO options to REST API and workbench)
+	 */
     private static class InsertWithBodyTask extends AbstractRestApiTask<Void> {
 
         private final String baseURI;

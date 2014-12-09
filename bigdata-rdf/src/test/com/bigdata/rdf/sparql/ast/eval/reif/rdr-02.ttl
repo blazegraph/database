@@ -1,12 +1,12 @@
-# <<:SAP :bought :sybase>> dc:source news:us-sybase ;
-#                          dc:created "2011-04-05T12:00:00Z"^^xsd:dateTime .
-
 @prefix :          <http://example.com/> .
 @prefix news:      <http://example.com/news/> .
 @prefix rdf:       <http://www.w3.org/1999/02/22-rdf-syntax-ns#> . 
 @prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#> . 
 @prefix dc:        <http://purl.org/dc/terms/> . 
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
+
+# <<:SAP :bought :sybase>> dc:source news:us-sybase ;
+#                          dc:created "2011-04-05T12:00:00Z"^^xsd:dateTime .
 
 :SAP :bought :sybase .
 _:s1 rdf:subject   :SAP .

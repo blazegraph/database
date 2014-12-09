@@ -26,18 +26,9 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
@@ -97,9 +88,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public static Test suite() {
 	
         return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
-//                "test9.*", TestMode.quads);
-		        "test.*.*", TestMode.quads, TestMode.sids,
-		        TestMode.triples);
+                "test_SELECT_ALL", TestMode.quads, TestMode.sids,
+                TestMode.triples);
 	    
 	}
 
@@ -539,7 +529,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         }
         
         /**
-         * FIXME JJC: Uncomment to test CONNEG for JSON.
+         * Uncommented to test CONNEG for JSON (available with openrdf 2.7).
          * 
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
          *      JSON-LD </a>
@@ -548,12 +538,12 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/704" >
          *      ask does not return json </a>
          */
-//        {
-//            final IPreparedBooleanQuery query = m_repo
-//                    .prepareBooleanQuery(queryStr);
-//            query.setHeader("Accept", "application/sparql-results+json");
-//            assertEquals(false, query.evaluate());
-//        }
+        {
+            final IPreparedBooleanQuery query = m_repo
+                    .prepareBooleanQuery(queryStr);
+            query.setHeader("Accept", "application/sparql-results+json");
+            assertEquals(false, query.evaluate());
+        }
         
     }
 
@@ -619,13 +609,10 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         }
 
         /**
-         * FIXME The necessary parser does not appear to be available. If you
-         * enable this you will get ClassNotFoundException for
-         * <code>au/com/bytecode/opencsv/CSVReader</code>
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
-         *      Migrate to openrdf 2.7 </a>
-         */
+		 * FIXME The necessary parser does not appear to be available (even with
+		 * openrdf 2.7). If you enable this you will get ClassNotFoundException
+		 * for <code>au/com/bytecode/opencsv/CSVReader</code>
+		 */
         if (false) {
 
             final IPreparedTupleQuery query = m_repo
@@ -651,15 +638,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         }
 
         /**
-         * FIXME Enable this once we have a JSON result format parser (openrdf
-         * 2.7).
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
-         *      Migrate to openrdf 2.7 </a>
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
-         *      JSON-LD </a>
-         */
-        if (false) {
+		 * Enabled now that we have a JSON result format parser (openrdf 2.7).
+		 * 
+		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
+		 *      Migrate to openrdf 2.7 </a>
+		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
+		 *      JSON-LD </a>
+		 */
+        if (true) {
 
             final IPreparedTupleQuery query = m_repo
                     .prepareTupleQuery(queryStr);
@@ -673,31 +659,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         
 	}
 
-//    /**
-//     * Select everything in the kb using a POST. There will be no solutions
-//     * (assuming that we are using a told triple kb or quads kb w/o axioms).
-//     */
-//    public void test_POST_SELECT_ALL() throws Exception {
-//
-//        final String queryStr = "select * where {?s ?p ?o}";
-//
-//        final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "POST";
-//
-//        opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//        // TODO JSON parser is not bundled by openrdf.
-////        opts.acceptHeader = TupleQueryResultFormat.JSON.getDefaultMIMEType();
-////        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//        opts.acceptHeader = TupleQueryResultFormat.BINARY.getDefaultMIMEType();
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
-//
-//    }
-
     /**
      * A GET query which should result in an error (the query is not well
      * formed).
@@ -706,7 +667,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
         final String queryStr = "select * where {?s ?p ?o} X {}";
 
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
         
         try {
@@ -720,16 +680,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         	// perfect
         	
         }
-
-//		final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "GET";
-//
-//        opts.acceptHeader = TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
-//        
-//        assertErrorStatusCode(HttpServletResponse.SC_BAD_REQUEST,
-//                doSparqlQuery(opts, requestPath));
 
     }
     
@@ -771,13 +721,12 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
         
     }
 
-//    // FIXME We need an NQuadsWriter to run this test.
 //    // Note: quads interchange
-//    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
-//
-//        doInsertWithBodyTest("POST", 23, NQuadsParser.nquads);
-//        
-//    }
+    public void test_POST_INSERT_withBody_NQUADS() throws Exception {
+
+        doInsertWithBodyTest("POST", 23, RDFFormat.NQUADS);
+        
+    }
 
     // TODO Write test for UPDATE where we override the default context using
     // the context-uri.
@@ -1978,134 +1927,13 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
     }
 
-	public void _test976() throws Exception {
-		doStressDescribeTest("GET", RDFFormat.RDFXML, 10000 /** tasks **/, 100 /** threads **/, 50 /** statements **/);
-	}
-	
-	public void _test967() throws Exception {
-		
-		final IIndexManager im = getIndexManager();
-		
-		System.err.println(im.getClass().getName());
-		
-		final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(100);
-		final AtomicInteger namespaceCount = new AtomicInteger(0);
-		final CountDownLatch latch = new CountDownLatch(2);
-		final AtomicBoolean testSucceeding = new AtomicBoolean(true);
-
-		// 1. Create namespace
-		executor.submit(new Runnable() {
-			@Override
-			public void run() {
-				final String namespace = "n" + namespaceCount.getAndIncrement();
-				final Properties properties = new Properties();
-				properties.put("com.bigdata.rdf.sail.namespace", namespace);
-				try {
-					log.info(String.format("Create namespace %s...", namespace));
-					m_repo.createRepository(namespace, properties);
-					log.warn(String.format("Create namespace %s done", namespace));
-					latch.countDown();
-				} catch (final Exception e) {
-					log.error(String.format("Failed to create namespace %s:", namespace), e);
-					testSucceeding.set(false);
-				}
-				if (testSucceeding.get())
-					executor.schedule(this, 10, TimeUnit.SECONDS);
-			}
-		});
-
-		// 2. Data load
-		executor.submit(new Runnable() {
-			@Override
-			public void run() {
-				String namespace = null;
-				try {
-					latch.await(); // Wait at least 2 created namespaces
-					namespace = "n" + ThreadLocalRandom.current().nextInt(namespaceCount.get() - 1);
-					final Collection<Statement> stmts = new ArrayList<>(100000);
-					for (int i = 0; i < 100000; i++) {
-						stmts.add(generateTriple());
-					}
-					log.info(String.format("Loading package into %s namespace...", namespace));
-					m_repo.getRepositoryForNamespace(namespace).add(new ApacheRemoteRepository.AddOp(stmts));
-					log.warn(String.format("Loading package into %s namespace done", namespace));
-				} catch (final Exception e) {
-					log.error(String.format("Failed to load package into namespace %s:", namespace), e);
-					testSucceeding.set(false);
-				}
-				if (testSucceeding.get())
-					executor.schedule(this, 10, TimeUnit.SECONDS);
-			}
-		});
-
-		// 3. Get namespace list
-		executor.submit(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					log.info("Get namespace list...");
-					m_repo.getRepositoryDescriptions().close();
-					log.warn("Get namespace list done");
-				} catch (final Exception e) {
-					log.error("Failed to get namespace list:", e);
-					testSucceeding.set(false);
-				}
-				if (testSucceeding.get())
-					executor.schedule(this, 2, TimeUnit.SECONDS);
-			}
-		});
-
-		// 4. Execute SPARQL
-		executor.submit(new Runnable() {
-			@Override
-			public void run() {
-				String namespace = null;
-				try {
-					latch.await(); // Wait at least 2 created namespaces
-					namespace = "n" + ThreadLocalRandom.current().nextInt(namespaceCount.get() - 1);
-					log.info(String.format("Execute SPARQL on %s namespace...", namespace));
-					m_repo.getRepositoryForNamespace(namespace).prepareTupleQuery("SELECT * {?s ?p ?o} LIMIT 100").evaluate().close();
-					log.warn(String.format("Execute SPARQL on %s namespace done", namespace));
-				} catch (final Exception e) {
-					log.error(String.format("Failed to execute SPARQL on %s namespace:", namespace), e);
-					testSucceeding.set(false);
-				}
-				if (testSucceeding.get())
-					executor.schedule(this, 2, TimeUnit.SECONDS);
-			}
-		});
-
-		final int SECOND = 1000; // 1 second
-		int DURATION = 60 * 60 * SECOND; // 1 hour
-		while (DURATION > 0 && testSucceeding.get()) {
-			Thread.sleep(SECOND); // Wait a while
-			DURATION -= SECOND;
-		}
-		
-		log.warn("Stopping...");
-		
-		executor.shutdownNow();
-		executor.awaitTermination(5, TimeUnit.MINUTES);
-
-		log.info("Cleanup namespaces...");
-		for (int i = 0; i < namespaceCount.get(); i++) {
-			m_repo.deleteRepository("n" + i);
-		}
-
-		assertTrue(testSucceeding.get());
-	}
-
-	private static Statement generateTriple() {
-		final String	URI_PREFIX			= "http://bigdata.test/";
-		return new StatementImpl(new URIImpl(URI_PREFIX + UUID.randomUUID()), new URIImpl(URI_PREFIX + UUID.randomUUID()), new URIImpl(URI_PREFIX + UUID.randomUUID()));
-	}
 //    /**
 //     * Unit test for ACID UPDATE using PUT. This test is for the operation where
 //     * the request body is a multi-part MIME document conveying both the
 //     * statements to be removed and the statement to be inserted.
 //     */
 //    public void test_PUT_UPDATE_WITH_MULTI_PART_MIME() {
-//        fail("write test"); 
+//        fail("write test");
 //    }
 
 }

@@ -202,8 +202,8 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
         /**
          * The data file.
          */
-        static private final String ssspGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/ssspGraph.ttl";
-        static private final String ssspGraph2 = "src/test/com/bigdata/rdf/graph/data/ssspGraph.ttl";
+        static private final String ssspGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/ssspGraph.ttlx";
+        static private final String ssspGraph2 = "src/test/com/bigdata/rdf/graph/data/ssspGraph.ttlx";
         
         public final URI link, v1, v2, v3, v4, v5;
 

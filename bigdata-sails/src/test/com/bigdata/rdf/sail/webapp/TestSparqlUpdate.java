@@ -63,18 +63,19 @@ import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.model.vocabulary.DC;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
-import org.openrdf.query.parser.sparql.DC;
-import org.openrdf.query.parser.sparql.FOAF;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
 
 /**
  * Proxied test suite.
@@ -90,7 +91,7 @@ import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
  * @see SPARQLUpdateTest
  */
 public class TestSparqlUpdate<S extends IIndexManager> extends
-        AbstractTestNanoSparqlJettyClient<S> {
+        AbstractTestNanoSparqlClient<S> {
     
     public TestSparqlUpdate() {
 
@@ -1696,7 +1697,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         assertEquals(2L, countResults(query.evaluate()));
 
         /*
-         * Then I still get only one result for the query, the triple with ?
+         * Then I still get only one result for the query, the triple with ''
          * which is \u00E4. But if I now add the 'u' flag to the regex, I get
          * both triples as result, so this seems to be a viable workaround.
          * Always setting the UNICODE_CASE flag sounds like a good idea, and in

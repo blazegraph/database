@@ -102,7 +102,7 @@ public class StrBeforeBOp extends IVValueExpression<IV> implements INeedsMateria
         // didn't find it
         if (i < 0) {
         	
-        	return ret(arg1, "", bs);
+        	return ret(arg1, null, bs);
         	
         }
         
@@ -120,7 +120,15 @@ public class StrBeforeBOp extends IVValueExpression<IV> implements INeedsMateria
     }
     
     private IV ret(final Literal arg1, final String label, final IBindingSet bs) {
-    	
+
+        if (label == null) {
+        
+            final BigdataLiteral str = getValueFactory().createLiteral("");
+            
+            return super.asIV(str, bs);
+            
+        }
+
     	final String lang = arg1.getLanguage();
     	
     	if (lang != null) {

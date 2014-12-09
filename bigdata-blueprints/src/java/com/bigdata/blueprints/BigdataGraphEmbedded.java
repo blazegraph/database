@@ -22,12 +22,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.repository.RepositoryConnection;
 
+import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit;
+import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit.Action;
+import com.bigdata.rdf.changesets.ChangeAction;
+import com.bigdata.rdf.changesets.ChangeRecord;
+import com.bigdata.rdf.changesets.IChangeLog;
+import com.bigdata.rdf.changesets.IChangeRecord;
+import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.tinkerpop.blueprints.Features;
 import com.tinkerpop.blueprints.TransactionalGraph;
 
@@ -40,11 +58,14 @@ import com.tinkerpop.blueprints.TransactionalGraph;
  * @author mikepersonick
  *
  */
-public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalGraph {
+public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalGraph, IChangeLog {
 
 	final BigdataSailRepository repo;
 	
 //	transient BigdataSailRepositoryConnection cxn;
+	
+	final List<BigdataGraphListener> listeners = 
+	        Collections.synchronizedList(new LinkedList<BigdataGraphListener>());
 	
 	/**
 	 * Create a Blueprints wrapper around a {@link BigdataSail} instance.
@@ -85,12 +106,13 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	    return repo;
 	}
 	
-    protected final ThreadLocal<RepositoryConnection> cxn = new ThreadLocal<RepositoryConnection>() {
-        protected RepositoryConnection initialValue() {
-            RepositoryConnection cxn = null;
+    protected final ThreadLocal<BigdataSailRepositoryConnection> cxn = new ThreadLocal<BigdataSailRepositoryConnection>() {
+        protected BigdataSailRepositoryConnection initialValue() {
+            BigdataSailRepositoryConnection cxn = null;
             try {
                 cxn = repo.getUnisolatedConnection();
                 cxn.setAutoCommit(false);
+                cxn.addChangeLog(BigdataGraphEmbedded.this);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
@@ -98,7 +120,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         }
     };
 
-	protected RepositoryConnection getWriteConnection() throws Exception {
+	protected BigdataSailRepositoryConnection getWriteConnection() throws Exception {
 //	    if (cxn == null) {
 //	        cxn = repo.getUnisolatedConnection();
 //	        cxn.setAutoCommit(false);
@@ -106,7 +128,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	    return cxn.get();
 	}
 	
-	protected RepositoryConnection getReadConnection() throws Exception {
+	protected BigdataSailRepositoryConnection getReadConnection() throws Exception {
 	    return repo.getReadOnlyConnection();
 	}
 	
@@ -203,6 +225,187 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         // override
         FEATURES.supportsTransactions = true; //BigdataGraph.FEATURES.supportsTransactions;
         
+    }
+    
+    public void addListener(final BigdataGraphListener listener) {
+        this.listeners.add(listener);
+    }
+
+    public void removeListener(final BigdataGraphListener listener) {
+        this.listeners.remove(listener);
+    }
+
+    /**
+     * We need to batch and materialize these.
+     */
+    private final List<IChangeRecord> removes = new LinkedList<IChangeRecord>();
+    
+    /**
+     * Changed events coming from bigdata.
+     */
+    @Override
+    public void changeEvent(final IChangeRecord record) {
+        /*
+         * Adds come in already materialized. Removes do not. Batch and
+         * materialize at commit or abort notification.
+         */
+        if (record.getChangeAction() == ChangeAction.REMOVED) {
+            synchronized(removes) {
+                removes.add(record);
+            }
+        } else {
+            notify(record);
+        }
+    }
+    
+    /**
+     * Turn a change record into a graph edit and notify the graph listeners.
+     * 
+     * @param record
+     *          Bigdata change record.
+     */
+    protected void notify(final IChangeRecord record) {
+        final BigdataGraphEdit edit = toGraphEdit(record);
+        if (edit != null) {
+            for (BigdataGraphListener listener : listeners) {
+                listener.graphEdited(edit, record.toString());
+            }
+        }
+    }
+    
+    /**
+     * Turn a bigdata change record into a graph edit.
+     * 
+     * @param record
+     *          Bigdata change record
+     * @return
+     *          graph edit
+     */
+    protected BigdataGraphEdit toGraphEdit(final IChangeRecord record) {
+        
+        final Action action;
+        if (record.getChangeAction() == ChangeAction.INSERTED) {
+            action = Action.Add;
+        } else if (record.getChangeAction() == ChangeAction.REMOVED) {
+            action = Action.Remove;
+        } else {
+            /*
+             * Truth maintenance.
+             */
+            return null;
+        }
+        
+        final BigdataGraphAtom atom = super.toGraphAtom(record.getStatement());
+        
+        return new BigdataGraphEdit(action, atom);
+        
+    }
+    
+    /**
+     * Materialize a batch of change records.
+     * 
+     * @param records
+     *          Bigdata change records
+     * @return
+     *          Same records with materialized values
+     */
+    protected List<IChangeRecord> materialize(final List<IChangeRecord> records) {
+        
+        try {
+            final AbstractTripleStore db = cxn.get().getTripleStore();
+
+            final List<IChangeRecord> materialized = new LinkedList<IChangeRecord>();
+
+            // collect up the ISPOs out of the unresolved change records
+            final ISPO[] spos = new ISPO[records.size()];
+            int i = 0;
+            for (IChangeRecord rec : records) {
+                spos[i++] = rec.getStatement();
+            }
+
+            // use the database to resolve them into BigdataStatements
+            final BigdataStatementIterator it = db
+                    .asStatementIterator(new ChunkedArrayIterator<ISPO>(i,
+                            spos, null/* keyOrder */));
+
+            /*
+             * the BigdataStatementIterator will produce BigdataStatement
+             * objects in the same order as the original ISPO array
+             */
+            for (IChangeRecord rec : records) {
+                final BigdataStatement stmt = it.next();
+                materialized.add(new ChangeRecord(stmt, rec.getChangeAction()));
+            }
+
+            return materialized;
+        } catch (RuntimeException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+        
+    }
+
+    /**
+     * Notification of transaction beginning.
+     */
+    @Override
+    public void transactionBegin() {
+        for (BigdataGraphListener listener : listeners) {
+            listener.transactionBegin();
+        }
+    }
+
+    /**
+     * Notification of transaction preparing for commit.
+     */
+    @Override
+    public void transactionPrepare() {
+        for (BigdataGraphListener listener : listeners) {
+            listener.transactionPrepare();
+        }
+    }
+
+    /**
+     * Notification of transaction committed.
+     */
+    @Override
+    public void transactionCommited(final long commitTime) {
+        notifyRemoves();
+        for (BigdataGraphListener listener : listeners) {
+            listener.transactionCommited(commitTime);
+        }
+    }
+
+    /**
+     * Notification of transaction aborted.
+     */
+    @Override
+    public void transactionAborted() {
+        notifyRemoves();
+        for (BigdataGraphListener listener : listeners) {
+            listener.transactionAborted();
+        }
+    }
+    
+    /**
+     * Materialize and notify listeners of the remove events.
+     */
+    protected void notifyRemoves() {
+        if (listeners.size() > 0) {
+            final List<IChangeRecord> removes;
+            synchronized(this.removes) {
+                removes = materialize(this.removes);
+                this.removes.clear();
+            }
+            for (IChangeRecord remove : removes) {
+                notify(remove);
+            }
+        } else {
+            synchronized(this.removes) {
+                this.removes.clear();
+            }
+        }
     }
 
 

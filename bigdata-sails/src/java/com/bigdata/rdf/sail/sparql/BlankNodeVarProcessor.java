@@ -5,6 +5,7 @@
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -30,11 +31,14 @@ import com.bigdata.rdf.sail.sparql.ast.VisitorException;
  */
 public class BlankNodeVarProcessor extends ASTVisitorBase {
 
-	public static void process(ASTOperationContainer qc)
+	
+	public static Set<String> process(ASTOperationContainer qc)
 		throws MalformedQueryException
 	{
 		try {
-			qc.jjtAccept(new BlankNodeToVarConverter(), null);
+			BlankNodeToVarConverter converter = new BlankNodeToVarConverter();
+			qc.jjtAccept(converter, null);
+			return converter.getUsedBNodeIDs();
 		}
 		catch (VisitorException e) {
 			throw new MalformedQueryException(e);
@@ -72,24 +76,29 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
             return "-anon-" + anonVarNo++;
 		}
 
+		public Set<String> getUsedBNodeIDs() {
+			usedBNodeIDs.addAll(conversionMap.keySet());
+			return Collections.unmodifiableSet(usedBNodeIDs);
+		}
+
 		@Override
-		public Object visit(final ASTBasicGraphPattern node, final Object data)
+		public Object visit(ASTBasicGraphPattern node, Object data)
 			throws VisitorException
 		{
 			// The same Blank node ID cannot be used across Graph Patterns
 			usedBNodeIDs.addAll(conversionMap.keySet());
 
-			// Blank nodes are scope to Basic Graph Patterns
+			// Blank nodes are scoped to Basic Graph Patterns
 			conversionMap.clear();
 
 			return super.visit(node, data);
 		}
 
 		@Override
-		public Object visit(final ASTBlankNode node, final Object data)
+		public Object visit(ASTBlankNode node, Object data)
 			throws VisitorException
 		{
-			final String bnodeID = node.getID();
+			String bnodeID = node.getID();
 			String varName = findVarName(bnodeID);
 
 			if (varName == null) {
@@ -100,7 +109,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 				}
 			}
 
-			final ASTVar varNode = new ASTVar(SyntaxTreeBuilderTreeConstants.JJTVAR);
+			ASTVar varNode = new ASTVar(SyntaxTreeBuilderTreeConstants.JJTVAR);
 			varNode.setName(varName);
 			varNode.setAnonymous(true);
 
@@ -109,10 +118,10 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 			return super.visit(node, data);
 		}
 
-		private String findVarName(final String bnodeID) throws VisitorException {
+		private String findVarName(String bnodeID) throws VisitorException {
 			if (bnodeID == null)
 				return null;
-			final String varName = conversionMap.get(bnodeID);
+			String varName = conversionMap.get(bnodeID);
 			if (varName == null && usedBNodeIDs.contains(bnodeID))
 				throw new VisitorException(
 						"BNodeID already used in another scope: " + bnodeID);
@@ -120,7 +129,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 		}
 
 		@Override
-		public Object visit(final ASTBlankNodePropertyList node, final Object data)
+		public Object visit(ASTBlankNodePropertyList node, Object data)
 			throws VisitorException
 		{
 			node.setVarName(createAnonVarName());
@@ -128,7 +137,7 @@ public class BlankNodeVarProcessor extends ASTVisitorBase {
 		}
 
 		@Override
-		public Object visit(final ASTCollection node, final Object data)
+		public Object visit(ASTCollection node, Object data)
 			throws VisitorException
 		{
 			node.setVarName(createAnonVarName());

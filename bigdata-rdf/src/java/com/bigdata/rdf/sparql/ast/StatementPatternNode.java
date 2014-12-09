@@ -196,6 +196,25 @@ public class StatementPatternNode extends
 		 *      Reification Done Right</a>
 		 */
         String SID = "sid";
+
+		/**
+		 * An optional annotation whose value is a variable which will become
+		 * bound to the fast range count of the associated triple pattern.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} is slow.
+		 *      </a>
+		 */
+        String FAST_RANGE_COUNT_VAR = "fastRangeCountVar";
+        
+		/**
+		 * An optional annotation whose value the variable that will be bound by
+		 * a {@link DistinctTermAdvancer} layered over the access path.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1034" > DISTINCT
+		 *      PREDICATEs query is slow </a>
+		 */
+        String DISTINCT_TERM_SCAN_VAR = "distinctTermScanVar";
         
     }
     
@@ -394,9 +413,52 @@ public class StatementPatternNode extends
 		if (scope == null)
 			throw new IllegalArgumentException();
     	
-    		setProperty(Annotations.SCOPE, scope);
+		setProperty(Annotations.SCOPE, scope);
     	
     }
+
+	/**
+	 * Return the {@link VarNode} associated with the optional
+	 * {@link Annotations#FAST_RANGE_COUNT_VAR} property.
+	 * 
+	 * @return The {@link VarNode} -or- <code>null</code> if this triple pattern
+	 *         is not associated with that annotation.
+	 */
+	final public VarNode getFastRangeCountVar() {
+		
+		return (VarNode) getProperty(Annotations.FAST_RANGE_COUNT_VAR);
+		
+	}
+	
+	final public void setFastRangeCount(final VarNode var) {
+
+		if (var == null)
+			throw new IllegalArgumentException();
+
+		setProperty(Annotations.FAST_RANGE_COUNT_VAR, var);
+
+	}
+
+	/**
+	 * Return the variable that will be bound by the
+	 * {@link DistinctTermAdvancer} pattern.
+	 * 
+	 * @return The distinct term scan variable -or- <code>null</code> if the
+	 *         access path will not use a distinct term scan.
+	 * 
+	 * @see Annotations#DISTINCT_TERM_SCAN_VAR
+	 */
+	final public VarNode getDistinctTermScanVar() {
+
+		return (VarNode) getProperty(Annotations.DISTINCT_TERM_SCAN_VAR);
+
+	}
+
+	final public void setDistinctTermScanVar(final VarNode var) {
+
+		setProperty(Annotations.DISTINCT_TERM_SCAN_VAR, var);
+
+	}
     
     /**
      * {@inheritDoc}
@@ -633,6 +695,16 @@ public class StatementPatternNode extends
 		final Scope scope = getScope();
 		if (scope != null) {
 			sb.append(" [scope=" + scope + "]");
+		}
+
+		final VarNode fastRangeCountVar = getFastRangeCountVar();
+		if (fastRangeCountVar != null) {
+			sb.append(" [fastRangeCount=" + fastRangeCountVar + "]");
+		}
+
+		final VarNode distinctTermScanVar = getDistinctTermScanVar();
+		if (distinctTermScanVar != null) {
+			sb.append(" [distinctTermScan=" + distinctTermScanVar + "]");
 		}
 
         if(isOptional()) {

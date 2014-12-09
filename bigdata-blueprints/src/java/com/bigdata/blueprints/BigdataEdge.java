@@ -61,7 +61,7 @@ public class BigdataEdge extends BigdataElement implements Edge {
 	public Object getId() {
 	    
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
 		return graph.factory.fromURI(uri);
 		
@@ -71,7 +71,7 @@ public class BigdataEdge extends BigdataElement implements Edge {
 	public void remove() {
 	    
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
 		graph.removeEdge(this);
 		
@@ -81,7 +81,7 @@ public class BigdataEdge extends BigdataElement implements Edge {
 	public String getLabel() {
 	    
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
 		return (String) graph.getProperty(uri, graph.getValueFactory().getLabelURI());
 		
@@ -143,7 +143,7 @@ public class BigdataEdge extends BigdataElement implements Edge {
     public Set<String> getPropertyKeys() {
         
         if (log.isInfoEnabled())
-            log.info("()");
+            log.info("");
         
         return super.getPropertyKeys();
         

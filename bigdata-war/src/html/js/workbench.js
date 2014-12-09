@@ -18,9 +18,11 @@ var CODEMIRROR_DEFAULTS = {
 // key is value of RDF type selector, value is name of CodeMirror mode
 var RDF_MODES = {
    'n-triples': 'ntriples',
+   'n-triples-RDR': 'ntriples-RDR',
    'rdf/xml': 'xml',
    'json': 'json',
-   'turtle': 'turtle'
+   'turtle': 'turtle',
+   'turtle-RDR': 'turtle'
 };
 var FILE_CONTENTS = null;
 // file/update editor type handling
@@ -29,6 +31,7 @@ var FILE_CONTENTS = null;
 var RDF_TYPES = {
    'nq': 'n-quads',
    'nt': 'n-triples',
+   'ntx': 'n-triples-RDR',
    'n3': 'n3',
    'rdf': 'rdf/xml',
    'rdfs': 'rdf/xml',
@@ -38,17 +41,20 @@ var RDF_TYPES = {
    'trig': 'trig',
    'trix': 'trix',
    //'xml': 'trix',
-   'ttl': 'turtle'
+   'ttl': 'turtle',
+   'ttlx': 'turtle-RDR'
 };
 var RDF_CONTENT_TYPES = {
    'n-quads': 'text/x-nquads',
    'n-triples': 'text/plain',
+   'n-triples-RDR': 'application/x-n-triples-RDR',
    'n3': 'text/rdf+n3',
    'rdf/xml': 'application/rdf+xml',
    'json': 'application/sparql-results+json',
    'trig': 'application/x-trig',
    'trix': 'application/trix',
-   'turtle': 'application/x-turtle'
+   'turtle': 'application/x-turtle',
+   'turtle-RDR': 'application/x-turtle-RDR'
 };
 var SPARQL_UPDATE_COMMANDS = [
    'INSERT',
@@ -104,7 +110,9 @@ var NAMESPACE_SHORTCUTS = {
 var EXPORT_EXTENSIONS = {
    'application/rdf+xml': ['RDF/XML', 'rdf', true],
    'application/n-triples': ['N-Triples', 'nt', true],
+   'application/x-n-triples-RDR': ['N-Triples-RDR', 'ntx', true],
    'application/x-turtle': ['Turtle', 'ttl', true],
+   'application/x-turtle-RDR': ['Turtle-RDR', 'ttlx', true],
    'text/rdf+n3': ['N3', 'n3', true],
    'application/trix': ['TriX', 'trix', true],
    'application/x-trig': ['TRIG', 'trig', true],
@@ -783,6 +791,7 @@ function updateResponseError(jqXHR, textStatus, errorThrown) {
    if(jqXHR.status === 0) {
       message += 'Could not contact server';
    } else {
+      var response = $('<div>').append(jqXHR.responseText);
       if(response.find('pre').length === 0) {
          message += response.text();
       } else {
@@ -917,7 +926,7 @@ function submitQuery(e) {
    var settings = {
       type: 'POST',
       data: $('#query-form').serialize(),
-      headers: { 'Accept': 'application/sparql-results+json, application/rdf+xml' },
+      headers: { 'Accept': 'application/sparql-results+json' },
       success: showQueryResults,
       error: queryResultsError
    };
@@ -1069,8 +1078,9 @@ function updateResultCountAndExecutionTime(count) {
    var sec = Math.floor(ms / 1000);
    ms = ms % 1000;
    var min = Math.floor(sec / 60);
-   min = min % 60;
+   sec = sec % 60;
    var hr = Math.floor(min / 60);
+   min = min % 60;
    var executionTime = '';
    if(hr > 0) {
       executionTime += hr + 'hr, ';
@@ -1736,7 +1746,7 @@ function loadPerformance(path) {
 /* Utility functions */
 
 function getSID(binding) {
-   return '<<\n ' + abbreviate(binding.value.s.value) + '\n ' + abbreviate(binding.value.p.value) + '\n ' + abbreviate(binding.value.o.value) + '\n>>';
+   return '<<\n ' + abbreviate(binding.subject.value) + '\n ' + abbreviate(binding.predicate.value) + '\n ' + abbreviate(binding.object.value) + '\n>>';
 }
 
 function abbreviate(uri) {

@@ -42,6 +42,8 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 
 /**
@@ -567,4 +569,36 @@ public interface QueryHints {
      */
     FilterExistsModeEnum DEFAULT_FILTER_EXISTS = FilterExistsModeEnum.VectoredSubPlan;
 
+	/*
+	 * FIXME I have added system property based query hints that can be used to
+	 * disable the fast-range-count and distinct-term-scan optimizers in case we
+	 * run into more edge cases. These query hints can be removed once we have
+	 * more experience with these optimizers.
+	 */
+    
+    /**
+	 * The name of an property that may be used to enable or disable the
+	 * {@link ASTFastRangeCountOptimizer}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+	 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+	 *      </a>
+	 */
+    String FAST_RANGE_COUNT_OPTIMIZER = "fastRangeCountOptimizer";
+
+	boolean DEFAULT_FAST_RANGE_COUNT_OPTIMIZER = Boolean.valueOf(System
+			.getProperty(FAST_RANGE_COUNT_OPTIMIZER, "true"));
+    
+    /**
+	 * The name of an property that may be used to enable or disable the
+	 * {@link ASTDistinctTermScanOptimizer}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+	 *      query is slow </a>
+	 */
+    String DISTINCT_TERM_SCAN_OPTIMIZER = "distinctTermScanOptimizer";
+
+	boolean DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER = Boolean.valueOf(System
+			.getProperty(DISTINCT_TERM_SCAN_OPTIMIZER, "true"));
+    
 }

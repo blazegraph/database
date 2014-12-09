@@ -59,12 +59,14 @@
             <select id="rdf-type" disabled>
               <option value="n-quads">N-Quads</option>
               <option value="n-triples">N-Triples</option>
+              <option value="n-triples-RDR">N-Triples-RDR</option>
               <option value="n3">Notation3</option>
               <option value="rdf/xml">RDF/XML</option>
               <option value="json">JSON</option>
               <option value="trig">TriG</option>
               <option value="trix">TriX</option>
               <option value="turtle">Turtle</option>
+              <option value="turtle-RDR">Turtle-RDR</option>
             </select>
           </p>
           <a href="#" class="advanced-features-toggle">Advanced features</a>
@@ -78,7 +80,7 @@
 
         </div>
 
-        <div class="box" id="update-response">
+        <div class="error-box" id="update-response">
           <span></span>
           <iframe name="update-response-container"></iframe>
         </div>
@@ -124,7 +126,7 @@
 
         </div>
 
-        <div id="query-response" class="box">
+        <div id="query-response" class="error-box">
         </div>
 
         <div id="query-pagination" class="box">

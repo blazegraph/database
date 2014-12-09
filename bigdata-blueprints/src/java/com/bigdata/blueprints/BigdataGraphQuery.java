@@ -228,8 +228,14 @@ public class BigdataGraphQuery implements GraphQuery {
      */
     @Override
     public Iterable<Edge> edges() {
-        final String queryStr = toQueryStr(EDGE);
-        return graph.getEdges(queryStr);
+        try {
+            final String queryStr = toQueryStr(EDGE);
+            return graph.getEdges(queryStr);
+        } catch (RuntimeException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     /**
@@ -239,8 +245,14 @@ public class BigdataGraphQuery implements GraphQuery {
      */
     @Override
     public Iterable<Vertex> vertices() {
-        final String queryStr = toQueryStr(VERTEX);
-        return graph.getVertices(queryStr, true);
+        try {
+            final String queryStr = toQueryStr(VERTEX);
+            return graph.getVertices(queryStr, true);
+        } catch (RuntimeException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
     
     /**
