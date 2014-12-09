@@ -36,6 +36,7 @@ import org.openrdf.repository.RepositoryException;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
@@ -90,8 +91,7 @@ public class BigdataSailRemoteRepository implements Repository {
 		
         this.executor = Executors.newCachedThreadPool();
 
-
-        this.nss = new JettyRemoteRepository(sparqlEndpointURL, useLBS,
+        this.nss = new JettyRemoteRepositoryManager(sparqlEndpointURL, useLBS,
                 executor);
 	}
 
@@ -104,7 +104,6 @@ public class BigdataSailRemoteRepository implements Repository {
 		this.executor = null;
 		
 		this.nss = nss;
-		
 	}
 	
 	public JettyRemoteRepository getRemoteRepository() {
@@ -116,6 +115,10 @@ public class BigdataSailRemoteRepository implements Repository {
 	@Override
 	public void shutDown() throws RepositoryException {
 
+		// FIXME: this should be handled more cleanly
+		if (nss instanceof JettyRemoteRepositoryManager)
+			((JettyRemoteRepositoryManager) nss).close();
+		
 		if (executor != null)
 			executor.shutdownNow();
 		

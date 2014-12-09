@@ -167,10 +167,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             
         } finally {
 
-            /*
-             * Note: HttpURLConnection.disconnect() is not a "close". close() is
-             * an implicit action for this class.
-             */
+            repo.close();
 
         }
 

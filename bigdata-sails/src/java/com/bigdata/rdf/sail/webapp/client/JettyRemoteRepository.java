@@ -423,8 +423,10 @@ public class JettyRemoteRepository {
 
 		try {
 			httpClient.start();
-			
-			// System.err.println("Started DefaultClient() " + JettyHttpClient.activeCount());
+						
+			if (JettyHttpClient.activeCount() > 20) {
+				System.err.println("Started DefaultClient() " + JettyHttpClient.activeCount());				
+			}
 
 			while (!httpClient.isStarted()) {
 				// FIXME: use listener pattern
