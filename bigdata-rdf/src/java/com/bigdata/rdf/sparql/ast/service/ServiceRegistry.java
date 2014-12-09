@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;

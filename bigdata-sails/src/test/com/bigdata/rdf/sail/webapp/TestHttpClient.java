@@ -38,10 +38,8 @@ import org.eclipse.jetty.client.HttpResponse;
 import org.eclipse.jetty.client.api.Request;
 
 import com.bigdata.rdf.sail.webapp.client.ApacheConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.EntityContentProvider;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
-import com.bigdata.util.http.ApacheHttpClient;
 import com.bigdata.util.http.JettyHttpClient;
 
 /**
@@ -75,25 +73,6 @@ public class TestHttpClient extends TestCase {
 			System.out.println("Success: " + response.getStatusLine());
 
 		}
-	}
-
-	public void testSimpleBigdataApacheClient() throws Exception {
-		ApacheHttpClient client = new ApacheHttpClient();
-		
-		com.bigdata.util.http.IHttpResponse response = client.GET("http://ctc.io/");
-		
-		if (response.getStatusCode() == 200) {
-			System.out.println("Apache Success: " + response);
-		} else {
-			System.err.println("Apache Failure: " + response);
-		}
-	}
-	
-	public void _testSimpleApacheRepository() {
-		org.apache.http.client.HttpClient client = new org.apache.http.impl.client.DefaultHttpClient();
-		
-		final ApacheRemoteRepository repo = new ApacheRemoteRepository("http://ctc.io/", false, client, null);
-		
 	}
 
 	/**

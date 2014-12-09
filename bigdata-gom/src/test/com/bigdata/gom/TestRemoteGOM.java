@@ -41,8 +41,6 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Resource;

@@ -476,6 +476,35 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
     	
 	}
 
+	/**
+	 * Counts the #of results in a SPARQL result set.
+	 * 
+	 * @param result
+	 *            The connection from which to read the results.
+	 * 
+	 * @return The #of results.
+	 * 
+	 * @throws Exception
+	 *             If anything goes wrong.
+	 */
+	protected long countResults(final GraphQueryResult result) throws Exception {
+
+    	long count = 0;
+    	
+    	while(result.hasNext()) {
+    		
+    		result.next();
+    		
+    		count++;
+    		
+    	}
+    	
+    	result.close();
+    	
+    	return count;
+    	
+	}
+
     /**
      * Generates some statements and serializes them using the specified
      * {@link RDFFormat}.

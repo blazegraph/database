@@ -38,7 +38,6 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.BindingSet;

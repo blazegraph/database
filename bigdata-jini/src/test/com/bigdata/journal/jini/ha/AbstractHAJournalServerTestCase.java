@@ -44,14 +44,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.http.HttpMethod;
@@ -212,103 +204,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             
         }
         if(log.isInfoEnabled()) log.info("---- TEST END "+getName() + "----");        
-    }
-
-    /**
-     * Http connection.
-     * 
-     * @param opts
-     *            The connection options.
-     * 
-     * @return The connection.
-     */
-    protected HttpResponse doConnect(final HttpClient httpClient,
-            final ConnectOptions opts) throws Exception {
-
-        /*
-         * Generate the fully formed and encoded URL.
-         */
-        
-        final StringBuilder urlString = new StringBuilder(opts.serviceURL);
-
-        ConnectOptions.addQueryParams(urlString, opts.requestParams);
-
-        if (log.isDebugEnabled()) {
-            log.debug("*** Request ***");
-            log.debug(opts.serviceURL);
-            log.debug(opts.method);
-            log.debug("query=" + opts.getRequestParam("query"));
-        }
-
-        HttpUriRequest request = null;
-        try {
-
-            request = newRequest(urlString.toString(), opts.method);
-            
-            if (opts.requestHeaders != null) {
-
-                for (Map.Entry<String, String> e : opts.requestHeaders
-                        .entrySet()) {
-            
-                    request.addHeader(e.getKey(), e.getValue());
-                
-                if (log.isDebugEnabled())
-                        log.debug(e.getKey() + ": " + e.getValue());
-
-                }
-                
-            }
-
-            if (opts.entity != null) {
-
-                ((HttpEntityEnclosingRequestBase) request).setEntity(opts.entity);
-
-            }
-
-            final HttpResponse response = httpClient.execute(request);
-            
-            return response;
-            
-//            // connect.
-//            conn.connect();
-//
-//            return conn;
-
-        } catch (Throwable t) {
-            /*
-             * If something goes wrong, then close the http connection.
-             * Otherwise, the connection will be closed by the caller.
-             */
-            try {
-                
-                if (request != null)
-                    request.abort();
-                
-//                // clean up the connection resources
-//                if (conn != null)
-//                    conn.disconnect();
-                
-            } catch (Throwable t2) {
-                // ignored.
-            }
-            throw new RuntimeException(opts.serviceURL + " : " + t, t);
-        }
-
-    }
-
-    static protected HttpUriRequest newRequest(final String uri,
-            final String method) {
-        if (method.equals("GET")) {
-            return new HttpGet(uri);
-        } else if (method.equals("POST")) {
-            return new HttpPost(uri);
-        } else if (method.equals("DELETE")) {
-            return new HttpDelete(uri);
-        } else if (method.equals("PUT")) {
-            return new HttpPut(uri);
-        } else {
-            throw new IllegalArgumentException();
-        }
     }
 
     /**

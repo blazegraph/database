@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 
