@@ -74,8 +74,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 
 /**
  * Proxied test suite.
@@ -91,7 +90,7 @@ import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
  * @see SPARQLUpdateTest
  */
 public class TestSparqlUpdate<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+        AbstractTestNanoSparqlJettyClient<S> {
     
     public TestSparqlUpdate() {
 

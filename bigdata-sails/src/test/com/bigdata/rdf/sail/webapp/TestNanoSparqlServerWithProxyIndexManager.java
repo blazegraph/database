@@ -251,9 +251,6 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // Multi-tenancy API.
         suite.addTestSuite(TestMultiTenancyAPI.class);
 
-        // RemoteRepository test (nano sparql server client-wrapper using Apache)
-        suite.addTestSuite(TestNanoSparqlClient.class);
-
         // RemoteRepository test (nano sparql server client-wrapper using Jetty)
         suite.addTestSuite(TestNanoSparqlJettyClient.class);
 

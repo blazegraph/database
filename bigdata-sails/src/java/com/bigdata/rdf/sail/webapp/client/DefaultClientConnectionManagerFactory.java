@@ -28,13 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp.client;
 
 import org.apache.http.HttpHost;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.routing.HttpRoute;
-import org.apache.http.conn.scheme.PlainSocketFactory;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.HttpParams;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -78,24 +71,6 @@ public class DefaultClientConnectionManagerFactory
 		}
 
         return cm;
-
-    }
-    
-    /**
-     * Return a {@link SchemeRegistry} which has been pre-configured for HTTP
-     * and HTTPS.
-     */
-    protected SchemeRegistry newSchemeRegistry() {
-    
-        final SchemeRegistry schemeRegistry = new SchemeRegistry();
-
-        schemeRegistry.register(new Scheme("http", 80, PlainSocketFactory
-                .getSocketFactory()));
-        
-        schemeRegistry.register(new Scheme("https", 443, SSLSocketFactory
-                .getSocketFactory()));
-
-        return schemeRegistry;
 
     }
     

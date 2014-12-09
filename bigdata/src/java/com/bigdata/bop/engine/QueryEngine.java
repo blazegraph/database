@@ -51,7 +51,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 

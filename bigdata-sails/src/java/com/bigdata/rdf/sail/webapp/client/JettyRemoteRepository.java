@@ -57,7 +57,6 @@ import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.api.ContentProvider;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.util.component.LifeCycle;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
@@ -1929,7 +1928,7 @@ public class JettyRemoteRepository {
 
             final TupleQueryResultParser parser = parserFactory.getParser();
     
-            result = new BackgroundTupleResult(parser, response.getInputStream(), null /*entity*/);
+            result = new BackgroundTupleResult(parser, response.getInputStream());
             
             executor.execute(result);
             
@@ -2100,7 +2099,7 @@ public class JettyRemoteRepository {
             }
             
             final BackgroundGraphResult tmp = new BackgroundGraphResult(
-                    parser, response.getInputStream(), charset, baseURI, null) {
+                    parser, response.getInputStream(), charset, baseURI) {
             	
             	final AtomicBoolean notDone = new AtomicBoolean(true);
             	

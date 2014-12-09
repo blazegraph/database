@@ -69,7 +69,7 @@ import org.openrdf.repository.RepositoryException;
 import com.bigdata.journal.IIndexManager;
 
 public class AbstractSimpleInsertTest<S extends IIndexManager> extends
-		AbstractTestNanoSparqlClient<S> {
+		AbstractTestNanoSparqlJettyClient<S> {
 
 	private static final String EX_NS = "http://example.org/";
 	private ValueFactory f = new ValueFactoryImpl();

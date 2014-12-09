@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.bop.bindingSet.ListBindingSet;

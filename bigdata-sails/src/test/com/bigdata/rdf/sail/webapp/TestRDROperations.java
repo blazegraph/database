@@ -33,7 +33,7 @@ import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 
 /**
  * Test of RDR specific data interchange and query.
@@ -43,7 +43,7 @@ import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
  * @param <S>
  */
 public class TestRDROperations<S extends IIndexManager> extends
-		AbstractTestNanoSparqlClient<S> {
+		AbstractTestNanoSparqlJettyClient<S> {
 
 	public TestRDROperations() {
 

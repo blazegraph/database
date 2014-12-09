@@ -103,13 +103,5 @@ public class TestMultipartContent extends TestCase {
 			System.out.println(new String(iter.next().array()));
 		}
 	}
-	
-	public void testBase64() {
-		final String tst = "this is a short string";
 		
-		System.out.println("Jetty:  " + new String(B64Code.encode(tst.getBytes())));
-		System.out.println("Apache: " + org.apache.commons.codec.binary.Base64.encodeBase64String(tst.getBytes()));
-	}
-	
-	
 }

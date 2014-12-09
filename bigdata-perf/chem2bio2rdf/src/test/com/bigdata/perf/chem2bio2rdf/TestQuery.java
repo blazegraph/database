@@ -3,8 +3,6 @@ package com.bigdata.perf.chem2bio2rdf;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 
