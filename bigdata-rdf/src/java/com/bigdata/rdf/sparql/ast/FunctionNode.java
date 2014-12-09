@@ -10,11 +10,12 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.BOp.Annotations;
 
 /**
  * AST node for anything which is neither a constant nor a variable, including
- * math operators, string functions, etc.
+ * math operators, string functions, etc. The {@link FunctionNode} arguments are
+ * the ordered list {@link ValueExpressionNode}s that are the arguments to the
+ * SPARQL function.
  * 
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$

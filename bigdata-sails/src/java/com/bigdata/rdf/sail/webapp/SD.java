@@ -295,6 +295,10 @@ public class SD {
     static public final URI TURTLE = new URIImpl(
             "http://www.w3.org/ns/formats/Turtle");
 
+    // RDR specific extension of TURTLE.
+    static public final URI TURTLE_RDR = new URIImpl(
+            "http://www.bigdata.com/ns/formats/Turtle-RDR");
+
     /**
      * Unique URI for N3.
      * 
@@ -335,7 +339,11 @@ public class SD {
      */
     static public final URI NQUADS = new URIImpl(
             "http://sw.deri.org/2008/07/n-quads/#n-quads");
-    
+
+    // RDR specific extension of N-Triples.
+    static public final URI NTRIPLES_RDR = new URIImpl(
+            "http://www.bigdata.com/ns/formats/N-Triples-RDR");
+
     /*
      * SPARQL results
      */
@@ -553,8 +561,6 @@ public class SD {
      *      URIs)
      * 
      * @see #inputFormat
-     * 
-     *      TODO Add an explicit declaration for SIDS mode data interchange?
      */
     protected void describeInputFormats() {
         
@@ -566,7 +572,11 @@ public class SD {
         g.add(aService, SD.inputFormat, SD.TRIG);
         // g.add(service, SD.inputFormat, SD.BINARY); // TODO BINARY
         g.add(aService, SD.inputFormat, SD.NQUADS);
-
+		if (tripleStore.getStatementIdentifiers()) {
+			// RDR specific data interchange.
+			g.add(aService, SD.inputFormat, SD.NTRIPLES_RDR);
+			g.add(aService, SD.inputFormat, SD.TURTLE_RDR);
+        }
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_XML);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_CSV);

@@ -447,7 +447,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
         if (!namedGraphs.getGraphs().contains(uri.getIV())) {
 
             // uri is not in the named graphs.
-            throw new RuntimeException("URI not in named graphs: " + uri);
+//            throw new RuntimeException("URI not in named graphs: " + uri);
 
         }
 

@@ -42,12 +42,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Statement;
-import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.GraphQuery;
-import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryInterruptedException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
@@ -64,7 +59,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.store.LocalTripleStore;
 
 /**
  * Bigdata uses snapshot isolation for transactions while openrdf assumes that
@@ -78,67 +72,67 @@ import com.bigdata.rdf.store.LocalTripleStore;
  */
 public class BigdataConnectionTest extends RepositoryConnectionTest {
 
-    /**
-     * When <code>true</code>, the unit tests for setDataset() with SPARQL
-     * UPDATE are enabled.
-     * 
-     * FIXME setDataset() does not work correctly for UPDATE
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593" >
-     *      openrdf 2.6.9 </a>
-     */
-    private static boolean DATASET = false;
-
-	@Override
-	public void testDefaultContext()
-		throws Exception
-	{
-		if (DATASET)
-			super.testDefaultContext();
-	}
-
-	public void testDefaultInsertContext()
-		throws Exception
-	{
-		if (DATASET)
-			super.testDefaultInsertContext();
-	}
-
-	public void testExclusiveNullContext()
-		throws Exception
-	{
-		if (DATASET)
-			super.testExclusiveNullContext();
-	}
-
+//    /**
+//     * When <code>true</code>, the unit tests for setDataset() with SPARQL
+//     * UPDATE are enabled.
+//     * 
+//     * FIXME setDataset() does not work correctly for UPDATE
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/593" >
+//     *      openrdf 2.6.9 </a>
+//     */
+//    private static boolean DATASET = false;
+//
+//	@Override
+//	public void testDefaultContext()
+//		throws Exception
+//	{
+//		if (DATASET)
+//			super.testDefaultContext();
+//	}
+//
+//	public void testDefaultInsertContext()
+//		throws Exception
+//	{
+//		if (DATASET)
+//			super.testDefaultInsertContext();
+//	}
+//
+//	public void testExclusiveNullContext()
+//		throws Exception
+//	{
+//		if (DATASET)
+//			super.testExclusiveNullContext();
+//	}
+//
     private static final Logger log = Logger.getLogger(BigdataConnectionTest.class);
     
 	public BigdataConnectionTest(String name) {
 		super(name);
 	}
     
-    /**
-     * Return a test suite using the {@link LocalTripleStore} and pipeline
-     * joins.
-     */
-    public static class LTSWithPipelineJoins extends BigdataConnectionTest {
-
-        public LTSWithPipelineJoins(String name) {
-            
-            super(name);
-            
-        }
-        
-        @Override
-        protected Properties getProperties() {
-            
-            final Properties p = new Properties(super.getProperties());
-            
-            return p;
-            
-        }
-
-    }
+//    /**
+//     * Return a test suite using the {@link LocalTripleStore} and pipeline
+//     * joins.
+//     */
+//    public static class LTSWithPipelineJoins extends BigdataConnectionTest {
+//
+//        public LTSWithPipelineJoins(String name) {
+//            
+//            super(name);
+//            
+//        }
+//        
+//        @Override
+//        protected Properties getProperties() {
+//            
+//            final Properties p = new Properties(super.getProperties());
+//            
+//            return p;
+//            
+//        }
+//
+//    }
     
 	protected Properties getProperties() {
 	    
@@ -209,8 +203,7 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
      * Overridden to destroy the backend database and its files on the disk.
      */
     @Override
-    protected void tearDown()
-        throws Exception
+    public void tearDown() throws Exception
     {
 
         final IIndexManager backend = testRepository == null ? null
@@ -244,447 +237,447 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
         }
 
     }
-
-    /**
-	 * This test has been overridden because Sesame assumes "read-committed"
-	 * transaction semantics while bidata uses snapshot isolation for its
-	 * transactions.
-	 */
-    @Override
-    public void testEmptyCommit()
-        throws Exception
-    {
-        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
-//      super.testEmptyCommit();
-		assertTrue(testCon.isEmpty());
-		assertTrue(testCon2.isEmpty());
-		testCon.setAutoCommit(false);
-		testCon.add(vf.createBNode(), vf.createURI("urn:pred"), vf.createBNode());
-		assertFalse(testCon.isEmpty());
-		assertTrue(testCon2.isEmpty());
-		testCon.commit();
-		assertFalse(testCon.isEmpty());
-//		assertFalse(testCon2.isEmpty()); // No. This is read-committed semantics.
-		assertTrue(testCon2.isEmpty()); // Yes. This is snapshot isolation semantics.
-    }
-    
-	/**
-	 * This test has been overridden because Sesame assumes "read-committed"
-	 * transaction semantics while bidata uses snapshot isolation for its
-	 * transactions.
-	 */
-    @Override
-    public void testSizeCommit()
-        throws Exception
-    {
-        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
-//        super.testSizeCommit();
-		assertEquals(0, testCon.size());
-		assertEquals(0, testCon2.size());
-		testCon.setAutoCommit(false);
-		testCon.add(vf.createBNode(), vf.createURI("urn:pred"), vf.createBNode());
-		assertEquals(1, testCon.size());
-		assertEquals(0, testCon2.size());
-		testCon.add(vf.createBNode(), vf.createURI("urn:pred"), vf.createBNode());
-		assertEquals(2, testCon.size());
-		assertEquals(0, testCon2.size());
-		testCon.commit();
-		assertEquals(2, testCon.size());
-//		assertEquals(2, testCon2.size()); // No. read-committed semantics.
-		assertEquals(0, testCon2.size()); // Yes. snapshot isolation.
-    }
-
-	/**
-	 * This test has been overridden because Sesame assumes "read-committed"
-	 * transaction semantics while bidata uses snapshot isolation for its
-	 * transactions.
-	 */
-    @Override
-    public void testTransactionIsolation()
-        throws Exception
-    {
-        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
-//        super.testTransactionIsolation();
-
-        testCon.setAutoCommit(false);
-		testCon.add(bob, name, nameBob);
-
-		assertTrue(testCon.hasStatement(bob, name, nameBob, false));
-		assertFalse(testCon2.hasStatement(bob, name, nameBob, false));
-
-		testCon.commit();
-
-		assertTrue(testCon.hasStatement(bob, name, nameBob, false));
-//		assertTrue(testCon2.hasStatement(bob, name, nameBob, false)); // No. This is read-committed semantics.
-		assertFalse(testCon2.hasStatement(bob, name, nameBob, false)); // Yes. This is snapshot isolation semantics.
-
-    }
-
+//
 //    /**
-//     * Copied into the local test suite unchanged in order to debug with this
-//     * test.
+//	 * This test has been overridden because Sesame assumes "read-committed"
+//	 * transaction semantics while bidata uses snapshot isolation for its
+//	 * transactions.
+//	 */
+//    @Override
+//    public void testEmptyCommit()
+//        throws Exception
+//    {
+//        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
+////      super.testEmptyCommit();
+//		assertTrue(testCon.isEmpty());
+//		assertTrue(testCon2.isEmpty());
+//		testCon.setAutoCommit(false);
+//		testCon.add(vf.createBNode(), vf.createURI("urn:pred"), vf.createBNode());
+//		assertFalse(testCon.isEmpty());
+//		assertTrue(testCon2.isEmpty());
+//		testCon.commit();
+//		assertFalse(testCon.isEmpty());
+////		assertFalse(testCon2.isEmpty()); // No. This is read-committed semantics.
+//		assertTrue(testCon2.isEmpty()); // Yes. This is snapshot isolation semantics.
+//    }
+//    
+//	/**
+//	 * This test has been overridden because Sesame assumes "read-committed"
+//	 * transaction semantics while bidata uses snapshot isolation for its
+//	 * transactions.
+//	 */
+//    @Override
+//    public void testSizeCommit()
+//        throws Exception
+//    {
+//        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
+////        super.testSizeCommit();
+//		assertEquals(0, testCon.size());
+//		assertEquals(0, testCon2.size());
+//		testCon.setAutoCommit(false);
+//		testCon.add(vf.createBNode(), vf.createURI("urn:pred"), vf.createBNode());
+//		assertEquals(1, testCon.size());
+//		assertEquals(0, testCon2.size());
+//		testCon.add(vf.createBNode(), vf.createURI("urn:pred"), vf.createBNode());
+//		assertEquals(2, testCon.size());
+//		assertEquals(0, testCon2.size());
+//		testCon.commit();
+//		assertEquals(2, testCon.size());
+////		assertEquals(2, testCon2.size()); // No. read-committed semantics.
+//		assertEquals(0, testCon2.size()); // Yes. snapshot isolation.
+//    }
+//
+//	/**
+//	 * This test has been overridden because Sesame assumes "read-committed"
+//	 * transaction semantics while bidata uses snapshot isolation for its
+//	 * transactions.
+//	 */
+//    @Override
+//    public void testTransactionIsolation()
+//        throws Exception
+//    {
+//        log.warn("Test overridden since bigdata uses full snapshot tx isolation.");
+////        super.testTransactionIsolation();
+//
+//        testCon.setAutoCommit(false);
+//		testCon.add(bob, name, nameBob);
+//
+//		assertTrue(testCon.hasStatement(bob, name, nameBob, false));
+//		assertFalse(testCon2.hasStatement(bob, name, nameBob, false));
+//
+//		testCon.commit();
+//
+//		assertTrue(testCon.hasStatement(bob, name, nameBob, false));
+////		assertTrue(testCon2.hasStatement(bob, name, nameBob, false)); // No. This is read-committed semantics.
+//		assertFalse(testCon2.hasStatement(bob, name, nameBob, false)); // Yes. This is snapshot isolation semantics.
+//
+//    }
+//
+////    /**
+////     * Copied into the local test suite unchanged in order to debug with this
+////     * test.
+////     */
+////    @Override
+////    public void testOpen() throws Exception {
+////        assertTrue(testCon.isOpen());
+////        assertTrue(testCon2.isOpen());
+////        testCon.close();
+////        assertFalse(testCon.isOpen());
+////        assertTrue(testCon2.isOpen());
+////    }
+//    
+//    /**
+//     * Modified to test SPARQL instead of Serql.
 //     */
 //    @Override
-//    public void testOpen() throws Exception {
-//        assertTrue(testCon.isOpen());
-//        assertTrue(testCon2.isOpen());
-//        testCon.close();
-//        assertFalse(testCon.isOpen());
-//        assertTrue(testCon2.isOpen());
-//    }
-    
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-    @Override
-	public void testSimpleTupleQuery()
-		throws Exception
-	{
-		testCon.add(alice, name, nameAlice, context2);
-		testCon.add(alice, mbox, mboxAlice, context2);
-		testCon.add(context2, publisher, nameAlice);
-	
-		testCon.add(bob, name, nameBob, context1);
-		testCon.add(bob, mbox, mboxBob, context1);
-		testCon.add(context1, publisher, nameBob);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" SELECT name, mbox");
-//		queryBuilder.append(" FROM {} foaf:name {name};");
-//		queryBuilder.append("         foaf:mbox {mbox}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" SELECT ?name ?mbox");
-		queryBuilder.append(" WHERE {");
-		queryBuilder.append(" ?x foaf:name ?name .");
-		queryBuilder.append(" ?x foaf:mbox ?mbox .");
-		queryBuilder.append(" }");
-		
-		
-	
-		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertTrue(solution.hasBinding("name"));
-				assertTrue(solution.hasBinding("mbox"));
-	
-				Value nameResult = solution.getValue("name");
-				Value mboxResult = solution.getValue("mbox");
-	
-				assertTrue((nameAlice.equals(nameResult) || nameBob.equals(nameResult)));
-				assertTrue((mboxAlice.equals(mboxResult) || mboxBob.equals(mboxResult)));
-			}
-		}
-		finally {
-			result.close();
-		}
-	}
-
-    /**
-     * This is a test of simply preparing a SeRQL query into a TupleExpr, no
-     * data, no evaluation.  Since we don't support SeRQL anymore, it does
-     * not seem worthwhile to port this one.
-     */
-    @Override
-	public void testPrepareSeRQLQuery()
-		throws Exception
-	{
-	}
-    
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-	public void testSimpleTupleQueryUnicode()
-		throws Exception
-	{
-/*		
- This is commented out until we fix the unicode problem.
- 
-		testCon.add(alexander, name, <UNICODE VAR FROM SUPER>);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" SELECT person");
-//		queryBuilder.append(" FROM {person} foaf:name {").append(<UNICODE VAR FROM SUPER>.getLabel()).append("}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" SELECT ?person");
-		queryBuilder.append(" where { ?person foaf:name \"").append(<UNICODE VAR FROM SUPER>.getLabel()).append("\" . }");
-	
-		
-		
-		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertTrue(solution.hasBinding("person"));
-				assertEquals(alexander, solution.getValue("person"));
-			}
-		}
-		finally {
-			result.close();
-		}
-*/
-	}
-	
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-	public void testPreparedTupleQuery()
-		throws Exception
-	{
-		testCon.add(alice, name, nameAlice, context2);
-		testCon.add(alice, mbox, mboxAlice, context2);
-		testCon.add(context2, publisher, nameAlice);
-	
-		testCon.add(bob, name, nameBob, context1);
-		testCon.add(bob, mbox, mboxBob, context1);
-		testCon.add(context1, publisher, nameBob);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" SELECT name, mbox");
-//		queryBuilder.append(" FROM {} foaf:name {name};");
-//		queryBuilder.append("         foaf:mbox {mbox}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" SELECT ?name ?mbox");
-		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
-		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
-
-		
-		
-		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
-		query.setBinding("name", nameBob);
-	
-		TupleQueryResult result = query.evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertTrue(solution.hasBinding("name"));
-				assertTrue(solution.hasBinding("mbox"));
-	
-				Value nameResult = solution.getValue("name");
-				Value mboxResult = solution.getValue("mbox");
-	
-				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
-				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
-			}
-		}
-		finally {
-			result.close();
-		}
-	}
-	
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-	public void testPreparedTupleQuery2()
-		throws Exception
-	{
-		testCon.add(alice, name, nameAlice, context2);
-		testCon.add(alice, mbox, mboxAlice, context2);
-		testCon.add(context2, publisher, nameAlice);
-	
-		testCon.add(bob, name, nameBob, context1);
-		testCon.add(bob, mbox, mboxBob, context1);
-		testCon.add(context1, publisher, nameBob);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" SELECT name, mbox");
-//		queryBuilder.append(" FROM {p} foaf:name {name};");
-//		queryBuilder.append("         foaf:mbox {mbox}");
-//		queryBuilder.append(" WHERE p = VAR");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" SELECT ?name ?mbox");
-		queryBuilder.append(" WHERE { ?VAR foaf:name ?name .");
-		queryBuilder.append("         ?VAR foaf:mbox ?mbox . }");
-
-		
-		
-		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
-		query.setBinding("VAR", bob);
-	
-		TupleQueryResult result = query.evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertTrue(solution.hasBinding("name"));
-				assertTrue(solution.hasBinding("mbox"));
-	
-				Value nameResult = solution.getValue("name");
-				Value mboxResult = solution.getValue("mbox");
-	
-				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
-				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
-			}
-		}
-		finally {
-			result.close();
-		}
-	}
-	
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-	public void testPreparedTupleQueryUnicode()
-		throws Exception
-	{
-/*		
- This is commented out until we fix the unicode problem.
-		 
-		testCon.add(alexander, name, <UNICODE VAR FROM SUPER>);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" SELECT person");
-//		queryBuilder.append(" FROM {person} foaf:name {name}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" SELECT ?person");
-		queryBuilder.append(" WHERE { ?person foaf:name ?name . }");
-
-		
-		
-		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
-		query.setBinding("name", <UNICODE VAR FROM SUPER>);
-	
-		TupleQueryResult result = query.evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				BindingSet solution = result.next();
-				assertTrue(solution.hasBinding("person"));
-				assertEquals(alexander, solution.getValue("person"));
-			}
-		}
-		finally {
-			result.close();
-		}
-*/
-	}
-	
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-	public void testSimpleGraphQuery()
-		throws Exception
-	{
-		testCon.add(alice, name, nameAlice, context2);
-		testCon.add(alice, mbox, mboxAlice, context2);
-		testCon.add(context2, publisher, nameAlice);
-	
-		testCon.add(bob, name, nameBob, context1);
-		testCon.add(bob, mbox, mboxBob, context1);
-		testCon.add(context1, publisher, nameBob);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" CONSTRUCT *");
-//		queryBuilder.append(" FROM {} foaf:name {name};");
-//		queryBuilder.append("         foaf:mbox {mbox}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" CONSTRUCT { ?x foaf:name ?name .");
-		queryBuilder.append("             ?x foaf:mbox ?mbox . }");
-		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
-		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
-
-		
-		
-		GraphQueryResult result = testCon.prepareGraphQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				Statement st = result.next();
-				if (name.equals(st.getPredicate())) {
-					assertTrue(nameAlice.equals(st.getObject()) || nameBob.equals(st.getObject()));
-				}
-				else {
-					assertTrue(mbox.equals(st.getPredicate()));
-					assertTrue(mboxAlice.equals(st.getObject()) || mboxBob.equals(st.getObject()));
-				}
-			}
-		}
-		finally {
-			result.close();
-		}
-	}
-	
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
-	public void testPreparedGraphQuery()
-		throws Exception
-	{
-		testCon.add(alice, name, nameAlice, context2);
-		testCon.add(alice, mbox, mboxAlice, context2);
-		testCon.add(context2, publisher, nameAlice);
-	
-		testCon.add(bob, name, nameBob, context1);
-		testCon.add(bob, mbox, mboxBob, context1);
-		testCon.add(context1, publisher, nameBob);
-	
-		StringBuilder queryBuilder = new StringBuilder();
-//		queryBuilder.append(" CONSTRUCT *");
-//		queryBuilder.append(" FROM {} foaf:name {name};");
-//		queryBuilder.append("         foaf:mbox {mbox}");
-//		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
-		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
-		queryBuilder.append(" CONSTRUCT { ?x foaf:name ?name .");
-		queryBuilder.append("             ?x foaf:mbox ?mbox . }");
-		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
-		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
-
-		
-		
-		GraphQuery query = testCon.prepareGraphQuery(QueryLanguage.SPARQL, queryBuilder.toString());
-		query.setBinding("name", nameBob);
-	
-		GraphQueryResult result = query.evaluate();
-	
-		try {
-			assertTrue(result != null);
-			assertTrue(result.hasNext());
-	
-			while (result.hasNext()) {
-				Statement st = result.next();
-				assertTrue(name.equals(st.getPredicate()) || mbox.equals(st.getPredicate()));
-				if (name.equals(st.getPredicate())) {
-					assertTrue("unexpected value for name: " + st.getObject(), nameBob.equals(st.getObject()));
-				}
-				else {
-					assertTrue(mbox.equals(st.getPredicate()));
-					assertTrue("unexpected value for mbox: " + st.getObject(), mboxBob.equals(st.getObject()));
-				}
-	
-			}
-		}
-		finally {
-			result.close();
-		}
-	}
-
+//	public void testSimpleTupleQuery()
+//		throws Exception
+//	{
+//		testCon.add(alice, name, nameAlice, context2);
+//		testCon.add(alice, mbox, mboxAlice, context2);
+//		testCon.add(context2, publisher, nameAlice);
+//	
+//		testCon.add(bob, name, nameBob, context1);
+//		testCon.add(bob, mbox, mboxBob, context1);
+//		testCon.add(context1, publisher, nameBob);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" SELECT name, mbox");
+////		queryBuilder.append(" FROM {} foaf:name {name};");
+////		queryBuilder.append("         foaf:mbox {mbox}");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" SELECT ?name ?mbox");
+//		queryBuilder.append(" WHERE {");
+//		queryBuilder.append(" ?x foaf:name ?name .");
+//		queryBuilder.append(" ?x foaf:mbox ?mbox .");
+//		queryBuilder.append(" }");
+//		
+//		
+//	
+//		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				BindingSet solution = result.next();
+//				assertTrue(solution.hasBinding("name"));
+//				assertTrue(solution.hasBinding("mbox"));
+//	
+//				Value nameResult = solution.getValue("name");
+//				Value mboxResult = solution.getValue("mbox");
+//	
+//				assertTrue((nameAlice.equals(nameResult) || nameBob.equals(nameResult)));
+//				assertTrue((mboxAlice.equals(mboxResult) || mboxBob.equals(mboxResult)));
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//	}
+//
+//    /**
+//     * This is a test of simply preparing a SeRQL query into a TupleExpr, no
+//     * data, no evaluation.  Since we don't support SeRQL anymore, it does
+//     * not seem worthwhile to port this one.
+//     */
+//    @Override
+//	public void testPrepareSeRQLQuery()
+//		throws Exception
+//	{
+//	}
+//    
+//    /**
+//     * Modified to test SPARQL instead of Serql.
+//     */
+//	public void testSimpleTupleQueryUnicode()
+//		throws Exception
+//	{
+///*		
+// This is commented out until we fix the unicode problem.
+// 
+//		testCon.add(alexander, name, <UNICODE VAR FROM SUPER>);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" SELECT person");
+////		queryBuilder.append(" FROM {person} foaf:name {").append(<UNICODE VAR FROM SUPER>.getLabel()).append("}");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" SELECT ?person");
+//		queryBuilder.append(" where { ?person foaf:name \"").append(<UNICODE VAR FROM SUPER>.getLabel()).append("\" . }");
+//	
+//		
+//		
+//		TupleQueryResult result = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				BindingSet solution = result.next();
+//				assertTrue(solution.hasBinding("person"));
+//				assertEquals(alexander, solution.getValue("person"));
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//*/
+//	}
+//	
+//    /**
+//     * Modified to test SPARQL instead of Serql.
+//     */
+//	public void testPreparedTupleQuery()
+//		throws Exception
+//	{
+//		testCon.add(alice, name, nameAlice, context2);
+//		testCon.add(alice, mbox, mboxAlice, context2);
+//		testCon.add(context2, publisher, nameAlice);
+//	
+//		testCon.add(bob, name, nameBob, context1);
+//		testCon.add(bob, mbox, mboxBob, context1);
+//		testCon.add(context1, publisher, nameBob);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" SELECT name, mbox");
+////		queryBuilder.append(" FROM {} foaf:name {name};");
+////		queryBuilder.append("         foaf:mbox {mbox}");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" SELECT ?name ?mbox");
+//		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
+//		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
+//
+//		
+//		
+//		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+//		query.setBinding("name", nameBob);
+//	
+//		TupleQueryResult result = query.evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				BindingSet solution = result.next();
+//				assertTrue(solution.hasBinding("name"));
+//				assertTrue(solution.hasBinding("mbox"));
+//	
+//				Value nameResult = solution.getValue("name");
+//				Value mboxResult = solution.getValue("mbox");
+//	
+//				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
+//				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//	}
+//	
+//    /**
+//     * Modified to test SPARQL instead of Serql.
+//     */
+//	public void testPreparedTupleQuery2()
+//		throws Exception
+//	{
+//		testCon.add(alice, name, nameAlice, context2);
+//		testCon.add(alice, mbox, mboxAlice, context2);
+//		testCon.add(context2, publisher, nameAlice);
+//	
+//		testCon.add(bob, name, nameBob, context1);
+//		testCon.add(bob, mbox, mboxBob, context1);
+//		testCon.add(context1, publisher, nameBob);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" SELECT name, mbox");
+////		queryBuilder.append(" FROM {p} foaf:name {name};");
+////		queryBuilder.append("         foaf:mbox {mbox}");
+////		queryBuilder.append(" WHERE p = VAR");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" SELECT ?name ?mbox");
+//		queryBuilder.append(" WHERE { ?VAR foaf:name ?name .");
+//		queryBuilder.append("         ?VAR foaf:mbox ?mbox . }");
+//
+//		
+//		
+//		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+//		query.setBinding("VAR", bob);
+//	
+//		TupleQueryResult result = query.evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				BindingSet solution = result.next();
+//				assertTrue(solution.hasBinding("name"));
+//				assertTrue(solution.hasBinding("mbox"));
+//	
+//				Value nameResult = solution.getValue("name");
+//				Value mboxResult = solution.getValue("mbox");
+//	
+//				assertEquals("unexpected value for name: " + nameResult, nameBob, nameResult);
+//				assertEquals("unexpected value for mbox: " + mboxResult, mboxBob, mboxResult);
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//	}
+//	
+//    /**
+//     * Modified to test SPARQL instead of Serql.
+//     */
+//	public void testPreparedTupleQueryUnicode()
+//		throws Exception
+//	{
+///*		
+// This is commented out until we fix the unicode problem.
+//		 
+//		testCon.add(alexander, name, <UNICODE VAR FROM SUPER>);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" SELECT person");
+////		queryBuilder.append(" FROM {person} foaf:name {name}");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" SELECT ?person");
+//		queryBuilder.append(" WHERE { ?person foaf:name ?name . }");
+//
+//		
+//		
+//		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+//		query.setBinding("name", <UNICODE VAR FROM SUPER>);
+//	
+//		TupleQueryResult result = query.evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				BindingSet solution = result.next();
+//				assertTrue(solution.hasBinding("person"));
+//				assertEquals(alexander, solution.getValue("person"));
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//*/
+//	}
+//	
+//    /**
+//     * Modified to test SPARQL instead of Serql.
+//     */
+//	public void testSimpleGraphQuery()
+//		throws Exception
+//	{
+//		testCon.add(alice, name, nameAlice, context2);
+//		testCon.add(alice, mbox, mboxAlice, context2);
+//		testCon.add(context2, publisher, nameAlice);
+//	
+//		testCon.add(bob, name, nameBob, context1);
+//		testCon.add(bob, mbox, mboxBob, context1);
+//		testCon.add(context1, publisher, nameBob);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" CONSTRUCT *");
+////		queryBuilder.append(" FROM {} foaf:name {name};");
+////		queryBuilder.append("         foaf:mbox {mbox}");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" CONSTRUCT { ?x foaf:name ?name .");
+//		queryBuilder.append("             ?x foaf:mbox ?mbox . }");
+//		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
+//		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
+//
+//		
+//		
+//		GraphQueryResult result = testCon.prepareGraphQuery(QueryLanguage.SPARQL, queryBuilder.toString()).evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				Statement st = result.next();
+//				if (name.equals(st.getPredicate())) {
+//					assertTrue(nameAlice.equals(st.getObject()) || nameBob.equals(st.getObject()));
+//				}
+//				else {
+//					assertTrue(mbox.equals(st.getPredicate()));
+//					assertTrue(mboxAlice.equals(st.getObject()) || mboxBob.equals(st.getObject()));
+//				}
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//	}
+//	
+//    /**
+//     * Modified to test SPARQL instead of Serql.
+//     */
+//	public void testPreparedGraphQuery()
+//		throws Exception
+//	{
+//		testCon.add(alice, name, nameAlice, context2);
+//		testCon.add(alice, mbox, mboxAlice, context2);
+//		testCon.add(context2, publisher, nameAlice);
+//	
+//		testCon.add(bob, name, nameBob, context1);
+//		testCon.add(bob, mbox, mboxBob, context1);
+//		testCon.add(context1, publisher, nameBob);
+//	
+//		StringBuilder queryBuilder = new StringBuilder();
+////		queryBuilder.append(" CONSTRUCT *");
+////		queryBuilder.append(" FROM {} foaf:name {name};");
+////		queryBuilder.append("         foaf:mbox {mbox}");
+////		queryBuilder.append(" USING NAMESPACE foaf = <" + FOAF_NS + ">");
+//		queryBuilder.append(" PREFIX foaf: <" + FOAF_NS + ">");
+//		queryBuilder.append(" CONSTRUCT { ?x foaf:name ?name .");
+//		queryBuilder.append("             ?x foaf:mbox ?mbox . }");
+//		queryBuilder.append(" WHERE { ?x foaf:name ?name .");
+//		queryBuilder.append("         ?x foaf:mbox ?mbox . }");
+//
+//		
+//		
+//		GraphQuery query = testCon.prepareGraphQuery(QueryLanguage.SPARQL, queryBuilder.toString());
+//		query.setBinding("name", nameBob);
+//	
+//		GraphQueryResult result = query.evaluate();
+//	
+//		try {
+//			assertTrue(result != null);
+//			assertTrue(result.hasNext());
+//	
+//			while (result.hasNext()) {
+//				Statement st = result.next();
+//				assertTrue(name.equals(st.getPredicate()) || mbox.equals(st.getPredicate()));
+//				if (name.equals(st.getPredicate())) {
+//					assertTrue("unexpected value for name: " + st.getObject(), nameBob.equals(st.getObject()));
+//				}
+//				else {
+//					assertTrue(mbox.equals(st.getPredicate()));
+//					assertTrue("unexpected value for mbox: " + st.getObject(), mboxBob.equals(st.getObject()));
+//				}
+//	
+//			}
+//		}
+//		finally {
+//			result.close();
+//		}
+//	}
+//
     /**
      * {@inheritDoc}
      * <p>

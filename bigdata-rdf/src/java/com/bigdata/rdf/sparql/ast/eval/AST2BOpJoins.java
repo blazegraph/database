@@ -53,6 +53,8 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.bop.join.AccessPathJoinAnnotations;
+import com.bigdata.bop.join.DistinctTermScanOp;
+import com.bigdata.bop.join.FastRangeCountOp;
 import com.bigdata.bop.join.HTreeHashJoinAnnotations;
 import com.bigdata.bop.join.HTreeHashJoinOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
@@ -64,9 +66,12 @@ import com.bigdata.bop.rdf.filter.NativeDistinctFilter;
 import com.bigdata.bop.rdf.filter.StripContextFilter;
 import com.bigdata.bop.rdf.join.DataSetJoin;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InGraphHashSetFilter;
 import com.bigdata.rdf.spo.SPOKeyOrder;
@@ -167,14 +172,44 @@ public class AST2BOpJoins extends AST2BOpFilters {
         final boolean quads = pred.getProperty(Annotations.QUADS,
                 Annotations.DEFAULT_QUADS);
 
-        // pull of the Sesame dataset before we strip the annotations.
+        // when non-null use distinct-term-scan. see #1035.
+		final VarNode distinctTermScanVar = (VarNode) pred
+				.getProperty(StatementPatternNode.Annotations.DISTINCT_TERM_SCAN_VAR);
+
+        // when non-null use fast-range-count. see #1037.
+		final VarNode fastRangeCountVar = (VarNode) pred
+				.getProperty(StatementPatternNode.Annotations.FAST_RANGE_COUNT_VAR);
+        
+        // pull off the Sesame dataset before we strip the annotations.
         final DatasetNode dataset = (DatasetNode) pred
                 .getProperty(Annotations.DATASET);
 
         // strip off annotations that we do not want to propagate.
-        pred = pred.clearAnnotations(new String[] { Annotations.SCOPE,
-                Annotations.QUADS, Annotations.DATASET });
+		pred = pred.clearAnnotations(new String[] { Annotations.SCOPE,
+				Annotations.QUADS, Annotations.DATASET,
+				StatementPatternNode.Annotations.DISTINCT_TERM_SCAN_VAR,
+				StatementPatternNode.Annotations.FAST_RANGE_COUNT_VAR });
 
+		if (fastRangeCountVar != null) {
+
+			// fast-range-count. see #1037.
+			left = fastRangeCountJoin(left, anns, pred, dataset, cutoffLimit,
+					fastRangeCountVar, queryHints, ctx);
+			
+			return left;
+			
+		}
+
+		if (distinctTermScanVar != null) {
+			
+			// distinct-term-scan. see #1035.
+			left = distinctTermScanJoin(left, anns, pred, dataset, cutoffLimit,
+					distinctTermScanVar, queryHints, ctx);
+			
+			return left;
+			
+		}
+		
         if (quads) {
 
             /*
@@ -247,6 +282,83 @@ public class AST2BOpJoins extends AST2BOpFilters {
     }
 
     /**
+	 * FIXME We need to handle cutoff joins here or the distinct-term-scan will
+	 * not work with the RTO (alternatively, make sure the RTO is only using
+	 * pipeline joins when sampling the join graph).
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+	 *      query is slow </a>
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+    private static PipelineOp distinctTermScanJoin(//
+			final PipelineOp left,//
+			final List<NV> anns, //
+			Predicate pred,//
+			final DatasetNode dataset, //
+			final Long cutoffLimitIsIgnored,//
+			final VarNode distinctTermScanVar, //
+			final Properties queryHints, //
+			final AST2BOpContext ctx//
+			) {
+
+		final IVariable distinctVar = distinctTermScanVar.getValueExpression();
+
+		anns.add(new NV(DistinctTermScanOp.Annotations.DISTINCT_VAR,
+				distinctVar));
+
+		// A mock constant used for predicate in which the distinctVar is not
+		// yet bound.
+		final Constant<IV> mockConst = new Constant<IV>(TermId.mockIV(VTE.URI));
+
+		// ensure distinctVar is bound in mockPred.
+		final IPredicate mockPred = pred.asBound(distinctVar, mockConst);
+
+		final SPOKeyOrder keyOrder = SPOKeyOrder.getKeyOrder(mockPred,
+				ctx.isQuads() ? 4 : 3);
+
+		// Override the key order.
+		pred = (Predicate) pred.setProperty(IPredicate.Annotations.KEY_ORDER,
+				keyOrder);
+
+        anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+		return applyQueryHints(
+				new DistinctTermScanOp(leftOrEmpty(left), NV.asMap(anns
+						.toArray(new NV[anns.size()]))), queryHints, ctx);
+		
+	}
+
+    /**
+	 * Use the {@link FastRangeCountOp} rather than a key-range scan.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+	 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+	 *      </a>
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static PipelineOp fastRangeCountJoin(//
+			final PipelineOp left,//
+			final List<NV> anns, //
+			final Predicate pred,//
+			final DatasetNode dataset, //
+			final Long cutoffLimitIsIgnored,//
+			final VarNode fastRangeCountVar, //
+			final Properties queryHints, //
+			final AST2BOpContext ctx//
+			) {
+
+		anns.add(new NV(FastRangeCountOp.Annotations.COUNT_VAR,
+				fastRangeCountVar.getValueExpression()));
+
+        anns.add(new NV(PipelineJoin.Annotations.PREDICATE, pred));
+
+		return applyQueryHints(
+				new FastRangeCountOp(leftOrEmpty(left), NV.asMap(anns
+						.toArray(new NV[anns.size()]))), queryHints, ctx);
+		
+	}
+
+	/**
      * Generate a {@link PipelineJoin} for a triples mode access path.
      * 
      * @param ctx
@@ -335,7 +447,7 @@ public class AST2BOpJoins extends AST2BOpFilters {
                     BOpEvaluationContext.ANY));
         }
 
-        if (dataset == null || dataset.getNamedGraphs()==null) {
+		if (dataset == null || dataset.getNamedGraphs() == null) {
 
             /*
              * The dataset is all graphs. C is left unbound and the unmodified

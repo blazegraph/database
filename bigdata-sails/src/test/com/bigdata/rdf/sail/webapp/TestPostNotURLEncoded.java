@@ -54,7 +54,7 @@ public class TestPostNotURLEncoded extends AbstractProtocolTest {
 	public void testSelectPostJSON() throws IOException {
 		setAccept(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 		setMethodisPost("application/sparql-query",AbstractProtocolTest.SELECT);
-		assertTrue(serviceRequest().contains("\"results\": {"));
+		assertTrue(serviceRequest().contains("results"));
 		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
 	}
 
@@ -69,7 +69,7 @@ public class TestPostNotURLEncoded extends AbstractProtocolTest {
 		setAccept(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
 		setMethodisPost("application/sparql-query",AbstractProtocolTest.ASK);
 		String response = serviceRequest("query",AbstractProtocolTest.ASK);
-		assertTrue("Bad response: "+response,response.contains("\"boolean\": "));
+		assertTrue("Bad response: "+response,response.contains("boolean"));
 		assertEquals(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON, getResponseContentType());
 	}
 	

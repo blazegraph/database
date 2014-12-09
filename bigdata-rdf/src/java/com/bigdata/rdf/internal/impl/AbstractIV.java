@@ -527,7 +527,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     	return false;
     }
     
-    final public boolean isNumeric() {
+    public boolean isNumeric() {
         return isInline() && getDTE().isNumeric();
     }
 

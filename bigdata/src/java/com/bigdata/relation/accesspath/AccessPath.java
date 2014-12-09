@@ -160,6 +160,16 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
     private final boolean hasFilter;
     
     /**
+     * <code>true</code> iff there is a filter for the access path (either local
+     * or remote).
+     */
+    public final boolean hasFilter() {
+    	
+    	return hasFilter;
+    	
+    }
+    
+    /**
      * <code>true</code> iff all elements in the predicate which are required
      * to generate the key are bound to constants.
      */
@@ -600,6 +610,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
                 + (fromKey == null ? "n/a" : BytesUtil.toString(fromKey))
                 + ", toKey="
                 + (toKey == null ? "n/a" : BytesUtil.toString(toKey))
+				+ ", hasFilter=" + hasFilter
                 + ", indexLocalFilter="
                 + (indexLocalFilter == null ? "n/a" : indexLocalFilter)
                 + ", accessPathFilter="

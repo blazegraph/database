@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.io.Reader;
@@ -91,7 +90,6 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.ApacheRemoteRepositoryManager;
@@ -438,29 +436,29 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
     }
 
-	protected String getStreamContents(final InputStream inputStream)
-            throws IOException {
-
-        final Reader rdr = new InputStreamReader(inputStream);
-		
-	    final StringBuffer sb = new StringBuffer();
-		
-	    final char[] buf = new char[512];
-	    
-		while (true) {
-		
-		    final int rdlen = rdr.read(buf);
-			
-		    if (rdlen == -1)
-				break;
-			
-		    sb.append(buf, 0, rdlen);
-		    
-		}
-		
-		return sb.toString();
-
-	}
+//	protected String getStreamContents(final InputStream inputStream)
+//            throws IOException {
+//
+//        final Reader rdr = new InputStreamReader(inputStream);
+//		
+//	    final StringBuffer sb = new StringBuffer();
+//		
+//	    final char[] buf = new char[512];
+//	    
+//		while (true) {
+//		
+//		    final int rdlen = rdr.read(buf);
+//			
+//		    if (rdlen == -1)
+//				break;
+//			
+//		    sb.append(buf, 0, rdlen);
+//		    
+//		}
+//		
+//		return sb.toString();
+//
+//	}
 
 	/**
 	 * Counts the #of results in a SPARQL result set.
@@ -474,6 +472,35 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 *             If anything goes wrong.
 	 */
 	protected long countResults(final TupleQueryResult result) throws Exception {
+
+    	long count = 0;
+    	
+    	while(result.hasNext()) {
+    		
+    		result.next();
+    		
+    		count++;
+    		
+    	}
+    	
+    	result.close();
+    	
+    	return count;
+    	
+	}
+
+	/**
+	 * Counts the #of results in a GRAPH result set.
+	 * 
+	 * @param result
+	 *            The connection from which to read the results.
+	 * 
+	 * @return The #of results.
+	 * 
+	 * @throws Exception
+	 *             If anything goes wrong.
+	 */
+	protected long countResults(final GraphQueryResult result) throws Exception {
 
     	long count = 0;
     	
@@ -960,6 +987,16 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
     }
     
+    /**
+	 * Read a graph from a file.
+	 * 
+	 * @param file
+	 *            The file.
+	 * @return The contents as a {@link Graph}.
+	 * @throws RDFParseException
+	 * @throws RDFHandlerException
+	 * @throws IOException
+	 */
     protected static Graph readGraphFromFile(final File file) throws RDFParseException, RDFHandlerException, IOException {
         
         final RDFFormat format = RDFFormat.forFileName(file.getName());

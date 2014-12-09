@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Properties;
+
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
@@ -45,6 +47,15 @@ import com.tinkerpop.blueprints.Features;
  */
 public class BigdataGraphClient extends BigdataGraph {
 
+    private static final Properties props = new Properties();
+    static {
+        /*
+         * We don't want the BigdataGraph to close our connection after every
+         * read.  The BigdataGraphClient represents a session with the server.
+         */
+        props.setProperty(BigdataGraph.Options.READ_FROM_WRITE_CONNECTION, "true");
+    }
+    
 	final BigdataSailRemoteRepository repo;
 	
 	transient BigdataSailRemoteRepositoryConnection cxn;
@@ -73,7 +84,7 @@ public class BigdataGraphClient extends BigdataGraph {
     
     public BigdataGraphClient(final BigdataSailRemoteRepository repo, 
             final BlueprintsValueFactory factory) {
-        super(factory);
+        super(factory, props);
         
         this.repo = repo;
     }

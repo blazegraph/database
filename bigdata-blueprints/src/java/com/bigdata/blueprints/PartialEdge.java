@@ -38,6 +38,12 @@ public class PartialEdge extends PartialElement implements Edge {
         super(id);
     }
 
+    public PartialEdge(final String id, final String from, final String to) {
+        super(id);
+        setFrom(new PartialVertex(from));
+        setTo(new PartialVertex(to));
+    }
+
     @Override
     public String getLabel() {
         return label;

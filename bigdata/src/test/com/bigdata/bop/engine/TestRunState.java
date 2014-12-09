@@ -910,6 +910,322 @@ public class TestRunState extends TestCase2 {
     }
 
     /**
+     * Unit test for {@link RunState#getOperatorRunState(int)} when some
+     * operators require at-once evaluation.
+     *
+     * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
+     */
+    public void test_getOperatorRunState_atOnceRequested() {
+
+        final int startId = 1;
+        final int joinId1 = 2;
+        final int joinId2 = 4;
+        final int countId = 6;
+
+        final PipelineOp startOp = new StartOp(new BOp[] {},
+                NV.asMap(new NV[] {//
+                        new NV(PipelineOp.Annotations.BOP_ID, startId),//
+                        new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
+                                BOpEvaluationContext.CONTROLLER),//
+                }));
+
+        final PipelineOp join1Op = new MockPipelineOp(new BOp[] { startOp },
+                new NV(PipelineOp.Annotations.BOP_ID, joinId1)//
+        );
+
+        final PipelineOp join2Op = new MockPipelineOp(new BOp[] { join1Op }, //
+                new NV(PipelineOp.Annotations.BOP_ID, joinId2)//
+        );
+
+        final PipelineOp countOp = new MockPipelineOp(new BOp[] { join2Op }, //
+                new NV(PipelineOp.Annotations.BOP_ID, countId),//
+                new NV(PipelineOp.Annotations.PIPELINED, false),//
+                new NV(PipelineOp.Annotations.MAX_MEMORY, 0)
+        );
+
+        final PipelineOp query = countOp;
+
+        final UUID queryId = UUID.randomUUID();
+
+        final long begin = System.currentTimeMillis();
+
+        final long deadline = Long.MAX_VALUE;
+
+        final Map<Integer, BOp> bopIndex = BOpUtility.getIndex(query);
+
+        final InnerState actual = new InnerState(query, queryId, deadline,
+                begin, bopIndex);
+
+        final RunState runState = new RunState(actual);
+
+        actual.atOnceRequired.add(countId);
+
+        final UUID serviceId = UUID.randomUUID();
+
+        /*
+         * If the query is inactive (nothing running, no chunks available) then
+         * it is trivially true for any operator in the query plan that it can
+         * not be triggered and will not be executed.
+         */
+        {
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such that one chunk is available for the
+         * start operator and verify that all downstream operators can be
+         * triggered.
+         */
+        {
+
+            actual.availableMap.put(startId, new AtomicLong(1L));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such that one chunk is available for join1
+         * and verify that the start operator is done but that join1 and all
+         * downstream operators (join2, count) can be triggered.
+         */
+        {
+
+            assertNotNull(actual.availableMap.remove(startId));
+
+            actual.availableMap.put(joinId1, new AtomicLong(1L));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such that one chunk is available for join2
+         * and verify that the start operator and first join are done but that
+         * the 2nd join and count can be triggered.
+         */
+        {
+
+            assertNotNull(actual.availableMap.remove(joinId1));
+
+            actual.availableMap.put(joinId2, new AtomicLong(1L));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such no chunks are available but the start
+         * operator is running and verify that all downstream operators can be
+         * triggered.
+         */
+        {
+
+            assertNotNull(actual.availableMap.remove(joinId2));
+
+            actual.runningMap.put(startId, new AtomicLong(1L));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such no chunks are available but the 1st
+         * join operator is running and verify that the 2nd join operator and
+         * the count operator can be triggered.
+         */
+        {
+
+            assertNotNull(actual.runningMap.remove(startId));
+
+            actual.runningMap.put(joinId1, new AtomicLong(1L));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such no chunks are available but the 2nd
+         * join operator is running and verify that the 2nd join operator and
+         * the count operator can be triggered.
+         */
+        {
+
+            assertNotNull(actual.runningMap.remove(joinId1));
+            actual.runningMap.put(joinId2, new AtomicLong(1L));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.Running,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such that no chunks are available no
+         * operators are running and verify that all operators report 'AllDone'.
+         */
+        {
+
+            assertNotNull(actual.runningMap.remove(joinId2));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such that the count operator has been
+         * evaluated (runningCountMap is non-empty) but is not currently
+         * running. Verify that the count operator will now start its last
+         * evaluation pass phase.
+         */
+        {
+
+            assertNull(actual.runningMap.put(countId, new AtomicLong(0)));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.StartLastPass,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the activity state such that the doneSet for the count is
+         * non-empty and verify that the count operator now reports that it is
+         * in its last evaluation phase.
+         */
+        {
+
+            assertEquals(null, actual.doneOn.get(countId));
+            actual.doneOn.put(countId, Collections.singleton(serviceId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.RunningLastPass,
+                    runState.getOperatorRunState(countId));
+
+        }
+
+        /*
+         * Modify the run state such that the doneSet for the count operator
+         * is an empty set. This is the signal that the operator has finished
+         * its last pass evaluation.
+         */
+        {
+
+            assertNotNull(actual.doneOn.remove(countId));
+            actual.doneOn.put(countId, Collections.emptySet());
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(startId));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId1));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(joinId2));
+
+            assertEquals(RunStateEnum.AllDone,
+                    runState.getOperatorRunState(countId));
+        }
+
+    }
+
+    /**
      * Very simple unit test for the {@link RunState} API. A query with a single
      * {@link StartOp} operator is created and the {@link RunState} for that
      * query is directly manipulated in accordance with a simple evaluation

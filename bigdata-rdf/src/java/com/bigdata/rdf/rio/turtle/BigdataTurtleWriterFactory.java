@@ -12,31 +12,42 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 
+import com.bigdata.rdf.ServiceProviderHook;
+
 /**
- * An {@link RDFWriterFactory} for Turtle writers.
+ * An RDR-aware {@link RDFWriterFactory} for Turtle writers.
  * 
  * @author Arjohn Kampman
+ * @openrdf
+ * 
+ * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
  */
 public class BigdataTurtleWriterFactory implements RDFWriterFactory {
 
 	/**
-	 * Returns {@link RDFFormat#TURTLE}.
+	 * Returns {@link ServiceProviderHook#TURTLE_RDR}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 *      always discovered </a>
 	 */
+	@Override
 	public RDFFormat getRDFFormat() {
-		return RDFFormat.TURTLE;
+		return ServiceProviderHook.TURTLE_RDR;
 	}
 
 	/**
 	 * Returns a new instance of {@link BigdataTurtleWriter}.
 	 */
-	public RDFWriter getWriter(OutputStream out) {
+	@Override
+	public RDFWriter getWriter(final OutputStream out) {
 		return new BigdataTurtleWriter(out);
 	}
 
 	/**
 	 * Returns a new instance of {@link BigdataTurtleWriter}.
 	 */
-	public RDFWriter getWriter(Writer writer) {
+	@Override
+	public RDFWriter getWriter(final Writer writer) {
 		return new BigdataTurtleWriter(writer);
 	}
 }

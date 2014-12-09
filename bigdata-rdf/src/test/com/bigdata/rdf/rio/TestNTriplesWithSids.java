@@ -11,6 +11,7 @@ import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParserRegistry;
 
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
@@ -98,13 +99,13 @@ public class TestNTriplesWithSids extends AbstractTripleStoreTestCase {
 			// Verify that the correct parser will be used.
 			assertEquals("NTriplesParserClass",
 					BigdataNTriplesParser.class.getName(), RDFParserRegistry
-							.getInstance().get(RDFFormat.NTRIPLES).getParser()
+							.getInstance().get(ServiceProviderHook.NTRIPLES_RDR).getParser()
 							.getClass().getName());
 
 			final DataLoader dataLoader = store.getDataLoader();
 
 			final LoadStats loadStats = dataLoader.loadData(new StringReader(
-					data), getName()/* baseURL */, RDFFormat.NTRIPLES);
+					data), getName()/* baseURL */, ServiceProviderHook.NTRIPLES_RDR);
 
 			if (log.isInfoEnabled())
 				log.info(store.dumpStore());
@@ -249,13 +250,13 @@ public class TestNTriplesWithSids extends AbstractTripleStoreTestCase {
 			// Verify that the correct parser will be used.
 			assertEquals("NTriplesParserClass",
 					BigdataNTriplesParser.class.getName(), RDFParserRegistry
-							.getInstance().get(RDFFormat.NTRIPLES).getParser()
+							.getInstance().get(ServiceProviderHook.NTRIPLES_RDR).getParser()
 							.getClass().getName());
 
 			final DataLoader dataLoader = store.getDataLoader();
 
 			final LoadStats loadStats = dataLoader.loadData(new StringReader(
-					data), getName()/* baseURL */, RDFFormat.NTRIPLES);
+					data), getName()/* baseURL */, ServiceProviderHook.NTRIPLES_RDR);
 
 			if (log.isInfoEnabled())
 				log.info(store.dumpStore());

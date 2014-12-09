@@ -67,6 +67,7 @@ public class Depends {
     @SuppressWarnings("unused")
     private static class OrderByLicense implements Comparator<Dependency> {
 
+        @Override
         public int compare(Dependency o1, Dependency o2) {
             return o1.licenseURL().compareTo(o2.licenseURL());
         }
@@ -244,9 +245,9 @@ public class Depends {
             "http://site.icu-project.org/",
             "http://source.icu-project.org/repos/icu/icu/trunk/license.html");
 
-    private final static Dep nxparser = new Dep("nxparser",
-            "http://sw.deri.org/2006/08/nxparser/",
-            "http://sw.deri.org/2006/08/nxparser/license.txt");
+//    private final static Dep nxparser = new Dep("nxparser",
+//            "http://sw.deri.org/2006/08/nxparser/",
+//            "http://sw.deri.org/2006/08/nxparser/license.txt");
 
     private final static Dep nanohttp = new Dep("nanohttp",
             "http://elonen.iki.fi/code/nanohttpd/",
@@ -281,6 +282,12 @@ public class Depends {
             "https://github.com/tinkerpop/rexster",
             "https://github.com/tinkerpop/rexster/blob/master/LICENSE.txt");
 
+    // Note: This is a test-only dependency at this time.
+    @SuppressWarnings("unused")
+	private final static Dep hamcrestCore = new Dep("hamcrest-core", 
+            "https://code.google.com/p/hamcrest/",
+    		"http://opensource.org/licenses/BSD-3-Clause");
+    
     static private final Dep[] depends;
     static {
         depends = new Dep[] { //
@@ -304,7 +311,7 @@ public class Depends {
             slf4j,//
             sesame,//
             icu,//
-            nxparser,//
+//            nxparser,//
             nanohttp,//
             jetty,//
             servletApi,//

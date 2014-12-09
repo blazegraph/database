@@ -10,24 +10,33 @@ import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.turtle.TurtleParser;
 
+import com.bigdata.rdf.ServiceProviderHook;
+
 /**
- * An {@link RDFParserFactory} for Turtle parsers.
+ * An RDR-aware {@link RDFParserFactory} for Turtle parsers.
  * 
  * @author Arjohn Kampman
  * @openrdf
+ * 
+ * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
  */
 public class BigdataTurtleParserFactory implements RDFParserFactory {
 
 	/**
-	 * Returns {@link RDFFormat#TURTLE}.
+	 * Returns {@link ServiceProviderHook#TURTLE_RDR}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 *      always discovered </a>
 	 */
+	@Override
 	public RDFFormat getRDFFormat() {
-		return RDFFormat.TURTLE;
+		return ServiceProviderHook.TURTLE_RDR;
 	}
 
 	/**
 	 * Returns a new instance of {@link TurtleParser}.
 	 */
+	@Override
 	public RDFParser getParser() {
 		return new BigdataTurtleParser();
 	}

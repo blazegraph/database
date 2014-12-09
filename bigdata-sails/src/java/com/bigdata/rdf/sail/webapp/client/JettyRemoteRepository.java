@@ -1961,11 +1961,11 @@ public class JettyRemoteRepository {
             	}
             	
             	@Override
-            	public void close() throws QueryEvaluationException {
+            	public void handleClose() throws QueryEvaluationException {
             		
             		try {
         			
-            			super.close();
+            			super.handleClose();
         			
             		} finally {
             			

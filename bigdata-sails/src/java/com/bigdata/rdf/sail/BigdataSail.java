@@ -88,13 +88,14 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
+import org.openrdf.sail.UnknownSailTransactionStateException;
+import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -138,6 +139,7 @@ import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -3774,27 +3776,27 @@ public class BigdataSail extends SailBase implements Sail {
          * Update
          */
         
-        /**
-         * Bigdata now uses an internal query model which differs significantly
-         * from the Sesame query model. Support is not provided for
-         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
-         * prepared and evaluated using a
-         * {@link BigdataSailRepositoryConnection}.
-         * 
-         * @throws SailException
-         *             <em>always</em>.
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
-         *      SPARQL 1.1 Update </a>
-         */
-        @Override
-        public void executeUpdate(final UpdateExpr updateExpr,
-                final Dataset dataset, final BindingSet bindingSet,
-                boolean includeInferred) throws SailException {
-
-            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
-            
-        }
+//        /**
+//         * Bigdata now uses an internal query model which differs significantly
+//         * from the Sesame query model. Support is not provided for
+//         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
+//         * prepared and evaluated using a
+//         * {@link BigdataSailRepositoryConnection}.
+//         * 
+//         * @throws SailException
+//         *             <em>always</em>.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+//         *      SPARQL 1.1 Update </a>
+//         */
+//        @Override
+//        public void executeUpdate(final UpdateExpr updateExpr,
+//                final Dataset dataset, final BindingSet bindingSet,
+//                boolean includeInferred) throws SailException {
+//
+//            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+//            
+//        }
         
         /*
          * High-level query.
@@ -3983,6 +3985,125 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
+        }
+
+        /*
+		 * These methods are new with openrdf 2.7. Bigdata uses either
+		 * MVCC (full read-write tx) or simply a single writer on the live
+		 * indices (unisolated). The latter has more throughput.
+		 * 
+		 * TODO The MVCC semantics in bigdata do use a prepare()/commit()
+		 * pattern and have the notion of active and inactive transactions. This
+		 * transaction statement metadata could be exposed to the SailConnection
+		 * for the BigdataSailReadOnlyConnection and BigdataSailRWConnection,
+		 * but not for the BigdataSailConnection (unisolated connection).
+		 * 
+		 * BBT - 11/15/2015
+		 * 
+		 * (non-Javadoc)
+		 * 
+		 * @see org.openrdf.sail.SailConnection#begin()
+		 */
+        
+        /**
+         * NOP.
+         * <p>
+         * {@inheritDoc}
+         */
+        @Override
+        public void begin() throws SailException {
+            
+        }
+
+        /**
+		 * Always returns <code>true</code>.
+		 * <p>
+		 * Note: Bigdata does not expose its internal transaction state to the
+		 * sail (the concept of active and inactive transactions exists for full
+		 * read/write transactions and but those semantics are not exposed to
+		 * the sail).
+		 * <p>
+		 * {@inheritDoc}
+		 */
+        @Override
+        public boolean isActive() throws UnknownSailTransactionStateException {
+            
+        	return true;
+        	
+        }
+
+		/**
+		 * NOP - the internal transaction model is not exposed to the
+		 * {@link SailConnection}.
+		 * <p>
+		 * Note: Full read/write transactions do have a prepare()/commit() model
+		 * interallly based on MVCC, but unisolated connections do not.
+		 * <p>
+		 * {@inheritDoc}
+		 */
+        @Override
+        public void prepare() throws SailException {
+            
+        }
+
+        /*
+		 * This API is new with openrdf 2.7. It is not supported. Bigdata has a
+		 * different logical operator model from openrdf. The UpdateContext is
+		 * expressed in terms of the openrdf logical operator model
+		 * (UpdateExpr). Therefore it can not be used with bigdata.
+		 * 
+		 * (non-Javadoc)
+		 * 
+		 * @see org.openrdf.sail.SailConnection#startUpdate(org.openrdf.sail.
+		 * UpdateContext)
+		 */
+        
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void startUpdate(UpdateContext op)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void addStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void removeStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void endUpdate(UpdateContext op)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+            
         }
 
     } // class BigdataSailConnection

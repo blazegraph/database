@@ -28,6 +28,7 @@ abstract public class AbstractGraphFixture implements
         SailConnection cxn = null;
         try {
             cxn = getSail().getConnection();
+            cxn.begin();
             newSailGraphLoader(cxn).loadGraph(null/* fallback */, resources);
             cxn.commit();
             ok = true;

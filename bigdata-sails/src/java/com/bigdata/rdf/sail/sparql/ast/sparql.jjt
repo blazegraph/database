@@ -26,6 +26,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * "make javacc" to rebuild.  Be sure to first remove the sparql.jj file
  * so it will generate a new one.
+ * 
+ * Updated 6/7/14 by Mike Personick.  Updated to capture the delta between the 
+ * Sesame 2.6.10/2.7.12 sparql.jjt files.
  */
  
 /*
@@ -113,6 +116,30 @@ public class SyntaxTreeBuilder {
         }
         return s;
     }
+
+	private String readToMatchingBrace() {
+	    StringBuilder sb = new StringBuilder();
+	    Token tok;
+	    int nesting = 1;
+	    boolean previousTokenDtSep = false;
+	    while (true) {
+		tok = getToken(1);
+		if (!previousTokenDtSep && ! tok.image.equals("^^")) {
+		    sb.append(" ");
+		}
+		if (tok.kind == LBRACE) nesting++;
+		if (tok.kind == RBRACE) {
+		    nesting--;
+		    if (nesting == 0) break;
+		}
+		sb.append(tok.image);
+		previousTokenDtSep = tok.image.equals("^^");
+
+		tok = getNextToken();
+
+	    }
+	    return sb.toString();
+	}
 }
 PARSER_END(SyntaxTreeBuilder)
 
@@ -217,6 +244,8 @@ TOKEN [IGNORE_CASE] :
 |   <BNODE: "bnode">
 |   <STRDT: "strdt">
 |   <STRLANG: "strlang">
+|	<UUID: "uuid">
+|	<STRUUID: "struuid">
 |   <IRI: "IRI"|"URI">
 |   <IF: "if">
 |   <IN: "in">
@@ -235,6 +264,7 @@ TOKEN [IGNORE_CASE] :
 |   <BIND: "bind">
 |   <SERVICE: "service">
 |   <BINDINGS: "bindings">
+|	<VALUES: "values">
 |   <UNDEF: "UNDEF">
 |   <STRLEN: "strlen">
 |   <SUBSTR: "substr">
@@ -322,9 +352,7 @@ TOKEN:
 
 |   <PNAME_NS: (<PN_PREFIX>)? ":">
 |   <PNAME_LN: (<PN_PREFIX>)? ":" <PN_LOCAL>> // Note: PN_LOCAL not optional, case handled by PNAME_NS
-
-|   <BLANK_NODE_LABEL: "_:" <PN_LOCAL>>
-
+|	<BLANK_NODE_LABEL: "_:" (<PN_CHARS_U> | <NUM>) ((<PN_CHARS>|".")* <PN_CHARS>)? >
 |   <VAR1: "?" <VARNAME>>
 |   <VAR2: "$" <VARNAME>>
 |   <LANGTAG: "@" (<ALPHA>)+ ("-" (<ALPHA>|<NUM>)+)*>
@@ -366,17 +394,14 @@ TOKEN:
       // | ["\u10000"-"\uEFFFF"] FIXME: JavaCC/Java can't handle this?
     >
 |   <#PN_CHARS_U: <PN_CHARS_BASE> | "_">
-|   <#PN_START_CHAR: <PN_CHARS_U> | <NUM> | <PLX>> 
-|   <#VAR_CHAR: <PN_START_CHAR> | "\u00B7" | ["\u0300"-"\u036F"] | ["\u203F"-"\u2040"]>
-|   <#PN_END_CHAR: <VAR_CHAR> | "-">
-|   <#PN_CHAR: <PN_END_CHAR> | ".">
-
-|   <#PN_PREFIX: <PN_CHARS_BASE> ( (<PN_CHAR>)* <PN_END_CHAR> )?>
-|   <#PN_LOCAL: <PN_START_CHAR> ( ( <PN_CHAR> | <PLX> )* (<PN_END_CHAR> | <PLX> ) )?>
+|	<#VAR_CHAR: <PN_CHARS_U> | <NUM> | "\u00B7" | ["\u0300"-"\u036F"] | ["\u203F"-"\u2040"]>
+|	<#PN_CHARS: <PN_CHARS_U> | "-" | <NUM> | "\u00B7" | ["\u0300"-"\u036F"] | ["\u203F"-"\u2040"]> 
+|	<#PN_PREFIX: <PN_CHARS_BASE> ( (<PN_CHARS> | ".")* <PN_CHARS>)?>
+|	<#PN_LOCAL: (<PN_CHARS_U> | ":" | <NUM> | <PLX> ) ( (<PN_CHARS> | "." | ":" | <PLX>)* ( <PN_CHARS> | ":" | <PLX>) )?>
 |   <#PLX: <PERCENT> | <PN_LOCAL_ESC>>
 |   <#PERCENT: "%" <HEX> <HEX>>
-|   <#PN_LOCAL_ESC: "\\" [ "_", "~", ".", "-", "!", "$", "&", "\"", "(", ")", "*", "+", ",", ";", "=", ":", "/", "?", "#", "@", "%" ]>
-|   <#VARNAME: <PN_START_CHAR> (<VAR_CHAR>)*>
+|	<#PN_LOCAL_ESC: "\\" [ "_", "~", ".", "-", "!", "$", "&", "\"", "(", ")", "*", "+", ",", ";", "=", "/", "?", "#", "@", "%" ]>
+|	<#VARNAME: (<PN_CHARS_U> | <NUM> ) (<VAR_CHAR>)*>
 }
 
 //
@@ -433,8 +458,7 @@ void PrefixDecl() :
 void Query() #void :
 {}
 {
-    (SelectQuery() | ConstructQuery() | DescribeQuery() | AskQuery())
-}
+    (SelectQuery() | ConstructQuery() |	DescribeQuery() | AskQuery()) }
 
 void SelectQuery() :
 {}
@@ -570,25 +594,43 @@ void WhereClause() :
      [<WHERE>] GroupGraphPattern()
 }
 
-// Note: Modified to group the binding variables and binding sets for more
-// efficient processing.
 void BindingsClause() :
 {}
 {
-//    <BINDINGS> ( Var() )* <LBRACE> ( BindingSet())* <RBRACE>
-    <BINDINGS> BindingVars() BindingSets() 
+    <VALUES> DataBlock()
+    // Keeping deprecated BINDINGS keyword for backward compatibility purposes
+    | <BINDINGS> (Var())* <LBRACE> (BindingSet())* <RBRACE>
 }
 
-void BindingVars() :
+void InlineData():
 {}
 {
-    ( Var() )*
+    <VALUES> DataBlock()
 }
 
-void BindingSets() :
+void DataBlock() #void :
 {}
 {
-    <LBRACE> ( BindingSet() )* <RBRACE>
+     InlineDataOneVar()
+   | InlineDataFull()
+}
+
+void InlineDataOneVar() #void :
+{}
+{
+    Var() <LBRACE> (SimpleBindingSet())* <RBRACE>
+}
+
+void InlineDataFull() #void :
+{}
+{
+    ( <NIL> | <LPAREN> (Var())* <RPAREN> ) <LBRACE> ( BindingSet())* <RBRACE>
+}
+
+void SimpleBindingSet() #BindingSet :
+{}
+{
+    BindingValue() 
 }
 
 void BindingSet() :
@@ -756,6 +798,7 @@ void GraphPatternNotTriples() #void :
 |   GraphGraphPattern()
 |   MinusGraphPattern()
 |   ServiceGraphPattern()
+| 	InlineData()
 }
 
 void OptionalGraphPattern() :
@@ -856,13 +899,19 @@ void TriplesSameSubjectPath() :
 //  VarOrTerm() PropertyListPath()
     VarOrTermOrTRefP() PropertyListPath()
     |
-    TriplesNode() [PropertyListPath()]
+    TriplesNodePath() [PropertyListPath()]
 }
 
 void PropertyListPath() :
 {}
 {
-    (VerbPath() | VerbSimple()) ObjectList() (LOOKAHEAD(2) <SEMICOLON> [PropertyListPath()] )*
+    (VerbPath() | VerbSimple()) ObjectListPath() [<SEMICOLON> [PropertyListPath()] ]
+}
+
+void ObjectListPath() #ObjectList:
+{}
+{
+	ObjectPath() ( <COMMA> ObjectPath() )*
 }
 
 void VerbPath() #void :
@@ -943,10 +992,6 @@ void PathMod() :
     <PLUS> { jjtThis.setLowerBound(1);
          jjtThis.setUpperBound(Long.MAX_VALUE);
     }
-    |
-    <LBRACE> ( min = <INTEGER> {jjtThis.setLowerBound(Long.parseLong(min.image)); } 
-        ( <COMMA> ( <RBRACE> {jjtThis.setUpperBound(Long.MAX_VALUE); } | max = <INTEGER> {jjtThis.setUpperBound(Long.parseLong(max.image)); } <RBRACE> ) | <RBRACE> ) 
-            | <COMMA> max = <INTEGER> {jjtThis.setUpperBound(Long.parseLong(max.image)); jjtThis.setLowerBound(0); } <RBRACE> )
 }
 
 void VerbSimple() #void :
@@ -958,8 +1003,13 @@ void VerbSimple() #void :
 void Object() #void :
 {}
 {
-    GraphNode()
+	GraphNode()
 |   TRefPattern() // extension for triple reference patterns.
+}
+
+void ObjectPath() #void :{}
+{
+    GraphNodePath()
 }
 
 void Verb() #void :
@@ -978,10 +1028,24 @@ void TriplesNode() #void :
     BlankNodePropertyList()
 }
 
+void TriplesNodePath() #void :
+{}
+{
+	CollectionPath()
+|
+	BlankNodePropertyListPath()
+}
+
 void BlankNodePropertyList() :
 {}
 {
     <LBRACK> PropertyList() <RBRACK>
+}
+
+void BlankNodePropertyListPath() #BlankNodePropertyList :
+{}
+{
+	<LBRACK> PropertyListPath() <RBRACK>
 }
 
 void Collection() :
@@ -990,12 +1054,26 @@ void Collection() :
     <LPAREN> ( GraphNode() )+ <RPAREN>
 }
 
+void CollectionPath() #Collection:
+{}
+{
+	<LPAREN> ( GraphNodePath() )+ <RPAREN>
+}
+
 void GraphNode() #void :
 {}
 {
     VarOrTerm()
 |
     TriplesNode()
+}
+
+void GraphNodePath() #void :
+{}
+{
+	VarOrTerm()
+|
+	TriplesNodePath()
 }
 
 void VarOrTerm() #void :
@@ -1203,6 +1281,8 @@ void BrackettedExpression() #void :
     <LPAREN> Expression() <RPAREN>
 }
 
+
+
 void BuiltInCall() #void :
 {}
 {
@@ -1261,6 +1341,8 @@ void RDFTermFunction() #void :
 |   Str()
 |   StrDt()
 |   StrLang()
+|	UUID()
+|	STRUUID()
 }
 
 void DateTimeFunction() #void :
@@ -1589,6 +1671,18 @@ void StrLang() :
     <STRLANG> <LPAREN> Expression() <COMMA> Expression() <RPAREN>
 }
 
+void UUID() :
+{}
+{
+	<UUID> <NIL>
+}
+
+void STRUUID() :
+{}
+{
+	<STRUUID> <NIL>
+}
+
 void Bind() :
 {}
 {
@@ -1779,6 +1873,12 @@ void SolutionsRef() :
     <SOLUTIONS> t = <VAR3> {jjtThis.setName(t.image);}  
 }
 
+void UnparsedQuadDataBlock() :
+{}
+{
+    <LBRACE> {jjtThis.setDataBlock(readToMatchingBrace()); } <RBRACE>
+}
+
 void QuadData() #void :
 {}
 {
@@ -1872,13 +1972,13 @@ void Create() :
 void InsertData() :
 {}
 {
-    <INSERT> <DATA> QuadData()
+    <INSERT> <DATA> UnparsedQuadDataBlock()
 }
 
 void DeleteData() :
 {}
 {
-    <DELETE> <DATA> QuadData()
+    <DELETE> <DATA> UnparsedQuadDataBlock()
 }
 
 void DeleteWhere() :

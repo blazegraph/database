@@ -97,7 +97,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
         return queryResult;
 
     }
-
+    
     public QueryRoot optimize() throws QueryEvaluationException {
 
         return optimize((BindingsClause) null);

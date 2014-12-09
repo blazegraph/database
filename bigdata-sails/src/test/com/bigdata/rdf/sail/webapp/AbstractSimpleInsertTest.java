@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) � 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) 2001-2007
 
 All rights reserved.
 
@@ -59,11 +59,11 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.model.vocabulary.DC;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
-import org.openrdf.query.parser.sparql.DC;
-import org.openrdf.query.parser.sparql.FOAF;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.journal.IIndexManager;

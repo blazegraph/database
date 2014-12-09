@@ -152,7 +152,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         // r.next(1500);
         final Random r = new Random();
 
-        final int maxAborts = 100;
+//        final int maxAborts = 100;
         
         final CAT commits = new CAT();
         final CAT aborts = new CAT();
@@ -199,7 +199,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
                     lastWriterFuture = writers.submit(new Writer(r,
                             500/* nwrites */, sail, commits, aborts,
-                            maxAborts, failex, subs, preds));
+                            /*maxAborts,*/ failex, subs, preds));
                     
                 }
 
@@ -287,7 +287,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
         final BigdataSail sail;
         final CAT commits;
         final CAT aborts;
-        final int maxAborts;
+//        final int maxAborts;
         final AtomicReference<Throwable> failex;
         final int nuris;
         final int npreds;
@@ -296,7 +296,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
 
         Writer(final Random r, final int nwrites,
                 final BigdataSail sail, final CAT commits,
-                final CAT aborts, final int maxAborts,
+                final CAT aborts, //final int maxAborts,
                 final AtomicReference<Throwable> failex, final URI[] subs,
                 final URI[] preds) {
 
@@ -305,7 +305,7 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
             this.sail = sail;
             this.commits = commits;
             this.aborts = aborts;
-            this.maxAborts = maxAborts;
+//            this.maxAborts = maxAborts;
             this.failex = failex;
             this.nuris = subs.length;
             this.npreds = preds.length;
@@ -339,7 +339,8 @@ abstract public class TestMROWTransactions extends ProxyBigdataSailTestCase {
                 if (InnerCause.isInnerCause(ise, InterruptedException.class)) {
                     // ignore
                 } else if (InnerCause.isInnerCause(ise, MyBTreeException.class)
-                        && aborts.get() < maxAborts) {
+                        //&& aborts.get() < maxAborts
+                        ) {
                     // ignore
                 } else {
                     log.warn(ise, ise);

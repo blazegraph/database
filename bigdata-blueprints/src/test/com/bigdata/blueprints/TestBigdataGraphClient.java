@@ -59,6 +59,49 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
         return new BigdataGraphTest();
     }
     
+//    public void testAddVertexProperties() throws Exception {
+//        final BigdataGraphTest test = new BigdataGraphTest();
+//        test.stopWatch();
+//        final BigdataTestSuite testSuite = new BigdataTestSuite(test);
+//        try {
+//            testSuite.testVertexEquality();
+//        } finally {
+//            test.shutdown();
+//        }
+//
+//    }
+//
+//    private static class BigdataTestSuite extends TestSuite {
+//        
+//        public BigdataTestSuite(final BigdataGraphTest graphTest) {
+//            super(graphTest);
+//        }
+//        
+//        public void testVertexEquality() {
+//            Graph graph = graphTest.generateGraph();
+//
+//            if (!graph.getFeatures().ignoresSuppliedIds) {
+//                Vertex v = graph.addVertex(graphTest.convertId("1"));
+//                Vertex u = graph.getVertex(graphTest.convertId("1"));
+//                assertEquals(v, u);
+//            }
+//
+//            this.stopWatch();
+//            Vertex v = graph.addVertex(null);
+//            assertNotNull(v);
+//            Vertex u = graph.getVertex(v.getId());
+//            assertNotNull(u);
+//            assertEquals(v, u);
+//            printPerformance(graph.toString(), 1, "vertex added and retrieved", this.stopWatch());
+//
+//            assertEquals(graph.getVertex(u.getId()), graph.getVertex(u.getId()));
+//            assertEquals(graph.getVertex(v.getId()), graph.getVertex(u.getId()));
+//            assertEquals(graph.getVertex(v.getId()), graph.getVertex(v.getId()));
+//
+//            graph.shutdown();
+//        }
+//    }
+    
     private class BigdataGraphTest extends GraphTest {
 
 		@Override
