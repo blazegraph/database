@@ -35,6 +35,7 @@ public class JettyHttpClient extends HttpClient {
 		 */
 		setFollowRedirects(true);
 		
+		s_active.incrementAndGet();
 	}
 	
 	/**
@@ -53,16 +54,16 @@ public class JettyHttpClient extends HttpClient {
 			
 			stop();
 			
-			// s_active.decrementAndGet();
+			s_active.decrementAndGet();
 			
 			// for debug
 			m_stopped = new StackInfoReport();
 		}
 	}
 
-//	final static AtomicInteger s_active = new AtomicInteger();
-//	public static int activeCount() {
-//		return s_active.get();
-//	}
+	final static AtomicInteger s_active = new AtomicInteger();
+	public static int activeCount() {
+		return s_active.get();
+	}
 	
 }
