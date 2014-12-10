@@ -41,6 +41,8 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
+import com.bigdata.util.InnerCause;
+import com.bigdata.util.StackInfoReport;
 
 public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
@@ -210,23 +212,6 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
         return graphResults(opts, null/* queryId */, null /*listener*/);
-        
-//        try {
-//            // check response in try.
-//            checkResponseCode(response = doConnect(opts));
-//
-//            // return asynchronous parse of result.
-//            return result = graphResults(response);
-//
-//        } finally {
-//            if (result == null) {
-//                // Consume entity if bad response.
-//                try {
-//                    EntityUtils.consume(response.getEntity());
-//                } catch (IOException ex) {
-//                }
-//            }
-//        }
     }
 
     /**
@@ -318,12 +303,9 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
         } finally {
 
-            if (response != null) {
-//                try {
-//                    EntityUtils.consume(response.getEntity());
-//                } catch (IOException ex) {
-//                }
-            }
+        	if (response != null)
+        		response.consume();
+            
 
         }
         
@@ -356,7 +338,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         JettyResponseListener response = null;
 
         opts.setAcceptHeader(ConnectOptions.MIME_PROPERTIES_XML);
-
+        boolean consumeNeeded = true;
         try {
 
             checkResponseCode(response = doConnect(opts));
@@ -390,17 +372,19 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
             final Properties properties = parser.parse(response.getInputStream());
 
+            consumeNeeded = false;
+            
             return properties;
-
+        } catch (Exception e) {
+            consumeNeeded = !InnerCause.isInnerCause(e,
+                    HttpException.class);
+        	consumeNeeded = true;
+        	throw e;
         } finally {
 
-            if (response != null) {
-//                try {
-//                    EntityUtils.consume(response.getEntity());
-//                } catch (IOException ex) {
-//                }
-            }
-
+        	if (response != null && consumeNeeded)
+        		response.consume();
+            
         }
 
     }
@@ -408,8 +392,11 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     volatile boolean m_closed = false;
     
 	public void close() {
-		if (m_closed)
-			throw new AssertionError("Already closed");
+		if (m_closed) {
+			log.warn("The repository manager has already been closed", httpClient.m_stopped);
+			return;
+		}
+		
 		try {
 			m_closed = true;
 			httpClient.close();

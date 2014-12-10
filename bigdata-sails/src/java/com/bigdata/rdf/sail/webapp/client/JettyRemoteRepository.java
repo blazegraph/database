@@ -92,6 +92,8 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
 
+import com.bigdata.util.StackInfoReport;
+
 // Note: Do not import. Not part of the bigdata-client.jar
 //
 //import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
@@ -454,53 +456,7 @@ public class JettyRemoteRepository {
         return sparqlEndpointURL;
         
     }
-    
-//    /**
-//     * Set incremental truth maintenance to either true or false on the server.
-//     */
-//    public void setTruthMaintenance(final boolean tm) throws Exception {
-//    	
-//        final ConnectOptions opts = newConnectOptions();
-//
-//        opts.addRequestParam("truthMaintenance", String.valueOf(tm));
-//
-//        checkResponseCode(doConnect(opts));
-//
-//    }
-//
-//    /**
-//     * Compute database at once closure on the server and do a commit.
-//     */
-//    public long doClosure() throws Exception {
-//    	
-//        final ConnectOptions opts = newConnectOptions();
-//
-//        opts.addRequestParam("doClosure");
-//
-//        HttpResponse response = null;
-//        try {
-//            
-//            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-//            
-//            checkResponseCode(response = doConnect(opts));
-//            
-//            final MutationResult result = mutationResults(response);
-//            
-//            return result.mutationCount;
-//            
-//        } finally {
-//            
-//            try {
-//                
-//                if (response != null)
-//                    EntityUtils.consume(response.getEntity());
-//                
-//            } catch (Exception ex) { }
-//            
-//        }
-//    	
-//    }
-    
+        
     /**
      * Post a GraphML file to the blueprints layer of the remote bigdata instance.
      */
@@ -537,14 +493,9 @@ public class JettyRemoteRepository {
 
         } finally {
 
-//            try {
-//
-//                if (response != null)
-//                    EntityUtils.consume(response.getEntity());
-//
-//            } catch (Exception ex) {
-//            }
-
+        	if (response != null)
+        		response.consume();
+            
         }
         
     }
@@ -792,16 +743,19 @@ public class JettyRemoteRepository {
 
         JettyResponseListener response = null;
         try {
+            log.warn("CANCEL START!");
             // Issue request, check response status code.
             checkResponseCode(response = doConnect(opts));
+            
+            log.warn("CANCEL CLEAN!", new StackInfoReport());
         } finally {
             /*
              * Ensure that the http response entity is consumed so that the http
              * connection will be released in a timely fashion.
              */
-//            try {
-//                EntityUtils.consume(response.getEntity());
-//            } catch (IOException ex) {log.warn(ex); }
+        	if (response != null)
+        		response.consume();
+            
         }
             
     }
@@ -853,13 +807,9 @@ public class JettyRemoteRepository {
             
         } finally {
             
-//            try {
-//            
-//                if (resp != null)
-//                    EntityUtils.consume(resp.getEntity());
-//                
-//            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (resp != null)
+        		resp.consume();
+                     
         }
 
     }
@@ -906,13 +856,9 @@ public class JettyRemoteRepository {
             
         } finally {
             
-//            try {
-//            
-//                if (resp != null)
-//                    EntityUtils.consume(resp.getEntity());
-//                
-//            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (resp != null)
+        		resp.consume();
+                      
         }
     	
     }
@@ -965,13 +911,9 @@ public class JettyRemoteRepository {
             
         } finally {
             
-//            try {
-//                
-//                if (response != null)
-//                    EntityUtils.consume(response.getEntity());
-//                
-//            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (response != null)
+        		response.consume();
+        	
         }
         
     }
@@ -1045,13 +987,9 @@ public class JettyRemoteRepository {
             
         } finally {
             
-//            try {
-//                
-//                if (response != null)
-//                    EntityUtils.consume(response.getEntity());
-//                
-//            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (response != null)
+        		response.consume();
+                        
         }
         
     }
@@ -1133,12 +1071,8 @@ public class JettyRemoteRepository {
             
         } finally {
             
-//            try {
-//                
-//                if (response != null)
-//                    EntityUtils.consume(response.getEntity());
-//                
-//            } catch (Exception ex) {log.warn(ex); }
+        	if (response != null)
+        		response.consume();
             
         }
         
@@ -1452,17 +1386,9 @@ public class JettyRemoteRepository {
                 
             } finally {
                 
-//                try {
-//                    
-//                    if (response != null)
-//                        EntityUtils.consume(response.getEntity());
-//                    
-//                } catch (Exception ex) {
-//                    
-//                    log.warn(ex);
-//                    
-//                }
-                
+            	if (response != null)
+            		response.consume();
+	                            
             }
             
         }
@@ -1632,6 +1558,10 @@ public class JettyRemoteRepository {
      *      for large POST requests </a>
      */
     public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
+    	
+    	if (httpClient.isStopped()) {
+    		throw new RuntimeException("The client has been stopped", httpClient.m_stopped);
+    	}
 
         /*
          * Generate the fully formed and encoded URL.
@@ -2002,13 +1932,9 @@ public class JettyRemoteRepository {
             
         } finally {
             
-//            // terminate the http connection.
-//            response.disconnect();
-//            if (entity != null && result == null) {
-//                try {
-//                    EntityUtils.consume(entity);
-//                } catch (IOException ex) {log.warn(ex); }
-//            }
+        	if (response != null)
+        		response.consume();
+            
             
             if (response != null && tqrImpl == null) {
             	try {
@@ -2165,10 +2091,8 @@ public class JettyRemoteRepository {
 //            // terminate the http connection.
 //            response.disconnect();
             if (response != null && result == null) {
-//                try {
-//                    EntityUtils.consume(entity);
-//                } catch (IOException ex) {log.warn(ex); }
-                
+            	response.consume();
+            	
                 try {
                 	cancel(queryId);
                 } catch (Exception ex) {log.warn(ex); }
@@ -2229,13 +2153,11 @@ public class JettyRemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
+        	if (response != null)
+        		response.consume();
+            
         	if (result == null) {
-//	            try {
-//	                EntityUtils.consume(entity);
-//	            } catch (IOException ex) {log.warn(ex); }
-	            
+                
 	            try {
 	            	cancel(queryId);
 	            } catch (Exception ex) {log.warn(ex); }
@@ -2315,12 +2237,10 @@ public class JettyRemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-//            try {
-//                EntityUtils.consume(entity);
-//            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.consume();
+        	}
+        	
         }
 
     }
@@ -2374,12 +2294,10 @@ public class JettyRemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-//            try {
-//                EntityUtils.consume(entity);
-//            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.consume();
+        	}
+        	
         }
 
     }
@@ -2433,12 +2351,10 @@ public class JettyRemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-//            try {
-//                EntityUtils.consume(entity);
-//            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.consume();
+        	}
+        	
         }
 
     }
@@ -2488,12 +2404,10 @@ public class JettyRemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-//            try {
-//                EntityUtils.consume(entity);
-//            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.consume();
+        	}
+        	
         }
 
     }

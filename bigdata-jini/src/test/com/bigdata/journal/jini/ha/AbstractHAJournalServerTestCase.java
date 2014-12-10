@@ -300,14 +300,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         opts.method = "GET";
 
 		try {
-			// final HttpResponse response;
-			//
-			// RemoteRepository.checkResponseCode(response =
-			// doConnect(httpClient,
-			// opts));
-			//
-			// EntityUtils.consume(response.getEntity());
-
 			final JettyResponseListener response;
 
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(

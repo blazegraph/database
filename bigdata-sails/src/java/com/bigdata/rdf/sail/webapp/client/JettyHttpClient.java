@@ -2,6 +2,7 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
@@ -14,6 +15,9 @@ import com.bigdata.util.StackInfoReport;
  */
 public class JettyHttpClient extends HttpClient {
 	
+    private static final transient Logger log = Logger
+            .getLogger(JettyHttpClient.class);
+    
 	final boolean m_autoClose;
 	
 	StackInfoReport m_stopped = null;

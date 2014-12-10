@@ -213,10 +213,4 @@ public class TestHttpClient extends TestCase {
 		}
 	}
 	
-	public void testEntityContentProviders() {
-		// Let's see how standard ApaceForms and JettyForms compare.
-		
-		
-	}
-
 }
