@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -37,6 +38,8 @@ import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.HttpHeader;
+
+import com.bigdata.util.InnerCause;
 
 public class JettyResponseListener extends InputStreamResponseListener {
 	
@@ -54,9 +57,10 @@ public class JettyResponseListener extends InputStreamResponseListener {
 				
 				// FIXME: added only to see if this removes the EOFException in CI!
 				log.debug("REMOVE SLEEP ONCE FIXED");
-				Thread.sleep(20);
+				Thread.sleep(50);
 				
-				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes!
+				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes, for queued requests!
+				// m_response = await(300, TimeUnit.SECONDS).getResponse(); // wait up to 5 minutes!
 				
 				if (traceEnabled)
 					log.trace("Response in " + (System.currentTimeMillis()-start) + "ms");
@@ -97,7 +101,7 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	public String getReason() {
 		ensureResponse();
 		
-		return null;
+		return m_response.getReason();
 	}
 
 	public HttpFields getHeaders() {
@@ -126,28 +130,45 @@ public class JettyResponseListener extends InputStreamResponseListener {
 
         }
 	}
+	
+	/**
+	 * Ensure we have the stream ready before trying to process it!
+	 */
+	public InputStream getInputStream() {
+		ensureResponse();
+		
+		return super.getInputStream();
+	}
 
     public void consume()
             throws IOException {
     	
-        final InputStream r = getInputStream();
-
-        try {
-
-            final byte[] data = new byte[4096];
-
-            int ch;
-            while ((ch = r.read(data)) != -1) {
-            	if (log.isTraceEnabled())
-            		log.trace("Read " + ch + " bytes");
-            }
-
-
-        } finally {
-
-            r.close();
-
-        }
+    	try {
+	        final InputStream r = getInputStream();
+	
+	        try {
+	
+	            final byte[] data = new byte[4096];
+	
+	            int ch;
+	            while ((ch = r.read(data)) != -1) {
+	            	if (log.isTraceEnabled())
+	            		log.trace("Read " + ch + " bytes");
+	            }
+	
+	
+	        } finally {
+	
+	            r.close();
+	
+	        }
+    	} catch (final RuntimeException | IOException e) {
+    		if (InnerCause.isInnerCause(e, EOFException.class)) {
+    			// fine
+    		} else {
+    			throw e;
+    		}
+    	}
 
     }
 

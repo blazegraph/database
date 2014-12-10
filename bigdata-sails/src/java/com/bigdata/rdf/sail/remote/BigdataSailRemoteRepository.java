@@ -116,8 +116,11 @@ public class BigdataSailRemoteRepository implements Repository {
 	public void shutDown() throws RepositoryException {
 
 		// FIXME: this should be handled more cleanly
-		if (nss instanceof JettyRemoteRepositoryManager)
+		if (nss instanceof JettyRemoteRepositoryManager) {
 			((JettyRemoteRepositoryManager) nss).close();
+		} else {
+			System.err.println("DEBUG: Not closing JettyRemoteRepository");
+		}
 		
 		if (executor != null)
 			executor.shutdownNow();

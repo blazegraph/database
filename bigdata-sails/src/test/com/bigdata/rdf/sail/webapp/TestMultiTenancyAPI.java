@@ -289,8 +289,6 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          */
         final String namespace2 = "kb2-" + UUID.randomUUID();
         
-        System.err.println("TEST_CREATE01");
-
         doTestCreate(namespace2);
         
     }
@@ -315,7 +313,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 //        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
         final String namespace2 = "kb2-" + UUID.randomUUID() + "-&<>-foo";
 
-        System.err.println("TEST_CREATE02");
+        log.warn("TEST_CREATE02");
 
         doTestCreate(namespace2);
         
@@ -323,11 +321,12 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
     
     private void doTestCreate(final String namespace2) throws Exception {
         
-    	System.err.println("DO_TEST_CREATE - default namespace " + namespace);
+    	log.warn("DO_TEST_CREATE - default namespace " + namespace);
     	
     	{
     		// ensure default namespace is ready
     		m_repo.getRepositoryProperties(namespace);
+    		log.warn("Got properties for " + namespace);
     	}
 
     	
@@ -351,7 +350,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             final Properties p = m_repo.getRepositoryProperties(namespace2);
             assertNotNull(p);
             
-            System.err.println("Found properties for namespace " + namespace2);
+            log.warn("Found properties for namespace " + namespace2);
         }
 
         /*
@@ -388,7 +387,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         assertNotNull(otherKb);
         assertFalse(otherKb.sparqlEndpoint.isEmpty());
 
-        System.err.println("Found summaries for namespaces: " + namespace + " & " + namespace2);
+        log.warn("Found summaries for namespaces: " + namespace + " & " + namespace2);
         /*
          * Remove any other KBs from the map so we do not have side-effects.
          */
@@ -425,7 +424,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             
             // GET the properties for that data set.
             {
-                System.err.println("Looking for namespace " + ns);
+                log.warn("Looking for namespace " + ns);
                 /*final*/ Properties p = null;
                 try {
                 	p = m_repo.getRepositoryProperties(ns);
@@ -433,7 +432,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 	fail("Couldn't get the properties", t);
                 }
                 assertEquals(ns, p.getProperty(RelationSchema.NAMESPACE));
-                System.err.println("Found schema for " + ns);
+                log.warn("Found schema for " + ns);
             }
 
             final JettyRemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
@@ -488,6 +487,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             {
                 
                 m_repo.deleteRepository(ns);
+                
+                log.warn("Removing repository: " + ns);
                 
                 // one fewer data sets known to the server.
                 ndatasets--;
