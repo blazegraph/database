@@ -84,6 +84,15 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     }
     
     /**
+     * Create a Blueprints wrapper around a {@link BigdataSail} instance with
+     * a non-standard {@link BlueprintsValueFactory} implementation.
+     */
+    public BigdataGraphEmbedded(final BigdataSail sail, 
+            final BlueprintsValueFactory factory, final Properties props) {
+        this(new BigdataSailRepository(sail), factory, props);
+    }
+    
+    /**
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance.
      */
@@ -178,6 +187,10 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	@Override
 	@Deprecated
 	public void stopTransaction(Conclusion arg0) {
+	}
+	
+	public StringBuilder dumpStore() {
+	    return repo.getDatabase().dumpStore();
 	}
 	
 	

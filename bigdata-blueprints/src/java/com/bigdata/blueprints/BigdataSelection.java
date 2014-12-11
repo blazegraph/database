@@ -71,6 +71,11 @@ public class BigdataSelection {
         public Iterator<Map.Entry<String,Object>> iterator() {
             return vals.entrySet().iterator();
         }
+
+        @Override
+        public String toString() {
+            return "Bindings [vals=" + vals + "]";
+        }
         
     }
     

@@ -160,7 +160,7 @@ public class StaticAnalysisBase {
             
         } else if (op instanceof ArbitraryLengthPathNode) {
         	
-        	varSet.addAll(((ArbitraryLengthPathNode) op).getProducedBindings());
+        	varSet.addAll(((ArbitraryLengthPathNode) op).getMaybeProducedBindings());
         	
         	// do not recurse
         	return varSet;

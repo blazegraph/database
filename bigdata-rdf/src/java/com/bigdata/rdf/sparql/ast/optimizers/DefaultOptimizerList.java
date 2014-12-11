@@ -317,23 +317,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTGraphGroupOptimizer());
 
         /**
-         * Rewrites the WHERE clause of each query by lifting out any
-         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
-         * of any named subquery such that there is no more than one
-         * {@link ServiceNode} in that subquery by lifting out additional
-         * {@link ServiceNode}s into new named subqueries.
-         * <p>
-         * Note: This rewrite step is necessary to preserve the "run-once"
-         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
-         * any position other than the head of a named subquery, it will be
-         * invoked once for each solution which flows through that part of
-         * the query plan.  This is wasteful since the SERVICE call does not
-         * run "as-bound" (source solutions are not propagated to the SERVICE
-         * when it is invoked).
-         */
-        add(new ASTServiceNodeOptimizer());
-        
-        /**
          * Lift FILTERs which can be evaluated based solely on the bindings in
          * the parent group out of a child group. This helps because we will
          * issue the subquery for the child group less often (assuming that the
@@ -440,6 +423,28 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTFlattenJoinGroupsOptimizer());
 
+        /**
+         * Convert an ALP service call into an ArbitraryLengthPathNode
+         */
+        add(new ASTALPServiceOptimizer());
+
+        /**
+         * Rewrites the WHERE clause of each query by lifting out any
+         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
+         * of any named subquery such that there is no more than one
+         * {@link ServiceNode} in that subquery by lifting out additional
+         * {@link ServiceNode}s into new named subqueries.
+         * <p>
+         * Note: This rewrite step is necessary to preserve the "run-once"
+         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
+         * any position other than the head of a named subquery, it will be
+         * invoked once for each solution which flows through that part of
+         * the query plan.  This is wasteful since the SERVICE call does not
+         * run "as-bound" (source solutions are not propagated to the SERVICE
+         * when it is invoked).
+         */
+        add(new ASTServiceNodeOptimizer());
+        
         /*
          * Join Order Optimization
          */
@@ -472,6 +477,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Add range counts to all statement patterns.
          */
         add(new ASTRangeCountOptimizer());
+        
+        /**
+         * Attach cardinality to join groups and unions.  Not fully implemented
+         * yet.
+         */
+        add(new ASTCardinalityOptimizer());
         
 		/**
 		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range

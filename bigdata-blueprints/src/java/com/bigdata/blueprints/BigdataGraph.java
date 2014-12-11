@@ -55,6 +55,8 @@ import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.blueprints.BigdataGraphAtom.ElementType;
 import com.bigdata.blueprints.BigdataSelection.Bindings;
+import com.bigdata.rdf.sail.BigdataSailGraphQuery;
+import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Features;
@@ -72,6 +74,9 @@ import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 public abstract class BigdataGraph implements Graph {
 
     private static final transient Logger log = Logger.getLogger(BigdataGraph.class);
+    
+    private static final transient Logger sparqlLog = Logger.getLogger(
+            BigdataGraph.class.getName() + ".SparqlLogger");
     
     public interface Options {
         
@@ -116,7 +121,7 @@ public abstract class BigdataGraph implements Graph {
 	/**
 	 * Factory for round-tripping between Blueprints data and RDF data.
 	 */
-	final BlueprintsValueFactory factory;
+	protected final BlueprintsValueFactory factory;
 	
 	/**
 	 * Allow re-use of edge identifiers.
@@ -1367,8 +1372,19 @@ public abstract class BigdataGraph implements Graph {
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
         
+        if (sparqlLog.isTraceEnabled()) {
+            sparqlLog.trace("query:\n"+queryStr);
+        }
+                
         final org.openrdf.query.GraphQuery query = 
                 cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+        
+        if (sparqlLog.isTraceEnabled()) {
+            if (query instanceof BigdataSailGraphQuery) {
+                final BigdataSailGraphQuery bdgq = (BigdataSailGraphQuery) query;
+                sparqlLog.trace("optimized AST:\n"+bdgq.optimize());
+            }
+        }
         
         final GraphQueryResult result = query.evaluate();
         
@@ -1491,8 +1507,19 @@ public abstract class BigdataGraph implements Graph {
         
         try {
             
+            if (sparqlLog.isTraceEnabled()) {
+                sparqlLog.trace("query:\n"+queryStr);
+            }
+            
             final TupleQuery query = (TupleQuery) 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+            
+            if (sparqlLog.isTraceEnabled()) {
+                if (query instanceof BigdataSailTupleQuery) {
+                    final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+                    sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+                }
+            }
             
             final TupleQueryResult result = query.evaluate();
             try {
