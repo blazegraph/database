@@ -40,6 +40,7 @@ import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.http.HttpHeader;
 
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.StackInfoReport;
 
 public class JettyResponseListener extends InputStreamResponseListener {
 	
@@ -56,8 +57,8 @@ public class JettyResponseListener extends InputStreamResponseListener {
 				final long start = traceEnabled ? System.currentTimeMillis() : 0;
 				
 				// FIXME: added only to see if this removes the EOFException in CI!
-				log.debug("REMOVE SLEEP ONCE FIXED");
-				Thread.sleep(50);
+				// log.debug("REMOVE SLEEP ONCE FIXED");
+				// Thread.sleep(50);
 				
 				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes, for queued requests!
 				// m_response = await(300, TimeUnit.SECONDS).getResponse(); // wait up to 5 minutes!
@@ -133,18 +134,33 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	
 	/**
 	 * Ensure we have the stream ready before trying to process it!
+	 * 
+	 * But also allow getInputStream to be called multiple times (for now)
 	 */
-	public InputStream getInputStream() {
+	
+	private StackInfoReport streamSourced = null;
+	public InputStream getInputStream(final boolean forcenew) {
+		if (!forcenew) {
+			if (streamSourced != null) {
+				throw new RuntimeException("Who did this first?", streamSourced);
+			}
+			// streamSourced = new StackInfoReport();
+		}
+			
 		ensureResponse();
 		
 		return super.getInputStream();
+	}
+
+	public InputStream getInputStream() {
+		return getInputStream(false);
 	}
 
     public void consume()
             throws IOException {
     	
     	try {
-	        final InputStream r = getInputStream();
+	        final InputStream r = getInputStream(true);
 	
 	        try {
 	

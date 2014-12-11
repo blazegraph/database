@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -12,6 +14,7 @@ import java.util.UUID;
 
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jetty.util.IO;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -425,6 +428,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             // GET the properties for that data set.
             {
                 log.warn("Looking for namespace " + ns);
+                Thread.sleep(100); // FIXME: Avoids stochastic CI failure
                 /*final*/ Properties p = null;
                 try {
                 	p = m_repo.getRepositoryProperties(ns);
@@ -432,8 +436,8 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 	fail("Couldn't get the properties", t);
                 }
                 assertEquals(ns, p.getProperty(RelationSchema.NAMESPACE));
-                log.warn("Found schema for " + ns);
-            }
+                log.warn("Found schema for " + ns);                
+             }
 
             final JettyRemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
 
@@ -595,6 +599,12 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
         // TODO Verify that top-level status and counters still work.
         
+    }
+    
+    public void testEOFStreams() throws IOException {
+    	final InputStream closed = IO.getClosedStream();
+    	
+    	assertTrue(closed.read() == -1);
     }
 
 }

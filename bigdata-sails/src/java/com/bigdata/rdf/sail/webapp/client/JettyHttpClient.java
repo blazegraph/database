@@ -26,9 +26,21 @@ public class JettyHttpClient extends HttpClient {
 		this(false/*do NOT auto close by default*/);
 	}
 	
+	public JettyHttpClient(final String keystorepath) {
+		this(false/*do NOT auto close by default*/, new SslContextFactory(keystorepath));
+	}
+	
 	public JettyHttpClient(final boolean autoclose) {
-		super(new SslContextFactory(true)); // Use default SSL factory
+		this(autoclose, new SslContextFactory(true)); // Use default SSL factory
+	}
 		
+	public JettyHttpClient(final boolean autoclose, final String keystorepath) {
+		this(autoclose, new SslContextFactory(keystorepath)); // Use default SSL factory
+	}
+		
+	public JettyHttpClient(final boolean autoclose, final SslContextFactory sslFactory) {
+		super(sslFactory); // Use default SSL factory
+			
 		m_autoClose = autoclose;
 		/*
 		 * Ensure that the client follows redirects using a standard policy.

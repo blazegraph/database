@@ -273,9 +273,14 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 		response = doConnect(opts);
 
-		checkResponseCode(url, response);
-
-		return streamToString(response.getInputStream());
+		try {
+			checkResponseCode(url, response);
+	
+			return streamToString(response.getInputStream());
+		} finally {
+			if (response != null)
+				response.consume();
+		}
 
 	}
 
