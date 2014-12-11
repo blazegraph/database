@@ -270,7 +270,6 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         try {
 
             checkResponseCode(response = doConnect(opts));
-
         } finally {
         	if (response != null)
         		response.consume();
@@ -378,7 +377,6 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         } catch (Exception e) {
             consumeNeeded = !InnerCause.isInnerCause(e,
                     HttpException.class);
-        	consumeNeeded = true;
         	throw e;
         } finally {
 

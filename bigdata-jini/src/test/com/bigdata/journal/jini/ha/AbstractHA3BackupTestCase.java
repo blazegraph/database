@@ -106,17 +106,18 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 
         opts.method = "GET";
 
-        try {
+        JettyResponseListener response = null;
 
-            final JettyResponseListener response;
+        try {
 
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
 					serviceURL, executorService);
 			try {
 	            JettyRemoteRepository.checkResponseCode(response = rpm.doConnect(opts));
-	
-	            response.consume();
 			} finally {
+				if (response != null)
+					response.consume();
+				
 				rpm.close();
 			}
 

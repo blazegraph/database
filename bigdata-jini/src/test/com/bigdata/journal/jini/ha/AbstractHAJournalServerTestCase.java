@@ -299,8 +299,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         opts.method = "GET";
 
+		JettyResponseListener response = null;
 		try {
-			final JettyResponseListener response;
 
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
 					serviceURL, executorService);
@@ -308,8 +308,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 				JettyRemoteRepository.checkResponseCode(response = rpm
 						.doConnect(opts));
 
-				response.consume();
 			} finally {
+				if (response != null)
+					response.consume();
+				
 				rpm.close();
 			}
 
