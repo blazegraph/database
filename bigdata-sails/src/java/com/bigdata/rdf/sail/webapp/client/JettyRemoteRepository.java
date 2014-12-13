@@ -428,11 +428,6 @@ public class JettyRemoteRepository {
 			if (JettyHttpClient.activeCount() > 20) {
 				System.err.println("Started DefaultClient() " + JettyHttpClient.activeCount());				
 			}
-
-			while (!httpClient.isStarted()) {
-				// FIXME: use listener pattern
-				Thread.sleep(5);
-			}
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -743,11 +738,8 @@ public class JettyRemoteRepository {
 
         JettyResponseListener response = null;
         try {
-            log.warn("CANCEL START!");
             // Issue request, check response status code.
             checkResponseCode(response = doConnect(opts));
-            
-            log.warn("CANCEL CLEAN!", new StackInfoReport());
         } finally {
             /*
              * Ensure that the http response entity is consumed so that the http
@@ -1383,7 +1375,11 @@ public class JettyRemoteRepository {
                 // Note: No response body is expected.
                 
                 checkResponseCode(response = doConnect(opts));
-                
+            } catch (Exception e) {
+            	// log.warn("REMOVE SLEEP: SparqlUpdate problem");
+            	// Thread.sleep(50); // FIXME: this should not be necessary, but avoids EOFExceptions
+            	
+            	throw e;
             } finally {
                 
             	if (response != null)
@@ -1786,7 +1782,7 @@ public class JettyRemoteRepository {
         final int rc = responseListener.getStatus();
         
         if (rc < 200 || rc >= 300) {
-        
+        	
             throw new HttpException(rc, "Status Code=" + rc + ", Status Line="
                     + responseListener.getReason() + ", Response="
                     + responseListener.getResponseBody());

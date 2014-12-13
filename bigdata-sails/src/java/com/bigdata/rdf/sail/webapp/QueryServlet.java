@@ -516,9 +516,8 @@ public class QueryServlet extends BigdataRDFServlet {
 					)).get();
 
 		} catch (Throwable t) {
-
+			// if (!InnerCause.isInnerCause(t, DatasetNotFoundException.class))
 			launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
-
 		}
 	
 	}
