@@ -316,8 +316,6 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 //        final String namespace2 = "kb2-" + UUID.randomUUID() + "-&/<>-foo";
         final String namespace2 = "kb2-" + UUID.randomUUID() + "-&<>-foo";
 
-        log.warn("TEST_CREATE02");
-
         doTestCreate(namespace2);
         
     }
@@ -360,17 +358,13 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          * Verify error if attempting to create a KB for a namespace which
          * already exists.
          */
-        try {
+		try {
+			m_repo.createRepository(namespace2, properties);
 
-            m_repo.createRepository(namespace2, properties);
-            
-            fail("Expecting: " + HttpServletResponse.SC_CONFLICT);
-            
-        } catch (HttpException ex) {
-            
-            assertEquals(HttpServletResponse.SC_CONFLICT, ex.getStatusCode());
-            
-        }
+			fail("Expecting: " + HttpServletResponse.SC_CONFLICT);
+		} catch (HttpException ex) {
+			assertEquals(HttpServletResponse.SC_CONFLICT, ex.getStatusCode());
+		}
 
         // Get the summaries, indexed by the data set namespace.
         final Map<String/* namespace */, VoidSummary> summaries = indexOnNamespace(getRepositoryDescriptions()
@@ -398,19 +392,16 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 			final Iterator<Map.Entry<String, VoidSummary>> itr = summaries.entrySet().iterator();
 
 			while(itr.hasNext()) {
-				
 				final Map.Entry<String,VoidSummary> e = itr.next();
 				
 				if(e.getKey().equals(namespace)||e.getKey().equals(namespace2)) 
 					continue;
 				
 				itr.remove();
-				
 			}
 
 			// Only two are left.
 			assertEquals(2,summaries.size());
-			
         }
         
         /*
@@ -420,6 +411,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         // Decremented as we delete data sets.
         int ndatasets = summaries.size(); 
         
+        int nsindex = 0;
         for(VoidSummary summary : summaries.values()) {
 
             // The namespace for that data set.
@@ -427,12 +419,13 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             
             // GET the properties for that data set.
             {
-                log.warn("Looking for namespace " + ns);
-                Thread.sleep(100); // FIXME: Avoids stochastic CI failure
+                log.warn("Looking for namespace " + nsindex++ + " " + ns);
                 /*final*/ Properties p = null;
                 try {
+                    log.warn("Fetching properties " + ns);
                 	p = m_repo.getRepositoryProperties(ns);
                 } catch (Throwable t) {
+                	log.warn("Couldn't get properties for " + ns, t); // to help see failure in log!
                 	fail("Couldn't get the properties", t);
                 }
                 assertEquals(ns, p.getProperty(RelationSchema.NAMESPACE));
@@ -442,17 +435,13 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             final JettyRemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
 
             {
-
                 // GET the Service Description for the data set.
                 {
-
                 	JettyRemoteRepository.asGraph(tmp.getServiceDescription());
-
                 }
 
                 // Test a SPARQL 1.1. Query against the data set.
                 {
-
                     final TupleQueryResult result = tmp.prepareTupleQuery(
                             "SELECT (COUNT(*) as ?count) {?s ?p ?o}")
                             .evaluate();
@@ -461,16 +450,13 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
                     if(log.isInfoEnabled())
                     	log.info("namespace=" + ns + ", triples=" + nresults);
-
                 }
 
                 // Test a SPARQL 1.1 Update against the data set.
                 {
-
                     tmp.prepareUpdate(
                             "PREFIX : <http://www.bigdata.com> \n"
                                     + "INSERT DATA {:a :b :c}").evaluate();
-
                 }
 
                 /*
@@ -489,19 +475,16 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
              * service description, sparql query & update, etc).
              */
             {
-                
                 m_repo.deleteRepository(ns);
                 
                 log.warn("Removing repository: " + ns);
                 
                 // one fewer data sets known to the server.
                 ndatasets--;
-                
-            }
+             }
 
             // Describe data sets now reports one fewer data sets.
             {
-                
                 // Get the summaries, indexed by the data set namespace.
                 final Map<String/* namespace */, VoidSummary> summaries2 = indexOnNamespace(getRepositoryDescriptions()
                         .values());
@@ -511,89 +494,68 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
              
                 // The deleted namespace is no longer reported.
                 assertNull(summaries2.get(ns));
-                
             }
             
             // Properties now fails.
             {
-             
                 try {
-                
                     m_repo.getRepositoryProperties(ns);
                     
                     fail("Expecting " + BigdataServlet.HTTP_NOTFOUND);
-
                 } catch (HttpException ex) {
-                
                     assertEquals(BigdataServlet.HTTP_NOTFOUND,
                             ex.getStatusCode());
-                    
                 }
-                
             }
-
+           
             // Service Description now fails.
             {
-
                 try {
-                
                     tmp.getServiceDescription();
                     
                     fail("Expecting " + BigdataServlet.HTTP_NOTFOUND);
-
                 } catch (HttpException ex) {
-                
                     assertEquals(BigdataServlet.HTTP_NOTFOUND,
                             ex.getStatusCode());
-                    
                 }
-
             }
 
             // SPARQL 1.1. Query against the data set now fails.
             {
-
                 TupleQueryResult result = null;
                 try {
-                    
                     result = tmp.prepareTupleQuery(
                             "SELECT (COUNT(*) as ?count) {?s ?p ?o}")
                             .evaluate();
                     
                     fail("Expecting " + BigdataServlet.HTTP_NOTFOUND);
-
                 } catch (HttpException ex) {
-
                     assertEquals(BigdataServlet.HTTP_NOTFOUND,
                             ex.getStatusCode());
                 } finally {
-
                     if (result != null)
                         result.close();
-                
                 }
-
             }
 
             // SPARQL 1.1 Update against the data set now fails.
+            // FIXME: This code can result in a later EOFExeption generated
+            //	by the next query
             {
-
                 try {
-                    
                     tmp.prepareUpdate(
                             "PREFIX : <http://www.bigdata.com> \n"
                                     + "INSERT DATA {:a :b :c}").evaluate();
 
                     fail("Expecting " + BigdataServlet.HTTP_NOTFOUND);
-
                 } catch (HttpException ex) {
-
                     assertEquals(BigdataServlet.HTTP_NOTFOUND,
                             ex.getStatusCode());
-
                 }
-
             }
+
+        	// When this fails
+            // Thread.sleep(50); // FIXME: Avoids stochastic CI failure
 
         }
 

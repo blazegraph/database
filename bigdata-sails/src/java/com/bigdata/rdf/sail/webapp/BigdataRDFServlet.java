@@ -191,6 +191,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 					/*
 					 * The addressed KB does not exist.
 					 */
+					// log.error("Set SC_NOT_FOUND: DATABASE NOT FOUND!");
 					resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
 					resp.setContentType(MIME_TEXT_PLAIN);
 				} else if (InnerCause.isInnerCause(t,
@@ -249,7 +250,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                     // ignore any problems here.
                 }
             }
+            
+            // log.warn("CHECK: Not rethrowing exception if response has been set, comitted: " + resp.isCommitted());
+            // do not rethrow
+            return null;
         }
+        
         if (t instanceof RuntimeException) {
             throw (RuntimeException) t;
         } else if (t instanceof Error) {
