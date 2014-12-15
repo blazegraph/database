@@ -1,9 +1,6 @@
 package com.bigdata.rdf.internal;
 
-import java.math.BigInteger;
 import java.util.Arrays;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 
@@ -152,7 +149,7 @@ public final class Inet4Address {
     	
         return (src[0] & 0xff) + "." + (src[1] & 0xff) + "." + 
         	   (src[2] & 0xff) + "." + (src[3] & 0xff) +
-        	   (netmask < 32 ? "/" + netmask : ""); 
+        	   (netmask <= 32 ? "/" + netmask : ""); 
     }
 
 	public static Inet4Address textToAddr(String... s) {
@@ -241,7 +238,7 @@ public final class Inet4Address {
 				 */
 				for (int i = 0; i < 5; i++) {
 					val = Integer.parseInt(s[i]);
-					if (val < 0 || val > 0xff)
+					if (val < 0 || val > 32)
 						return null;
 					res[i] = (byte) (val & 0xff);
 				}
