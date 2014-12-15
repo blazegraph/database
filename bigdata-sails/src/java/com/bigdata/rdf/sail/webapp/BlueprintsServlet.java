@@ -101,7 +101,7 @@ public class BlueprintsServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp, "");
+            BigdataRDFServlet.launderThrowable(t, resp, "");
             
         }
         

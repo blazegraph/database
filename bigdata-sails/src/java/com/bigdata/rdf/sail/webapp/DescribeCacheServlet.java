@@ -312,73 +312,72 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
                 return;
 
             }
+        }
 
+        /*
+         * CONNEG
+         */
+        final RDFFormat format;
+        {
             /*
-             * CONNEG
+             * CONNEG for the MIME type.
+             * 
+             * Note: An attempt to CONNEG for a MIME type which can not be
+             * used with a given type of query will result in a response
+             * using a default MIME Type for that query.
              */
-            final RDFFormat format;
-            {
+            final String acceptStr = req.getHeader("Accept");
+
+            final ConnegUtil util = new ConnegUtil(acceptStr);
+
+            format = util.getRDFFormat(RDFFormat.RDFXML);
+        }
+
+        /*
+         * Generate response.
+         */
+        try {
+           
+            final String mimeType = format.getDefaultMIMEType();
+            
+            resp.setContentType(mimeType);
+
+            if (isAttachment(mimeType)) {
                 /*
-                 * CONNEG for the MIME type.
-                 * 
-                 * Note: An attempt to CONNEG for a MIME type which can not be
-                 * used with a given type of query will result in a response
-                 * using a default MIME Type for that query.
+                 * Mark this as an attachment (rather than inline). This is
+                 * just a hint to the user agent. How the user agent handles
+                 * this hint is up to it.
                  */
-                final String acceptStr = req.getHeader("Accept");
-
-                final ConnegUtil util = new ConnegUtil(acceptStr);
-
-                format = util.getRDFFormat(RDFFormat.RDFXML);
+                resp.setHeader("Content-disposition",
+                        "attachment; filename=query" + UUID.randomUUID()
+                                + "." + format.getDefaultFileExtension());
             }
 
-            /*
-             * Generate response.
-             */
-            try {
-               
-                final String mimeType = format.getDefaultMIMEType();
-                
-                resp.setContentType(mimeType);
+            if (format.hasCharset()) {
 
-                if (isAttachment(mimeType)) {
-                    /*
-                     * Mark this as an attachment (rather than inline). This is
-                     * just a hint to the user agent. How the user agent handles
-                     * this hint is up to it.
-                     */
-                    resp.setHeader("Content-disposition",
-                            "attachment; filename=query" + UUID.randomUUID()
-                                    + "." + format.getDefaultFileExtension());
-                }
+                // Note: Binary encodings do not specify charset.
+                resp.setCharacterEncoding(format.getCharset().name());
 
-                if (format.hasCharset()) {
-
-                    // Note: Binary encodings do not specify charset.
-                    resp.setCharacterEncoding(format.getCharset().name());
-
-                }
-                
-                final OutputStream os = resp.getOutputStream();
-
-                final RDFWriter w = RDFWriterRegistry.getInstance().get(format)
-                        .getWriter(os);
-
-                w.startRDF();
-
-                for (Statement s : g)
-                    w.handleStatement(s);
-                
-                w.endRDF();
-                os.flush();
-
-            } catch (Throwable e) {
-
-                throw BigdataRDFServlet.launderThrowable(e, resp,
-                        "DESCRIBE: uris=" + internalURIs);
-                
             }
+            
+            final OutputStream os = resp.getOutputStream();
 
+            final RDFWriter w = RDFWriterRegistry.getInstance().get(format)
+                    .getWriter(os);
+
+            w.startRDF();
+
+            for (Statement s : g)
+                w.handleStatement(s);
+            
+            w.endRDF();
+            os.flush();
+
+        } catch (Throwable e) {
+
+            BigdataRDFServlet.launderThrowable(e, resp,
+                    "DESCRIBE: uris=" + internalURIs);
+            
         }
 
     }
