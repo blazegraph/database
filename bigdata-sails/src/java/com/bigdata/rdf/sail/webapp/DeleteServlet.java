@@ -413,7 +413,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp,
+            BigdataRDFServlet.launderThrowable(t, resp,
                     "DELETE-WITH-BODY: baseURI=" + baseURI + ", context-uri="
                             + Arrays.toString(defaultContext));
 
@@ -613,7 +613,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp,
+            BigdataRDFServlet.launderThrowable(t, resp,
                     "DELETE-WITH-ACCESS-PATH: (s=" + s + ",p=" + p + ",o=" + o
                             + ",c=" + c + ")");
 
