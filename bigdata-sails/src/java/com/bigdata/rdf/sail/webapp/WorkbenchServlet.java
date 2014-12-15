@@ -164,7 +164,7 @@ public class WorkbenchServlet extends BigdataRDFServlet {
 	        
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp, null);
+            BigdataRDFServlet.launderThrowable(t, resp, null);
 
         }
 

@@ -190,7 +190,7 @@ public class CountersServlet extends BigdataServlet {
         
         } catch (Throwable t) {
             
-            throw BigdataRDFServlet.launderThrowable(t, resp, "");
+            BigdataRDFServlet.launderThrowable(t, resp, "");
             
         }
 
