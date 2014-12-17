@@ -66,7 +66,6 @@ import com.bigdata.util.InnerCause;
  * data and/or SPARQL query layers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class BigdataRDFServlet extends BigdataServlet {
 
@@ -141,43 +140,39 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 //    }
 
     /**
-     * Write the stack trace onto the output stream. This will show up in the
-     * client's response. This code path should be used iff we have already
-     * begun writing the response. Otherwise, an HTTP error status should be
-     * used instead.
-     * <p>
-     * This method is invoked as follows:
-     * 
-     * <pre>
-     * throw launderThrowable(...)
-     * </pre>
-     * 
-     * This keeps the compiler happy since it will understand that the caller's
-     * method always exits with a thrown cause.
-     * 
-     * @param t
-     *            The thrown error.
-     * @param os
-     *            The stream on which the response will be written.
-     * @param queryStr
-     *            The SPARQL Query -or- SPARQL Update command (if available)
-     *            -or- a summary of the REST API command -or- an empty string if
-     *            nothing else is more appropriate.
-     * 
-     * @return Nothing. The pattern of the returned throwable is used to make
-     *         the compiler happy.
-     * 
-     * @throws IOException
-     *             if the cause was an {@link IOException}
-     * @throws Error
-     *             if the cause was an {@link Error}.
-     * @throws RuntimeException
-     *             if the cause was a {@link RuntimeException} or anything not
-     *             declared to be thrown by this method.
-     */
-    protected static RuntimeException launderThrowable(final Throwable t,
-            final HttpServletResponse resp, final String queryStr)
-            throws IOException {
+	 * Best effort to write the stack trace onto the output stream so it will
+	 * show up in the HTTP response. This code path should be used iff we have
+	 * already begun writing the response. Otherwise, an HTTP error status
+	 * should be used instead. REST API methods that have defined HTTP status
+	 * codes (e.g., for {@link HttpServletResponse#SC_BAD_REQUEST}) should
+	 * verify the request before proceeding in order to satisify their API
+	 * semantics.
+	 * <p>
+	 * This method is invoked as follows:
+	 * 
+	 * <pre>
+	 * launderThrowable(...)
+	 * </pre>
+	 * 
+	 * This method MUST be invoked from the top-level where the request is
+	 * handled. The servlet container may ABORT the connection if there is an
+	 * attempt to write onto a closed response. This can cause EOF errors in the
+	 * client.
+	 * 
+	 * @param t
+	 *            The thrown error.
+	 * @param os
+	 *            The stream on which the response will be written.
+	 * @param queryStr
+	 *            The SPARQL Query -or- SPARQL Update command (if available)
+	 *            -or- a summary of the REST API command -or- an empty string if
+	 *            nothing else is more appropriate.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1075" > LaunderThrowable
+	 *      should never throw an exception </a>
+	 */
+    protected static void launderThrowable(final Throwable t,
+            final HttpServletResponse resp, final String queryStr) {
         final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
             // log an error for the service.
@@ -185,85 +180,89 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         } finally {
             // ignore any problems here.
         }
-        if (resp != null) {
-            if (!resp.isCommitted()) {
-				if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+		if (resp == null) {
+			// Nothing can be done.
+			return;
+		}
+		if (!resp.isCommitted()) {
+			/*
+			 * Set appropriate status code.
+			 * 
+			 * Note: A committed response has already had its status code and
+			 * headers written.
+			 */
+			if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+				/*
+				 * The addressed KB does not exist.
+				 */
+				resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t,
+					ConstraintViolationException.class)) {
+				/*
+				 * A constraint violation is a bad request (the data violates
+				 * the rules) not a server error.
+				 */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause
+					.isInnerCause(t, MalformedQueryException.class)) {
+				/*
+				 * Send back a BAD REQUEST (400) along with the text of the
+				 * syntax error message.
+				 * 
+				 * TODO Write unit test for 400 response for bad client request.
+				 */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else {
+				// Internal server error.
+				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			}
+		}
+		/*
+		 * Attempt to write the stack trace on the response.
+		 * 
+		 * Note: If the OutputStream has already been closed then an IOException
+		 * is caught and ignored.
+		 */
+		{
+			OutputStream os = null;
+			try {
+				os = resp.getOutputStream();
+				final PrintWriter w = new PrintWriter(os);
+				if (queryStr != null) {
 					/*
-					 * The addressed KB does not exist.
+					 * Write the query onto the output stream.
 					 */
-					// log.error("Set SC_NOT_FOUND: DATABASE NOT FOUND!");
-					resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-					resp.setContentType(MIME_TEXT_PLAIN);
-				} else if (InnerCause.isInnerCause(t,
-						ConstraintViolationException.class)) {
-					/*
-					 * A constraint violation is a bad request (the data
-					 * violates the rules) not a server error.
-					 */
-					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-					resp.setContentType(MIME_TEXT_PLAIN);
-				} else if (InnerCause.isInnerCause(t,
-						MalformedQueryException.class)) {
-					/*
-					 * Send back a BAD REQUEST (400) along with the text of the
-					 * syntax error message.
-					 * 
-					 * TODO Write unit test for 400 response for bad client
-					 * request.
-					 */
-					resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-					resp.setContentType(MIME_TEXT_PLAIN);
-				} else {
-					// Internal server error.
-					resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    resp.setContentType(MIME_TEXT_PLAIN);
-                }
-            }
-            OutputStream os = null;
-            try {
-                os = resp.getOutputStream();
-                final PrintWriter w = new PrintWriter(os);
-                if (queryStr != null) {
-                    /*
-                     * Write the query onto the output stream.
-                     */
-                    w.write(queryStr);
-                    w.write("\n");
-                }
-                /*
-                 * Write the stack trace onto the output stream.
-                 */
-                t.printStackTrace(w);
-                w.flush();
-                // flush the output stream.
-                os.flush();
-            } catch (IOException ex) {
-                // Could not write on output stream.
-            } finally {
-                // ignore any problems here.
-            }
-            if (os != null) {
-                try {
-                    // ensure output stream is closed.
-                    os.close();
-                } catch (Throwable t2) {
-                    // ignore any problems here.
-                }
-            }
-            
-            // log.warn("CHECK: Not rethrowing exception if response has been set, comitted: " + resp.isCommitted());
-            // do not rethrow
-            return null;
-        }
-        
-        if (t instanceof RuntimeException) {
-            throw (RuntimeException) t;
-        } else if (t instanceof Error) {
-            throw (Error) t;
-        } else if (t instanceof IOException) {
-            throw (IOException) t;
-        } else
-            throw new RuntimeException(t);
+					w.write(queryStr);
+					w.write("\n");
+				}
+				/*
+				 * Write the stack trace onto the output stream.
+				 */
+				t.printStackTrace(w);
+				w.flush();
+				// flush the output stream.
+				os.flush();
+			} catch (IOException ex) {
+				// Could not write on output stream.
+			} finally {
+				// ignore any problems here.
+			}
+			if (os != null) {
+				try {
+					// ensure output stream is closed.
+					os.close();
+				} catch (Throwable t2) {
+					// ignore any problems here.
+				}
+			}
+		}
+		/*
+		 * Nothing is thrown.
+		 */
     }
 
     /**
@@ -482,8 +481,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             writer.endRDF();
             os.flush();
         } catch (RDFHandlerException e) {
-            // log.error(e, e);
-            throw launderThrowable(e, resp, "");
+        	// wrap and rethrow. will be handled by launderThrowable().
+            throw new IOException(e);
         } finally {
             os.close();
         }
@@ -516,17 +515,14 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         resp.setContentType(format.getDefaultMIMEType());
 
         final OutputStream os = resp.getOutputStream();
-        try {
-            final PropertiesWriter writer = PropertiesWriterRegistry
-                    .getInstance().get(format).getWriter(os);
-            writer.write(properties);
-            os.flush();
-        } catch (IOException e) {
-            // log.error(e, e);
-            throw launderThrowable(e, resp, "");
-        } finally {
-            os.close();
-        }
+		try {
+			final PropertiesWriter writer = PropertiesWriterRegistry
+					.getInstance().get(format).getWriter(os);
+			writer.write(properties);
+			os.flush();
+		} finally {
+			os.close();
+		}
     }
 
     /**

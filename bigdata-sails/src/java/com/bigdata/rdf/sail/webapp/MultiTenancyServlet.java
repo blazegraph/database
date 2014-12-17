@@ -416,7 +416,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         } catch (Throwable e) {
 
-            throw launderThrowable(e, resp, "namespace=" + namespace);
+            launderThrowable(e, resp, "namespace=" + namespace);
 
         }
         
@@ -466,7 +466,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         } catch (Throwable e) {
 
-            throw launderThrowable(e, resp, "");
+            launderThrowable(e, resp, "");
 
         } finally {
 
@@ -570,6 +570,10 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
 			sendProperties(req, resp, properties);
 
+		} catch(Throwable t) {
+			
+			launderThrowable(t, resp, "namespace=" + namespace);
+			
 		} finally {
 
 		    getBigdataRDFContext().abortTx(tx);
@@ -640,6 +644,12 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             }
 
             sendGraph(req, resp, g);
+
+		} catch (Throwable t) {
+
+			launderThrowable(t, resp, "describeEachNamedGraph="
+					+ describeEachNamedGraph + ", describeDefaultNamespace="
+					+ describeDefaultNamespace);
 
         } finally {
 
