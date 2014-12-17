@@ -207,7 +207,7 @@ public class InsertServlet extends BigdataRDFServlet {
             
         } catch (Throwable t) {
 
-            throw BigdataRDFServlet.launderThrowable(t, resp,
+            BigdataRDFServlet.launderThrowable(t, resp,
                     "INSERT-WITH-BODY: baseURI=" + baseURI + ", context-uri="
                             + Arrays.toString(defaultContext));
 
@@ -403,7 +403,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            throw launderThrowable(t, resp, "uri=" + urls + ", context-uri="
+            launderThrowable(t, resp, "uri=" + urls + ", context-uri="
                     + Arrays.toString(defaultContext));
 
         }

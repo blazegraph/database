@@ -297,6 +297,10 @@ public class QueryServlet extends BigdataRDFServlet {
             }
 
             sendGraph(req, resp, g);
+            
+		} catch (Throwable t) {
+
+			launderThrowable(t, resp, "");
 
         } finally {
 
