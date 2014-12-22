@@ -32,6 +32,8 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
 
@@ -271,7 +273,7 @@ public interface IHABufferStrategy extends IBufferStrategy {
      *             if the service is not joined with the met quorum for that
      *             token at any point during the operation.
      */
-    void writeOnStream(OutputStream os,
+    void writeOnStream(OutputStream os, Set<Entry<Long, byte[]>> coreData,
             Quorum<HAGlue, QuorumService<HAGlue>> quorum, long token)
             throws IOException, QuorumException;
 
