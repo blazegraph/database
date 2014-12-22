@@ -1519,4 +1519,43 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
+	void snapshot(TreeMap<Long, byte[]> tm) {
+		if (m_diskAddr > 0)
+			tm.put(m_store.metaBit2Addr(m_diskAddr), commitData());
+	}
+	
+	byte[] commitData() {
+		try {
+			
+			final AllocBlock fb = m_allocBlocks.get(0);
+
+			final byte[] buf = new byte[1024];
+			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
+			try {
+                str.writeInt(m_size);
+                
+                final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+                while (iter.hasNext()) {
+                    final AllocBlock block = iter.next();
+
+                    str.writeInt(block.m_addr);
+                    for (int i = 0; i < m_bitSize; i++) {
+                    	    str.writeInt(block.m_commit[i]);
+                    }
+
+                }
+                // add checksum
+                final int chk = ChecksumUtility.getCHK().checksum(buf,
+                        str.size());
+                str.writeInt(chk);
+			} finally {
+			    str.close();
+			}
+
+			return buf;
+		} catch (IOException e) {
+			throw new StorageTerminalError("Error on write", e);
+		}
+	}
+
 }

@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
@@ -58,6 +59,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -152,6 +154,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
@@ -6868,6 +6872,53 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
     }
+    
+    /**
+     * With lock held to ensure that there is no concurrent commit, copy
+     * key data atomically to ensure recovered snapshot is consistent with
+     * the commit state when the snapshot is taken.
+     * <p>
+     * If this is not done then it is possible for the allocation data - both
+     * metabits and fixed allocator commit bits - to be updated and inconsistent
+     * with the saved root blocks.So 
+     * @throws IOException 
+     */
+	public Set<java.util.Map.Entry<Long, byte[]>> snapshotAllocationData(final AtomicReference<IRootBlockView> rbv) throws IOException {
+		final Lock lock = _fieldReadWriteLock.readLock();
+
+		lock.lock();
+		try {
+			final TreeMap<Long, byte[]> tm = new TreeMap<Long, byte[]>();
+			final IBufferStrategy bs = getBufferStrategy();
+			
+			// clone rootblocks
+			final ByteBuffer rb0 = bs.readRootBlock(true/*is rb0*/);
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK0, rb0.array());
+			final ByteBuffer rb1 = bs.readRootBlock(false/*is rb0*/);
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK1, rb1.array());
+			
+			// return last commitCounter
+            final IRootBlockView rbv0 = new RootBlockView(true/* rootBlock0 */, rb0, checker);            
+            final IRootBlockView rbv1 = new RootBlockView(false/* rootBlock0 */, rb1, checker);
+            
+            rbv.set(RootBlockUtility.chooseRootBlock(rbv0, rbv1));
+			
+			if (bs instanceof RWStrategy) {
+				final RWStore rws = ((RWStrategy) bs).getStore();
+				
+				// get metabits
+				rws.snapshotMetabits(tm);
+				
+				// get committed allocations
+				rws.snapshotAllocators(tm);
+			}
+			
+			
+			return tm.entrySet();
+		} finally {
+			lock.unlock();
+		}
+	}
 
     /**
      * Implementation hooks into the various low-level operations required to

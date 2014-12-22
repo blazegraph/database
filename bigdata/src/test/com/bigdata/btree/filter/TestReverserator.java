@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.filter;
 
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
@@ -135,6 +136,39 @@ public class TestReverserator extends AbstractTupleCursorTestCase {
             }
 
         }
+
+    }
+
+    public void test_reverse_with_branching_factor() {
+
+		for (int bf = 64; bf < 1024; bf += 64) {
+			final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+			metadata.setBranchingFactor(bf);
+
+			BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+
+			final Random r = new Random();
+
+			for (int i = 1; i < 2000; i++) {
+
+				btree.insert("key" + r.nextInt(), "value" + r.nextInt());
+
+				final ITupleCursor2<String> cursor = newCursor(btree,
+						IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
+
+				final ITupleIterator<String> itr = new Reverserator<String>(
+						cursor);
+
+				int count = 0;
+
+				while (itr.hasNext()) {
+					itr.next();
+					count++;
+				}
+
+				assertTrue(i == count);
+			}
+		}
 
     }
 
