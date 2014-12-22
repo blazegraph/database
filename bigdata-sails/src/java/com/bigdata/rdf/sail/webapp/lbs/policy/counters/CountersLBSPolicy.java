@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;

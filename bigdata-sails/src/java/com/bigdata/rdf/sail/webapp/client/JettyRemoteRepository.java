@@ -424,10 +424,6 @@ public class JettyRemoteRepository {
 
 		try {
 			httpClient.start();
-						
-			if (JettyHttpClient.activeCount() > 20) {
-				System.err.println("Started DefaultClient() " + JettyHttpClient.activeCount());				
-			}
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
