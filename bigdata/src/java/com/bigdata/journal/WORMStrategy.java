@@ -33,6 +33,7 @@ import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -2653,9 +2654,13 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
     
     @Override 
-    public void writeOnStream(final OutputStream os,
+    public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
             throws IOException, QuorumException {
+    	
+    	if (snapshotData != null) {
+    		throw new UnsupportedOperationException("Implement merge of snapshot data");
+    	}
         
         IBufferAccess buf = null;
         try {
