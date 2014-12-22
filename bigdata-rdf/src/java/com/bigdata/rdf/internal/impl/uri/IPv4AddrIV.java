@@ -167,6 +167,9 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 			this.value = Inet4Address.textToAddr(s);
 			
 			if (value == null) {
+			    if (log.isDebugEnabled()) {
+			        log.debug("not a valid IP: " + hostAddress);
+			    }
 	            throw new UnknownHostException("not a valid IP: " + hostAddress);
 			}
 			
@@ -178,6 +181,9 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	        
 		} else {
 			
+            if (log.isDebugEnabled()) {
+                log.debug("not a valid IP: " + hostAddress);
+            }
 			throw new UnknownHostException("not a valid IP: " + hostAddress);
 			
 		}
