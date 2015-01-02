@@ -75,6 +75,7 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.MergeStreamWithSortedSet;
 
 /**
  * Disk-based Write Once Read Many (WORM) journal strategy. The phsyical layout
@@ -2656,127 +2657,143 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     @Override 
     public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
-            throws IOException, QuorumException {
-    	
-    	if (snapshotData != null) {
-    		throw new UnsupportedOperationException("Implement merge of snapshot data");
-    	}
-        
-        IBufferAccess buf = null;
-        try {
+			throws IOException, QuorumException {
 
-            try {
-                // Acquire a buffer.
-                buf = DirectBufferPool.INSTANCE.acquire();
-            } catch (InterruptedException ex) {
-                // Wrap and re-throw.
-                throw new IOException(ex);
-            }
-            
-            // The backing ByteBuffer.
-            final ByteBuffer b = buf.buffer();
-
-            // The capacity of that buffer (typically 1MB).
-            final int bufferCapacity = b.capacity();
-
-            // A big enough byte[].
-            final byte[] a = new byte[bufferCapacity];
-            
-            // The size of the root blocks (which we skip).
-            final int headerSize = FileMetadata.headerSize0;
-
-            /*
-             * The size of the file at the moment we begin. We will not
-             * replicate data on new extensions of the file. Those data will
-             * be captured by HALog files that are replayed by the service
-             * that is doing the rebuild.
-             */
-            final long fileExtent = getExtent();
-
-            // The #of bytes to be transmitted.
-            final long totalBytes = fileExtent - headerSize;
-            
-            // The #of bytes remaining.
-            long remaining = totalBytes;
-            
-            // The offset from which data is retrieved.
-            long offset = headerSize;
-            
-            long sequence = 0L;
-            
-            if (log.isInfoEnabled())
-                log.info("Writing on stream: nbytes=" + totalBytes);
-
-            while (remaining > 0) {
-
-                int nbytes = (int) Math.min((long) bufferCapacity,
-                        remaining);
-                
-                if (sequence == 0L && nbytes == bufferCapacity
-                        && remaining > bufferCapacity) {
-                    
-                    /*
-                     * Adjust the first block so the remainder will be
-                     * aligned on the bufferCapacity boundaries (IO
-                     * efficiency).
-                     */
-                    nbytes -= headerSize;
-
-                }
-
-                if (log.isDebugEnabled())
-                    log.debug("Writing block: sequence=" + sequence
-                            + ", offset=" + offset + ", nbytes=" + nbytes);
-
-                // read direct from store
-                final ByteBuffer clientBuffer = b;
-                clientBuffer.position(0);
-                clientBuffer.limit(nbytes);
-
-                readRaw(/*nbytes,*/ offset, clientBuffer);
-
-                assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
-                
-                if (BytesUtil
-                        .toArray(clientBuffer, false/* forceCopy */, a/* dst */) != a) {
-
-                    // Should have copied into our array.
-                    throw new AssertionError();
-                    
-                }
-
-                // write onto the stream.
-                os.write(a, 0/* off */, nbytes/* len */);
-
-                remaining -= nbytes;
-                
-                offset += nbytes;
-
-                sequence++;
-                
-                if (!quorum.getClient().isJoinedMember(token))
-                    throw new QuorumException();
-
-            }
-
-            if (log.isInfoEnabled())
-                log.info("Wrote on stream: #blocks=" + sequence + ", #bytes="
-                        + (fileExtent - headerSize));
-
-        } finally {
-            
-            if (buf != null) {
-                try {
-                    // Release the direct buffer.
-                    buf.release();
-                } catch (InterruptedException e) {
-                    log.warn(e);
-                }
-            }
-
-        }
-        
-    }
+		final FileChannelUtility.ReopenerInputStream instr = new FileChannelUtility.ReopenerInputStream(
+				opener);
+		try {
+			MergeStreamWithSortedSet.process(instr, snapshotData, os);
+			
+			if (!quorum.getClient().isJoinedMember(token))
+				throw new QuorumException();
+		} finally {
+			instr.close();
+		}
+	}
+    
+//    public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
+//            final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
+//            throws IOException, QuorumException {
+//    	
+//    	if (snapshotData != null) {
+//    		throw new UnsupportedOperationException("Implement merge of snapshot data");
+//    	}
+//        
+//        IBufferAccess buf = null;
+//        try {
+//
+//            try {
+//                // Acquire a buffer.
+//                buf = DirectBufferPool.INSTANCE.acquire();
+//            } catch (InterruptedException ex) {
+//                // Wrap and re-throw.
+//                throw new IOException(ex);
+//            }
+//            
+//            // The backing ByteBuffer.
+//            final ByteBuffer b = buf.buffer();
+//
+//            // The capacity of that buffer (typically 1MB).
+//            final int bufferCapacity = b.capacity();
+//
+//            // A big enough byte[].
+//            final byte[] a = new byte[bufferCapacity];
+//            
+//            // The size of the root blocks (which we skip).
+//            final int headerSize = FileMetadata.headerSize0;
+//
+//            /*
+//             * The size of the file at the moment we begin. We will not
+//             * replicate data on new extensions of the file. Those data will
+//             * be captured by HALog files that are replayed by the service
+//             * that is doing the rebuild.
+//             */
+//            final long fileExtent = getExtent();
+//
+//            // The #of bytes to be transmitted.
+//            final long totalBytes = fileExtent - headerSize;
+//            
+//            // The #of bytes remaining.
+//            long remaining = totalBytes;
+//            
+//            // The offset from which data is retrieved.
+//            long offset = headerSize;
+//            
+//            long sequence = 0L;
+//            
+//            if (log.isInfoEnabled())
+//                log.info("Writing on stream: nbytes=" + totalBytes);
+//
+//            while (remaining > 0) {
+//
+//                int nbytes = (int) Math.min((long) bufferCapacity,
+//                        remaining);
+//                
+//                if (sequence == 0L && nbytes == bufferCapacity
+//                        && remaining > bufferCapacity) {
+//                    
+//                    /*
+//                     * Adjust the first block so the remainder will be
+//                     * aligned on the bufferCapacity boundaries (IO
+//                     * efficiency).
+//                     */
+//                    nbytes -= headerSize;
+//
+//                }
+//
+//                if (log.isDebugEnabled())
+//                    log.debug("Writing block: sequence=" + sequence
+//                            + ", offset=" + offset + ", nbytes=" + nbytes);
+//
+//                // read direct from store
+//                final ByteBuffer clientBuffer = b;
+//                clientBuffer.position(0);
+//                clientBuffer.limit(nbytes);
+//
+//                readRaw(/*nbytes,*/ offset, clientBuffer);
+//
+//                assert clientBuffer.remaining() > 0 : "Empty buffer: " + clientBuffer;
+//                
+//                if (BytesUtil
+//                        .toArray(clientBuffer, false/* forceCopy */, a/* dst */) != a) {
+//
+//                    // Should have copied into our array.
+//                    throw new AssertionError();
+//                    
+//                }
+//
+//                // write onto the stream.
+//                os.write(a, 0/* off */, nbytes/* len */);
+//
+//                remaining -= nbytes;
+//                
+//                offset += nbytes;
+//
+//                sequence++;
+//                
+//                if (!quorum.getClient().isJoinedMember(token))
+//                    throw new QuorumException();
+//
+//            }
+//
+//            if (log.isInfoEnabled())
+//                log.info("Wrote on stream: #blocks=" + sequence + ", #bytes="
+//                        + (fileExtent - headerSize));
+//
+//        } finally {
+//            
+//            if (buf != null) {
+//                try {
+//                    // Release the direct buffer.
+//                    buf.release();
+//                } catch (InterruptedException e) {
+//                    log.warn(e);
+//                }
+//            }
+//
+//        }
+//        
+//    }
     
     @Override
     public void setExtentForLocalStore(final long extent) throws IOException,

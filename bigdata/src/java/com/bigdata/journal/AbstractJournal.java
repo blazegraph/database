@@ -6903,6 +6903,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
             rbv.set(RootBlockUtility.chooseRootBlock(rbv0, rbv1));
 			
+            // Disabling this test allows demonstration of the need to atomically snapshot the metabits and allocators
+            //	for the RWStore in conjunction with TestHA1SnapshotPolicy.test_snapshot_stressMultipleTx_restore_validate
 			if (bs instanceof RWStrategy) {
 				final RWStore rws = ((RWStrategy) bs).getStore();
 				

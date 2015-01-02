@@ -682,7 +682,11 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
             throws IOException, QuorumException {
 
-        m_store.writeOnStream(os, snapshotData, quorum, token);
+        try {
+			m_store.writeOnStream(os, snapshotData, quorum, token);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
 
     }
 
