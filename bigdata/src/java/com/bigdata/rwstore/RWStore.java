@@ -6102,21 +6102,26 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
     
     /**
+     * @throws InterruptedException 
      * @see IHABufferStrategy#writeOnStream(OutputStream, Quorum, long)
      */
     public void writeOnStream(final OutputStream os,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
-            throws IOException, QuorumException {
+            throws IOException, QuorumException, InterruptedException {
     	writeOnStream(os, new TreeSet<java.util.Map.Entry<Long, byte[]>>(), quorum, token);
     }
     
     public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
-            throws IOException, QuorumException {
+            throws IOException, QuorumException, InterruptedException {
     	
-    	final FileInputStream filein = new FileInputStream(this.m_fd);
-    	
-    	MergeStreamWithSortedSet.process(filein, snapshotData, os);
+    	// final FileInputStream filein = new FileInputStream(this.m_fd);
+    	final FileChannelUtility.ReopenerInputStream filein = new FileChannelUtility.ReopenerInputStream(m_reopener);
+    	try {
+    		MergeStreamWithSortedSet.process(filein, snapshotData, os);
+    	} finally {
+    		filein.close();
+    	}
     	
         if (!quorum.getClient().isJoinedMember(token))
             throw new QuorumException();

@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.io;
 
+import java.io.EOFException;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -505,6 +507,69 @@ public class TestFileChannelUtility extends TestCase {
             
         }
         
+    }
+    
+    public void testReopenerInputStream() throws IOException, InterruptedException {
+    	final Random r = new Random();
+    	
+        final File sourceFile = File.createTempFile("TestFileChannelUtility", getName());
+        sourceFile.deleteOnExit();
+        
+        final int filelen = 20 * 1024 * 1024;
+        
+        final FileOutputStream outstr = new FileOutputStream(sourceFile);
+        try {        
+        	// write 20M!
+        	byte[] buf = new byte[4096];
+        	r.nextBytes(buf);
+        	
+        	for (int i = 0; i < filelen; i += buf.length) {
+        		outstr.write(buf);
+        	}
+        	outstr.flush();
+        } finally {
+        	outstr.close();
+        }
+        
+        final RandomAccessFile raf = new RandomAccessFile(sourceFile, "rw");
+        final FileChannel channel = raf.getChannel();
+        
+        try {
+			final IReopenChannel<FileChannel> reopener = new IReopenChannel<FileChannel>() {
+	
+	    		@Override
+	    		public FileChannel reopenChannel() throws IOException {
+	
+	    			if (channel == null)
+	    				throw new IOException("Closed");
+	
+	    			return channel;
+	
+	    		}
+	    	};
+	    	
+	    	final FileChannelUtility.ReopenerInputStream instr = new FileChannelUtility.ReopenerInputStream(reopener);
+			try {
+				int totalReads = 0;
+				final byte[] buf = new byte[8192];
+				while (totalReads < filelen) {
+					int nxtLen = 1+ r.nextInt(buf.length-1); // max 8192 read
+
+					final int rdlen = instr.read(buf, 0, nxtLen);
+					if (rdlen == -1) {
+						throw new EOFException("Unexpected, total reads: "
+								+ totalReads);
+					}
+					totalReads += rdlen;
+				}
+			} finally {
+	    		instr.close();
+	    	}
+	    	
+        } finally {
+        	raf.close();
+        } 
+    	
     }
     
 }
