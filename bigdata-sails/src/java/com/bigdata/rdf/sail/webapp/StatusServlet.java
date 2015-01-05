@@ -26,8 +26,10 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.text.DateFormat;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -46,6 +48,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
@@ -178,6 +181,16 @@ public class StatusServlet extends BigdataRDFServlet {
     static enum DigestEnum {
         None, Journal, HALogs, Snapshots, All;
     }
+
+    /**
+	 * URL request parameter to trigger a thread dump. The thread dump is
+	 * written onto the http response. This is intended to provide an aid when
+	 * analyzing either node-local or distributed deadlocks.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 *      threads to status page </a>
+	 */
+    static final String THREAD_DUMP = "threadDump";
 
     /**
      * Special HA status request designed for clients that poll to determine the
@@ -386,6 +399,20 @@ public class StatusServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+		if (req.getParameter(THREAD_DUMP) != null) {
+
+			/*
+			 * Write out a thread dump as an aid to the diagnosis of deadlocks.
+			 * 
+			 * Note: This code path should not obtain any locks. This is
+			 * necessary in order for the code to run even when the server is in
+			 * a deadlock.
+			 */
+			doThreadDump(req, resp);
+			return;
+
+    	}
+    	
         if (req.getParameter(HA) != null
                 && getIndexManager() instanceof AbstractJournal
                //  && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
@@ -1247,6 +1274,7 @@ public class StatusServlet extends BigdataRDFServlet {
              * Comparator puts the entries into descending order by the query
              * execution time (longest running queries are first).
              */
+        	@Override
             public int compare(final Long o1, final Long o2) {
                 if (o1.longValue() < o2.longValue())
                     return 1;
@@ -1318,5 +1346,82 @@ public class StatusServlet extends BigdataRDFServlet {
         return crosswalkMap;
 
     }
+
+    /**
+	 * Write a thread dump onto the http response as an aid to diagnose both
+	 * node-local and distributed deadlocks.
+	 * <p>
+	 * Note: This code should not obtain any locks. This is necessary in order
+	 * for the code to run even when the server is in a deadlock.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 *      threads to status page </a>
+	 */
+	private static void doThreadDump(final HttpServletRequest req,
+			final HttpServletResponse resp) throws IOException {
+
+		resp.setStatus(HTTP_OK);
+
+		// Do not cache the response.
+		// TODO Alternatively "max-age=1" for max-age in seconds.
+		resp.addHeader("Cache-Control", "no-cache");
+
+		// Plain text response.
+		resp.setContentType(MIME_TEXT_PLAIN);
+
+		final PrintWriter w = resp.getWriter();
+
+		try {
+
+			final DateFormat df = DateFormat.getDateTimeInstance();
+			final Date date = new Date(System.currentTimeMillis());
+
+			w.write(Banner.getBanner());
+			w.write("Thread dump. Date:" + df.format(date));
+			w.write("\n\n");
+
+			// Setup an ordered map.
+			final Map<Thread, StackTraceElement[]> dump = new TreeMap<Thread, StackTraceElement[]>(
+					new Comparator<Thread>() {
+						@Override
+						public int compare(Thread o1, Thread o2) {
+							return Long.compare(o1.getId(), o2.getId());
+						}
+					});
+
+			// Add the stack trace for each thread.
+			dump.putAll(Thread.getAllStackTraces());
+
+			for (Map.Entry<Thread, StackTraceElement[]> threadEntry : dump
+					.entrySet()) {
+
+				final Thread thread = threadEntry.getKey();
+
+				w.append("THREAD#" + thread.getId() + ", name="
+						+ thread.getName() + ", state=" + thread.getState()
+						+ ", priority=" + thread.getPriority() + ", daemon="
+						+ thread.isDaemon() + "\n");
+
+				for (StackTraceElement elem : threadEntry.getValue()) {
+
+					w.append("\t" + elem.toString() + "\n");
+
+				}
+
+			}
+
+			w.flush();
+
+		} catch (Throwable t) {
+
+			launderThrowable(t, resp, "");
+
+		} finally {
+
+			w.close();
+
+		}
+
+	}
 
 }
