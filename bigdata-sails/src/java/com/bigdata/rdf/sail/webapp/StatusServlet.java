@@ -26,10 +26,8 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
-import java.text.DateFormat;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -48,7 +46,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
@@ -1347,7 +1345,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
     }
 
-    /**
+	/**
 	 * Write a thread dump onto the http response as an aid to diagnose both
 	 * node-local and distributed deadlocks.
 	 * <p>
@@ -1373,44 +1371,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
 		try {
 
-			final DateFormat df = DateFormat.getDateTimeInstance();
-			final Date date = new Date(System.currentTimeMillis());
-
-			w.write(Banner.getBanner());
-			w.write("Thread dump. Date:" + df.format(date));
-			w.write("\n\n");
-
-			// Setup an ordered map.
-			final Map<Thread, StackTraceElement[]> dump = new TreeMap<Thread, StackTraceElement[]>(
-					new Comparator<Thread>() {
-						@Override
-						public int compare(Thread o1, Thread o2) {
-							return Long.compare(o1.getId(), o2.getId());
-						}
-					});
-
-			// Add the stack trace for each thread.
-			dump.putAll(Thread.getAllStackTraces());
-
-			for (Map.Entry<Thread, StackTraceElement[]> threadEntry : dump
-					.entrySet()) {
-
-				final Thread thread = threadEntry.getKey();
-
-				w.append("THREAD#" + thread.getId() + ", name="
-						+ thread.getName() + ", state=" + thread.getState()
-						+ ", priority=" + thread.getPriority() + ", daemon="
-						+ thread.isDaemon() + "\n");
-
-				for (StackTraceElement elem : threadEntry.getValue()) {
-
-					w.append("\t" + elem.toString() + "\n");
-
-				}
-
-			}
-
-			w.flush();
+			BigdataStatics.threadDump(w);
 
 		} catch (Throwable t) {
 
