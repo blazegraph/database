@@ -1373,6 +1373,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
 			BigdataStatics.threadDump(w);
 
+			w.flush();
+			
 		} catch (Throwable t) {
 
 			launderThrowable(t, resp, "");

@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata;
 
-import java.io.PrintWriter;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Comparator;
 import java.util.Date;
@@ -139,46 +139,53 @@ public class BigdataStatics {
 	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
 	 *      threads to status page </a>
 	 */
-    public static void threadDump(final PrintWriter w) {
-    	
-		final DateFormat df = DateFormat.getDateTimeInstance();
-		final Date date = new Date(System.currentTimeMillis());
+	public static void threadDump(final Appendable w) {
 
-		w.write(Banner.getBanner());
-		w.write("Thread dump. Date:" + df.format(date));
-		w.write("\n\n");
+		try {
 
-		// Setup an ordered map.
-		final Map<Thread, StackTraceElement[]> dump = new TreeMap<Thread, StackTraceElement[]>(
-				new Comparator<Thread>() {
-					@Override
-					public int compare(Thread o1, Thread o2) {
-						return Long.compare(o1.getId(), o2.getId());
-					}
-				});
+			final DateFormat df = DateFormat.getDateTimeInstance();
+			final Date date = new Date(System.currentTimeMillis());
 
-		// Add the stack trace for each thread.
-		dump.putAll(Thread.getAllStackTraces());
+			w.append(Banner.getBanner());
+			w.append("Thread dump. Date:" + df.format(date));
+			w.append("\n\n");
 
-		for (Map.Entry<Thread, StackTraceElement[]> threadEntry : dump
-				.entrySet()) {
+			// Setup an ordered map.
+			final Map<Thread, StackTraceElement[]> dump = new TreeMap<Thread, StackTraceElement[]>(
+					new Comparator<Thread>() {
+						@Override
+						public int compare(Thread o1, Thread o2) {
+							return Long.compare(o1.getId(), o2.getId());
+						}
+					});
 
-			final Thread thread = threadEntry.getKey();
+			// Add the stack trace for each thread.
+			dump.putAll(Thread.getAllStackTraces());
 
-			w.append("THREAD#" + thread.getId() + ", name=" + thread.getName()
-					+ ", state=" + thread.getState() + ", priority="
-					+ thread.getPriority() + ", daemon=" + thread.isDaemon()
-					+ "\n");
+			for (Map.Entry<Thread, StackTraceElement[]> threadEntry : dump
+					.entrySet()) {
 
-			for (StackTraceElement elem : threadEntry.getValue()) {
+				final Thread thread = threadEntry.getKey();
 
-				w.append("\t" + elem.toString() + "\n");
+				w.append("THREAD#" + thread.getId() + ", name="
+						+ thread.getName() + ", state=" + thread.getState()
+						+ ", priority=" + thread.getPriority() + ", daemon="
+						+ thread.isDaemon() + "\n");
+
+				for (StackTraceElement elem : threadEntry.getValue()) {
+
+					w.append("\t" + elem.toString() + "\n");
+
+				}
 
 			}
 
+		} catch (IOException ex) {
+			
+			throw new RuntimeException(ex);
+			
 		}
-
-		w.flush();
-
+		
 	}
+
 }
