@@ -91,6 +91,9 @@ public class Banner {
 
     }
     
+    /**
+     * Display the banner, dependencies, etc.
+     */
     static public void banner() {
         
         if(didBanner.compareAndSet(false/*expect*/, true/*update*/)) {
@@ -131,7 +134,7 @@ public class Banner {
                     maxLicenseLen = Math.min(80, maxLicenseLen);
 
                     final Formatter f = new Formatter(sb);
-
+                    try {
                     final String fmt1 = "" //
                             + "%-" + maxNameLen + "s"//
 //                            + " %-" + maxProjectLen + "s" //
@@ -148,6 +151,9 @@ public class Banner {
                                 dep.licenseURL()//
                                 );
 
+                    }
+                    } finally {
+                    	f.close();
                     }
                 }
                 
@@ -396,6 +402,15 @@ public class Banner {
 
       return getBuildInfo().get(BuildInfoMeta.buildVersion);
 
+   }
+   
+   /**
+    * Return the banner.
+    */
+   public static String getBanner() {
+	   
+	   return banner;
+	   
    }
     
     /**
