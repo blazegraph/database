@@ -39,6 +39,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -60,6 +61,7 @@ public class TestNanoSparqlServer extends TestCase2 {
     private String m_rootURL;
     private String m_serviceURL;
     private JettyRemoteRepositoryManager m_repo;
+    private JettyHttpClient m_client;
     
     @Override
     public void setUp() throws Exception {
@@ -143,7 +145,10 @@ public class TestNanoSparqlServer extends TestCase2 {
                     + namespace + "\nrootURL=" + m_rootURL + "\nserviceURL="
                     + m_serviceURL);
 
-        m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
+        m_client = new JettyHttpClient();
+        m_client.start();
+        
+        m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client,
                 m_indexManager.getExecutorService());
         
     }
@@ -176,6 +181,8 @@ public class TestNanoSparqlServer extends TestCase2 {
         m_serviceURL = null;
         
         m_repo.close();
+        
+        m_client.stop();
         
         log.info("tear down done");
 

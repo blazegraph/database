@@ -35,6 +35,7 @@ import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -138,9 +139,12 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         
         o.addRequestParam("queryId", queryId.toString());
         
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
         final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(//
                 uriStr,//
                 params.getServiceOptions().isBigdataLBS(),// useLBS
+                client,
                 params.getTripleStore().getExecutorService()
                 );
         
@@ -168,6 +172,8 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         } finally {
 
             repo.close();
+            
+            client.stop();
 
         }
 
