@@ -301,9 +301,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 		JettyResponseListener response = null;
 		try {
-
+			final JettyHttpClient client = new JettyHttpClient();
+			client.start();
+			
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
-					serviceURL, executorService);
+					serviceURL, client, executorService);
 			try {
 				JettyRemoteRepository.checkResponseCode(response = rpm
 						.doConnect(opts));
@@ -313,6 +315,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 					response.consume();
 				
 				rpm.close();
+				client.stop();
 			}
 
 		} catch (IOException ex) {
@@ -399,7 +402,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         opts.method = "GET";
 
         try {
-        	final JettyRemoteRepositoryManager rpm = getRemoteRepository(haGlue);
+        	final JettyHttpClient client = new JettyHttpClient();
+        	client.start();
+        	final JettyRemoteRepositoryManager rpm = getRemoteRepository(haGlue, client);
 			try {
 	            final JettyResponseListener response = rpm.doConnect(opts);
 				JettyRemoteRepository.checkResponseCode(response);
@@ -409,6 +414,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 				return HAStatusEnum.valueOf(s);
 			} finally {
 				rpm.close();
+				client.stop();
 			}
 
         } catch (IOException ex) {
@@ -470,13 +476,12 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * Return a {@link JettyRemoteRepositoryManager} for talking to the
      * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
      * interface.
-     * 
-     * @throws IOException
+     * @throws Exception 
      */
-    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue)
-            throws IOException {
+    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue, final JettyHttpClient client)
+            throws Exception {
 
-        return getRemoteRepository(haGlue, false/* useLoadBalancer */);
+        return getRemoteRepository(haGlue, false/* useLoadBalancer */, client);
         
     }
 
@@ -491,30 +496,32 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      *            when <code>true</code> the URL will be the load balancer on
      *            that service and the request MAY be redirected to another
      *            service.
-     * 
-     * @throws IOException
+     * @throws Exception 
      */
     protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue,
-            final boolean useLoadBalancer) throws IOException {
+            final boolean useLoadBalancer, final JettyHttpClient client) throws Exception {
 
         final String serviceURL = getNanoSparqlServerURL(haGlue);
 //                + (useLoadBalancer ? "/LBS" : "") 
 //                + "/sparql";
 
         final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(serviceURL,
-                useLoadBalancer, executorService);
+                useLoadBalancer, client, executorService);
 
         return repo;
         
     }
 
     protected JettyRemoteRepositoryManager getRemoteRepositoryManager(
-            final HAGlue haGlue, final boolean useLBS) throws IOException {
+            final HAGlue haGlue, final boolean useLBS) throws Exception {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
         final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(
-                endpointURL, useLBS, executorService);
+                endpointURL, useLBS, client, executorService);
 
         return repo;
         
@@ -643,7 +650,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
 
             // Run query.
-            final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS);
+           	final JettyHttpClient client = new JettyHttpClient();
+        	client.start();
+            final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, client);
             try {
 	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
 	                    .evaluate();
@@ -656,6 +665,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 	            return ((org.openrdf.model.Literal) v).longValue();
             } finally {
             	remoteRepo.close();
+            	client.stop();
             }
 
         }
@@ -712,6 +722,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * 
      * @param haGlue
      *            The server.
+     * @throws Exception 
      * 
      * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/617" >
      *      Concurrent KB create fails with "No axioms defined?" </a>
@@ -734,9 +745,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      *             commitCounter:=1 and finally verify that the KB is in fact
      *             visible on each of the services.
      */
-    protected void awaitKBExists(final HAGlue haGlue) throws IOException {
+    protected void awaitKBExists(final HAGlue haGlue) throws Exception {
       
-        final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue);
+       	final JettyHttpClient client = new JettyHttpClient();
+    	client.start();
+    	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         
         try {
 	        assertCondition(new Runnable() {
@@ -752,6 +765,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 	        }, 5, TimeUnit.SECONDS);
         } finally {
         	repo.close();
+        	client.stop();
         }
         
     }

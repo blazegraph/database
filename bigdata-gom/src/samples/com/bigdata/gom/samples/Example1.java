@@ -12,6 +12,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -92,12 +93,16 @@ public class Example1 implements Callable<Void> {
 
         JettyRemoteRepositoryManager repo = null;
 
+        JettyHttpClient client = null;
+
         try {
 
             executor = Executors.newCachedThreadPool();
+            
+            client = new JettyHttpClient();
 
             repo = new JettyRemoteRepositoryManager(
-            		serviceURL, executor);
+            		serviceURL, client, executor);
 
             final IObjectManager om = new NanoSparqlObjectManager(repo,
                     namespace);
@@ -109,6 +114,12 @@ public class Example1 implements Callable<Void> {
             if (repo != null) {
 
             	repo.close();
+
+            }
+
+            if (client != null) {
+
+            	client.stop();
 
             }
 

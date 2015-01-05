@@ -37,6 +37,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
@@ -177,14 +178,18 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         // Impose the desired LBS policy.
         setPolicy(newTestPolicy(), services);
         
+        // Shared JettyHttpCLient
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
         // Repositories without the LBS.
         final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
         // Repositories with the LBS.
         final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
         try {
-	        repos[0] = getRemoteRepository(serverA);
-	        repos[1] = getRemoteRepository(serverB);
-	        repos[2] = getRemoteRepository(serverC);
+	        repos[0] = getRemoteRepository(serverA, client);
+	        repos[1] = getRemoteRepository(serverB, client);
+	        repos[2] = getRemoteRepository(serverC, client);
 	
 	        /*
 	         * Verify that query on all nodes is allowed.
@@ -198,9 +203,9 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	
 	        }
 	
-	        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-	        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-	        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
+	        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+	        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+	        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
 	
 	        /*
 	         * Verify that query on all nodes is allowed using the LBS.
@@ -239,6 +244,8 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	        	if (r != null)
 	        		r.close();
 	        }
+	        
+	        client.stop();
         }
 
     }
@@ -277,6 +284,10 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         // Impose the desired LBS policy.
         setPolicy(newTestPolicy(), services);
         
+        // Shared HttpClient
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
         // Repositories without the LBS.
         final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
         // Repositories with the LBS.
@@ -284,13 +295,13 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         
 		try {
 
-			repos[0] = getRemoteRepository(serverA);
-			repos[1] = getRemoteRepository(serverB);
-			repos[2] = getRemoteRepository(serverC);
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
 
-			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
+			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
 
 			// Add some data using leader.
 			simpleTransaction_noQuorumCheck(serverA, false/* useLBS */); // leader.
@@ -322,6 +333,8 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	        	if (r != null)
 	        		r.close();
 	        }
+	        
+	        client.stop();
         }
 
     }
@@ -360,18 +373,20 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 		// Impose the desired LBS policy.
 		setPolicy(newTestPolicy(), services);
 
+		final JettyHttpClient client = new JettyHttpClient();
+		client.start();
 		// Repositories without the LBS.
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
 		// Repositories with the LBS.
 		final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
 		try {
-			repos[0] = getRemoteRepository(serverA);
-			repos[1] = getRemoteRepository(serverB);
-			repos[2] = getRemoteRepository(serverC);
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
 
-			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
+			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
 
 			// Add some data using leader.
 			simpleTransaction_noQuorumCheck(serverA, false/* useLBS */); // leader.
@@ -402,6 +417,8 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 				if (r != null)
 					r.close();
 			}
+			
+			client.stop();
 		}
 
 	}
@@ -467,18 +484,21 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 		// Impose the desired LBS policy.
 		setPolicy(newTestPolicy(), services);
 
+		final JettyHttpClient client = new JettyHttpClient();
+		client.start();
+		
 		// Repositories without the LBS.
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
 		// Repositories with the LBS.
 		final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
 		try {
-			repos[0] = getRemoteRepository(serverA);
-			repos[1] = getRemoteRepository(serverB);
-			repos[2] = getRemoteRepository(serverC);
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
 
-			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
+			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
 
 			/*
 			 * Verify read on each service.
@@ -513,6 +533,8 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 				if (r != null)
 					r.close();
 			}
+			
+			client.stop();
 		}
 
 	}
@@ -529,12 +551,16 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
         final String updateStr = sb.toString();
 
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
         final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
-                useLoadBalancer);
+                useLoadBalancer, client);
         try {
         	repo.prepareUpdate(updateStr).evaluate();
         } finally {
         	repo.close();
+        	client.stop();
         }
 
     }
@@ -551,12 +577,16 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
 		final String updateStr = sb.toString();
 
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
 		final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
-				useLoadBalancer);
+				useLoadBalancer, client);
 		try {
 			repo.prepareUpdate(updateStr).evaluate();
 		} finally {
 			repo.close();
+			client.stop();
 		}
 
 	}

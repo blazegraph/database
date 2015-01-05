@@ -83,6 +83,7 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
@@ -125,6 +126,11 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
      */
 	// private ClientConnectionManager m_cm;
 	
+    /**
+     * The http client.
+     */
+    protected JettyHttpClient m_client;
+
     /**
      * The client-API wrapper to the NSS.
      */
@@ -352,7 +358,10 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
          * webapp when the client requests the root URL.
          */
 
-        m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
+        m_client = new JettyHttpClient();
+        m_client.start();
+        
+        m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client,
                 getIndexManager().getExecutorService());
 
         log.info("Setup Active Threads: " + Thread.activeCount());
@@ -394,9 +403,11 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 		
 		log.info("Connection Shutdown Check");
 		
-        m_repo.close(); // will also stop the HttpClient
+        m_repo.close();
+        m_client.stop();
         
         m_repo = null;
+        m_client = null;
         
         log.info("tear down done");
 

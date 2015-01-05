@@ -73,7 +73,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
         
     }
     
-    protected JettyRemoteRepositoryManager(final String serviceURL,
+    public JettyRemoteRepositoryManager(final String serviceURL,
             final JettyHttpClient httpClient, final Executor executor) {
 
         this(serviceURL, false/* useLBS */, httpClient, executor);
@@ -95,7 +95,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      * @param httpClient
      * @param executor
      */
-    protected JettyRemoteRepositoryManager(final String serviceURL,
+    public JettyRemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final JettyHttpClient httpClient,
             final Executor executor) {
 
@@ -105,15 +105,16 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     }
 
-    public JettyRemoteRepositoryManager(String serviceURL,
-    		final Executor executor) {
-		this(serviceURL, DefaultClient(false), executor);
-	}
-
-    public JettyRemoteRepositoryManager(String serviceURL, boolean useLBS,
-			ExecutorService executorService) {
-		this(serviceURL, useLBS, DefaultClient(false), executorService);
-	}
+// Remove auto client creation option
+//    public JettyRemoteRepositoryManager(String serviceURL,
+//    		final Executor executor) {
+//		this(serviceURL, DefaultClient(false), executor);
+//	}
+//
+//    public JettyRemoteRepositoryManager(String serviceURL, boolean useLBS,
+//			ExecutorService executorService) {
+//		this(serviceURL, useLBS, DefaultClient(false), executorService);
+//	}
     
 	/**
      * Return the base URL for a remote repository (less the /sparql path

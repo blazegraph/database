@@ -50,6 +50,7 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -364,9 +365,12 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			for (int i = 0; i < joined.length; i++) {
 
-				services[i] = quorum.getClient().getService(joined[i]);
+		       	final JettyHttpClient client = new JettyHttpClient();
+	        	client.start();
 
-				repos[i] = getRemoteRepository(services[i]);
+	        	services[i] = quorum.getClient().getService(joined[i]);
+
+				repos[i] = getRemoteRepository(services[i], client);
 
 			}
 
@@ -473,9 +477,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		} finally {
 			// close all created repos
 			for (JettyRemoteRepositoryManager r : repos) {
-				if (r != null)
+				if (r != null) {
+					final JettyHttpClient client = r.getClient();
 					r.close();
-
+					client.stop();
+				}
 			}
 
 		}
@@ -1010,13 +1016,16 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader);
+							final JettyHttpClient client = new JettyHttpClient();
+							client.start();
+							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
 				        	try {
 				        		repo.prepareUpdate(
 										updateStr).evaluate();
-								log.warn("COMPLETED TRANSACTION " + count);
+								log.info("COMPLETED TRANSACTION " + count);
 				        	} finally {
 				        		repo.close();
+				        		client.stop();
 				        	}
 
 								Thread.sleep(transactionDelay);
@@ -2216,8 +2225,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				}
 
 				public Void call() throws Exception {
-
-					final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(leader);
+					final JettyHttpClient client = new JettyHttpClient();
+					client.start();
+					
+					final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(leader, client);
 					try {
 						for (int n = 0; n < nTransactions; n++) {
 
@@ -2250,6 +2261,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 						return null;
 					} finally {
 						remoteRepo.close();
+						client.stop();
 					}
 
 				}
@@ -2310,8 +2322,11 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                     
                     long queryCount = 0;
                     
+                    final JettyHttpClient client = new JettyHttpClient();
+                    client.start();
+                    
                     final JettyRemoteRepositoryManager remoteRepo;
-                    remoteRepo = getRemoteRepository(haGlue);
+                    remoteRepo = getRemoteRepository(haGlue, client);
 					try {
 						while (!updateTaskFuture.isDone()) {
 
@@ -2342,6 +2357,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 						}
 					} finally {
                     	remoteRepo.close();
+                    	client.stop();
                     }
  
                     // done.
@@ -3519,11 +3535,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Verify binary equality of ALL journals.
 		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
+		final JettyHttpClient client = new JettyHttpClient();
+		client.start();
+		
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
 		try {
-			repos[0] = getRemoteRepository(serverA);
-			repos[1] = getRemoteRepository(serverB);
-			repos[2] = getRemoteRepository(serverC);
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
 
 			/*
 			 * Verify that query on all nodes is allowed.
@@ -3565,6 +3584,8 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 					r.close();
 				}
 			}
+			
+			client.stop();
 		}
 
 	}

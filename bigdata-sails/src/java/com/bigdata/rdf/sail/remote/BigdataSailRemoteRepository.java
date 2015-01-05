@@ -60,6 +60,8 @@ public class BigdataSailRemoteRepository implements Repository {
     private final ExecutorService executor;
     
     private final JettyRemoteRepository nss;
+    
+    private final JettyHttpClient client;
 
     /**
      * Ctor that simply specifies an endpoint and lets this class manage the
@@ -91,7 +93,14 @@ public class BigdataSailRemoteRepository implements Repository {
 		
         this.executor = Executors.newCachedThreadPool();
 
-        this.nss = new JettyRemoteRepositoryManager(sparqlEndpointURL, useLBS,
+        this.client = new JettyHttpClient();
+        try {
+			client.start();
+		} catch (Exception e) {
+			throw new RuntimeException("Unable to start HttpClient", e);
+		}
+        
+        this.nss = new JettyRemoteRepositoryManager(sparqlEndpointURL, useLBS, client,
                 executor);
 	}
 
@@ -104,6 +113,8 @@ public class BigdataSailRemoteRepository implements Repository {
 		this.executor = null;
 		
 		this.nss = nss;
+		
+		this.client = null;
 	}
 	
 	public JettyRemoteRepository getRemoteRepository() {
@@ -118,6 +129,12 @@ public class BigdataSailRemoteRepository implements Repository {
 		// FIXME: this should be handled more cleanly
 		if (nss instanceof JettyRemoteRepositoryManager) {
 			((JettyRemoteRepositoryManager) nss).close();
+			
+			try {
+				client.stop();
+			} catch (Exception e) {
+				throw new RuntimeException("Problem stopping http client", e);
+			}
 		} else {
 			System.err.println("DEBUG: Not closing JettyRemoteRepository");
 		}

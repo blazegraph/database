@@ -33,6 +33,7 @@ import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
@@ -101,17 +102,20 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
         /*
          * Do CANCEL for each service using the default namespace.
          */
+        final JettyRemoteRepositoryManager[] rpms = new JettyRemoteRepositoryManager[3];
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
         {
             // Get RemoteRepository for each service.
-            final JettyRemoteRepositoryManager[] repo = new JettyRemoteRepositoryManager[3];
 
-            repo[0] = getRemoteRepository(serverA);
-            repo[1] = getRemoteRepository(serverB);
-            repo[2] = getRemoteRepository(serverC);
+            rpms[0] = getRemoteRepository(serverA, client);
+            rpms[1] = getRemoteRepository(serverB, client);
+            rpms[2] = getRemoteRepository(serverC, client);
 
-            repo[0].cancel(UUID.randomUUID());
-            repo[1].cancel(UUID.randomUUID());
-            repo[2].cancel(UUID.randomUUID());
+            rpms[0].cancel(UUID.randomUUID());
+            rpms[1].cancel(UUID.randomUUID());
+            rpms[2].cancel(UUID.randomUUID());
 
         }
         
@@ -127,56 +131,22 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
             // Get RemoteRepository for each service.
             final JettyRemoteRepository[] repo = new JettyRemoteRepository[3];
             
-            repo[0] = getRemoteRepositoryForNamespace(serverA, namespace);
-            repo[1] = getRemoteRepositoryForNamespace(serverB, namespace);
-            repo[2] = getRemoteRepositoryForNamespace(serverC, namespace);
+            repo[0] = rpms[0].getRepositoryForNamespace(namespace);
+            repo[1] = rpms[1].getRepositoryForNamespace(namespace);
+            repo[2] = rpms[2].getRepositoryForNamespace(namespace);
 
             repo[0].cancel(UUID.randomUUID());
             repo[1].cancel(UUID.randomUUID());
             repo[2].cancel(UUID.randomUUID());
         }
+        
+        // Close down the rpms and stop the client
+        for (JettyRemoteRepositoryManager rpm : rpms) {
+        	rpm.close();
+        }
+        
+        client.stop();
 
     }
 
-    /**
-     * Return a {@link RemoteRepository} that will communicate with the KB
-     * instance associated with the given <i>namespace</i>. The
-     * {@link RemoteRepository} will use a URL for the SPARQL end point that is
-     * associated with the specified namespace and formed as
-     * <code>/namespace/<i>namespace</i>/sparql</code> rather than the default
-     * KB SPARQL end point (<code>/sparql</code>).
-     * 
-     * @param haGlue
-     *            The service.
-     * @param namespace
-     *            The namespace.
-     * @return The {@link RemoteRepository} for that namespace.
-     * 
-     * @throws IOException
-     * 
-     *             TODO Push down into the abstract base class when reconciling
-     *             with the RDR branch which has changes to the abstract base
-     *             class to support the LBS.
-     */
-    protected JettyRemoteRepository getRemoteRepositoryForNamespace(
-            final HAGlue haGlue, final String namespace) throws IOException {
-
-        final String sparqlEndpointURL = getNanoSparqlServerURL(haGlue);
-
-        // Client for talking to the NSS.
-       //  final HttpClient httpClient = new DefaultHttpClient(ccm);
-
-        final JettyRemoteRepositoryManager repositoryManager = new JettyRemoteRepositoryManager(
-                sparqlEndpointURL, executorService);
-
-        final JettyRemoteRepository repo = repositoryManager
-                .getRepositoryForNamespace(namespace);
-
-        // Note: This is not required in order to demonstrate the problem.
-//        repo.setMaxRequestURLLength(65536);
-//        repo.setQueryMethod("GET");
-
-        return repo;
-
-    }
 }

@@ -15,6 +15,7 @@ import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -327,13 +328,16 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 		// The HAGlue interfaces for those joined services, in join order.
 		final HAGlue[] services = new HAGlue[joined.length];
 
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+        
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
 		try {
 			for (int i = 0; i < joined.length; i++) {
 
 				services[i] = quorum.getClient().getService(joined[i]);
 
-				repos[i] = getRemoteRepository(services[i]);
+				repos[i] = getRemoteRepository(services[i], client);
 
 			}
 
@@ -441,6 +445,8 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 					r.close();
 
 			}
+			
+			client.stop();
 		}
 
 	}

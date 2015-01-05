@@ -44,6 +44,7 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -446,120 +447,127 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
 		// The HAGlue interfaces for those joined services, in join order.
 		final HAGlue[] services = new HAGlue[joined.length];
 
-		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
 		try {
-			for (int i = 0; i < joined.length; i++) {
+			final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
+			try {
+				for (int i = 0; i < joined.length; i++) {
 
-				services[i] = quorum.getClient().getService(joined[i]);
+					services[i] = quorum.getClient().getService(joined[i]);
 
-				repos[i] = getRemoteRepository(services[i]);
+					repos[i] = getRemoteRepository(services[i], client);
 
-			}
-
-			/*
-			 * LOAD data on leader.
-			 */
-			{
-
-				final FutureTask<Void> ft = new FutureTask<Void>(
-						new LargeLoadTask(token, true/* reallyLargeLoad */));
-
-				executorService.submit(ft);
-
-				// impose timeout on load.
-				ft.get(2 * longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
-
-			}
-
-			// Current commit point.
-			final long lastCommitCounter2 = 2L;
-
-			// There are now TWO (2) commit points.
-			awaitCommitCounter(lastCommitCounter2, serverA, serverB);
-
-			/*
-			 * Verify that query on all nodes is allowed and now provides a
-			 * non-empty result.
-			 */
-			for (JettyRemoteRepositoryManager r : repos) {
-
-				// Should have data.
-				assertEquals(
-						100L,
-						countResults(r.prepareTupleQuery(
-								"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
-
-			}
-
-			final HAGlue leader = quorum.getClient().getLeader(token);
-
-			{
-
-				// Verify quorum is still valid.
-				quorum.assertQuorum(token);
-
-				// Snapshot directory is empty.
-				assertEquals(
-						0,
-						recursiveCount(getSnapshotDirA(),
-								SnapshotManager.SNAPSHOT_FILTER));
-
-				final Future<IHASnapshotResponse> ft = leader
-						.takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
-
-				final Future<IHASnapshotResponse> ft2 = leader
-						.takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
-
-				// Both Futures are non-null.
-				assertNotNull(ft);
-
-				assertNotNull(ft2);
-
-				// Neither Future is done.
-				assertFalse(ft.isDone());
-
-				assertFalse(ft2.isDone());
-
-				// wait for the snapshot.
-				try {
-					ft.get(20, TimeUnit.SECONDS);
-				} catch (TimeoutException ex) {
-					// Interrupt both futures.
-					ft.cancel(true/* mayInterruptIfRunning */);
-					ft2.cancel(true/* mayInterruptIfRunning */);
-					throw ex;
 				}
 
-				// Verify 2nd future is also done (the should be two proxies for
-				// the
-				// same future).
-				assertTrue(ft2.isDone());
+				/*
+				 * LOAD data on leader.
+				 */
+				{
 
-				// Verify no error on 2nd future.
-				ft2.get();
+					final FutureTask<Void> ft = new FutureTask<Void>(
+							new LargeLoadTask(token, true/* reallyLargeLoad */));
 
-				final IRootBlockView snapshotRB = ft.get().getRootBlock();
+					executorService.submit(ft);
 
-				final long commitCounter = 2L;
+					// impose timeout on load.
+					ft.get(2 * longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
 
-				// Verify snapshot is for the expected commit point.
-				assertEquals(commitCounter, snapshotRB.getCommitCounter());
+				}
 
-				// Snapshot directory contains the desired filename.
-				assertExpectedSnapshots(getSnapshotDirA(),
-						new long[] { commitCounter });
+				// Current commit point.
+				final long lastCommitCounter2 = 2L;
 
-				// Verify digest of snapshot agrees with digest of journal.
-				assertSnapshotDigestEquals(leader, commitCounter);
+				// There are now TWO (2) commit points.
+				awaitCommitCounter(lastCommitCounter2, serverA, serverB);
 
+				/*
+				 * Verify that query on all nodes is allowed and now provides a
+				 * non-empty result.
+				 */
+				for (JettyRemoteRepositoryManager r : repos) {
+
+					// Should have data.
+					assertEquals(
+							100L,
+							countResults(r.prepareTupleQuery(
+									"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
+
+				}
+
+				final HAGlue leader = quorum.getClient().getLeader(token);
+
+				{
+
+					// Verify quorum is still valid.
+					quorum.assertQuorum(token);
+
+					// Snapshot directory is empty.
+					assertEquals(
+							0,
+							recursiveCount(getSnapshotDirA(),
+									SnapshotManager.SNAPSHOT_FILTER));
+
+					final Future<IHASnapshotResponse> ft = leader
+							.takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
+
+					final Future<IHASnapshotResponse> ft2 = leader
+							.takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
+
+					// Both Futures are non-null.
+					assertNotNull(ft);
+
+					assertNotNull(ft2);
+
+					// Neither Future is done.
+					assertFalse(ft.isDone());
+
+					assertFalse(ft2.isDone());
+
+					// wait for the snapshot.
+					try {
+						ft.get(20, TimeUnit.SECONDS);
+					} catch (TimeoutException ex) {
+						// Interrupt both futures.
+						ft.cancel(true/* mayInterruptIfRunning */);
+						ft2.cancel(true/* mayInterruptIfRunning */);
+						throw ex;
+					}
+
+					// Verify 2nd future is also done (the should be two proxies
+					// for
+					// the
+					// same future).
+					assertTrue(ft2.isDone());
+
+					// Verify no error on 2nd future.
+					ft2.get();
+
+					final IRootBlockView snapshotRB = ft.get().getRootBlock();
+
+					final long commitCounter = 2L;
+
+					// Verify snapshot is for the expected commit point.
+					assertEquals(commitCounter, snapshotRB.getCommitCounter());
+
+					// Snapshot directory contains the desired filename.
+					assertExpectedSnapshots(getSnapshotDirA(),
+							new long[] { commitCounter });
+
+					// Verify digest of snapshot agrees with digest of journal.
+					assertSnapshotDigestEquals(leader, commitCounter);
+
+				}
+			} finally {
+				for (JettyRemoteRepositoryManager r : repos) {
+					if (r != null)
+						r.close();
+
+				}
 			}
 		} finally {
-			for (JettyRemoteRepositoryManager r : repos) {
-				if (r != null)
-					r.close();
-
-			}
-		}
+        	client.stop();
+        }
 	}
     
     /**

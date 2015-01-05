@@ -41,6 +41,7 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
@@ -109,9 +110,11 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
         JettyResponseListener response = null;
 
         try {
-
+        	final JettyHttpClient client = new JettyHttpClient();
+        	client.start();
+        	
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
-					serviceURL, executorService);
+					serviceURL, client, executorService);
 			try {
 	            JettyRemoteRepository.checkResponseCode(response = rpm.doConnect(opts));
 			} finally {
@@ -119,6 +122,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 					response.consume();
 				
 				rpm.close();
+				client.stop();
 			}
 
         } catch (IOException ex) {

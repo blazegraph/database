@@ -52,6 +52,7 @@ import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -77,6 +78,11 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * The executor used by the http client.
 	 */
 	private ExecutorService executorService;
+
+	/**
+	 * The http client.
+	 */
+	protected JettyHttpClient m_client;
 
 	/**
 	 * The client-API wrapper to the NSS.
@@ -166,7 +172,10 @@ public class TestNSSHealthCheck extends TestCase2 {
 		executorService = Executors.newCachedThreadPool(DaemonThreadFactory
 				.defaultThreadFactory());
 
-		m_repo = new JettyRemoteRepositoryManager(m_serviceURL, executorService);
+		m_client = new JettyHttpClient();
+		m_client.start();
+		
+		m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client, executorService);
 
 	}
 
@@ -193,6 +202,11 @@ public class TestNSSHealthCheck extends TestCase2 {
 		if (m_repo != null) {
 			m_repo.close();
 			m_repo = null;
+		}
+
+		if (m_client != null) {
+			m_client.stop();
+			m_client = null;
 		}
 
 		if (executorService != null) {

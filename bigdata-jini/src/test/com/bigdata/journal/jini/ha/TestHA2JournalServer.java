@@ -38,6 +38,7 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -139,7 +140,10 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
          */
 		for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
-			final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
+	        final JettyHttpClient client = new JettyHttpClient();
+	        client.start();
+	        
+			final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
 			try {
 				// Should be empty.
 				assertEquals(
@@ -148,6 +152,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 								"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
 			} finally {
 				repo.close();
+				client.stop();
 			}
 
 		}
@@ -264,22 +269,28 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-			for (HAGlue service : new HAGlue[] { serverA, serverB }) {
-
-				awaitNSSAndHAReady(service);
-
-				final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-				try {
-					// Should be empty.
-					assertEquals(
-							0L,
-							countResults(repo.prepareTupleQuery(
-									"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-				} finally {
-					repo.close();
+            final JettyHttpClient client = new JettyHttpClient();
+            client.start();
+            try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+	
+					awaitNSSAndHAReady(service);
+	
+					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+					} finally {
+						repo.close();
+					}
+	
 				}
-
-			}
+            } finally {
+            	client.stop();
+            }
 
         }
         
@@ -376,22 +387,28 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-			for (HAGlue service : new HAGlue[] { serverA, serverB }) {
-
-				awaitNSSAndHAReady(service);
-
-				final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-				try {
-					// Should be empty.
-					assertEquals(
-							0L,
-							countResults(repo.prepareTupleQuery(
-									"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-				} finally {
-					repo.close();
+            final JettyHttpClient client = new JettyHttpClient();
+            client.start();
+            try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+	
+					awaitNSSAndHAReady(service);
+	
+					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+					} finally {
+						repo.close();
+					}
+	
 				}
-
-			}
+            } finally {
+            	client.stop();
+            }
 
         }
         

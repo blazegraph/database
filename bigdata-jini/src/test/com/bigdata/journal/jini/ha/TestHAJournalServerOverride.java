@@ -47,6 +47,7 @@ import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
@@ -791,21 +792,28 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+            final JettyHttpClient client = new JettyHttpClient();
+            client.start();
+			try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
-                awaitNSSAndHAReady(service);
+					awaitNSSAndHAReady(service);
 
-                final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-                try {
-	                // Should be empty.
-	                assertEquals(
-	                        0L,
-	                        countResults(repo.prepareTupleQuery(
-	                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-                } finally {
-                	repo.close();
-                }
+					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10")
+										.evaluate()));
+					} finally {
+						repo.close();
+					}
 
+				}
+			} finally {
+            	client.stop();
             }
 
         }
@@ -886,20 +894,27 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+            final JettyHttpClient client = new JettyHttpClient();
+            client.start();
+			try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
-                awaitNSSAndHAReady(service);
-                
-                final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-                try {
-	                // Should be empty.
-	                assertEquals(
-	                        0L,
-	                        countResults(repo.prepareTupleQuery(
-	                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-                } finally {
-                	repo.close();
-                }
+					awaitNSSAndHAReady(service);
+
+					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10")
+										.evaluate()));
+					} finally {
+						repo.close();
+					}
+				}
+			} finally {
+            	client.close();
             }
 
         }
@@ -1040,73 +1055,84 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
          * Force the follower out of the quorum. Verify quorum meets again and
          * that we can read on all services.
          */
-        {
+		{
 
-            final HAGlue leader = quorum.getClient().getLeader(token1);
+			final HAGlue leader = quorum.getClient().getLeader(token1);
 
-            if (leader.equals(serverA)) {
+			if (leader.equals(serverA)) {
 
-                leader.submit(new ForceRemoveService(getServiceBId()), true).get();
+				leader.submit(new ForceRemoveService(getServiceBId()), true)
+						.get();
 
-            } else {
+			} else {
 
-                leader.submit(new ForceRemoveService(getServiceAId()), true).get();
+				leader.submit(new ForceRemoveService(getServiceAId()), true)
+						.get();
 
-            }
-            
-            // Thread.sleep(100000); // sleep to allow thread dump for analysis
-            // Okay, is the problem that the quorum doesn't break?
-            // assertFalse(quorum.isQuorumMet());
-            
-            // Right so the Quorum is not met, but the follower deosn't seem to know it's broken
-            
-            // Wait for the quorum to break and then meet again.
-            final long token2 = awaitNextQuorumMeet(token1);
+			}
 
-            if (log.isInfoEnabled()) {
-                log.info("Zookeeper after quorum meet:\n" + dumpZoo());
-            }
-            
-            /*
-             * Bouncing the connection broke the quorun, so verify that the
-             * quorum token was advanced.
-             */
-            assertEquals(token1 + 1, token2);
-            
-            // The leader MAY have changed (since the quorum broke).
-            final HAGlue leader2 = quorum.getClient().getLeader(token2);
+			// Thread.sleep(100000); // sleep to allow thread dump for analysis
+			// Okay, is the problem that the quorum doesn't break?
+			// assertFalse(quorum.isQuorumMet());
 
-            // Verify leader self-reports in new role.
-            awaitHAStatus(leader2, HAStatusEnum.Leader);
+			// Right so the Quorum is not met, but the follower deosn't seem to
+			// know it's broken
 
-//            final UUID leaderId2 = leader2.getServiceId();
-//
-//            assertFalse(leaderId1.equals(leaderId2));
-            
-            /*
-             * Verify we can read on the KB on both nodes.
-             * 
-             * Note: It is important to test the reads for the first commit on
-             * both the leader and the follower.
-             */
-            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+			// Wait for the quorum to break and then meet again.
+			final long token2 = awaitNextQuorumMeet(token1);
 
-                awaitNSSAndHAReady(service);
+			if (log.isInfoEnabled()) {
+				log.info("Zookeeper after quorum meet:\n" + dumpZoo());
+			}
 
-                final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-                try {
-	                // Should be empty.
-	                assertEquals(
-	                        0L,
-	                        countResults(repo.prepareTupleQuery(
-	                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-                } finally {
-                	repo.close();
-                }
+			/*
+			 * Bouncing the connection broke the quorun, so verify that the
+			 * quorum token was advanced.
+			 */
+			assertEquals(token1 + 1, token2);
 
-            }
+			// The leader MAY have changed (since the quorum broke).
+			final HAGlue leader2 = quorum.getClient().getLeader(token2);
 
-        }
+			// Verify leader self-reports in new role.
+			awaitHAStatus(leader2, HAStatusEnum.Leader);
+
+			// final UUID leaderId2 = leader2.getServiceId();
+			//
+			// assertFalse(leaderId1.equals(leaderId2));
+
+			/*
+			 * Verify we can read on the KB on both nodes.
+			 * 
+			 * Note: It is important to test the reads for the first commit on
+			 * both the leader and the follower.
+			 */
+			final JettyHttpClient client = new JettyHttpClient();
+			client.start();
+			try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+
+					awaitNSSAndHAReady(service);
+
+					final JettyRemoteRepositoryManager repo = getRemoteRepository(
+							service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10")
+										.evaluate()));
+					} finally {
+						repo.close();
+					}
+
+				}
+			} finally {
+				client.stop();
+			}
+
+		}
         
     }
 
@@ -1118,90 +1144,99 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
      * service in the pipeline order, and that the quorum did not break (same
      * token).
      */
-    public void test_ABC_forceRemoveService_B() throws Exception {
-        
-        final ABC services = new ABC(true/*sequential*/);
-        final HAGlue serverA = services.serverA;
-        final HAGlue serverB = services.serverB;
-        final HAGlue serverC = services.serverC;
-        
-        final long token1 = awaitFullyMetQuorum();
+	public void test_ABC_forceRemoveService_B() throws Exception {
 
-        doNSSStatusRequest(serverA);
-        doNSSStatusRequest(serverB);
-        doNSSStatusRequest(serverC);
+		final ABC services = new ABC(true/* sequential */);
+		final HAGlue serverA = services.serverA;
+		final HAGlue serverB = services.serverB;
+		final HAGlue serverC = services.serverC;
 
-        // Await initial commit point (KB create).
-        awaitCommitCounter(1L, serverA, serverB, serverC);
+		final long token1 = awaitFullyMetQuorum();
 
-        // Await [A] up and running as leader.
-        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
+		doNSSStatusRequest(serverA);
+		doNSSStatusRequest(serverB);
+		doNSSStatusRequest(serverC);
 
-        // Await [B] up and running as follower.
-        assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
+		// Await initial commit point (KB create).
+		awaitCommitCounter(1L, serverA, serverB, serverC);
 
-        // Verify self-reporting by RMI in their respective roles.
-        awaitHAStatus(serverA, HAStatusEnum.Leader);
-        awaitHAStatus(serverB, HAStatusEnum.Follower);
-        awaitHAStatus(serverC, HAStatusEnum.Follower);
-        
-        // Verify binary equality on the journal files.
-        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+		// Await [A] up and running as leader.
+		assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(serverA));
 
-        if (log.isInfoEnabled()) {
-            log.info("Zookeeper before forcing service remove:\n" + dumpZoo());
-        }
-        
-        /*
-         * Bounce the 1st follower out of the quorum. Verify quorum meets again
-         * and that we can read on all services.
-         */
-        {
+		// Await [B] up and running as follower.
+		assertEquals(HAStatusEnum.Follower, awaitNSSAndHAReady(serverB));
 
-            serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
-            
-            // Wait for the quorum to fully meet again.
-            final long token2 = awaitFullyMetQuorum();
+		// Verify self-reporting by RMI in their respective roles.
+		awaitHAStatus(serverA, HAStatusEnum.Leader);
+		awaitHAStatus(serverB, HAStatusEnum.Follower);
+		awaitHAStatus(serverC, HAStatusEnum.Follower);
 
-            if (log.isInfoEnabled()) {
-                log.info("Zookeeper after quorum fully met again:\n" + dumpZoo());
-            }
-            
-            /*
-             * The quorum did not break. The token is unchanged.
-             */
-            assertEquals(token1, token2);
-            
-            /*
-             * Service B came back in at the end of the pipeline.
-             */
-            awaitPipeline(new HAGlue[] { serverA, serverC, serverB });
+		// Verify binary equality on the journal files.
+		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
-            /*
-             * Verify we can read on the KB on all nodes.
-             * 
-             * Note: It is important to test the reads for the first commit on
-             * both the leader and the follower.
-             */
-            for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
+		if (log.isInfoEnabled()) {
+			log.info("Zookeeper before forcing service remove:\n" + dumpZoo());
+		}
 
-                awaitNSSAndHAReady(service);
+		/*
+		 * Bounce the 1st follower out of the quorum. Verify quorum meets again
+		 * and that we can read on all services.
+		 */
+		{
 
-                final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-                try {
-	                // Should be empty.
-	                assertEquals(
-	                        0L,
-	                        countResults(repo.prepareTupleQuery(
-	                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-                } finally {
-                	repo.close();
-                }
-            }
+			serverA.submit(new ForceRemoveService(getServiceBId()), true).get();
 
-        }
-        
-    }
+			// Wait for the quorum to fully meet again.
+			final long token2 = awaitFullyMetQuorum();
+
+			if (log.isInfoEnabled()) {
+				log.info("Zookeeper after quorum fully met again:\n"
+						+ dumpZoo());
+			}
+
+			/*
+			 * The quorum did not break. The token is unchanged.
+			 */
+			assertEquals(token1, token2);
+
+			/*
+			 * Service B came back in at the end of the pipeline.
+			 */
+			awaitPipeline(new HAGlue[] { serverA, serverC, serverB });
+
+			/*
+			 * Verify we can read on the KB on all nodes.
+			 * 
+			 * Note: It is important to test the reads for the first commit on
+			 * both the leader and the follower.
+			 */
+			final JettyHttpClient client = new JettyHttpClient();
+			client.start();
+			try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
+
+					awaitNSSAndHAReady(service);
+
+					final JettyRemoteRepositoryManager repo = getRemoteRepository(
+							service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10")
+										.evaluate()));
+					} finally {
+						repo.close();
+					}
+				}
+			} finally {
+				client.stop();
+			}
+
+		}
+
+	}
 
     /**
      * Test of {@link QuorumActor#forceRemoveService(UUID)}. Start A + B + C in
@@ -1277,11 +1312,14 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
+            final JettyHttpClient client = new JettyHttpClient();
+            client.start();
+            try {
 			for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
 				awaitNSSAndHAReady(service);
 
-				final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
+				final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
 				try {
 					// Should be empty.
 					assertEquals(
@@ -1292,6 +1330,9 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					repo.close();
 				}
 			}
+            } finally {
+            	client.stop();
+            }
 
         }
         
@@ -1701,18 +1742,24 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         /*
          * Can query B/C. 
          */
-        for (HAGlue service : new HAGlue[] { serverB, serverC }) {
+        final JettyHttpClient client = new JettyHttpClient();
+        client.start();
+		try {
+			for (HAGlue service : new HAGlue[] { serverB, serverC }) {
 
-            final JettyRemoteRepositoryManager repo = getRemoteRepository(service);
-            try {
-            assertEquals(
-                    1L,
-                    countResults(repo.prepareTupleQuery(
-                            "SELECT (count(*) as ?count) {?a ?b ?c}")
-                            .evaluate()));
-            } finally {
-            	repo.close();
-            }
+				final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+				try {
+					assertEquals(
+							1L,
+							countResults(repo.prepareTupleQuery(
+									"SELECT (count(*) as ?count) {?a ?b ?c}")
+									.evaluate()));
+				} finally {
+					repo.close();
+				}
+			}
+		} finally {
+        	client.stop();
         }
         
         // restart zookeeper.
