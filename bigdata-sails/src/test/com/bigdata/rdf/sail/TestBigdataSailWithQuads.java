@@ -199,6 +199,7 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
     }
 
+    @Override
     public Properties getProperties() {
 
         final Properties properties = new Properties(super.getProperties());
