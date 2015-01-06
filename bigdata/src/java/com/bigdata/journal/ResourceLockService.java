@@ -38,7 +38,6 @@ import com.bigdata.concurrent.NamedLock;
  * An implementation using {@link NamedLock}s suitable for within JVM locking.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 final
 public class ResourceLockService implements IResourceLockService {
@@ -55,6 +54,7 @@ public class ResourceLockService implements IResourceLockService {
 
     }
 
+    @Override
     public IResourceLock acquireLock(final String namespace) {
 
         final Lock lock = locks.acquireLock(namespace);
@@ -63,6 +63,7 @@ public class ResourceLockService implements IResourceLockService {
 
     }
 
+    @Override
     public IResourceLock acquireLock(final String namespace,
             final long timeout) throws InterruptedException, TimeoutException {
 
@@ -97,6 +98,7 @@ public class ResourceLockService implements IResourceLockService {
 
         }
 
+        @Override
         public void unlock() {
 
             lock.unlock();

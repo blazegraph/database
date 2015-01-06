@@ -112,11 +112,11 @@ import com.bigdata.util.NT;
  * </dl>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * 
  * @param <T>
  *            The generic type of the [R]elation.
  */
-public class DefaultResourceLocator<T extends ILocatableResource> // 
+public class DefaultResourceLocator<T extends ILocatableResource<T>> // 
         implements IResourceLocator<T> {
 
     protected static final transient Logger log = Logger
@@ -232,6 +232,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
     }
 
     // @todo hotspot 2% total query time.
+    @Override
     public T locate(final String namespace, final long timestamp) {
 
         if (namespace == null)
@@ -1047,6 +1048,7 @@ public class DefaultResourceLocator<T extends ILocatableResource> //
         
     }
 
+    @Override
     public void discard(final ILocatableResource<T> instance,
             final boolean destroyed) {
 
