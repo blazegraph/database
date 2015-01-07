@@ -106,6 +106,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IAllocationContext;
@@ -114,7 +115,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.MergeStreamWithSortedSet;
+import com.bigdata.util.MergeStreamWithSnapshotData;
 
 /**
  * Storage class
@@ -6101,24 +6102,14 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     }
     
-    /**
-     * @throws InterruptedException 
-     * @see IHABufferStrategy#writeOnStream(OutputStream, Quorum, long)
-     */
-    public void writeOnStream(final OutputStream os,
-            final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
-            throws IOException, QuorumException, InterruptedException {
-    	writeOnStream(os, new TreeSet<java.util.Map.Entry<Long, byte[]>>(), quorum, token);
-    }
-    
-    public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
+    public void writeOnStream(final OutputStream os, final ISnapshotData snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
             throws IOException, QuorumException, InterruptedException {
     	
     	// final FileInputStream filein = new FileInputStream(this.m_fd);
     	final FileChannelUtility.ReopenerInputStream filein = new FileChannelUtility.ReopenerInputStream(m_reopener);
     	try {
-    		MergeStreamWithSortedSet.process(filein, snapshotData, os);
+    		MergeStreamWithSnapshotData.process(filein, snapshotData, os);
     	} finally {
     		filein.close();
     	}
@@ -7486,10 +7477,11 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	}
 
 	/**
-	 * Add the address/ByteBuffer to the snapshot map
+	 * Add the address/byte[] to the snapshot representing the metabits allocaiton data
+	 * 
 	 * @throws IOException 
 	 */
-	public void snapshotMetabits(final TreeMap<Long, byte[]> tm) throws IOException {
+	public void snapshotMetabits(final ISnapshotData tm) throws IOException {
 		final long mba;
 		if (m_metaBitsAddr < 0) {
 			mba = physicalAddress((int) m_metaBitsAddr);
@@ -7502,9 +7494,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	}
 
 	/**
-	 * Add the set of address/allocator to the snapshot map
+	 * Add the address/allocator associated with each FixedAllocator to the snapshot map
 	 */
-	public void snapshotAllocators(final TreeMap<Long, byte[]> tm) {
+	public void snapshotAllocators(final ISnapshotData tm) {
 		for(FixedAllocator alloc : m_allocs) {
 			alloc.snapshot(tm);
 		}

@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
@@ -53,6 +54,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
+import com.bigdata.journal.AbstractJournal.ISnapshotEntry;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
@@ -1872,16 +1875,23 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 
 		public void test_snapshotData() throws IOException {
-			Journal journal = (Journal) getStore(0); // remember no history!
-			
-			for (int i = 0; i < 100; i++)
-				commitSomeData(journal);
+			final Journal journal = (Journal) getStore(0); // remember no history!
 
-			final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
-			final Set<Entry<Long, byte[]>> data = journal.snapshotAllocationData(rbv);
-			
-			for (Entry<Long, byte[]> e : data) {
-				log.info("Position: " + e.getKey() + ", data size: " + e.getValue().length);
+			try {
+				for (int i = 0; i < 100; i++)
+					commitSomeData(journal);
+
+				final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
+				final Iterator<ISnapshotEntry> data = journal.snapshotAllocationData(rbv).entries();
+
+				while (data.hasNext()) {
+					final ISnapshotEntry e = data.next();
+					
+					log.info("Position: " + e.getAddress() + ", data size: "
+							+ e.getData().length);
+				}
+			} finally {
+				journal.destroy();
 			}
 		}
 		

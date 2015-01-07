@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.ICommitter;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
@@ -1519,16 +1520,21 @@ public class FixedAllocator implements Allocator {
 		return false;
 	}
 
-	void snapshot(TreeMap<Long, byte[]> tm) {
+	/**
+	 * Add a copy of the currently committed allocation data to the snapshot.  This is used by the snapshot
+	 * mechanism to ensure that a file copy, taken over the course of multiple commits, will contain the
+	 * correct allocation data from the time the snapshot was taken.
+	 */
+	void snapshot(final ISnapshotData tm) {
 		if (m_diskAddr > 0)
 			tm.put(m_store.metaBit2Addr(m_diskAddr), commitData());
 	}
 	
+	/**
+	 * Returns the 1K committed allocation data by writing the commit data for each allocation block.
+	 */
 	byte[] commitData() {
-		try {
-			
-			final AllocBlock fb = m_allocBlocks.get(0);
-
+		try {			
 			final byte[] buf = new byte[1024];
 			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
 			try {
