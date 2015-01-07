@@ -447,10 +447,12 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
     }
     
     /*
-     * Disable this long running test for CI
+     * With 500 txns this test is not too long.  If there is a problem at scale
+     * the count can be increased to ensure the snapshot takes a significant amount of time
+     * and therefore be more likely to show an atomicity problem.
      */
-    public void _test_snapshot_stressMultipleTx_restore_validate() throws Exception {
-    	do_snapshot_multipleTx_restore_validate(10000/*txn before*/, 1000/*txn after*/);
+    public void test_snapshot_stressMultipleTx_restore_validate() throws Exception {
+    	do_snapshot_multipleTx_restore_validate(500/*txn before*/, 50/*txn after*/);
     }
     
     public void do_snapshot_multipleTx_restore_validate(final int N1/*before snapshot*/, final int N2/*after-during snapshot*/) throws Exception {

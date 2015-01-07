@@ -50,6 +50,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
@@ -678,7 +679,7 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
     }
     
     @Override
-    public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
+    public void writeOnStream(final OutputStream os, final ISnapshotData snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
             throws IOException, QuorumException {
 

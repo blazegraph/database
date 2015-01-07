@@ -62,7 +62,6 @@ public class TestAll extends TestCase {
         
         // test iterator semantics.
         suite.addTestSuite(TestTupleFilters.class);
-        suite.addTestSuite(TestReverserator.class);
         suite.addTestSuite(TestRemoverator.class);
 
         /*

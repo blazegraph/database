@@ -650,13 +650,13 @@ public class FileChannelUtility {
       */
      public static class ReopenerInputStream extends InputStream {
     	 
-    	 final IReopenChannel<FileChannel> m_opener;
-    	 final ByteBuffer m_buffer;
-         final IBufferAccess m_bufferAccess;
-         final long m_eof;
-    	 long m_cursor = 0;
+    	 final private IReopenChannel<FileChannel> m_opener;
+    	 final private ByteBuffer m_buffer;
+         final private IBufferAccess m_bufferAccess;
+         final private long m_eof;
+    	 private long m_cursor = 0;
     	 
-    	 final byte[] m_singleByte = new byte[1];
+    	 final private byte[] m_singleByte = new byte[1];
     	 
     	 public ReopenerInputStream(final IReopenChannel<FileChannel> opener) throws IOException {
     		 m_opener = opener;

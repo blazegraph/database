@@ -33,7 +33,6 @@ import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -45,7 +44,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree.Counter;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.counters.AbstractStatisticsCollector;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
@@ -70,12 +68,13 @@ import com.bigdata.io.writecache.IBackingReader;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheCounters;
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.MergeStreamWithSortedSet;
+import com.bigdata.util.MergeStreamWithSnapshotData;
 
 /**
  * Disk-based Write Once Read Many (WORM) journal strategy. The phsyical layout
@@ -2655,14 +2654,14 @@ public class WORMStrategy extends AbstractBufferStrategy implements
     }
     
     @Override 
-    public void writeOnStream(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
+    public void writeOnStream(final OutputStream os, final ISnapshotData snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
 			throws IOException, QuorumException {
 
 		final FileChannelUtility.ReopenerInputStream instr = new FileChannelUtility.ReopenerInputStream(
 				opener);
 		try {
-			MergeStreamWithSortedSet.process(instr, snapshotData, os);
+			MergeStreamWithSnapshotData.process(instr, snapshotData, os);
 			
 			if (!quorum.getClient().isJoinedMember(token))
 				throw new QuorumException();

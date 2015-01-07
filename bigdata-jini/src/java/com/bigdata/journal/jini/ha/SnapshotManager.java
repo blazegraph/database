@@ -39,7 +39,9 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -67,6 +69,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HASnapshotResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IHABufferStrategy;
@@ -1445,7 +1448,7 @@ public class SnapshotManager implements IServiceInit<Void> {
 				// allocation data, setting
 				// the current committed rootblock view
 				final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
-				final Set<java.util.Map.Entry<Long, byte[]>> coreData = journal
+				final ISnapshotData coreData = journal
 						.snapshotAllocationData(rbv);
 
 				final File file = snapshotManager.getSnapshotFile(rbv.get()
