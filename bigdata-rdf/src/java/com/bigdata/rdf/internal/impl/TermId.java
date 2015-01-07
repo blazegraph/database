@@ -94,6 +94,7 @@ public class TermId<V extends BigdataValue>
 
     }
 
+    @Override
     public IV<V, Void> clone(final boolean clearCache) {
 
         final TermId<V> tmp = new TermId<V>(flags, termId);
@@ -152,6 +153,7 @@ public class TermId<V extends BigdataValue>
      * infinite recursion through {@link BigdataValue#toString()} if the latter
      * were to display the {@link IV}.
      */
+    @Override
     public String toString() {
 
         return "TermId(" + termId + String.valueOf(getVTE().getCharCode())
@@ -202,6 +204,7 @@ public class TermId<V extends BigdataValue>
      * which case this will compare the cached {@link BigdataValue}s if they
      * exist.  Null IVs without cached values are never equal.
      */
+    @Override
     public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -226,12 +229,14 @@ public class TermId<V extends BigdataValue>
      * 
      * @see Long#hashCode()
      */
+    @Override
     public int hashCode() {
         
         return (int) (termId ^ (termId >>> 32));
         
     }
 
+    @Override
     public int byteLength() {
 
         if (IVUtility.PACK_TIDS) {
