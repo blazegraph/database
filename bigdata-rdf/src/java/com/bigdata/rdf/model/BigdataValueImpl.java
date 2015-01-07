@@ -50,6 +50,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
     protected volatile IV iv;
 
+    @Override
     public final BigdataValueFactory getValueFactory() {
         
         return valueFactory;
@@ -97,6 +98,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
         
     }
 
+    @Override
     final public void clearInternalValue() {
 
         iv = null;
@@ -115,12 +117,14 @@ public abstract class BigdataValueImpl implements BigdataValue {
 
     }
 
+    @Override
     public IV getIV() {
 
         return iv;
         
     }
 
+    @Override
     final public void setIV(final IV iv) {
 
         if (iv == null) {
@@ -146,7 +150,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
      * so we can recover the {@link BigdataValueFactory} singleton reference for
      * that namespace when the value is deserialized.
      */
-	private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+	private void writeObject(final java.io.ObjectOutputStream out) throws IOException {
 
 		out.defaultWriteObject();
 		
@@ -158,7 +162,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 	 * Imposes the canonicalizing mapping on the non-Serializable
 	 * BigdataValueFactory during object de-serialization.
 	 */
-	private void readObject(java.io.ObjectInputStream in) throws IOException,
+	private void readObject(final java.io.ObjectInputStream in) throws IOException,
 			ClassNotFoundException {
 
 		in.defaultReadObject();
@@ -174,6 +178,7 @@ public abstract class BigdataValueImpl implements BigdataValue {
 	 * with the term in the 0th index position and the IV in the 1st index
 	 * position.
 	 */
+	@Override
 	public Object get(int index) {
 		
 		if (index == 0) {
