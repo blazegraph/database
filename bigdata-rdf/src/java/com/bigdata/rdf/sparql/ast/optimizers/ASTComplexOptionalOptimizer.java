@@ -41,6 +41,7 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -317,18 +318,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             for(int i=0; i<members.length && !optimizationApplicable; i++) {
             	
             	// the where clause will be non-empty if any of the group
-            	// members contains a solution-generating pattern
+            	// members contains a solution-generating pattern (different
+            	// from optional, which will be optimized)
             	IGroupMemberNode t = members[i];
             	optimizationApplicable |= 
-            			   t instanceof StatementPatternNode
-                        || t instanceof NamedSubqueryInclude
-                        || t instanceof SubqueryRoot
-                        || t instanceof ServiceNode
-                        || t instanceof UnionNode
-                        || t instanceof ArbitraryLengthPathNode 
-                        || t instanceof BindingsClause
-                        || (t instanceof JoinGroupNode &&
-                        	!((JoinGroupNode) t).isOptional());
+            		t instanceof IBindingProducerNode && 
+            		!(t instanceof JoinGroupNode && ((JoinGroupNode) t).isOptional());
             }
     	
 	    	if (!optimizationApplicable)
