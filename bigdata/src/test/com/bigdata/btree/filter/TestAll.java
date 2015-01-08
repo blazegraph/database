@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree.filter;
 
-import com.bigdata.btree.TestChunkedIterators;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -58,11 +56,12 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("Tuple filters");
+    	final TestSuite suite = new TestSuite("Tuple filters");
         
         // test iterator semantics.
         suite.addTestSuite(TestTupleFilters.class);
         suite.addTestSuite(TestRemoverator.class);
+        suite.addTestSuite(TestReverserator.class);
 
         /*
          * tests of various iterators or cursors that provide a facility, such
