@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Collections;
+import java.util.List;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.model.BigdataURI;
@@ -44,6 +46,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryBase.Annotations;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -185,7 +188,8 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
     /**
      * Assert proper handling of redundant (identical) filter expressions.
      */
-    public void test_redundantFilter() {
+    @SuppressWarnings("unchecked")
+	public void test_redundantFilter() {
 
         final String sampleInstance = "http://www.example.com/I";
         final BigdataURI someUri = valueFactory.createURI(sampleInstance);
@@ -206,12 +210,10 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
          * QueryType: SELECT
          * SELECT VarNode(s)
          *   JoinGroupNode {
-         *     JoinGroupNode {
-         *       QueryType: SELECT
-         *       SELECT VarNode(s)
-         *         JoinGroupNode {
-         *           StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
-         *         }
+         *     QueryType: SELECT
+         *     SELECT VarNode(s)
+         *       JoinGroupNode {
+         *         StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
          *     }
          *     FILTER( FunctionNode(VarNode(s),VarNode(s))[FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#not-equal-to, valueExpr=com.bigdata.rdf.internal.constraints.CompareBOp(s,TermId(0U)[eg:b])[ CompareBOp.op=NE]] )
          *     FILTER( FunctionNode(VarNode(s),VarNode(s))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#not-equal-to, valueExpr=com.bigdata.rdf.internal.constraints.CompareBOp(s,TermId(0U)[eg:b])[ CompareBOp.op=NE]] )
@@ -239,10 +241,6 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
         	qUnoptimizedInner.setWhereClause(innerJoin);
         	
         	///////////////////////////////////// STEP 1: build outer query
-        	// build dummy join around projection
-        	JoinGroupNode dummyJoin = new JoinGroupNode();
-        	dummyJoin.addArg(qUnoptimizedInner);
-
         	// build filter expressions
         	FilterNode f1 = new FilterNode(FunctionNode.NE(
         		new ConstantNode(someUri.getIV()), varS));        	
@@ -252,7 +250,7 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
         	
         	// build outer join
         	JoinGroupNode outerJoin = new JoinGroupNode();
-        	outerJoin.addArg(dummyJoin);
+        	outerJoin.addArg(qUnoptimizedInner);
         	outerJoin.addArg(f1);
         	outerJoin.addArg(f2);
         	
@@ -264,6 +262,8 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
         	qUnoptimized.setWhereClause(outerJoin);
         	qUnoptimized.setProjection(projection);
         }
+        System.out.println(qUnoptimized);
+
 
         // we need to apply the value exp rewriter to calculate value exps
         final ASTSetValueExpressionsOptimizer valueExpRewriter = 
@@ -289,6 +289,41 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
         final IQueryNode qOptimized = joinRewriter.optimize(
         	contextJoinRewriter, qIntermediate, bsetsJoinRewriter);
         
-        // TODO: assert that joins are correctly reordered
+        /** This is the output we expect
+         * QueryType: SELECT
+         * SELECT VarNode(s)
+         *   JoinGroupNode {
+         *     QueryType: SELECT
+         *     SELECT VarNode(s)
+         *       JoinGroupNode {
+         *         StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
+         *       }
+         *       FILTER( FunctionNode(ConstantNode(TermId(1U)[http://www.example.com/I]),VarNode(s))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2005/xpath-functions#not-equal-to, valueExpr=com.bigdata.rdf.internal.constraints.CompareBOp(TermId(1U)[http://www.example.com/I],s)[ CompareBOp.op=NE]] )
+         *   }
+         */
+        
+        // the optimized query contains no more filter at top-level, but one
+        // filter nested inside the SELECT clause (duplicate has been removed)
+        assertEquals(
+        	QueryType.SELECT,
+        	qOptimized.annotations().get(Annotations.QUERY_TYPE));
+        JoinGroupNode topLevelJoin = 
+        	(JoinGroupNode)qOptimized.annotations().get(Annotations.GRAPH_PATTERN);
+        List<IGroupMemberNode> topLevelJoinChildren = topLevelJoin.getChildren();
+        
+        // the top level join has only one subquery, namely the select; filters
+        // have been pushed inside
+        assertEquals(topLevelJoinChildren.size(),1);
+        SubqueryRoot innerSelect = (SubqueryRoot)topLevelJoinChildren.get(0);
+        assertEquals(
+        	QueryType.SELECT,
+        	innerSelect.annotations().get(Annotations.QUERY_TYPE));
+        
+        JoinGroupNode innerJoin =
+        	(JoinGroupNode)innerSelect.annotations().get(Annotations.GRAPH_PATTERN);
+        assertNotNull(innerJoin);
+        List<FilterNode> filters =
+            	(List<FilterNode>)innerSelect.annotations().get("filters");
+        assertEquals(filters.size(),1);
     }
 }
