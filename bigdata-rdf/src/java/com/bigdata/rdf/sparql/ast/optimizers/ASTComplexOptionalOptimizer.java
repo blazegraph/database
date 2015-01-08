@@ -41,6 +41,7 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -302,6 +303,33 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             final StaticAnalysis sa, final QueryBase query,
             final JoinGroupNode group, final Set<IVariable<?>> exogenousVars) {
 
+    	/*
+    	 * Step 0: Precondition check
+    	 * 
+    	 * Check if the optimization is indeed applicable: rewriting is only
+    	 * sound if the WHERE clause of the body select query (as constructed
+    	 * in Step 1 below) will contain one or more solution generating
+    	 * expressions (triple patterns, join groups, etc.)
+    	 */
+    	{
+            final IGroupMemberNode[] members = group
+                    .toArray(new IGroupMemberNode[] {});
+            boolean optimizationApplicable = false;
+            for(int i=0; i<members.length && !optimizationApplicable; i++) {
+            	
+            	// the where clause will be non-empty if any of the group
+            	// members contains a solution-generating pattern (different
+            	// from optional, which will be optimized)
+            	IGroupMemberNode t = members[i];
+            	optimizationApplicable |= 
+            		t instanceof IBindingProducerNode && 
+            		!(t instanceof JoinGroupNode && ((JoinGroupNode) t).isOptional());
+            }
+    	
+	    	if (!optimizationApplicable)
+	    		return; // not safe, can't do anything here
+    	}
+    	
         /*
          * Step 1.
          * 
