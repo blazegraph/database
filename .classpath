@@ -30,7 +30,6 @@
 	<classpathentry kind="src" path="bigdata-rdf/src/resources/service-providers"/>
 	<classpathentry kind="src" path="bigdata-gom/src/java"/>
 	<classpathentry kind="src" path="bigdata-gom/src/test"/>
-	<classpathentry kind="src" path="bigdata-gom/src/resources"/>
 	<classpathentry kind="src" path="bigdata-gom/src/samples"/>
 	<classpathentry kind="src" path="bigdata-gas/src/java"/>
 	<classpathentry kind="src" path="bigdata-gas/src/test"/>
