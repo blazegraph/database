@@ -31,12 +31,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -50,6 +54,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
+import com.bigdata.journal.AbstractJournal.ISnapshotEntry;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
@@ -59,6 +65,7 @@ import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.RWStrategy;
@@ -1867,6 +1874,27 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			}
 		}
 
+		public void test_snapshotData() throws IOException {
+			final Journal journal = (Journal) getStore(0); // remember no history!
+
+			try {
+				for (int i = 0; i < 100; i++)
+					commitSomeData(journal);
+
+				final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
+				final Iterator<ISnapshotEntry> data = journal.snapshotAllocationData(rbv).entries();
+
+				while (data.hasNext()) {
+					final ISnapshotEntry e = data.next();
+					
+					log.info("Position: " + e.getAddress() + ", data size: "
+							+ e.getData().length);
+				}
+			} finally {
+				journal.destroy();
+			}
+		}
+		
 		/**
 		 * Tests whether tasks are able to access and modify data safely by
 		 * emulating transactions by calling activateTx and deactivateTx

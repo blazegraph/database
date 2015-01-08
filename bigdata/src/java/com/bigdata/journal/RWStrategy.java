@@ -32,6 +32,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Lock;
@@ -49,6 +50,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
@@ -677,11 +679,15 @@ public class RWStrategy extends AbstractRawStore implements IBufferStrategy,
     }
     
     @Override
-    public void writeOnStream(final OutputStream os,
+    public void writeOnStream(final OutputStream os, final ISnapshotData snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
             throws IOException, QuorumException {
 
-        m_store.writeOnStream(os, quorum, token);
+        try {
+			m_store.writeOnStream(os, snapshotData, quorum, token);
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
 
     }
 

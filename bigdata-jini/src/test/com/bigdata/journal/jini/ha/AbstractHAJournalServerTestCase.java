@@ -29,6 +29,8 @@ package com.bigdata.journal.jini.ha;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -1188,23 +1190,50 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      *            the journal.
      */
     protected void dumpJournal(final Journal journal) {
-
-        final StringWriter sw = new StringWriter();
-
-        final PrintWriter w = new PrintWriter(sw);
-
-        // Verify can dump journal.
-        new DumpJournal(journal).dumpJournal(w, null/* namespaces */,
-                true/* dumpHistory */, true/* dumpPages */,
-                true/* dumpIndices */, false/* showTuples */);
-
-        w.flush();
-
-        w.close();
-
-        if (log.isInfoEnabled())
-            log.info(sw.toString());
-
+		try {
+			// Write to file, not String, to remove memory stress
+			File file = File.createTempFile("journal", "dump");
+			try {	    	
+		    	final FileWriter fw = new FileWriter(file, false);
+		
+		        final PrintWriter w = new PrintWriter(fw);
+		
+		        // Verify can dump journal.
+		        new DumpJournal(journal).dumpJournal(w, null/* all namespaces */,
+		                true/* dumpHistory */, true/* dumpPages */,
+		                true/* dumpIndices */, false/* showTuples */);
+		
+		        w.flush();
+		
+		        w.close();
+		        
+		        fw.close();
+		        
+		        if (log.isInfoEnabled()) {
+		        	// read/write max 10M
+		        	final int MAXWRITE = 10 * 1024 * 1024;
+		        	final FileReader reader = new FileReader(file);	        	
+		        	final StringWriter sw = new StringWriter();
+		        	final char[] buf = new char[4096];
+		        	int rdlen;
+		        	int total = 0;
+		        	while ((rdlen = reader.read(buf)) != -1) {
+		        		sw.write(buf, 0, rdlen);
+		        		total += rdlen;
+		        		if (total > MAXWRITE) {
+		        			
+		        			break;
+		        		}
+		        	}
+		            log.info(sw.toString());
+		        }
+			} finally {
+				file.delete();
+			}
+	
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+	    }
     }
 
     /**

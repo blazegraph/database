@@ -408,7 +408,8 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 		return VTE.valueOf((byte) (((flags & VTE_MASK) >>> VTE_SHIFT) & 0xff));
 
     }
-    
+
+	@Override
     final public VTE getVTE() {
 
         return getVTE(flags);
@@ -418,6 +419,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     /**
      * Return the {@link DTE} for this {@link IV}.
      */
+	@Override
     final public DTE getDTE() {
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
