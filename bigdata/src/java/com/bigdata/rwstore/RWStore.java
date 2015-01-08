@@ -27,6 +27,7 @@ package com.bigdata.rwstore;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,6 +48,8 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -103,6 +106,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IAllocationContext;
@@ -111,6 +115,7 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.MergeStreamWithSnapshotData;
 
 /**
  * Storage class
@@ -1513,7 +1518,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 default:
                     throw new IllegalStateException(
                             "Incompatible RWStore header version: storeVersion="
-                                    + storeVersion + ", cVersion=" + cVersion);
+                                    + storeVersion + ", cVersion=" + cVersion + ", demispace: " + isUsingDemiSpace());
                 }
                 m_lastDeferredReleaseTime = strBuf.readLong();
                 if (strBuf.readInt() != cDefaultMetaBitsSize) {
@@ -3055,6 +3060,33 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * @throws IOException
      */
     private void writeMetaBits() throws IOException {
+        final byte buf[] = genMetabitsData();
+
+        /*
+         * Note: this address is set by commit() prior to calling
+         * writeMetaBits().
+         */
+        //final long addr = physicalAddress(m_metaBitsAddr);
+        final long addr = m_metaBitsAddr < 0 ? physicalAddress(m_metaBitsAddr) : ((long) m_metaBitsAddr) << ALLOCATION_SCALEUP;
+        if (addr == 0) {
+            throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
+        }
+        
+        assert addr > 0;
+        
+        try {
+        	if (log.isDebugEnabled())
+        		log.debug("writing metabits at: " + addr);
+        	
+        	// Similar to writeMetaBits, we are no longer writing to a FixedAllocator managed region,
+        	//	so no latched address is provided
+            m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr < 0 ? m_metaBitsAddr : 0 /*latchedAddr*/);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    private byte[] genMetabitsData() throws IOException {
         // the metabits is now prefixed by a long specifying the lastTxReleaseTime
         // used to free the deferedFree allocations.  This is used to determine
         //  which commitRecord to access to process the nextbatch of deferred
@@ -3097,29 +3129,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         } finally {
             str.close();
         }
-
-        /*
-         * Note: this address is set by commit() prior to calling
-         * writeMetaBits().
-         */
-        //final long addr = physicalAddress(m_metaBitsAddr);
-        final long addr = m_metaBitsAddr < 0 ? physicalAddress(m_metaBitsAddr) : ((long) m_metaBitsAddr) << ALLOCATION_SCALEUP;
-        if (addr == 0) {
-            throw new IllegalStateException("Invalid metabits address: " + m_metaBitsAddr);
-        }
         
-        assert addr > 0;
-        
-        try {
-        	if (log.isDebugEnabled())
-        		log.debug("writing metabits at: " + addr);
-        	
-        	// Similar to writeMetaBits, we are no longer writing to a FixedAllocator managed region,
-        	//	so no latched address is provided
-            m_writeCacheService.write(addr, ByteBuffer.wrap(buf), 0/*chk*/, false/*useChecksum*/, m_metaBitsAddr < 0 ? m_metaBitsAddr : 0 /*latchedAddr*/);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+        return buf;
     }
 
     /**
@@ -6091,10 +6102,23 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 
     }
     
-    /**
-     * @see IHABufferStrategy#writeOnStream(OutputStream, Quorum, long)
-     */
-    public void writeOnStream(final OutputStream os,
+    public void writeOnStream(final OutputStream os, final ISnapshotData snapshotData,
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
+            throws IOException, QuorumException, InterruptedException {
+    	
+    	// final FileInputStream filein = new FileInputStream(this.m_fd);
+    	final FileChannelUtility.ReopenerInputStream filein = new FileChannelUtility.ReopenerInputStream(m_reopener);
+    	try {
+    		MergeStreamWithSnapshotData.process(filein, snapshotData, os);
+    	} finally {
+    		filein.close();
+    	}
+    	
+        if (!quorum.getClient().isJoinedMember(token))
+            throw new QuorumException();
+    }
+    
+    public void writeOnStream2(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum, final long token)
             throws IOException, QuorumException {
     
@@ -7445,6 +7469,36 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 			return true;
 		} else {
 			return false;
+		}
+	}
+	
+	public boolean isUsingDemiSpace() {
+		return m_metaBitsAddr > 0;
+	}
+
+	/**
+	 * Add the address/byte[] to the snapshot representing the metabits allocaiton data
+	 * 
+	 * @throws IOException 
+	 */
+	public void snapshotMetabits(final ISnapshotData tm) throws IOException {
+		final long mba;
+		if (m_metaBitsAddr < 0) {
+			mba = physicalAddress((int) m_metaBitsAddr);
+		} else {
+        // long ret = physicalAddress((int) m_metaBitsAddr);
+			mba = convertAddr(-m_metaBitsAddr); // maximum 48 bit address range
+		}
+
+		tm.put(mba, genMetabitsData());
+	}
+
+	/**
+	 * Add the address/allocator associated with each FixedAllocator to the snapshot map
+	 */
+	public void snapshotAllocators(final ISnapshotData tm) {
+		for(FixedAllocator alloc : m_allocs) {
+			alloc.snapshot(tm);
 		}
 	}
 
