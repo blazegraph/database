@@ -29,9 +29,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.filter;
 
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.AbstractBTree;
+import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
 import com.bigdata.btree.AbstractTupleCursorTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IRangeQuery;
@@ -41,14 +43,12 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.TestTuple;
 import com.bigdata.btree.Tuple;
-import com.bigdata.btree.AbstractBTreeTupleCursor.ReadOnlyBTreeTupleCursor;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 
 /**
  * Test suite for the {@link Reverserator}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestReverserator extends AbstractTupleCursorTestCase {
 
@@ -65,6 +65,7 @@ public class TestReverserator extends AbstractTupleCursorTestCase {
         super(arg0);
     }
 
+    @Override
     protected ITupleCursor2<String> newCursor(AbstractBTree btree, int flags,
             byte[] fromKey, byte[] toKey) {
         
@@ -135,6 +136,51 @@ public class TestReverserator extends AbstractTupleCursorTestCase {
             }
 
         }
+
+    }
+
+    /**
+	 * Stress test written in an attempt to find a spin lock in the reverse
+	 * cursor traversal.
+	 * <p>
+	 * Note: This test was in the jetty branch. I have picked it up and copied
+	 * it into the master. The version in the master should be preserved.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1078"> Possible tight loop
+	 *      in cursor.prior() </a>
+	 */
+    public void test_reverse_with_branching_factor() {
+
+		final Random r = new Random();
+
+		for (int bf = 32; bf < 1024; bf += r.nextInt(32)) {
+			
+			final IndexMetadata metadata = new IndexMetadata(UUID.randomUUID());
+			
+			metadata.setBranchingFactor(bf);
+
+			BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+
+			for (int i = 1; i < 2000; i++) {
+
+				btree.insert("key" + r.nextInt(), "value" + r.nextInt());
+
+				final ITupleCursor2<String> cursor = newCursor(btree,
+						IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
+
+				final ITupleIterator<String> itr = new Reverserator<String>(
+						cursor);
+
+				int count = 0;
+
+				while (itr.hasNext()) {
+					itr.next();
+					count++;
+				}
+
+				assertTrue(i == count);
+			}
+		}
 
     }
 
