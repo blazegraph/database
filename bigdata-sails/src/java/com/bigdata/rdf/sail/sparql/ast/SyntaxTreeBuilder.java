@@ -68,7 +68,7 @@ public class SyntaxTreeBuilder/*@bgen(jjtree)*/implements SyntaxTreeBuilderTreeC
             boolean previousTokenDtSep = false;
             while (true) {
                 tok = getToken(1);
-                if (!previousTokenDtSep && ! tok.image.equals("^^")) {
+                if (!previousTokenDtSep && ! tok.image.equals("^^") && !tok.image.startsWith("@")) {
                     sb.append(" ");
                 }
                 if (tok.kind == LBRACE) nesting++;
