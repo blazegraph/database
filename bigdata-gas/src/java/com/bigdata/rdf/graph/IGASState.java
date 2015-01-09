@@ -295,4 +295,15 @@ public interface IGASState<VS,ES, ST> {
      */
     void retainAll(Set<Value> retainSet);
 
+    /**
+	 * Convert a value into an appropriate internal form.
+	 * 
+	 * @param value
+	 *            The value.
+	 *            
+	 * @return The internal form and <code>null</code> if the argument is
+	 *         <code>null</code>.
+	 */
+	Value asValue(Value value);
+
 }

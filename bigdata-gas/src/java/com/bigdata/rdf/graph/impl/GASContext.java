@@ -710,6 +710,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * 
          * @return The #of visited edges.
          */
+        @Override
         public Long call() throws Exception {
 
             final boolean TRACE = log.isTraceEnabled();
