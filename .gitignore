@@ -331,3 +331,7 @@
 
 # ignore all HA CI benchmark files.
 benchmark
+
+/bigdata-perf/gas/*.out
+/bigdata-perf/gas/*.test
+/bigdata-perf/gas/*.jnl
