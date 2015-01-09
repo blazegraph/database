@@ -302,7 +302,7 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
 
         for (Value v : vertices) {
 
-            tmp.add(v);
+            tmp.add(asValue(v)); // convert to internal form and impose distinct.
 
         }
 
@@ -480,6 +480,13 @@ public class GASState<VS, ES, ST> implements IGASState<VS, ES, ST> {
         return ret;
         
     }
+
+	@Override
+	public Value asValue(final Value value) {
+		
+		return value;
+		
+	}
     
 //    public Set<Value> values() {
 //    	
