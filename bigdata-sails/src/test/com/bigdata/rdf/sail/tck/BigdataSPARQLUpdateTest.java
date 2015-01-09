@@ -645,4 +645,31 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
         }
     }
 
+    
+    /**
+     * SPARQL update test for literals with language tags, cf. ticket #1073.
+     */
+    public void testUpdateLiteralsWithLanguageTags() throws Exception {
+
+        final String queryStr = "SELECT * WHERE { ?s ?p ?o }";
+    	long nrTriplesBeforeUpdate = countSolutions(queryStr);
+    	
+        // Insert statement:
+    	StringBuilder updateStrBuf = new StringBuilder();
+    	updateStrBuf.append("INSERT DATA { ");
+    	updateStrBuf.append("<http://rm-lod.org/object/2176/production/date> ");
+    	updateStrBuf.append("<http://www.w3.org/2000/01/rdf-schema#label> ");
+    	updateStrBuf.append("\"1906\"@ru . }");
+
+    	String updateStr = updateStrBuf.toString();
+    	
+        final BigdataSailUpdate update = (BigdataSailUpdate)
+                con.prepareUpdate(QueryLanguage.SPARQL, updateStr);
+        update.execute();
+
+        // Test query:
+    	long nrTriplesAfterUpdate = countSolutions(queryStr);
+
+        assertEquals(nrTriplesBeforeUpdate + 1, nrTriplesAfterUpdate);
+    }
 }
