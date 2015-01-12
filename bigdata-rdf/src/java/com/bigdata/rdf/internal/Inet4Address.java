@@ -238,8 +238,10 @@ public final class Inet4Address {
 				 */
 				for (int i = 0; i < 5; i++) {
 					val = Integer.parseInt(s[i]);
-					if (val < 0 || val > 32)
+					if (val < 0 || val > 0xff)
 						return null;
+					if (i == 4 && val > 32)
+					    return null;
 					res[i] = (byte) (val & 0xff);
 				}
 				break;

@@ -39,7 +39,9 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -67,6 +69,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HASnapshotResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IHABufferStrategy;
@@ -1439,154 +1442,161 @@ public class SnapshotManager implements IServiceInit<Void> {
 
 			// Grab a read lock.
 			final long txId = journal.newTx(ITx.READ_COMMITTED);
-
-			// Get all snapshot core data, including rootblocks and any allocation data, setting
-			//	the current committed rootblock view
-			final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
-			final Set<java.util.Map.Entry<Long, byte[]>> coreData = journal.snapshotAllocationData(rbv);
-			
-			final File file = snapshotManager.getSnapshotFile(rbv.get().getCommitCounter());
-
-			if (file.exists() && file.length() != 0L) {
-
-				/*
-				 * Snapshot exists and is not (logically) empty.
-				 * 
-				 * Note: The SnapshotManager will not recommend taking a
-				 * snapshot if a snapshot already exists for the current commit
-				 * point since there is no committed delta that can be captured
-				 * by the snapshot.
-				 * 
-				 * This code makes sure that we do not attempt to overwrite a
-				 * snapshot if we already have one for the same commit point. If
-				 * you want to re-generate a snapshot for the same commit point
-				 * (e.g., because the existing one is corrupt) then you MUST
-				 * remove the pre-existing snapshot first.
-				 */
-
-				throw new IOException("File exists: " + file);
-
-			}
-
-			final File parentDir = file.getParentFile();
-
-			// Make sure the parent directory(ies) exist.
-			if (!parentDir.exists())
-				if (!parentDir.mkdirs())
-					throw new IOException("Could not create directory: "
-							+ parentDir);
-
-			/*
-			 * Create a temporary file. We will write the snapshot here. The
-			 * file will be renamed onto the target file name iff the snapshot
-			 * is successfully written.
-			 */
-			final File tmp = File.createTempFile(
-					SnapshotManager.SNAPSHOT_TMP_PREFIX,
-					SnapshotManager.SNAPSHOT_TMP_SUFFIX, parentDir);
-
-			DataOutputStream os = null;
-			boolean success = false;
 			try {
 
-				os = new DataOutputStream(new GZIPOutputStream(
-						new FileOutputStream(tmp)));
-			
-				// write out the file data.
-				((IHABufferStrategy) journal.getBufferStrategy())
-						// .writeOnStream(os, journal.getQuorum(), token);
-						.writeOnStream(os, coreData, journal.getQuorum(), token);
+				// Get all snapshot core data, including rootblocks and any
+				// allocation data, setting
+				// the current committed rootblock view
+				final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
+				final ISnapshotData coreData = journal
+						.snapshotAllocationData(rbv);
 
-				// flush the output stream.
-				os.flush();
+				final File file = snapshotManager.getSnapshotFile(rbv.get()
+						.getCommitCounter());
 
-				// done.
-				success = true;
-			} catch (Throwable t) {
-				/*
-				 * Log @ ERROR and launder throwable.
-				 */
-				log.error(t, t);
-				if (t instanceof Exception)
-					throw (Exception) t;
-				else
-					throw new RuntimeException(t);
-			} finally {
+				if (file.exists() && file.length() != 0L) {
 
-				// Release the read lock.
-				journal.abort(txId);
+					/*
+					 * Snapshot exists and is not (logically) empty.
+					 * 
+					 * Note: The SnapshotManager will not recommend taking a
+					 * snapshot if a snapshot already exists for the current
+					 * commit point since there is no committed delta that can
+					 * be captured by the snapshot.
+					 * 
+					 * This code makes sure that we do not attempt to overwrite
+					 * a snapshot if we already have one for the same commit
+					 * point. If you want to re-generate a snapshot for the same
+					 * commit point (e.g., because the existing one is corrupt)
+					 * then you MUST remove the pre-existing snapshot first.
+					 */
 
-				if (os != null) {
-					try {
-						os.close();
-					} finally {
-						// ignore.
-					}
+					throw new IOException("File exists: " + file);
+
 				}
 
-				/*
-				 * Either rename the temporary file onto the target filename or
-				 * delete the tempoary file. The snapshot is not considered to
-				 * be valid until it is found under the appropriate name.
-				 */
-				if (success) {
+				final File parentDir = file.getParentFile();
 
-					if (!journal.getQuorum().getClient().isJoinedMember(token)) {
-						// Verify before putting down the root blocks.
-						throw new QuorumException(
-								"Snapshot aborted: service not joined with met quorum.");
+				// Make sure the parent directory(ies) exist.
+				if (!parentDir.exists())
+					if (!parentDir.mkdirs())
+						throw new IOException("Could not create directory: "
+								+ parentDir);
+
+				/*
+				 * Create a temporary file. We will write the snapshot here. The
+				 * file will be renamed onto the target file name iff the
+				 * snapshot is successfully written.
+				 */
+				final File tmp = File.createTempFile(
+						SnapshotManager.SNAPSHOT_TMP_PREFIX,
+						SnapshotManager.SNAPSHOT_TMP_SUFFIX, parentDir);
+
+				DataOutputStream os = null;
+				boolean success = false;
+				try {
+
+					os = new DataOutputStream(new GZIPOutputStream(
+							new FileOutputStream(tmp)));
+
+					// write out the file data.
+					((IHABufferStrategy) journal.getBufferStrategy())
+					// .writeOnStream(os, journal.getQuorum(), token);
+							.writeOnStream(os, coreData, journal.getQuorum(),
+									token);
+
+					// flush the output stream.
+					os.flush();
+
+					// done.
+					success = true;
+				} catch (Throwable t) {
+					/*
+					 * Log @ ERROR and launder throwable.
+					 */
+					log.error(t, t);
+					if (t instanceof Exception)
+						throw (Exception) t;
+					else
+						throw new RuntimeException(t);
+				} finally {
+
+					if (os != null) {
+						try {
+							os.close();
+						} finally {
+							// ignore.
+						}
 					}
 
-					if (!tmp.renameTo(file)) {
+					/*
+					 * Either rename the temporary file onto the target filename
+					 * or delete the tempoary file. The snapshot is not
+					 * considered to be valid until it is found under the
+					 * appropriate name.
+					 */
+					if (success) {
 
-						log.error("Could not rename " + tmp + " as " + file);
+						if (!journal.getQuorum().getClient()
+								.isJoinedMember(token)) {
+							// Verify before putting down the root blocks.
+							throw new QuorumException(
+									"Snapshot aborted: service not joined with met quorum.");
+						}
 
-					} else {
+						if (!tmp.renameTo(file)) {
 
-						// Add to the set of known snapshots.
-						snapshotManager.addSnapshot(file);
+							log.error("Could not rename " + tmp + " as " + file);
 
-						if (haLog.isInfoEnabled())
-							haLog.info("Captured snapshot: " + file
-									+ ", commitCounter="
-									+ rbv.get().getCommitCounter()
-									+ ", length=" + file.length());
+						} else {
 
-						/*
-						 * Attempt to purge older snapshots and HALogs.
-						 */
+							// Add to the set of known snapshots.
+							snapshotManager.addSnapshot(file);
 
-						if (quorum != null) {
+							if (haLog.isInfoEnabled())
+								haLog.info("Captured snapshot: " + file
+										+ ", commitCounter="
+										+ rbv.get().getCommitCounter()
+										+ ", length=" + file.length());
 
-							// This quorum member.
-							final QuorumService<HAGlue> localService = quorum
-									.getClient();
+							/*
+							 * Attempt to purge older snapshots and HALogs.
+							 */
 
-							if (localService != null) {
+							if (quorum != null) {
 
-								localService.purgeHALogs(token);
+								// This quorum member.
+								final QuorumService<HAGlue> localService = quorum
+										.getClient();
+
+								if (localService != null) {
+
+									localService.purgeHALogs(token);
+
+								}
 
 							}
 
 						}
 
-					}
+					} else {
 
-				} else {
+						if (!tmp.delete()) {
 
-					if (!tmp.delete()) {
+							log.warn("Could not delete temporary file: " + tmp);
 
-						log.warn("Could not delete temporary file: " + tmp);
+						}
 
 					}
 
 				}
 
+				// Done.
+				return new HASnapshotResponse(rbv.get());
+			} finally {
+				// Release the read lock.
+				journal.abort(txId);
 			}
-
-			// Done.
-			return new HASnapshotResponse(rbv.get());
-
 		}
 
 		public IHASnapshotResponse call2() throws Exception {

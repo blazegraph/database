@@ -981,7 +981,12 @@ abstract public class WriteCacheService implements IWriteCache {
 
             while (true) {
 
-                assert !halt;
+            	/*
+            	 * Replace assert !halt; since it is set in WriteCacheService.close()
+            	 */
+                if (halt) {
+                    throw new RuntimeException(firstCause.get());
+                }
 
                 // Await dirty cache buffer.
                 final WriteCache cache = awaitDirtyBuffer();

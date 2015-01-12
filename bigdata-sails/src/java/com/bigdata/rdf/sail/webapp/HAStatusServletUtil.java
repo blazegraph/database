@@ -145,7 +145,8 @@ public class HAStatusServletUtil {
 
         final HAJournal journal = (HAJournal) indexManager;
 
-        final ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>> quorum = (ZKQuorumImpl) journal
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+		final ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>> quorum = (ZKQuorumImpl) journal
                 .getQuorum();
 
         // The current token.
@@ -154,7 +155,7 @@ public class HAStatusServletUtil {
         // The last valid token.
         final long lastValidToken = quorum.lastValidToken();
 
-        // This token is a bit different. It is senstive to the journal role in
+        // This token is a bit different. It is sensitive to the journal role in
         // the quorum (joined or not).
         final long haReadyToken = journal.getHAReady();
         
@@ -176,7 +177,7 @@ public class HAStatusServletUtil {
         {
             QuorumService<HAGlue> t;
             try {
-                t = (QuorumService) quorum.getClient();
+                t = (QuorumService<HAGlue>) quorum.getClient();
             } catch (IllegalStateException ex) {
                 // Note: Not available (quorum.start() not called)./
                 t = null;
@@ -1030,9 +1031,9 @@ public class HAStatusServletUtil {
    public void doHealthStatus(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
-      StringWriter writer = new StringWriter();
-      JsonFactory factory = new JsonFactory();
-      JsonGenerator json = factory.createGenerator(writer);
+      final StringWriter writer = new StringWriter();
+      final JsonFactory factory = new JsonFactory();
+      final JsonGenerator json = factory.createGenerator(writer);
 
       json.writeStartObject();
       json.writeStringField("version", Banner.getVersion());

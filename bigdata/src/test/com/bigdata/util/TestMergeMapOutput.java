@@ -3,15 +3,14 @@ package com.bigdata.util;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Map.Entry;
 import java.util.Random;
-import java.util.Set;
-import java.util.TreeMap;
 
 import junit.framework.TestCase2;
 
 import org.junit.Test;
+
+import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 
 /**
  * Tests the utility to merge an input stream with a sorted set of <Long, ByteBuffer>
@@ -34,7 +33,7 @@ public class TestMergeMapOutput extends TestCase2 {
 			src[i] = 'X';
 		}
 		
-		final TreeMap<Long, byte[]> tm = new TreeMap<Long, byte[]>();
+		final ISnapshotData tm = new AbstractJournal.SnapshotData();
 		long pos = r.nextInt(4096);
 		
 		int ychars = 0;
@@ -54,9 +53,7 @@ public class TestMergeMapOutput extends TestCase2 {
 		
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 				
-		Set<Entry<Long, byte[]>> es = tm.entrySet();
-		
-		MergeStreamWithSortedSet.process(new ByteArrayInputStream(src), es, out);
+		MergeStreamWithSnapshotData.process(new ByteArrayInputStream(src), tm, out);
 		
 		final byte[] outbuf = out.toByteArray();
 		
@@ -67,6 +64,7 @@ public class TestMergeMapOutput extends TestCase2 {
 		}
 		
 		log.info("src.length: " + src.length + ", outbuf.length: " + outbuf.length);
+		
 		assertTrue(outbuf.length == src.length);
 		
 		assertTrue(ychars == outYcount);

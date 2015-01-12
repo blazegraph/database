@@ -186,7 +186,7 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
                 cxn.commit();
                 
                 if (log.isDebugEnabled())
-                    log.debug(cxn.getTripleStore().dumpStore());
+                    log.debug("\n"+cxn.getTripleStore().dumpStore());
                 
                 final TupleQuery query = cxn.prepareTupleQuery(
                         QueryLanguage.SPARQL, "select * { ?s ?p ?o }");

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.io;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
@@ -36,6 +37,7 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.TimeUnit;
+import com.bigdata.io.DirectBufferPool;
 
 import org.apache.log4j.Logger;
 
@@ -642,5 +644,83 @@ public class FileChannelUtility {
         return nwrites;
 
     }
+     
+     /**
+      * An InputStream implementation that utilizes the resilient readAll method of this class
+      */
+     public static class ReopenerInputStream extends InputStream {
+    	 
+    	 final private IReopenChannel<FileChannel> m_opener;
+    	 final private ByteBuffer m_buffer;
+         final private IBufferAccess m_bufferAccess;
+         final private long m_eof;
+    	 private long m_cursor = 0;
+    	 
+    	 final private byte[] m_singleByte = new byte[1];
+    	 
+    	 public ReopenerInputStream(final IReopenChannel<FileChannel> opener) throws IOException {
+    		 m_opener = opener;
+    		 m_eof = opener.reopenChannel().size();
+    		 try {
+				m_bufferAccess = DirectBufferPool.INSTANCE.acquire();
+	    		m_buffer = m_bufferAccess.buffer();
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+    	 }
+    	
+  		@Override
+  		public void close() {
+  			try {
+				m_bufferAccess.release();
+			} catch (InterruptedException e) {
+				log.warn(e);
+			}
+  		}
+  		
+ 		@Override
+ 		public int read() throws IOException {
+ 			final int ret = read(m_singleByte, 0, 1);
+ 			if (ret == -1) {
+ 				return -1;
+ 			} else {
+ 				return m_singleByte[0];
+ 			}
+ 		}
+
+		@Override
+		public int read(final byte[] dst) throws IOException {
+			return read(dst, 0, dst.length);
+		}
+
+		@Override
+		public int read(final byte[] dst, final int off, final int len) throws IOException {
+			final int rdlen = (int) ((m_cursor + len) < m_eof ? len : m_eof-m_cursor);
+			
+			if (rdlen == 0)
+				return -1; // eof!
+			
+			m_buffer.position(0);
+			m_buffer.limit(rdlen);
+			
+			final int ret = FileChannelUtility.readAll(m_opener, m_buffer, m_cursor);
+			
+			if (ret > 0) {
+				m_cursor += rdlen;
+				
+				if (log.isTraceEnabled())
+					log.trace("Request for " + len + " bytes");
+
+				m_buffer.position(0);
+				m_buffer.limit(rdlen);
+				m_buffer.get(dst, off, rdlen);
+				
+				return rdlen;
+			}
+			
+			return -1; // EOF
+			
+		}
+     }
 
 }

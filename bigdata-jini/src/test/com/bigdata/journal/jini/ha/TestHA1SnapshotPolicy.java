@@ -461,11 +461,21 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
      * verify that the new journal is at the correct commit point and compare it
      * for binary equality with the original journal on A (same digests).
      */
-    public void testA_snapshot_multipleTx_restore_validate() throws Exception {
+    public void test_snapshot_multipleTx_restore_validate() throws Exception {
+    	do_snapshot_multipleTx_restore_validate(7/*txn before*/, 8/*txn after*/);
+    }
+    
+    /*
+     * With 500 txns this test is not too long.  If there is a problem at scale
+     * the count can be increased to ensure the snapshot takes a significant amount of time
+     * and therefore be more likely to show an atomicity problem.
+     */
+    public void test_snapshot_stressMultipleTx_restore_validate() throws Exception {
+    	do_snapshot_multipleTx_restore_validate(500/*txn before*/, 50/*txn after*/);
+    }
+    
+    public void do_snapshot_multipleTx_restore_validate(final int N1/*before snapshot*/, final int N2/*after-during snapshot*/) throws Exception {
 
-        final int N1 = 7; // #of transactions to run before the snapshot.
-        final int N2 = 8; // #of transactions to run after the snapshot.
-        
         // Start service.
         final HAGlue serverA = startA();
 
@@ -494,8 +504,9 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
         awaitCommitCounter(commitCounterN1, serverA);
 
         /*
-         * Take a snapshot.
+         * Take a snapshot, but do NOT wait
          */
+        final Future<IHASnapshotResponse> ft;
         {
 
             // Verify quorum is still valid.
@@ -505,9 +516,18 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
             assertEquals(1, recursiveCount(getSnapshotDirA(),SnapshotManager.SNAPSHOT_FILTER));
 
             // request snapshot on A.
-            final Future<IHASnapshotResponse> ft = serverA
+            ft = serverA
                     .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
+        }
 
+        // Now run M transactions - while snapshot is being taken!
+        for (int i = 0; i < N2; i++) {
+
+            simpleTransaction();
+            
+        }
+
+        {
             // wait for the snapshot.
             try {
                 ft.get(10, TimeUnit.SECONDS);
@@ -525,8 +545,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
             assertExpectedSnapshots(getSnapshotDirA(), new long[]{commitCounterN1});
 
             // Verify digest of snapshot agrees with digest of journal.
-            assertSnapshotDigestEquals(serverA, commitCounterN1);
-
+            // assertSnapshotDigestEquals(serverA, commitCounterN1);
         }
 
         {
@@ -542,13 +561,6 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
             doRestoreA(serverA, commitCounterN1);
         }
 
-        // Now run M transactions.
-        for (int i = 0; i < N2; i++) {
-
-            simpleTransaction();
-            
-        }
-
         final long commitCounterN2 = N2 + N1 + 1;
 
         awaitCommitCounter(commitCounterN2, serverA);
@@ -560,8 +572,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
          * Now, get the snapshot that we took above, decompress it, and then
          * roll it forward and verify it against the current committed journal.
          */
-        doRestoreA(serverA, commitCounterN1);
-        
+        doRestoreA(serverA, commitCounterN1);        
     }
 
 }
