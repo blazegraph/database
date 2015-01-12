@@ -6876,19 +6876,21 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     /**
      * With lock held to ensure that there is no concurrent commit, copy
      * key data atomically to ensure recovered snapshot is consistent with
-     * the commit state when the snapshot is taken.
+     * the commit state when the snapshot is taken.  This atomic data snapshot
+     * can be merged with the file data to ensure a valid new store copy.
      * <p>
      * If this is not done then it is possible for the allocation data - both
-     * metabits and fixed allocator commit bits - to be updated and inconsistent
-     * with the saved root blocks.So 
+     * metabits and fixed allocator commit bits - to be overwritten and inconsistent
+     * with the saved root blocks.
+     * 
      * @throws IOException 
      */
-	public Set<java.util.Map.Entry<Long, byte[]>> snapshotAllocationData(final AtomicReference<IRootBlockView> rbv) throws IOException {
+	public ISnapshotData snapshotAllocationData(final AtomicReference<IRootBlockView> rbv) throws IOException {
 		final Lock lock = _fieldReadWriteLock.readLock();
 
 		lock.lock();
 		try {
-			final TreeMap<Long, byte[]> tm = new TreeMap<Long, byte[]>();
+			final ISnapshotData tm = new SnapshotData();
 			final IBufferStrategy bs = getBufferStrategy();
 			
 			// clone rootblocks
@@ -6903,6 +6905,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
             rbv.set(RootBlockUtility.chooseRootBlock(rbv0, rbv1));
 			
+            // Disabling this test allows demonstration of the need to atomically snapshot the metabits and allocators
+            //	for the RWStore in conjunction with TestHA1SnapshotPolicy.test_snapshot_stressMultipleTx_restore_validate
 			if (bs instanceof RWStrategy) {
 				final RWStore rws = ((RWStrategy) bs).getStore();
 				
@@ -6914,7 +6918,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			}
 			
 			
-			return tm.entrySet();
+			return tm;
 		} finally {
 			lock.unlock();
 		}
@@ -8598,4 +8602,61 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
+    public interface ISnapshotEntry {
+    	long getAddress();
+    	byte[] getData();
+    }
+    
+    public interface ISnapshotData {
+    	void put(long addr, byte[] data);
+    	
+    	Iterator<ISnapshotEntry> entries();
+    }
+    
+    static public class SnapshotData implements ISnapshotData {
+    	
+    	final TreeMap<Long, byte[]> m_map = new TreeMap<Long, byte[]>();
+
+		@Override
+		public void put(long addr, byte[] data) {
+			m_map.put(addr, data);
+		}
+
+		@Override
+		public Iterator<ISnapshotEntry> entries() {
+			final Iterator<Map.Entry<Long, byte[]>> entries = m_map.entrySet().iterator();
+			
+			return new Iterator<ISnapshotEntry>() {
+
+				@Override
+				public boolean hasNext() {
+					return entries.hasNext();
+				}
+
+				@Override
+				public ISnapshotEntry next() {
+					final Map.Entry<Long, byte[]> entry = entries.next();
+					return new ISnapshotEntry() {
+
+						@Override
+						public long getAddress() {
+							return entry.getKey();
+						}
+
+						@Override
+						public byte[] getData() {
+							return entry.getValue();
+						}
+						
+					};
+				}
+
+				@Override
+				public void remove() {
+					entries.remove();
+				}
+				
+			};
+		}   	
+    }
 }

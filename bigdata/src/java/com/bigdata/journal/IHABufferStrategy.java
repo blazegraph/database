@@ -32,8 +32,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
-import java.util.Map.Entry;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
 
@@ -46,6 +44,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 
@@ -273,7 +272,7 @@ public interface IHABufferStrategy extends IBufferStrategy {
      *             if the service is not joined with the met quorum for that
      *             token at any point during the operation.
      */
-    void writeOnStream(OutputStream os, Set<Entry<Long, byte[]>> coreData,
+    void writeOnStream(OutputStream os, ISnapshotData coreData,
             Quorum<HAGlue, QuorumService<HAGlue>> quorum, long token)
             throws IOException, QuorumException;
 

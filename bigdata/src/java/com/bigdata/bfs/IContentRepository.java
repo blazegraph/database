@@ -7,6 +7,7 @@ import java.util.Iterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
+ * @deprecated This is part of the BFS support.
  */
 public interface IContentRepository 
 {
