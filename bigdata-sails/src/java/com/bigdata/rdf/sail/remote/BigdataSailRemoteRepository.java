@@ -137,8 +137,6 @@ public class BigdataSailRemoteRepository implements Repository {
 					throw new RuntimeException("Problem stopping http client", e);
 				}
 			}
-		} else {
-			System.err.println("DEBUG: Not closing JettyRemoteRepository");
 		}
 		
 		if (executor != null)
