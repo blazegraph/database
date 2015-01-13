@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
@@ -91,8 +92,6 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
-
-import com.bigdata.util.StackInfoReport;
 
 // Note: Do not import. Not part of the bigdata-client.jar
 //
@@ -1371,11 +1370,7 @@ public class JettyRemoteRepository {
                 // Note: No response body is expected.
                 
                 checkResponseCode(response = doConnect(opts));
-            } catch (Exception e) {
-            	// log.warn("REMOVE SLEEP: SparqlUpdate problem");
-            	// Thread.sleep(50); // FIXME: this should not be necessary, but avoids EOFExceptions
-            	
-            	throw e;
+
             } finally {
                 
             	if (response != null)
