@@ -72,7 +72,6 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
@@ -380,9 +379,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     private final IIndexManager localIndexManager;
 
     /**
-     * The {@link ClientConnectionManager} is used to make remote HTTP
-     * connections (SPARQL SERVICE call joins).
-     */
+	 * The {@link HttpClient} is used to make remote HTTP connections (SPARQL
+	 * SERVICE call joins).
+	 */
     private final AtomicReference<HttpClient> clientConnectionManagerRef = new AtomicReference<HttpClient>();
     
 //    /**
@@ -470,9 +469,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     }
     
     /**
-     * Return the {@link ClientConnectionManager} used to make remote SERVICE
-     * call requests.
-     */
+	 * Return the {@link HttpClient} used to make remote SERVICE call requests.
+	 */
     public HttpClient getClientConnectionManager() {
 
     	HttpClient cm = clientConnectionManagerRef.get();
