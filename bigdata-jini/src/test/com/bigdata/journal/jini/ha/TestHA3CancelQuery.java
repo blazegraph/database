@@ -29,11 +29,14 @@ package com.bigdata.journal.jini.ha;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
@@ -103,8 +106,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
          * Do CANCEL for each service using the default namespace.
          */
         final JettyRemoteRepositoryManager[] rpms = new JettyRemoteRepositoryManager[3];
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
         {
             // Get RemoteRepository for each service.

@@ -81,9 +81,10 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
@@ -129,7 +130,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
     /**
      * The http client.
      */
-    protected JettyHttpClient m_client;
+    protected HttpClient m_client;
 
     /**
      * The client-API wrapper to the NSS.
@@ -358,8 +359,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
          * webapp when the client requests the root URL.
          */
 
-        m_client = new JettyHttpClient();
-        m_client.start();
+       	m_client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client,
                 getIndexManager().getExecutorService());

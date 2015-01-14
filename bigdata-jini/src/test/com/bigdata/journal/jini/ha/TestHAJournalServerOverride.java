@@ -34,6 +34,7 @@ import java.util.concurrent.TimeoutException;
 import net.jini.config.Configuration;
 
 import org.apache.zookeeper.ZooKeeper;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HACommitGlue;
@@ -47,7 +48,8 @@ import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
@@ -792,8 +794,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            final JettyHttpClient client = new JettyHttpClient();
-            client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
@@ -894,8 +895,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            final JettyHttpClient client = new JettyHttpClient();
-            client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
@@ -914,7 +914,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					}
 				}
 			} finally {
-            	client.close();
+            	client.stop();
             }
 
         }
@@ -1107,8 +1107,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 			 * Note: It is important to test the reads for the first commit on
 			 * both the leader and the follower.
 			 */
-			final JettyHttpClient client = new JettyHttpClient();
-			client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
@@ -1210,8 +1209,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 			 * Note: It is important to test the reads for the first commit on
 			 * both the leader and the follower.
 			 */
-			final JettyHttpClient client = new JettyHttpClient();
-			client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
@@ -1312,8 +1310,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            final JettyHttpClient client = new JettyHttpClient();
-            client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
             try {
 			for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
@@ -1742,8 +1739,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         /*
          * Can query B/C. 
          */
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 		try {
 			for (HAGlue service : new HAGlue[] { serverB, serverC }) {
 

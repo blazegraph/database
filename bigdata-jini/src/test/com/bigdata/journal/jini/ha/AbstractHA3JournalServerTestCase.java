@@ -69,6 +69,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.data.ACL;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -97,8 +98,9 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -2884,8 +2886,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-       	final JettyHttpClient client = new JettyHttpClient();
-    	client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer, client);
         try {
@@ -2915,8 +2916,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         try {
 
-           	final JettyHttpClient client = new JettyHttpClient();
-        	client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         	try {
         		repo.prepareUpdate(updateStr).evaluate();
@@ -2944,8 +2944,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-           	final JettyHttpClient client = new JettyHttpClient();
-        	client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         	try {
         		repo.prepareTupleQuery(queryStr).evaluate();
@@ -3063,8 +3062,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
 
-           	final JettyHttpClient client = new JettyHttpClient();
-        	client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
             final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
         	try {
         		repo.prepareUpdate(updateStr).evaluate();

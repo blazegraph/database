@@ -6,6 +6,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
@@ -15,7 +17,8 @@ import com.bigdata.ha.msg.HASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -328,8 +331,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 		// The HAGlue interfaces for those joined services, in join order.
 		final HAGlue[] services = new HAGlue[joined.length];
 
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
 		try {

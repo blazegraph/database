@@ -29,6 +29,8 @@ import java.io.Serializable;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
@@ -37,7 +39,8 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
@@ -179,8 +182,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         setPolicy(newTestPolicy(), services);
         
         // Shared JettyHttpCLient
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
         // Repositories without the LBS.
         final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
@@ -285,8 +287,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         setPolicy(newTestPolicy(), services);
         
         // Shared HttpClient
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
         // Repositories without the LBS.
         final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
@@ -373,8 +374,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 		// Impose the desired LBS policy.
 		setPolicy(newTestPolicy(), services);
 
-		final JettyHttpClient client = new JettyHttpClient();
-		client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 		// Repositories without the LBS.
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
 		// Repositories with the LBS.
@@ -484,8 +484,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 		// Impose the desired LBS policy.
 		setPolicy(newTestPolicy(), services);
 
-		final JettyHttpClient client = new JettyHttpClient();
-		client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 		
 		// Repositories without the LBS.
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
@@ -551,8 +550,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
         final String updateStr = sb.toString();
 
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
         final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer, client);
@@ -577,8 +575,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
 		final String updateStr = sb.toString();
 
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
 		final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
 				useLoadBalancer, client);

@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 
 import junit.framework.AssertionFailedError;
@@ -51,8 +52,9 @@ import com.bigdata.journal.Journal.Options;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -82,7 +84,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	/**
 	 * The http client.
 	 */
-	protected JettyHttpClient m_client;
+	protected HttpClient m_client;
 
 	/**
 	 * The client-API wrapper to the NSS.
@@ -172,8 +174,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 		executorService = Executors.newCachedThreadPool(DaemonThreadFactory
 				.defaultThreadFactory());
 
-		m_client = new JettyHttpClient();
-		m_client.start();
+       	m_client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 		
 		m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client, executorService);
 

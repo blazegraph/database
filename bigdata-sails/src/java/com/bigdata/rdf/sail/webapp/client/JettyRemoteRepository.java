@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
@@ -91,8 +92,6 @@ import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.xml.sax.Attributes;
 import org.xml.sax.ext.DefaultHandler2;
-
-import com.bigdata.util.StackInfoReport;
 
 // Note: Do not import. Not part of the bigdata-client.jar
 //
@@ -209,7 +208,7 @@ public class JettyRemoteRepository {
     /**
      * The client used for http connections.
      */
-    protected final JettyHttpClient httpClient;
+    protected final HttpClient httpClient;
 
     /**
      * Thread pool for processing HTTP responses in background.
@@ -317,7 +316,7 @@ public class JettyRemoteRepository {
      *             can not use the LBS prefix.
      */
     public JettyRemoteRepository(final String sparqlEndpointURL,
-            final JettyHttpClient httpClient, final Executor executor) {
+            final AutoCloseHttpClient httpClient, final Executor executor) {
 
         // FIXME Should default useLBS:=true. it is basically free.
         this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
@@ -351,7 +350,7 @@ public class JettyRemoteRepository {
      *            zero cost when not using HA, so it is recommended to always
      *            specify <code>true</code>. When <code>false</code>, the REST
      *            API methods will NOT use the load balancer aware requestURLs.
-     * @param httpClient
+     * @param httpClient2
      *            The {@link HttpClient}.
      * @param executor
      *            The thread pool for processing HTTP responses.
@@ -362,13 +361,13 @@ public class JettyRemoteRepository {
      *      HALoadBalancer </a>
      */
     public JettyRemoteRepository(final String sparqlEndpointURL,
-            final boolean useLBS, final JettyHttpClient httpClient,
+            final boolean useLBS, final HttpClient httpClient2,
             final Executor executor) {
         
         if (sparqlEndpointURL == null)
             throw new IllegalArgumentException();
 
-        if (httpClient == null)
+        if (httpClient2 == null)
             throw new IllegalArgumentException();
 
         if (executor == null)
@@ -378,9 +377,9 @@ public class JettyRemoteRepository {
         
         this.sparqlEndpointURL = sparqlEndpointURL;
 
-        this.httpClient = httpClient;
+        this.httpClient = httpClient2;
         
-        if (httpClient.isStopped()) {
+        if (httpClient2.isStopped()) {
         	throw new IllegalArgumentException("Client is not running");
         }
         
@@ -394,12 +393,12 @@ public class JettyRemoteRepository {
         
     }
 
-	public JettyRemoteRepository(String sparqlEndpointURL, boolean useLBS,
-			ExecutorService executor) {
-		this(sparqlEndpointURL,useLBS, DefaultClient(false /*force new*/), executor);
-	}
+//	public JettyRemoteRepository(String sparqlEndpointURL, boolean useLBS,
+//			ExecutorService executor) {
+//		this(sparqlEndpointURL,useLBS, DefaultClient(false /*force new*/), executor);
+//	}
 
-    static JettyHttpClient s_sharedClient = null;
+    static AutoCloseHttpClient s_sharedClient = null;
     static Object s_sharedClientLock = new Object();
 
 	/**
@@ -408,15 +407,15 @@ public class JettyRemoteRepository {
      * 
      * @return the new HttpClient
      */
-	public static JettyHttpClient DefaultClient(final boolean forceNew) {
-		final JettyHttpClient httpClient;
+	public static AutoCloseHttpClient DefaultClient(final boolean forceNew) {
+		final AutoCloseHttpClient httpClient;
 
-		if (true /* always force new to see if this fixes CI problem*/ || forceNew) {
-			httpClient = new JettyHttpClient(true/* autoClose */);
+		if (forceNew) {
+			httpClient = new AutoCloseHttpClient(true/* autoClose */);
 		} else {
 			synchronized (s_sharedClientLock) {
 				if (s_sharedClient == null || s_sharedClient.isStopped()) {
-					s_sharedClient = new JettyHttpClient(false/* autoclose */);
+					s_sharedClient = new AutoCloseHttpClient(false/* autoclose */);
 				}
 				httpClient = s_sharedClient;
 			}
@@ -1552,7 +1551,7 @@ public class JettyRemoteRepository {
     public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
     	
     	if (httpClient.isStopped()) {
-    		throw new RuntimeException("The client has been stopped", httpClient.m_stopped);
+    		throw new RuntimeException("The client has been stopped");
     	}
 
         /*
@@ -1732,7 +1731,7 @@ public class JettyRemoteRepository {
     public Request newRequest(final String uri,
             final String method) {
     	if (httpClient.isStopped()) {
-    		throw new AssertionError("The Client has been stopped", httpClient.m_stopped);
+    		throw new AssertionError("The Client has been stopped");
     	}
     	
     	return newRequest(httpClient, uri, method);
@@ -2538,7 +2537,7 @@ public class JettyRemoteRepository {
     	
     }
 
-	public JettyHttpClient getClient() {
+	public HttpClient getClient() {
 		return this.httpClient;
 	}
 

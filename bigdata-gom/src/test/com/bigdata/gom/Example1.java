@@ -5,6 +5,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 
@@ -12,7 +13,8 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -93,14 +95,13 @@ public class Example1 implements Callable<Void> {
         
         JettyRemoteRepositoryManager repo = null;
         
-        JettyHttpClient client = null;
+        HttpClient client = null;
 
         try {
 
             executor = Executors.newCachedThreadPool();
             
-            client = new JettyHttpClient();
-            client.start();
+           	client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 
             repo = new JettyRemoteRepositoryManager(
             		serviceURL, client, executor);

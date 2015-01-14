@@ -48,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.http.HttpMethod;
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
@@ -74,7 +75,7 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
@@ -303,8 +304,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 		JettyResponseListener response = null;
 		try {
-			final JettyHttpClient client = new JettyHttpClient();
-			client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 			
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
 					serviceURL, client, executorService);
@@ -404,8 +404,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         opts.method = "GET";
 
         try {
-        	final JettyHttpClient client = new JettyHttpClient();
-        	client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         	final JettyRemoteRepositoryManager rpm = getRemoteRepository(haGlue, client);
 			try {
 	            final JettyResponseListener response = rpm.doConnect(opts);
@@ -433,7 +432,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 		final String serviceURL = getNanoSparqlServerURL(haGlue);
 		final String query = serviceURL + "/status?HA";
 
-		final JettyHttpClient client = JettyRemoteRepositoryManager.DefaultClient(true);
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 		try {
 			final org.eclipse.jetty.client.api.Request request = client
 					.newRequest(query).method(HttpMethod.GET);
@@ -450,7 +449,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 			log.error(ex, ex);
 			throw ex;
 		} finally {
-			client.close();
+			client.stop();
 		}
 
 	}
@@ -480,7 +479,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * interface.
      * @throws Exception 
      */
-    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue, final JettyHttpClient client)
+    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue, final HttpClient client)
             throws Exception {
 
         return getRemoteRepository(haGlue, false/* useLoadBalancer */, client);
@@ -501,7 +500,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * @throws Exception 
      */
     protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue,
-            final boolean useLoadBalancer, final JettyHttpClient client) throws Exception {
+            final boolean useLoadBalancer, final HttpClient client) throws Exception {
 
         final String serviceURL = getNanoSparqlServerURL(haGlue);
 //                + (useLoadBalancer ? "/LBS" : "") 
@@ -519,8 +518,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
-        final JettyHttpClient client = new JettyHttpClient();
-        client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
         
         final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(
                 endpointURL, useLBS, client, executorService);
@@ -652,8 +650,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
 
             // Run query.
-           	final JettyHttpClient client = new JettyHttpClient();
-        	client.start();
+           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
             final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, client);
             try {
 	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
@@ -749,8 +746,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected void awaitKBExists(final HAGlue haGlue) throws Exception {
       
-       	final JettyHttpClient client = new JettyHttpClient();
-    	client.start();
+       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
     	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         
         try {
