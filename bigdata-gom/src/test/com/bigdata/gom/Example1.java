@@ -46,6 +46,7 @@ public class Example1 implements Callable<Void> {
         
     }
 
+    @Override
     public Void call() throws Exception {
 
         final ICloseableIterator<Statement> itr = om

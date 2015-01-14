@@ -43,7 +43,7 @@ public class BigdataSailNSSWrapper {
             .getLogger(BigdataSailNSSWrapper.class);
 
 
-    public final BigdataSail sail;
+    private final BigdataSail sail;
     
     /**
      * A jetty {@link Server} running a {@link NanoSparqlServer} instance which
@@ -94,14 +94,14 @@ public class BigdataSailNSSWrapper {
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 
-            initParams.put(ConfigParams.NAMESPACE, sail.getDatabase().getNamespace());
+            initParams.put(ConfigParams.NAMESPACE, getSail().getDatabase().getNamespace());
 
             initParams.put(ConfigParams.CREATE, "false");
             
         }
         // Start server for that kb instance.
         m_fixture = NanoSparqlServer.newInstance(0/* port */,
-                sail.getDatabase().getIndexManager(), initParams);
+                getSail().getDatabase().getIndexManager(), initParams);
 
         m_fixture.start();
 
@@ -139,7 +139,7 @@ public class BigdataSailNSSWrapper {
         
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
         		m_httpClient,
-                sail.getDatabase().getIndexManager().getExecutorService());
+                getSail().getDatabase().getIndexManager().getExecutorService());
 
     }
 
@@ -155,9 +155,10 @@ public class BigdataSailNSSWrapper {
 
         m_rootURL = null;
         m_serviceURL = null;
-        
-        log.warn("Stopping", new StackInfoReport("Stopping HTTPClient"));
-        
+
+		if (log.isDebugEnabled())
+			log.debug("Stopping", new StackInfoReport("Stopping HTTPClient"));
+
         m_httpClient.stop();       
         m_httpClient = null;
         
@@ -168,6 +169,13 @@ public class BigdataSailNSSWrapper {
             log.info("tear down done");
         
     }
+
+    /**
+     * The backing {@link BigdataSail} instance.
+     */
+	public BigdataSail getSail() {
+		return sail;
+	}
 
     
 }

@@ -1184,7 +1184,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
-                log.info("Terminating ClientConnectionManager: " + this);
+                log.info("Terminating HttpClient: " + this);
             try {
 				cm.stop();
 			} catch (Exception e) {
@@ -1241,7 +1241,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
-                log.info("Terminating ClientConnectionManager: " + this);
+                log.info("Terminating HttpClient: " + this);
             try {
 				cm.stop();
 			} catch (Exception e) {
