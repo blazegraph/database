@@ -74,6 +74,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
