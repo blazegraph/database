@@ -356,7 +356,7 @@ public class JettyRemoteRepository {
      *            The thread pool for processing HTTP responses.
      * 
      * @see JettyRemoteRepositoryManager
-     * @see DefaultClientConnectionManagerFactory
+     * @see HttpClientConfigurator
      * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */

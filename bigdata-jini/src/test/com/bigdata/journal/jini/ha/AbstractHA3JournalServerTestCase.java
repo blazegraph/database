@@ -98,7 +98,7 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
@@ -2886,7 +2886,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer, client);
         try {
@@ -2916,7 +2916,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         try {
 
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         	try {
         		repo.prepareUpdate(updateStr).evaluate();
@@ -2944,7 +2944,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         	try {
         		repo.prepareTupleQuery(queryStr).evaluate();
@@ -3062,7 +3062,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
 
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
             final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
         	try {
         		repo.prepareUpdate(updateStr).evaluate();

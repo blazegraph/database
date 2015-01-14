@@ -40,7 +40,7 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -142,7 +142,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
          */
 		for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 	        
 			final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
 			try {
@@ -270,7 +270,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
             try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 	
@@ -387,7 +387,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
             try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 	

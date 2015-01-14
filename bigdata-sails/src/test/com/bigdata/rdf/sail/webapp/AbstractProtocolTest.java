@@ -53,7 +53,7 @@ import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 
 /**
  * This class supports making requests to the server with fairly low level control.

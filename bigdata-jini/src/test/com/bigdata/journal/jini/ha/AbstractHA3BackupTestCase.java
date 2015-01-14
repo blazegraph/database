@@ -44,7 +44,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
@@ -113,7 +113,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
         JettyResponseListener response = null;
 
         try {
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         	
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
 					serviceURL, client, executorService);

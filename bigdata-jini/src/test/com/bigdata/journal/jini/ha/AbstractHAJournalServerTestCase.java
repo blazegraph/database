@@ -73,7 +73,7 @@ import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
@@ -156,7 +156,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         executorService = Executors
                 .newCachedThreadPool(new DaemonThreadFactory(getName()));
 
-        ccm = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+        ccm = HttpClientConfigurator.getInstance().newInstance();
 
         /*
          * Override the log level for the ProcessHelper to ensure that we
@@ -304,7 +304,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 		JettyResponseListener response = null;
 		try {
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			
 			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
 					serviceURL, client, executorService);
@@ -404,7 +404,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         opts.method = "GET";
 
         try {
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         	final JettyRemoteRepositoryManager rpm = getRemoteRepository(haGlue, client);
 			try {
 	            final JettyResponseListener response = rpm.doConnect(opts);
@@ -432,7 +432,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 		final String serviceURL = getNanoSparqlServerURL(haGlue);
 		final String query = serviceURL + "/status?HA";
 
-       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		try {
 			final org.eclipse.jetty.client.api.Request request = client
 					.newRequest(query).method(HttpMethod.GET);
@@ -518,7 +518,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
-       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
         final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(
                 endpointURL, useLBS, client, executorService);
@@ -650,7 +650,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
 
             // Run query.
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
             final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, client);
             try {
 	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
@@ -746,7 +746,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected void awaitKBExists(final HAGlue haGlue) throws Exception {
       
-       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
     	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         
         try {

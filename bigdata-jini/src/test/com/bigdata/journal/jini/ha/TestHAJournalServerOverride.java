@@ -49,7 +49,7 @@ import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
@@ -794,7 +794,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
@@ -895,7 +895,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
@@ -1107,7 +1107,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 			 * Note: It is important to test the reads for the first commit on
 			 * both the leader and the follower.
 			 */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
@@ -1209,7 +1209,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 			 * Note: It is important to test the reads for the first commit on
 			 * both the leader and the follower.
 			 */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
@@ -1310,7 +1310,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
             try {
 			for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
@@ -1739,7 +1739,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         /*
          * Can query B/C. 
          */
-       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		try {
 			for (HAGlue service : new HAGlue[] { serverB, serverC }) {
 

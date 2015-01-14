@@ -53,7 +53,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -368,7 +368,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			for (int i = 0; i < joined.length; i++) {
 
-	           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+	           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 
 	        	services[i] = quorum.getClient().getService(joined[i]);
 
@@ -1018,7 +1018,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-				           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+				           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
 				        	try {
 				        		repo.prepareUpdate(
@@ -2226,7 +2226,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				}
 
 				public Void call() throws Exception {
-		           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+		           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 					
 					final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(leader, client);
 					try {
@@ -2322,7 +2322,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                     
                     long queryCount = 0;
                     
-                   	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+                   	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
                     
                     final JettyRemoteRepositoryManager remoteRepo;
                     remoteRepo = getRemoteRepository(haGlue, client);
@@ -3534,7 +3534,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Verify binary equality of ALL journals.
 		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
-       	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		
 		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
 		try {

@@ -36,7 +36,7 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 /**
@@ -627,7 +627,7 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-				           	final HttpClient client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+				           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 					        
 							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
 				        	try {

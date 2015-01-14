@@ -33,7 +33,7 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
@@ -93,7 +93,7 @@ public class BigdataSailRemoteRepository implements Repository {
 		
         this.executor = Executors.newCachedThreadPool();
 
-       	this.client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	this.client = HttpClientConfigurator.getInstance().newInstance();
         
         this.nss = new JettyRemoteRepositoryManager(sparqlEndpointURL, useLBS, client,
                 executor);
