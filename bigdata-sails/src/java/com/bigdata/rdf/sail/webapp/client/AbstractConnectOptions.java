@@ -1,16 +1,37 @@
+/**
+Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.webapp.client;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
-public class AbstractConnectOptions {
+public class AbstractConnectOptions implements IMimeTypes {
 
     /** The URL of the remote REST service. */
     public final String serviceURL;
@@ -42,21 +63,16 @@ public class AbstractConnectOptions {
      */
     public static final String DEFAULT_BOOLEAN_ACCEPT_HEADER;
 
-    /**
-     * Used for NSS mutation operation responses.
-     */
-    public static final String MIME_APPLICATION_XML = "application/xml";
+//    /**
+//     * Used for NSS mutation operation responses.
+//     */
+//    public static final String MIME_APPLICATION_XML = "application/xml";
     
-    /**
-     * Used to interchange {@link Properties} objects.
-     */
-    public static final String MIME_PROPERTIES_XML = "application/xml";
+//    /**
+//     * Used to interchange {@link Properties} objects.
+//     */
+//    public static final String MIME_PROPERTIES_XML = "application/xml";
 
-    /**
-     * Used to interchange GraphML (blueprints).
-     */
-    public static final String MIME_GRAPH_ML = "application/graphml+xml";
-    
     static {
 
         /**

@@ -20,7 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.client;
+package com.bigdata.rdf.sail.webapp;
 
 import java.net.URL;
 import java.util.LinkedHashMap;
@@ -32,8 +32,8 @@ import org.eclipse.jetty.server.Server;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.ConfigParams;
-import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.config.NicUtil;
 
@@ -176,7 +176,6 @@ public class BigdataSailNSSWrapper {
 	public BigdataSail getSail() {
 		return sail;
 	}
-
     
 }
 
