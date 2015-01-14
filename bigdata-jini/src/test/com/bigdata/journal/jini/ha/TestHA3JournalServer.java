@@ -40,9 +40,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.eclipse.jetty.client.HttpClient;
-
 import net.jini.config.Configuration;
+
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -52,7 +52,6 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
@@ -480,9 +479,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			// close all created repos
 			for (JettyRemoteRepositoryManager r : repos) {
 				if (r != null) {
-					final HttpClient client = r.getClient();
 					r.close();
-					client.stop();
 				}
 			}
 
