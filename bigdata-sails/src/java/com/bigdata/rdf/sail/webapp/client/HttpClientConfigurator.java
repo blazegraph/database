@@ -28,28 +28,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp.client;
 
 import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 
 /**
  * Factory for {@link HttpClient}.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @see Options
  * 
- *         TODO Provide SPI resolution to configure this.
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class HttpClientConfigurator {
 
-	/**
-	 * This is the name of an optional System property that may be used to
-	 * override the {@link IHttpClientFactory} implementation class (default
-	 * {@value #DEFAULT_CONNECTION_MANAGER_FACTORY_CLASS}).
-	 */
-	final static public String CONNECTION_MANAGER_FACTORY_CLASS = HttpClientConfigurator.class.getName();
+	public interface Options {
 
-	/**
-	 * The name of the default {@link IHttpClientFactory} implementation class.
-	 */
-	final static public String DEFAULT_CONNECTION_MANAGER_FACTORY_CLASS = DefaultHttpClientFactory.class.getName();
+		/**
+		 * This is the name of an optional System property that may be used to
+		 * override the {@link IHttpClientFactory} implementation class (default
+		 * {@value #DEFAULT_CONNECTION_MANAGER_FACTORY_CLASS}).
+		 */
+		final static public String CONNECTION_MANAGER_FACTORY_CLASS = HttpClientConfigurator.class
+				.getName();
+
+		/**
+		 * The name of the default {@link IHttpClientFactory} implementation
+		 * class.
+		 */
+		final static public String DEFAULT_CONNECTION_MANAGER_FACTORY_CLASS = DefaultHttpClientFactory.class
+				.getName();
+
+	}
 	
 	/**
 	 * Allow a user configurable factory to allow the override of the
@@ -60,8 +66,8 @@ public class HttpClientConfigurator {
 	public static IHttpClientFactory getInstance() {
 
 		final String configuredFactory = System.getProperty(
-				CONNECTION_MANAGER_FACTORY_CLASS,
-				DEFAULT_CONNECTION_MANAGER_FACTORY_CLASS);
+				Options.CONNECTION_MANAGER_FACTORY_CLASS,
+				Options.DEFAULT_CONNECTION_MANAGER_FACTORY_CLASS);
 
 		try {
 
@@ -72,58 +78,20 @@ public class HttpClientConfigurator {
 			if (!IHttpClientFactory.class.isAssignableFrom(factoryClass)) {
 
 				throw new RuntimeException("Invalid option: "
-						+ CONNECTION_MANAGER_FACTORY_CLASS + "=" + factoryClass
-						+ ":: Class does not extend "
+						+ Options.CONNECTION_MANAGER_FACTORY_CLASS + "="
+						+ factoryClass + ":: Class does not extend "
 						+ IHttpClientFactory.class);
 
 			}
 
 			final IHttpClientFactory factory = factoryClass.newInstance();
-			
+
 			return factory;
 
 		} catch (Exception e) {
 
 			throw new RuntimeException("Could not create "
 					+ IHttpClientFactory.class.getSimpleName() + ": " + e, e);
-
-		}
-
-	}
-
-	/**
-	 * This implementation:
-	 * <ul>
-	 * <li>Sets up redirect handling.</li>
-	 * <li>Sets a default SSL context factory that trusts all certificates. This
-	 * allows encrypted communications with any SSL endpoint, but it does not
-	 * verify the identity associated with that certificate.</li>
-	 * </ul>
-	 */
-	public static final class DefaultHttpClientFactory implements
-			IHttpClientFactory {
-
-		@Override
-		public HttpClient newInstance() {
-
-			final HttpClient cm = new HttpClient(
-					new SslContextFactory(true/* trustAll */));
-
-			try {
-
-				// Allow redirects.
-				cm.setFollowRedirects(true);
-
-				// Start the client.
-				cm.start();
-
-			} catch (Exception e) {
-
-				throw new RuntimeException("Unable to start HttpClient", e);
-
-			}
-
-			return cm;
 
 		}
 

@@ -46,12 +46,17 @@ public class AbstractConnectOptions {
      * Used for NSS mutation operation responses.
      */
     public static final String MIME_APPLICATION_XML = "application/xml";
-
+    
     /**
      * Used to interchange {@link Properties} objects.
      */
     public static final String MIME_PROPERTIES_XML = "application/xml";
 
+    /**
+     * Used to interchange GraphML (blueprints).
+     */
+    public static final String MIME_GRAPH_ML = "application/graphml+xml";
+    
     static {
 
         /**

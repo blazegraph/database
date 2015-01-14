@@ -27,14 +27,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 
 import org.apache.http.entity.ByteArrayEntity;
-import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.GraphQueryResult;
 
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
@@ -42,14 +39,18 @@ import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.util.InnerCause;
-import com.bigdata.util.StackInfoReport;
 
-import cutthecrap.utils.striterators.ICloseable;
+/**
+ * A manager for connections to one or more REST API / SPARQL end points for the
+ * same bigdata service.
+ * 
+ * @author bryan
+ */
+public class JettyRemoteRepositoryManager extends JettyRemoteRepository
+		implements AutoCloseable {
 
-public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
-
-    private static final transient Logger log = Logger
-            .getLogger(JettyRemoteRepositoryManager.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(JettyRemoteRepositoryManager.class);
     
     /**
      * The path to the root of the web application (without the trailing "/").
@@ -61,6 +62,11 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      */
     private final String baseServiceURL;
 
+    /**
+     * <code>true</code> iff open.
+     */
+    private volatile boolean m_closed = false;
+    
     /**
      * The path to the root of the web application (without the trailing "/").
      * <p>
@@ -83,20 +89,21 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
     
     /**
-     * 
-     * @param serviceURL
-     *            The path to the root of the web application (without the
-     *            trailing "/"). <code>/sparql</code> will be appended to this
-     *            path to obtain the SPARQL end point for the default data set.
-     * @param useLBS
-     *            When <code>true</code>, the REST API methods will use the load
-     *            balancer aware requestURLs. The load balancer has essentially
-     *            zero cost when not using HA, so it is recommended to always
-     *            specify <code>true</code>. When <code>false</code>, the REST
-     *            API methods will NOT use the load balancer aware requestURLs.
-     * @param httpClient
-     * @param executor
-     */
+	 * 
+	 * @param serviceURL
+	 *            The path to the root of the web application (without the
+	 *            trailing "/"). <code>/sparql</code> will be appended to this
+	 *            path to obtain the SPARQL end point for the default data set.
+	 * @param useLBS
+	 *            When <code>true</code>, the REST API methods will use the load
+	 *            balancer aware requestURLs. The load balancer has essentially
+	 *            zero cost when not using HA, so it is recommended to always
+	 *            specify <code>true</code>. When <code>false</code>, the REST
+	 *            API methods will NOT use the load balancer aware requestURLs.
+	 * @param httpClient
+	 * @param executor
+	 *            The life cycle of this object is owned by the caller.
+	 */
     public JettyRemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
@@ -390,23 +397,22 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     }
 
-    volatile boolean m_closed = false;
-    
-	public void close() {
-		if (m_closed) {
-			log.warn("The repository manager has already been closed");
+    @Override
+	public void close() throws Exception {
+
+		if (!m_closed) {
+			// Already closed.
 			return;
 		}
-		
-		try {
-			m_closed = true;
-			if (httpClient instanceof ICloseable)
-				((ICloseable) httpClient).close();
-		} catch (Exception e) {
-			log.warn("Problem stopping httpClient", e);
-			
-			throw new RuntimeException(e);
+
+		if (httpClient instanceof AutoCloseable) {
+
+			((AutoCloseable) httpClient).close();
+
 		}
+
+		m_closed = true;
+
 	}
 
 }

@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -350,10 +349,11 @@ public class JettyRemoteRepository {
      *            zero cost when not using HA, so it is recommended to always
      *            specify <code>true</code>. When <code>false</code>, the REST
      *            API methods will NOT use the load balancer aware requestURLs.
-     * @param httpClient2
+     * @param httpClient
      *            The {@link HttpClient}.
      * @param executor
-     *            The thread pool for processing HTTP responses.
+     *            The thread pool for processing HTTP responses. The life cycle
+     *            of this object is owned by the caller.
      * 
      * @see JettyRemoteRepositoryManager
      * @see HttpClientConfigurator
@@ -361,15 +361,18 @@ public class JettyRemoteRepository {
      *      HALoadBalancer </a>
      */
     public JettyRemoteRepository(final String sparqlEndpointURL,
-            final boolean useLBS, final HttpClient httpClient2,
+            final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
         
         if (sparqlEndpointURL == null)
             throw new IllegalArgumentException();
 
-        if (httpClient2 == null)
+        if (httpClient == null)
             throw new IllegalArgumentException();
 
+        if (httpClient.isStopped())
+        	throw new IllegalStateException("Client is not running");
+        
         if (executor == null)
             throw new IllegalArgumentException();
 
@@ -377,11 +380,7 @@ public class JettyRemoteRepository {
         
         this.sparqlEndpointURL = sparqlEndpointURL;
 
-        this.httpClient = httpClient2;
-        
-        if (httpClient2.isStopped()) {
-        	throw new IllegalArgumentException("Client is not running");
-        }
+        this.httpClient = httpClient;
         
         this.executor = executor;
 
@@ -397,38 +396,6 @@ public class JettyRemoteRepository {
 //			ExecutorService executor) {
 //		this(sparqlEndpointURL,useLBS, DefaultClient(false /*force new*/), executor);
 //	}
-
-    static AutoCloseHttpClient s_sharedClient = null;
-    static Object s_sharedClientLock = new Object();
-
-	/**
-     * Utility to create a default jetty HttpClient to simplify initialization
-     * <p>
-     * 
-     * @return the new HttpClient
-     */
-	public static AutoCloseHttpClient DefaultClient(final boolean forceNew) {
-		final AutoCloseHttpClient httpClient;
-
-		if (forceNew) {
-			httpClient = new AutoCloseHttpClient(true/* autoClose */);
-		} else {
-			synchronized (s_sharedClientLock) {
-				if (s_sharedClient == null || s_sharedClient.isStopped()) {
-					s_sharedClient = new AutoCloseHttpClient(false/* autoclose */);
-				}
-				httpClient = s_sharedClient;
-			}
-		}
-
-		try {
-			httpClient.start();
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
-		return httpClient;
-	}
     
 	@Override
     public String toString() {
@@ -469,7 +436,7 @@ public class JettyRemoteRepository {
             
             final ByteArrayEntity entity = new ByteArrayEntity(data);
 
-            entity.setContentType("application/graphml+xml");
+            entity.setContentType(ConnectOptions.MIME_GRAPH_ML);
             
             opts.entity = entity;
             
@@ -1724,23 +1691,23 @@ public class JettyRemoteRepository {
 
     }
     
-    public Request newRequest(final String uri,
-            final String method) {
-    	if (httpClient.isStopped()) {
-    		throw new AssertionError("The Client has been stopped");
-    	}
-    	
-    	return newRequest(httpClient, uri, method);
-    }
-    
-    public static Request newRequest(final HttpClient httpClient, final String uri,
-            final String method) {
-    	
-    	if (httpClient.isStopped()) {
-    		throw new AssertionError("The Client has been stopped");
-    	}
+	public Request newRequest(final String uri, final String method) {
+
+		return newRequest(httpClient, uri, method);
+
+	}
+
+	public static Request newRequest(final HttpClient httpClient,
+			final String uri, final String method) {
+
+		if (httpClient == null)
+			throw new IllegalArgumentException();
+
+		if (httpClient.isStopped())
+			throw new IllegalStateException("The Client has been stopped");
     	
     	return httpClient.newRequest(uri).method(getMethod(method));
+
     }
     
     static HttpMethod getMethod(final String method) {
@@ -2314,6 +2281,7 @@ public class JettyRemoteRepository {
              */
             parser.parse(response.getInputStream(), new DefaultHandler2(){
 
+            	@Override
                 public void startElement(final String uri,
                         final String localName, final String qName,
                         final Attributes attributes) {
@@ -2375,6 +2343,7 @@ public class JettyRemoteRepository {
              */
             parser.parse(response.getInputStream(), new DefaultHandler2(){
 
+            	@Override
                 public void startElement(final String uri,
                         final String localName, final String qName,
                         final Attributes attributes) {
@@ -2532,9 +2501,5 @@ public class JettyRemoteRepository {
     	return uris;
     	
     }
-
-	public HttpClient getClient() {
-		return this.httpClient;
-	}
 
 }

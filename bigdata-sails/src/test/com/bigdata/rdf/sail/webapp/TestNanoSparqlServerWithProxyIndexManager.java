@@ -253,7 +253,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
         // RemoteRepository test (nano sparql server client-wrapper using Jetty)
         suite.addTestSuite(TestNanoSparqlJettyClient.class);
-
+        
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
         

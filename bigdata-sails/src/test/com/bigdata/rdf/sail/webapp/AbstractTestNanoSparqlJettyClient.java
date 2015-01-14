@@ -84,7 +84,6 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
@@ -292,7 +291,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 		if (log.isTraceEnabled())
 			log.trace("Setting up test:" + getName());
 		
-		final Properties properties = getProperties();
+//		final Properties properties = getProperties();
 
 		// guaranteed distinct namespace for the KB instance.
 		namespace = getName() + UUID.randomUUID();
@@ -364,8 +363,10 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client,
                 getIndexManager().getExecutorService());
 
-        log.info("Setup Active Threads: " + Thread.activeCount());
-    }
+		if (log.isInfoEnabled())
+			log.info("Setup Active Threads: " + Thread.activeCount());
+	
+	}
 
     @Override
 	public void tearDown() throws Exception {
@@ -415,7 +416,8 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
         
         final int nthreads = Thread.activeCount();
 
-        log.info("Teardown Active Threads: " + nthreads);
+		if (log.isInfoEnabled())
+			log.info("Teardown Active Threads: " + nthreads);
         
         if (nthreads > 300) {
         	log.error("High residual thread count: " + nthreads);
