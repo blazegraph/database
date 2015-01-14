@@ -1,6 +1,5 @@
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -8,8 +7,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
+
+import junit.framework.TestCase;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
@@ -19,12 +19,8 @@ import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.message.BasicNameValuePair;
 import org.eclipse.jetty.client.api.ContentProvider;
-import org.eclipse.jetty.util.Fields;
-import org.eclipse.jetty.util.B64Code;
 
 import com.bigdata.rdf.sail.webapp.client.EntityContentProvider;
-
-import junit.framework.TestCase;
 
 /**
  * The Jetty HttpClient does not provide "out of the box" support for multipart

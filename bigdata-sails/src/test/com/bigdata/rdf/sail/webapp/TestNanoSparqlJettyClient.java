@@ -70,10 +70,10 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.util.config.NicUtil;
 
