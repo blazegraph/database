@@ -201,12 +201,12 @@ public class AbstractConnectOptions {
             final String name = e.getKey();
             final String[] vals = e.getValue();
             if (vals == null) {
-                urlString.append(URLEncoder.encode(name, JettyRemoteRepository.UTF8));
+                urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
             } else {
                 for (String val : vals) {
-                    urlString.append(URLEncoder.encode(name, JettyRemoteRepository.UTF8));
+                    urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
                     urlString.append("=");
-                    urlString.append(URLEncoder.encode(val, JettyRemoteRepository.UTF8));
+                    urlString.append(URLEncoder.encode(val, RemoteRepository.UTF8));
                 }
             }
         } // next Map.Entry
@@ -222,7 +222,7 @@ public class AbstractConnectOptions {
      * @return The UTF8 encoding of that text.
      * 
      * @throws RuntimeException
-     *             if the {@link JettyRemoteRepository#UTF8} encoding is not
+     *             if the {@link RemoteRepository#UTF8} encoding is not
      *             available.
      * @throws NullPointerException
      *             if the argument is <code>null</code>.
@@ -231,7 +231,7 @@ public class AbstractConnectOptions {
 
         try {
         
-            final String out = URLEncoder.encode(in, JettyRemoteRepository.UTF8);
+            final String out = URLEncoder.encode(in, RemoteRepository.UTF8);
             
             return out;
             

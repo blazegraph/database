@@ -33,7 +33,7 @@ import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
  * Test of RDR specific data interchange and query.

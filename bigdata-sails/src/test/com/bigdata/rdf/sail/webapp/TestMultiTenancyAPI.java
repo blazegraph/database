@@ -27,7 +27,7 @@ import org.openrdf.query.TupleQueryResult;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 import com.bigdata.relation.RelationSchema;
@@ -168,7 +168,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         final Map<Resource, VoidSummary> summaries = new LinkedHashMap<Resource, VoidSummary>();
 
         // Do the discovery.
-        final Graph g = JettyRemoteRepository.asGraph(m_repo
+        final Graph g = RemoteRepository.asGraph(m_repo
                 .getRepositoryDescriptions());
 
         final Statement[] a = getMatches(g, null/* dataset */, RDF.TYPE,
@@ -432,12 +432,12 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 log.warn("Found schema for " + ns);                
              }
 
-            final JettyRemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
+            final RemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
 
             {
                 // GET the Service Description for the data set.
                 {
-                	JettyRemoteRepository.asGraph(tmp.getServiceDescription());
+                	RemoteRepository.asGraph(tmp.getServiceDescription());
                 }
 
                 // Test a SPARQL 1.1. Query against the data set.

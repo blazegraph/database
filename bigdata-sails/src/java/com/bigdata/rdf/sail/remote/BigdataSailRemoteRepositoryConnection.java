@@ -74,9 +74,9 @@ import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedSparqlUpdate;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
@@ -115,7 +115,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 		try {
 		
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 	
 			return remote.rangeCount(s, p, o, c);
 			
@@ -134,7 +134,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			final GraphQueryResult src = 
 					remote.getStatements(s, p, o, includeInferred, c);
@@ -197,7 +197,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			return remote.hasStatement(s, p, o, includeInferred, c);
 			
@@ -222,7 +222,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			final IPreparedBooleanQuery q = remote.prepareBooleanQuery(query);
 			
@@ -343,7 +343,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			final IPreparedGraphQuery q = remote.prepareGraphQuery(query);
 			
@@ -492,7 +492,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			final IPreparedTupleQuery q = remote.prepareTupleQuery(query);
 			
@@ -729,7 +729,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 			
 			op.setContext(c);
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			remote.add(op);
 			
@@ -799,7 +799,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 			
 			op.setContext(c);
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			remote.remove(op);
 			
@@ -855,7 +855,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 
 			final Iterator<Resource> contexts = remote.getContexts().iterator();
 			
@@ -896,7 +896,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			return remote.rangeCount(null, null, null, c);
 			
@@ -930,7 +930,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			final GraphQueryResult src = 
 					remote.getStatements(s, p, o, includeInferred, c);
@@ -976,7 +976,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final JettyRemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = repo.getRemoteRepository();
 			
 			final IPreparedSparqlUpdate update = remote.prepareUpdate(query);
 			

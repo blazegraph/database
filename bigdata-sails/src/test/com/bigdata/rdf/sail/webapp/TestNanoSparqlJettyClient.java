@@ -70,9 +70,9 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.util.config.NicUtil;
@@ -522,7 +522,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 	 */
 	public void test_SERVICE_DESCRIPTION() throws Exception {
 
-		final Graph g = JettyRemoteRepository
+		final Graph g = RemoteRepository
 				.asGraph(m_repo.getServiceDescription());
 
 		final ValueFactory f = g.getValueFactory();
@@ -2085,7 +2085,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 						stmts.add(generateTriple());
 					}
 					log.warn(String.format("Loading package into %s namespace...", namespace));
-					m_repo.getRepositoryForNamespace(namespace).add(new JettyRemoteRepository.AddOp(stmts));
+					m_repo.getRepositoryForNamespace(namespace).add(new RemoteRepository.AddOp(stmts));
 					log.warn(String.format("Loading package into %s namespace done", namespace));
 				} catch (final Exception e) {
 					log.error(String.format("Failed to load package into namespace %s:", namespace), e);

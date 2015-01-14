@@ -74,7 +74,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
  * Proxied test suite.

@@ -51,7 +51,7 @@ import com.bigdata.rdf.sail.webapp.CountersServlet;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.EntityContentProvider;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
@@ -273,7 +273,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
             response = doConnect(cm, o);
 
-            JettyRemoteRepository.checkResponseCode(response);
+            RemoteRepository.checkResponseCode(response);
 
             // Check the mime type for something we can handle.
             final String contentType = response.getContentType();
@@ -363,7 +363,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
         Request request = null;
         try {
 
-            request = JettyRemoteRepository.newRequest(httpClient, urlString.toString(),
+            request = RemoteRepository.newRequest(httpClient, urlString.toString(),
                     opts.method);
 
             if (opts.requestHeaders != null) {

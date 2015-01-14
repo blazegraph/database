@@ -66,7 +66,7 @@ public class BigdataSailNSSWrapper {
     /**
      * The client-API wrapper to the NSS.
      */
-    public JettyRemoteRepositoryManager m_repo;
+    public RemoteRepositoryManager m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -137,7 +137,7 @@ public class BigdataSailNSSWrapper {
 
        	m_httpClient = HttpClientConfigurator.getInstance().newInstance();
         
-        m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
+        m_repo = new RemoteRepositoryManager(m_serviceURL,
         		m_httpClient,
                 getSail().getDatabase().getIndexManager().getExecutorService());
 

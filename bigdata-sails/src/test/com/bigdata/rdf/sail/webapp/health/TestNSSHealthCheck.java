@@ -55,7 +55,7 @@ import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -89,7 +89,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	/**
 	 * The client-API wrapper to the NSS.
 	 */
-	protected JettyRemoteRepositoryManager m_repo;
+	protected RemoteRepositoryManager m_repo;
 
 	/**
 	 * The effective {@link NanoSparqlServer} http end point (including the
@@ -176,7 +176,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 
        	m_client = HttpClientConfigurator.getInstance().newInstance();
 		
-		m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client, executorService);
+		m_repo = new RemoteRepositoryManager(m_serviceURL, m_client, executorService);
 
 	}
 

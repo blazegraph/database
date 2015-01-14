@@ -100,7 +100,7 @@ import org.xml.sax.ext.DefaultHandler2;
 /**
  * Java API to the Nano Sparql Server.
  * <p>
- * Note: The {@link JettyRemoteRepository} object SHOULD be reused for multiple
+ * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
  * operations against the same end point.
  * 
  * @see <a href=
@@ -110,10 +110,10 @@ import org.xml.sax.ext.DefaultHandler2;
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" > Create
  *      a bigdata-client jar for the NSS REST API </a>
  */
-public class JettyRemoteRepository {
+public class RemoteRepository {
 
     private static final transient Logger log = Logger
-            .getLogger(JettyRemoteRepository.class);
+            .getLogger(RemoteRepository.class);
 
     /*
      * Note: These fields are replicated from the com.bigdata.rdf.store.BD
@@ -143,7 +143,7 @@ public class JettyRemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String QUERY_METHOD = JettyRemoteRepository.class
+    static public final String QUERY_METHOD = RemoteRepository.class
             .getName() + ".queryMethod";
     
     /**
@@ -165,7 +165,7 @@ public class JettyRemoteRepository {
      * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
-    static public final String MAX_REQUEST_URL_LENGTH = JettyRemoteRepository.class
+    static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
             .getName() + ".maxRequestURLLength";
     
     /**
@@ -355,12 +355,12 @@ public class JettyRemoteRepository {
      *            The thread pool for processing HTTP responses. The life cycle
      *            of this object is owned by the caller.
      * 
-     * @see JettyRemoteRepositoryManager
+     * @see RemoteRepositoryManager
      * @see HttpClientConfigurator
      * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
-    public JettyRemoteRepository(final String sparqlEndpointURL,
+    public RemoteRepository(final String sparqlEndpointURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
         
@@ -880,7 +880,7 @@ public class JettyRemoteRepository {
      *        
      * @return The mutation count.
      */
-    public long remove(final com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp remove) throws Exception {
+    public long remove(final com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp remove) throws Exception {
         
         final ConnectOptions opts = newUpdateConnectOptions();
         

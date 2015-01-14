@@ -84,9 +84,9 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.AddOp;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -134,7 +134,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
     /**
      * The client-API wrapper to the NSS.
      */
-    protected JettyRemoteRepositoryManager m_repo;
+    protected RemoteRepositoryManager m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -360,7 +360,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 
        	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client,
+        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client,
                 getIndexManager().getExecutorService());
 
 		if (log.isInfoEnabled())

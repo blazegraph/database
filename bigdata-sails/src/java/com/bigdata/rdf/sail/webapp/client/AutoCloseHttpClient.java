@@ -33,11 +33,11 @@ import com.bigdata.util.StackInfoReport;
 /**
  * A {@link HttpClient} that supports the {@link AutoCloseable} protocol and
  * which will be transparently closed by the
- * {@link JettyRemoteRepositoryManager} if
- * {@link JettyRemoteRepositoryManager#close()} is invoked.
+ * {@link RemoteRepositoryManager} if
+ * {@link RemoteRepositoryManager#close()} is invoked.
  * <p>
  * Note: Do NOT use an instance of this class if you wish to share the same
- * {@link HttpClient} across multiple {@link JettyRemoteRepositoryManager}
+ * {@link HttpClient} across multiple {@link RemoteRepositoryManager}
  * instances.
  * 
  * @author Martyn Cutcher
@@ -89,7 +89,7 @@ public class AutoCloseHttpClient extends HttpClient implements AutoCloseable {
 	/**
 	 * {@inheritDoc}
 	 * <p>
-	 * Called from {@link JettyRemoteRepositoryManager} when it is closed.
+	 * Called from {@link RemoteRepositoryManager} when it is closed.
 	 * 
 	 * @throws Exception
 	 */

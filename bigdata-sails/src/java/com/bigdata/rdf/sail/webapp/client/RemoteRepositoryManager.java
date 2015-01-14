@@ -46,7 +46,7 @@ import com.bigdata.util.InnerCause;
  * 
  * @author bryan
  */
-public class JettyRemoteRepositoryManager extends JettyRemoteRepository
+public class RemoteRepositoryManager extends RemoteRepository
 		implements AutoCloseable {
 
 //    private static final transient Logger log = Logger
@@ -104,7 +104,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
 	 *            assume that the end point is bigdata and thus we can not use
 	 *            the LBS prefix.
 	 */
-    public JettyRemoteRepositoryManager(final String serviceURL,
+    public RemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
         this(serviceURL, false/* useLBS */, httpClient, executor);
@@ -134,7 +134,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
 	 *            them. This would simplify some test code, and might help some
 	 *            client application code, but it would not be used internally.
 	 */
-    public JettyRemoteRepositoryManager(final String serviceURL,
+    public RemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
 
@@ -174,7 +174,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
     }
 
     /**
-     * Obtain a {@link JettyRemoteRepository} for a data set managed by the remote
+     * Obtain a {@link RemoteRepository} for a data set managed by the remote
      * service.
      * 
      * @param namespace
@@ -182,15 +182,15 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
      *            
      * @return An interface which may be used to talk to that data set.
      */
-    public JettyRemoteRepository getRepositoryForNamespace(final String namespace) {
+    public RemoteRepository getRepositoryForNamespace(final String namespace) {
 
-        return new JettyRemoteRepository(getRepositoryBaseURLForNamespace(namespace)
+        return new RemoteRepository(getRepositoryBaseURLForNamespace(namespace)
                 + "/sparql", useLBS, httpClient, executor);
         
     }
 
     /**
-     * Obtain a {@link JettyRemoteRepository} for the data set having the specified
+     * Obtain a {@link RemoteRepository} for the data set having the specified
      * SPARQL end point.
      * 
      * @param sparqlEndpointURL
@@ -204,27 +204,27 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
      * 
      * @return An interface which may be used to talk to that data set.
      */
-    public JettyRemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
             final boolean useLBS) {
 
-        return new JettyRemoteRepository(sparqlEndpointURL, useLBS, httpClient,
+        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient,
                 executor);
 
     }
 
     /**
-     * Obtain a {@link JettyRemoteRepository} for the data set having the specified
+     * Obtain a {@link RemoteRepository} for the data set having the specified
      * SPARQL end point. The load balancer will be used or not as per the
-     * parameters to the {@link JettyRemoteRepositoryManager} constructor.
+     * parameters to the {@link RemoteRepositoryManager} constructor.
      * 
      * @param sparqlEndpointURL
      *            The URL of the SPARQL end point.
      * 
      * @return An interface which may be used to talk to that data set.
      */
-    public JettyRemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
+    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
 
-        return new JettyRemoteRepository(sparqlEndpointURL, useLBS, httpClient, executor);
+        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient, executor);
 
     }
 
