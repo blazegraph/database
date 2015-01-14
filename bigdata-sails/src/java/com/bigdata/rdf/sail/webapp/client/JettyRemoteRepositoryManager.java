@@ -44,6 +44,8 @@ import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 
+import cutthecrap.utils.striterators.ICloseable;
+
 public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
 
     private static final transient Logger log = Logger
@@ -74,7 +76,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     }
     
     public JettyRemoteRepositoryManager(final String serviceURL,
-            final JettyHttpClient httpClient, final Executor executor) {
+            final HttpClient httpClient, final Executor executor) {
 
         this(serviceURL, false/* useLBS */, httpClient, executor);
 
@@ -96,7 +98,7 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
      * @param executor
      */
     public JettyRemoteRepositoryManager(final String serviceURL,
-            final boolean useLBS, final JettyHttpClient httpClient,
+            final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
 
         super(serviceURL + "/sparql", useLBS, httpClient, executor);
@@ -392,13 +394,14 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository {
     
 	public void close() {
 		if (m_closed) {
-			log.warn("The repository manager has already been closed", httpClient.m_stopped);
+			log.warn("The repository manager has already been closed");
 			return;
 		}
 		
 		try {
 			m_closed = true;
-			httpClient.close();
+			if (httpClient instanceof ICloseable)
+				((ICloseable) httpClient).close();
 		} catch (Exception e) {
 			log.warn("Problem stopping httpClient", e);
 			

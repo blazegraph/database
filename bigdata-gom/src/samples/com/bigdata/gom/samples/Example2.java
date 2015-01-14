@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -20,7 +21,8 @@ import com.bigdata.gom.gpo.ILinkSet;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -298,13 +300,13 @@ public class Example2 implements Callable<Void> {
 
         JettyRemoteRepositoryManager repo = null;
 
-        JettyHttpClient client = null;
+        HttpClient client = null;
 
         try {
 
             executor = Executors.newCachedThreadPool();
             
-            client = new JettyHttpClient();
+           	client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 
             repo = new JettyRemoteRepositoryManager(
             		serviceURL, client, executor);

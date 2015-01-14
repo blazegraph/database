@@ -42,6 +42,7 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -65,7 +66,8 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.JettyHttpClient;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.config.NicUtil;
@@ -83,7 +85,7 @@ public class TestRemoteGOM extends TestCase {
 
 	private Server m_server;
 
-	private JettyHttpClient m_client;
+	private HttpClient m_client;
 	
 	private JettyRemoteRepositoryManager m_repo;
 	
@@ -181,8 +183,7 @@ public class TestRemoteGOM extends TestCase {
 
         // m_cm = httpClient.getConnectionManager();
         
-        m_client = new JettyHttpClient();
-        m_client.start();
+       	m_client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
 
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client, m_indexManager.getExecutorService());
 
