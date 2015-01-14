@@ -53,7 +53,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
@@ -361,7 +361,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// The HAGlue interfaces for those joined services, in join order.
 		final HAGlue[] services = new HAGlue[joined.length];
 
-		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[joined.length];
 
 		try {
 
@@ -379,7 +379,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			 * Verify that query on all nodes is allowed and produces nothing
 			 * before we write anything.
 			 */
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				// Should be empty.
 				assertEquals(0L,
@@ -404,7 +404,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			 * Verify that query on all nodes is allowed and now provides a
 			 * non-empty result.
 			 */
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				// Should have data.
 				assertEquals(
@@ -446,7 +446,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			 * Verify that query on all nodes is allowed and now provides an
 			 * empty result.
 			 */
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				// Should be empty.
 				assertEquals(
@@ -477,7 +477,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			 */
 		} finally {
 			// close all created repos
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 				if (r != null) {
 					r.close();
 				}
@@ -1016,7 +1016,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							quorum.assertQuorum(token);
 
 				           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
+							final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
 				        	try {
 				        		repo.prepareUpdate(
 										updateStr).evaluate();
@@ -2225,7 +2225,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				public Void call() throws Exception {
 		           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 					
-					final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(leader, client);
+					final RemoteRepositoryManager remoteRepo = getRemoteRepository(leader, client);
 					try {
 						for (int n = 0; n < nTransactions; n++) {
 
@@ -2321,7 +2321,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
                     
                    	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
                     
-                    final JettyRemoteRepositoryManager remoteRepo;
+                    final RemoteRepositoryManager remoteRepo;
                     remoteRepo = getRemoteRepository(haGlue, client);
 					try {
 						while (!updateTaskFuture.isDone()) {
@@ -3533,7 +3533,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		
-		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
 		try {
 			repos[0] = getRemoteRepository(serverA, client);
 			repos[1] = getRemoteRepository(serverB, client);
@@ -3542,7 +3542,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			/*
 			 * Verify that query on all nodes is allowed.
 			 */
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				r.setQueryMethod("GET");
 
@@ -3554,14 +3554,14 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 			}
 
 			// Change the maximum length of a GET for a Query.
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				r.setMaxRequestURLLength(1);
 
 			}
 
 			// Run with the new length. All requests should be POSTs.
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				r.setQueryMethod("POST");
 
@@ -3574,7 +3574,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 		} finally {
 
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 				if (r != null) {
 					r.close();
 				}

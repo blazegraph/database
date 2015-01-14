@@ -34,12 +34,12 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * An implementation of Sesame's {@link Repository} that wraps a bigdata
- * {@link JettyRemoteRepository}. This provides SAIL API based client access to
+ * {@link RemoteRepository}. This provides SAIL API based client access to
  * a bigdata remote NanoSparqlServer.
  * <p>
  * This implementation operates only in auto-commit mode (each mutation
@@ -76,15 +76,15 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * created ourselves or one that was passed in by the caller. If we create
 	 * this object, then we own its life cycle and will close it when this
 	 * object is closed. In this case it will also be a
-	 * {@link JettyRemoteRepositoryManager} rather than just a
-	 * {@link JettyRemoteRepository}.
+	 * {@link RemoteRepositoryManager} rather than just a
+	 * {@link RemoteRepository}.
 	 */
-    private final JettyRemoteRepository nss;
+    private final RemoteRepository nss;
 
     /**
      * The object used to communicate with that remote repository.
      */
-	public JettyRemoteRepository getRemoteRepository() {
+	public RemoteRepository getRemoteRepository() {
 		
 		return nss;
 		
@@ -126,7 +126,7 @@ public class BigdataSailRemoteRepository implements Repository {
 		// Note: Client *might* be AutoCloseable.
 		this.client = HttpClientConfigurator.getInstance().newInstance();
 
-		this.nss = new JettyRemoteRepositoryManager(sparqlEndpointURL, useLBS,
+		this.nss = new RemoteRepositoryManager(sparqlEndpointURL, useLBS,
 				client, executor);
 	
 	}
@@ -135,7 +135,7 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * Ctor that allows the caller to manage the ClientConnectionManager for 
 	 * the HTTP client and the manage the ExecutorService. More flexible.  
 	 */
-	public BigdataSailRemoteRepository(final JettyRemoteRepository nss) {
+	public BigdataSailRemoteRepository(final RemoteRepository nss) {
 
 		if (nss == null)
 			throw new IllegalArgumentException();

@@ -30,7 +30,7 @@ package com.bigdata.rdf.sail.webapp.client;
 import java.util.UUID;
 
 /**
- * A prepared query against the {@link JettyRemoteRepository}.
+ * A prepared query against the {@link RemoteRepository}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

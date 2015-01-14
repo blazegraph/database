@@ -41,8 +41,8 @@ import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 
 /**
@@ -185,9 +185,9 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
         // Repositories without the LBS.
-        final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
+        final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
         // Repositories with the LBS.
-        final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
+        final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
         try {
 	        repos[0] = getRemoteRepository(serverA, client);
 	        repos[1] = getRemoteRepository(serverB, client);
@@ -196,7 +196,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	        /*
 	         * Verify that query on all nodes is allowed.
 	         */
-	        for (JettyRemoteRepositoryManager r : repos) {
+	        for (RemoteRepositoryManager r : repos) {
 	
 	            // Should be empty.
 	            assertEquals(0L,
@@ -212,7 +212,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	        /*
 	         * Verify that query on all nodes is allowed using the LBS.
 	         */
-	        for (JettyRemoteRepositoryManager r : reposLBS) {
+	        for (RemoteRepositoryManager r : reposLBS) {
 	
 	            // Should be empty.
 	            assertEquals(0L,
@@ -238,11 +238,11 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	        // Verify binary equality of ALL journals.
 	        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
         } finally {
-	        for (JettyRemoteRepositoryManager r : repos) {
+	        for (RemoteRepositoryManager r : repos) {
 	        	if (r != null)
 	        		r.close();
 	        }
-	        for (JettyRemoteRepositoryManager r : reposLBS) {
+	        for (RemoteRepositoryManager r : reposLBS) {
 	        	if (r != null)
 	        		r.close();
 	        }
@@ -290,9 +290,9 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
         // Repositories without the LBS.
-        final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
+        final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
         // Repositories with the LBS.
-        final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
+        final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
         
 		try {
 
@@ -326,11 +326,11 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 			assertDigestsEquals(services);
 
 		} finally {
-	        for (JettyRemoteRepositoryManager r : repos) {
+	        for (RemoteRepositoryManager r : repos) {
 	        	if (r != null)
 	        		r.close();
 	        }
-	        for (JettyRemoteRepositoryManager r : reposLBS) {
+	        for (RemoteRepositoryManager r : reposLBS) {
 	        	if (r != null)
 	        		r.close();
 	        }
@@ -376,9 +376,9 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		// Repositories without the LBS.
-		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
 		// Repositories with the LBS.
-		final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
+		final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
 		try {
 			repos[0] = getRemoteRepository(serverA, client);
 			repos[1] = getRemoteRepository(serverB, client);
@@ -409,11 +409,11 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 			// Verify binary equality of ALL journals.
 			assertDigestsEquals(services);
 		} finally {
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 				if (r != null)
 					r.close();
 			}
-			for (JettyRemoteRepositoryManager r : reposLBS) {
+			for (RemoteRepositoryManager r : reposLBS) {
 				if (r != null)
 					r.close();
 			}
@@ -487,9 +487,9 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		
 		// Repositories without the LBS.
-		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[3];
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
 		// Repositories with the LBS.
-		final JettyRemoteRepositoryManager[] reposLBS = new JettyRemoteRepositoryManager[3];
+		final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
 		try {
 			repos[0] = getRemoteRepository(serverA, client);
 			repos[1] = getRemoteRepository(serverB, client);
@@ -524,11 +524,11 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 			assertEquals(0L, getCountStar(serverB));
 			assertEquals(0L, getCountStar(serverC));
 		} finally {
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 				if (r != null)
 					r.close();
 			}
-			for (JettyRemoteRepositoryManager r : reposLBS) {
+			for (RemoteRepositoryManager r : reposLBS) {
 				if (r != null)
 					r.close();
 			}
@@ -552,7 +552,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
-        final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
+        final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer, client);
         try {
         	repo.prepareUpdate(updateStr).evaluate();
@@ -577,7 +577,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
-		final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
+		final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
 				useLoadBalancer, client);
 		try {
 			repo.prepareUpdate(updateStr).evaluate();

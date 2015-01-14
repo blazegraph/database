@@ -62,7 +62,7 @@ import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.config.NicUtil;
 
@@ -80,7 +80,7 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
     protected Server m_server;
 
 	protected HttpClient m_client;
-	protected JettyRemoteRepositoryManager m_repo;
+	protected RemoteRepositoryManager m_repo;
 	
 	protected String m_serviceURL;
 
@@ -204,7 +204,7 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
         // m_cm = httpClient.getConnectionManager();
        	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client, m_indexManager.getExecutorService());
+        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client, m_indexManager.getExecutorService());
         
         om = new NanoSparqlObjectManager(m_repo,
                 m_namespace); 

@@ -50,7 +50,7 @@ import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
 
@@ -800,7 +800,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
 					awaitNSSAndHAReady(service);
 
-					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -901,7 +901,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
 					awaitNSSAndHAReady(service);
 
-					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -1113,7 +1113,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
 					awaitNSSAndHAReady(service);
 
-					final JettyRemoteRepositoryManager repo = getRemoteRepository(
+					final RemoteRepositoryManager repo = getRemoteRepository(
 							service, client);
 					try {
 						// Should be empty.
@@ -1215,7 +1215,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
 					awaitNSSAndHAReady(service);
 
-					final JettyRemoteRepositoryManager repo = getRemoteRepository(
+					final RemoteRepositoryManager repo = getRemoteRepository(
 							service, client);
 					try {
 						// Should be empty.
@@ -1316,7 +1316,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 
 				awaitNSSAndHAReady(service);
 
-				final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+				final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 				try {
 					// Should be empty.
 					assertEquals(
@@ -1743,7 +1743,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 		try {
 			for (HAGlue service : new HAGlue[] { serverB, serverC }) {
 
-				final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+				final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 				try {
 					assertEquals(
 							1L,

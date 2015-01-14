@@ -76,8 +76,8 @@ import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -306,10 +306,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 		try {
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			
-			final JettyRemoteRepositoryManager rpm = new JettyRemoteRepositoryManager(
+			final RemoteRepositoryManager rpm = new RemoteRepositoryManager(
 					serviceURL, client, executorService);
 			try {
-				JettyRemoteRepository.checkResponseCode(response = rpm
+				RemoteRepository.checkResponseCode(response = rpm
 						.doConnect(opts));
 
 			} finally {
@@ -405,10 +405,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         try {
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final JettyRemoteRepositoryManager rpm = getRemoteRepository(haGlue, client);
+        	final RemoteRepositoryManager rpm = getRemoteRepository(haGlue, client);
 			try {
 	            final JettyResponseListener response = rpm.doConnect(opts);
-				JettyRemoteRepository.checkResponseCode(response);
+				RemoteRepository.checkResponseCode(response);
 
 				final String s = response.getResponseBody();
 				
@@ -439,7 +439,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 			final JettyResponseListener response = new JettyResponseListener();
 			request.send(response);
-			JettyRemoteRepository.checkResponseCode(response);
+			RemoteRepository.checkResponseCode(response);
 			
 			final String s = response.getResponseBody();
 
@@ -474,12 +474,12 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     }
 
     /**
-     * Return a {@link JettyRemoteRepositoryManager} for talking to the
+     * Return a {@link RemoteRepositoryManager} for talking to the
      * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
      * interface.
      * @throws Exception 
      */
-    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue, final HttpClient client)
+    protected RemoteRepositoryManager getRemoteRepository(final HAGlue haGlue, final HttpClient client)
             throws Exception {
 
         return getRemoteRepository(haGlue, false/* useLoadBalancer */, client);
@@ -487,7 +487,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     }
 
     /**
-     * Return a {@link JettyRemoteRepositoryManager} for talking to the
+     * Return a {@link RemoteRepositoryManager} for talking to the
      * {@link NanoSparqlServer} instance associated with an {@link HAGlue}
      * interface.
      * 
@@ -499,28 +499,28 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      *            service.
      * @throws Exception 
      */
-    protected JettyRemoteRepositoryManager getRemoteRepository(final HAGlue haGlue,
+    protected RemoteRepositoryManager getRemoteRepository(final HAGlue haGlue,
             final boolean useLoadBalancer, final HttpClient client) throws Exception {
 
         final String serviceURL = getNanoSparqlServerURL(haGlue);
 //                + (useLoadBalancer ? "/LBS" : "") 
 //                + "/sparql";
 
-        final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(serviceURL,
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(serviceURL,
                 useLoadBalancer, client, executorService);
 
         return repo;
         
     }
 
-    protected JettyRemoteRepositoryManager getRemoteRepositoryManager(
+    protected RemoteRepositoryManager getRemoteRepositoryManager(
             final HAGlue haGlue, final boolean useLBS) throws Exception {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
-        final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(
                 endpointURL, useLBS, client, executorService);
 
         return repo;
@@ -651,7 +651,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
             // Run query.
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-            final JettyRemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, client);
+            final RemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, client);
             try {
 	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
 	                    .evaluate();
@@ -747,7 +747,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     protected void awaitKBExists(final HAGlue haGlue) throws Exception {
       
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-    	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+    	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         
         try {
 	        assertCondition(new Runnable() {

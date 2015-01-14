@@ -38,7 +38,7 @@ import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -142,7 +142,7 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         o.addRequestParam("queryId", queryId.toString());
         
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        final JettyRemoteRepositoryManager repo = new JettyRemoteRepositoryManager(//
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(//
                 uriStr,//
                 params.getServiceOptions().isBigdataLBS(),// useLBS
                 client,

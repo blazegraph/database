@@ -19,7 +19,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suite for the restore of the HA1 Journal from a snapshot and transaction
@@ -333,7 +333,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
-		final JettyRemoteRepositoryManager[] repos = new JettyRemoteRepositoryManager[joined.length];
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[joined.length];
 		try {
 			for (int i = 0; i < joined.length; i++) {
 
@@ -368,7 +368,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 			 * Verify that query on all nodes is allowed and now provides a
 			 * non-empty result.
 			 */
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				// Should have data.
 				assertEquals(
@@ -441,7 +441,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 
 			}
 		} finally {
-			for (JettyRemoteRepositoryManager r : repos) {
+			for (RemoteRepositoryManager r : repos) {
 
 				if (r != null)
 					r.close();

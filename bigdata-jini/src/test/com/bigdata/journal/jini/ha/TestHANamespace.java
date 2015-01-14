@@ -35,7 +35,7 @@ import org.openrdf.query.GraphQueryResult;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test case for concurrent list namespace and create namespace operations.
@@ -93,7 +93,7 @@ public class TestHANamespace extends AbstractHA3JournalServerTestCase {
 		// Wait until up and running as the leader.
 		awaitHAStatus(leader, HAStatusEnum.Leader);
 		
-        final JettyRemoteRepositoryManager repositoryManager = getRemoteRepositoryManager(
+        final RemoteRepositoryManager repositoryManager = getRemoteRepositoryManager(
                 leader, false/* useLBS */);
 
 		final Semaphore awaitDone = new Semaphore(0);

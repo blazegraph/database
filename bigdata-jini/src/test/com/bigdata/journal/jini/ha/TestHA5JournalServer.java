@@ -37,7 +37,7 @@ import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * HA5 test suite.
@@ -629,7 +629,7 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
 
 				           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 					        
-							final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
+							final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
 				        	try {
 				        		repo.prepareUpdate(
 										updateStr).evaluate();

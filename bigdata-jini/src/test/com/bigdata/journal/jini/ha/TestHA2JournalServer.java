@@ -41,7 +41,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
@@ -144,7 +144,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 	        
-			final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+			final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 			try {
 				// Should be empty.
 				assertEquals(
@@ -276,7 +276,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 	
 					awaitNSSAndHAReady(service);
 	
-					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -393,7 +393,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 	
 					awaitNSSAndHAReady(service);
 	
-					final JettyRemoteRepositoryManager repo = getRemoteRepository(service, client);
+					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
 					try {
 						// Should be empty.
 						assertEquals(

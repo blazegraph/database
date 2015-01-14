@@ -37,8 +37,8 @@ import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suite for the SPARQL query and SPARQL update request cancellation
@@ -105,7 +105,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
         /*
          * Do CANCEL for each service using the default namespace.
          */
-        final JettyRemoteRepositoryManager[] rpms = new JettyRemoteRepositoryManager[3];
+        final RemoteRepositoryManager[] rpms = new RemoteRepositoryManager[3];
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         
         {
@@ -131,7 +131,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
             final String namespace = "kb";
 
             // Get RemoteRepository for each service.
-            final JettyRemoteRepository[] repo = new JettyRemoteRepository[3];
+            final RemoteRepository[] repo = new RemoteRepository[3];
             
             repo[0] = rpms[0].getRepositoryForNamespace(namespace);
             repo[1] = rpms[1].getRepositoryForNamespace(namespace);
@@ -143,7 +143,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
         }
         
         // Close down the rpms and stop the client
-        for (JettyRemoteRepositoryManager rpm : rpms) {
+        for (RemoteRepositoryManager rpm : rpms) {
         	rpm.close();
         }
         

@@ -101,7 +101,7 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -2887,7 +2887,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String updateStr = sb.toString();
 
        	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue,
+        final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer, client);
         try {
         	repo.prepareUpdate(updateStr).evaluate();
@@ -2917,7 +2917,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         try {
 
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         	try {
         		repo.prepareUpdate(updateStr).evaluate();
         	} finally {
@@ -2945,7 +2945,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         try {
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final JettyRemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
         	try {
         		repo.prepareTupleQuery(queryStr).evaluate();
         	} finally {
@@ -3063,7 +3063,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
             quorum.assertQuorum(token);
 
            	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-            final JettyRemoteRepositoryManager repo = getRemoteRepository(leader, client);
+            final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
         	try {
         		repo.prepareUpdate(updateStr).evaluate();
         	} finally {

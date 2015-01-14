@@ -30,7 +30,7 @@ package com.bigdata.rdf.sail.webapp.client;
 import org.openrdf.query.GraphQueryResult;
 
 /**
- * A prepared graph query for the {@link JettyRemoteRepository}.
+ * A prepared graph query for the {@link RemoteRepository}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

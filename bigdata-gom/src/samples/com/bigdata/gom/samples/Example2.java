@@ -23,7 +23,7 @@ import com.bigdata.gom.om.NanoSparqlObjectManager;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -298,7 +298,7 @@ public class Example2 implements Callable<Void> {
         
         ExecutorService executor = null;
 
-        JettyRemoteRepositoryManager repo = null;
+        RemoteRepositoryManager repo = null;
 
         HttpClient client = null;
 
@@ -308,7 +308,7 @@ public class Example2 implements Callable<Void> {
             
            	client = HttpClientConfigurator.getInstance().newInstance();
 
-            repo = new JettyRemoteRepositoryManager(
+            repo = new RemoteRepositoryManager(
             		serviceURL, client, executor);
 
             final IObjectManager om = new NanoSparqlObjectManager(repo,
