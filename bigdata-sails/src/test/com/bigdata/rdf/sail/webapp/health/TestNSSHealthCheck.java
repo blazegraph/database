@@ -52,7 +52,7 @@ import com.bigdata.journal.Journal.Options;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.JettyRemoteRepositoryManager;
@@ -174,7 +174,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 		executorService = Executors.newCachedThreadPool(DaemonThreadFactory
 				.defaultThreadFactory());
 
-       	m_client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	m_client = HttpClientConfigurator.getInstance().newInstance();
 		
 		m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client, executorService);
 

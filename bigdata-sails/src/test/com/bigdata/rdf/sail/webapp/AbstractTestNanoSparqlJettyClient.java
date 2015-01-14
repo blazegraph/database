@@ -81,7 +81,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
@@ -359,7 +359,7 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
          * webapp when the client requests the root URL.
          */
 
-       	m_client = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	m_client = HttpClientConfigurator.getInstance().newInstance();
         
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL, m_client,
                 getIndexManager().getExecutorService());

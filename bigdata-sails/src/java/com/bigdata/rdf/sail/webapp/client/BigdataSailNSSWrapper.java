@@ -135,7 +135,7 @@ public class BigdataSailNSSWrapper {
 //        m_cm = DefaultClientConnectionManagerFactory.getInstance()
 //                .newInstance();
 
-       	m_httpClient = DefaultClientConnectionManagerFactory.getInstance().newInstance();
+       	m_httpClient = HttpClientConfigurator.getInstance().newInstance();
         
         m_repo = new JettyRemoteRepositoryManager(m_serviceURL,
         		m_httpClient,

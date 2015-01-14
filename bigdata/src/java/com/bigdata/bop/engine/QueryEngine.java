@@ -72,7 +72,7 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -499,7 +499,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                      */
                     
                     clientConnectionManagerRef
-                            .set(cm = DefaultClientConnectionManagerFactory
+                            .set(cm = HttpClientConfigurator
                                     .getInstance().newInstance());
 
                 }
