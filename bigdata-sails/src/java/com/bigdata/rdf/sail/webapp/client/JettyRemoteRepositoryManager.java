@@ -81,6 +81,29 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
         
     }
     
+    /**
+	 * 
+	 * @param serviceURL
+	 *            The path to the root of the web application (without the
+	 *            trailing "/"). <code>/sparql</code> will be appended to this
+	 *            path to obtain the SPARQL end point for the default data set.
+	 * @param httpClient
+	 *            If the client implements {@link AutoCloseable} then it will be
+	 *            closed by {@link #close()}.
+	 * @param executor
+	 *            The life cycle of this object is owned by the caller.
+	 * 
+	 *            TODO Should this be deprecated since it does not force the
+	 *            caller to choose a value for <code>useLBS</code>?
+	 *            <p>
+	 *            This version does not force the caller to decide whether or
+	 *            not the LBS pattern will be used. In general, it should be
+	 *            used if the end point is bigdata. This class is generally, but
+	 *            not always, used with a bigdata end point. The main exception
+	 *            is SPARQL Basic Federated Query. For that use case we can not
+	 *            assume that the end point is bigdata and thus we can not use
+	 *            the LBS prefix.
+	 */
     public JettyRemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
@@ -101,8 +124,15 @@ public class JettyRemoteRepositoryManager extends JettyRemoteRepository
 	 *            specify <code>true</code>. When <code>false</code>, the REST
 	 *            API methods will NOT use the load balancer aware requestURLs.
 	 * @param httpClient
+	 *            If the client implements {@link AutoCloseable} then it will be
+	 *            closed by {@link #close()}.
 	 * @param executor
 	 *            The life cycle of this object is owned by the caller.
+	 * 
+	 *            TODO We could define a constructor that creates the
+	 *            {@link HttpClient} and {@link Executor} and then "autocloses"
+	 *            them. This would simplify some test code, and might help some
+	 *            client application code, but it would not be used internally.
 	 */
     public JettyRemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final HttpClient httpClient,

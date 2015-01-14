@@ -300,27 +300,27 @@ public class JettyRemoteRepository {
 
     }
     
-    /**
-     * 
-     * @param sparqlEndpointURL
-     * @param httpClient
-     * @param executor
-     * 
-     * @deprecated This version does not force the caller to decide whether or
-     *             not the LBS pattern will be used. In general, it should be
-     *             used if the end point is bigdata. This class is generally,
-     *             but not always, used with a bigdata end point. The main
-     *             exception is SPARQL Basic Federated Query. For that use case
-     *             we can not assume that the end point is bigdata and thus we
-     *             can not use the LBS prefix.
-     */
-    public JettyRemoteRepository(final String sparqlEndpointURL,
-            final AutoCloseHttpClient httpClient, final Executor executor) {
-
-        // FIXME Should default useLBS:=true. it is basically free.
-        this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
-
-    }
+//    /**
+//     * 
+//     * @param sparqlEndpointURL
+//     * @param httpClient
+//     * @param executor
+//     * 
+//     * @deprecated This version does not force the caller to decide whether or
+//     *             not the LBS pattern will be used. In general, it should be
+//     *             used if the end point is bigdata. This class is generally,
+//     *             but not always, used with a bigdata end point. The main
+//     *             exception is SPARQL Basic Federated Query. For that use case
+//     *             we can not assume that the end point is bigdata and thus we
+//     *             can not use the LBS prefix.
+//     */
+//    public JettyRemoteRepository(final String sparqlEndpointURL,
+//            final AutoCloseHttpClient httpClient, final Executor executor) {
+//
+//        // FIXME Should default useLBS:=true. it is basically free.
+//        this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
+//
+//    }
 
     /**
      * Create a connection to a remote repository. A typical invocation looks

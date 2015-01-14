@@ -155,7 +155,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 		    for (BigdataSailNSSWrapper wrapper : testSails.values()) {
 		        try {
     		        wrapper.shutdown();
-    		        wrapper.sail.__tearDownUnitTest();
+    		        wrapper.getSail().__tearDownUnitTest();
 		        } catch (Exception ex) {
 		            throw new RuntimeException(ex);
 		        }
