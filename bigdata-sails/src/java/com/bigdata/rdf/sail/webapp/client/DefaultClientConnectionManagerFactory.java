@@ -39,8 +39,23 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
  */
 public class DefaultClientConnectionManagerFactory implements IHttpClientFactory
 {
-
+	final static String CONNECTION_MANAGER_FACTORY = "com.bigdata.clientconnectionmanagerfactory";
+	
+	/**
+	 * Allow a user configurable factory to allow the override of the HttpClient(s) it will return.
+	 */
     public static IHttpClientFactory getInstance() {
+    	
+    	final String configuredFactory = System.getenv(CONNECTION_MANAGER_FACTORY);
+    	if (configuredFactory != null) {
+    		try {
+    			final Class<IHttpClientFactory> factoryClass = (Class<IHttpClientFactory>) Class.forName(configuredFactory);
+    			
+    			return factoryClass.newInstance();
+    		} catch (Exception e) {
+    			throw new RuntimeException("Problem creating ClientCOnnectionFactory", e);
+    		}
+    	}
         
         return new DefaultClientConnectionManagerFactory();
         
