@@ -42,12 +42,15 @@ import org.eclipse.jetty.http.HttpHeader;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 
+/**
+ * Class handles the jetty {@link Response} input stream.
+ */
 public class JettyResponseListener extends InputStreamResponseListener {
 	
     private static final transient Logger log = Logger
             .getLogger(JettyResponseListener.class);
     
-	Response m_response;
+    private Response m_response;
 	
 	private void ensureResponse() {
 		if (m_response == null) {
@@ -55,10 +58,6 @@ public class JettyResponseListener extends InputStreamResponseListener {
 				final boolean traceEnabled = log.isTraceEnabled();
 				
 				final long start = traceEnabled ? System.currentTimeMillis() : 0;
-				
-				// FIXME: added only to see if this removes the EOFException in CI!
-				// log.debug("REMOVE SLEEP ONCE FIXED");
-				// Thread.sleep(50);
 				
 				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes, for queued requests!
 				// m_response = await(300, TimeUnit.SECONDS).getResponse(); // wait up to 5 minutes!
@@ -132,14 +131,15 @@ public class JettyResponseListener extends InputStreamResponseListener {
         }
 	}
 	
+	private StackInfoReport streamSourced = null;
+	
 	/**
 	 * Ensure we have the stream ready before trying to process it!
 	 * 
 	 * But also allow getInputStream to be called multiple times (for now)
 	 */
-	
-	private StackInfoReport streamSourced = null;
 	public InputStream getInputStream(final boolean forcenew) {
+		
 		if (!forcenew) {
 			if (streamSourced != null) {
 				throw new RuntimeException("Who did this first?", streamSourced);
@@ -150,17 +150,24 @@ public class JettyResponseListener extends InputStreamResponseListener {
 		ensureResponse();
 		
 		return super.getInputStream();
+		
 	}
 
+	@Override
 	public InputStream getInputStream() {
-		return getInputStream(false);
+	
+		return getInputStream(false/* forceNew */);
+		
 	}
 
-    public void consume()
-            throws IOException {
+	/**
+	 * Fully consume the http response.
+	 */
+	public void consume() throws IOException {
     	
     	try {
-	        final InputStream r = getInputStream(true);
+
+    		final InputStream r = getInputStream(true/* forceNew */);
 	
 	        try {
 	
