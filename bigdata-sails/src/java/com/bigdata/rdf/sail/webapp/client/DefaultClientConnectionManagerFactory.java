@@ -27,59 +27,55 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import org.apache.http.HttpHost;
-import org.apache.http.params.HttpParams;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
 /**
- * Factory for {@link ClientConnectionManager}.
- * <p>
- * Note: This does not implement
- * {@link org.apache.http.conn.ClientConnectionManagerFactory} because that
- * interface implies the use of the deprecated form of the
- * {@link ThreadSafeClientConnManager} constructor (the variant which accepts
- * the {@link HttpParams}s).
+ * Factory for {@link HttpClient}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: ClientConnectionManagerFactory.java 6174 2012-03-22 12:41:14Z
- *          thompsonbry $
  * 
- *          TODO Provide SPI resolution to configue this.
+ *         TODO Provide SPI resolution to configure this.
  */
-public class DefaultClientConnectionManagerFactory 
-//implements ClientConnectionManagerFactory 
+public class DefaultClientConnectionManagerFactory implements IHttpClientFactory
 {
 
-    public static DefaultClientConnectionManagerFactory getInstance() {
+    public static IHttpClientFactory getInstance() {
         
         return new DefaultClientConnectionManagerFactory();
         
     }
-    
+
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * This implementation:
+	 * <ul>
+	 * <li>Sets up redirect handling.</li>
+	 * <li>Sets a default SSL context factory that trusts all certificates. This
+	 * allows encrypted communications with any SSL endpoint, but it does not
+	 * verify the identity associated with that certificate.</li>
+	 * </ul>
+	 */
     public HttpClient newInstance() {
 
-        final HttpClient cm = new HttpClient(new SslContextFactory(true));
+		final HttpClient cm = new HttpClient(
+				new SslContextFactory(true/* trustAll */));
         
         try {
-    		cm.setFollowRedirects(true);
+
+        	cm.setFollowRedirects(true);
     		
 			cm.start();
 
         } catch (Exception e) {
-			throw new RuntimeException("Unable to start HttpClient", e);
+			
+        	throw new RuntimeException("Unable to start HttpClient", e);
+        	
 		}
 
         return cm;
 
     }
-    
-//    @Override
-//    public ClientConnectionManager newInstance(HttpParams params,
-//            SchemeRegistry schemeRegistry) {
-//
-//        return null;
-//        
-//    }
 
 }
