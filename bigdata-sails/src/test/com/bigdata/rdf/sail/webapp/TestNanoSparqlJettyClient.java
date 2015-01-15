@@ -25,7 +25,6 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -296,13 +295,17 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		response = doConnect(opts);
 
 		try {
+
 			checkResponseCode(url, response);
-	
-			return streamToString(response.getInputStream());
+
 		} finally {
+			
 			if (response != null)
-				response.consume();
+				response.abort();
+			
 		}
+
+		return response.getResponseBody();
 
 	}
 
@@ -326,7 +329,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 					+ response.getReason() + ", headers="
 					+ response.getHeaders().toString()
 					+ ", ResponseBody="
-					+ streamToString(response.getInputStream()));
+					+ response.getResponseBody());
 
 		}
 
@@ -342,17 +345,6 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 	}
 
-	private static String streamToString(final InputStream instr) throws IOException {
-		final StringBuilder sb = new StringBuilder();
-		final byte[] buf = new byte[256];
-		int rdlen = 0;
-		while ((rdlen = instr.read(buf)) != -1) {
-			sb.append(new String(buf, 0, rdlen));
-		}
-		
-		return sb.toString();
-	}
-	
 	/**
 	 * Connect to a SPARQL end point (GET or POST query only).
 	 * 
@@ -484,7 +476,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 			}
 
-			final JettyResponseListener response = new JettyResponseListener();
+			final JettyResponseListener response = new JettyResponseListener(request);
 			
 			request.send(response);
 

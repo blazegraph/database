@@ -22,7 +22,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.webapp.health;
 
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.LinkedHashMap;
@@ -32,9 +31,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.server.Server;
-
 import junit.framework.AssertionFailedError;
 import junit.framework.Test;
 import junit.framework.TestCase2;
@@ -42,6 +38,9 @@ import junit.framework.TestListener;
 import junit.framework.TestResult;
 import junit.framework.TestSuite;
 import junit.textui.ResultPrinter;
+
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.server.Server;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
@@ -54,9 +53,9 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -507,18 +506,14 @@ public class TestNSSHealthCheck extends TestCase2 {
 
 			response = m_repo.doConnect(opts);
 
-			m_repo.checkResponseCode(response);
+			RemoteRepository.checkResponseCode(response);
 
 			return response.getResponseBody();
 
 		} finally {
 
-			try {
-				if (response != null)
-					response.consume();
-			} catch (IOException ex) {
-				log.warn(ex, ex);
-			}
+			if (response != null)
+				response.abort();
 
 		}
 

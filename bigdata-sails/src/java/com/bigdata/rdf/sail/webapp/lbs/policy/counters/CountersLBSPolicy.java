@@ -320,12 +320,8 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
         } finally {
             
-            if (response != null && !didDrainEntity) {
-                try {
-                    response.consume();
-                } catch (IOException ex) {
-                    log.warn(ex);
-                }
+			if (response != null && !didDrainEntity) {
+				response.abort();
             }
             
         }
@@ -387,7 +383,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
             }
 
-            final JettyResponseListener listener = new JettyResponseListener();
+            final JettyResponseListener listener = new JettyResponseListener(request);
             
             request.send(listener);
             

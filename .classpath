@@ -83,7 +83,7 @@
 	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-xml-9.2.3.v20140905.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
 	<classpathentry kind="lib" path="bigdata/lib/junit-4.11.jar"/>
-	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar"/>
+	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar" sourcepath="/Users/bryan/cuda-workspace/openrdf-sesame-2.7.13"/>
 	<classpathentry kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.7.13.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.7.13.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.7.13.jar"/>

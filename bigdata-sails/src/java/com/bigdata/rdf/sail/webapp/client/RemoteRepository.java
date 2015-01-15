@@ -54,7 +54,6 @@ import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpRequest;
-import org.eclipse.jetty.client.api.ContentProvider;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpMethod;
 import org.openrdf.OpenRDFUtil;
@@ -451,7 +450,7 @@ public class RemoteRepository {
         } finally {
 
         	if (response != null)
-        		response.consume();
+        		response.abort();
             
         }
         
@@ -708,7 +707,7 @@ public class RemoteRepository {
              * connection will be released in a timely fashion.
              */
         	if (response != null)
-        		response.consume();
+        		response.abort();
             
         }
             
@@ -762,7 +761,7 @@ public class RemoteRepository {
         } finally {
             
         	if (resp != null)
-        		resp.consume();
+        		resp.abort();
                      
         }
 
@@ -811,7 +810,7 @@ public class RemoteRepository {
         } finally {
             
         	if (resp != null)
-        		resp.consume();
+        		resp.abort();
                       
         }
     	
@@ -866,7 +865,7 @@ public class RemoteRepository {
         } finally {
             
         	if (response != null)
-        		response.consume();
+        		response.abort();
         	
         }
         
@@ -942,7 +941,7 @@ public class RemoteRepository {
         } finally {
             
         	if (response != null)
-        		response.consume();
+        		response.abort();
                         
         }
         
@@ -1026,7 +1025,7 @@ public class RemoteRepository {
         } finally {
             
         	if (response != null)
-        		response.consume();
+        		response.abort();
             
         }
         
@@ -1341,7 +1340,7 @@ public class RemoteRepository {
             } finally {
                 
             	if (response != null)
-            		response.consume();
+            		response.abort();
 	                            
             }
             
@@ -1667,8 +1666,9 @@ public class RemoteRepository {
 
             }
             
-            JettyResponseListener listener = new JettyResponseListener();
+            final JettyResponseListener listener = new JettyResponseListener(request);
             
+            // Note: Send with a listener is non-blocking.
             request.send(listener);
             
             return listener;
@@ -1778,7 +1778,6 @@ public class RemoteRepository {
             throws Exception {
 
     	JettyResponseListener response = null;
-        ContentProvider content = null;
         BackgroundTupleResult result = null;
         TupleQueryResultImpl tqrImpl = null;
         try {
@@ -1813,9 +1812,7 @@ public class RemoteRepository {
             final TupleQueryResultParser parser = parserFactory.getParser();
     
             result = new BackgroundTupleResult(parser, response.getInputStream());
-            
-            executor.execute(result);
-            
+
             final MapBindingSet bindings = new MapBindingSet();
             
             final InsertBindingSetCursor cursor = 
@@ -1824,9 +1821,9 @@ public class RemoteRepository {
             final List<String> list = new ArrayList<String>(
                     result.getBindingNames());
             
-            tqrImpl = new TupleQueryResultImpl(list, cursor) {
+            final TupleQueryResultImpl tmp = new TupleQueryResultImpl(list, cursor) {
 
-            	final AtomicBoolean notDone = new AtomicBoolean(true);
+            	private final AtomicBoolean notDone = new AtomicBoolean(true);
             	
             	@Override
             	public boolean hasNext() throws QueryEvaluationException {
@@ -1848,53 +1845,74 @@ public class RemoteRepository {
             		
             		try {
         			
-            			super.handleClose();
-        			
-            		} finally {
-            			
-		    			if (notDone.compareAndSet(true, false)) {
-		    				
-		    				try {
-		    					cancel(queryId);
-		    				} catch (Exception ex) {log.warn(ex); }
-		    				
-		    			}
-		    			
-		    			/*
-		    			 * Notify the listener.
-		    			 */
-		    			if (listener != null) {
-		    			    listener.closed(queryId);
-            		}
-        			
+						super.handleClose();
+
+					} finally {
+
+						if (notDone.compareAndSet(true, false)) {
+
+							try {
+								cancel(queryId);
+							} catch (Exception ex) {
+								log.warn(ex);
+							}
+
+						}
+
+						/*
+						 * Notify the listener.
+						 */
+						if (listener != null) {
+							listener.closed(queryId);
+						}
+
             		}
         			
             	};
             	
             };
             
-            return tqrImpl;
+			/*
+			 * Submit task for execution. It will asynchronously consume the
+			 * response, pumping solutions into the cursor.
+			 * 
+			 * Note: Can throw a RejectedExecutionException!
+			 */
+			executor.execute(result);
             
-//            final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
-//    
-//            parser.setTupleQueryResultHandler(handler);
-//    
-//            parser.parse(entity.getContent());
-//    
-//            // done.
-//            return handler.getQueryResult();
+			// The task was accepted by the executor.
+			tqrImpl = tmp;
+			
+			/*
+			 * Return the tuple query result listener to the caller. they now
+			 * have responsibility for calling close() on that object in order
+			 * to close the http connection and release the associated
+			 * resources.
+			 */
+            return tqrImpl;
             
         } finally {
             
-        	if (response != null)
-        		response.consume();
-            
-            
-            if (response != null && tqrImpl == null) {
-            	try {
-            		cancel(queryId);
-            	} catch(Exception ex) {log.warn(ex); }
-            }
+			if (response != null && tqrImpl == null) {
+				/*
+				 * Error handling code path. We have an http response listener,
+				 * but we were not able to setup the tuple query result listener
+				 * and execute the task to parse the response.
+				 */
+				response.abort();
+				try {
+					/*
+					 * POST back to the server to cancel the request in case it
+					 * is still running on the server.
+					 */
+					cancel(queryId);
+				} catch (Exception ex) {
+					log.warn(ex);
+				}
+				if (listener != null) {
+					listener.closed(queryId);
+				}
+			}
             
         }
 
@@ -2025,32 +2043,40 @@ public class RemoteRepository {
             	
             };
             
+			/*
+			 * Note: Asynchronous execution. Typically does not even start
+			 * running until after we leave this method!
+			 */
             executor.execute(tmp);
             
+            // The executor accepted the task for execution (at some point).
             result = tmp;
-            
-            return result;
 
-//            final Graph g = new GraphImpl();
-//
-//            parser.setRDFHandler(new StatementCollector(g));
-//
-//            parser.parse(entity.getContent(), baseURI);
-//
-////            return new GraphQueryResultImpl(Collections.EMPTY_MAP, g);
-//            return g;
+            // Result will be asynchronously produced.
+            return result;
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
             if (response != null && result == null) {
-            	response.consume();
+				/*
+				 * This code path only handles errors. We have a response, but
+				 * we were not able to generate the asynchronous [result]
+				 * object.
+				 */
+            	response.abort();
             	
                 try {
+					/*
+					 * POST back to the server in an attempt to cancel the
+					 * request if already executing on the server.
+					 */
                 	cancel(queryId);
                 } catch (Exception ex) {log.warn(ex); }
-            }
+				
+                if (listener != null) {
+					listener.closed(queryId);
+				}
+			}
 
         }
 
@@ -2101,19 +2127,31 @@ public class RemoteRepository {
 
             final BooleanQueryResultParser parser = factory.getParser();
 
-            result = parser.parse(response.getInputStream());
-            
-            return result;
+            final InputStream is = response.getInputStream();
+			try {
+				result = parser.parse(is);
+				return result;
+			} finally {
+				is.close();
+			}
 
         } finally {
 
-        	if (response != null)
-        		response.consume();
-            
-        	if (result == null) {
-                
+			if (result == null) {
+				/*
+				 * Error handling path. We issued the request, but were not able
+				 * to parse out the response.
+				 */
+				if (response != null) {
+					// Make sure the response listener is closed.
+					response.abort();
+				}
 	            try {
-	            	cancel(queryId);
+					/*
+					 * POST request to server to cancel query in case it is
+					 * still running.
+					 */
+					cancel(queryId);
 	            } catch (Exception ex) {log.warn(ex); }
         	}
 
@@ -2192,7 +2230,7 @@ public class RemoteRepository {
         } finally {
 
         	if (response != null) {
-        		response.consume();
+        		response.abort();
         	}
         	
         }
@@ -2249,7 +2287,7 @@ public class RemoteRepository {
         } finally {
 
         	if (response != null) {
-        		response.consume();
+        		response.abort();
         	}
         	
         }
@@ -2307,7 +2345,7 @@ public class RemoteRepository {
         } finally {
 
         	if (response != null) {
-        		response.consume();
+        		response.abort();
         	}
         	
         }
@@ -2361,7 +2399,7 @@ public class RemoteRepository {
         } finally {
 
         	if (response != null) {
-        		response.consume();
+        		response.abort();
         	}
         	
         }

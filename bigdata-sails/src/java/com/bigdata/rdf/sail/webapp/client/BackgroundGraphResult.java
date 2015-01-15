@@ -77,7 +77,7 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
         }
         try {
             queue.close();
-            in.close();
+            in.close(); // close the input stream.
         } catch (IOException e) {
             throw new QueryEvaluationException(e);
         }
@@ -85,7 +85,7 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
 
     @Override
     public void run() {
-        boolean completed = false;
+//        boolean completed = false;
         parserThread = Thread.currentThread();
         try {
             parser.setRDFHandler(this);
@@ -94,7 +94,7 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
             } else {
                 parser.parse(new InputStreamReader(in, charset), baseURI);
             }
-            completed = true;
+//            completed = true;
         } catch (RDFHandlerException e) {
             // parsing was cancelled or interrupted
         } catch (RDFParseException e) {
