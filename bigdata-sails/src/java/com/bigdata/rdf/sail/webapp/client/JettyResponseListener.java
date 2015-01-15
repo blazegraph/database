@@ -133,52 +133,69 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	
 	private StackInfoReport streamSourced = null;
 	
+	private InputStream m_cachedStream = null;
+	
 	/**
 	 * Ensure we have the stream ready before trying to process it!
-	 * 
+	 * <p>
 	 * But also allow getInputStream to be called multiple times (for now)
+	 * <p>
+	 * Note that this changes the semantics of getInputStream() since if called
+	 * a second time will return a closed stream by default.
 	 */
-	public InputStream getInputStream(final boolean forcenew) {
+	public InputStream retrieveInputStream(final boolean forcenew) {
 		
-		if (!forcenew) {
-			if (streamSourced != null) {
-				throw new RuntimeException("Who did this first?", streamSourced);
+		if (m_cachedStream != null) {
+			if (forcenew) {
+				throw new RuntimeException("Stream already retrieved");
 			}
-			// streamSourced = new StackInfoReport();
+			
+			return m_cachedStream;
 		}
 			
 		ensureResponse();
 		
-		return super.getInputStream();
+		return getInputStream();
 		
 	}
 
 	@Override
 	public InputStream getInputStream() {
-	
-		return getInputStream(false/* forceNew */);
+		if (m_cachedStream != null) {
+			return super.getInputStream(); // allow to return closed stream
+		}
 		
+		ensureResponse();
+		
+		m_cachedStream = super.getInputStream();
+		
+		return m_cachedStream;
 	}
 
-	/**
-	 * Fully consume the http response.
-	 */
 	public void consume() throws IOException {
+		consume(false/*readAll*/);
+	}
+	
+	/**
+	 * Fully consume the http response if readALl is set, otherwsie
+	 * just retrieve the stream and close it.
+	 */
+	public void consume(final boolean readAll) throws IOException {
     	
     	try {
 
-    		final InputStream r = getInputStream(true/* forceNew */);
+    		final InputStream r = retrieveInputStream(false/* forceNew */);
 	
 	        try {
-	
-	            final byte[] data = new byte[4096];
-	
-	            int ch;
-	            while ((ch = r.read(data)) != -1) {
-	            	if (log.isTraceEnabled())
-	            		log.trace("Read " + ch + " bytes");
-	            }
-	
+	        	if (readAll) {
+		            final byte[] data = new byte[4096];
+		
+		            int ch;
+		            while ((ch = r.read(data)) != -1) {
+		            	if (log.isTraceEnabled())
+		            		log.trace("Read " + ch + " bytes");
+		            }
+	        	}
 	
 	        } finally {
 	
