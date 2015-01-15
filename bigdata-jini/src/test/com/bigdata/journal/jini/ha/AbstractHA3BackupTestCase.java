@@ -121,7 +121,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 	            RemoteRepository.checkResponseCode(response = rpm.doConnect(opts));
 			} finally {
 				if (response != null)
-					response.consume();
+					response.abort();
 				
 				rpm.close();
 				client.stop();

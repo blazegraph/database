@@ -312,7 +312,7 @@ public class RemoteRepositoryManager extends RemoteRepository
             checkResponseCode(response = doConnect(opts));
         } finally {
         	if (response != null)
-        		response.consume();
+        		response.abort();
 
         }
         
@@ -343,7 +343,7 @@ public class RemoteRepositoryManager extends RemoteRepository
         } finally {
 
         	if (response != null)
-        		response.consume();
+        		response.abort();
             
 
         }
@@ -421,7 +421,7 @@ public class RemoteRepositoryManager extends RemoteRepository
         } finally {
 
         	if (response != null && consumeNeeded)
-        		response.consume();
+        		response.abort();
             
         }
 

@@ -27,7 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import org.apache.log4j.Logger;
+
+import com.bigdata.util.NV;
 
 /**
  * Extract and return the quality score for the mime type (defaults to
@@ -46,23 +51,32 @@ public class MiniMime {
     
     static private final Logger log = Logger.getLogger(MiniMime.class);
 
+    /**
+     * The extracted quality score for the MIME Type (<code>q=...</code>).
+     */
     public final float q;
 
     private final String mimeType;
 
-    public final String[][] params;
+	/**
+	 * The parsed name=value MIME Type parameters. The tail of the array MAY
+	 * have one or more null elements. You can just break out of the loop when
+	 * you hit the first <code>null</code> MIME type parameter name.
+	 */
+    private final List<NV> params = new LinkedList<NV>();
 
     public MiniMime(final String s) {
         final String[] b = s.split(";");
         mimeType = b[0].trim();
         float q = 1f;
-        params = new String[b.length][];
+//        params = new String[b.length][];
         for (int i = 1; i < b.length; i++) {
             final String c = b[i];
             final String[] d = c.split("=");
             if (d.length < 2)
                 continue;
-            params[i] = d;
+			params.add(new NV(d[0], d[1]));
+//            params[i] = d;
             // params[i][0] = d[0];
             // params[i][1] = d[1];
             if (!d[0].equals("q"))
@@ -74,7 +88,45 @@ public class MiniMime {
         this.q = q;
     }
 
+    /**
+	 * The MIME type without any MIME parameters.
+	 */
     public String getMimeType() {
         return mimeType;
     }
+
+    /**
+	 * Return the first value for the named MIME type parameter.
+	 * 
+	 * @param name
+	 *            The parameter name (case sensitive).
+	 * @param def
+	 *            The default value (optional).
+	 * 
+	 * @return The value for that parameter and the caller's default value
+	 *         otherwise.
+	 */
+	public String getParam(final String name, final String def) {
+		if (name == null)
+			throw new IllegalArgumentException();
+		for (NV nv : params) {
+			if (name.equals(nv.getName())) {
+				return nv.getValue();
+			}
+		}
+		return def;
+	}
+
+	/**
+	 * Return the value of the <code>charset</code>.
+	 * 
+	 * @return The value of the <code>charset</code> parameter -or-
+	 *         <code>ISO-8851-1</code> if that parameter was not specified.
+	 */
+	public String getContentEncoding() {
+
+		return getParam("charset","ISO-8859-1");
+
+	}
+
 }

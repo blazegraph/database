@@ -52,8 +52,9 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
     public BackgroundTupleResult(final TupleQueryResultParser parser,
             final InputStream in) {
         
-		this(new QueueCursor<BindingSet>(10), parser, in);
-		
+    	// TODO Why is the capacity so small? Why not 100 or more?
+		this(new QueueCursor<BindingSet>(10/* capacity */), parser, in);
+
 	}
 
     public BackgroundTupleResult(final QueueCursor<BindingSet> queue,
@@ -71,6 +72,13 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 				closed = true;
 				if (parserThread != null) {
 					parserThread.interrupt();
+				}
+				if (in != null) {
+					try {
+						in.close();
+					} catch (IOException e) {
+						throw new QueryEvaluationException(e);
+					}
 				}
 			}
 		}
@@ -108,12 +116,15 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 			}
 			parserThread = Thread.currentThread();
 		}
-		boolean completed = false;
+//		boolean completed = false;
 		try {
+			/*
+			 * Run the parser, pumping events into this class (which is its own
+			 * listener).
+			 */
 			parser.setTupleQueryResultHandler(this);
 			parser.parse(in);
-			// release connection back into pool if all results have been read
-			completed = true;
+//			completed = true;
 		} catch (TupleQueryResultHandlerException e) {
 			// parsing cancelled or interrupted
 		} catch (QueryResultParseException e) {

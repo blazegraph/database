@@ -27,18 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.Logger;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
-import org.openrdf.query.resultio.BooleanQueryResultWriter;
-import org.openrdf.query.resultio.BooleanQueryResultWriterFactory;
-import org.openrdf.query.resultio.BooleanQueryResultWriterRegistry;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
@@ -53,7 +47,7 @@ import com.bigdata.rdf.sail.webapp.client.MiniMime;
  */
 public class ConnegUtil {
 	
-    private static Logger log = Logger.getLogger(ConnegUtil.class);
+//    private static Logger log = Logger.getLogger(ConnegUtil.class);
 
     private static final Pattern pattern;
     static {

@@ -314,7 +314,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 			} finally {
 				if (response != null)
-					response.consume();
+					response.abort();
 				
 				rpm.close();
 				client.stop();
@@ -437,7 +437,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 			final org.eclipse.jetty.client.api.Request request = client
 					.newRequest(query).method(HttpMethod.GET);
 
-			final JettyResponseListener response = new JettyResponseListener();
+			final JettyResponseListener response = new JettyResponseListener(request);
 			request.send(response);
 			RemoteRepository.checkResponseCode(response);
 			
