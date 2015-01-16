@@ -75,7 +75,7 @@ public class MiniMime {
             final String[] d = c.split("=");
             if (d.length < 2)
                 continue;
-			params.add(new NV(d[0], d[1]));
+			params.add(new NV(d[0].trim(), d[1].trim()));
 //            params[i] = d;
             // params[i][0] = d[0];
             // params[i][1] = d[1];
@@ -125,7 +125,8 @@ public class MiniMime {
 	 */
 	public String getContentEncoding() {
 
-		return getParam("charset","ISO-8859-1");
+		// return getParam("charset","ISO-8859-1");
+		return getParam("charset",null);
 
 	}
 
