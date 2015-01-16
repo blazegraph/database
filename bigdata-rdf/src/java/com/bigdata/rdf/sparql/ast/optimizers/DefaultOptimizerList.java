@@ -496,7 +496,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 * subsequent step.
 		 */
 		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
-			add(new ASTCombinedFastRangeCountDistinctTermScanOptimizer());
+			add(new ASTSimpleGroupByAndCountOptimizer());
 		
         /**
 		 * Optimizes
