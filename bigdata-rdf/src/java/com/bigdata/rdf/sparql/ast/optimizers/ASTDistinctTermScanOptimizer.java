@@ -28,10 +28,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -63,7 +63,9 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IKeyOrder;
 
@@ -399,61 +401,134 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 
         // The graph term/variable iff specified by the query.		
 		Map<String,Object> annotations = new HashMap<String,Object>();		
-		Predicate pred = new Predicate(args,annotations);
+		Predicate<ISPO> pred = new Predicate<ISPO>(args,annotations);
 		
 		// next, retrieve access path for the predicate
 		SPORelation spor = context.getAbstractTripleStore().getSPORelation();
 		
-		// before looking up the access path, we must append 
-		IAccessPath<ISPO> accessPath = spor.getAccessPath(pred);
-		
-		// retrieve the key order
-		IKeyOrder<ISPO> keyOrder = accessPath.getKeyOrder();
-		
-		// project the triple pattern on the index
-		int keyArity = keyOrder.getKeyArity();
-		IVariableOrConstant[] projection = new IVariableOrConstant[keyArity];
-		for (int i=0; i<keyArity; i++) {
-			projection[i] = args[keyOrder.getKeyOrder(i)];
+		Set<SPOKeyOrder> candidateKeyOrder =
+			getCandidateKeyOrders(sp, termScanVar, context, isQuads);
+		if (candidateKeyOrder.isEmpty()) {
+			return null;
+		} else {
+			return candidateKeyOrder.iterator().next();
 		}
+	}
+
+
+	/**
+	 * Return all candidate key orders. Candidate key orders must satisfy the
+	 * condition that the constants in the triple pattern form a prefix,
+	 * followed by the term scan variable in the position right behind the
+	 * constant positions.
+	 * 
+	 * @param sp
+	 * @param termScanVar
+	 * @param context
+	 * @param isQuads
+	 * @return
+	 */
+	private Set<SPOKeyOrder> getCandidateKeyOrders(
+			StatementPatternNode sp, IVariable<?> termScanVar,
+			AST2BOpContext context, boolean isQuads) {
+
+		/**
+		 * Constraints on the positions are as follows:
+		 * 
+		 * 2 - constant
+		 * 1 - the distinct term scan var 
+		 * 0 - unconstrained
+		 */
+		StringBuffer constantPosBuf = new StringBuffer();
+		Character distinctTermScanPos = null;
+		StringBuffer unconstrainedPosBuf = new StringBuffer();
 		
-		// Verify that the calculated projection (which projects the sp on the
-		// key order) has the form  (IConstant)* ProjectionVar (IVariable)*
-		//
-		// We do so by a DFA with three stati 0, 1, and 2 (error), defined
-		// as follows:
-		//
-		//  (IConstant)* ProjectionVar (IVariable || null)		
-		// ^                          ^
-		// |                          |
-		// 0                          1    <--- status variable
-		int status = 0; // nothing found yet
-		for (int i=0; i<projection.length && status<2; i++) {
-			IVariableOrConstant varOrConst = projection[i] ;
-			if (status==0 && varOrConst instanceof IConstant) {
-				// stay in status 0
-			} else if (status==0 && varOrConst instanceof IVariable) {
-				// make sure the variable is the projection variable
-				IVariable var = (IVariable)varOrConst;
-				if (var.equals(termScanVar)) {
-					status = 1; // from now on, allow only other vars
-				} else {
-					status = 2; // error, key order invalid
-				}
-			} else if (status==1 && varOrConst==null) {
-				// legal, no state change				
-			} else if (status==1 && varOrConst instanceof IVariable) {
-				// make sure the variable is *not* the projection variable 
-				IVariable var = (IVariable)varOrConst;
-				if (var.equals(termScanVar)) {
-					status = 2; // error, key order invalid
-				}
+		int pcS = getPositionConstraint(sp.s().getValueExpression(), termScanVar);
+		int pcP = getPositionConstraint(sp.p().getValueExpression(), termScanVar);
+		int pcO = getPositionConstraint(sp.o().getValueExpression(), termScanVar);
+		
+		if (pcS==2) constantPosBuf.append("S");
+		if (pcP==2) constantPosBuf.append("P");
+		if (pcO==2) constantPosBuf.append("O");
+		if (pcS==1) distinctTermScanPos='S';
+		if (pcP==1) distinctTermScanPos='P';
+		if (pcO==1) distinctTermScanPos='O';
+		if (pcS==0) unconstrainedPosBuf.append("S");
+		if (pcP==0) unconstrainedPosBuf.append("P");
+		if (pcO==0) unconstrainedPosBuf.append("O");
+
+		if (isQuads) {
+			if (sp.c()==null || sp.c().getValueExpression()==null) {
+				unconstrainedPosBuf.append("C");
 			} else {
-				status = 2; // error
+				int pcC = getPositionConstraint(
+							sp.c().getValueExpression(), termScanVar);
+				if (pcC==2) constantPosBuf.append("C");
+				if (pcC==1) distinctTermScanPos='C';
+				if (pcC==0) unconstrainedPosBuf.append("C");
 			}
 		}
 		
-		return status==1 /* success */? keyOrder : null; 
+		String prefix = constantPosBuf.toString();
+		Set<String> allPossibleConstPrefixes = new HashSet<String>();
+		getPermutations(prefix, allPossibleConstPrefixes);
+		if (allPossibleConstPrefixes.isEmpty())
+			allPossibleConstPrefixes.add("");	// neutral element
+
+		String suffix = unconstrainedPosBuf.toString();
+		Set<String> allPossibleConstSuffixes = new HashSet<String>();
+		getPermutations(suffix, allPossibleConstSuffixes);
+		if (allPossibleConstSuffixes.isEmpty())
+			allPossibleConstSuffixes.add(""); 	// neutral element
+		
+		// calculate set of all key order candidates
+		Set<SPOKeyOrder> allPossiblePrefixes = new HashSet<SPOKeyOrder>();
+		for (String constPrefix : allPossibleConstPrefixes) {
+			for (String constSuffix : allPossibleConstSuffixes) {
+				String index = constPrefix + distinctTermScanPos + constSuffix;
+				try {
+					allPossiblePrefixes.add(SPOKeyOrder.fromString(index));
+				} catch (IllegalArgumentException e) {
+					// key order does not exist, ignoring
+				}
+				
+			}
+		}
+		
+		return allPossiblePrefixes;
+	}
+        
+	/**
+	* Returns a constraint ID defined as follows:
+	* 
+	* 2 - constant
+	* 1 - the distinct term scan var 
+	* 0 - unconstrained
+	*/        
+    private int getPositionConstraint(IVariableOrConstant val,
+    		IVariable<?> termScanVar) {
+    	if (val instanceof IConstant) {
+    		return 2;
+    	} else if (val instanceof IVariable) {
+    		return val.equals(termScanVar) ? 1 : 0;
+    	} else { 
+    		return 0; // val == null
+    	}
+    }
+    
+	private void getPermutations(String str, Set<String> collector) { 
+		getPermutations("", str, collector); 
 	}
 
+	private void getPermutations(String prefix, String str, Set<String> collector) {
+	    int n = str.length();
+	    if (n == 0) collector.add(prefix);
+	    else {
+	        for (int i = 0; i < n; i++)
+	        	getPermutations(
+	            	prefix + str.charAt(i),
+	            	str.substring(0, i) + str.substring(i+1, n),
+	            	collector);
+	    }
+	}	    
 }

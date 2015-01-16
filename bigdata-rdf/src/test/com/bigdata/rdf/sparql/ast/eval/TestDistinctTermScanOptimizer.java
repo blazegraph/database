@@ -383,13 +383,13 @@ public class TestDistinctTermScanOptimizer extends
 		}
 
 		/**
-		 * Correct rejection test. The subject is bound.
+		 * Verify that the query
 		 * 
 		 * <pre>
 		 * SELECT DISTINCT ?p WHERE { GRAPH ?g { <http://bigdata.com#s1> ?p ?o . } }
 		 * </pre>
 		 * 
-		 * TODO We could optimize this using the {@link SPOKeyOrder#SPOC} index.
+		 * is optimized using the {@link SPOKeyOrder#SPOC} index.
 		 */
 		public void test_distinctTermScan_quads_correctRejection_02() throws Exception {
 
@@ -401,9 +401,9 @@ public class TestDistinctTermScanOptimizer extends
 			
 			h.runTest();
 
-			// Verify that the DistinctTermScanOp was NOT used in the query plan.
+			// Verify that the DistinctTermScanOp was used in the query plan.
 			assertEquals(
-					0,
+					1,
 					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
 							DistinctTermScanOp.class).size());
 
