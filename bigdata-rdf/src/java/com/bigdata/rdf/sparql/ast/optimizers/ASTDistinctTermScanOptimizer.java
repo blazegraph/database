@@ -27,14 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -50,11 +57,14 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
-import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPORelation;
+import com.bigdata.relation.accesspath.IAccessPath;
+import com.bigdata.striterator.IKeyOrder;
 
 /**
  * Optimizes
@@ -235,8 +245,8 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 * Looking for a single triple or quad pattern in the WHERE clause.
 		 */
 
-		final GraphPatternGroup<IGroupMemberNode> whereClause = queryBase
-				.getWhereClause();
+		final GraphPatternGroup<IGroupMemberNode> whereClause = 
+				queryBase.getWhereClause();
 
 		if (whereClause == null || whereClause.arity() != 1) {
 			// Not simple triple pattern.
@@ -252,15 +262,11 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		final StatementPatternNode sp = (StatementPatternNode) whereClause
 				.get(0);
 		
-		/*
-		 * Do not process SPs that have constants.
-		 * 
-		 * TODO This is overly broad. There are some cases that we could
-		 * translate but it depends on there being an index with a pre
-		 * prefix match formed from [Const + DistinctVar] and those are
-		 * rare.
-		 */
-		if(hasConstantInSp(context, sp)) return;
+		IKeyOrder<ISPO> keyOrder = 
+			getApplicableKeyOrderIfExists(sp, projectedVar, context);
+		if (keyOrder==null) {
+			return;
+		}
 		
 		/*
 		 * Make sure that there are no correlated variables in the SP.
@@ -337,6 +343,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		 */
 		final VarNode distinctTermScanVar = new VarNode(projectedVar.getName());
 		sp.setDistinctTermScanVar(distinctTermScanVar);
+		sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, keyOrder.toString());
 
 		/**
 		 * Change the estimated cardinality.
@@ -362,45 +369,99 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		sp.setProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, newCard);
 
 	}
-	
-	private boolean hasConstantInSp(AST2BOpContext context, StatementPatternNode sp) {
-		if (context.isQuads()) {
-			
-			final TermNode c = sp.c();
-			
-			if (c != null && c.isConstant()) {
-			
-				/**
-				 * We do not have an index that will let us use a distinct term
-				 * scan with C bound other than CSPO. Thus we can not optimize
-				 * SPs where the named graph position is bound.
-				 * 
-				 * If we really wanted to, we could optimize the following using
-				 * the CSPO index. This is an edge case though, which is why I
-				 * have not implemented it.
-				 * 
-				 * <pre>
-				 * DISTINCT ?s { graph :g {?s ?p ?o} }
-				 * </pre>
-				 */
-				
-				return true;
-			}	
+
+	/**
+	 * Computes an applicable key order for performing a distinct range term
+	 * scan, if exists. Such a key order must be formed out of a prefix 
+	 * [ConstList + DistinctVar], where ConstList is the list of constants
+	 * in the triple pattern.
+	 * 
+	 * @param sp
+	 * @param context
+	 * @return matching key order, if exists, null if not (indicating failure)
+	 */
+	private IKeyOrder<ISPO> getApplicableKeyOrderIfExists(
+		StatementPatternNode sp, IVariable<?> termScanVar, AST2BOpContext context) {
+		
+		boolean isQuads = context.getAbstractTripleStore().isQuads();
+		
+		// first, construct a predicate for index probing
+		IVariableOrConstant[] args = new IVariableOrConstant[isQuads ? 4 : 3 ];
+		args[0] = sp.s().getValueExpression();
+		args[1] = sp.p().getValueExpression();
+		args[2] = sp.o().getValueExpression();
+		if (isQuads) {
+			if (sp.c()==null) {
+				// TODO: note: the dummy var node above is necessary in quads mode:
+				// if we do not add a fourth component, at all (i.e., initialize the
+				// args array with size three, a crash will happen when calling
+				// getAccessPath() below. 
+				// @Bryan: is there a way around that/a more
+				// nice solution to the problem?				
+				VarNode dummy = new VarNode("%dummy%"); // dummy var node
+				args[3] = dummy.getValueExpression();
+			} else {
+				args[3] = sp.c().getValueExpression();
+			}
+		}
+
+        // The graph term/variable iff specified by the query.		
+		Map<String,Object> annotations = new HashMap<String,Object>();		
+		Predicate pred = new Predicate(args,annotations);
+		
+		// next, retrieve access path for the predicate
+		SPORelation spor = context.getAbstractTripleStore().getSPORelation();
+		
+		// before looking up the access path, we must append 
+		IAccessPath<ISPO> accessPath = spor.getAccessPath(pred);
+		
+		// retrieve the key order
+		IKeyOrder<ISPO> keyOrder = accessPath.getKeyOrder();
+		
+		// project the triple pattern on the index
+		int keyArity = keyOrder.getKeyArity();
+		IVariableOrConstant[] projection = new IVariableOrConstant[keyArity];
+		for (int i=0; i<keyArity; i++) {
+			projection[i] = args[keyOrder.getKeyOrder(i)];
 		}
 		
-
-		/*
-		 * Count arguments that are variables vs constants.
-		 * 
-		 * Note: For these purposes, we count the absence of c() for a quads
-		 * mode access pattern as a variable.
-		 */
-		final int nvars = BOpUtility.toList(sp, VarNode.class).size()
-				+ (context.isQuads() && sp.c() == null ? 1 : 0);
+		// Verify that the calculated projection (which projects the sp on the
+		// key order) has the form  (IConstant)* ProjectionVar (IVariable)*
+		//
+		// We do so by a DFA with three stati 0, 1, and 2 (error), defined
+		// as follows:
+		//
+		//  (IConstant)* ProjectionVar (IVariable || null)		
+		// ^                          ^
+		// |                          |
+		// 0                          1    <--- status variable
+		int status = 0; // nothing found yet
+		for (int i=0; i<projection.length && status<2; i++) {
+			IVariableOrConstant varOrConst = projection[i] ;
+			if (status==0 && varOrConst instanceof IConstant) {
+				// stay in status 0
+			} else if (status==0 && varOrConst instanceof IVariable) {
+				// make sure the variable is the projection variable
+				IVariable var = (IVariable)varOrConst;
+				if (var.equals(termScanVar)) {
+					status = 1; // from now on, allow only other vars
+				} else {
+					status = 2; // error, key order invalid
+				}
+			} else if (status==1 && varOrConst==null) {
+				// legal, no state change				
+			} else if (status==1 && varOrConst instanceof IVariable) {
+				// make sure the variable is *not* the projection variable 
+				IVariable var = (IVariable)varOrConst;
+				if (var.equals(termScanVar)) {
+					status = 2; // error, key order invalid
+				}
+			} else {
+				status = 2; // error
+			}
+		}
 		
-		// #of constants.
-		final int ncons = (context.isQuads() ? 4 : 3) - nvars;
-		return ncons > 0;	
+		return status==1 /* success */? keyOrder : null; 
 	}
 
 }

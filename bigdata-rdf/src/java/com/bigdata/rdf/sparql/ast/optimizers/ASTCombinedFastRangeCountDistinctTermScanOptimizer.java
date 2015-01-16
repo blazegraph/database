@@ -320,8 +320,6 @@ public class ASTCombinedFastRangeCountDistinctTermScanOptimizer implements IASTO
 		 *  (O4) Eliminate the group by clause
 		 */
 		{
-			System.out.println("Unoptimized:\n" + queryBase);
-			
 			// apply optimization step (O1)
 			SubqueryRoot selectDistinct = new SubqueryRoot(QueryType.SELECT);
 			ProjectionNode projection = new ProjectionNode();
@@ -334,14 +332,12 @@ public class ASTCombinedFastRangeCountDistinctTermScanOptimizer implements IASTO
 			join.addArg(stmtPattern);
 			selectDistinct.setWhereClause(join);
 			graphPattern.setArg(0, selectDistinct);
-			System.out.println("After O1:\n" + queryBase);
 			
 			// apply optimization step (O2)
 			StatementPatternNode stmtPatternClone = 
 					new StatementPatternNode(stmtPattern);
 			stmtPatternClone.setFastRangeCount(countNodeVar);
 			graphPattern.addArg(stmtPatternClone);
-			System.out.println("After O2:\n" + queryBase);
 			
 			// apply optimization step (O3)
 			projectionNode.setArg(
@@ -349,99 +345,9 @@ public class ASTCombinedFastRangeCountDistinctTermScanOptimizer implements IASTO
 					new AssignmentNode(
 							new VarNode(countNodeVar),
 							new VarNode(countNodeVar)));
-			System.out.println("After O3:\n" + queryBase);
 			
 			// apply optimization step (O4)
 			queryBase.setGroupBy(null);
-			System.out.println("After O4:\n" + queryBase);
 		}
 	}	
-	
-	/*
-	 * Checks whether an appropriate index is available to apply an "advanced"
-	 * distinct term scan operation (which is to be implemented in future).
-	 * This part of code should be migrated to the distinct term scan optimizer
-	 * instead, in combination with an advanced distinct term scan optimization
-	 * which considers index prefixes (rather than binding the variable to the
-	 * first position of the index always).
-	 */
-	/*
-	boolean distinctRangeTermIndexAvailable(
-		AST2BOpContext context, StatementPatternNode sp, VarNode distinctVar) {
-		
-		// TODO: we need adjustments for non-quad mode here
-		
-		//
-		// 4 bytes for the subject, predicate, and object position
-		// 
-		// 0 - position containing another variable (unconstrained)
-		// 1 - position containing the distinct var (lookup)
-		// 2 - position containing a constant (constraint)
-		//
-		byte[] sig = new byte[4];
-		sig[0] = getSigValue(sp.s(), distinctVar);	// subject
-		sig[1] = getSigValue(sp.p(), distinctVar);	// predicate
-		sig[2] = getSigValue(sp.o(), distinctVar);	// object
-		sig[3] = getSigValue(sp.c(), distinctVar);	// context
-
-		// mapping from index to byte positions
-		int[] spoc = new int[] { 0, 1, 2, 3 };
-		int[] sopc = new int[] { 0, 2, 1, 3 };
-		int[] pcso = new int[] { 1, 3, 0, 2 };
-		int[] pocs = new int[] { 1, 2, 3, 0 };
-		int[] ocsp = new int[] { 2, 3, 0, 1 };
-		int[] cspo = new int[] { 3, 0, 1, 2 };
-
-		int[][] availableIndices = { spoc, sopc, pcso, pocs, ocsp, cspo };
-
-		
-		// an index is usable if it
-		// (a) starts with any number of constants (value 2), followed by
-		// (b) exactly one distinct var (value 1), followed by
-		// (c) any number of variables (value 0)
-		boolean usableIndexFound = false;
-		for (int i=0; i<availableIndices.length && !usableIndexFound; i++) {
-			int[] curIndex = availableIndices[i];
-			
-			int prevSigVal = 2; // first reading constants
-			boolean ruledOut = false;
-			for (int j=0; j<4 && !ruledOut; j++) {
-				int sigVal = sig[curIndex[j]];
-				if (prevSigVal==2 && sigVal==2) { // trailing constant
-					// OK
-				} else if (prevSigVal==2 && sigVal==1) { // from constant to distinct var
-					// OK
-				} else if (prevSigVal==1 && sigVal==0) { // from distinct var to vars
-					// OK
-				} else if (prevSigVal==0 && sigVal==0) { // trailing vars
-					// OK					
-				} else {
-					ruledOut = true;
-				}
-				prevSigVal = sigVal;				
-			}
-			
-			usableIndexFound = !ruledOut && prevSigVal<=1;
-		}
-		
-		return usableIndexFound;
-		
-	}
-
-	private byte getSigValue(TermNode term, VarNode distinctVar) {
-		if (term==null) {
-			return 0;
-		} if (term instanceof VarNode) {
-			VarNode var = (VarNode)term;
-			if (var.equals(distinctVar)) {
-				return 1;
-			} else {
-				return 0;
-			}
-		} else {
-			return 2;
-		}
-	}
-	*/
-
 }
