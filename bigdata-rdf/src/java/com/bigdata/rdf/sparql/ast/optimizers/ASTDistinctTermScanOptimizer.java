@@ -41,6 +41,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -391,18 +392,9 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
 		args[1] = sp.p().getValueExpression();
 		args[2] = sp.o().getValueExpression();
 		if (isQuads) {
-			if (sp.c()==null) {
-				// TODO: note: the dummy var node above is necessary in quads mode:
-				// if we do not add a fourth component, at all (i.e., initialize the
-				// args array with size three, a crash will happen when calling
-				// getAccessPath() below. 
-				// @Bryan: is there a way around that/a more
-				// nice solution to the problem?				
-				VarNode dummy = new VarNode("%dummy%"); // dummy var node
-				args[3] = dummy.getValueExpression();
-			} else {
-				args[3] = sp.c().getValueExpression();
-			}
+			args[3] = sp.c()==null ?
+				Var.var("--anon-"+context.nextId()) : 
+				sp.c().getValueExpression();
 		}
 
         // The graph term/variable iff specified by the query.		
