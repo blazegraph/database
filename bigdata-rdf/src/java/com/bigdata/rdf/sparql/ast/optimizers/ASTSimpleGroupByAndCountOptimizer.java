@@ -67,25 +67,31 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * and similar patterns using an O(N) algorithm, where N is the number of
  * distinct solutions.
  * <p>
- * The optimizer adds annotations that allow to transform the query into
+ * The optimizer aims at establishing an execution plan that applies
  * a combination of distinct term scan pattern (to efficiently compute the
  * distinct values for the group variable) and fast range count pattern
  * to efficiently calculate the COUNT, without materialization of the variables
- * on which the COUNT operation is performed. Basically, this optimizer combines
- * the optimization strategies performed in the 
- * {@link ASTDistinctTermScanOptimizer} (which operates over the DISTINCT
- * modifier rather than a GROUP BY clause) and the
- * {@link ASTRangeCountOptimizer} for efficient computation of COUNT in
- * non GROUP BY queries.
- *
+ * on which the COUNT operation is performed. 
+ * 
+ * The basic idea is to 
+ * 
+ * (i) replace the GROUP BY pattern through a SELECT DISTINCT subquery to
+ *     calculate the distinct bindings for variable ?z first, and 
+ * (ii) use a fast range count operator to efficiently calculate the COUNT.
+ * 
+ * Note that the subquery in step (i) may (where possible) be optimized by
+ * the {@link ASTDistinctTermScanOptimizer}, i.e. if possible the subquery
+ * producing the ?z bindings will be replaced by a distinct term scan in 
+ * a later optimization step.
+ * 
  * @see <a href="http://trac.bigdata.com/ticket/1059">
  		GROUP BY optimization using distinct-term-scan and fast-range-count</a>
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
-public class ASTCombinedFastRangeCountDistinctTermScanOptimizer implements IASTOptimizer {
+public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
 
-    public ASTCombinedFastRangeCountDistinctTermScanOptimizer() {
+    public ASTSimpleGroupByAndCountOptimizer() {
     }
     
     @Override
