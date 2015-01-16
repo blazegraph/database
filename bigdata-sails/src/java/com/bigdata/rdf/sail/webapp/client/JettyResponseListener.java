@@ -149,10 +149,16 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	 */
 	public String getResponseBody() throws IOException {
 
-		final String contentEncoding = getContentEncoding();
 
-		final Reader r = new InputStreamReader(getInputStream(),
-				contentEncoding);
+		final Reader r;
+		{
+			final String contentEncoding = getContentEncoding();
+			if (contentEncoding != null ) {
+				r = new InputStreamReader(getInputStream(),contentEncoding);
+			} else {
+				r = new InputStreamReader(getInputStream());
+			}				
+		}
 
         try {
 
