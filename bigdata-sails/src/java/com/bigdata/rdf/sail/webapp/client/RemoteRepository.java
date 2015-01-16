@@ -1813,6 +1813,14 @@ public class RemoteRepository {
     
             result = new BackgroundTupleResult(parser, response.getInputStream());
 
+			/*
+			 * Submit task for execution. It will asynchronously consume the
+			 * response, pumping solutions into the cursor.
+			 * 
+			 * Note: Can throw a RejectedExecutionException!
+			 */
+			executor.execute(result);
+            
             final MapBindingSet bindings = new MapBindingSet();
             
             final InsertBindingSetCursor cursor = 
@@ -1871,14 +1879,6 @@ public class RemoteRepository {
             	};
             	
             };
-            
-			/*
-			 * Submit task for execution. It will asynchronously consume the
-			 * response, pumping solutions into the cursor.
-			 * 
-			 * Note: Can throw a RejectedExecutionException!
-			 */
-			executor.execute(result);
             
 			// The task was accepted by the executor.
 			tqrImpl = tmp;
