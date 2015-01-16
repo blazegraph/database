@@ -298,14 +298,14 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 			checkResponseCode(url, response);
 
+			return response.getResponseBody();
+
 		} finally {
 			
 			if (response != null)
 				response.abort();
 			
 		}
-
-		return response.getResponseBody();
 
 	}
 
