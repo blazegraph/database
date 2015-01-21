@@ -32,6 +32,7 @@ import org.junit.Ignore;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
+import com.bigdata.bop.IPredicate;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -191,6 +192,8 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						 */
 						sp1.setProperty(Annotations.ESTIMATED_CARDINALITY,
 								newRangeCount);
+						// the optimizer also adds a SOPC key order to be used by the access path
+						sp1.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SOPC");
 
 						// Note: DISTINCT|REDUCED are NOT part of the
 						// projection.
@@ -246,18 +249,19 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						final long newRangeCount = (long) (1.0 / (store
 								.isQuads() ? 4 : 3)) * rangeCount_sp1;
 						
+						StatementPatternNode sp = 
+							statementPatternNode(
+								varNode(s), varNode(p), varNode(o), varNode(z), OPTIONAL,
+								property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+								property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s)));
+						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SOPC");
+
 						expected = 
 								select(
 									projection(
 										varNode(s)
 									),
-									where(
-										statementPatternNode(
-											varNode(s), varNode(p), varNode(o), varNode(z), OPTIONAL,
-											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
-											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s))
-										)
-									), NOT_DISTINCT, NOT_REDUCED
+									where(sp), NOT_DISTINCT, NOT_REDUCED
 								);
 					}
 
@@ -337,18 +341,18 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						final long newRangeCount = (long) (1.0 / (store
 								.isQuads() ? 4 : 3)) * rangeCount_sp1;
 						
+						StatementPatternNode sp =
+							statementPatternNode(
+									varNode(s), varNode(p), varNode(o), varNode(z),
+									property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+									property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s)));
+						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SOPC");
 						expected = 
 								select(
 									projection(
 										varNode(s)
 									),
-									where(
-										statementPatternNode(
-											varNode(s), varNode(p), varNode(o), varNode(z),
-											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
-											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s))
-										)
-									), NOT_DISTINCT, NOT_REDUCED
+									where(sp), NOT_DISTINCT, NOT_REDUCED
 								);
 					}
 
@@ -386,18 +390,19 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						final long newRangeCount = (long) (1.0 / (store
 								.isQuads() ? 4 : 3)) * rangeCount_sp1;
 						
+						StatementPatternNode sp = statementPatternNode(
+								varNode(s), varNode(p), varNode(o), varNode(z),
+								property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
+								property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(z))
+							);
+						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "CSPO");
+						
 						expected = 
 								select(
 									projection(
 										varNode(z)
 									),
-									where(
-										statementPatternNode(
-											varNode(s), varNode(p), varNode(o), varNode(z),
-											property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
-											property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(z))
-										)
-									), NOT_DISTINCT, NOT_REDUCED
+									where(sp), NOT_DISTINCT, NOT_REDUCED
 								);
 					}
 
