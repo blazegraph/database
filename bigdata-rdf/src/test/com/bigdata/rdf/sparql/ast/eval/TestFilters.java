@@ -151,4 +151,22 @@ public class TestFilters extends AbstractDataDrivenSPARQLTestCase {
     
     }
 
+    /**
+     * Test correct behavior of redundant filters (fix of issue #972)
+     * 
+     * <pre>
+     * select ?s
+     * { 
+     *   { SELECT ?s WHERE { ?s ?p ?o } }
+     *   FILTER ( ?s != <eg:b>)
+     *   FILTER ( ?s != <eg:b>) 
+     * }
+     * </pre>
+     * @throws Exception
+     */
+    public void test_redundant_filter() throws Exception {
+        
+        new TestHelper("filter-redundant").runTest();
+    
+    }
 }
