@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -1777,9 +1778,13 @@ public class RemoteRepository {
             final UUID queryId, final IPreparedQueryListener listener)
             throws Exception {
 
+    	// listener handling the http response.
     	JettyResponseListener response = null;
-        BackgroundTupleResult result = null;
-        TupleQueryResultImpl tqrImpl = null;
+    	// future for parsing that response (in the background).
+    	FutureTask<Void> ft = null;
+    	// iteration pattern returned to caller. once they hold this they are
+    	// responsible for cleaning up the request by calling close().
+    	TupleQueryResultImpl tqrImpl = null;
         try {
 
             response = doConnect(opts);
@@ -1811,24 +1816,39 @@ public class RemoteRepository {
 
             final TupleQueryResultParser parser = parserFactory.getParser();
     
-            result = new BackgroundTupleResult(parser, response.getInputStream());
+			final BackgroundTupleResult result = new BackgroundTupleResult(
+					parser, response.getInputStream());
 
+            final MapBindingSet bindings = new MapBindingSet();
+            
+            final InsertBindingSetCursor cursor = 
+                new InsertBindingSetCursor(result, bindings);
+
+            // Wrap as FutureTask so we can cancel.
+            ft = new FutureTask<Void>(result, null/* result */);
+            		
 			/*
 			 * Submit task for execution. It will asynchronously consume the
 			 * response, pumping solutions into the cursor.
 			 * 
 			 * Note: Can throw a RejectedExecutionException!
 			 */
-			executor.execute(result);
-            
-            final MapBindingSet bindings = new MapBindingSet();
-            
-            final InsertBindingSetCursor cursor = 
-                new InsertBindingSetCursor(result, bindings);
-            
+			executor.execute(ft);
+
+			/*
+			 * Note: This will block until the binding names are received, so it
+			 * can not be done until we submit the BackgroundTupleResult for
+			 * execution.
+			 */
             final List<String> list = new ArrayList<String>(
                     result.getBindingNames());
             
+			/*
+			 * The task was accepted by the executor. Wrap with iteration
+			 * pattern. Once this object is returned to the caller they are
+			 * responsible for calling close() to provide proper error cleanup
+			 * of the resources associated with the request.
+			 */
             final TupleQueryResultImpl tmp = new TupleQueryResultImpl(list, cursor) {
 
             	private final AtomicBoolean notDone = new AtomicBoolean(true);
@@ -1880,25 +1900,31 @@ public class RemoteRepository {
             	
             };
             
-			// The task was accepted by the executor.
-			tqrImpl = tmp;
-			
 			/*
-			 * Return the tuple query result listener to the caller. they now
+			 * Return the tuple query result listener to the caller. They now
 			 * have responsibility for calling close() on that object in order
 			 * to close the http connection and release the associated
 			 * resources.
 			 */
-            return tqrImpl;
+            return (tqrImpl = tmp);
             
         } finally {
             
 			if (response != null && tqrImpl == null) {
 				/*
-				 * Error handling code path. We have an http response listener,
-				 * but we were not able to setup the tuple query result listener
-				 * and execute the task to parse the response.
+				 * Error handling code path. We have an http response listener
+				 * but we were not able to setup the tuple query result
+				 * listener.
 				 */
+				if (ft != null) {
+					/*
+					 * We submitted the task to parse the response. Since the
+					 * code is not returning normally (tqrImpl:=null) we cancel
+					 * the FutureTask for the background parse of that response.
+					 */
+					ft.cancel(true/* mayInterruptIfRunning */);
+				}
+				// Abort the http response handling.
 				response.abort();
 				try {
 					/*
@@ -1932,7 +1958,9 @@ public class RemoteRepository {
     public GraphQueryResult graphResults(final ConnectOptions opts,
             final UUID queryId, final IPreparedQueryListener listener) throws Exception {
 
+    	// The listener handling the http response.
     	JettyResponseListener response = null;
+    	// Incrementally parse the response in another thread.  
         BackgroundGraphResult result = null;
         try {
 
@@ -2052,7 +2080,13 @@ public class RemoteRepository {
             // The executor accepted the task for execution (at some point).
             result = tmp;
 
-            // Result will be asynchronously produced.
+            /*
+			 * Result will be asynchronously produced.
+			 * 
+			 * Note: At this point the caller is responsible for calling close()
+			 * on this object to clean up the resources associated with this
+			 * request.
+			 */
             return result;
 
         } finally {
