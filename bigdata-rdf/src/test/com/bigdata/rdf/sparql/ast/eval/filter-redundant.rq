@@ -1,0 +1,6 @@
+select ?s
+{ 
+  { SELECT ?s WHERE { ?s ?p ?o } }
+  FILTER ( ?s != <unknown:graph>) 
+  FILTER ( ?s != <unknown:graph>) 
+}
