@@ -577,7 +577,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		}
 
 		/**
-		 * FIXME JJC: Uncomment to test CONNEG for JSON.
+		 * Test CONNEG for JSON.
 		 * 
 		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
 		 *      JSON-LD </a>
@@ -586,12 +586,12 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/704" >
 		 *      ask does not return json </a>
 		 */
-		// {
-		// final IPreparedBooleanQuery query = m_repo
-		// .prepareBooleanQuery(queryStr);
-		// query.setHeader("Accept", "application/sparql-results+json");
-		// assertEquals(false, query.evaluate());
-		// }
+		{
+			final IPreparedBooleanQuery query = m_repo
+					.prepareBooleanQuery(queryStr);
+			query.setHeader("Accept", "application/sparql-results+json");
+			assertEquals(false, query.evaluate());
+		}
 
 	}
 
@@ -689,15 +689,14 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		}
 
 		/**
-		 * FIXME Enable this once we have a JSON result format parser (openrdf
-		 * 2.7).
+		 * Note: requires JSON result format parser (openrdf 2.7).
 		 * 
 		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
 		 *      Migrate to openrdf 2.7 </a>
 		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
 		 *      JSON-LD </a>
 		 */
-		if (false) {
+		if (true) {
 
 			final IPreparedTupleQuery query = m_repo
 					.prepareTupleQuery(queryStr);
@@ -810,13 +809,13 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 	}
 
-	// // FIXME We need an NQuadsWriter to run this test.
-	// // Note: quads interchange
-	// public void test_POST_INSERT_withBody_NQUADS() throws Exception {
-	//
-	// doInsertWithBodyTest("POST", 23, NQuadsParser.nquads);
-	//
-	// }
+	// Note: requires NQuadsWriter to run this test (openrdf 2.7)
+	// Note: quads interchange
+	public void test_POST_INSERT_withBody_NQUADS() throws Exception {
+
+		doInsertWithBodyTest("POST", 23, RDFFormat.NQUADS);
+
+	}
 
 	// TODO Write test for UPDATE where we override the default context using
 	// the context-uri.
@@ -1730,20 +1729,9 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		 */
 		{
 
-			// final QueryOptions opts = new QueryOptions();
-			// opts.serviceURL = m_serviceURL;
-			// opts.queryStr = deleteQueryStr;
-			// opts.method = "PUT";
-			// //opts.acceptHeader = ...;
-			// opts.contentType = RDFFormat.NTRIPLES.getDefaultMIMEType();
-			// opts.data = data;
-			// final MutationResult ret = getMutationResult(doSparqlQuery(opts,
-			// requestPath));
-			// assertEquals(2, ret.mutationCount);// FIXME 1 removed, but also 1
-			// added.
-
 			final RemoveOp remove = new RemoveOp(deleteQueryStr);
 			final AddOp add = new AddOp(data, format);
+			// Note: 1 removed, but also 1 added.
 			assertEquals(2, m_repo.update(remove, add));
 
 		}
@@ -1930,20 +1918,9 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		 */
 		{
 
-			// final QueryOptions opts = new QueryOptions();
-			// opts.serviceURL = m_serviceURL;
-			// opts.queryStr = deleteQueryStr;
-			// opts.method = "PUT";
-			// //opts.acceptHeader = ...;
-			// opts.contentType = RDFFormat.NTRIPLES.getDefaultMIMEType();
-			// opts.data = data;
-			// final MutationResult ret = getMutationResult(doSparqlQuery(opts,
-			// requestPath));
-			// assertEquals(2, ret.mutationCount);// FIXME 1 removed, but also 1
-			// added.
-
 			final RemoveOp remove = new RemoveOp(deleteQueryStr);
 			final AddOp add = new AddOp(data, format);
+			// Note: 1 removed, but also 1 added.
 			assertEquals(2, m_repo.update(remove, add));
 
 		}
