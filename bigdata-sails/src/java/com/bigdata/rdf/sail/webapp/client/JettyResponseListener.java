@@ -51,6 +51,13 @@ public class JettyResponseListener extends InputStreamResponseListener {
     private volatile Response m_response;
 	private volatile InputStream m_cachedStream = null;
 
+	/**
+	 * Note: This is the default content encoding for <code>text/*</code> per
+	 * Section 3.7.1 Canonicalization and Text Defaults of the HTTP 1.1
+	 * specification.
+	 */
+	private static final String ISO_8859_1 = "ISO-8859-1";
+	
 	// FIXME Configuration parameter for maxBufferSize:long
 	public JettyResponseListener(final Request request) {
 		if (request == null)
@@ -98,10 +105,25 @@ public class JettyResponseListener extends InputStreamResponseListener {
 
 	/**
 	 * Return the content encoding specified by the <code>charset</code> MIME
-	 * parameter for the <code>Content-Type</code> header.
+	 * parameter for the <code>Content-Type</code> header and <code>null</code>
+	 * if that MIME type parameter was not specified.
+	 * <p>
+	 * Note: Per Section 3.7.1 Canonicalization and Text Defaults of the HTTP
+	 * 1.1 specification:
+	 * <ul>
+	 * <li>
+	 * The "charset" parameter is used with some media types to define the
+	 * character set (section 3.4) of the data. When no explicit charset
+	 * parameter is provided by the sender, media subtypes of the "text" type
+	 * are defined to have a default charset value of "ISO-8859-1" when received
+	 * via HTTP. Data in character sets other than "ISO-8859-1" or its subsets
+	 * MUST be labeled with an appropriate charset value. See section 3.4.1 for
+	 * compatibility problems.</li>
+	 * </ul>
 	 * 
-	 * @return The content encoding and <code>ISO-8851-1</code> if the
-	 *         <code>charset</code> parameter was not specified.
+	 * @return The content encoding if the <code>charset</code> parameter was
+	 *         specified and otherwise <code>null</code>.
+	 * 
 	 * @throws IOException
 	 * 
 	 *             TODO Really, <code>ISO-8851-1</code> is only the default if
@@ -149,15 +171,35 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	 */
 	public String getResponseBody() throws IOException {
 
-
 		final Reader r;
 		{
 			final String contentEncoding = getContentEncoding();
 			if (contentEncoding != null ) {
-				r = new InputStreamReader(getInputStream(),contentEncoding);
+				/*
+				 * Explicit content encoding. 
+				 */
+				r = new InputStreamReader(getInputStream(), contentEncoding);
+			} else if (getContentType().startsWith("text/")) {
+				/**
+				 * Note: Per Section 3.7.1 Canonicalization and Text Defaults of
+				 * the HTTP 1.1 specification:
+				 * <p>
+				 * The "charset" parameter is used with some media types to
+				 * define the character set (section 3.4) of the data. When no
+				 * explicit charset parameter is provided by the sender, media
+				 * subtypes of the "text" type are defined to have a default
+				 * charset value of "ISO-8859-1" when received via HTTP. Data in
+				 * character sets other than "ISO-8859-1" or its subsets MUST be
+				 * labeled with an appropriate charset value. See section 3.4.1
+				 * for compatibility problems.
+				 */
+				r = new InputStreamReader(getInputStream(),ISO_8859_1);
 			} else {
+				/*
+				 * Also per that section, no default otherwise.
+				 */
 				r = new InputStreamReader(getInputStream());
-			}				
+			}		
 		}
 
         try {
