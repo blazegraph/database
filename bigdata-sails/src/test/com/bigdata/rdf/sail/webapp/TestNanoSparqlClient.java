@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.ByteArrayOutputStream;
@@ -76,14 +77,19 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.util.config.NicUtil;
 
-public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
-		AbstractTestNanoSparqlJettyClient<S> {
+/**
+ * Proxied test suite.
+ *
+ * @param <S>
+ */
+public class TestNanoSparqlClient<S extends IIndexManager> extends
+		AbstractTestNanoSparqlClient<S> {
 
-	public TestNanoSparqlJettyClient() {
+	public TestNanoSparqlClient() {
 
 	}
 
-	public TestNanoSparqlJettyClient(final String name) {
+	public TestNanoSparqlClient(final String name) {
 
 		super(name);
 
@@ -91,13 +97,9 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 	public static Test suite() {
 
-//		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlJettyClient.class,
-//				"test.*.*", TestMode.quads);
-
-		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlJettyClient.class,
-//        "test9.*", TestMode.quads);
-		   "test.*.*", TestMode.quads, TestMode.sids, TestMode.triples);
-//		   "testMultipleFixtures", TestMode.quads, TestMode.sids, TestMode.triples);
+		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
+                "test_SELECT_ALL", TestMode.quads, TestMode.sids,
+                TestMode.triples);
        
 	}
 
@@ -577,7 +579,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		}
 
 		/**
-		 * Test CONNEG for JSON.
+                 * Uncommented to test CONNEG for JSON (available with openrdf 2.7).
 		 * 
 		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/588" >
 		 *      JSON-LD </a>
@@ -689,7 +691,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 		}
 
 		/**
-		 * Note: requires JSON result format parser (openrdf 2.7).
+		 * Enabled now that we have a JSON result format parser (openrdf 2.7).
 		 * 
 		 * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/714" >
 		 *      Migrate to openrdf 2.7 </a>
@@ -743,7 +745,6 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 		final String queryStr = "select * where {?s ?p ?o} X {}";
 
-		// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 		final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
 
 		try {
@@ -757,17 +758,6 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 			// perfect
 
 		}
-
-		// final QueryOptions opts = new QueryOptions();
-		// opts.serviceURL = m_serviceURL;
-		// opts.queryStr = queryStr;
-		// opts.method = "GET";
-		//
-		// opts.acceptHeader =
-		// TupleQueryResultFormat.SPARQL.getDefaultMIMEType();
-		//
-		// assertErrorStatusCode(HttpServletResponse.SC_BAD_REQUEST,
-		// doSparqlQuery(opts, requestPath));
 
 	}
 
@@ -979,8 +969,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 			// assertEquals(expectedStatementCount, countResults(doSparqlQuery(
 			// opts, requestPath)));
 
-			final IPreparedTupleQuery query = m_repo
-					.prepareTupleQuery(queryStr);
+                        final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
 			assertEquals(expectedStatementCount, countResults(query.evaluate()));
 
 		}
@@ -1016,8 +1005,7 @@ public class TestNanoSparqlJettyClient<S extends IIndexManager> extends
 
 			// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 			final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
-			final IPreparedGraphQuery query = m_repo
-					.prepareGraphQuery(queryStr);
+                        final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
 			g2 = asGraph(query.evaluate());
 
 		}

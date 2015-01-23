@@ -98,7 +98,7 @@ import com.bigdata.util.config.NicUtil;
  *
  * @param <S>
  */
-public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager> extends ProxyTestCase<S> {
+public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> extends ProxyTestCase<S> {
 
     /**
      * The path used to resolve resources in this package when they are being
@@ -158,11 +158,11 @@ public abstract class AbstractTestNanoSparqlJettyClient<S extends IIndexManager>
 //	 */
 //	final protected static String requestPath = "/sparql";
 
-	public AbstractTestNanoSparqlJettyClient() {
+	public AbstractTestNanoSparqlClient() {
 		
 	}
 
-	public AbstractTestNanoSparqlJettyClient(final String name) {
+	public AbstractTestNanoSparqlClient(final String name) {
 
 		super(name);
 

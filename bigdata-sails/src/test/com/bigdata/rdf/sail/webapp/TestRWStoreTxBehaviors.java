@@ -13,7 +13,7 @@ import com.bigdata.rwstore.RWStore;
  * @param <S>
  */
 public class TestRWStoreTxBehaviors<S extends IIndexManager> extends
-		AbstractTestNanoSparqlJettyClient<S> {
+		AbstractTestNanoSparqlClient<S> {
 
 	public TestRWStoreTxBehaviors() {
 

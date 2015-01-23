@@ -42,7 +42,7 @@ import com.bigdata.relation.RelationSchema;
  * correctly).
  */
 public class TestMultiTenancyAPI<S extends IIndexManager> extends
-        AbstractTestNanoSparqlJettyClient<S> {
+        AbstractTestNanoSparqlClient<S> {
 
     public TestMultiTenancyAPI() {
 
