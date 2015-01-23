@@ -65,7 +65,7 @@ import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
  * @author jeremycarroll
  *
  */
-public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlJettyClient<IIndexManager> {
+public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient<IIndexManager> {
 
 	protected interface RequestFactory {
 		HttpUriRequest createRequest(String ... params);

@@ -43,7 +43,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  * @param <S>
  */
 public class TestRDROperations<S extends IIndexManager> extends
-		AbstractTestNanoSparqlJettyClient<S> {
+		AbstractTestNanoSparqlClient<S> {
 
 	public TestRDROperations() {
 

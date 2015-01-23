@@ -91,7 +91,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  * @see SPARQLUpdateTest
  */
 public class TestSparqlUpdate<S extends IIndexManager> extends
-        AbstractTestNanoSparqlJettyClient<S> {
+        AbstractTestNanoSparqlClient<S> {
     
     public TestSparqlUpdate() {
 
