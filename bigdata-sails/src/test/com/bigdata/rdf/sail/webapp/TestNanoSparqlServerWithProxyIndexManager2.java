@@ -195,8 +195,6 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
          * List any non-proxied tests (typically bootstrapping tests).
          */
         
-        suite.addTestSuite(TestNanoSparqlClient2.class);
-        
 		//Protocol
 		suite.addTest(TestProtocolAll.suite());
 

@@ -30,9 +30,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase2;
 
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
 
@@ -42,7 +40,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
@@ -63,9 +61,8 @@ public class TestNanoSparqlServer extends TestCase2 {
     private Journal m_indexManager;
     private String m_rootURL;
     private String m_serviceURL;
-    private ClientConnectionManager m_cm;
-    private DefaultHttpClient m_httpClient;
     private RemoteRepositoryManager m_repo;
+    private HttpClient m_client;
     
     @Override
     public void setUp() throws Exception {
@@ -149,23 +146,9 @@ public class TestNanoSparqlServer extends TestCase2 {
                     + namespace + "\nrootURL=" + m_rootURL + "\nserviceURL="
                     + m_serviceURL);
 
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
-
-        final DefaultHttpClient httpClient = new DefaultHttpClient(m_cm);
-        m_httpClient = httpClient;
+       	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        /*
-         * Ensure that the client follows redirects using a standard policy.
-         * 
-         * Note: This is necessary for tests of the webapp structure since the
-         * container may respond with a redirect (302) to the location of the
-         * webapp when the client requests the root URL.
-         */
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
-
-        m_repo = new RemoteRepositoryManager(m_serviceURL,
-                m_httpClient,
+        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client,
                 m_indexManager.getExecutorService());
         
     }
@@ -197,13 +180,9 @@ public class TestNanoSparqlServer extends TestCase2 {
         m_rootURL = null;
         m_serviceURL = null;
         
-        if (m_cm != null) {
-            m_cm.shutdown();
-            m_cm = null;
-        }
+        m_repo.close();
         
-        m_httpClient = null;
-        m_repo = null;
+        m_client.stop();
         
         log.info("tear down done");
 

@@ -34,18 +34,24 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServlet;
 
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
 
 /**
  * This class supports making requests to the server with fairly low level control.
@@ -126,7 +132,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();
-		client = new DefaultHttpClient(DefaultClientConnectionManagerFactory.getInstance().newInstance());
+		client = new DefaultHttpClient(newInstance());
 		resetDefaultOptions();
 	}
 	@Override
@@ -186,6 +192,40 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		}
 	}
 
+    protected ClientConnectionManager newInstance() {
+
+        final ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(
+                newSchemeRegistry());
+
+        // Increase max total connection to 200
+        cm.setMaxTotal(200);
+
+        // Increase default max connection per route to 20
+        cm.setDefaultMaxPerRoute(20);
+
+        // Increase max connections for localhost to 50
+        final HttpHost localhost = new HttpHost("locahost");
+
+        cm.setMaxForRoute(new HttpRoute(localhost), 50);
+
+        return cm;
+
+    }
+
+
+    protected SchemeRegistry newSchemeRegistry() {
+        
+        final SchemeRegistry schemeRegistry = new SchemeRegistry();
+
+        schemeRegistry.register(new Scheme("http", 80, PlainSocketFactory
+                .getSocketFactory()));
+        
+        schemeRegistry.register(new Scheme("https", 443, SSLSocketFactory
+                .getSocketFactory()));
+
+        return schemeRegistry;
+
+    }
 	/**
 	 * This is the main entry point for subclasses.
 	 * This method sends a request to the server, as set up

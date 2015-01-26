@@ -28,12 +28,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
-import com.bigdata.rdf.vocab.RDFSVocabulary;
 
 /**
  * Helper class to create a bigdata instance.
@@ -95,24 +95,47 @@ public class BigdataSailFactory {
     }
     
     /**
-     * Connect to a remote bigdata instance.
-     * 
-     * FIXME This does not support the HA load balancer pattern and does not
-     * parameterize the value of the ContextPath. Also, should this class be
-     * part of the "client" package?
-     */
-    public static BigdataSailRemoteRepository connect(final String serviceEndpoint) {
-        
+	 * Connect to a remote bigdata instance.
+	 * 
+	 * FIXME This does not support the HA load balancer pattern.
+	 * 
+	 * FIXME This does not parameterize the value of the ContextPath. See
+	 * {@link BigdataStatics#getContextPath()}.
+	 */
+	public static BigdataSailRemoteRepository connect(
+			final String serviceEndpoint) {
+
+		return new BigdataSailRemoteRepository(
+				normalizeEndpoint(serviceEndpoint));
+
+	}
+
+	/**
+	 * Massage the service endpoint to ensure that it ends with
+	 * </code>/bigdata/sparql</code>
+	 */
+    static private String normalizeEndpoint(final String serviceEndpoint) {
+
         if (serviceEndpoint.endsWith("/bigdata/sparql")) {
-            return new BigdataSailRemoteRepository(serviceEndpoint);
+            
+        	return serviceEndpoint;
+        	
         } else if (serviceEndpoint.endsWith("/bigdata/")) {
-            return new BigdataSailRemoteRepository(serviceEndpoint + "sparql");
+            
+        	return serviceEndpoint + "sparql";
+        	
         } else if (serviceEndpoint.endsWith("/bigdata")) {
-            return new BigdataSailRemoteRepository(serviceEndpoint + "/sparql");
+            
+        	return serviceEndpoint + "/sparql";
+        	
         } else if (serviceEndpoint.endsWith("/")) {
-            return new BigdataSailRemoteRepository(serviceEndpoint + "bigdata/sparql");
+            
+        	return serviceEndpoint + "bigdata/sparql";
+        	
         } else {
-            return new BigdataSailRemoteRepository(serviceEndpoint + "/bigdata/sparql");
+            
+        	return serviceEndpoint + "/bigdata/sparql";
+        	
         }
         
     }

@@ -40,7 +40,7 @@ public class StringUtil {
      *            A String containing an integer.
      * @return an int
      */
-    public static long toLong(String string) {
+    public static long toLong(final String string) {
         long val = 0;
         boolean started = false;
         boolean minus = false;
