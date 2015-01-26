@@ -1200,7 +1200,8 @@ public class HALoadBalancerServlet extends ProxyServlet {
             else
                 response.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
         }
-        AsyncContext asyncContext = (AsyncContext)request.getAttribute(ASYNC_CONTEXT);
+        
+        AsyncContext asyncContext = request.getAsyncContext();
         asyncContext.complete();
     }
 

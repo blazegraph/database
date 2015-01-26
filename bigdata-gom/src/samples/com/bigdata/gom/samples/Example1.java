@@ -5,9 +5,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 
@@ -15,8 +13,9 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -83,8 +82,8 @@ public class Example1 implements Callable<Void> {
         /**
          * The top-level SPARQL end point for a NanoSparqlServer instance.
          */
-        final String sparqlEndpointURL = "http://localhost:8080"
-                + BigdataStatics.getContextPath() + "/sparql/";
+        final String serviceURL = "http://localhost:8080"
+                + BigdataStatics.getContextPath();
 
         /**
          * The namespace of the KB instance that you want to connect to on that
@@ -92,21 +91,20 @@ public class Example1 implements Callable<Void> {
          */
         final String namespace = "kb";
         
-        ClientConnectionManager ccm = null;
-
         ExecutorService executor = null;
+
+        RemoteRepositoryManager repo = null;
+
+        HttpClient client = null;
 
         try {
 
             executor = Executors.newCachedThreadPool();
+            
+           	client = HttpClientConfigurator.getInstance().newInstance();
 
-            ccm = DefaultClientConnectionManagerFactory.getInstance()
-                    .newInstance();
-
-            final HttpClient httpClient = new DefaultHttpClient(ccm);
-
-            final RemoteRepository repo = new RemoteRepository(
-                    sparqlEndpointURL, httpClient, executor);
+            repo = new RemoteRepositoryManager(
+            		serviceURL, client, executor);
 
             final IObjectManager om = new NanoSparqlObjectManager(repo,
                     namespace);
@@ -115,9 +113,15 @@ public class Example1 implements Callable<Void> {
 
         } finally {
 
-            if (ccm != null) {
+            if (repo != null) {
 
-                ccm.shutdown();
+            	repo.close();
+
+            }
+
+            if (client != null) {
+
+            	client.stop();
 
             }
 
