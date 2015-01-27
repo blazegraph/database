@@ -82,15 +82,17 @@ public interface IVCache<V extends BigdataValue,T> {
         throws UnsupportedOperationException;
 
     /**
-     * Cache the materialized {@link Value}.
-     * <p>
-     * Note: This is normally invoked by {@link #asValue(LexiconRelation)}
-     * during a lexicon join cache a newly materialized {@link Value} on the
-     * {@link IV}.
-     * 
-     * @param val
-     *            The {@link BigdataValue}.
-     */
+	 * Set the {@link BigdataValue} on the cache.
+	 * <p>
+	 * Note: This is normally invoked by {@link #asValue(LexiconRelation)}
+	 * during a lexicon join cache a newly materialized {@link Value} on the
+	 * {@link IV}.
+	 * 
+	 * @param val
+	 *            The {@link BigdataValue}.
+	 *            
+	 * @return The argument.
+	 */
     V setValue(final V val);
     
     /**

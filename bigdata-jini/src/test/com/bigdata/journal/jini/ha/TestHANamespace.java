@@ -204,7 +204,7 @@ public class TestHANamespace extends AbstractHA3JournalServerTestCase {
 
 		} finally {
 
-			// repositoryManager.shutdown();
+			repositoryManager.close();
 
 		}
 

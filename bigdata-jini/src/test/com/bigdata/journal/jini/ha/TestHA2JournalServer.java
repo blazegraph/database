@@ -32,13 +32,16 @@ import java.util.concurrent.TimeUnit;
 import net.jini.config.Configuration;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suites for an {@link HAJournalServer} quorum with a replication factor
@@ -110,21 +113,26 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
                 serverB.awaitHAReady(awaitQuorumTimeout, TimeUnit.MILLISECONDS));
 
         // Verify can access the REST API "status" page.
-        doNSSStatusRequest(serverA);
-        doNSSStatusRequest(serverB);
-
-        // Verify that service self-reports role via the REST API.
-        assertEquals(HAStatusEnum.Leader, getNSSHAStatus(serverA));
-
-        // Verify that service self-reports role via the REST API.
-        assertEquals(HAStatusEnum.Follower, getNSSHAStatus(serverB));
-
+        //doNSSStatusRequest(serverA);
+        //doNSSStatusRequest(serverB);
+        
         // Check RMI API.
         awaitHAStatus(serverA, HAStatusEnum.Leader);
         awaitHAStatus(serverB, HAStatusEnum.Follower);
 
         // Await initial commit point (KB create).
         awaitCommitCounter(1L, serverA, serverB);
+        
+        
+        // So. what is the difference - at the httpClinet level - between getNSSHAStatus and hetNSSHAStatusAlt?
+        assertEquals(getNSSHAStatusAlt(serverB), getNSSHAStatus(serverB));
+        assertEquals(getNSSHAStatusAlt(serverA), getNSSHAStatus(serverA));
+
+        // Verify that service self-reports role via the REST API.
+        assertEquals(HAStatusEnum.Follower, getNSSHAStatusAlt(serverB));
+
+        // Verify that service self-reports role via the REST API.
+        assertEquals(HAStatusEnum.Leader, getNSSHAStatusAlt(serverA));
 
         /*
          * Verify we can read on the KB on both nodes.
@@ -132,17 +140,23 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
          * Note: It is important to test the reads for the first commit on both
          * the leader and the follower.
          */
-        for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+		for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
-            final RemoteRepository repo = getRemoteRepository(service);
-            
-            // Should be empty.
-            assertEquals(
-                    0L,
-                    countResults(repo.prepareTupleQuery(
-                            "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+	        
+			final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+			try {
+				// Should be empty.
+				assertEquals(
+						0L,
+						countResults(repo.prepareTupleQuery(
+								"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+			} finally {
+				repo.close();
+				client.stop();
+			}
 
-        }
+		}
         
         // Verify binary equality on the journal files.
         assertDigestsEquals(new HAGlue[] { serverA, serverB });
@@ -256,18 +270,26 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
-
-                awaitNSSAndHAReady(service);
-                
-                final RemoteRepository repo = getRemoteRepository(service);
-
-                // Should be empty.
-                assertEquals(
-                        0L,
-                        countResults(repo.prepareTupleQuery(
-                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+            try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+	
+					awaitNSSAndHAReady(service);
+	
+					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+					} finally {
+						repo.close();
+					}
+	
+				}
+            } finally {
+            	client.stop();
             }
 
         }
@@ -365,18 +387,26 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-            for (HAGlue service : new HAGlue[] { serverA, serverB }) {
-                
-                awaitNSSAndHAReady(service);
-
-                final RemoteRepository repo = getRemoteRepository(service);
-
-                // Should be empty.
-                assertEquals(
-                        0L,
-                        countResults(repo.prepareTupleQuery(
-                                "SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
-
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+            try {
+				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
+	
+					awaitNSSAndHAReady(service);
+	
+					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+					try {
+						// Should be empty.
+						assertEquals(
+								0L,
+								countResults(repo.prepareTupleQuery(
+										"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
+					} finally {
+						repo.close();
+					}
+	
+				}
+            } finally {
+            	client.stop();
             }
 
         }

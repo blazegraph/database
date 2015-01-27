@@ -271,8 +271,16 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
          */
         for (FilterNode joinFilter : attachedFilters) {
 
-            group.removeArg(joinFilter);
-
+        	/*
+        	 * the attachedFilters array contains identical FilterNode
+        	 * expressions (as of Java equals method) only once, but in the 
+        	 * AST they may occur multiple times. Therefore, we iteratively
+        	 * remove them until all filter expressions have been discarded. 
+        	 */
+        	boolean checkNext = true;
+        	while (checkNext) {
+        		checkNext = group.removeArg(joinFilter);
+        	}
         }
 
     }

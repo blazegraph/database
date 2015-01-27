@@ -87,7 +87,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager() {
 
-		this(null/* name */, getTemporaryJournal(), TestMode.triples);
+		this(null/* name */, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
 
 	}
 
@@ -96,7 +96,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager(String name) {
 
-		this(name, getTemporaryJournal(), TestMode.triples);
+		this(name, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
 
 	}
 
@@ -251,9 +251,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // Multi-tenancy API.
         suite.addTestSuite(TestMultiTenancyAPI.class);
 
-        // RemoteRepository test (nano sparql server client-wrapper)
+        // RemoteRepository test (nano sparql server client-wrapper using Jetty)
         suite.addTestSuite(TestNanoSparqlClient.class);
-
+        
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
         

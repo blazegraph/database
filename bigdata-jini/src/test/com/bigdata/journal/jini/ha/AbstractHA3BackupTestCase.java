@@ -32,10 +32,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Calendar;
 import java.util.Properties;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
@@ -46,7 +43,11 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 
 /**
  * Abstract base class for testing the {@link ISnapshotPolicy} and
@@ -98,7 +99,7 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
             final Integer percentLogSize) throws Exception {
 
         // Client for talking to the NSS.
-        final HttpClient httpClient = new DefaultHttpClient(ccm);
+        // final HttpClient httpClient = new DefaultHttpClient(ccm);
 
         // The NSS service URL (NOT the SPARQL end point).
         final String serviceURL = getNanoSparqlServerURL(haGlue);
@@ -109,14 +110,22 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 
         opts.method = "GET";
 
+        JettyResponseListener response = null;
+
         try {
-
-            final HttpResponse response;
-
-            RemoteRepository.checkResponseCode(response = doConnect(httpClient,
-                    opts));
-
-            EntityUtils.consume(response.getEntity());
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        	
+			final RemoteRepositoryManager rpm = new RemoteRepositoryManager(
+					serviceURL, client, executorService);
+			try {
+	            RemoteRepository.checkResponseCode(response = rpm.doConnect(opts));
+			} finally {
+				if (response != null)
+					response.abort();
+				
+				rpm.close();
+				client.stop();
+			}
 
         } catch (IOException ex) {
 

@@ -20,23 +20,21 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp.client;
+package com.bigdata.rdf.sail.webapp;
 
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.ConfigParams;
-import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.config.NicUtil;
 
 public class BigdataSailNSSWrapper {
@@ -45,7 +43,7 @@ public class BigdataSailNSSWrapper {
             .getLogger(BigdataSailNSSWrapper.class);
 
 
-    public final BigdataSail sail;
+    private final BigdataSail sail;
     
     /**
      * A jetty {@link Server} running a {@link NanoSparqlServer} instance which
@@ -58,7 +56,7 @@ public class BigdataSailNSSWrapper {
      * the {@link RemoteRepository}. This is used when we tear down the
      * {@link RemoteRepository}.
      */
-    private ClientConnectionManager m_cm;
+    //private ClientConnectionManager m_cm;
     
     /**
      * Exposed to tests that do direct HTTP GET/POST operations.
@@ -96,14 +94,14 @@ public class BigdataSailNSSWrapper {
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 
-            initParams.put(ConfigParams.NAMESPACE, sail.getDatabase().getNamespace());
+            initParams.put(ConfigParams.NAMESPACE, getSail().getDatabase().getNamespace());
 
             initParams.put(ConfigParams.CREATE, "false");
             
         }
         // Start server for that kb instance.
         m_fixture = NanoSparqlServer.newInstance(0/* port */,
-                sail.getDatabase().getIndexManager(), initParams);
+                getSail().getDatabase().getIndexManager(), initParams);
 
         m_fixture.start();
 
@@ -134,24 +132,14 @@ public class BigdataSailNSSWrapper {
 
 //        m_cm = httpClient.getConnectionManager();
         
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
+//        m_cm = DefaultClientConnectionManagerFactory.getInstance()
+//                .newInstance();
 
-        final DefaultHttpClient httpClient = new DefaultHttpClient(m_cm);
-        m_httpClient = httpClient;
+       	m_httpClient = HttpClientConfigurator.getInstance().newInstance();
         
-        /*
-         * Ensure that the client follows redirects using a standard policy.
-         * 
-         * Note: This is necessary for tests of the webapp structure since the
-         * container may respond with a redirect (302) to the location of the
-         * webapp when the client requests the root URL.
-         */
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
-
         m_repo = new RemoteRepositoryManager(m_serviceURL,
-                m_httpClient,
-                sail.getDatabase().getIndexManager().getExecutorService());
+        		m_httpClient,
+                getSail().getDatabase().getIndexManager().getExecutorService());
 
     }
 
@@ -167,13 +155,14 @@ public class BigdataSailNSSWrapper {
 
         m_rootURL = null;
         m_serviceURL = null;
-        
-        if (m_cm != null) {
-            m_cm.shutdown();
-            m_cm = null;
-        }
 
+		if (log.isDebugEnabled())
+			log.debug("Stopping", new StackInfoReport("Stopping HTTPClient"));
+
+        m_httpClient.stop();       
         m_httpClient = null;
+        
+        m_repo.close();
         m_repo = null;
         
         if (log.isInfoEnabled())
@@ -181,6 +170,12 @@ public class BigdataSailNSSWrapper {
         
     }
 
+    /**
+     * The backing {@link BigdataSail} instance.
+     */
+	public BigdataSail getSail() {
+		return sail;
+	}
     
 }
 

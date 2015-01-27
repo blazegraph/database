@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.apache.http.conn.ClientConnectionManager;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
@@ -677,7 +677,7 @@ public class BOpContext<E> extends BOpContextBase {
      * Return the {@link ClientConnectionManager} used to make remote SERVICE
      * call requests.
      */
-    public ClientConnectionManager getClientConnectionManager() {
+    public HttpClient getClientConnectionManager() {
         
         return getRunningQuery().getQueryEngine().getClientConnectionManager();
         

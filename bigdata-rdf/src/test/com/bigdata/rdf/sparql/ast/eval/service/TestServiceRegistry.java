@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sail.SailException;
@@ -280,8 +281,9 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
                 final QueryEngine queryEngine = QueryEngineFactory
                         .getQueryController(store.getIndexManager());
 
-                final ClientConnectionManager cm = queryEngine
-                        .getClientConnectionManager();
+//                final ClientConnectionManager cm = queryEngine
+//                        .getClientConnectionManager();
+                final HttpClient cm = queryEngine.getClientConnectionManager();
 
                 final JoinGroupNode groupNode = new JoinGroupNode();
                 

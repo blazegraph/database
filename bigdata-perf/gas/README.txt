@@ -15,8 +15,3 @@ The files in this directory include:
                        (single machine read/write bigdata database). This is the
                        recommended database mode for BSBM as it has significantly
                        better performance.
-                       
-- WORMStore.properties - configuration properties for a bigdata database instance
-                         suitable for BSBM and backed by the WORM persistence
-                         engine (single machine write once, read many bigdata
-                         database).

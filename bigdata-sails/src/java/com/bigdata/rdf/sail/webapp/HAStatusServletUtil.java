@@ -1011,6 +1011,8 @@ public class HAStatusServletUtil {
 
         BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
                 BigdataRDFServlet.MIME_TEXT_PLAIN, status.name());
+        
+        log.warn("Responding to HA status request");
 
         return;
 
