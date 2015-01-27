@@ -20,7 +20,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 /*
  * Created on Jan 9, 2015
  */
@@ -58,302 +58,300 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
-
 /**
- * Optimizes
- * <code>
+ * Optimizes <code>
  	SELECT (COUNT(*) as ?count) ?z WHERE {  ?x rdf:type ?z  } GROUP BY ?z
- * </code>
- * and similar patterns using an O(N) algorithm, where N is the number of
- * distinct solutions.
+ * </code> and similar patterns using an O(N) algorithm, where N is
+ * the number of distinct solutions.
  * <p>
- * The optimizer aims at establishing an execution plan that applies
- * a combination of distinct term scan pattern (to efficiently compute the
- * distinct values for the group variable) and fast range count pattern
- * to efficiently calculate the COUNT, without materialization of the variables
- * on which the COUNT operation is performed. 
+ * The optimizer aims at establishing an execution plan that applies a
+ * combination of distinct term scan pattern (to efficiently compute the
+ * distinct values for the group variable) and fast range count pattern to
+ * efficiently calculate the COUNT, without materialization of the variables on
+ * which the COUNT operation is performed.
  * 
- * The basic idea is to 
+ * The basic idea is to
  * 
  * (i) replace the GROUP BY pattern through a SELECT DISTINCT subquery to
- *     calculate the distinct bindings for variable ?z first, and 
- * (ii) use a fast range count operator to efficiently calculate the COUNT.
+ * calculate the distinct bindings for variable ?z first, and (ii) use a fast
+ * range count operator to efficiently calculate the COUNT.
  * 
- * Note that the subquery in step (i) may (where possible) be optimized by
- * the {@link ASTDistinctTermScanOptimizer}, i.e. if possible the subquery
- * producing the ?z bindings will be replaced by a distinct term scan in 
- * a later optimization step.
+ * Note that the sub query in step (i) may (where possible) be optimized by the
+ * {@link ASTDistinctTermScanOptimizer}, i.e. if possible the subquery producing
+ * the ?z bindings will be replaced by a distinct term scan in a later
+ * optimization step.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/1059">
- 		GROUP BY optimization using distinct-term-scan and fast-range-count</a>
+ * @see <a href="http://trac.bigdata.com/ticket/1059"> GROUP BY optimization
+ *      using distinct-term-scan and fast-range-count</a>
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
 public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
 
-    public ASTSimpleGroupByAndCountOptimizer() {
-    }
-    
-    @Override
-	public IQueryNode optimize(final AST2BOpContext context,
-			final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+   public ASTSimpleGroupByAndCountOptimizer() {
+   }
 
-		final QueryRoot queryRoot = (QueryRoot) queryNode;
+   @Override
+   public IQueryNode optimize(final AST2BOpContext context,
+         final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-		final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
+      final QueryRoot queryRoot = (QueryRoot) queryNode;
 
-		final DatasetNode dataset = queryRoot.getDataset();
+      final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
 
-		if (context.getAbstractTripleStore().isQuads()) {
-			boolean ok = false;
-			if (dataset == null || dataset.getNamedGraphs() == null) {
-				/*
-				 * The dataset is all graphs.
-				 */
-				ok = true;
-			}
+      final DatasetNode dataset = queryRoot.getDataset();
 
-			if (!ok) {
-				return queryNode;
-			}
-		}
-        
-        // First, process any pre-existing named subqueries.
-        {
-            
-            final NamedSubqueriesNode namedSubqueries = queryRoot
-                    .getNamedSubqueries();
+      if (context.getAbstractTripleStore().isQuads()) {
+         boolean ok = false;
+         if (dataset == null || dataset.getNamedGraphs() == null) {
+            /*
+             * The dataset is all graphs.
+             */
+            ok = true;
+         }
 
-            if (namedSubqueries != null) {
+         if (!ok) {
+            return queryNode;
+         }
+      }
 
-                // Note: works around concurrent modification error.
-                final List<NamedSubqueryRoot> list = BOpUtility.toList(
-                        namedSubqueries, NamedSubqueryRoot.class);
-                
-                for (NamedSubqueryRoot namedSubquery : list) {
+      // First, process any pre-existing named subqueries.
+      {
+         final NamedSubqueriesNode namedSubqueries = queryRoot
+               .getNamedSubqueries();
 
-					// Rewrite the named sub-select
-					doSelectQuery(context, sa, (QueryRoot) queryNode,
-							namedSubquery);
+         if (namedSubqueries != null) {
 
-				}
+            // Note: works around concurrent modification error.
+            final List<NamedSubqueryRoot> list = BOpUtility.toList(
+                  namedSubqueries, NamedSubqueryRoot.class);
 
+            for (NamedSubqueryRoot namedSubquery : list) {
+
+               // Rewrite the named sub-select
+               doSelectQuery(context, sa, (QueryRoot) queryNode, namedSubquery);
             }
+         }
+      }
 
-        }
-        
-		// rewrite the top-level select
-		doSelectQuery(context, sa, (QueryRoot) queryNode, (QueryBase) queryNode);
+      // rewrite the top-level select
+      doSelectQuery(context, sa, (QueryRoot) queryNode, (QueryBase) queryNode);
 
-		return queryNode;
+      return queryNode;
+   }
 
-	}
-    
-	/**
-	 * Attempt to rewrite the SELECT.
-	 * 
-	 * @param context
-	 * @param sa
-	 * @param queryRoot
-	 *            The top-level of the query.
-	 * @param queryBase
-	 *            Either a top-level query or a sub-query.
-	 */
-	private void doSelectQuery(final AST2BOpContext context,
-			final StaticAnalysis sa, final QueryRoot queryRoot,
-			final QueryBase queryBase) {
-		
-		/**
-		 *  The prerequisites for the optimizer, which we check in the
-		 *  following, are as follows:
-		 *  
-		 *  (C1) Query must be a SELECT query
-		 *  (C2) Single triple pattern in body
-		 *  (C3) Single GROUP BY variable that is part of the triple pattern
-		 *  (C4) Projection for the GROUP BY variable plus a COUNT operation,
-		 *      which operates over * or any other variable in the triple
-		 *      pattern (the COUNT must not be DISTINCT)
-		 */
-		ProjectionNode projectionNode = null;
-		Integer indexOfVarNode = null;	// index of VarNode in projectionNode
-		Integer indexOfCountNode = null;// index of COUNT node in projectionNode
-		VarNode countNodeVar = null; 	// VarNode bound through COUNT operation
-		GraphPatternGroup<IGroupMemberNode> graphPattern; // surrounding gp
-		StatementPatternNode stmtPattern = null; // the inner statement pattern
-		VarNode groupingVar = null;	// the variable which is grouped
-		
-		{
-			GroupByNode groupByNode = queryBase.getGroupBy();
-			if (groupByNode==null || groupByNode.arity()!=1 || 
-				!(groupByNode.get(0) instanceof AssignmentNode)) {
-				return;
-			}			
-			AssignmentNode assignmentNodeInGroupBy =
-				(AssignmentNode) groupByNode.get(0);
-			if (assignmentNodeInGroupBy.arity()!=2 ||
-				!(assignmentNodeInGroupBy.get(0) instanceof VarNode) ||
-				!(assignmentNodeInGroupBy.get(1) instanceof VarNode)) {
-				return; // something's wrong here
-			}
-			
-			groupingVar = (VarNode) assignmentNodeInGroupBy.get(1);
-			VarNode groupingVarRenamed = (VarNode) assignmentNodeInGroupBy.get(0); 			
-			
-			
-			// Check for condition (C1)
-			QueryType queryType = queryBase.getQueryType();
-			if (!QueryType.SELECT.equals(queryType)) {
-				return; // optimization not applicable
-			}
-		
-			// Check for condition (C2)
-			graphPattern = queryBase.getGraphPattern();
-			if (graphPattern.args().size()!=1) {
-				return;
-			}
-			
-			BOp potentialStmtPattern = graphPattern.get(0);
-			if (!(potentialStmtPattern instanceof StatementPatternNode)) {
-				return;
-			}
-			
-			stmtPattern = 
-				(StatementPatternNode) potentialStmtPattern;
-			Set<VarNode> varNodesInStmtPattern = new HashSet<VarNode>();
-			VarNode graphVarNode = null;
-			for (int i=0; i<stmtPattern.arity(); i++) {
-				BOp arg = stmtPattern.get(i);
-				if (arg instanceof VarNode) {
-					varNodesInStmtPattern.add((VarNode)arg);
-					if (i==3) {
-						graphVarNode = (VarNode)arg;
-					}
-				}
-			}
-			
-			// Check for condition (C3)
-			if (!varNodesInStmtPattern.contains(groupingVar)) {
-				return; // illegal grouping, optimization not applicable
-			}
-			
-			// Check for condition (C4)
-			projectionNode = queryBase.getProjection();
-			if (projectionNode.size()!=2) {
-				return;
-			}
+   /**
+    * Attempt to rewrite the SELECT.
+    * 
+    * @param context
+    * @param sa
+    * @param queryRoot
+    *           The top-level of the query.
+    * @param queryBase
+    *           Either a top-level query or a sub-query.
+    */
+   private void doSelectQuery(final AST2BOpContext context,
+         final StaticAnalysis sa, final QueryRoot queryRoot,
+         final QueryBase queryBase) {
 
-			indexOfVarNode = null;
-			indexOfCountNode = null;
-			for (int i=0; i<2; i++) {
-				AssignmentNode curNode = projectionNode.getExpr(i);
-				
-				IValueExpressionNode valNode = curNode.getValueExpressionNode();
-				
-				if (valNode instanceof FunctionNode && indexOfCountNode==null) {
-					final FunctionNode fNode = 
-							(FunctionNode) curNode.getValueExpressionNode();
-					
-					if (!fNode.getFunctionURI().equals(FunctionRegistry.COUNT))
-						return; // NOT COUNT
-					
-					// check for problematic COUNT(DISTINCT ...)) pattern
-					Map<String,Object> scalarVals = fNode.getScalarValues();
-					Object isDistinct =
-						scalarVals.get(AggregateBase.Annotations.DISTINCT);
-					if (isDistinct!=null && isDistinct instanceof Boolean
-						&& (Boolean)isDistinct) {
-						return; // COUNT (DISTINCT ...)	 cannot be optimized			
-					}
+      /**
+       * The prerequisites for the optimizer, which we check in the following,
+       * are as follows:
+       * 
+       * (C1) Query must be a SELECT query 
+       * 
+       * (C2) Single triple pattern in body
+       * 
+       * (C3) Single GROUP BY variable that is part of the triple pattern
+       * 
+       * (C4) Projection for the GROUP BY variable plus a COUNT operation, which
+       *      operates over star or any other variable in the triple pattern,
+       *      plus the COUNT must not be DISTINCT
+       */
+      
+      // the following variables will be bound during precondition check,
+      // for later use in rewriting (used only in case the optimization applies)
+      ProjectionNode projectionNode = null;
+      Integer indexOfVarNode = null; // index of VarNode in projectionNode
+      Integer indexOfCountNode = null;// index of COUNT node in projectionNode
+      VarNode countNodeVar = null; // VarNode bound through COUNT operation
+      GraphPatternGroup<IGroupMemberNode> graphPattern; // surrounding gp
+      StatementPatternNode stmtPattern = null; // the inner statement pattern
+      VarNode groupingVar = null; // the variable which is grouped
 
-					if (fNode.args().size()!=1) {
-						return;
-					}
-					
-					BOp inner = fNode.args().get(0);
-					if (!(inner instanceof VarNode)) {
-						return;
-					}
-					VarNode innerVarNode = (VarNode)inner;
-	
-					// the count operation must be performed on a variable
-					// distinct from the group variable and distinct from the
-					// named graph variable, if any (the latter is not
-					// necessarily bound); alternatively, a COUNT(*) is also ok
-					boolean countOnUngroupedStmtVariable = 
-						varNodesInStmtPattern.contains(innerVarNode) &&
-						!innerVarNode.equals(graphVarNode) &&
-						!innerVarNode.equals(groupingVarRenamed);
-					boolean isWildcard = innerVarNode.isWildcard();
-					
-					if (!(countOnUngroupedStmtVariable || isWildcard)) {
-						return; // optimization in overall not applicable
-					}
+      {
+         final GroupByNode groupByNode = queryBase.getGroupBy();
+         if (groupByNode == null || groupByNode.arity() != 1
+               || !(groupByNode.get(0) instanceof AssignmentNode)) {
+            return;
+         }
+         
+         final AssignmentNode assignmentNodeInGroupBy = 
+            (AssignmentNode) groupByNode.get(0);
+         if (assignmentNodeInGroupBy.arity() != 2
+               || !(assignmentNodeInGroupBy.get(0) instanceof VarNode)
+               || !(assignmentNodeInGroupBy.get(1) instanceof VarNode)) {
+            return; // something's wrong here
+         }
 
-					if (!(curNode.get(0) instanceof VarNode)) {
-						return; // first exp of assignment node is assigned var
-					}
-					
-					countNodeVar = (VarNode)curNode.get(0);
-					indexOfCountNode=i;
-					
-				} else if (valNode instanceof VarNode && indexOfVarNode==null) {
-					
-					VarNode valNodeAsVarNode = (VarNode)valNode;
-					if (!valNodeAsVarNode.equals(groupingVarRenamed)) {
-						return; // optimization not applicable
-					}
-					indexOfVarNode=i;
-					
-				} else {
-					return; // invalid
-				}
-			}
-		}
-		
-		
-		/**
-		 * Once we reach this point, we're sure that the optimization is
-		 *  applicable, we now rewrite the query plan accordingly; the following
-		 *  needs to be done:
-		 *  
-		 *  (O1) Wrap the existing statement pattern into a SELECT DISTINCT
-		 *       subquery, which could (potentially) be optimized to a distinct
-		 *       term scan by the #{ASTDistinctTermScanOptimzer}
-		 *  (O2) Duplicate the statement pattern and append a fast range
-		 *       count annotation, binding the count var of the SELECT clause
-		 *  (O3) Transform the SELECT clause: the COUNT expression is replaced
-		 *       by a projection for the variable introduced in O2
-		 *  (O4) Eliminate the group by clause
-		 */
-		{
-			// apply optimization step (O1)
-			SubqueryRoot selectDistinct = new SubqueryRoot(QueryType.SELECT);
-			ProjectionNode projection = new ProjectionNode();
-			AssignmentNode assignemntNode =
-				new AssignmentNode(groupingVar, groupingVar);
-			projection.addArg(assignemntNode);
-			projection.setDistinct(true);
-			selectDistinct.setProjection(projection);
-			JoinGroupNode join = new JoinGroupNode();
-			join.addArg(stmtPattern);
-			selectDistinct.setWhereClause(join);
-			graphPattern.setArg(0, selectDistinct);
-			
-			// apply optimization step (O2)
-			StatementPatternNode stmtPatternClone = 
-					new StatementPatternNode(stmtPattern);
-			stmtPatternClone.setFastRangeCount(countNodeVar);
-			graphPattern.addArg(stmtPatternClone);
-			
-			// apply optimization step (O3)
-			projectionNode.setArg(
-					indexOfCountNode,
-					new AssignmentNode(
-							new VarNode(countNodeVar),
-							new VarNode(countNodeVar)));
-			
-			// apply optimization step (O4)
-			queryBase.setGroupBy(null);
-		}
-	}	
+         groupingVar = (VarNode) assignmentNodeInGroupBy.get(1);
+         
+         final VarNode groupingVarRenamed =
+            (VarNode) assignmentNodeInGroupBy.get(0);
+
+         // Check for condition (C1)
+         final QueryType queryType = queryBase.getQueryType();
+         if (!QueryType.SELECT.equals(queryType)) {
+            return; // optimization not applicable
+         }
+
+         // Check for condition (C2)
+         graphPattern = queryBase.getGraphPattern();
+         if (graphPattern.args().size() != 1) {
+            return;
+         }
+
+         final BOp potentialStmtPattern = graphPattern.get(0);
+         if (!(potentialStmtPattern instanceof StatementPatternNode)) {
+            return;
+         }
+
+         stmtPattern = (StatementPatternNode) potentialStmtPattern;
+         Set<VarNode> varNodesInStmtPattern = new HashSet<VarNode>();
+         VarNode graphVarNode = null;
+         for (int i = 0; i < stmtPattern.arity(); i++) {
+            final BOp arg = stmtPattern.get(i);
+            if (arg instanceof VarNode) {
+               varNodesInStmtPattern.add((VarNode) arg);
+               if (i == 3) {
+                  graphVarNode = (VarNode) arg;
+               }
+            }
+         }
+
+         // Check for condition (C3)
+         if (!varNodesInStmtPattern.contains(groupingVar)) {
+            return; // illegal grouping, optimization not applicable
+         }
+
+         // Check for condition (C4)
+         projectionNode = queryBase.getProjection();
+         if (projectionNode.size() != 2) {
+            return;
+         }
+
+         indexOfVarNode = null;
+         indexOfCountNode = null;
+         for (int i = 0; i < 2; i++) {
+            final AssignmentNode curNode = projectionNode.getExpr(i);
+
+            final IValueExpressionNode valNode = 
+               curNode.getValueExpressionNode();
+
+            if (valNode instanceof FunctionNode && indexOfCountNode == null) {
+               final FunctionNode fNode = (FunctionNode) curNode
+                     .getValueExpressionNode();
+
+               if (!fNode.getFunctionURI().equals(FunctionRegistry.COUNT))
+                  return; // NOT COUNT
+
+               // check for problematic COUNT(DISTINCT ...)) pattern
+               final Map<String, Object> scalarVals = fNode.getScalarValues();
+               final Object isDistinct = scalarVals
+                     .get(AggregateBase.Annotations.DISTINCT);
+               if (isDistinct != null && isDistinct instanceof Boolean
+                     && (Boolean) isDistinct) {
+                  return; // COUNT (DISTINCT ...) cannot be optimized
+               }
+
+               if (fNode.args().size() != 1) {
+                  return;
+               }
+
+               final BOp inner = fNode.args().get(0);
+               if (!(inner instanceof VarNode)) {
+                  return;
+               }
+               final VarNode innerVarNode = (VarNode) inner;
+
+               // the count operation must be performed on a variable
+               // distinct from the named graph variable, if any 
+               // (as the latter is not necessarily bound); 
+               // alternatively, a COUNT(*) is also ok
+               boolean countOnPotentiallyUnboundVariable = 
+                  varNodesInStmtPattern.contains(innerVarNode) && 
+                  !innerVarNode.equals(graphVarNode);
+               boolean isWildcard = innerVarNode.isWildcard();
+
+               if (!(countOnPotentiallyUnboundVariable || isWildcard)) {
+                  return; // optimization in overall not applicable
+               }
+
+               if (!(curNode.get(0) instanceof VarNode)) {
+                  return; // first exp of assignment node is assigned var
+               }
+
+               countNodeVar = (VarNode) curNode.get(0);
+               indexOfCountNode = i;
+
+            } else if (valNode instanceof VarNode && indexOfVarNode == null) {
+
+               final VarNode valNodeAsVarNode = (VarNode) valNode;
+               if (!valNodeAsVarNode.equals(groupingVarRenamed)) {
+                  return; // optimization not applicable
+               }
+               indexOfVarNode = i;
+
+            } else {
+               return; // invalid
+            }
+         }
+      }
+
+      /**
+       * Once we reach this point, we're sure that the optimization is
+       * applicable, we now rewrite the query plan accordingly; the following
+       * needs to be done:
+       * 
+       * (O1) Wrap the existing statement pattern into a SELECT DISTINCT
+       * subquery, which could (potentially) be optimized to a distinct term
+       * scan by the #{ASTDistinctTermScanOptimzer} 
+       * 
+       * (O2) Duplicate the statement pattern and append a fast range count 
+       * annotation, binding the count var of the SELECT clause 
+       * 
+       * (O3) Transform the SELECT clause: the COUNT expression is replaced by 
+       * a projection for the variable introduced in O2 
+       * 
+       * (O4) Eliminate the group by clause
+       */
+      {
+         // apply optimization step (O1)
+         final SubqueryRoot selectDistinct = new SubqueryRoot(QueryType.SELECT);
+         final ProjectionNode projection = new ProjectionNode();
+         final AssignmentNode assignemntNode = 
+            new AssignmentNode(groupingVar, groupingVar);
+         projection.addArg(assignemntNode);
+         projection.setDistinct(true);
+         selectDistinct.setProjection(projection);
+         
+         final JoinGroupNode join = new JoinGroupNode();
+         join.addArg(stmtPattern);
+         selectDistinct.setWhereClause(join);
+         graphPattern.setArg(0, selectDistinct);
+
+         // apply optimization step (O2)
+         final StatementPatternNode stmtPatternClone = 
+            new StatementPatternNode(stmtPattern);
+         stmtPatternClone.setFastRangeCount(countNodeVar);
+         graphPattern.addArg(stmtPatternClone);
+
+         // apply optimization step (O3)
+         projectionNode.setArg(indexOfCountNode, new AssignmentNode(
+               new VarNode(countNodeVar), new VarNode(countNodeVar)));
+
+         // apply optimization step (O4)
+         queryBase.setGroupBy(null);
+      }
+   }
 }

@@ -20,7 +20,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Properties;
@@ -31,288 +31,287 @@ import junit.framework.TestSuite;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.join.DistinctTermScanOp;
 import com.bigdata.bop.join.FastRangeCountOp;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleGroupByAndCountOptimizer;
-import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * SPARQL level test suite for the {@link ASTSimpleGroupByAndCountOptimizer}.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/1059" >
- * 		GROUP BY optimization using distinct-term-scan and fast-range-count</a>
+ * @see <a href="http://trac.bigdata.com/ticket/1059"> GROUP BY optimization
+ *      using distinct-term-scan and fast-range-count</a>
+ *      
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
 public class TestSimpleGroupByAndCountOptimizer extends
-		AbstractDataDrivenSPARQLTestCase {
+      AbstractDataDrivenSPARQLTestCase {
 
-	public TestSimpleGroupByAndCountOptimizer() {
-	}
+   public TestSimpleGroupByAndCountOptimizer() {
+   }
 
-	public TestSimpleGroupByAndCountOptimizer(String name) {
-		super(name);
-	}
-	
-    public static Test suite()
-    {
+   public TestSimpleGroupByAndCountOptimizer(String name) {
+      super(name);
+   }
 
-        final TestSuite suite = new TestSuite(
-        	TestSimpleGroupByAndCountOptimizer.class.getSimpleName());
+   public static Test suite() {
 
-        suite.addTestSuite(TestTriplesModeAPs.class);
-        suite.addTestSuite(TestQuadsModeAPs.class);
-        
-        return suite;
-    }
+      final TestSuite suite = new TestSuite(
+            TestSimpleGroupByAndCountOptimizer.class.getSimpleName());
 
-    /**
-     * Triples mode test suite.
-     */
-	public static class TestTriplesModeAPs extends TestSimpleGroupByAndCountOptimizer {
+      suite.addTestSuite(TestTriplesModeAPs.class);
+      suite.addTestSuite(TestQuadsModeAPs.class);
 
-		@Override
-		public Properties getProperties() {
+      return suite;
+   }
 
-			final Properties properties = new Properties(super.getProperties());
+   /**
+    * Triples mode test suite.
+    */
+   public static class TestTriplesModeAPs extends
+         TestSimpleGroupByAndCountOptimizer {
 
-			// turn off quads.
-			properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
+      @Override
+      public Properties getProperties() {
 
-			// turn on triples
-			properties.setProperty(AbstractTripleStore.Options.TRIPLES_MODE,
-					"true");
+         final Properties properties = new Properties(super.getProperties());
 
-			return properties;
+         // turn off quads.
+         properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
 
-		}
+         // turn on triples
+         properties.setProperty(AbstractTripleStore.Options.TRIPLES_MODE,
+               "true");
 
-		/**
-		 * Optimization applies to pattern: 
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(*) as ?count) ?z 
-		 * WHERE {  ?x rdf:type ?z  } GROUP BY ?z
-		 * </pre>
-		 */
-		public void test_simpleGroupByAndCount_01() throws Exception {
+         return properties;
 
-			final TestHelper h = new TestHelper(
-					"simpleGroupByAndCount_triples_01", // testURI,
-					"simpleGroupByAndCount_triples_01.rq",// queryFileURL
-					"simpleGroupByAndCount_triples.ttl",// dataFileURL
-					"simpleGroupByAndCount_triples_01.srx"// resultFileURL
-			);
-			
-			h.runTest();
+      }
 
-			// Verify that the DistinctTermScanOp and FastRangeCountOp
-			// are both used in the query plan.
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							DistinctTermScanOp.class).size());
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-		}
-		
-		/**
-		 * Optimization applies to pattern: 
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(?x) as ?count) ?z 
-		 * WHERE {  ?x rdf:type ?z  } GROUP BY ?z
-		 * </pre>
-		 */
-		public void test_simpleGroupByAndCount_02() throws Exception {
+      /**
+       * Optimization applies to pattern:
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?z 
+       * WHERE {  ?x rdf:type ?z  } GROUP BY ?z
+       * </pre>
+       */
+      public void test_simpleGroupByAndCount_01() throws Exception {
 
-			final TestHelper h = new TestHelper(
-					"simpleGroupByAndCount_triples_02", // testURI,
-					"simpleGroupByAndCount_triples_02.rq",// queryFileURL
-					"simpleGroupByAndCount_triples.ttl",// dataFileURL
-					"simpleGroupByAndCount_triples_02.srx"// resultFileURL
-			);
-			
-			h.runTest();
+         final TestHelper h = new TestHelper(
+               "simpleGroupByAndCount_triples_01", // testURI,
+               "simpleGroupByAndCount_triples_01.rq",// queryFileURL
+               "simpleGroupByAndCount_triples.ttl",// dataFileURL
+               "simpleGroupByAndCount_triples_01.srx"// resultFileURL
+         );
 
-			// Verify that the DistinctTermScanOp and FastRangeCountOp
-			// are both used in the query plan.
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							DistinctTermScanOp.class).size());
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-		}
+         h.runTest();
 
-		/**
-		 * Optimization does *not* apply to pattern: 
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(?z) as ?count) ?z 
-		 * WHERE {  ?x rdf:type ?z  } GROUP BY ?z
-		 * </pre>
-		 */
-		public void test_simpleGroupByAndCount_03() throws Exception {
+         // Verify that the DistinctTermScanOp and FastRangeCountOp
+         // are both used in the query plan.
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
 
-			final TestHelper h = new TestHelper(
-					"simpleGroupByAndCount_triples_03", // testURI,
-					"simpleGroupByAndCount_triples_03.rq",// queryFileURL
-					"simpleGroupByAndCount_triples.ttl",// dataFileURL
-					"simpleGroupByAndCount_triples_03.srx"// resultFileURL
-			);
-			
-			h.runTest();
+      /**
+       * Optimization applies to pattern:
+       * 
+       * <pre>
+       * SELECT  (COUNT(?x) as ?count) ?z 
+       * WHERE {  ?x rdf:type ?z  } GROUP BY ?z
+       * </pre>
+       */
+      public void test_simpleGroupByAndCount_02() throws Exception {
 
-			// Verify that the FastRangeCountOp is not used in the query plan
-			assertEquals(
-					0,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-		}
-		
-		/**
-		 * Optimization only partially applies to pattern: 
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(*) as ?count) ?z 
-		 * WHERE {  ?z rdf:type ?x  } GROUP BY ?z
-		 * </pre>
-		 * 
-		 * Fast range count is used, but no distinct term scan.
-		 * The reason is that there is no PSO index.
-		 */
-		public void test_simpleGroupByAndCount_04() throws Exception {
+         final TestHelper h = new TestHelper(
+               "simpleGroupByAndCount_triples_02", // testURI,
+               "simpleGroupByAndCount_triples_02.rq",// queryFileURL
+               "simpleGroupByAndCount_triples.ttl",// dataFileURL
+               "simpleGroupByAndCount_triples_02.srx"// resultFileURL
+         );
 
-			final TestHelper h = new TestHelper(
-					"simpleGroupByAndCount_triples_04", // testURI,
-					"simpleGroupByAndCount_triples_04.rq",// queryFileURL
-					"simpleGroupByAndCount_triples.ttl",// dataFileURL
-					"simpleGroupByAndCount_triples_04.srx"// resultFileURL
-			);
-			
-			h.runTest();
+         h.runTest();
 
-			// Verify that there is neither a FastRangeCountOp nor a
-			// DistinctTermScanOp used in the query plan
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-			assertEquals(
-					0,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							DistinctTermScanOp.class).size());
-		}
+         // Verify that the DistinctTermScanOp and FastRangeCountOp
+         // are both used in the query plan.
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
 
-	}
+      /**
+       * Optimization applies to pattern:
+       * 
+       * <pre>
+       * SELECT  (COUNT(?z) as ?count) ?z 
+       * WHERE {  ?x rdf:type ?z  } GROUP BY ?z
+       * </pre>
+       */
+      public void test_simpleGroupByAndCount_03() throws Exception {
 
-	/**
-     * Quads mode test suite.
-	 */
-	public static class TestQuadsModeAPs extends TestSimpleGroupByAndCountOptimizer {
+         final TestHelper h = new TestHelper(
+               "simpleGroupByAndCount_triples_03", // testURI,
+               "simpleGroupByAndCount_triples_03.rq",// queryFileURL
+               "simpleGroupByAndCount_triples.ttl",// dataFileURL
+               "simpleGroupByAndCount_triples_03.srx"// resultFileURL
+         );
 
-		/**
-		 * Optimization applies as in triple mode for fully unbound triple
-		 * patterns, e.g.:
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(*) as ?count) ?z 
-		 * WHERE { GRAPH ?g { ?x rdf:type ?z } } GROUP BY ?z
-		 * </pre>
-		 */
-		public void test_distinctTermScan_quads_01() throws Exception {
+         h.runTest();
 
-			final TestHelper h = new TestHelper("distinctTermScan_quads_01", // testURI,
-					"simpleGroupByAndCount_quads_01.rq",// queryFileURL
-					"simpleGroupByAndCount_quads.trig",// dataFileURL
-					"simpleGroupByAndCount_quads_01.srx"// resultFileURL
-			);
-			
-			h.runTest();
+         // Verify that the FastRangeCountOp is used in the query plan
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
 
-			// Verify that the DistinctTermScanOp and FastRangeCountOp
-			// are both used in the query plan.
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							DistinctTermScanOp.class).size());
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-		}
-		
-		/**
-		 * The query
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(*) as ?count) ?z 
-		 * WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?x rdf:type ?z } } GROUP BY ?z
-		 * </pre>
-		 * 
-		 * requires either an CPOS or a PCOS index for the distinct term scan
-		 * optimization, none of which is present. Hence, only the fast range
-		 * count optimization can be applied.
-		 */
-		public void test_distinctTermScan_quads_02() throws Exception {
+      /**
+       * Optimization only partially applies to pattern:
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?z 
+       * WHERE {  ?z rdf:type ?x  } GROUP BY ?z
+       * </pre>
+       * 
+       * Fast range count is used, but no distinct term scan. The reason is that
+       * there is no PSO index.
+       */
+      public void test_simpleGroupByAndCount_04() throws Exception {
 
-			final TestHelper h = new TestHelper("distinctTermScan_quads_02", // testURI,
-					"simpleGroupByAndCount_quads_02.rq",// queryFileURL
-					"simpleGroupByAndCount_quads.trig",// dataFileURL
-					"simpleGroupByAndCount_quads_02.srx"// resultFileURL
-			);
-			
-			h.runTest();
+         final TestHelper h = new TestHelper(
+               "simpleGroupByAndCount_triples_04", // testURI,
+               "simpleGroupByAndCount_triples_04.rq",// queryFileURL
+               "simpleGroupByAndCount_triples.ttl",// dataFileURL
+               "simpleGroupByAndCount_triples_04.srx"// resultFileURL
+         );
 
-			// Verify that the DistinctTermScanOp and FastRangeCountOp
-			// are both used in the query plan.
-			assertEquals(
-					0,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							DistinctTermScanOp.class).size());
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-		}
+         h.runTest();
 
-		/**
-		 * The query
-		 * 
-		 * <pre>
-		 * SELECT  (COUNT(*) as ?count) ?s
-		 * WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?s ?p ?o } } 
-		 * GROUP BY ?s
-		 * </pre>
-		 * 
-		 * can be optimized using the CSPO index.
-		 */
-		public void test_distinctTermScan_quads_03() throws Exception {
+         // Verify that there is neither a FastRangeCountOp nor a
+         // DistinctTermScanOp used in the query plan
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+      }
 
-			final TestHelper h = new TestHelper("distinctTermScan_quads_03", // testURI,
-					"simpleGroupByAndCount_quads_03.rq",// queryFileURL
-					"simpleGroupByAndCount_quads.trig",// dataFileURL
-					"simpleGroupByAndCount_quads_03.srx"// resultFileURL
-			);
-			
-			h.runTest();
+   }
 
-			// Verify that the DistinctTermScanOp and FastRangeCountOp
-			// are both used in the query plan.
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							DistinctTermScanOp.class).size());
-			assertEquals(
-					1,
-					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
-							FastRangeCountOp.class).size());
-		}
+   /**
+    * Quads mode test suite.
+    */
+   public static class TestQuadsModeAPs extends
+         TestSimpleGroupByAndCountOptimizer {
 
-	}
+      /**
+       * Optimization applies as in triple mode for fully unbound triple
+       * patterns, e.g.:
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?z 
+       * WHERE { GRAPH ?g { ?x rdf:type ?z } } GROUP BY ?z
+       * </pre>
+       */
+      public void test_distinctTermScan_quads_01() throws Exception {
+
+         final TestHelper h = new TestHelper("distinctTermScan_quads_01", // testURI,
+               "simpleGroupByAndCount_quads_01.rq",// queryFileURL
+               "simpleGroupByAndCount_quads.trig",// dataFileURL
+               "simpleGroupByAndCount_quads_01.srx"// resultFileURL
+         );
+
+         h.runTest();
+
+         // Verify that the DistinctTermScanOp and FastRangeCountOp
+         // are both used in the query plan.
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
+
+      /**
+       * The query
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?z 
+       * WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?x rdf:type ?z } } GROUP BY ?z
+       * </pre>
+       * 
+       * requires either an CPOS or a PCOS index for the distinct term scan
+       * optimization, none of which is present. Hence, only the fast range
+       * count optimization can be applied.
+       */
+      public void test_distinctTermScan_quads_02() throws Exception {
+
+         final TestHelper h = new TestHelper("distinctTermScan_quads_02", // testURI,
+               "simpleGroupByAndCount_quads_02.rq",// queryFileURL
+               "simpleGroupByAndCount_quads.trig",// dataFileURL
+               "simpleGroupByAndCount_quads_02.srx"// resultFileURL
+         );
+
+         h.runTest();
+
+         // Verify that the DistinctTermScanOp and FastRangeCountOp
+         // are both used in the query plan.
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
+
+      /**
+       * The query
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?s
+       * WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?s ?p ?o } } 
+       * GROUP BY ?s
+       * </pre>
+       * 
+       * can be optimized using the CSPO index.
+       */
+      public void test_distinctTermScan_quads_03() throws Exception {
+
+         final TestHelper h = new TestHelper("distinctTermScan_quads_03", // testURI,
+               "simpleGroupByAndCount_quads_03.rq",// queryFileURL
+               "simpleGroupByAndCount_quads.trig",// dataFileURL
+               "simpleGroupByAndCount_quads_03.srx"// resultFileURL
+         );
+
+         h.runTest();
+
+         // Verify that the DistinctTermScanOp and FastRangeCountOp
+         // are both used in the query plan.
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+         assertEquals(
+               1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
+
+   }
 }
