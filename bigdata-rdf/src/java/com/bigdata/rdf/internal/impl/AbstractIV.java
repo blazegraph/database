@@ -408,7 +408,8 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 		return VTE.valueOf((byte) (((flags & VTE_MASK) >>> VTE_SHIFT) & 0xff));
 
     }
-    
+
+	@Override
     final public VTE getVTE() {
 
         return getVTE(flags);
@@ -418,6 +419,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     /**
      * Return the {@link DTE} for this {@link IV}.
      */
+	@Override
     final public DTE getDTE() {
 
         return DTE.valueOf((byte) ((flags & DTE_MASK) & 0xff));
@@ -455,30 +457,35 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
     }
 
+    @Override
     final public boolean isLiteral() {
 
         return (flags & VTE_MASK) >>> VTE_SHIFT == VTE.LITERAL.v();
 
     }
 
+    @Override
     final public boolean isBNode() {
 
         return (flags & VTE_MASK) >>> VTE_SHIFT == VTE.BNODE.v();
 
     }
 
+    @Override
     final public boolean isURI() {
 
         return (flags & VTE_MASK) >>> VTE_SHIFT == VTE.URI.v();
 
     }
-
+    
+    @Override
     final public boolean isStatement() {
 
         return (flags & VTE_MASK) >>> VTE_SHIFT == VTE.STATEMENT.v();
 
     }
 
+    @Override
     final public boolean isResource() {
 
         return isURI() || isBNode();
@@ -492,6 +499,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      * be overridden in many derived classes which have compile time knowledge
      * of whether the RDF value is inline or not.
      */
+    @Override
     public boolean isInline() {
         return isInline(flags);
     }
@@ -504,6 +512,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 	 * method can be overridden in many derived classes which have compile time
 	 * knowledge of whether the value is an RDF {@link Literal} or not.
 	 */
+    @Override
     public boolean isExtension() {
         return isExtension(flags);
     }
@@ -513,6 +522,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      * <p>
      * The default implementation returns <code>false</code>.
      */
+    @Override
     public boolean isVocabulary() {
         return false;
     }
@@ -523,51 +533,70 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      * This implementation returns <code>false</code>. It is overridden by
      * {@link TermId}.
      */
+    @Override
     public boolean isNullIV() {
     	return false;
     }
     
+    @Override
     public boolean isNumeric() {
         return isInline() && getDTE().isNumeric();
     }
 
+    @Override
     final public boolean isSignedNumeric() {
         return isInline() && getDTE().isSignedNumeric();
     }
 
+    @Override
     final public boolean isUnsignedNumeric() {
         return isInline() && getDTE().isUnsignedNumeric();
     }
 
+    @Override
     final public boolean isFixedNumeric() {
         return isInline() && getDTE().isFixedNumeric();
     }
 
+    @Override
     final public boolean isBigNumeric() {
         return isInline() && getDTE().isBigNumeric();
     }
 
+    @Override
     final public boolean isFloatingPointNumeric() {
         return isInline() && getDTE().isFloatingPointNumeric();
     }
 
     /**
-     * Return a hash code based on the value of the point in the value space.
-     */
+	 * Return a hash code based on the value of the point in the value space.
+	 * <p>
+	 * Note: The {@link IV} implementations typically DO NOT return hash codes
+	 * that are consistent with {@link BigdataValue#hashCode()}. Therefore you
+	 * MUST NOT mix {@link IV}s and {@link BigdataValue}s in the keys of a map
+	 * or the values of a set.
+	 */
+    @Override
     abstract public int hashCode();
 
     /**
-     * Return true iff the two values are the same point in the same value
-     * space. Points in different value spaces (as identified by different
-     * datatype URIs) are NOT equal even if they have the same value in the
-     * corresponding primitive data type.
-     */
+	 * Return true iff the two {@link IV}s are the same point in the same value
+	 * space. Points in different value spaces (as identified by different
+	 * datatype URIs) are NOT equal even if they have the same value in the
+	 * corresponding primitive data type.
+	 * <p>
+	 * Note: The {@link IV} implementations typically DO NOT compare equals()
+	 * with {@link BigdataValue}s. Therefore you MUST NOT mix {@link IV}s and
+	 * {@link BigdataValue}s in the keys of a map or the values of a set.
+	 */
+    @Override
     abstract public boolean equals(Object o);
     
     /**
      * Imposes an ordering of IVs based on their natural sort ordering in the 
      * index as unsigned byte[]s.
      */
+    @Override
     @SuppressWarnings("rawtypes")
     final public int compareTo(final IV o) {
 
@@ -625,6 +654,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
     @SuppressWarnings("rawtypes")
     public abstract int _compareTo(IV o);
 
+    @Override
     public IKeyBuilder encode(final IKeyBuilder keyBuilder) {
 
         // First emit the flags byte.
@@ -890,6 +920,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
      */
 	private volatile transient V cache = null;
 
+    @Override
 	final public V getValue() {
 
 		final V v = cache;
@@ -901,14 +932,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 
 	}
 
-	/**
-	 * Set the {@link BigdataValue} on the cache.
-	 * 
-	 * @param v
-	 *            The {@link BigdataValue}.
-	 *            
-	 * @return The argument.
-	 */
+    @Override
 	final public V setValue(final V v) {
 
 		return (this.cache = v);
@@ -931,9 +955,7 @@ public abstract class AbstractIV<V extends BigdataValue, T>
 //		
 //	}
 	
-	/**
-	 * Return <code>true</code> if cached or <code>false</code> if not.
-	 */
+    @Override
 	final public boolean hasValue() {
 		
 		return cache != null;

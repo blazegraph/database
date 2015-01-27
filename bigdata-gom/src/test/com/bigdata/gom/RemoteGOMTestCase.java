@@ -40,9 +40,8 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
 
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.repository.RepositoryException;
@@ -61,8 +60,9 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.config.NicUtil;
 
@@ -79,11 +79,10 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
 
     protected Server m_server;
 
-	protected RemoteRepository m_repo;
+	protected HttpClient m_client;
+	protected RemoteRepositoryManager m_repo;
 	
 	protected String m_serviceURL;
-
-	protected ClientConnectionManager m_cm;
 
 	protected IIndexManager m_indexManager;
 
@@ -196,18 +195,16 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
         }
 
         m_serviceURL = new URL("http", hostAddr, port,
-                BigdataStatics.getContextPath() + "/sparql"/* file */)
+                BigdataStatics.getContextPath() /* file */)
+        		// BigdataStatics.getContextPath() + "/sparql"/* file */)
                 .toExternalForm();
 
         // final HttpClient httpClient = new DefaultHttpClient();
 
         // m_cm = httpClient.getConnectionManager();
-
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
-
-        m_repo = new RemoteRepository(m_serviceURL,
-                new DefaultHttpClient(m_cm), m_indexManager.getExecutorService());
+       	m_client = HttpClientConfigurator.getInstance().newInstance();
+        
+        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client, m_indexManager.getExecutorService());
         
         om = new NanoSparqlObjectManager(m_repo,
                 m_namespace); 
@@ -233,17 +230,14 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
 
         }
         
+        m_repo.close();
+        
         m_repo = null;
+        
+        m_client.stop();
+        m_client = null;
 
         m_serviceURL = null;
-
-        if (m_cm != null) {
-
-            m_cm.shutdown();
-
-            m_cm = null;
-
-        }
 
         if (m_indexManager != null && m_namespace != null) {
 

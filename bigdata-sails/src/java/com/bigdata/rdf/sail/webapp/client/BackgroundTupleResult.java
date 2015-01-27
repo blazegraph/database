@@ -12,8 +12,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.util.EntityUtils;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryResultHandlerException;
@@ -43,8 +41,6 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 
 	final private InputStream in;
 
-	final private HttpEntity entity;
-
 	final private QueueCursor<BindingSet> queue;
 
 	// No need to synchronize this field because visibility is guaranteed
@@ -54,20 +50,19 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 	final private CountDownLatch bindingNamesReady = new CountDownLatch(1);
 
     public BackgroundTupleResult(final TupleQueryResultParser parser,
-            final InputStream in, final HttpEntity entity) {
+            final InputStream in) {
         
-		this(new QueueCursor<BindingSet>(10), parser, in, entity);
-		
+    	// TODO Why is the capacity so small? Why not 100 or more?
+		this(new QueueCursor<BindingSet>(10/* capacity */), parser, in);
+
 	}
 
     public BackgroundTupleResult(final QueueCursor<BindingSet> queue,
-            final TupleQueryResultParser parser, final InputStream in,
-            final HttpEntity entity) {
+            final TupleQueryResultParser parser, final InputStream in) {
         super(Collections.<String>emptyList(), queue);
 		this.queue = queue;
 		this.parser = parser;
 		this.in = in;
-		this.entity = entity;
 	}
 
     @Override
@@ -77,6 +72,13 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 				closed = true;
 				if (parserThread != null) {
 					parserThread.interrupt();
+				}
+				if (in != null) {
+					try {
+						in.close();
+					} catch (IOException e) {
+						throw new QueryEvaluationException(e);
+					}
 				}
 			}
 		}
@@ -114,13 +116,15 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 			}
 			parserThread = Thread.currentThread();
 		}
-		boolean completed = false;
+//		boolean completed = false;
 		try {
+			/*
+			 * Run the parser, pumping events into this class (which is its own
+			 * listener).
+			 */
 			parser.setTupleQueryResultHandler(this);
 			parser.parse(in);
-			// release connection back into pool if all results have been read
-			EntityUtils.consume(entity);
-			completed = true;
+//			completed = true;
 		} catch (TupleQueryResultHandlerException e) {
 			// parsing cancelled or interrupted
 		} catch (QueryResultParseException e) {
@@ -133,11 +137,6 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 			}
 			queue.done();
 			bindingNamesReady.countDown();
-			if (!completed) {
-				try {
-					EntityUtils.consume(entity);
-				} catch (IOException ex) { }
-			}
 		}
 	}
 
