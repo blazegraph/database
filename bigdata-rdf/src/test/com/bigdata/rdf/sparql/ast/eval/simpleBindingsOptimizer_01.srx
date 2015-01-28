@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='personId'/>
+        <variable name='type'/>
+    </head>
+    <results>
+        <result>
+            <binding name='personId'>
+			   <uri>http://bigdata.com#Michael</uri>
+            </binding>
+            <binding name='type'>
+            <uri>http://bigdata.com#Person</uri>
+            </binding>
+        </result>
+        <result>
+            <binding name='personId'>
+            <uri>http://bigdata.com#Bryan</uri>
+            </binding>
+            <binding name='type'>
+            <uri>http://bigdata.com#Person</uri>
+            </binding>
+        </result>
+    </results>
+</sparql>

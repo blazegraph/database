@@ -1,0 +1,3 @@
+@prefix : <http://bigdata.com#> .
+
+:Datapoint :value 10 . 
