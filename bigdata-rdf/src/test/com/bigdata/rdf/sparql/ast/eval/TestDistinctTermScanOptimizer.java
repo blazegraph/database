@@ -222,11 +222,6 @@ public class TestDistinctTermScanOptimizer extends
 	}
 
 	/**
-	 * Note: We MUST have correct rejection tests for the quads mode. If the
-	 * named graph is bound then we can not use this operator (except for the
-	 * very special case of CSPO which is not actually implemented since it is
-	 * such a special case).
-	 * <p>
 	 * Note: For quads we need to test all of the combinations of default and
 	 * named graph modes and both with and without the GRAPH {} wrapping the
 	 * triple pattern. These tests can be run both with and without the
@@ -383,13 +378,13 @@ public class TestDistinctTermScanOptimizer extends
 		}
 
 		/**
-		 * Correct rejection test. The subject is bound.
+		 * Test verifying that the query
 		 * 
 		 * <pre>
 		 * SELECT DISTINCT ?p WHERE { GRAPH ?g { <http://bigdata.com#s1> ?p ?o . } }
 		 * </pre>
 		 * 
-		 * TODO We could optimize this using the {@link SPOKeyOrder#SPOC} index.
+		 * is optimized using the {@link SPOKeyOrder#SPOC} index.
 		 */
 		public void test_distinctTermScan_quads_correctRejection_02() throws Exception {
 
@@ -401,14 +396,11 @@ public class TestDistinctTermScanOptimizer extends
 			
 			h.runTest();
 
-			// Verify that the DistinctTermScanOp was NOT used in the query plan.
+			// Verify that the DistinctTermScanOp was used in the query plan.
 			assertEquals(
-					0,
+					1,
 					BOpUtility.toList(h.getASTContainer().getQueryPlan(),
 							DistinctTermScanOp.class).size());
-
 		}
-
 	}
-
 }

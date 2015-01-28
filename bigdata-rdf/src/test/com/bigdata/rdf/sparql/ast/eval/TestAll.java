@@ -182,6 +182,10 @@ public class TestAll extends TestCase {
         // @see #1035 (distinct-term-scan optimizer)
         suite.addTest(TestDistinctTermScanOptimizer.suite());
 
+        // SELECT (COUNT(*) as ?count) ?z WHERE {  ?x rdf:type ?z  } GROUP BY ?z
+        // @see #1059 (combination of fast-range-count and distinct-term-scan)
+        suite.addTest(TestSimpleGroupByAndCountOptimizer.suite());
+        
         /*
          * Runtime Query Optimizer (RTO).
          */

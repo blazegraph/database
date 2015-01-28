@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -37,6 +38,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
@@ -46,11 +48,14 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
+import com.bigdata.rdf.spo.DistinctMultiTermAdvancer;
 import com.bigdata.rdf.spo.DistinctTermAdvancer;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.relation.IRelation;
@@ -410,8 +415,21 @@ public class DistinctTermScanOp<E> extends PipelineOp {
         	
         	final byte[] toKey = ap.getToKey();
         	
-			final DistinctTermAdvancer filter = new DistinctTermAdvancer(
-					keyOrder.getKeyArity());
+        	// if there are predicate positions bound to constants, we use
+        	// the distinct multi term advancer, otherwise the simple distinct
+        	// term advancer is sufficient
+        	List<BOp> predicateArgs = ap.getPredicate().args();
+        	int nrConsts = 0;
+        	for (int i=0; i<predicateArgs.size(); i++) {
+        		if (predicateArgs.get(i) instanceof IConstant) {
+        			nrConsts++;
+        		}
+        	}
+        	final int nrConstsFinal = nrConsts;
+        	
+			final Advancer<SPO> filter = nrConsts==0 ?
+				new DistinctTermAdvancer(keyOrder.getKeyArity()) :
+				new DistinctMultiTermAdvancer(keyOrder.getKeyArity(), nrConsts);
             
             /*
              * Layer in the logic to advance to the tuple that will have the
@@ -432,11 +450,9 @@ public class DistinctTermScanOp<E> extends PipelineOp {
                     protected boolean isValid(final ITuple<E> tuple) {
 
                         final byte[] key = tuple.getKey();
-                        
-                        final IV iv = IVUtility.decode(key);
-                        
+                        final IV[] ivs = IVUtility.decode(key,nrConstsFinal+1);
+                        final IV iv = ivs[nrConstsFinal];
                         return termIdFilter.isValid(iv);
-
                     }
 
                 });
@@ -459,8 +475,8 @@ public class DistinctTermScanOp<E> extends PipelineOp {
 
 							final byte[] key = ((ITuple<?>) obj).getKey();
                             
-                            return IVUtility.decode(key);
-                            
+							final IV[] ivs = IVUtility.decode(key,nrConstsFinal+1);
+							return ivs[nrConstsFinal];
                         }
                         
                     });
