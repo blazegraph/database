@@ -207,6 +207,40 @@ public class TestSimpleGroupByAndCountOptimizer extends
                      DistinctTermScanOp.class).size());
       }
 
+      /**
+       * The optimization must *not* be applied in the presence of delete
+       * markers. Delete markers are present in the case of isolatable
+       * indices. The query below, which is amenable to optimization in 
+       * principle, cannot be optimized when this mode is used.
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?z 
+       * WHERE {  ?z rdf:type ?x  } GROUP BY ?z
+       * </pre>
+       */
+      public void test_simpleGroupByAndCount_delete_markers() throws Exception {
+
+         final TestHelper h = new TestHelper(
+               "simpleGroupByAndCount_triples_04", // testURI,
+               "simpleGroupByAndCount_triples_04.rq",// queryFileURL
+               "simpleGroupByAndCount_triples.ttl",// dataFileURL
+               "simpleGroupByAndCount_triples_04.srx"// resultFileURL
+         );
+         enableDeleteMarkersInIndes();
+         h.runTest();
+
+         // Verify that there is neither a FastRangeCountOp nor a
+         // DistinctTermScanOp used in the query plan
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+      }
+
    }
 
    /**
@@ -309,6 +343,40 @@ public class TestSimpleGroupByAndCountOptimizer extends
                      DistinctTermScanOp.class).size());
          assertEquals(
                1,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+      }
+      
+      /**
+       * The optimization must *not* be applied in the presence of delete
+       * markers. Delete markers are present in the case of isolatable
+       * indices. The query below, which is amenable to optimization in 
+       * principle, cannot be optimized when this mode is used.
+       * 
+       * <pre>
+       * SELECT  (COUNT(*) as ?count) ?s
+       * WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?s ?p ?o } } 
+       * GROUP BY ?s
+       * </pre>
+       */
+      public void test_distinctTermScan_quads_delete_markers() throws Exception {
+
+         final TestHelper h = new TestHelper("distinctTermScan_quads_03", // testURI,
+               "simpleGroupByAndCount_quads_03.rq",// queryFileURL
+               "simpleGroupByAndCount_quads.trig",// dataFileURL
+               "simpleGroupByAndCount_quads_03.srx"// resultFileURL
+         );
+         enableDeleteMarkersInIndes();
+         h.runTest();
+
+         // Verify that the DistinctTermScanOp and FastRangeCountOp
+         // are both used in the query plan.
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     DistinctTermScanOp.class).size());
+         assertEquals(
+               0,
                BOpUtility.toList(h.getASTContainer().getQueryPlan(),
                      FastRangeCountOp.class).size());
       }

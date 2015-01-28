@@ -2615,6 +2615,19 @@ public class SPORelation extends AbstractRelation<ISPO> {
     }
 
     /**
+     * Checks whether one of the associated triple indices uses delete markers.
+     * 
+     * @return true if some index uses delete markers
+     */
+    public boolean indicesHaveDeleteMarkers() {
+       /**
+        *  actually, either none of the triple indices or all of them uses
+        *  delete markers, so it suffices to probe the primary index
+        */
+       return getPrimaryIndex().getIndexMetadata().getDeleteMarkers();
+    }
+
+    /**
      * The {@link ILexiconConfiguration} instance, which will determine how
      * terms are encoded and decoded in the key space.
     private ILexiconConfiguration lexiconConfiguration;
