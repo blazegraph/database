@@ -318,7 +318,7 @@ public class FastRangeCountOp<E> extends PipelineOp {
 					 * reasoning about the cost of the operator.
 					 */
 					final IAccessPath<E> accessPath = context.getAccessPath(
-							relation, predicate);
+							relation, asBound);
 
 					if (accessPath.getPredicate().getIndexLocalFilter() != null) {
 						// index has local filter. requires scan.

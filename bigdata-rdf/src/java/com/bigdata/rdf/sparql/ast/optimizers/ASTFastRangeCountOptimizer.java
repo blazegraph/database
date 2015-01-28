@@ -38,7 +38,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -133,19 +132,13 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-		if (//context instanceof AST2BOpUpdateContext &&
-				TimestampUtility.isReadWriteTx(context
-						.getAbstractTripleStore().getTimestamp())) {
+       if (context.getAbstractTripleStore().
+             getSPORelation().indicesHaveDeleteMarkers()) {
 			/**
-			 * Disallow for SPARQL QUERY/UPDATE when using full read-write tx.
+			 * Disallow for optimization when using delete markers.
 			 * <p>
-			 * Full read-write transactions use delete markers in the unisolated
-			 * index in order to detect write-write conflicts when one tx
-			 * deletes a tuple and another writes on the same tuple.
-			 * <p>
-			 * The presence of deleteMarkers in the unisolated version of the
-			 * isolatable index means that the fast-range count will be turned
-			 * into a key-range scan, which is not desired.
+			 * The presence of deleteMarkers means that the fast-range count will
+			 * be turned into a key-range scan, which is not desired.
 			 * <p>
 			 * While AccessPath.rangeCountExact(true) method will do the right
 			 * thing even if the index has delete markers (it will convert to a
@@ -157,7 +150,6 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 			 */
 
 			return queryNode;
-			
     	}
 		
         final QueryRoot queryRoot = (QueryRoot) queryNode;
