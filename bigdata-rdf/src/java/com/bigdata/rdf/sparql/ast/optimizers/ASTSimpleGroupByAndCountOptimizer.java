@@ -95,6 +95,26 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
    public IQueryNode optimize(final AST2BOpContext context,
          final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
+      if (context.getAbstractTripleStore().
+            getSPORelation().indicesHaveDeleteMarkers()) {
+        /**
+         * Disallow for optimization when using delete markers.
+         * <p>
+         * The presence of deleteMarkers means that the fast-range count will
+         * be turned into a key-range scan, which is not desired.
+         * <p>
+         * While AccessPath.rangeCountExact(true) method will do the right
+         * thing even if the index has delete markers (it will convert to a
+         * scan for either delete markers or if there is a FILTER attached
+         * to the index), converting to a scan defeats the purpose of the
+         * ASTFastRangeCountOptimizer. In this case, the cost would have
+         * been the same if we had not rewritten the AST. Hence we do not
+         * rewrite the query.
+         */
+
+        return queryNode;
+     }
+      
       final QueryRoot queryRoot = (QueryRoot) queryNode;
 
       final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
