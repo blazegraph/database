@@ -1058,9 +1058,7 @@ ${postInstallMessage}</echo>
       <copy file="${bigdata-rdf.lib}/nxparser-${nxparser.version}.jar"
             tofile="${dist.lib}/nxparser.jar" /> -->
 
-      <!-- apache http components (SPARQL connections). -->
-      <copy file="${bigdata-http.lib}/commons-codec-${apache.commons_codec.version}.jar"
-            tofile="${dist.lib}/commons-codec.jar" />
+      <!--  http components (SPARQL connections). -->
       <copy file="${bigdata-http.lib}/commons-fileupload-${apache.commons_fileupload.version}.jar"
             tofile="${dist.lib}/commons-fileupload.jar" />
       <copy file="${bigdata-http.lib}/commons-io-${apache.commons_io.version}.jar"
@@ -1069,12 +1067,16 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/commons-logging.jar" />
       <copy file="${bigdata-http.lib}/httpclient-${apache.httpclient.version}.jar"
             tofile="${dist.lib}/httpclient.jar" />
-      <copy file="${bigdata-http.lib}/httpclient-cache-${apache.httpclient_cache.version}.jar"
-            tofile="${dist.lib}/httpclient-cache.jar" />
       <copy file="${bigdata-http.lib}/httpcore-${apache.httpcore.version}.jar"
             tofile="${dist.lib}/httpcore.jar" />
       <copy file="${bigdata-http.lib}/httpmime-${apache.httpmime.version}.jar"
             tofile="${dist.lib}/httpmime.jar" />
+   	<!-- REMOVE
+      <copy file="${bigdata-http.lib}/commons-codec-${apache.commons_codec.version}.jar"
+            tofile="${dist.lib}/commons-codec.jar" />
+      <copy file="${bigdata-http.lib}/httpclient-cache-${apache.httpclient_cache.version}.jar"
+            tofile="${dist.lib}/httpclient-cache.jar" />
+     -->
                           
       <!-- Zookeeper library -->
       <copy file="${bigdata-zookeeper.lib}/zookeeper-${zookeeper.version}.jar"

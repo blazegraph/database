@@ -38,8 +38,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.BOp;
@@ -212,7 +212,7 @@ public class ServiceCallJoin extends PipelineOp {
 
         private final AbstractTripleStore db;
 
-        private final ClientConnectionManager cm;
+        private final HttpClient cm;
         
         private final IVariableOrConstant<?> serviceRef;
 

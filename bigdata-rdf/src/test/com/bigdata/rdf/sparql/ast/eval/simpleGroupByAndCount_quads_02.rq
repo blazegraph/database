@@ -1,0 +1,2 @@
+SELECT  (COUNT(*) as ?count) ?z 
+WHERE { GRAPH <http://www.bigdata.com/mygraph> { ?x rdf:type ?z } } GROUP BY ?z

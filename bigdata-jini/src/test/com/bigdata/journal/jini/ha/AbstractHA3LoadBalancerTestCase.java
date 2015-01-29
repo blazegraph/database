@@ -29,6 +29,8 @@ import java.io.Serializable;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
@@ -37,7 +39,9 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 
@@ -177,57 +181,74 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         // Impose the desired LBS policy.
         setPolicy(newTestPolicy(), services);
         
+        // Shared JettyHttpCLient
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        
         // Repositories without the LBS.
-        final RemoteRepository[] repos = new RemoteRepository[3];
-        repos[0] = getRemoteRepository(serverA);
-        repos[1] = getRemoteRepository(serverB);
-        repos[2] = getRemoteRepository(serverC);
-
-        /*
-         * Verify that query on all nodes is allowed.
-         */
-        for (RemoteRepository r : repos) {
-
-            // Should be empty.
-            assertEquals(0L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
-                            .evaluate()));
-
+        final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
+        // Repositories with the LBS.
+        final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
+        try {
+	        repos[0] = getRemoteRepository(serverA, client);
+	        repos[1] = getRemoteRepository(serverB, client);
+	        repos[2] = getRemoteRepository(serverC, client);
+	
+	        /*
+	         * Verify that query on all nodes is allowed.
+	         */
+	        for (RemoteRepositoryManager r : repos) {
+	
+	            // Should be empty.
+	            assertEquals(0L,
+	                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+	                            .evaluate()));
+	
+	        }
+	
+	        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+	        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+	        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
+	
+	        /*
+	         * Verify that query on all nodes is allowed using the LBS.
+	         */
+	        for (RemoteRepositoryManager r : reposLBS) {
+	
+	            // Should be empty.
+	            assertEquals(0L,
+	                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+	                            .evaluate()));
+	
+	        }
+	
+	        /*
+	         * Send an update request to the LBS on each service. The request should
+	         * be proxied to the leader if it is directed to a follower. This is how
+	         * we know whether the LBS is active or not. If it is not active, then
+	         * the follower will refuse to process the update.
+	         */
+	
+	        simpleTransaction_noQuorumCheck(serverA, true/* useLBS */); // leader.
+	        simpleTransaction_noQuorumCheck(serverB, true/* useLBS */); // follower.
+	        simpleTransaction_noQuorumCheck(serverC, true/* useLBS */); // follower.
+	
+	        // await the KB create commit point to become visible on each service.
+	        awaitCommitCounter(4L, new HAGlue[] { serverA, serverB, serverC });
+	
+	        // Verify binary equality of ALL journals.
+	        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
+        } finally {
+	        for (RemoteRepositoryManager r : repos) {
+	        	if (r != null)
+	        		r.close();
+	        }
+	        for (RemoteRepositoryManager r : reposLBS) {
+	        	if (r != null)
+	        		r.close();
+	        }
+	        
+	        client.stop();
         }
-
-        final RemoteRepository[] reposLBS = new RemoteRepository[3];
-        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
-
-        /*
-         * Verify that query on all nodes is allowed using the LBS.
-         */
-        for (RemoteRepository r : reposLBS) {
-
-            // Should be empty.
-            assertEquals(0L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
-                            .evaluate()));
-
-        }
-
-        /*
-         * Send an update request to the LBS on each service. The request should
-         * be proxied to the leader if it is directed to a follower. This is how
-         * we know whether the LBS is active or not. If it is not active, then
-         * the follower will refuse to process the update.
-         */
-
-        simpleTransaction_noQuorumCheck(serverA, true/* useLBS */); // leader.
-        simpleTransaction_noQuorumCheck(serverB, true/* useLBS */); // follower.
-        simpleTransaction_noQuorumCheck(serverC, true/* useLBS */); // follower.
-
-        // await the KB create commit point to become visible on each service.
-        awaitCommitCounter(4L, new HAGlue[] { serverA, serverB, serverC });
-
-        // Verify binary equality of ALL journals.
-        assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
     }
 
@@ -265,109 +286,142 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         // Impose the desired LBS policy.
         setPolicy(newTestPolicy(), services);
         
+        // Shared HttpClient
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        
         // Repositories without the LBS.
-        final RemoteRepository[] repos = new RemoteRepository[3];
-        repos[0] = getRemoteRepository(serverA);
-        repos[1] = getRemoteRepository(serverB);
-        repos[2] = getRemoteRepository(serverC);
-
+        final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
         // Repositories with the LBS.
-        final RemoteRepository[] reposLBS = new RemoteRepository[3];
-        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
-
-        // Add some data using leader.
-        simpleTransaction_noQuorumCheck(serverA, false/* useLBS */); // leader.
-
-        // Should be non-zero.
-        assertNotSame(0L, getCountStar(serverA, false/* useLBS */));
-
-        // delete everything using leader.
-        reposLBS[0].remove(new RemoveOp(null, null, null));
-
-        // Verify everything is gone on the leader.
-        awaitHAStatus(serverA, HAStatusEnum.Leader);
+        final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
         
-        // Should be zero.
-        assertEquals(0L, getCountStar(serverA, false/* useLBS */));
-        
-        // await the commit point to become visible on each service.
-        awaitCommitCounter(3L, services);
+		try {
 
-        // Verify binary equality of ALL journals.
-        assertDigestsEquals(services);
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
+
+			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
+
+			// Add some data using leader.
+			simpleTransaction_noQuorumCheck(serverA, false/* useLBS */); // leader.
+
+			// Should be non-zero.
+			assertNotSame(0L, getCountStar(serverA, false/* useLBS */));
+
+			// delete everything using leader.
+			reposLBS[0].remove(new RemoveOp(null, null, null));
+
+			// Verify everything is gone on the leader.
+			awaitHAStatus(serverA, HAStatusEnum.Leader);
+
+			// Should be zero.
+			assertEquals(0L, getCountStar(serverA, false/* useLBS */));
+
+			// await the commit point to become visible on each service.
+			awaitCommitCounter(3L, services);
+
+			// Verify binary equality of ALL journals.
+			assertDigestsEquals(services);
+
+		} finally {
+	        for (RemoteRepositoryManager r : repos) {
+	        	if (r != null)
+	        		r.close();
+	        }
+	        for (RemoteRepositoryManager r : reposLBS) {
+	        	if (r != null)
+	        		r.close();
+	        }
+	        
+	        client.stop();
+        }
 
     }
     
     /**
      * Test of DELETE on the follower.
      */
-    public void test_delete_follower() throws Exception {
-        
-        final ABC abc = new ABC(true/* sequential */);
+	public void test_delete_follower() throws Exception {
 
-        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
+		final ABC abc = new ABC(true/* sequential */);
 
-        // The expected HStatus for each of the services (A,B,C).
-        final HAStatusEnum[] expectedHAStatusArray = new HAStatusEnum[] { //
-                HAStatusEnum.Leader, //
-                HAStatusEnum.Follower,//
-                HAStatusEnum.Follower //
-                };
+		final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
 
-        // The services in their join order.
-        final HAGlue[] services = new HAGlue[] { serverA, serverB, serverC };
-        
-        // Verify quorum is FULLY met.
-        awaitFullyMetQuorum();
+		// The expected HStatus for each of the services (A,B,C).
+		final HAStatusEnum[] expectedHAStatusArray = new HAStatusEnum[] { //
+		HAStatusEnum.Leader, //
+				HAStatusEnum.Follower,//
+				HAStatusEnum.Follower //
+		};
 
-        // await the KB create commit point to become visible on each service.
-        awaitCommitCounter(1L, services);
+		// The services in their join order.
+		final HAGlue[] services = new HAGlue[] { serverA, serverB, serverC };
 
-        // Verify binary equality of ALL journals.
-        assertDigestsEquals(services);
+		// Verify quorum is FULLY met.
+		awaitFullyMetQuorum();
 
-        // Verify the HAStatus of each service.
-        awaitHAStatus(expectedHAStatusArray, services);
+		// await the KB create commit point to become visible on each service.
+		awaitCommitCounter(1L, services);
 
-        // Impose the desired LBS policy.
-        setPolicy(newTestPolicy(), services);
+		// Verify binary equality of ALL journals.
+		assertDigestsEquals(services);
 
-        // Repositories without the LBS.
-        final RemoteRepository[] repos = new RemoteRepository[3];
-        repos[0] = getRemoteRepository(serverA);
-        repos[1] = getRemoteRepository(serverB);
-        repos[2] = getRemoteRepository(serverC);
+		// Verify the HAStatus of each service.
+		awaitHAStatus(expectedHAStatusArray, services);
 
-        // Repositories with the LBS.
-        final RemoteRepository[] reposLBS = new RemoteRepository[3];
-        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
+		// Impose the desired LBS policy.
+		setPolicy(newTestPolicy(), services);
 
-        // Add some data using leader.
-        simpleTransaction_noQuorumCheck(serverA, false/* useLBS */); // leader.
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+		// Repositories without the LBS.
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
+		// Repositories with the LBS.
+		final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
+		try {
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
 
-        // Should be non-zero.
-        assertNotSame(0L, getCountStar(serverA, false/* useLBS */));
+			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
 
-        // delete everything using 1st follower
-        reposLBS[1].remove(new RemoveOp(null, null, null));
+			// Add some data using leader.
+			simpleTransaction_noQuorumCheck(serverA, false/* useLBS */); // leader.
 
-        // Verify everything is gone on the leader.
-        awaitHAStatus(serverA, HAStatusEnum.Leader);
-        
-        // Should be zero.
-        assertEquals(0L, getCountStar(serverA, false/* useLBS */));
-        
-        // await the commit point to become visible on each service.
-        awaitCommitCounter(3L, services);
+			// Should be non-zero.
+			assertNotSame(0L, getCountStar(serverA, false/* useLBS */));
 
-        // Verify binary equality of ALL journals.
-        assertDigestsEquals(services);
+			// delete everything using 1st follower
+			reposLBS[1].remove(new RemoveOp(null, null, null));
 
-    }
+			// Verify everything is gone on the leader.
+			awaitHAStatus(serverA, HAStatusEnum.Leader);
+
+			// Should be zero.
+			assertEquals(0L, getCountStar(serverA, false/* useLBS */));
+
+			// await the commit point to become visible on each service.
+			awaitCommitCounter(3L, services);
+
+			// Verify binary equality of ALL journals.
+			assertDigestsEquals(services);
+		} finally {
+			for (RemoteRepositoryManager r : repos) {
+				if (r != null)
+					r.close();
+			}
+			for (RemoteRepositoryManager r : reposLBS) {
+				if (r != null)
+					r.close();
+			}
+			
+			client.stop();
+		}
+
+	}
     
     /**
      * Test of a simple sequence of events that I often test through a web
@@ -399,75 +453,90 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
      * }
      * </pre>
      */
-    public void test_simple_sequence() throws Exception {
+	public void test_simple_sequence() throws Exception {
 
-        final ABC abc = new ABC(true/* sequential */);
+		final ABC abc = new ABC(true/* sequential */);
 
-        final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
+		final HAGlue serverA = abc.serverA, serverB = abc.serverB, serverC = abc.serverC;
 
-        // The expected HStatus for each of the services (A,B,C).
-        final HAStatusEnum[] expectedHAStatusArray = new HAStatusEnum[] { //
-                HAStatusEnum.Leader, //
-                HAStatusEnum.Follower,//
-                HAStatusEnum.Follower //
-                };
+		// The expected HStatus for each of the services (A,B,C).
+		final HAStatusEnum[] expectedHAStatusArray = new HAStatusEnum[] { //
+		HAStatusEnum.Leader, //
+				HAStatusEnum.Follower,//
+				HAStatusEnum.Follower //
+		};
 
-        // The services in their join order.
-        final HAGlue[] services = new HAGlue[] { serverA, serverB, serverC };
-        
-        // Verify quorum is FULLY met.
-        awaitFullyMetQuorum();
+		// The services in their join order.
+		final HAGlue[] services = new HAGlue[] { serverA, serverB, serverC };
 
-        // await the KB create commit point to become visible on each service.
-        awaitCommitCounter(1L, services);
+		// Verify quorum is FULLY met.
+		awaitFullyMetQuorum();
 
-        // Verify binary equality of ALL journals.
-        assertDigestsEquals(services);
+		// await the KB create commit point to become visible on each service.
+		awaitCommitCounter(1L, services);
 
-        // Verify the HAStatus of each service.
-        awaitHAStatus(expectedHAStatusArray, services);
+		// Verify binary equality of ALL journals.
+		assertDigestsEquals(services);
 
-        // Impose the desired LBS policy.
-        setPolicy(newTestPolicy(), services);
-        
-        // Repositories without the LBS.
-        final RemoteRepository[] repos = new RemoteRepository[3];
-        repos[0] = getRemoteRepository(serverA);
-        repos[1] = getRemoteRepository(serverB);
-        repos[2] = getRemoteRepository(serverC);
+		// Verify the HAStatus of each service.
+		awaitHAStatus(expectedHAStatusArray, services);
 
-        // Repositories with the LBS.
-        final RemoteRepository[] reposLBS = new RemoteRepository[3];
-        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */);
-        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */);
-        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */);
+		// Impose the desired LBS policy.
+		setPolicy(newTestPolicy(), services);
 
-        /*
-         * Verify read on each service.
-         */
-        assertEquals(0L, getCountStar(serverA));
-        assertEquals(0L, getCountStar(serverB));
-        assertEquals(0L, getCountStar(serverC));
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+		
+		// Repositories without the LBS.
+		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
+		// Repositories with the LBS.
+		final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
+		try {
+			repos[0] = getRemoteRepository(serverA, client);
+			repos[1] = getRemoteRepository(serverB, client);
+			repos[2] = getRemoteRepository(serverC, client);
 
-        /*
-         * Verify insert on A, read back on all.
-         */
-        simpleInsertTransaction_noQuorumCheck(serverA, true/* useLoadBalancer */);
+			reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
+			reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
+			reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
 
-        assertEquals(2L, getCountStar(serverA));
-        assertEquals(2L, getCountStar(serverB));
-        assertEquals(2L, getCountStar(serverC));
+			/*
+			 * Verify read on each service.
+			 */
+			assertEquals(0L, getCountStar(serverA));
+			assertEquals(0L, getCountStar(serverB));
+			assertEquals(0L, getCountStar(serverC));
 
-        /*
-         * Verify delete on B, read back on all.
-         */
-        simpleDeleteTransaction_noQuorumCheck(serverB, true/* useLoadBalancer */);
+			/*
+			 * Verify insert on A, read back on all.
+			 */
+			simpleInsertTransaction_noQuorumCheck(serverA, true/* useLoadBalancer */);
 
-        assertEquals(0L, getCountStar(serverA));
-        assertEquals(0L, getCountStar(serverB));
-        assertEquals(0L, getCountStar(serverC));
-        
-    }
+			assertEquals(2L, getCountStar(serverA));
+			assertEquals(2L, getCountStar(serverB));
+			assertEquals(2L, getCountStar(serverC));
+
+			/*
+			 * Verify delete on B, read back on all.
+			 */
+			simpleDeleteTransaction_noQuorumCheck(serverB, true/* useLoadBalancer */);
+
+			assertEquals(0L, getCountStar(serverA));
+			assertEquals(0L, getCountStar(serverB));
+			assertEquals(0L, getCountStar(serverC));
+		} finally {
+			for (RemoteRepositoryManager r : repos) {
+				if (r != null)
+					r.close();
+			}
+			for (RemoteRepositoryManager r : reposLBS) {
+				if (r != null)
+					r.close();
+			}
+			
+			client.stop();
+		}
+
+	}
 
     protected void simpleInsertTransaction_noQuorumCheck(final HAGlue haGlue,
             final boolean useLoadBalancer) throws IOException, Exception {
@@ -481,30 +550,42 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
         final String updateStr = sb.toString();
 
-        final RemoteRepository repo = getRemoteRepository(haGlue,
-                useLoadBalancer);
-
-        repo.prepareUpdate(updateStr).evaluate();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        
+        final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+                useLoadBalancer, client);
+        try {
+        	repo.prepareUpdate(updateStr).evaluate();
+        } finally {
+        	repo.close();
+        	client.stop();
+        }
 
     }
 
     protected void simpleDeleteTransaction_noQuorumCheck(final HAGlue haGlue,
-            final boolean useLoadBalancer) throws IOException, Exception {
+			final boolean useLoadBalancer) throws IOException, Exception {
 
-        final StringBuilder sb = new StringBuilder();
-        sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-        sb.append("DELETE DATA {\n");
-        sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-        sb.append("  dc:creator \"A.N.Other\" .\n");
-        sb.append("}\n");
+		final StringBuilder sb = new StringBuilder();
+		sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+		sb.append("DELETE DATA {\n");
+		sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+		sb.append("  dc:creator \"A.N.Other\" .\n");
+		sb.append("}\n");
 
-        final String updateStr = sb.toString();
+		final String updateStr = sb.toString();
 
-        final RemoteRepository repo = getRemoteRepository(haGlue,
-                useLoadBalancer);
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        
+		final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+				useLoadBalancer, client);
+		try {
+			repo.prepareUpdate(updateStr).evaluate();
+		} finally {
+			repo.close();
+			client.stop();
+		}
 
-        repo.prepareUpdate(updateStr).evaluate();
-
-    }
+	}
 
 }

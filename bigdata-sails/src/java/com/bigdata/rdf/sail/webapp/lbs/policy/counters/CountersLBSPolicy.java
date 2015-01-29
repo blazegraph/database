@@ -34,15 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
-import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.api.Request;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -55,8 +49,10 @@ import com.bigdata.journal.PlatformStatsPlugIn;
 import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.rdf.sail.webapp.CountersServlet;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
+import com.bigdata.rdf.sail.webapp.client.EntityContentProvider;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHostMetrics;
@@ -165,7 +161,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
             hosts = tmp.toArray(new String[tmp.size()]);
         }
 
-        final ClientConnectionManager cm = getClientConnectionManager();
+        final HttpClient cm = getClientConnectionManager();
 
         for (String hostname : hosts) {
 
@@ -212,7 +208,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
     }
 
-    private ClientConnectionManager getClientConnectionManager() {
+    private HttpClient getClientConnectionManager() {
 
         final Journal journal = getJournal();
 
@@ -232,7 +228,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
         }
 
-        final ClientConnectionManager cm = queryEngine
+        final HttpClient cm = queryEngine
                 .getClientConnectionManager();
 
         return cm;
@@ -250,7 +246,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
      * @return
      * @throws Exception
      */
-    private static CounterSet doCountersQuery(final ClientConnectionManager cm,
+    private static CounterSet doCountersQuery(final HttpClient cm,
             final String hostname, final String baseRequestURI,
             final int uniqueId) throws Exception {
 
@@ -271,24 +267,16 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
         // Used to defeat the httpd cache on /counters.
         o.addRequestParam("uniqueId", Integer.toString(uniqueId));
 
-        final DefaultHttpClient httpClient = new DefaultHttpClient(cm);
-
-        // Setup a standard strategy for following redirects.
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
-
-        HttpResponse response = null;
-        HttpEntity entity = null;
         boolean didDrainEntity = false;
+        JettyResponseListener response = null;
         try {
 
-            response = doConnect(httpClient, o);
+            response = doConnect(cm, o);
 
             RemoteRepository.checkResponseCode(response);
 
-            entity = response.getEntity();
-
             // Check the mime type for something we can handle.
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
@@ -300,7 +288,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
             final CounterSet counterSet = new CounterSet();
 
-            final InputStream is = entity.getContent();
+            final InputStream is = response.getInputStream();
 
             try {
 
@@ -332,12 +320,8 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
         } finally {
             
-            if (entity != null && !didDrainEntity) {
-                try {
-                    EntityUtils.consume(entity);
-                } catch (IOException ex) {
-                    log.warn(ex);
-                }
+			if (response != null && !didDrainEntity) {
+				response.abort();
             }
             
         }
@@ -352,7 +336,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
      * 
      * @return The connection.
      */
-    static private HttpResponse doConnect(final DefaultHttpClient httpClient,
+    static private JettyResponseListener doConnect(final HttpClient httpClient,
             final ConnectOptions opts) throws IOException {
 
         /*
@@ -372,10 +356,10 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
             log.debug(urlString.toString());
         }
 
-        HttpUriRequest request = null;
+        Request request = null;
         try {
 
-            request = RemoteRepository.newRequest(urlString.toString(),
+            request = RemoteRepository.newRequest(httpClient, urlString.toString(),
                     opts.method);
 
             if (opts.requestHeaders != null) {
@@ -383,7 +367,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
                 for (Map.Entry<String, String> e : opts.requestHeaders
                         .entrySet()) {
 
-                    request.addHeader(e.getKey(), e.getValue());
+                    request.header(e.getKey(), e.getValue());
 
                     if (log.isDebugEnabled())
                         log.debug(e.getKey() + ": " + e.getValue());
@@ -394,14 +378,16 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
             
             if (opts.entity != null) {
 
-                ((HttpEntityEnclosingRequestBase) request)
-                        .setEntity(opts.entity);
+            	final EntityContentProvider cp = new EntityContentProvider(opts.entity);
+                request.content(cp, cp.getContentType());
 
             }
 
-            final HttpResponse response = httpClient.execute(request);
+            final JettyResponseListener listener = new JettyResponseListener(request);
             
-            return response;
+            request.send(listener);
+            
+            return listener;
 
         } catch (Throwable t) {
             /*
@@ -411,7 +397,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
             try {
                 
                 if (request != null)
-                    request.abort();
+                    request.abort(t);
                 
                 
             } catch (Throwable t2) {

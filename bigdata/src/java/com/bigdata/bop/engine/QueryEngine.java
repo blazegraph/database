@@ -51,8 +51,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -72,8 +72,7 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.internal.constraints.TrueBOp;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
@@ -380,10 +379,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     private final IIndexManager localIndexManager;
 
     /**
-     * The {@link ClientConnectionManager} is used to make remote HTTP
-     * connections (SPARQL SERVICE call joins).
-     */
-    private final AtomicReference<ClientConnectionManager> clientConnectionManagerRef = new AtomicReference<ClientConnectionManager>();
+	 * The {@link HttpClient} is used to make remote HTTP connections (SPARQL
+	 * SERVICE call joins).
+	 */
+    private final AtomicReference<HttpClient> clientConnectionManagerRef = new AtomicReference<HttpClient>();
     
 //    /**
 //     * A pool used to service IO requests (reads on access paths).
@@ -470,12 +469,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     }
     
     /**
-     * Return the {@link ClientConnectionManager} used to make remote SERVICE
-     * call requests.
-     */
-    public ClientConnectionManager getClientConnectionManager() {
+	 * Return the {@link HttpClient} used to make remote SERVICE call requests.
+	 */
+    public HttpClient getClientConnectionManager() {
 
-        ClientConnectionManager cm = clientConnectionManagerRef.get();
+    	HttpClient cm = clientConnectionManagerRef.get();
         
         if (cm == null) {
 
@@ -501,7 +499,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                      */
                     
                     clientConnectionManagerRef
-                            .set(cm = DefaultClientConnectionManagerFactory
+                            .set(cm = HttpClientConfigurator
                                     .getInstance().newInstance());
 
                 }
@@ -1183,11 +1181,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
-        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
-                log.info("Terminating ClientConnectionManager: " + this);
-            cm.shutdown();
+                log.info("Terminating HttpClient: " + this);
+            try {
+				cm.stop();
+			} catch (Exception e) {
+				log.error("Problem shutting down HttpClient", e);
+			}
         }
         
         // clear the queues
@@ -1236,11 +1238,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
-        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
-                log.info("Terminating ClientConnectionManager: " + this);
-            cm.shutdown();
+                log.info("Terminating HttpClient: " + this);
+            try {
+				cm.stop();
+			} catch (Exception e) {
+				log.error("Problem stopping HttpClient", e);
+			}
         }
 
         // halt any running queries.

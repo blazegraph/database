@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
 package com.bigdata.rdf.sail.webapp.client;
 
 import java.io.ByteArrayOutputStream;
@@ -27,11 +28,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.util.EntityUtils;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.GraphQueryResult;
 
 import com.bigdata.rdf.properties.PropertiesFormat;
@@ -40,28 +38,20 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
+import com.bigdata.util.InnerCause;
 
 /**
- * Java client for the Multi-Tenancy API on a remote Nano Sparql Server.
+ * A manager for connections to one or more REST API / SPARQL end points for the
+ * same bigdata service.
  * 
- * <p>
- * Note: The {@link RemoteRepository} object SHOULD be reused for multiple
- * operations against the same end point.
- * 
- * @see <a href=
- *      "https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"
- *      > NanoSparqlServer REST API </a>
- * 
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/628" > Create
- *      a bigdata-client jar for the NSS REST API </a>
- * 
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/696" >
- *      Incorrect HttpEntity consuming in RemoteRepositoryManager </a>
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author bryan
  */
-public class RemoteRepositoryManager extends RemoteRepository {
+public class RemoteRepositoryManager extends RemoteRepository
+		implements AutoCloseable {
 
+//    private static final transient Logger log = Logger
+//            .getLogger(JettyRemoteRepositoryManager.class);
+    
     /**
      * The path to the root of the web application (without the trailing "/").
      * <p>
@@ -72,6 +62,11 @@ public class RemoteRepositoryManager extends RemoteRepository {
      */
     private final String baseServiceURL;
 
+    /**
+     * <code>true</code> iff open.
+     */
+    private volatile boolean m_closed = false;
+    
     /**
      * The path to the root of the web application (without the trailing "/").
      * <p>
@@ -86,28 +81,59 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
     }
     
+    /**
+	 * 
+	 * @param serviceURL
+	 *            The path to the root of the web application (without the
+	 *            trailing "/"). <code>/sparql</code> will be appended to this
+	 *            path to obtain the SPARQL end point for the default data set.
+	 * @param httpClient
+	 *            If the client implements {@link AutoCloseable} then it will be
+	 *            closed by {@link #close()}.
+	 * @param executor
+	 *            The life cycle of this object is owned by the caller.
+	 * 
+	 *            TODO Should this be deprecated since it does not force the
+	 *            caller to choose a value for <code>useLBS</code>?
+	 *            <p>
+	 *            This version does not force the caller to decide whether or
+	 *            not the LBS pattern will be used. In general, it should be
+	 *            used if the end point is bigdata. This class is generally, but
+	 *            not always, used with a bigdata end point. The main exception
+	 *            is SPARQL Basic Federated Query. For that use case we can not
+	 *            assume that the end point is bigdata and thus we can not use
+	 *            the LBS prefix.
+	 */
     public RemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
-        this(serviceURL, true/* useLBS */, httpClient, executor);
+        this(serviceURL, false/* useLBS */, httpClient, executor);
 
     }
     
     /**
-     * 
-     * @param serviceURL
-     *            The path to the root of the web application (without the
-     *            trailing "/"). <code>/sparql</code> will be appended to this
-     *            path to obtain the SPARQL end point for the default data set.
-     * @param useLBS
-     *            When <code>true</code>, the REST API methods will use the load
-     *            balancer aware requestURLs. The load balancer has essentially
-     *            zero cost when not using HA, so it is recommended to always
-     *            specify <code>true</code>. When <code>false</code>, the REST
-     *            API methods will NOT use the load balancer aware requestURLs.
-     * @param httpClient
-     * @param executor
-     */
+	 * 
+	 * @param serviceURL
+	 *            The path to the root of the web application (without the
+	 *            trailing "/"). <code>/sparql</code> will be appended to this
+	 *            path to obtain the SPARQL end point for the default data set.
+	 * @param useLBS
+	 *            When <code>true</code>, the REST API methods will use the load
+	 *            balancer aware requestURLs. The load balancer has essentially
+	 *            zero cost when not using HA, so it is recommended to always
+	 *            specify <code>true</code>. When <code>false</code>, the REST
+	 *            API methods will NOT use the load balancer aware requestURLs.
+	 * @param httpClient
+	 *            If the client implements {@link AutoCloseable} then it will be
+	 *            closed by {@link #close()}.
+	 * @param executor
+	 *            The life cycle of this object is owned by the caller.
+	 * 
+	 *            TODO We could define a constructor that creates the
+	 *            {@link HttpClient} and {@link Executor} and then "autocloses"
+	 *            them. This would simplify some test code, and might help some
+	 *            client application code, but it would not be used internally.
+	 */
     public RemoteRepositoryManager(final String serviceURL,
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
@@ -118,7 +144,18 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
     }
 
-    /**
+// Remove auto client creation option
+//    public JettyRemoteRepositoryManager(String serviceURL,
+//    		final Executor executor) {
+//		this(serviceURL, DefaultClient(false), executor);
+//	}
+//
+//    public JettyRemoteRepositoryManager(String serviceURL, boolean useLBS,
+//			ExecutorService executorService) {
+//		this(serviceURL, useLBS, DefaultClient(false), executorService);
+//	}
+    
+	/**
      * Return the base URL for a remote repository (less the /sparql path
      * component).
      * 
@@ -187,7 +224,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
      */
     public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
 
-        return getRepositoryForURL(sparqlEndpointURL, useLBS);
+        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient, executor);
 
     }
 
@@ -205,7 +242,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
      */
     public GraphQueryResult getRepositoryDescriptions() throws Exception {
 
-        final ConnectOptions opts = newConnectOptions(baseServiceURL + "/namespace");
+        final ConnectOptions opts = new ConnectOptions(baseServiceURL + "/namespace");
         
         opts.method = "GET";
 
@@ -214,24 +251,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
         
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        return graphResults(opts, null/* queryId */, null);
-        
-//        try {
-//            // check response in try.
-//            checkResponseCode(response = doConnect(opts));
-//
-//            // return asynchronous parse of result.
-//            return result = graphResults(response);
-//
-//        } finally {
-//            if (result == null) {
-//                // Consume entity if bad response.
-//                try {
-//                    EntityUtils.consume(response.getEntity());
-//                } catch (IOException ex) {
-//                }
-//            }
-//        }
+        return graphResults(opts, null/* queryId */, null /*listener*/);
     }
 
     /**
@@ -255,12 +275,15 @@ public class RemoteRepositoryManager extends RemoteRepository {
             throw new IllegalArgumentException("Property not defined: "
                     + OPTION_CREATE_KB_NAMESPACE);
 
-        final ConnectOptions opts = newConnectOptions(baseServiceURL
+//        final ConnectOptions opts = new ConnectOptions(baseServiceURL
+//                + "/namespace", httpClient);
+
+        final ConnectOptions opts = new ConnectOptions(baseServiceURL
                 + "/namespace");
 
         opts.method = "POST";
 
-        HttpResponse response = null;
+        JettyResponseListener response = null;
 
         // Setup the request entity.
         {
@@ -287,15 +310,9 @@ public class RemoteRepositoryManager extends RemoteRepository {
         try {
 
             checkResponseCode(response = doConnect(opts));
-
         } finally {
-
-            if (response != null) {
-                try {
-                    EntityUtils.consume(response.getEntity());
-                } catch (IOException ex) {
-                }
-            }
+        	if (response != null)
+        		response.abort();
 
         }
         
@@ -317,7 +334,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         opts.method = "DELETE";
 
-        HttpResponse response = null;
+        JettyResponseListener response = null;
 
         try {
 
@@ -325,12 +342,9 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         } finally {
 
-            if (response != null) {
-                try {
-                    EntityUtils.consume(response.getEntity());
-                } catch (IOException ex) {
-                }
-            }
+        	if (response != null)
+        		response.abort();
+            
 
         }
         
@@ -360,17 +374,15 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
         opts.method = "GET";
 
-        HttpResponse response = null;
+        JettyResponseListener response = null;
 
         opts.setAcceptHeader(ConnectOptions.MIME_PROPERTIES_XML);
-
+        boolean consumeNeeded = true;
         try {
 
             checkResponseCode(response = doConnect(opts));
 
-            final HttpEntity entity = response.getEntity();
-
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             if (contentType == null)
                 throw new RuntimeException("Not found: Content-Type");
@@ -385,7 +397,7 @@ public class RemoteRepositoryManager extends RemoteRepository {
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType="
                                 + contentType + " : response="
-                                + getResponseBody(response));
+                                + response.getResponseBody());
 
             final PropertiesParserFactory factory = PropertiesParserRegistry
                     .getInstance().get(format);
@@ -397,21 +409,40 @@ public class RemoteRepositoryManager extends RemoteRepository {
 
             final PropertiesParser parser = factory.getParser();
 
-            final Properties properties = parser.parse(entity.getContent());
+            final Properties properties = parser.parse(response.getInputStream());
 
+            consumeNeeded = false;
+            
             return properties;
-
+        } catch (Exception e) {
+            consumeNeeded = !InnerCause.isInnerCause(e,
+                    HttpException.class);
+        	throw e;
         } finally {
 
-            if (response != null) {
-                try {
-                    EntityUtils.consume(response.getEntity());
-                } catch (IOException ex) {
-                }
-            }
-
+        	if (response != null && consumeNeeded)
+        		response.abort();
+            
         }
 
     }
+
+    @Override
+	public void close() throws Exception {
+
+		if (!m_closed) {
+			// Already closed.
+			return;
+		}
+
+		if (httpClient instanceof AutoCloseable) {
+
+			((AutoCloseable) httpClient).close();
+
+		}
+
+		m_closed = true;
+
+	}
 
 }

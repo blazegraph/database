@@ -33,6 +33,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
@@ -44,7 +46,9 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suite for the {@link ISnapshotPolicy}. This test suite is focused on the
@@ -427,129 +431,146 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
      * 2nd RMI.
      */
     public void testAB_snapshot_running_2nd_snapshot_same_future()
-            throws Exception {
+			throws Exception {
 
-        // Start 2 services.
-        final HAGlue serverA = startA();
-        final HAGlue serverB = startB();
+		// Start 2 services.
+		final HAGlue serverA = startA();
+		final HAGlue serverB = startB();
 
-        // Wait for a quorum meet.
-        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
-                TimeUnit.MILLISECONDS);
+		// Wait for a quorum meet.
+		final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+				TimeUnit.MILLISECONDS);
 
-        // Await initial commit point (KB create).
-        awaitCommitCounter(1L, serverA, serverB);
+		// Await initial commit point (KB create).
+		awaitCommitCounter(1L, serverA, serverB);
 
-        // The joined services, in their service join order.
-        final UUID[] joined = quorum.getJoined();
+		// The joined services, in their service join order.
+		final UUID[] joined = quorum.getJoined();
 
-        // The HAGlue interfaces for those joined services, in join order.
-        final HAGlue[] services = new HAGlue[joined.length];
+		// The HAGlue interfaces for those joined services, in join order.
+		final HAGlue[] services = new HAGlue[joined.length];
 
-        final RemoteRepository[] repos = new RemoteRepository[joined.length];
-        
-        for (int i = 0; i < joined.length; i++) {
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+		try {
+			final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[joined.length];
+			try {
+				for (int i = 0; i < joined.length; i++) {
 
-            services[i] = quorum.getClient().getService(joined[i]);
+					services[i] = quorum.getClient().getService(joined[i]);
 
-            repos[i] = getRemoteRepository(services[i]);
-            
+					repos[i] = getRemoteRepository(services[i], client);
+
+				}
+
+				/*
+				 * LOAD data on leader.
+				 */
+				{
+
+					final FutureTask<Void> ft = new FutureTask<Void>(
+							new LargeLoadTask(token, true/* reallyLargeLoad */));
+
+					executorService.submit(ft);
+
+					// impose timeout on load.
+					ft.get(2 * longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
+
+				}
+
+				// Current commit point.
+				final long lastCommitCounter2 = 2L;
+
+				// There are now TWO (2) commit points.
+				awaitCommitCounter(lastCommitCounter2, serverA, serverB);
+
+				/*
+				 * Verify that query on all nodes is allowed and now provides a
+				 * non-empty result.
+				 */
+				for (RemoteRepositoryManager r : repos) {
+
+					// Should have data.
+					assertEquals(
+							100L,
+							countResults(r.prepareTupleQuery(
+									"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
+
+				}
+
+				final HAGlue leader = quorum.getClient().getLeader(token);
+
+				{
+
+					// Verify quorum is still valid.
+					quorum.assertQuorum(token);
+
+					// Snapshot directory is empty.
+					assertEquals(
+							0,
+							recursiveCount(getSnapshotDirA(),
+									SnapshotManager.SNAPSHOT_FILTER));
+
+					final Future<IHASnapshotResponse> ft = leader
+							.takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
+
+					final Future<IHASnapshotResponse> ft2 = leader
+							.takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
+
+					// Both Futures are non-null.
+					assertNotNull(ft);
+
+					assertNotNull(ft2);
+
+					// Neither Future is done.
+					assertFalse(ft.isDone());
+
+					assertFalse(ft2.isDone());
+
+					// wait for the snapshot.
+					try {
+						ft.get(20, TimeUnit.SECONDS);
+					} catch (TimeoutException ex) {
+						// Interrupt both futures.
+						ft.cancel(true/* mayInterruptIfRunning */);
+						ft2.cancel(true/* mayInterruptIfRunning */);
+						throw ex;
+					}
+
+					// Verify 2nd future is also done (the should be two proxies
+					// for
+					// the
+					// same future).
+					assertTrue(ft2.isDone());
+
+					// Verify no error on 2nd future.
+					ft2.get();
+
+					final IRootBlockView snapshotRB = ft.get().getRootBlock();
+
+					final long commitCounter = 2L;
+
+					// Verify snapshot is for the expected commit point.
+					assertEquals(commitCounter, snapshotRB.getCommitCounter());
+
+					// Snapshot directory contains the desired filename.
+					assertExpectedSnapshots(getSnapshotDirA(),
+							new long[] { commitCounter });
+
+					// Verify digest of snapshot agrees with digest of journal.
+					assertSnapshotDigestEquals(leader, commitCounter);
+
+				}
+			} finally {
+				for (RemoteRepositoryManager r : repos) {
+					if (r != null)
+						r.close();
+
+				}
+			}
+		} finally {
+        	client.stop();
         }
-        
-        /*
-         * LOAD data on leader.
-         */
-        {
-
-            final FutureTask<Void> ft = new FutureTask<Void>(new LargeLoadTask(
-                    token, true/* reallyLargeLoad */));
-
-            executorService.submit(ft);
-
-            // impose timeout on load.
-            ft.get(2 * longLoadTimeoutMillis, TimeUnit.MILLISECONDS);
-            
-        }
-
-        // Current commit point.
-        final long lastCommitCounter2 = 2L;
-
-        // There are now TWO (2) commit points.
-        awaitCommitCounter(lastCommitCounter2, serverA, serverB);
-
-        /*
-         * Verify that query on all nodes is allowed and now provides a
-         * non-empty result.
-         */
-        for (RemoteRepository r : repos) {
-
-            // Should have data.
-            assertEquals(100L,
-                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c} LIMIT 100")
-                            .evaluate()));
-
-        }
-
-        final HAGlue leader = quorum.getClient().getLeader(token);
-
-        {
-
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-
-            // Snapshot directory is empty.
-            assertEquals(0, recursiveCount(getSnapshotDirA(), SnapshotManager.SNAPSHOT_FILTER));
-
-            final Future<IHASnapshotResponse> ft = leader
-                    .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
-
-            final Future<IHASnapshotResponse> ft2 = leader
-                    .takeSnapshot(new HASnapshotRequest(0/* percentLogSize */));
-
-            // Both Futures are non-null.
-            assertNotNull(ft);
-            
-            assertNotNull(ft2);
-
-            // Neither Future is done.
-            assertFalse(ft.isDone());
-
-            assertFalse(ft2.isDone());
-            
-            // wait for the snapshot.
-            try {
-                ft.get(20, TimeUnit.SECONDS);
-            } catch (TimeoutException ex) {
-                // Interrupt both futures.
-                ft.cancel(true/* mayInterruptIfRunning */);
-                ft2.cancel(true/* mayInterruptIfRunning */);
-                throw ex;
-            }
-            
-            // Verify 2nd future is also done (the should be two proxies for the
-            // same future).
-            assertTrue(ft2.isDone());
-
-            // Verify no error on 2nd future.
-            ft2.get();
-
-            final IRootBlockView snapshotRB = ft.get().getRootBlock();
-
-            final long commitCounter = 2L;
-            
-            // Verify snapshot is for the expected commit point.
-            assertEquals(commitCounter, snapshotRB.getCommitCounter());
-
-            // Snapshot directory contains the desired filename.
-            assertExpectedSnapshots(getSnapshotDirA(),
-                    new long[] { commitCounter });
-
-            // Verify digest of snapshot agrees with digest of journal.
-            assertSnapshotDigestEquals(leader, commitCounter);
-
-        }
-
-    }
+	}
     
     /**
      * Unit test starts A+B and runs N transactions. It then takes a snapshot.

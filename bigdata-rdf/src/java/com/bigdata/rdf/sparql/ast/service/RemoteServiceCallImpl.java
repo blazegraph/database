@@ -29,15 +29,16 @@ package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.UUID;
 
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -139,17 +140,12 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         o.addRequestParam("query", queryStr);
         
         o.addRequestParam("queryId", queryId.toString());
-
-        final DefaultHttpClient httpClient = new DefaultHttpClient(
-                params.getClientConnectionManager());
-
-        // Setup a standard strategy for following redirects.
-        httpClient.setRedirectStrategy(new DefaultRedirectStrategy());
         
-        final RemoteRepository repo = new RemoteRepository(//
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(//
                 uriStr,//
                 params.getServiceOptions().isBigdataLBS(),// useLBS
-                httpClient,//
+                client,
                 params.getTripleStore().getExecutorService()
                 );
         
@@ -176,10 +172,9 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
             
         } finally {
 
-            /*
-             * Note: HttpURLConnection.disconnect() is not a "close". close() is
-             * an implicit action for this class.
-             */
+            repo.close();
+            
+            client.stop();
 
         }
 

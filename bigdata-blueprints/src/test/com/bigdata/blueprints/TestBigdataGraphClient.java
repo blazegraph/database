@@ -29,7 +29,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.webapp.client.BigdataSailNSSWrapper;
+import com.bigdata.rdf.sail.webapp.BigdataSailNSSWrapper;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.TestSuite;
@@ -155,7 +155,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 		    for (BigdataSailNSSWrapper wrapper : testSails.values()) {
 		        try {
     		        wrapper.shutdown();
-    		        wrapper.sail.__tearDownUnitTest();
+    		        wrapper.getSail().__tearDownUnitTest();
 		        } catch (Exception ex) {
 		            throw new RuntimeException(ex);
 		        }

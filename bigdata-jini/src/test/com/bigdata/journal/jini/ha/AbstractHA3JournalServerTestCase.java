@@ -69,6 +69,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.data.ACL;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -97,8 +98,10 @@ import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -2883,10 +2886,15 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        final RemoteRepository repo = getRemoteRepository(haGlue,
-                useLoadBalancer);
-
-        repo.prepareUpdate(updateStr).evaluate();
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+                useLoadBalancer, client);
+        try {
+        	repo.prepareUpdate(updateStr).evaluate();
+        } finally {
+        	repo.close();
+        	client.stop();
+        }
 
     }
     
@@ -2908,9 +2916,18 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         try {
 
-            getRemoteRepository(haGlue).prepareUpdate(updateStr).evaluate();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+        	try {
+        		repo.prepareUpdate(updateStr).evaluate();
+        	} finally {
+        		repo.close();
+        		client.stop();
+        	}
 
         } catch (HttpException ex) {
+        	
+        	log.warn("Status Code: " + ex.getStatusCode(), ex);
 
             assertEquals("statusCode", 405, ex.getStatusCode());
 
@@ -2927,8 +2944,14 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-         
-            getRemoteRepository(haGlue).prepareTupleQuery(queryStr).evaluate();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+        	try {
+        		repo.prepareTupleQuery(queryStr).evaluate();
+        	} finally {
+        		repo.close();
+        		client.stop();
+        	}
             
         } catch (HttpException ex) {
             
@@ -3039,7 +3062,14 @@ public abstract class AbstractHA3JournalServerTestCase extends
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
 
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+            final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
+        	try {
+        		repo.prepareUpdate(updateStr).evaluate();
+        	} finally {
+        		repo.close();
+        		client.stop();
+        	}
 
             // Verify quorum is still valid.
             quorum.assertQuorum(token);

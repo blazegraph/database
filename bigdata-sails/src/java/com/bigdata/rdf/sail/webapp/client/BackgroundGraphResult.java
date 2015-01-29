@@ -14,8 +14,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.util.EntityUtils;
 import org.openrdf.model.Statement;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryEvaluationException;
@@ -42,23 +40,18 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
     final private CountDownLatch namespacesReady = new CountDownLatch(1);
     final private Map<String, String> namespaces = new ConcurrentHashMap<String, String>();
     final private QueueCursor<Statement> queue;
-    final private HttpEntity entity;
-
     public BackgroundGraphResult(final RDFParser parser, final InputStream in,
-            final Charset charset, final String baseURI, final HttpEntity entity) {
-        this(new QueueCursor<Statement>(10), parser, in, charset, baseURI,
-                entity);
+            final Charset charset, final String baseURI) {
+        this(new QueueCursor<Statement>(10), parser, in, charset, baseURI);
     }
 
     public BackgroundGraphResult(final QueueCursor<Statement> queue,
-            final RDFParser parser, final InputStream in, final Charset charset, final String baseURI,
-            final HttpEntity entity) {
+            final RDFParser parser, final InputStream in, final Charset charset, final String baseURI) {
         this.queue = queue;
         this.parser = parser;
         this.in = in;
         this.charset = charset;
         this.baseURI = baseURI;
-        this.entity = entity;
     }
 
     @Override
@@ -84,7 +77,7 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
         }
         try {
             queue.close();
-            in.close();
+            in.close(); // close the input stream.
         } catch (IOException e) {
             throw new QueryEvaluationException(e);
         }
@@ -92,7 +85,7 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
 
     @Override
     public void run() {
-        boolean completed = false;
+//        boolean completed = false;
         parserThread = Thread.currentThread();
         try {
             parser.setRDFHandler(this);
@@ -101,8 +94,7 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
             } else {
                 parser.parse(new InputStreamReader(in, charset), baseURI);
             }
-            EntityUtils.consume(entity);
-            completed = true;
+//            completed = true;
         } catch (RDFHandlerException e) {
             // parsing was cancelled or interrupted
         } catch (RDFParseException e) {
@@ -112,11 +104,6 @@ public class BackgroundGraphResult implements GraphQueryResult, Runnable,
         } finally {
             parserThread = null;
             queue.done();
-            if (!completed) {
-                try {
-                    EntityUtils.consume(entity);
-                } catch (IOException ex) { }
-            }
         }
     }
 
