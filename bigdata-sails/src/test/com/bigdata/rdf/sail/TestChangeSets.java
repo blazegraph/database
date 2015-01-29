@@ -32,10 +32,13 @@ import java.util.LinkedList;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.RepositoryResult;
+import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -100,6 +103,21 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         return props;
         
     }
+    
+    
+    /**
+     * Returns a configuration where stripping of quads within the loading
+     * process is disabled.
+     * @return
+     */
+    public Properties getTriplesNoInferenceNoQuadsStripping() {
+       
+       Properties props = getTriplesNoInference();
+       props.setProperty(BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE, "true");
+       
+       return props;       
+   }    
+    
 
     /**
      * 
@@ -942,4 +960,86 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         
     }
 
+    
+    /**
+     * When loading quads into a triple store, the context is striped away by
+     * default.
+     */
+    public void testQuadStripping() throws Exception {
+
+        BigdataSailRepositoryConnection cxn = null;
+
+        final BigdataSail sail = getSail(getTriplesNoInference());
+
+        try {
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+
+            final BigdataValueFactory vf = (BigdataValueFactory) sail
+                  .getValueFactory();
+            final URI s = vf.createURI("http://test/s");
+            final URI p = vf.createURI("http://test/p");
+            final URI o = vf.createURI("http://test/o");
+            final URI c = vf.createURI("http://test/c");
+
+            BigdataStatement stmt = vf.createStatement(s, p, o, c);
+            cxn.add(stmt); 
+
+            RepositoryResult<Statement> stmts = cxn.getStatements(null, null,
+                  null, false);
+            Statement res = stmts.next();
+            assertEquals(s, res.getSubject());
+            assertEquals(p, res.getPredicate());
+            assertEquals(o, res.getObject());
+            assertEquals(null, res.getContext());
+
+        } finally {
+            if (cxn != null)
+                cxn.close();
+            sail.__tearDownUnitTest();
+        }
+    }
+
+   /**
+    * When loading quads into a triple store and the BigdataSail option
+    * REJECT_QUADS_IN_TRIPLE_MODE is set to true, an exception will be thrown.
+    */
+   public void testQuadStrippingRejected() throws Exception {
+
+      BigdataSailRepositoryConnection cxn = null;
+
+      final BigdataSail sail = getSail(getTriplesNoInferenceNoQuadsStripping());
+
+      boolean exceptionEncountered = false;
+      try {
+
+         sail.initialize();
+         final BigdataSailRepository repo = new BigdataSailRepository(sail);
+         cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+
+         final BigdataValueFactory vf = (BigdataValueFactory) sail
+               .getValueFactory();
+         final URI s = vf.createURI("http://test/s");
+         final URI p = vf.createURI("http://test/p");
+         final URI o = vf.createURI("http://test/o");
+         final URI c = vf.createURI("http://test/c");
+
+         BigdataStatement stmt = vf.createStatement(s, p, o, c);
+         cxn.add(stmt);
+
+      } catch (RepositoryException e) {
+         
+         exceptionEncountered = true; // expected !
+         
+      } finally {
+         
+         if (cxn != null)
+            cxn.close();
+         sail.__tearDownUnitTest();
+      }
+      
+      assertTrue(exceptionEncountered);
+   }    
 }
