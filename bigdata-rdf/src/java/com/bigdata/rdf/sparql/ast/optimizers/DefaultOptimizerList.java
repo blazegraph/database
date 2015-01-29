@@ -496,6 +496,19 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
 			add(new ASTFastRangeCountOptimizer());
 
+		/**
+		 * Optimizes SELECT COUNT(*) ?z { triple-pattern } GROUP BY ?z using
+		 * the fast rang count pattern documented above, i.e. the COUNT is
+		 * rewritten to be performed via fast range count optimization where
+		 * possible. In addition, the computation of bindings for grouping
+		 * variable ?z is pushed inside a SELECT DISTINCT ?z { triple-pattern }
+		 * subquery, which may be amenable to optimization through the
+		 * {@link ASTDistinctTermScanOptimizer}, which is applied in the
+		 * subsequent step.
+		 */
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			add(new ASTSimpleGroupByAndCountOptimizer());
+		
         /**
 		 * Optimizes
 		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>

@@ -26,7 +26,6 @@ package com.bigdata.rdf.sail.webapp;
 
 import junit.framework.Test;
 
-
 import com.bigdata.journal.IIndexManager;
 
 /**

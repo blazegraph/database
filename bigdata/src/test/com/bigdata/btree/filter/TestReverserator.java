@@ -159,26 +159,33 @@ public class TestReverserator extends AbstractTupleCursorTestCase {
 			
 			metadata.setBranchingFactor(bf);
 
-			BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
+			final BTree btree = BTree.create(new SimpleMemoryRawStore(), metadata);
 
+			long ntuples = 0L;
+			
 			for (int i = 1; i < 2000; i++) {
 
-				btree.insert("key" + r.nextInt(), "value" + r.nextInt());
+				final String key = "key" + r.nextInt();
+				if (btree.contains(key))
+					continue;
 
+				btree.insert(key, "value" + r.nextInt());
+				ntuples++;
+				
 				final ITupleCursor2<String> cursor = newCursor(btree,
 						IRangeQuery.DEFAULT, null/* fromKey */, null/* toKey */);
 
 				final ITupleIterator<String> itr = new Reverserator<String>(
 						cursor);
 
-				int count = 0;
+				long count = 0;
 
 				while (itr.hasNext()) {
 					itr.next();
 					count++;
 				}
 
-				assertTrue(i == count);
+				assertEquals(count, ntuples);
 			}
 		}
 

@@ -100,6 +100,7 @@ public class BigdataGraphClient extends BigdataGraph {
     /**
      * Get a {@link BigdataSailRemoteRepositoryConnection}.
      */
+	@Override
 	protected BigdataSailRemoteRepositoryConnection getWriteConnection() throws Exception {
 	    if (cxn == null) {
 	        cxn = repo.getConnection();
@@ -111,6 +112,7 @@ public class BigdataGraphClient extends BigdataGraph {
      * Get a {@link BigdataSailRemoteRepositoryConnection}. No difference in
      * connection for remote clients.
      */
+	@Override
     protected BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
         return getWriteConnection();
     }

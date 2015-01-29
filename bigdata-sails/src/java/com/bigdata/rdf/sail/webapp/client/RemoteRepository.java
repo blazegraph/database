@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -20,6 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
 package com.bigdata.rdf.sail.webapp.client;
 
 import info.aduna.io.IOUtil;
@@ -28,9 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
@@ -41,29 +40,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
-import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.HttpRequest;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.http.HttpMethod;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
@@ -307,27 +300,27 @@ public class RemoteRepository {
 
     }
     
-    /**
-     * 
-     * @param sparqlEndpointURL
-     * @param httpClient
-     * @param executor
-     * 
-     * @deprecated This version does not force the caller to decide whether or
-     *             not the LBS pattern will be used. In general, it should be
-     *             used if the end point is bigdata. This class is generally,
-     *             but not always, used with a bigdata end point. The main
-     *             exception is SPARQL Basic Federated Query. For that use case
-     *             we can not assume that the end point is bigdata and thus we
-     *             can not use the LBS prefix.
-     */
-    public RemoteRepository(final String sparqlEndpointURL,
-            final HttpClient httpClient, final Executor executor) {
-
-        // FIXME Should default useLBS:=true. it is basically free.
-        this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
-
-    }
+//    /**
+//     * 
+//     * @param sparqlEndpointURL
+//     * @param httpClient
+//     * @param executor
+//     * 
+//     * @deprecated This version does not force the caller to decide whether or
+//     *             not the LBS pattern will be used. In general, it should be
+//     *             used if the end point is bigdata. This class is generally,
+//     *             but not always, used with a bigdata end point. The main
+//     *             exception is SPARQL Basic Federated Query. For that use case
+//     *             we can not assume that the end point is bigdata and thus we
+//     *             can not use the LBS prefix.
+//     */
+//    public JettyRemoteRepository(final String sparqlEndpointURL,
+//            final AutoCloseHttpClient httpClient, final Executor executor) {
+//
+//        // FIXME Should default useLBS:=true. it is basically free.
+//        this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
+//
+//    }
 
     /**
      * Create a connection to a remote repository. A typical invocation looks
@@ -359,10 +352,11 @@ public class RemoteRepository {
      * @param httpClient
      *            The {@link HttpClient}.
      * @param executor
-     *            The thread pool for processing HTTP responses.
+     *            The thread pool for processing HTTP responses. The life cycle
+     *            of this object is owned by the caller.
      * 
      * @see RemoteRepositoryManager
-     * @see DefaultClientConnectionManagerFactory
+     * @see HttpClientConfigurator
      * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
@@ -376,6 +370,9 @@ public class RemoteRepository {
         if (httpClient == null)
             throw new IllegalArgumentException();
 
+        if (httpClient.isStopped())
+        	throw new IllegalStateException("Client is not running");
+        
         if (executor == null)
             throw new IllegalArgumentException();
 
@@ -395,7 +392,12 @@ public class RemoteRepository {
         
     }
 
-    @Override
+//	public JettyRemoteRepository(String sparqlEndpointURL, boolean useLBS,
+//			ExecutorService executor) {
+//		this(sparqlEndpointURL,useLBS, DefaultClient(false /*force new*/), executor);
+//	}
+    
+	@Override
     public String toString() {
 
         return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
@@ -411,53 +413,7 @@ public class RemoteRepository {
         return sparqlEndpointURL;
         
     }
-    
-//    /**
-//     * Set incremental truth maintenance to either true or false on the server.
-//     */
-//    public void setTruthMaintenance(final boolean tm) throws Exception {
-//    	
-//        final ConnectOptions opts = newConnectOptions();
-//
-//        opts.addRequestParam("truthMaintenance", String.valueOf(tm));
-//
-//        checkResponseCode(doConnect(opts));
-//
-//    }
-//
-//    /**
-//     * Compute database at once closure on the server and do a commit.
-//     */
-//    public long doClosure() throws Exception {
-//    	
-//        final ConnectOptions opts = newConnectOptions();
-//
-//        opts.addRequestParam("doClosure");
-//
-//        HttpResponse response = null;
-//        try {
-//            
-//            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-//            
-//            checkResponseCode(response = doConnect(opts));
-//            
-//            final MutationResult result = mutationResults(response);
-//            
-//            return result.mutationCount;
-//            
-//        } finally {
-//            
-//            try {
-//                
-//                if (response != null)
-//                    EntityUtils.consume(response.getEntity());
-//                
-//            } catch (Exception ex) { }
-//            
-//        }
-//    	
-//    }
-    
+        
     /**
      * Post a GraphML file to the blueprints layer of the remote bigdata instance.
      */
@@ -467,7 +423,7 @@ public class RemoteRepository {
 
         opts.addRequestParam("blueprints");
 
-        HttpResponse response = null;
+        JettyResponseListener response = null;
         try {
 
             final File file = new File(path);
@@ -480,7 +436,7 @@ public class RemoteRepository {
             
             final ByteArrayEntity entity = new ByteArrayEntity(data);
 
-            entity.setContentType("application/graphml+xml");
+            entity.setContentType(ConnectOptions.MIME_GRAPH_ML);
             
             opts.entity = entity;
             
@@ -494,14 +450,9 @@ public class RemoteRepository {
 
         } finally {
 
-            try {
-
-                if (response != null)
-                    EntityUtils.consume(response.getEntity());
-
-            } catch (Exception ex) {
-            }
-
+        	if (response != null)
+        		response.abort();
+            
         }
         
     }
@@ -747,7 +698,7 @@ public class RemoteRepository {
 
         opts.addRequestParam("queryId", queryId.toString());
 
-        HttpResponse response = null;
+        JettyResponseListener response = null;
         try {
             // Issue request, check response status code.
             checkResponseCode(response = doConnect(opts));
@@ -756,9 +707,9 @@ public class RemoteRepository {
              * Ensure that the http response entity is consumed so that the http
              * connection will be released in a timely fashion.
              */
-            try {
-                EntityUtils.consume(response.getEntity());
-            } catch (IOException ex) {log.warn(ex); }
+        	if (response != null)
+        		response.abort();
+            
         }
             
     }
@@ -797,7 +748,7 @@ public class RemoteRepository {
             opts.addRequestParam("c", EncodeDecodeValue.encodeValues(c));
         }
 
-        HttpResponse resp = null;
+        JettyResponseListener resp = null;
         try {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -810,13 +761,9 @@ public class RemoteRepository {
             
         } finally {
             
-            try {
-            
-                if (resp != null)
-                    EntityUtils.consume(resp.getEntity());
-                
-            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (resp != null)
+        		resp.abort();
+                     
         }
 
     }
@@ -850,7 +797,7 @@ public class RemoteRepository {
 
         opts.addRequestParam("CONTEXTS");
 
-        HttpResponse resp = null;
+        JettyResponseListener resp = null;
         try {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -863,13 +810,9 @@ public class RemoteRepository {
             
         } finally {
             
-            try {
-            
-                if (resp != null)
-                    EntityUtils.consume(resp.getEntity());
-                
-            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (resp != null)
+        		resp.abort();
+                      
         }
     	
     }
@@ -909,7 +852,7 @@ public class RemoteRepository {
             opts.addRequestParam("context-uri", toStrings(add.context));
         }
         
-        HttpResponse response = null;
+        JettyResponseListener response = null;
         try {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -922,13 +865,9 @@ public class RemoteRepository {
             
         } finally {
             
-            try {
-                
-                if (response != null)
-                    EntityUtils.consume(response.getEntity());
-                
-            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (response != null)
+        		response.abort();
+        	
         }
         
     }
@@ -941,7 +880,7 @@ public class RemoteRepository {
      *        
      * @return The mutation count.
      */
-    public long remove(final RemoveOp remove) throws Exception {
+    public long remove(final com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp remove) throws Exception {
         
         final ConnectOptions opts = newUpdateConnectOptions();
         
@@ -989,7 +928,7 @@ public class RemoteRepository {
         
         }
         
-        HttpResponse response = null;
+        JettyResponseListener response = null;
         try {
             
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -1002,13 +941,9 @@ public class RemoteRepository {
             
         } finally {
             
-            try {
-                
-                if (response != null)
-                    EntityUtils.consume(response.getEntity());
-                
-            } catch (Exception ex) {log.warn(ex); }
-            
+        	if (response != null)
+        		response.abort();
+                        
         }
         
     }
@@ -1077,7 +1012,7 @@ public class RemoteRepository {
             opts.addRequestParam("context-uri-delete", toStrings(remove.context));
         }
         
-        HttpResponse response = null;
+        JettyResponseListener response = null;
         try {
 
             opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
@@ -1090,12 +1025,8 @@ public class RemoteRepository {
             
         } finally {
             
-            try {
-                
-                if (response != null)
-                    EntityUtils.consume(response.getEntity());
-                
-            } catch (Exception ex) {log.warn(ex); }
+        	if (response != null)
+        		response.abort();
             
         }
         
@@ -1398,7 +1329,7 @@ public class RemoteRepository {
         public void evaluate(final IPreparedQueryListener listener) 
                 throws Exception {
          
-            HttpResponse response = null;
+        	JettyResponseListener response = null;
             try {
 
                 setupConnectOptions();
@@ -1406,24 +1337,12 @@ public class RemoteRepository {
                 // Note: No response body is expected.
                 
                 checkResponseCode(response = doConnect(opts));
-                
+
             } finally {
                 
-                try {
-                    
-                    if (response != null)
-                        EntityUtils.consume(response.getEntity());
-                    
-                } catch (Exception ex) {
-                    
-                    log.warn(ex);
-                    
-                }
-                
-                if (listener != null) {
-                    listener.closed(getQueryId());
-                }
-                
+            	if (response != null)
+            		response.abort();
+	                            
             }
             
         }
@@ -1592,7 +1511,11 @@ public class RemoteRepository {
      *      RemoteRepository class should use application/x-www-form-urlencoded
      *      for large POST requests </a>
      */
-    public HttpResponse doConnect(final ConnectOptions opts) throws Exception {
+    public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
+    	
+    	if (httpClient.isStopped()) {
+    		throw new RuntimeException("The client has been stopped");
+    	}
 
         /*
          * Generate the fully formed and encoded URL.
@@ -1638,14 +1561,9 @@ public class RemoteRepository {
 
         ConnectOptions.addQueryParams(urlString, opts.requestParams);
 
-        /* Ensure all POST requests contain parameters in body, but convert GET if
-         * isLongRequestURL.  
-         * 
-         * @see #1008 (remote service queries should put parameters in the request body when using POST)
-         */
         final boolean isLongRequestURL = urlString.length() > getMaxRequestURLLength();
 
-        if (/* isLongRequestURL && */ opts.method.equals("POST")
+        if (isLongRequestURL && opts.method.equals("POST")
                 && opts.entity == null) {
 
             /*
@@ -1687,17 +1605,17 @@ public class RemoteRepository {
             log.debug(urlString.toString());
         }
 
-        HttpUriRequest request = null;
+        Request request = null;
         try {
 
-            request = newRequest(urlString.toString(), opts.method);
+            request = (HttpRequest) newRequest(urlString.toString(), opts.method);
 
             if (opts.requestHeaders != null) {
 
                 for (Map.Entry<String, String> e : opts.requestHeaders
                         .entrySet()) {
 
-                    request.addHeader(e.getKey(), e.getValue());
+                    request.header(e.getKey(), e.getValue());
 
                     if (log.isDebugEnabled())
                         log.debug(e.getKey() + ": " + e.getValue());
@@ -1736,7 +1654,8 @@ public class RemoteRepository {
 //                final ByteArrayEntity entity = new ByteArrayEntity(opts.data);
 //                entity.setContentType(opts.contentType);
 
-                ((HttpEntityEnclosingRequestBase) request).setEntity(opts.entity);
+            	final EntityContentProvider cp = new EntityContentProvider(opts.entity);
+                request.content(cp, cp.getContentType());
                 
 //                final OutputStream os = conn.getOutputStream();
 //                try {
@@ -1747,16 +1666,14 @@ public class RemoteRepository {
 //                }
 
             }
-
-            final HttpResponse response = httpClient.execute(request);
             
-            return response;
+            final JettyResponseListener listener = new JettyResponseListener(request);
             
-//            // connect.
-//            conn.connect();
-//
-//            return conn;
-
+            // Note: Send with a listener is non-blocking.
+            request.send(listener);
+            
+            return listener;
+            
         } catch (Throwable t) {
             /*
              * If something goes wrong, then close the http connection.
@@ -1765,11 +1682,7 @@ public class RemoteRepository {
             try {
                 
                 if (request != null)
-                    request.abort();
-                
-//                // clean up the connection resources
-//                if (conn != null)
-//                    conn.disconnect();
+                    request.abort(t);
                 
             } catch (Throwable t2) {
                 log.warn(t2); // ignored.
@@ -1779,41 +1692,59 @@ public class RemoteRepository {
 
     }
     
-    static public HttpUriRequest newRequest(final String uri,
-            final String method) {
+	public Request newRequest(final String uri, final String method) {
+
+		return newRequest(httpClient, uri, method);
+
+	}
+
+	public static Request newRequest(final HttpClient httpClient,
+			final String uri, final String method) {
+
+		if (httpClient == null)
+			throw new IllegalArgumentException();
+
+		if (httpClient.isStopped())
+			throw new IllegalStateException("The Client has been stopped");
+    	
+    	return httpClient.newRequest(uri).method(getMethod(method));
+
+    }
+    
+    static HttpMethod getMethod(final String method) {
         if (method.equals("GET")) {
-            return new HttpGet(uri);
+            return HttpMethod.GET;
         } else if (method.equals("POST")) {
-            return new HttpPost(uri);
+            return HttpMethod.POST;
         } else if (method.equals("DELETE")) {
-            return new HttpDelete(uri);
+            return HttpMethod.DELETE;
         } else if (method.equals("PUT")) {
-            return new HttpPut(uri);
+            return HttpMethod.PUT;
         } else {
             throw new IllegalArgumentException();
         }
     }
-
+    
     /**
      * Throw an exception if the status code does not indicate success.
      * 
-     * @param response
+     * @param inputStreamResponseListener
      *            The response.
      *            
      * @return The response.
      * 
      * @throws IOException
      */
-    static public HttpResponse checkResponseCode(final HttpResponse response)
+    static public JettyResponseListener checkResponseCode(final JettyResponseListener responseListener)
             throws IOException {
         
-        final int rc = response.getStatusLine().getStatusCode();
+        final int rc = responseListener.getStatus();
         
         if (rc < 200 || rc >= 300) {
-        
+        	
             throw new HttpException(rc, "Status Code=" + rc + ", Status Line="
-                    + response.getStatusLine() + ", Response="
-                    + getResponseBody(response));
+                    + responseListener.getReason() + ", Response="
+                    + responseListener.getResponseBody());
 
         }
 
@@ -1822,36 +1753,11 @@ public class RemoteRepository {
              * write out the status list, headers, etc.
              */
             log.debug("*** Response ***");
-            log.debug("Status Line: " + response.getStatusLine());
+            log.debug("Status Line: " + responseListener.getReason());
         }
 
-        return response;
+        return responseListener;
         
-    }
-
-    // TODO EntityUtils.toString(response.getEntity())?
-    protected static String getResponseBody(final HttpResponse response)
-            throws IOException {
-
-        final Reader r = new InputStreamReader(response.getEntity().getContent());
-
-        try {
-
-            final StringWriter w = new StringWriter();
-
-            int ch;
-            while ((ch = r.read()) != -1) {
-                w.append((char) ch);
-            }
-
-            return w.toString();
-
-        } finally {
-
-            r.close();
-
-        }
-
     }
 
     /**
@@ -1870,21 +1776,22 @@ public class RemoteRepository {
      */
     public TupleQueryResult tupleResults(final ConnectOptions opts, 
             final UUID queryId, final IPreparedQueryListener listener)
-                    throws Exception {
+            throws Exception {
 
-    	HttpResponse response = null;
-        HttpEntity entity = null;
-        BackgroundTupleResult result = null;
-        TupleQueryResultImpl tqrImpl = null;
+    	// listener handling the http response.
+    	JettyResponseListener response = null;
+    	// future for parsing that response (in the background).
+    	FutureTask<Void> ft = null;
+    	// iteration pattern returned to caller. once they hold this they are
+    	// responsible for cleaning up the request by calling close().
+    	TupleQueryResultImpl tqrImpl = null;
         try {
 
             response = doConnect(opts);
 
             checkResponseCode(response);
-            
-            entity = response.getEntity();
-            
-            final String contentType = entity.getContentType().getValue();
+                        
+            final String contentType = response.getContentType();
     
             final MiniMime mimeType = new MiniMime(contentType);
             
@@ -1895,7 +1802,7 @@ public class RemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
                     .getInstance().get(format);
@@ -1905,27 +1812,46 @@ public class RemoteRepository {
                         "No parser for format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
                                 + ", format=" + format + " : response="
-                                + getResponseBody(response));
+                                + response.getResponseBody());
 
             final TupleQueryResultParser parser = parserFactory.getParser();
     
-            final InputStream in = entity.getContent();
-            
-            result = new BackgroundTupleResult(parser, in, entity);
-            
-            executor.execute(result);
-            
+			final BackgroundTupleResult result = new BackgroundTupleResult(
+					parser, response.getInputStream());
+
             final MapBindingSet bindings = new MapBindingSet();
             
             final InsertBindingSetCursor cursor = 
                 new InsertBindingSetCursor(result, bindings);
-            
+
+            // Wrap as FutureTask so we can cancel.
+            ft = new FutureTask<Void>(result, null/* result */);
+            		
+			/*
+			 * Submit task for execution. It will asynchronously consume the
+			 * response, pumping solutions into the cursor.
+			 * 
+			 * Note: Can throw a RejectedExecutionException!
+			 */
+			executor.execute(ft);
+
+			/*
+			 * Note: This will block until the binding names are received, so it
+			 * can not be done until we submit the BackgroundTupleResult for
+			 * execution.
+			 */
             final List<String> list = new ArrayList<String>(
                     result.getBindingNames());
             
-            tqrImpl = new TupleQueryResultImpl(list, cursor) {
+			/*
+			 * The task was accepted by the executor. Wrap with iteration
+			 * pattern. Once this object is returned to the caller they are
+			 * responsible for calling close() to provide proper error cleanup
+			 * of the resources associated with the request.
+			 */
+            final TupleQueryResultImpl tmp = new TupleQueryResultImpl(list, cursor) {
 
-            	final AtomicBoolean notDone = new AtomicBoolean(true);
+            	private final AtomicBoolean notDone = new AtomicBoolean(true);
             	
             	@Override
             	public boolean hasNext() throws QueryEvaluationException {
@@ -1947,57 +1873,72 @@ public class RemoteRepository {
             		
             		try {
         			
-            			super.handleClose();
-        			
-            		} finally {
-            			
-		    			if (notDone.compareAndSet(true, false)) {
-		    				
-		    				try {
-		    					cancel(queryId);
-		    				} catch (Exception ex) {log.warn(ex); }
-		    				
-		    			}
-		    			
-		    			/*
-		    			 * Notify the listener.
-		    			 */
-		    			if (listener != null) {
-		    			    listener.closed(queryId);
-		    			}
-		    			
+						super.handleClose();
+
+					} finally {
+
+						if (notDone.compareAndSet(true, false)) {
+
+							try {
+								cancel(queryId);
+							} catch (Exception ex) {
+								log.warn(ex);
+							}
+
+						}
+
+						/*
+						 * Notify the listener.
+						 */
+						if (listener != null) {
+							listener.closed(queryId);
+						}
+
             		}
         			
             	};
             	
             };
             
-            return tqrImpl;
-            
-//            final TupleQueryResultBuilder handler = new TupleQueryResultBuilder();
-//    
-//            parser.setTupleQueryResultHandler(handler);
-//    
-//            parser.parse(entity.getContent());
-//    
-//            // done.
-//            return handler.getQueryResult();
+			/*
+			 * Return the tuple query result listener to the caller. They now
+			 * have responsibility for calling close() on that object in order
+			 * to close the http connection and release the associated
+			 * resources.
+			 */
+            return (tqrImpl = tmp);
             
         } finally {
             
-//            // terminate the http connection.
-//            response.disconnect();
-            if (entity != null && result == null) {
-                try {
-                    EntityUtils.consume(entity);
-                } catch (IOException ex) {log.warn(ex); }
-            }
-            
-            if (response != null && tqrImpl == null) {
-            	try {
-            		cancel(queryId);
-            	} catch(Exception ex) {log.warn(ex); }
-            }
+			if (response != null && tqrImpl == null) {
+				/*
+				 * Error handling code path. We have an http response listener
+				 * but we were not able to setup the tuple query result
+				 * listener.
+				 */
+				if (ft != null) {
+					/*
+					 * We submitted the task to parse the response. Since the
+					 * code is not returning normally (tqrImpl:=null) we cancel
+					 * the FutureTask for the background parse of that response.
+					 */
+					ft.cancel(true/* mayInterruptIfRunning */);
+				}
+				// Abort the http response handling.
+				response.abort();
+				try {
+					/*
+					 * POST back to the server to cancel the request in case it
+					 * is still running on the server.
+					 */
+					cancel(queryId);
+				} catch (Exception ex) {
+					log.warn(ex);
+				}
+				if (listener != null) {
+					listener.closed(queryId);
+				}
+			}
             
         }
 
@@ -2008,9 +1949,6 @@ public class RemoteRepository {
      * 
      * @param response
      *            The connection from which to read the results.
-     * @param listener
-     *            The listener to notify when the query result has been
-     *            closed (optional).
      * 
      * @return The graph
      * 
@@ -2018,11 +1956,11 @@ public class RemoteRepository {
      *             If anything goes wrong.
      */
     public GraphQueryResult graphResults(final ConnectOptions opts,
-            final UUID queryId, final IPreparedQueryListener listener) 
-                    throws Exception {
+            final UUID queryId, final IPreparedQueryListener listener) throws Exception {
 
-        HttpResponse response = null;
-        HttpEntity entity = null;
+    	// The listener handling the http response.
+    	JettyResponseListener response = null;
+    	// Incrementally parse the response in another thread.  
         BackgroundGraphResult result = null;
         try {
 
@@ -2030,11 +1968,9 @@ public class RemoteRepository {
 
             checkResponseCode(response);
             
-            entity = response.getEntity();
-
             final String baseURI = "";
 
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             if (contentType == null)
                 throw new RuntimeException("Not found: Content-Type");
@@ -2048,7 +1984,7 @@ public class RemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
 
@@ -2078,9 +2014,10 @@ public class RemoteRepository {
              */
             Charset charset = format.getCharset();//Charset.forName(UTF8);
             try {
-                final Header encoding = entity.getContentEncoding();
+            	
+            	final String encoding = response.getContentEncoding();
                 if (encoding != null)
-                    charset = Charset.forName(encoding.getValue());
+                    charset = Charset.forName(encoding);
             } catch (IllegalCharsetNameException e) {
                 // work around for Joseki-3.2
                 // Content-Type: application/rdf+xml;
@@ -2088,7 +2025,7 @@ public class RemoteRepository {
             }
             
             final BackgroundGraphResult tmp = new BackgroundGraphResult(
-                    parser, entity.getContent(), charset, baseURI, entity) {
+                    parser, response.getInputStream(), charset, baseURI) {
             	
             	final AtomicBoolean notDone = new AtomicBoolean(true);
             	
@@ -2134,34 +2071,46 @@ public class RemoteRepository {
             	
             };
             
+			/*
+			 * Note: Asynchronous execution. Typically does not even start
+			 * running until after we leave this method!
+			 */
             executor.execute(tmp);
             
+            // The executor accepted the task for execution (at some point).
             result = tmp;
-            
-            return result;
 
-//            final Graph g = new GraphImpl();
-//
-//            parser.setRDFHandler(new StatementCollector(g));
-//
-//            parser.parse(entity.getContent(), baseURI);
-//
-////            return new GraphQueryResultImpl(Collections.EMPTY_MAP, g);
-//            return g;
+            /*
+			 * Result will be asynchronously produced.
+			 * 
+			 * Note: At this point the caller is responsible for calling close()
+			 * on this object to clean up the resources associated with this
+			 * request.
+			 */
+            return result;
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
             if (response != null && result == null) {
+				/*
+				 * This code path only handles errors. We have a response, but
+				 * we were not able to generate the asynchronous [result]
+				 * object.
+				 */
+            	response.abort();
+            	
                 try {
-                    EntityUtils.consume(entity);
-                } catch (IOException ex) {log.warn(ex); }
-                
-                try {
+					/*
+					 * POST back to the server in an attempt to cancel the
+					 * request if already executing on the server.
+					 */
                 	cancel(queryId);
                 } catch (Exception ex) {log.warn(ex); }
-            }
+				
+                if (listener != null) {
+					listener.closed(queryId);
+				}
+			}
 
         }
 
@@ -2181,11 +2130,9 @@ public class RemoteRepository {
      *             encode a single boolean value.
      */
     protected boolean booleanResults(final ConnectOptions opts, 
-            final UUID queryId, final IPreparedQueryListener listener) 
-                    throws Exception {
+            final UUID queryId, final IPreparedQueryListener listener) throws Exception {
 
-    	HttpResponse response = null;
-        HttpEntity entity = null;
+    	JettyResponseListener response = null;
         Boolean result = null;
         try {
 
@@ -2193,9 +2140,7 @@ public class RemoteRepository {
 
             checkResponseCode(response);
             
-            entity = response.getEntity();
-            
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             final MiniMime mimeType = new MiniMime(contentType);
             
@@ -2206,7 +2151,7 @@ public class RemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final BooleanQueryResultParserFactory factory = BooleanQueryResultParserRegistry
                     .getInstance().get(format);
@@ -2216,24 +2161,34 @@ public class RemoteRepository {
 
             final BooleanQueryResultParser parser = factory.getParser();
 
-            result = parser.parse(entity.getContent());
-            
-            return result;
+            final InputStream is = response.getInputStream();
+			try {
+				result = parser.parse(is);
+				return result;
+			} finally {
+				is.close();
+			}
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-        	if (result == null) {
+			if (result == null) {
+				/*
+				 * Error handling path. We issued the request, but were not able
+				 * to parse out the response.
+				 */
+				if (response != null) {
+					// Make sure the response listener is closed.
+					response.abort();
+				}
 	            try {
-	                EntityUtils.consume(entity);
-	            } catch (IOException ex) {log.warn(ex); }
-	            
-	            try {
-	            	cancel(queryId);
+					/*
+					 * POST request to server to cancel query in case it is
+					 * still running.
+					 */
+					cancel(queryId);
 	            } catch (Exception ex) {log.warn(ex); }
         	}
-        	
+
         	if (listener != null) {
         	    listener.closed(queryId);
         	}
@@ -2253,14 +2208,11 @@ public class RemoteRepository {
      * @throws Exception
      *             If anything goes wrong.
      */
-    protected long countResults(final HttpResponse response) throws Exception {
+    protected long countResults(final JettyResponseListener response) throws Exception {
 
-        HttpEntity entity = null;
         try {
 
-            entity = response.getEntity();
-            
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             final MiniMime mimeType = new MiniMime(contentType);
             
@@ -2271,7 +2223,7 @@ public class RemoteRepository {
                 throw new IOException(
                         "Could not identify format for service response: serviceURI="
                                 + sparqlEndpointURL + ", contentType=" + contentType
-                                + " : response=" + getResponseBody(response));
+                                + " : response=" + response.getResponseBody());
 
             final TupleQueryResultParserFactory factory = TupleQueryResultParserRegistry
                     .getInstance().get(format);
@@ -2301,7 +2253,7 @@ public class RemoteRepository {
                 }
             });
 
-            parser.parse(entity.getContent());
+            parser.parse(response.getInputStream());
 
             if (log.isInfoEnabled())
                 log.info("nsolutions=" + nsolutions);
@@ -2311,25 +2263,20 @@ public class RemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-            try {
-                EntityUtils.consume(entity);
-            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.abort();
+        	}
+        	
         }
 
     }
 
-    static private MutationResult mutationResults(final HttpResponse response)
+    static private MutationResult mutationResults(final JettyResponseListener response)
             throws Exception {
 
-        HttpEntity entity = null;
         try {
 
-            entity = response.getEntity();
-            
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
@@ -2343,11 +2290,11 @@ public class RemoteRepository {
             
             final AtomicLong mutationCount = new AtomicLong();
             final AtomicLong elapsedMillis = new AtomicLong();
-
+            
             /*
              * For example: <data modified="5" milliseconds="112"/>
              */
-            parser.parse(entity.getContent(), new DefaultHandler2(){
+            parser.parse(response.getInputStream(), new DefaultHandler2(){
 
                 public void startElement(final String uri,
                         final String localName, final String qName,
@@ -2373,25 +2320,20 @@ public class RemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-            try {
-                EntityUtils.consume(entity);
-            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.abort();
+        	}
+        	
         }
 
     }
 
     static protected RangeCountResult rangeCountResults(
-            final HttpResponse response) throws Exception {
+            final JettyResponseListener response) throws Exception {
 
-        HttpEntity entity = null;
         try {
-
-            entity = response.getEntity();
             
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
@@ -2409,8 +2351,9 @@ public class RemoteRepository {
             /*
              * For example: <data rangeCount="5" milliseconds="112"/>
              */
-            parser.parse(entity.getContent(), new DefaultHandler2(){
+            parser.parse(response.getInputStream(), new DefaultHandler2(){
 
+            	@Override
                 public void startElement(final String uri,
                         final String localName, final String qName,
                         final Attributes attributes) {
@@ -2435,25 +2378,20 @@ public class RemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-            try {
-                EntityUtils.consume(entity);
-            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.abort();
+        	}
+        	
         }
 
     }
 
     static protected ContextsResult contextsResults(
-            final HttpResponse response) throws Exception {
+            final JettyResponseListener response) throws Exception {
 
-        HttpEntity entity = null;
         try {
-
-            entity = response.getEntity();
             
-            final String contentType = entity.getContentType().getValue();
+            final String contentType = response.getContentType();
 
             if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
 
@@ -2475,8 +2413,9 @@ public class RemoteRepository {
              * <context uri="http://bar"/>
              * </contexts>
              */
-            parser.parse(entity.getContent(), new DefaultHandler2(){
+            parser.parse(response.getInputStream(), new DefaultHandler2(){
 
+            	@Override
                 public void startElement(final String uri,
                         final String localName, final String qName,
                         final Attributes attributes) {
@@ -2493,12 +2432,10 @@ public class RemoteRepository {
 
         } finally {
 
-//            // terminate the http connection.
-//            response.disconnect();
-            try {
-                EntityUtils.consume(entity);
-            } catch (IOException ex) {log.warn(ex); }
-
+        	if (response != null) {
+        		response.abort();
+        	}
+        	
         }
 
     }

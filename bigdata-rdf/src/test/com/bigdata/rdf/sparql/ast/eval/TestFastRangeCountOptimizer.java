@@ -124,6 +124,34 @@ public class TestFastRangeCountOptimizer extends
 
 		}
 
+	    /**
+	    * The optimization must *not* be applied in the presence of delete
+	    * markers. Delete markers are present in the case of isolatable
+	    * indices. The query below, which is amenable to optimization in 
+	    * principle, cannot be optimized when this mode is used.
+	    * 
+       * <pre>
+       * SELECT (COUNT(*) as ?count) {?s ?p <http://bigdata.com#o1>}
+       * </pre>
+       */
+      public void test_fastRangeCount_delete_markers() throws Exception {
+
+         final TestHelper h = new TestHelper("fastRangeCount_triples_02", // testURI,
+               "fastRangeCount_triples_02.rq",// queryFileURL
+               "fastRangeCount_triples_01.ttl",// dataFileURL
+               "fastRangeCount_triples_02.srx"// resultFileURL
+         );
+         enableDeleteMarkersInIndes();
+         h.runTest();
+
+         // Verify that the FastRangeCountOp was used in the query plan.
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+
+      }
+		
 	}
 	
     /**
@@ -268,6 +296,34 @@ public class TestFastRangeCountOptimizer extends
 							FastRangeCountOp.class).size());
 
 		}
+		
+	    /**
+       * The optimization must *not* be applied in the presence of delete
+       * markers. Delete markers are present in the case of isolatable
+       * indices. The query below, which is amenable to optimization in 
+       * principle, cannot be optimized when this mode is used.
+       * 
+       * <pre>
+       * SELECT (COUNT(*) as ?count) {GRAPH <http://bigdata.com#g1> {?s ?p ?o} }
+       * </pre>
+       */
+      public void test_fastRangeCount_delete_markers() throws Exception {
+
+         final TestHelper h = new TestHelper("fastRangeCount_quads_04", // testURI,
+               "fastRangeCount_quads_04.rq",// queryFileURL
+               "fastRangeCount_quads_01.trig",// dataFileURL
+               "fastRangeCount_quads_04.srx"// resultFileURL
+         );
+         enableDeleteMarkersInIndes();
+         h.runTest();
+
+         // Verify that the FastRangeCountOp was used in the query plan.
+         assertEquals(
+               0,
+               BOpUtility.toList(h.getASTContainer().getQueryPlan(),
+                     FastRangeCountOp.class).size());
+
+      }
 
 	}
 

@@ -92,9 +92,9 @@ public class TestAll extends TestCase {
 						.getTemporaryJournal(true/* RWStore */),
 				TestMode.triples));
 
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
-        
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
+        
+        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
 

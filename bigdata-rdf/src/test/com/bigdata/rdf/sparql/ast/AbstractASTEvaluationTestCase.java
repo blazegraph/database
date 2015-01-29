@@ -56,6 +56,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.spo.SPORelation;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 
@@ -98,7 +99,6 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
          */
         
         baseURI = "http://www.bigdata.com";
-        
     }
     
     @Override
@@ -120,6 +120,12 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
     }
 
+    protected void enableDeleteMarkersInIndes() {
+       final SPORelation rel = store.getSPORelation();
+       rel.getPrimaryIndex().getIndexMetadata().setDeleteMarkers(true);
+    }
+    
+    
     @Override
     public Properties getProperties() {
 
@@ -164,6 +170,7 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
     }
 
+    
     static protected void assertSameAST(final IQueryNode expected,
             final IQueryNode actual) {
 
