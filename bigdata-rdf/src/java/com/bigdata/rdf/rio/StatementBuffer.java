@@ -316,7 +316,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public StatementBuffer(final AbstractTripleStore database,
             final int capacity) {
-
         this(null/* statementStore */, database, capacity);
 
     }
@@ -933,6 +932,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     public void add(final Resource s, final URI p, final Value o,
             final Resource c, final StatementEnum type) {
         
+       // silently strip context in quads mode
+       Resource context = database.isQuads() ? c : null;
+       
         if (nearCapacity()) {
 
             // bulk insert the buffered data into the store.
@@ -953,7 +955,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         }
         
         // add to the buffer.
-        handleStatement(s, p, o, c, type);
+        handleStatement(s, p, o, context, type);
 
     }
     
