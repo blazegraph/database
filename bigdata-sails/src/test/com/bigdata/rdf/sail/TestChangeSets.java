@@ -103,21 +103,6 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
         return props;
         
     }
-    
-    
-    /**
-     * Returns a configuration where stripping of quads within the loading
-     * process is disabled.
-     * @return
-     */
-    public Properties getTriplesNoInferenceNoQuadsStripping() {
-       
-       Properties props = getTriplesNoInference();
-       props.setProperty(BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE, "true");
-       
-       return props;       
-   }    
-    
 
     /**
      * 
