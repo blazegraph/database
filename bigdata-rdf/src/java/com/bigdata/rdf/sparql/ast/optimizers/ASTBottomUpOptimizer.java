@@ -50,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -560,7 +561,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
             }
             
-            nsr.setWhereClause(p);
+            nsr.setWhereClause(BOpUtility.deepCopy(p));
 
             queryRoot.getNamedSubqueriesNotNull().add(nsr);
             
@@ -605,11 +606,34 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         } else {
 
-            // Replace with named subquery INCLUDE.
-            pp.replaceWith(p, nsi);
-        
+           /**
+            *  Replace with named subquery INCLUDE.
+            *  
+            *  Note: we can not do that starting from pp, since pp is the 
+            *  parent join group node (which may differ from p.getParent().
+            *  
+            *  See ticket #1087 for an example query where this is the case
+            */
+           final IGroupNode ppNode = p.getParent();
+           if (ppNode instanceof  GroupNodeBase) {
+
+              final GroupNodeBase gnb = (GroupNodeBase)ppNode;
+              
+              if (ppNode instanceof JoinGroupNode) {
+                 gnb.replaceWith(p, nsi);                 
+                 
+              } else {
+                 // if the parent is not a JoinGroupNode, we wrap the include
+                 // into a join group node; this is necessary because, for
+                 // instance, INCLUDE is not supported inside all constructs
+                 // (e.g. fails in case we INCLUDE into a UNION operator)
+                 final JoinGroupNode nsiWrapper = new JoinGroupNode();
+                 nsiWrapper.addChild(nsi);
+                 
+                 gnb.replaceWith(p, nsiWrapper);
+              }
+           }        
         }
-       
     }
     
     /**

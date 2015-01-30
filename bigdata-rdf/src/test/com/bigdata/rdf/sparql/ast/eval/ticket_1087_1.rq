@@ -1,0 +1,11 @@
+SELECT * WHERE {
+  ?s <http://example.org/p1> ?o1 .
+  { ?s <http://example.org/p2> ?o2 } 
+  UNION 
+  {
+    ?s <http://example.org/p3> ?o3 .
+    OPTIONAL {
+      ?s <http://example.org/p1> ?o1 .
+    }
+  }
+}
