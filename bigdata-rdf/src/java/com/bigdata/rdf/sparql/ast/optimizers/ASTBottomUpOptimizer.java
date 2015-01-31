@@ -560,7 +560,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 }
 
             }
-            
+            // See #1087
             nsr.setWhereClause(BOpUtility.deepCopy(p));
 
             queryRoot.getNamedSubqueriesNotNull().add(nsr);
@@ -614,10 +614,10 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             *  
             *  See ticket #1087 for an example query where this is the case
             */
-           final IGroupNode ppNode = p.getParent();
+           final IGroupNode<?> ppNode = p.getParent();
            if (ppNode instanceof  GroupNodeBase) {
 
-              final GroupNodeBase gnb = (GroupNodeBase)ppNode;
+              final GroupNodeBase<?> gnb = (GroupNodeBase<?>) ppNode;
               
               if (ppNode instanceof JoinGroupNode) {
                  gnb.replaceWith(p, nsi);                 

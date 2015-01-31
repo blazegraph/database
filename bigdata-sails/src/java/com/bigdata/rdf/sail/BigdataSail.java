@@ -395,7 +395,7 @@ public class BigdataSail extends SailBase implements Sail {
          * in triple mode are rejected (true) or loaded while silently stripping
          * off the context (false). In the latter case, the fireSailChangedEvent
          * will report back the original statements, i.e. including the context,
-         * although the latter was not stored internally. This property onl
+         * although the latter was not stored internally. This property only
          * effects data loaded through the {@link Sail}.
          * 
          * @see http://trac.bigdata.com/ticket/1086
@@ -410,9 +410,9 @@ public class BigdataSail extends SailBase implements Sail {
     /**
      * Logger.
      */
-    final protected static Logger log = Logger.getLogger(BigdataSail.class);
+    final private static Logger log = Logger.getLogger(BigdataSail.class);
 
-    final protected static boolean INFO = log.isInfoEnabled();
+//    final protected static boolean INFO = log.isInfoEnabled();
 
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 

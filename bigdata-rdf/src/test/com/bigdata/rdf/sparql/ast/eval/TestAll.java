@@ -23,12 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.eval;
 
-import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -139,6 +139,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTCK.class);
 
+        // additional bottom-up evaluation tests.
+        suite.addTestSuite(TestTicket1087.class);
+        
 		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*
