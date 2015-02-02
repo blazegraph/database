@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.servlet.ServletConfig;
@@ -383,7 +384,9 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
             }
 
-            final JettyResponseListener listener = new JettyResponseListener(request);
+			final JettyResponseListener listener = new JettyResponseListener(
+					request, 16 * 1024/* maxResponseSize */,
+					TimeUnit.SECONDS.toMillis(300));
             
             request.send(listener);
             

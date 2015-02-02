@@ -47,6 +47,7 @@ public class JettyResponseListener extends InputStreamResponseListener {
     private static final transient Logger log = Logger
             .getLogger(JettyResponseListener.class);
     
+    private final long queryTimeoutMillis;
     private volatile Request m_request;
     private volatile Response m_response;
 	private volatile InputStream m_cachedStream = null;
@@ -58,11 +59,22 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	 */
 	private static final String ISO_8859_1 = "ISO-8859-1";
 	
-	// FIXME Configuration parameter for maxBufferSize:long
-	public JettyResponseListener(final Request request) {
+	/**
+	 * 
+	 * @param request
+	 * @param maxBufferSize
+	 * @param queryTimeoutMillis
+	 *            the timeout in milliseconds (if non-positive, then an infinite
+	 *            timeout is used).
+	 */
+	public JettyResponseListener(final Request request,
+			final long maxBufferSize,  long queryTimeoutMillis) {
+		super(maxBufferSize);
 		if (request == null)
 			throw new IllegalArgumentException();
 		m_request = request;
+		this.queryTimeoutMillis = queryTimeoutMillis <= 0L ? Long.MAX_VALUE
+				: queryTimeoutMillis;
 	}
 
 	/**
@@ -75,14 +87,16 @@ public class JettyResponseListener extends InputStreamResponseListener {
 		if (m_response == null) {
 			try {
 				final boolean traceEnabled = log.isTraceEnabled();
-				
-				final long start = traceEnabled ? System.currentTimeMillis() : 0;
-				// FIXME Configuration parameter.
-				m_response = get(300, TimeUnit.SECONDS); // wait up to 5 minutes, for queued requests!
-				// m_response = await(300, TimeUnit.SECONDS).getResponse(); // wait up to 5 minutes!
-				
+
+				final long start = traceEnabled ? System.currentTimeMillis()
+						: 0;
+
+				m_response = get(queryTimeoutMillis, TimeUnit.MILLISECONDS);
+
 				if (traceEnabled)
-					log.trace("Response in " + (System.currentTimeMillis()-start) + "ms");
+					log.trace("Response in "
+							+ (System.currentTimeMillis() - start) + "ms");
+
 			} catch (InterruptedException | TimeoutException
 					| ExecutionException e) {
 				throw new IOException(e);
@@ -125,11 +139,6 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	 *         specified and otherwise <code>null</code>.
 	 * 
 	 * @throws IOException
-	 * 
-	 *             TODO Really, <code>ISO-8851-1</code> is only the default if
-	 *             the Content-Type is <code>text/*</code> and otherwise there
-	 *             is no default and the response must specify the content
-	 *             encoding.
 	 */
 	public String getContentEncoding() throws IOException {
 		ensureResponse();
