@@ -46,6 +46,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -553,6 +554,15 @@ public class StatusServlet extends BigdataRDFServlet {
                 }
 
             }
+            
+			{ // Report the build version (when available). See #1089
+				String buildVer = Banner.getBuildInfo().get(Banner.BuildInfoMeta.buildVersion);
+				if (buildVer == null )
+					buildVer = "N/A";
+				current.node("p").text("Build Version=").node("span")
+						.attr("id", "buildVersion").text(buildVer).close()
+						.close();
+			}
 
             current.node("p").text("Accepted query count=")
                .node("span").attr("id", "accepted-query-count")
