@@ -21,14 +21,50 @@
       </div>
 
       <div id="tab-selector">
-        <a data-target="query" class="active">Query</a>
+        <a data-target="splash" class="active">Welcome</a>
+        <a data-target="query">Query</a>
         <a data-target="update">Update</a>
         <a data-target="explore">Explore</a>
+        <a data-target="namespaces">Namespaces</a>
         <a data-target="status">Status</a>
         <a data-target="health">Health</a>
         <a data-target="performance">Performance</a>
-        <a data-target="namespaces">Namespaces</a>
         <p>Current namespace: <span id="current-namespace"></span></p>
+      </div>
+
+      <div class="tab" id="splash-tab">
+
+        <div class="splashbox">
+          <p>
+            Welcome to BlazeGraph!
+          </p>
+        </div>
+        <div class="splashbox">
+          <p>
+            Graphs in a Blaze instance are segregated by namespace. To get started, navigate to the "Namespaces" tab to create a new namespace, or simply start working with the default namespace ("kb").
+          </p>
+        </div>
+        <div class="splashbox">
+          <p>
+            Through the workbench you can:
+            <li>Load data or issue SPARQL Updates through the "Update" tab.</li>
+            <li>Issue SPARQL queries through the "Query" tab.</li>
+            <li>Explore your data navigationally through the "Explore" tab.</li>
+            <li>Create or modify namespaces within your database through the "Namespaces" tab.</li>
+            <li>View the status of running queries through the "Status" tab (advanced).</li>
+            <li>Check performance of your BlazeGraph instance through the "Performance" tab (advanced).</li>
+          </p>
+        </div>
+        <div class="splashbox">
+            For more information on getting started with Blaze, please visit our
+          <a href="http://wiki.bigdata.com/wiki/index.php/Main_Page">Wiki</a> or our
+          <a href="http://www.bigdata.com">Website</a>.
+        </div>
+        <div class="splashbox">
+            For instructions on getting started writing Blaze clients, see
+          <a href="http://www.bigdata.com/sesame">Sesame</a> or 
+          <a href="http://www.bigdata.com/blueprints">Blueprints</a>.
+        </div>
       </div>
 
       <div class="tab" id="update-tab">
