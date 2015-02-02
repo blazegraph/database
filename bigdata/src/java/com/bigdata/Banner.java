@@ -426,14 +426,14 @@ public class Banner {
     }
     
     private static final String banner =//
-        "\nBIGDATA(R)"+//
+        "\nBlazeGraph(TM) Graph Engine"+//
         "\n"+//
         "\n                   Flexible"+//
         "\n                   Reliable"+//
         "\n                  Affordable"+//
         "\n      Web-Scale Computing for the Enterprise"+//
         "\n"+//
-        "\nCopyright SYSTAP, LLC 2006-2013.  All rights reserved."+//
+        "\nCopyright SYSTAP, LLC 2006-2015.  All rights reserved."+//
         "\n"+//
         "\n"+AbstractStatisticsCollector.fullyQualifiedHostName+//
         "\n"+new Date()+//
