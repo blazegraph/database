@@ -611,8 +611,17 @@ ga('send', 'pageview');
             <exclude name="sesame*testsuite*.jar"/>
             <!-- osgi stuff is not needed. -->
             <exclude name="bnd*.jar"/>
-            <!-- jetty / servlet / jsp jars not required for the WAR. --> 
-            <exclude name="jetty*.jar"/>
+	    <!-- The following jetty libraries are not required for the war file. -->
+            <exclude name="jetty-continuation*.jar"/>
+            <exclude name="jetty-jmx-*.jar"/>
+            <exclude name="jetty-jndi-*.jar"/>
+            <exclude name="jetty-proxy-*.jar"/>
+            <exclude name="jetty-rewrite-*.jar"/>
+            <exclude name="jetty-security-*.jar"/>
+            <exclude name="jetty-server-*.jar"/>
+            <exclude name="jetty-servlet-*.jar"/>
+            <exclude name="jetty-webapp-*.jar"/>
+            <exclude name="jetty-xml-*.jar"/>
          <exclude name="servlet-api*.jar"/>
             <!-- zookeeper only used in scale-out. -->
             <exclude name="apache/zookeeper*.jar"/>
