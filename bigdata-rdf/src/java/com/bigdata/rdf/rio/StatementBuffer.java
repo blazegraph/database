@@ -182,6 +182,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * The optional store into which statements will be inserted when non-
      * <code>null</code>.
      */
+    @Override
     public final AbstractTripleStore getStatementStore() {
 
         return statementStore;
@@ -205,6 +206,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * {@link #getStatementStore()} is <code>null</code>, statements will be
      * written into this store as well.
      */
+    @Override
     public final AbstractTripleStore getDatabase() {
         
         return database;
@@ -235,18 +237,21 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 //     */
 //    protected final boolean distinct = true;
     
+    @Override
     public boolean isEmpty() {
         
         return numStmts == 0;
         
     }
     
+    @Override
     public int size() {
         
         return numStmts;
         
     }
     
+    @Override
     public String toString() {
     	
     	return "numURIs=" + numURIs
@@ -316,7 +321,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public StatementBuffer(final AbstractTripleStore database,
             final int capacity) {
-
         this(null/* statementStore */, database, capacity);
 
     }
@@ -415,6 +419,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * 
      * @todo this implementation always returns ZERO (0).
      */
+    @Override
     public long flush() {
        
         /*
@@ -703,6 +708,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * Clears all buffered data, including the canonicalizing mapping for blank
      * nodes and deferred provenance statements.
      */
+    @Override
     public void reset() {
         
         _clear();
@@ -724,6 +730,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     /**
      * @todo could be replaced with {@link BigdataValueFactory
      */
+    @Override
     public void setBNodeMap(final Map<String, BigdataBNode> bnodes) {
     
         if (bnodes == null)
@@ -902,6 +909,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param p
      * @param o
      */
+    @Override
     public void add(final Resource s, final URI p, final Value o) {
         
         add(s, p, o, null, StatementEnum.Explicit);
@@ -916,6 +924,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param o
      * @param c
      */
+    @Override
     public void add(final Resource s, final URI p, final Value o, final Resource c) {
         
         add(s, p, o, c, StatementEnum.Explicit);
@@ -930,6 +939,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param o
      * @param type
      */
+    @Override
     public void add(final Resource s, final URI p, final Value o,
             final Resource c, final StatementEnum type) {
         
@@ -957,6 +967,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
     }
     
+    @Override
     public void add(final Statement e) {
 
         add(e.getSubject(), e.getPredicate(), e.getObject(), e.getContext(),
@@ -1385,6 +1396,9 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     protected void handleStatement(Resource _s, URI _p, Value _o, Resource _c,
             StatementEnum type) {
         
+    	// silently strip context in quads mode. See #1086.
+    	_c = database.isQuads() ? _c : null;
+       
     	if (log.isDebugEnabled()) {
     		
     		log.debug("handle stmt: " + _s + ", " + _p + ", " + _o + ", " + _c);
@@ -1621,6 +1635,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 			this.c = c;
 		}
 		
+	    @Override
 	    public String toString() {
 	        
 	        return "<" + s + ", " + p + ", " + o + ", " + c + ">";

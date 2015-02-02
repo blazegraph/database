@@ -27,11 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -42,7 +39,6 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -64,9 +60,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
-import com.bigdata.rdf.spo.SPORelation;
-import com.bigdata.relation.accesspath.AccessPath;
-import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -395,13 +388,6 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
                .c().getValueExpression();
       }
 
-      // The graph term/variable iff specified by the query.
-      Map<String, Object> annotations = new HashMap<String, Object>();
-      Predicate<ISPO> pred = new Predicate<ISPO>(args, annotations);
-
-      // next, retrieve access path for the predicate
-      SPORelation spor = context.getAbstractTripleStore().getSPORelation();
-
       Set<SPOKeyOrder> candidateKeyOrder = getCandidateKeyOrders(sp,
             termScanVar, context, isQuads);
       if (candidateKeyOrder.isEmpty()) {
@@ -431,13 +417,13 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
        * 
        * 2 - constant 1 - the distinct term scan var 0 - unconstrained
        */
-      StringBuffer constantPosBuf = new StringBuffer();
+      final StringBuffer constantPosBuf = new StringBuffer();
       Character distinctTermScanPos = null;
-      StringBuffer unconstrainedPosBuf = new StringBuffer();
+      final StringBuffer unconstrainedPosBuf = new StringBuffer();
 
-      int pcS = getPositionConstraint(sp.s().getValueExpression(), termScanVar);
-      int pcP = getPositionConstraint(sp.p().getValueExpression(), termScanVar);
-      int pcO = getPositionConstraint(sp.o().getValueExpression(), termScanVar);
+      final int pcS = getPositionConstraint(sp.s().getValueExpression(), termScanVar);
+      final int pcP = getPositionConstraint(sp.p().getValueExpression(), termScanVar);
+      final int pcO = getPositionConstraint(sp.o().getValueExpression(), termScanVar);
 
       if (pcS == 2)
          constantPosBuf.append("S");
@@ -473,23 +459,24 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
          }
       }
 
-      String prefix = constantPosBuf.toString();
-      Set<String> allPossibleConstPrefixes = new HashSet<String>();
+      final String prefix = constantPosBuf.toString();
+      final Set<String> allPossibleConstPrefixes = new LinkedHashSet<String>();
       getPermutations(prefix, allPossibleConstPrefixes);
       if (allPossibleConstPrefixes.isEmpty())
          allPossibleConstPrefixes.add(""); // neutral element
 
-      String suffix = unconstrainedPosBuf.toString();
-      Set<String> allPossibleConstSuffixes = new HashSet<String>();
+      final String suffix = unconstrainedPosBuf.toString();
+      final Set<String> allPossibleConstSuffixes = new LinkedHashSet<String>();
       getPermutations(suffix, allPossibleConstSuffixes);
       if (allPossibleConstSuffixes.isEmpty())
          allPossibleConstSuffixes.add(""); // neutral element
 
       // calculate set of all key order candidates
-      Set<SPOKeyOrder> allPossiblePrefixes = new HashSet<SPOKeyOrder>();
+      final Set<SPOKeyOrder> allPossiblePrefixes = 
+         new LinkedHashSet<SPOKeyOrder>();
       for (String constPrefix : allPossibleConstPrefixes) {
          for (String constSuffix : allPossibleConstSuffixes) {
-            String index = constPrefix + distinctTermScanPos + constSuffix;
+            final String index = constPrefix + distinctTermScanPos + constSuffix;
             try {
                allPossiblePrefixes.add(SPOKeyOrder.fromString(index));
             } catch (IllegalArgumentException e) {
@@ -527,7 +514,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
    private void getPermutations(
       String prefix, String str, Set<String> collector) {
       
-      int n = str.length();
+      final int n = str.length();
       if (n == 0)
          collector.add(prefix);
       else {

@@ -47,6 +47,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
@@ -584,5 +585,59 @@ public class TestStatementBuffer extends AbstractTripleStoreTestCase {
         }
 
     }
+	
+	
+    /**
+     * Triples mode test suite.
+     */
+    public static class TestTriplesModeAPs extends TestStatementBuffer {
+       
+       @Override
+       public Properties getProperties() { 
+
+           final Properties properties = new Properties(super.getProperties());
+
+           // turn off quads.
+           properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
+
+           // turn on triples
+           properties.setProperty(AbstractTripleStore.Options.TRIPLES_MODE,
+                 "true");
+           
+           return properties;
+        }
+    }
     
+    public void test_context_stripping() {
+       int capacity = 1;
+
+       final AbstractTripleStore store = getStore(getProperties());
+
+       try {
+
+          final BigdataValueFactory vf = store.getValueFactory();
+
+          final BigdataURI s = vf.createURI("http://example.com/s");
+          final BigdataURI p = vf.createURI("http://example.com/p");
+          final BigdataURI o = vf.createURI("http://example.com/o");
+          final BigdataURI c = vf.createURI("http://example.com/c");
+
+          final StatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
+                store, capacity);
+          buffer.add(vf.createStatement(s, p, o, c, StatementEnum.Explicit));
+
+          // flush the buffer.
+          buffer.flush();
+          
+          assertTrue(store.hasStatement(s, p, o));
+          assertFalse(store.hasStatement(s, p, o, c));
+
+       } finally {
+
+          store.__tearDownUnitTest();
+          
+      }
+
+   }
+
 }
