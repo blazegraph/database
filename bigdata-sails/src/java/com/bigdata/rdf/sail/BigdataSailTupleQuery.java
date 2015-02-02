@@ -118,7 +118,7 @@ public class BigdataSailTupleQuery extends SailTupleQuery
 
         originalQuery.setIncludeInferred(getIncludeInferred());
 
-        final QueryRoot optimized = ASTEvalHelper.optimizeTupleQuery(
+        final QueryRoot optimized = ASTEvalHelper.optimizeQuery(
                 getTripleStore(), astContainer, new QueryBindingSet(
                         getBindings()));
 

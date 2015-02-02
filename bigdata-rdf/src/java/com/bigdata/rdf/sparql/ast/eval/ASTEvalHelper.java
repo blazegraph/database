@@ -432,7 +432,7 @@ public class ASTEvalHelper {
      * 
      * @throws QueryEvaluationException
      */
-    static public QueryRoot optimizeTupleQuery(
+    static public QueryRoot optimizeQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
             final QueryBindingSet bs) throws QueryEvaluationException {
 
@@ -448,14 +448,14 @@ public class ASTEvalHelper {
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
 
-        // Get the projection for the query.
-        final IVariable<?>[] projected = astContainer.getOptimizedAST()
-                .getProjection().getProjectionVars();
-
-        final List<String> projectedSet = new LinkedList<String>();
-
-        for (IVariable<?> var : projected)
-            projectedSet.add(var.getName());
+//        // Get the projection for the query.
+//        final IVariable<?>[] projected = astContainer.getOptimizedAST()
+//                .getProjection().getProjectionVars();
+//
+//        final List<String> projectedSet = new LinkedList<String>();
+//
+//        for (IVariable<?> var : projected)
+//            projectedSet.add(var.getName());
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();

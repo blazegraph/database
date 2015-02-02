@@ -120,4 +120,32 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
 
     }
 
+    public QueryRoot optimize() throws QueryEvaluationException {
+
+        return optimize((BindingsClause) null);
+
+    }
+
+    public QueryRoot optimize(final BindingsClause bc)
+            throws QueryEvaluationException {
+
+        final QueryRoot originalQuery = astContainer.getOriginalAST();
+
+        if (bc != null)
+            originalQuery.setBindingsClause(bc);
+
+        if (getMaxQueryTime() > 0)
+            originalQuery.setTimeout(TimeUnit.SECONDS
+                    .toMillis(getMaxQueryTime()));
+
+        originalQuery.setIncludeInferred(getIncludeInferred());
+
+        final QueryRoot optimized = ASTEvalHelper.optimizeQuery(
+                getTripleStore(), astContainer, new QueryBindingSet(
+                        getBindings()));
+
+        return optimized;
+
+    }
+
 }
