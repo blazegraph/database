@@ -269,6 +269,7 @@ abstract public class AbstractTripleStore extends
      * 
      * @see Options#QUADS
      */
+    @Override
     final public boolean isQuads() {
         
         return quads;

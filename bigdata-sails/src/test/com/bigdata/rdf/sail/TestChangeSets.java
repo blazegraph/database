@@ -32,7 +32,6 @@ import java.util.LinkedList;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;

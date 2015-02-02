@@ -389,15 +389,30 @@ public class BigdataSail extends SailBase implements Sail {
          * @see BigdataSail#BigdataSail()
          */
         public static final String DEFAULT_FILE = "bigdata" + JNL;
+        
+        /**
+         * This optional boolean property may be used to specify whether quads
+         * in triple mode are rejected (true) or loaded while silently stripping
+         * off the context (false). In the latter case, the fireSailChangedEvent
+         * will report back the original statements, i.e. including the context,
+         * although the latter was not stored internally. This property only
+         * effects data loaded through the {@link Sail}.
+         * 
+         * @see http://trac.bigdata.com/ticket/1086
+         */
+        public static final String REJECT_QUADS_IN_TRIPLE_MODE = BigdataSail.
+              class.getPackage().getName() + ".rejectQuadsInTripleMode"; 
+        
+        public static final String DEFAULT_REJECT_QUADS_IN_TRIPLE_MODE = "false";
 
     }
 
     /**
      * Logger.
      */
-    final protected static Logger log = Logger.getLogger(BigdataSail.class);
+    final private static Logger log = Logger.getLogger(BigdataSail.class);
 
-    final protected static boolean INFO = log.isInfoEnabled();
+//    final protected static boolean INFO = log.isInfoEnabled();
 
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 
@@ -505,6 +520,15 @@ public class BigdataSail extends SailBase implements Sail {
      * @see {@link Options#ISOLATABLE_INDICES}
      */
     final private boolean isolatable;
+    
+    /**
+     *  Specifies whether quads in triple mode are rejected (true) or loaded 
+     *  while silently stripping off the context (false). In the latter case, 
+     *  the fireSailChangedEvent will report back the original statements,
+     *  i.e. including the context, although the latter was not stored
+     *  internally.
+     */
+    final private boolean rejectQuadsInTripleMode;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -1053,6 +1077,22 @@ public class BigdataSail extends SailBase implements Sail {
                         + isolatable);
             
         }
+        
+        
+        // allowAutoCommit
+        {
+            
+            rejectQuadsInTripleMode = 
+                Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE,
+                    BigdataSail.Options.DEFAULT_REJECT_QUADS_IN_TRIPLE_MODE));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE + "="
+                        + rejectQuadsInTripleMode);
+            
+        }
+        
 
         namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
@@ -2472,6 +2512,15 @@ public class BigdataSail extends SailBase implements Sail {
             // flush any pending retractions first!
             flushStatementBuffers(false/* flushAssertBuffer */, true/* flushRetractBuffer */);
 
+            // in case quads shall be rejected in triples mode by configuration
+            // and we encounter such a quad, raise an error
+            if (rejectQuadsInTripleMode && !quads && c!=null) {
+               throw new SailException(
+                  "Quad in triples mode is not allowed by configuration "
+                  + "(set parameter rejectQuadsInTripleMode to false to "
+                  + "allow for quads data)");
+            }
+            
             /*
              * Buffer the assertion.
              * 

@@ -193,7 +193,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 						sp1.setProperty(Annotations.ESTIMATED_CARDINALITY,
 								newRangeCount);
 						// the optimizer also adds a SOPC key order to be used by the access path
-						sp1.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SOPC");
+						sp1.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SPOC");
 
 						// Note: DISTINCT|REDUCED are NOT part of the
 						// projection.
@@ -254,7 +254,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 								varNode(s), varNode(p), varNode(o), varNode(z), OPTIONAL,
 								property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
 								property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s)));
-						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SOPC");
+						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SPOC");
 
 						expected = 
 								select(
@@ -346,7 +346,7 @@ public class TestASTDistinctTermScanOptimizer extends AbstractOptimizerTestCase 
 									varNode(s), varNode(p), varNode(o), varNode(z),
 									property(Annotations.ESTIMATED_CARDINALITY, newRangeCount),
 									property(Annotations.DISTINCT_TERM_SCAN_VAR, varNode(s)));
-						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SOPC");
+						sp.setQueryHint(IPredicate.Annotations.KEY_ORDER, "SPOC");
 						expected = 
 								select(
 									projection(
