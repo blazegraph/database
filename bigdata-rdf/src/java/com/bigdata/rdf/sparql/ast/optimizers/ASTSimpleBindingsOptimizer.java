@@ -67,6 +67,21 @@ public class ASTSimpleBindingsOptimizer implements IASTOptimizer {
       if (!(queryNode instanceof QueryRoot))
          return queryNode;
 
+      final QueryRoot queryRoot = (QueryRoot) queryNode;
+
+      /**
+       * One restriction is that the query must not have a VALUES
+       * clause at top level, as this may conflict with pulling bindings
+       * outside into the bindingsSet (again, this is a bit strict, but we
+       * consider this an edge case).
+       */
+      {
+         if (queryRoot.getBindingsClause()!=null) {
+            return queryNode;
+         }
+      }
+      
+      
       /**
        *  We only apply this optimization at top-level, since the
        * binding set applies to top-level constructs (adding bindings for
@@ -79,7 +94,6 @@ public class ASTSimpleBindingsOptimizer implements IASTOptimizer {
        * of the variables. However, BIND clauses in subqueries is considered
        * an edge case which probably is not worth the effort.
        */
-      final QueryRoot queryRoot = (QueryRoot) queryNode;
       {
          @SuppressWarnings("unchecked")
          final GroupNodeBase<IGroupMemberNode> whereClause = 
@@ -91,8 +105,8 @@ public class ASTSimpleBindingsOptimizer implements IASTOptimizer {
 
          }
 
-      }
-
+      }      
+      
       return queryNode;
    }
 
