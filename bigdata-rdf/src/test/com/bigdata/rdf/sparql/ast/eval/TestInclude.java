@@ -207,6 +207,30 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * Stress test variant of test_include_01, running the test case 1000
+     * times (to better track repeated problems with the test case).
+     * 
+     * @throws Exception
+     */
+    public void test_include_01_stresstest() throws Exception {
+       int nrReps = 1000;
+       int nrFails = 0;       
+       for (int i=0; i<nrReps; i++) {
+          try {
+           	 test_include_01();
+          } catch (Throwable t) {
+             nrFails++;
+          }
+       }
+       
+       if (nrFails>0)
+          throw new Exception(
+             "test_include_01 failed " + nrFails + "/" + nrReps + " times");
+    }
+
+    
+    
+    /**
 	 * This test populates a named solution set and then examines the ability to
 	 * deliver a SLICE of that named solution set in the same order in which the
 	 * data were stored. Normally, the named solution set would be created using
