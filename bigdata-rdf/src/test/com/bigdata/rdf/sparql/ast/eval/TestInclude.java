@@ -31,6 +31,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import junit.framework.TestResult;
+import junit.framework.TestSuite;
+
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
@@ -56,6 +59,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.eval.TestTCK.TCKStressTests;
 import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -108,127 +112,6 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         return new Constant<T>(val);
         
     }
-    
-    /**
-	 * This test populates a named solution set and then examines the ability to
-	 * deliver that named solution set in the same order in which the data were
-	 * stored. Normally, the named solution set would be created using
-	 * <code>INSERT INTO SOLUTIONS</code>, but in this case we drop down a level
-	 * and handle the creation of the named solution set in the test setup.
-	 * 
-	 * <pre>
-	 * SELECT * WHERE { INCLUDE %solutionSet1 }
-	 * </pre>
-	 */
-    public void test_include_01() throws Exception {
-    	
-        final TestHelper testHelper = new TestHelper(
-        		"include_01",// name
-        		"include_01.rq",// query URL
-        		"include_01.trig",// data URL
-        		"include_01.srx",// results URL
-        		true  // check order(!)
-        		);
-
-        final AbstractTripleStore tripleStore = testHelper.getTripleStore();
-        
-        final BigdataValueFactory vf = tripleStore.getValueFactory();
-        
-		final QueryEngine queryEngine = QueryEngineFactory
-				.getQueryController(tripleStore.getIndexManager());
-
-        final ISolutionSetManager sparqlCache = new SolutionSetManager(
-                (IBTreeManager) queryEngine.getIndexManager(),
-                tripleStore.getNamespace(), tripleStore.getTimestamp());
-
-		final String solutionSet = "%solutionSet1";
-		
-        final IVariable<?> x = Var.var("x");
-        final IVariable<?> y = Var.var("y");
-        final IVariable<?> z = Var.var("z");
-        
-		final XSDNumericIV<BigdataLiteral> one = new XSDNumericIV<BigdataLiteral>(
-				1);
-		one.setValue(vf.createLiteral(1));
-		
-		final XSDNumericIV<BigdataLiteral> two = new XSDNumericIV<BigdataLiteral>(
-				2);
-//		two.setValue(vf.createLiteral(2));
-		
-		final XSDNumericIV<BigdataLiteral> three = new XSDNumericIV<BigdataLiteral>(
-				3);
-//		three.setValue(vf.createLiteral(3));
-		
-		final XSDNumericIV<BigdataLiteral> four = new XSDNumericIV<BigdataLiteral>(
-				4);
-		four.setValue(vf.createLiteral(4));
-		
-		final XSDNumericIV<BigdataLiteral> five = new XSDNumericIV<BigdataLiteral>(
-				5);
-		five.setValue(vf.createLiteral(5));
-		
-        final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
-        {
-            final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst(one));
-            bset.set(y, asConst(two));
-            bsets.add(bset);
-        }
-        {
-            final IBindingSet bset = new ListBindingSet();
-            bsets.add(bset);
-        }
-        {
-            final IBindingSet bset = new ListBindingSet();
-            bset.set(x, asConst(three));
-            bset.set(y, asConst(four));
-            bset.set(z, asConst(five));
-            bsets.add(bset);
-        }
-
-        final IBindingSet[] bindingSets = bsets.toArray(new IBindingSet[]{});
-
-		sparqlCache.putSolutions(solutionSet,
-				BOpUtility.asIterator(bindingSets));
-
-        final ASTContainer astContainer = testHelper.runTest();
-
-        final PipelineOp queryPlan = astContainer.getQueryPlan();
-        
-        // top level should be the PROJECTION operator.
-        assertTrue(queryPlan instanceof ProjectionOp);
-        
-        // sole argument should be the INCLUDE operator.
-        final PipelineOp includeOp = (PipelineOp) queryPlan.get(0);
-        
-        // the INCLUDE should be evaluated using a solution set SCAN.
-        assertTrue(includeOp instanceof NestedLoopJoinOp);
-        
-    }
-    
-    /**
-     * Stress test variant of test_include_01, running the test case 1000
-     * times (to better track repeated problems with the test case).
-     * 
-     * @throws Exception
-     */
-    public void test_include_01_stresstest() throws Exception {
-       int nrReps = 1000;
-       int nrFails = 0;       
-       for (int i=0; i<nrReps; i++) {
-          try {
-           	 test_include_01();
-          } catch (Throwable t) {
-             nrFails++;
-          }
-       }
-       
-       if (nrFails>0)
-          throw new Exception(
-             "test_include_01 failed " + nrFails + "/" + nrReps + " times");
-    }
-
-    
     
     /**
 	 * This test populates a named solution set and then examines the ability to
@@ -665,5 +548,147 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         assertTrue(pipelineJoinOp instanceof PipelineJoin);
 
     }
+    
+    /**
+     * Execute the stress tests a couple of times.
+     * 
+     * @throws Exception
+     */
+    public void test_stressTests() throws Exception {
+
+        for (int i = 0; i < 100; i++) {
+            final TestSuite suite = new TestSuite(
+                IncludeStressTests.class.getSimpleName());
+
+            suite.addTestSuite(IncludeStressTests.class);
+            suite.run(new TestResult());
+        }
+    }
+    
+    
+    /**
+     * Tests to be executed in a stress test fashion, i.e. multiple times.
+     * 
+     * @author msc
+     */
+    public static class IncludeStressTests 
+    extends AbstractDataDrivenSPARQLTestCase  {
+       
+       
+        /**
+         * 
+         */
+        public IncludeStressTests() {
+        }
+
+        /**
+         * @param name
+         */
+        public IncludeStressTests(String name) {
+            super(name);
+        }       
+       
+        /**
+         * This test populates a named solution set and then examines the ability to
+         * deliver that named solution set in the same order in which the data were
+         * stored. Normally, the named solution set would be created using
+         * <code>INSERT INTO SOLUTIONS</code>, but in this case we drop down a level
+         * and handle the creation of the named solution set in the test setup.
+         * 
+         * <pre>
+         * SELECT * WHERE { INCLUDE %solutionSet1 }
+         * </pre>
+         */
+        public void test_include_01() throws Exception {
+
+            final TestHelper testHelper = new TestHelper("include_01",// name
+                "include_01.rq",// query URL
+                "include_01.trig",// data URL
+                "include_01.srx",// results URL
+                true // check order(!)
+            );
+
+            final AbstractTripleStore tripleStore = testHelper.getTripleStore();
+
+            final BigdataValueFactory vf = tripleStore.getValueFactory();
+
+            final QueryEngine queryEngine = QueryEngineFactory
+                .getQueryController(tripleStore.getIndexManager());
+
+            final ISolutionSetManager sparqlCache = new SolutionSetManager(
+                (IBTreeManager) queryEngine.getIndexManager(),
+                tripleStore.getNamespace(), tripleStore.getTimestamp());
+
+            final String solutionSet = "%solutionSet1";
+
+            final IVariable<?> x = Var.var("x");
+            final IVariable<?> y = Var.var("y");
+            final IVariable<?> z = Var.var("z");
+
+            final XSDNumericIV<BigdataLiteral> one = 
+                new XSDNumericIV<BigdataLiteral>(1);
+            one.setValue(vf.createLiteral(1));
+
+            final XSDNumericIV<BigdataLiteral> two = 
+                new XSDNumericIV<BigdataLiteral>(2);
+
+            final XSDNumericIV<BigdataLiteral> three = 
+                new XSDNumericIV<BigdataLiteral>(3);
+
+            final XSDNumericIV<BigdataLiteral> four = 
+                new XSDNumericIV<BigdataLiteral>(4);
+            four.setValue(vf.createLiteral(4));
+
+           final XSDNumericIV<BigdataLiteral> five = 
+                new XSDNumericIV<BigdataLiteral>(5);
+           five.setValue(vf.createLiteral(5));
+
+           final List<IBindingSet> bsets = new LinkedList<IBindingSet>();
+           {
+                final IBindingSet bset = new ListBindingSet();
+                bset.set(x, asConst(one));
+                bset.set(y, asConst(two));
+                bsets.add(bset);
+           }
+
+           {
+               final IBindingSet bset = new ListBindingSet();
+               bsets.add(bset);
+           }
+           
+           {
+               final IBindingSet bset = new ListBindingSet();
+               bset.set(x, asConst(three));
+               bset.set(y, asConst(four));
+               bset.set(z, asConst(five));
+               bsets.add(bset);
+           }
+
+           final IBindingSet[] bindingSets = bsets.toArray(new IBindingSet[] {});
+
+           sparqlCache.putSolutions(solutionSet,
+           BOpUtility.asIterator(bindingSets));
+
+           final ASTContainer astContainer = testHelper.runTest();
+
+           final PipelineOp queryPlan = astContainer.getQueryPlan();
+
+           // top level should be the PROJECTION operator.
+           assertTrue(queryPlan instanceof ProjectionOp);
+
+           // sole argument should be the INCLUDE operator.
+           final PipelineOp includeOp = (PipelineOp) queryPlan.get(0);
+
+           // the INCLUDE should be evaluated using a solution set SCAN.
+           assertTrue(includeOp instanceof NestedLoopJoinOp);
+
+      }
+
+      protected <T> IConstant<T> asConst(final T val) {
+
+         return new Constant<T>(val);
+
+      }
+    }   
     
 }
