@@ -1,0 +1,7 @@
+@prefix : <http://bigdata.com#> .
+
+:mygraph {
+   :Michael rdf:type :Person .
+   :Bryan rdf:type :Person .
+   :VW rdf:type :Car .
+}
