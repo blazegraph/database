@@ -387,6 +387,29 @@ public class TestTCK extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    
+    /**
+     * Stress test variant of test_opt_filter_1, running the test case 1000
+     * times (to better track repeated problems with the test case).
+     * 
+     * @throws Exception
+     */
+    public void test_opt_filter_1_stresstest() throws Exception {
+
+       int nrReps = 1000;
+       int nrFails = 0;       
+       for (int i=0; i<nrReps; i++) {
+         try {
+            test_opt_filter_1();
+         } catch (Throwable t) {
+            nrFails++;
+         }
+       }
+       
+       if (nrFails>0)
+          throw new Exception("TC failed " + nrFails + "/" + nrReps + " times");
+    }
+    
     /**
      * Complex optional semantics: 1.
      * 
