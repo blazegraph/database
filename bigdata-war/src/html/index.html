@@ -6,7 +6,7 @@
       href="/bigdata/html/favicon.ico" />
     <!-- meta charset="utf-8" -->
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-    <title>Bigdata Workbench</title>
+    <title>Blazegraph Workbench</title>
     <link rel="stylesheet" href="/bigdata/html/css/vendor/codemirror.css">
     <link rel="stylesheet" href="/bigdata/html/css/style.css">
     <!-- junit test marker: index.html -->
@@ -41,7 +41,7 @@
         </div>
         <div class="splashbox">
           <p>
-            Graphs in a Blaze instance are segregated by namespace. To get started, navigate to the "Namespaces" tab to create a new namespace, or simply start working with the default namespace ("kb").
+            Graphs in a Blaze instance are segregated by namespace. To get started, navigate to the "Namespaces" tab to create a new namespace <a href="#namespaces">[click here]</a>.
           </p>
         </div>
         <div class="splashbox">
@@ -57,13 +57,13 @@
         </div>
         <div class="splashbox">
             For more information on getting started with Blaze, please visit our
-          <a href="http://wiki.bigdata.com/wiki/index.php/Main_Page">Wiki</a> or our
-          <a href="http://www.bigdata.com">Website</a>.
+          <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> or our
+          <a href="http://www.blazegraph.com">Website</a>.
         </div>
         <div class="splashbox">
             For instructions on getting started writing Blaze clients, see
-          <a href="http://www.bigdata.com/sesame">Sesame</a> or 
-          <a href="http://www.bigdata.com/blueprints">Blueprints</a>.
+          <a href="http://www.blazegraph.com/sesame">Sesame</a> or 
+          <a href="http://www.blazegraph.com/blueprints">Blueprints</a>.
         </div>
       </div>
 
@@ -72,7 +72,7 @@
         <div class="box">
 
           <div class="links">
-            <a href="http://wiki.bigdata.com/wiki/index.php/Main_Page">Wiki</a> -
+            <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> -
             <a href="http://www.w3.org/TR/sparql11-update/">SPARQL Update</a>
           </div>
 
@@ -131,7 +131,7 @@
         <div class="box">
 
           <div class="links">
-            <a href="http://wiki.bigdata.com/wiki/index.php/Main_Page">Wiki</a> -
+            <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> -
             <a href="http://www.w3.org/TR/sparql11-query/">SPARQL Query</a>
           </div>
 
@@ -306,6 +306,22 @@
 
         <div class="box">
           <h1>Create namespace</h1>
+          <p>
+		There a number of features to enable.  There's full documentation <a href="http://wiki.blazegraph.com/wiki/index.php/GettingStarted#So_how_do_I_put_the_database_in_triple_store_versus_quad_store_mode.3F">here</a>.  You must select "Use" after you have created the KB.
+	  </p>
+		<br>
+	  <p><h2>A quick reference is below:</h2>
+		<ol>
+			<br>
+			<li>o PropertyGraph:  Select <i>triples</i>.</li>
+			<br>
+			<li>o RDF + SPARQL with named graphs:  Select <i>quads</i> mode.</li>
+			<br>
+			<li>o Support for <a href="http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right">Reification Done Right (RDR)</a>.  Select <i>rdr</i> mode.</li>
+			<br>
+		</ol>
+		<br>
+          </p>
           <form id="namespace-create">
             <label for="new-namespace-name">Name:</label>
             <input type="text" id="new-namespace-name">
@@ -331,7 +347,7 @@
 
       </div>
 
-      <div id="links"><a href="http://www.bigdata.com" target="_blank">Bigdata</a> - <a href="http://wiki.bigdata.com/" target="_blank">Wiki</a></div>
+      <div id="links"><a href="http://www.blazegraph.com" target="_blank">Blazegraph</a> - <a href="http://wiki.blazegraph.com/" target="_blank">Wiki</a></div>
 
     </div>
 
