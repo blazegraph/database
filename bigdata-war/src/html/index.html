@@ -41,7 +41,7 @@
         </div>
         <div class="splashbox">
           <p>
-            Graphs in a Blaze instance are segregated by namespace. To get started, navigate to the "Namespaces" tab to create a new namespace, or simply start working with the default namespace ("kb").
+            Graphs in a Blaze instance are segregated by namespace. To get started, navigate to the "Namespaces" tab to create a new namespace <a href="#namespaces">[click here]</a>.
           </p>
         </div>
         <div class="splashbox">
@@ -306,6 +306,22 @@
 
         <div class="box">
           <h1>Create namespace</h1>
+          <p>
+		There a number of features to enable.  There's full documentation <a href="http://wiki.bigdata.com/wiki/index.php/GettingStarted#So_how_do_I_put_the_database_in_triple_store_versus_quad_store_mode.3F">here</a>.  You must select "Use" after you have created the KB.
+	  </p>
+		<br>
+	  <p><h2>A quick reference is below:</h2>
+		<ol>
+			<br>
+			<li>o PropertyGraph:  Select <i>triples</i>.</li>
+			<br>
+			<li>o RDF + SPARQL with named graphs:  Select <i>quads</i> mode.</li>
+			<br>
+			<li>o Support for <a href="http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right">Reification Done Right (RDR)</a>.  Select <i>rdr</i> mode.</li>
+			<br>
+		</ol>
+		<br>
+          </p>
           <form id="namespace-create">
             <label for="new-namespace-name">Name:</label>
             <input type="text" id="new-namespace-name">
