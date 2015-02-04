@@ -1,0 +1,4 @@
+SELECT * WHERE {
+  BIND ( 2*?val as ?doubleVal )
+  <http://bigdata.com#Datapoint> <http://bigdata.com#value> ?val 
+}
