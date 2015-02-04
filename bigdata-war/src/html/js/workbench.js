@@ -230,40 +230,43 @@ function getNamespaces(synchronous) {
          var rdf = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
          var namespaces = data.getElementsByTagNameNS(rdf, 'Description');
          var i, title, titleText, use;
-         for(i=0; i<namespaces.length; i++) {
-            title = namespaces[i].getElementsByTagName('title')[0].textContent;
-            titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
-            if(title == NAMESPACE) {
-               use = 'In use';
-            } else {
-               use = '<a href="#" class="use-namespace">Use</a>';
+	 if( namespaces.length > 0)
+	 {
+            for(i=0; i<namespaces.length; i++) {
+               title = namespaces[i].getElementsByTagName('title')[0].textContent;
+               titleText = title == DEFAULT_NAMESPACE ? title + ' (default)' : title;
+               if(title == NAMESPACE) {
+                  use = 'In use';
+               } else {
+                  use = '<a href="#" class="use-namespace">Use</a>';
+               }
+               $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
             }
-            $('#namespaces-list').append('<tr data-name="' + title + '">><td>' + titleText + '</td><td>' + use + '</td><td><a href="#" class="delete-namespace">Delete</a></td><td><a href="#" class="namespace-properties">Properties</a></td><td><a href="#" class="clone-namespace">Clone</a></td><td><a href="' + RO_URL_PREFIX + 'namespace/' + title + '/sparql" class="namespace-service-description">Service Description</a></td></tr>');
-         }
-         $('.use-namespace').click(function(e) {
-            e.preventDefault();
-            useNamespace($(this).parents('tr').data('name'));
-         });
-         $('.delete-namespace').click(function(e) {
-            e.preventDefault();
-            deleteNamespace($(this).parents('tr').data('name'));
-         });
-         $('.namespace-properties').click(function(e) {
-            e.preventDefault();
-            getNamespaceProperties($(this).parents('tr').data('name'));
-         });
-         $('.namespace-properties-java').click(function(e) {
-            e.preventDefault();
-            getNamespaceProperties($(this).parents('tr').data('name'), 'java');
-         });
-         $('.clone-namespace').click(function(e) {
-            e.preventDefault();
-            cloneNamespace($(this).parents('tr').data('name'));
-            $('#namespace-create-errors').html('');
-         });
-         $('.namespace-service-description').click(function() {
-            return confirm('This can be an expensive operation. Proceed anyway?');
-         });
+           $('.use-namespace').click(function(e) {
+              e.preventDefault();
+              useNamespace($(this).parents('tr').data('name'));
+           });
+           $('.delete-namespace').click(function(e) {
+              e.preventDefault();
+              deleteNamespace($(this).parents('tr').data('name'));
+           });
+           $('.namespace-properties').click(function(e) {
+              e.preventDefault();
+              getNamespaceProperties($(this).parents('tr').data('name'));
+           });
+           $('.namespace-properties-java').click(function(e) {
+              e.preventDefault();
+              getNamespaceProperties($(this).parents('tr').data('name'), 'java');
+           });
+           $('.clone-namespace').click(function(e) {
+              e.preventDefault();
+              cloneNamespace($(this).parents('tr').data('name'));
+              $('#namespace-create-errors').html('');
+           });
+           $('.namespace-service-description').click(function() {
+              return confirm('This can be an expensive operation. Proceed anyway?');
+           });
+	 }
       }
    };
    $.ajax(settings);
@@ -443,9 +446,15 @@ function getDefaultNamespace() {
       async: false,
       url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true',
       success: function(data) {
-         // Chrome does not work with rdf\:Description, so look for Description too
-         var defaultDataset = $(data).find('rdf\\:Description, Description');
-         DEFAULT_NAMESPACE = defaultDataset.find('title')[0].textContent;
+        // Chrome does not work with rdf\:Description, so look for Description too
+        var defaultDataset = $(data).find('rdf\\:Description, Description');
+	var ELEMENT = defaultDataset.find('title');
+	 if(ELEMENT == null )
+	 {
+         	DEFAULT_NAMESPACE = "kb";
+	 } else {
+         	DEFAULT_NAMESPACE = ELEMENT[0].textContent;
+	 } 
       }
    };
    $.ajax(settings);
@@ -1900,7 +1909,7 @@ function startup() {
    // load namespaces, default namespace, HA status
    useLBS(false); // Note: default to false. Otherwise workbench breaks when not deployed into jetty container.
    getNamespaces(true);
-   getDefaultNamespace();
+   //getDefaultNamespace();
    showHealthTab();
 
    // complete setup
