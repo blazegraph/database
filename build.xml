@@ -2652,6 +2652,7 @@ ${postInstallMessage}</echo>
     <arg value="bigdata" />
 </java>
 </target>
+    <target name="start-blazegraph" depends="start-bigdata" description="Start the BlazeGraph Server (simple triples mode start)."/>
 
 	 <!-- This is NOT recommended for development or deployment. It is a    -->
 	 <!-- fast and simple bootstrap for people getting started with bigdata -->
