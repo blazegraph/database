@@ -240,6 +240,17 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTWildcardProjectionOptimizer());
         
         /**
+         * 
+         */
+        
+        /**
+         * Makes implicit bindings in the query explicit, in order to make them
+         * amenable to subsequent optimization through the 
+         * {@link ASTBindingAssigner}. Implicit bindings are those
+         */
+        add(new ASTSimpleBindingsOptimizer());
+        
+        /**
          * Propagates bindings from an input solution into the query, replacing
          * variables with constants while retaining the constant / variable
          * association.
