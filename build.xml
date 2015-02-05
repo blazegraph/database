@@ -15,6 +15,12 @@ with a RESTful API.
 
 See 'war'.
 
+Executable jar.  Bigdata can be built as an executable jar file.  This is a fully-
+bundled single jar distribution that may be run as "java -jar <jarfile>".  You may 
+use an alternate configuration file by setting the -Dbigdata.propertyFile= property.
+
+See 'executable-jar'
+
 Cluster deployment.  There are two ways to deploy the cluster. One is
 using 'ant-install' from either the top-level directory (either as
 checked out from SVN or as unpacked from the distribution artifact
@@ -2670,6 +2676,49 @@ ${postInstallMessage}</echo>
             <arg value="kb"/>
             <arg value="bigdata-war/src/WEB-INF/GraphStore.properties"/>
         </java>
+    </target>
+
+    <target name="executable-jar" depends="bundleJar"
+          description="Generates an Executable JAR artifact.">
+      	<property name="ejar.dir" value="${build.dir}/staged-jar"
+          description="The staging directory for the executable jar."/>
+      	<property name="ejar.file" value="${build.dir}/${version}-bundled.jar"
+          description="The generated Executable JAR file." />
+      	<delete file="${ejar.file}"
+          description="Remove the old Executable JAR file."/>
+      	<delete dir="${ejar.dir}"
+          description="Remove old Executable staging directory."/>
+        <echo message="Staging to ${ejar.dir}"/>
+        <mkdir dir="${ejar.dir}"/>
+        <copy flatten="true" todir="${ejar.dir}"
+            includeemptydirs="no"
+            preservelastmodified="true"
+            description="Stage the executable jar to a temporary directory."
+            >
+	   <fileset dir="${build.dir}/lib/">
+              <include name="**/*.jar"/>
+	   </fileset>
+	   <fileset dir="bigdata-war/src">
+              <include name="**/*.properties"/>
+              <include name="**/jetty.xml"/>
+           </fileset>
+        </copy>
+	<path id="jar.classpath">
+	   	<fileset file="${ejar.dir}/*.jar"/>
+    	</path>
+	<manifestclasspath property="mf.classpath" jarfile="${ejar.file}">
+    		<classpath refid="jar.classpath" />
+	</manifestclasspath>
+  	<tstamp/><!-- needed for TODAY -->
+  	<manifest file="${ejar.dir}/MANIFEST.MF">
+    		<attribute name="Main-Class" value="com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer"/>
+    		<attribute name="Class-Path" value="${mf.classpath}" />
+  	</manifest>
+  
+  	<!-- create the jar file, including the manifest file we just created -->
+  	<jar basedir="${ejar.dir}" 
+       		destfile="${ejar.file}"
+       		manifest="${ejar.dir}/MANIFEST.MF" />
     </target>
 
     <target name="fetch-gremlin" depends="prepare,compile,jar">
