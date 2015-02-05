@@ -4046,13 +4046,13 @@ abstract public class AbstractTripleStore extends
     public long removeStatements(final ISPO[] stmts, final int numStmts) {
 
         return removeStatements(new ChunkedArrayIterator<ISPO>(numStmts, stmts,
-                null/* keyOrder */), true);
+                null/* keyOrder */), true/*computeClosureForStatementIdentifiers*/);
 
     }
 
     public long removeStatements(final IChunkedOrderedIterator<ISPO> itr) {
 
-        return removeStatements(itr, true);
+        return removeStatements(itr, true/*computeClosureForStatementIdentifiers*/);
         
     }
     
