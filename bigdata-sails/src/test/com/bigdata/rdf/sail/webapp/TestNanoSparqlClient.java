@@ -1448,15 +1448,66 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 		doInsertbyURL("POST", packagePath + "test_delete_by_access_path.trig");
 
+		final URI base = new URIImpl("http://www.bigdata.com/");
+		final URI c1 = new URIImpl("http://www.bigdata.com/c1");
+		final URI c2 = new URIImpl("http://www.bigdata.com/c2");
+		
+		// This is the named graph that we will delete.
+		assertEquals(3,m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				base// c
+				));
+		
+		// These named graphs will not be deleted.
+		assertEquals(2,m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c1// c
+				));
+		assertEquals(2,m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c2// c
+				));
+		
+		// Delete the named graph (and only that graph)
 		final long mutationResult = doDeleteWithAccessPath(//
 				// requestPath,//
 				null,// s
 				null,// p
 				null,// o
-				new URIImpl("http://www.bigdata.com/") // c
+				base // c
 		);
+		assertEquals(3, mutationResult); // verify #of stmts modified.
 
-		assertEquals(3, mutationResult);
+		// range count each named graph again.
+		final long rangeCount_base = m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				base// c
+				);
+
+		final long rangeCount_c1 = m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c1// c
+				);
+
+		final long rangeCount_c2 = m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c2// c
+				);
+
+		// This is what we deleted out of the quad store.
+		assertEquals(0,rangeCount_base);
+
+		// These should be unchanged.
+		assertEquals(2, rangeCount_c1);
+
+		// These should be unchanged.
+		assertEquals(2, rangeCount_c2);
 
 	}
 
