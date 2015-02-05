@@ -1534,6 +1534,82 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	}
 
 	/**
+	 * Delete everything in a two named graphs (context) while the data in another
+	 * named graph is not deleted.
+	 */
+	public void test_DELETE_accessPath_delete_multiple_contexts() throws Exception {
+
+		if (TestMode.quads != testMode)
+			return;
+
+		doInsertbyURL("POST", packagePath + "test_delete_by_access_path.trig");
+
+		final URI base = new URIImpl("http://www.bigdata.com/");
+		final URI c1 = new URIImpl("http://www.bigdata.com/c1");
+		final URI c2 = new URIImpl("http://www.bigdata.com/c2");
+		
+		// This named graph will not be deleted.
+		assertEquals(3, m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				base// c
+				));
+		
+		// These named graphs will be deleted.
+		assertEquals(2, m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c1// c
+				));
+		assertEquals(2,m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c2// c
+				));
+
+		final long mutationResult = doDeleteWithAccessPath(//
+				// requestPath,//
+				null,// s
+				null,// p
+				null,// o
+				c1, c2 // c
+		);
+
+		// should have removed 2 statements from each of two named graphs for a
+		// total of 4 statements removed.
+		assertEquals(4, mutationResult);
+
+		// range count each named graph.
+		final long rangeCount_base = m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				base// c
+				);
+
+		final long rangeCount_c1 = m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c1// c
+				);
+
+		final long rangeCount_c2 = m_repo.rangeCount(null,// s,
+				null,// p
+				null,// o
+				c2// c
+				);
+
+		// Not deleted.
+		assertEquals(3,rangeCount_base);
+
+		// These should be deleted
+		assertEquals(0, rangeCount_c1);
+
+		// These should be unchanged.
+		assertEquals(0, rangeCount_c2);
+
+	}
+
+	/**
 	 * Delete using an access path with the context position bound.
 	 */
 	public void test_DELETE_accessPath_delete_c_nothingMatched()
