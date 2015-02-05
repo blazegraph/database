@@ -62,14 +62,12 @@ public class JettyResponseListener extends InputStreamResponseListener {
 	/**
 	 * 
 	 * @param request
-	 * @param maxBufferSize
 	 * @param queryTimeoutMillis
 	 *            the timeout in milliseconds (if non-positive, then an infinite
 	 *            timeout is used).
 	 */
 	public JettyResponseListener(final Request request,
-			final long maxBufferSize,  long queryTimeoutMillis) {
-		super(maxBufferSize);
+			long queryTimeoutMillis) {
 		if (request == null)
 			throw new IllegalArgumentException();
 		m_request = request;

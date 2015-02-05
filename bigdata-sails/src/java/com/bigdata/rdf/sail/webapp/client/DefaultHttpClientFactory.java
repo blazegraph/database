@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
+1Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.webapp.client;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
@@ -41,6 +42,8 @@ import org.eclipse.jetty.util.ssl.SslContextFactory;
  */
 public final class DefaultHttpClientFactory implements IHttpClientFactory {
 
+	private static final Logger log = Logger.getLogger(DefaultHttpClientFactory.class);
+	
 	public interface Options {
 
 		/**
@@ -62,27 +65,76 @@ public final class DefaultHttpClientFactory implements IHttpClientFactory {
 
 		final static public String DEFAULT_FOLLOW_REDIRECTS = "true";
 
+	    /**
+		 * The name of the system property that may be used to specify the maximum
+		 * size (in bytes) for the Jetty response buffer (default @value
+		 * {@value #DEFAULT_RESPONSE_BUFFER_SIZE})
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1092"> Set query timeout and
+		 *      response buffer length on jetty response listener</a>
+		 * @see <a href="http://trac.bigdata.com/ticket/1096"> Set jetty request
+		 *      buffer size</a>
+		 */
+		static public final String RESPONSE_BUFFER_SIZE = DefaultHttpClientFactory.class
+				.getName() + ".responseBufferSize";
+	    
+		/**
+		 * The default maximum size of the jetty response buffer (@value
+		 * {@value #DEFAULT_RESPONSE_BUFFER_SIZE}).
+		 * <p>
+		 * Note: The default value for the jetty platform is 16kb.  
+		 */
+	    static public final int DEFAULT_RESPONSE_BUFFER_SIZE = 16 * 1024;
+	    
+		/**
+		 * The name of the system property that may be used to specify the maximum
+		 * size (in bytes) for the Jetty request buffer (default @value
+		 * {@value #DEFAULT_REQUEST_BUFFER_SIZE})
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1096"> Set jetty request
+		 *      buffer size</a>
+		 */
+		public static final String REQUEST_BUFFER_SIZE = DefaultHttpClientFactory.class
+				.getName() + ".requestBufferSize";
+
+		/**
+		 * The default maximum size of the jetty request buffer (@value
+		 * {@value #DEFAULT_REQUEST_BUFFER_SIZE}).
+		 * <p>
+		 * Note: The default value for the jetty platform is 4kb.
+		 */
+		public static final int DEFAULT_REQUEST_BUFFER_SIZE = 16 * 1024;
+
 	}
 
 	@Override
 	public HttpClient newInstance() {
 
-		final SslContextFactory sslFactory;
+		final AutoCloseHttpClient cm;
+		{
+			final String sslKeystorePath = System.getProperty(
+					Options.SSL_KEYSTORE_PATH,
+					Options.DEFAULT_SSL_KEYSTORE_PATH);
 
-		final String sslKeystorePath = System.getProperty(
-				Options.SSL_KEYSTORE_PATH, Options.DEFAULT_SSL_KEYSTORE_PATH);
+			if (log.isInfoEnabled()) {
+				log.info(Options.SSL_KEYSTORE_PATH + "=" + sslKeystorePath);
+			}
 
-		if (sslKeystorePath == null) {
+			final SslContextFactory sslFactory;
 
-			sslFactory = new SslContextFactory(true/* trustAll */);
+			if (sslKeystorePath == null) {
 
-		} else {
+				sslFactory = new SslContextFactory(true/* trustAll */);
 
-			sslFactory = new SslContextFactory(sslKeystorePath);
+			} else {
+
+				sslFactory = new SslContextFactory(sslKeystorePath);
+
+			}
+
+			cm = new AutoCloseHttpClient(sslFactory);
 
 		}
-
-		final AutoCloseHttpClient cm = new AutoCloseHttpClient(sslFactory);
 
 		try {
 
@@ -90,10 +142,51 @@ public final class DefaultHttpClientFactory implements IHttpClientFactory {
 					.valueOf(System.getProperty(Options.FOLLOW_REDIRECTS,
 							Options.DEFAULT_FOLLOW_REDIRECTS));
 
+			if (log.isInfoEnabled()) {
+				log.info(Options.FOLLOW_REDIRECTS + "=" + followRedirects);
+			}
+			
 			if (followRedirects) {
 
 				// Allow redirects.
 				cm.setFollowRedirects(true);
+
+			}
+
+			/*
+			 * Configure the http request buffer capacity.
+			 * 
+			 * See #1097.
+			 */
+			{
+				final int bufferSize = Integer.valueOf(System
+						.getProperty(Options.REQUEST_BUFFER_SIZE,
+								Integer.toString(Options.DEFAULT_REQUEST_BUFFER_SIZE)));
+
+				if (log.isInfoEnabled()) {
+					log.info(Options.REQUEST_BUFFER_SIZE+ "=" + bufferSize);
+				}
+
+				cm.setRequestBufferSize(bufferSize);
+			}
+			
+			/*
+			 * Configure the http response buffer capacity.
+			 * 
+			 * See #1092.
+			 */
+			{
+
+				final int bufferSize = Integer
+						.parseInt(System.getProperty(
+								Options.RESPONSE_BUFFER_SIZE,
+								Integer.toString(Options.DEFAULT_RESPONSE_BUFFER_SIZE)));
+
+				if (log.isInfoEnabled()) {
+					log.info(Options.RESPONSE_BUFFER_SIZE + "=" + bufferSize);
+				}
+
+				cm.setResponseBufferSize(bufferSize);
 
 			}
 

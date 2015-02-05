@@ -188,26 +188,6 @@ public class RemoteRepository {
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
     /**
-	 * The name of the system property that may be used to specify the maximum
-	 * size (in bytes) for the Jetty response buffer (default @value
-	 * {@value #DEFAULT_MAX_RESPONSE_BUFFER_SIZE})
-	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1092"> Set query timeout and
-	 *      response buffer length on jetty response listener</a>
-	 */
-	static public final String MAX_RESPONSE_BUFFER_SIZE = RemoteRepository.class
-			.getName() + ".maxResponseBufferSize";
-    
-	/**
-	 * The default maximum size of the jetty response buffer (@value
-	 * {@value #DEFAULT_MAX_RESPONSE_BUFFER_SIZE}).
-	 * <p>
-	 * Note: The default value of 16k is the value specified as the default the
-	 * jetty platform.
-	 */
-    static public final long DEFAULT_MAX_RESPONSE_BUFFER_SIZE = 16 * 1024L;
-    
-    /**
      * When <code>true</code>, the REST API methods will use the load balancer
      * aware requestURLs. The load balancer has essentially zero cost when not
      * using HA, so it is recommended to always specify <code>true</code>. When
@@ -239,13 +219,6 @@ public class RemoteRepository {
      * using a <code>application/x-www-form-urlencoded</code> request entity.
      */
     private volatile int maxRequestURLLength;
-    
-    /**
-     * The maximum size of the jetty response buffer.
-     * 
-     * @see #MAX_RESPONSE_BUFFER_SIZE
-     */
-    private volatile long maxResponseBufferSize;
     
     /**
      * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
@@ -287,31 +260,6 @@ public class RemoteRepository {
         
     }
 
-    /**
-     * Return the maximum size of the jetty response buffer.
-     * 
-     * @see #MAX_RESPONSE_BUFFER_SIZE
-     */
-    public long getMaxResponseBufferSize() {
-    	
-    	return maxResponseBufferSize;
-    	
-    }
-    
-    /**
-     * Set the maximum size of the jetty response buffer.
-     * 
-     * @see #MAX_RESPONSE_BUFFER_SIZE
-     */
-    public void setMaxResponseBufferSize(final long newVal) {
-
-        if (newVal <= 0)
-            throw new IllegalArgumentException();
-
-        this.maxResponseBufferSize = newVal;
-        
-    }
-    
     /**
      * Return the HTTP verb that will be used for a QUERY (versus an UPDATE or
      * other mutation operations) (default {@value #DEFAULT_QUERY_METHOD}). POST can
@@ -439,10 +387,6 @@ public class RemoteRepository {
         setMaxRequestURLLength(Integer.parseInt(System.getProperty(
                 MAX_REQUEST_URL_LENGTH,
                 Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
-        
-        setMaxResponseBufferSize(Long.parseLong(System.getProperty(
-                MAX_RESPONSE_BUFFER_SIZE,
-                Long.toString(DEFAULT_MAX_RESPONSE_BUFFER_SIZE))));
         
         setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
         
@@ -1732,7 +1676,7 @@ public class RemoteRepository {
 			}
 
 			final JettyResponseListener listener = new JettyResponseListener(
-					request, getMaxResponseBufferSize(), queryTimeoutMillis);
+					request, queryTimeoutMillis);
 
             // Note: Send with a listener is non-blocking.
             request.send(listener);
