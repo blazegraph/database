@@ -212,14 +212,16 @@ public class AbstractConnectOptions implements IMimeTypes {
             return;
         boolean first = true;
         for (Map.Entry<String, String[]> e : requestParams.entrySet()) {
-            urlString.append(first ? "?" : "&");
-            first = false;
             final String name = e.getKey();
             final String[] vals = e.getValue();
             if (vals == null) {
+                urlString.append(first ? "?" : "&");
+                first = false;
                 urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
             } else {
                 for (String val : vals) {
+                    urlString.append(first ? "?" : "&");
+                    first = false;
                     urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
                     urlString.append("=");
                     urlString.append(URLEncoder.encode(val, RemoteRepository.UTF8));
