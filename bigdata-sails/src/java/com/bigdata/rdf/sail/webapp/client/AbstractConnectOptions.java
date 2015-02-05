@@ -204,6 +204,8 @@ public class AbstractConnectOptions implements IMimeTypes {
     
     /**
      * Add any URL query parameters.
+     * 
+     * @see #1097 (Extension REST API does not support multiple context values)
      */
     static public void addQueryParams(final StringBuilder urlString,
             final Map<String, String[]> requestParams)
