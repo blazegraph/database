@@ -479,9 +479,8 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 			}
 
 			final JettyResponseListener response = new JettyResponseListener(
-					request, 16 * 1024/* maxResponseSize */,
-					TimeUnit.SECONDS.toMillis(300));
-			
+					request, TimeUnit.SECONDS.toMillis(300));
+
 			request.send(response);
 
 			return response;

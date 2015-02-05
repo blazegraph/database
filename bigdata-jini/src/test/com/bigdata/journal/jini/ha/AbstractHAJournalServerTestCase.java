@@ -438,8 +438,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 					.newRequest(query).method(HttpMethod.GET);
 
 			final JettyResponseListener response = new JettyResponseListener(
-					request, 16 * 1024/* maxResponseSize */,
-					TimeUnit.SECONDS.toMillis(300));
+					request, TimeUnit.SECONDS.toMillis(300));
 
 			request.send(response);
 			RemoteRepository.checkResponseCode(response);
