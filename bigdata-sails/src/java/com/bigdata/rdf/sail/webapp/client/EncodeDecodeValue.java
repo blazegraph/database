@@ -417,7 +417,15 @@ public class EncodeDecodeValue {
         }
         throw new AssertionError();
     }
-    
+
+    /**
+	 * Decode each resource.
+	 * 
+	 * @param strings
+	 *            An array of encoded resources.
+	 * @return An array of decoded resources that is 1:1 with the original
+	 *         array.
+	 */
     public static Resource[] decodeResources(final String[] strings) {
     	if (strings == null || strings.length == 0)
     		return null;
@@ -429,7 +437,15 @@ public class EncodeDecodeValue {
     	
     	return resources;
     }
-    
+
+    /**
+	 * Encode each value.
+	 * 
+	 * @param values
+	 *            An array of RDF {@link Value}s.
+	 * @return An array of encoded RDF values that is 1:1 with the original
+	 *         array.
+	 */
     public static String[] encodeValues(final Value[] values) {
     	if (values == null || values.length == 0)
     		return null;
