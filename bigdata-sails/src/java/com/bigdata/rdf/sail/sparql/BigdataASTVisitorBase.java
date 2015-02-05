@@ -34,10 +34,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 
+import org.openrdf.query.algebra.StatementPattern.Scope;
+
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
 import com.bigdata.rdf.sail.sparql.ast.ASTFalse;
+import com.bigdata.rdf.sail.sparql.ast.ASTGraphGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTNumericLiteral;
 import com.bigdata.rdf.sail.sparql.ast.ASTQName;
@@ -49,6 +52,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTVar;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
 /**
@@ -250,5 +254,57 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
         return node.getValue();
 
     }
+    
+    /**
+     * Builds a fresh {@link GroupGraphPattern} that inherits the scope
+     * for the given node. This is done by looking up the scope of the given
+     * node by following its ancestor chain, to identify whether the node
+     * has some named graph ancestors. If so, the scope from the enclosing
+     * named graph ancestor is copied over, otherwise we're in default context.
+     * 
+     * @param n
+     * @return
+     */
+    protected GroupGraphPattern scopedGroupGraphPattern(Node n)
+    throws VisitorException {
+       
+        // extract the enclosing ASTGraphGraphPattern, if any
+        ASTGraphGraphPattern scopePattern = firstASTGraphGraphAncestor(n);
 
+        // if we're in a ASTGraphGraphPattern scope (for instance,
+        // this is the case for a subquery enclosed in a graph section,
+        // so we need to inherit that scope (see e.g. #832)
+        if (scopePattern!=null) {
+            Node child = scopePattern.jjtGetChild(0);
+            if (child!=null) {
+                final TermNode s = 
+                    (TermNode) scopePattern.jjtGetChild(0).jjtAccept(this, null);
+                   
+                if (s!=null)
+                    return new GroupGraphPattern(s, Scope.NAMED_CONTEXTS);
+            }
+        }               
+         
+        // otherwise, we're in default scope
+        return new GroupGraphPattern();
+    }
+    
+    
+    /**
+     * Returns the enclosing ASTGraphGraphPattern ancestor-or-self for the
+     * given node, or null if none exists.
+     * 
+     * @param node node at which to start lookup
+     * @return first enclosing {@link ASTGraphGraphPattern} ancestor, if any,
+     *         null otherwise
+     */
+    protected ASTGraphGraphPattern firstASTGraphGraphAncestor(Node node) {
+       if (node==null)
+          return null;
+       
+       if (node instanceof ASTGraphGraphPattern)
+          return (ASTGraphGraphPattern)node;
+       
+       return firstASTGraphGraphAncestor(node.jjtGetParent());
+    }
 }
