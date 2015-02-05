@@ -1164,6 +1164,10 @@ ${postInstallMessage}</echo>
             todir="${dist.bin}" />
       <chmod file="${dist.bin}/startHAServices" perm="755" />
 
+      <copy file="${src.resources}/bin/config.sh"
+            todir="${dist.bin}" />
+      <chmod file="${dist.bin}/config.sh" perm="755" />
+
       <copy file="${src.resources}/etc/init.d/bigdataHA"
             todir="${dist.dir}/etc/init.d" />
       <chmod file="${dist.dir}/etc/init.d/bigdataHA" perm="755" />
@@ -1391,6 +1395,8 @@ substitutions.
           <include name="bigdata/bin/disco-tool" />
           <include name="bigdata/bin/pstart" />
           <include name="bigdata/bin/startHAServices" />
+          <include name="bigdata/bin/startNSS" />
+          <include name="bigdata/bin/bigdataNSS" />
         </tarfileset>
       </tar>
 
@@ -1652,6 +1658,8 @@ substitutions.
           <include name="dist/bigdata/bin/disco-tool" />
           <include name="dist/bigdata/bin/pstart" />
           <include name="dist/bigdata/bin/startHAServices" />
+          <include name="dist/bigdata/bin/startNSS" />
+          <include name="dist/bigdata/bin/bigdataNSS" />
         </tarfileset>
       </tar>
 

@@ -15,10 +15,16 @@
 # The top-level of the installation.
 pushd `dirname $0` > /dev/null;cd ..;INSTALL_DIR=`pwd`;popd > /dev/null
 
+echo ${INSTALL_DIR}
+
 # Setup the directory for the pid of the ServiceStarter process.
 lockDir=${INSTALL_DIR}/var/lock
 mkdir -p $lockDir
 pidFile=$lockDir/pid
+
+if [ -f ${INSTALL_DIR}/bin/config.sh ] ; then
+        . ${INSTALL_DIR}/bin/config.sh
+fi
 
 ##
 # HAJournalServer configuration parameter overrides (see HAJournal.config).
