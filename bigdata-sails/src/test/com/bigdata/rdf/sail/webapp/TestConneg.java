@@ -300,4 +300,58 @@ public class TestConneg extends TestCase2 {
 
     }
     
+	public void test_connect_getMimeTypeForQueryParameter2() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_JSON_SHORT;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter3() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_XML;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter4() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_XML_SHORT;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter5() {
+		final String outputFormat = null;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter6() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_JSON;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+		final String acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter7() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_XML;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+    
 }
