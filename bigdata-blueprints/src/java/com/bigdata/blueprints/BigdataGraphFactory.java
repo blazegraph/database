@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Properties;
+
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.sail.BigdataSail;
@@ -88,9 +90,27 @@ public class BigdataGraphFactory  {
      * Create a new local in-memory bigdata instance.
      */
     public static BigdataGraph create() throws Exception {
+        return create(BigdataRDFFactory.INSTANCE);
+    }
+    
+    /**
+     * Create a new local in-memory bigdata instance with the supplied value
+     * factory.
+     */
+    public static BigdataGraph create(final BlueprintsValueFactory vf) 
+            throws Exception {
+        return create(vf, new Properties());
+    }
+    
+    /**
+     * Create a new local in-memory bigdata instance with the supplied value
+     * factory.
+     */
+    public static BigdataGraph create(final BlueprintsValueFactory vf, 
+            final Properties props) throws Exception {
         final BigdataSail sail = BigdataSailFactory.createSail();
         sail.initialize();
-        return new BigdataGraphEmbedded(sail);
+        return new BigdataGraphEmbedded(sail, vf, props);
     }
     
 //    /**

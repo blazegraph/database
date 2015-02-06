@@ -854,7 +854,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
-        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	vars.addAll(((ArbitraryLengthPathNode) node).getDefinitelyProducedBindings());
         	
         } else if (node instanceof ZeroLengthPathNode) {
         	
@@ -1018,7 +1018,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
-        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	vars.addAll(((ArbitraryLengthPathNode) node).getMaybeProducedBindings());
         	
         } else if (node instanceof ZeroLengthPathNode) {
         	
@@ -1130,7 +1130,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             } else if (child instanceof ArbitraryLengthPathNode) {
             	
-            	vars.addAll(((ArbitraryLengthPathNode) child).getProducedBindings());
+            	vars.addAll(((ArbitraryLengthPathNode) child).getDefinitelyProducedBindings());
             	
             } else if (child instanceof ZeroLengthPathNode) {
             	
