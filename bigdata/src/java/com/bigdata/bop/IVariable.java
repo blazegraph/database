@@ -49,5 +49,10 @@ public interface IVariable<E> extends IVariableOrConstant<E> {
 
 	/** An empty {@link IVariable} array. */
 	IVariable<?>[] EMPTY = new IVariable[0];
+	
+	/**
+     * Return <code>true</code> iff this is an anonymous variable.
+	 */
+	boolean isAnonymous();
 
 }

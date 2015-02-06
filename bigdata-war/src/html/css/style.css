@@ -163,6 +163,11 @@ h2 {
 .box:last-of-type {
 }
 
+.splashbox {
+   margin: 20px;
+   overflow-x: scroll;
+}
+
 .modal {
    display: none;
    position: fixed;

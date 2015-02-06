@@ -1,8 +1,9 @@
 #!/bin/bash
 
 if [ -z "${BD_HOME}" ]; then
-   echo "Not specified: BD_HOME";
-   exit 1;
+   # set BD_HOME to the top-level of the installation.
+   pushd `dirname $0` > /dev/null;cd ..;BD_HOME=`pwd`;popd > /dev/null
+   echo "BD_HOME Not specified: using ${BD_HOME}";
 fi
 export INSTALL_DIR=${BD_HOME}
 if [ "${INSTALL_TYPE}" == "BREW" ]; then
