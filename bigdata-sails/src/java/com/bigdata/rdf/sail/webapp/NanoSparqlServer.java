@@ -207,6 +207,14 @@ public class NanoSparqlServer {
          *      web.xml breaks tomcat WAR (HA LBS) </a>
          */
         String JETTY_OVERRIDE_WEB_XML = "jetty.overrideWebXml";
+        
+        /**
+         * The location to over propertyFile used to create the servlet.  This
+         * to allow overriding the default value via passing a Java Property at
+         * the command line.
+         */
+        
+        String BIGDATA_PROPERTY_FILE = "bigdata.propertyFile";
 
     }
 
@@ -1053,7 +1061,7 @@ public class NanoSparqlServer {
      * @param msg
      *            The optional message
      */
-    private static void usage(final int status, final String msg) {
+    protected static void usage(final int status, final String msg) {
 
         if (msg != null) {
 

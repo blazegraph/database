@@ -385,9 +385,8 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
             }
 
 			final JettyResponseListener listener = new JettyResponseListener(
-					request, 16 * 1024/* maxResponseSize */,
-					TimeUnit.SECONDS.toMillis(300));
-            
+					request, TimeUnit.SECONDS.toMillis(300));
+
             request.send(listener);
             
             return listener;

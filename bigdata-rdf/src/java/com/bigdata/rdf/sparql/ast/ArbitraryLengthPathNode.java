@@ -4,12 +4,15 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTALPServiceOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
 
 /**
@@ -23,6 +26,8 @@ public class ArbitraryLengthPathNode
 	extends GroupMemberNodeBase<ArbitraryLengthPathNode> 
 		implements IBindingProducerNode, IReorderableNode {
 
+    private static final transient Logger log = Logger.getLogger(ArbitraryLengthPathNode.class);
+    
     /**
      * 
      */
@@ -103,6 +108,23 @@ public class ArbitraryLengthPathNode
     }
     
     /**
+     * Fully construct an arbitrary length path node with all required
+     * annotations.
+     */
+    public ArbitraryLengthPathNode(final TermNode left, final TermNode right, 
+            final VarNode transitivityVarLeft, final VarNode transitivityVarRight,
+            final long lowerBound, final long upperBound) {
+        this(new BOp[] { new JoinGroupNode() }, NV.asMap(
+                new NV(Annotations.LEFT_TERM, left),
+                new NV(Annotations.RIGHT_TERM, right),
+                new NV(Annotations.TRANSITIVITY_VAR_LEFT, transitivityVarLeft),
+                new NV(Annotations.TRANSITIVITY_VAR_RIGHT, transitivityVarRight),
+                new NV(Annotations.LOWER_BOUND, lowerBound),
+                new NV(Annotations.UPPER_BOUND, upperBound)
+                ));             
+    }
+    
+    /**
      * Returns the left term.
      */
     public TermNode left() {
@@ -155,7 +177,28 @@ public class ArbitraryLengthPathNode
      * Return the variables bound by the path - i.e. what this node will
      * attempt to bind when run.
      */
-    public Set<IVariable<?>> getProducedBindings() {
+    public Set<IVariable<?>> getMaybeProducedBindings() {
+
+        final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
+
+        addProducedBindings(left(), producedBindings);
+        addProducedBindings(right(), producedBindings);
+        for (StatementPatternNode sp : subgroup().getStatementPatterns()) {
+            addProducedBindings(sp.s(), producedBindings);
+            addProducedBindings(sp.p(), producedBindings);
+            addProducedBindings(sp.o(), producedBindings);
+            addProducedBindings(sp.c(), producedBindings);
+        }
+        
+        return producedBindings;
+
+    }
+    
+    /**
+     * Return the variables bound by the path - i.e. what this node will
+     * attempt to bind when run.
+     */
+    public Set<IVariable<?>> getDefinitelyProducedBindings() {
 
         final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
 
@@ -173,11 +216,14 @@ public class ArbitraryLengthPathNode
      * 
      * @see StaticAnalysis._getJoinVars
      */
-    private void addProducedBindings(final TermNode t, final Set<IVariable<?>> producedBindings) {
+    private void addProducedBindings(final TermNode t, 
+            final Set<IVariable<?>> producedBindings) {
     	
     	if (t instanceof VarNode) {
     		
-            producedBindings.add(((VarNode) t).getValueExpression());
+    	    if (!((VarNode) t).isAnonymous()) {
+    	        producedBindings.add(((VarNode) t).getValueExpression());
+    	    }
             
     	} else if (t instanceof ConstantNode) {
     		
@@ -203,17 +249,14 @@ public class ArbitraryLengthPathNode
         sb.append("(left=").append(left()).append(", right=").append(right()).append(") {");
         sb.append(subgroup().toString(indent+1));
         sb.append("\n").append(s);
+        sb.append("}");
 
         final Long rangeCount = (Long) getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
 
         if (rangeCount != null) {
-            sb.append(indent(indent + 1));
-            sb.append(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY);
-            sb.append("=");
-            sb.append(rangeCount.toString());
-            sb.append("\n");
+            sb.append(" AST2BOpBase.estimatedCardinality=");
+            sb.append(getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY).toString());
         }
-        sb.append("}");
         
         return sb.toString();
 
@@ -229,7 +272,7 @@ public class ArbitraryLengthPathNode
 	}
 
 	@Override
-	public long getEstimatedCardinality(StaticOptimizer opt) {
+	public long getEstimatedCardinality(final StaticOptimizer opt) {
 		
 		final JoinGroupNode group = subgroup();
 		
@@ -264,27 +307,49 @@ public class ArbitraryLengthPathNode
 		}
 		
 		/*
-		 * Only deal with singleton paths for now.
-		 * 
 		 * TODO finish the ASTCardinalityOptimizer
 		 */
+		BOp pathExpr = null;
 		if (group.arity() == 1) {
 			
-			final BOp node = group.get(0);
-			
-			final long estCard = node.getProperty(
-					AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
-					Long.MAX_VALUE); 
+		    pathExpr = group.get(0);
+		    
+		} else {
+		    
+		    for (BOp node : group.getChildren()) {
+		        final ASTBase astNode = (ASTBase) node;
+		        if (astNode.getQueryHintAsBoolean(
+		                ASTALPServiceOptimizer.PATH_EXPR, false)) {
+		            pathExpr = node;
+		            break;
+		        }
+		    }
 
-
-
-			
-			return estCard + zeroMatchAdjustment;
-			
 		}
 		
-		return Long.MAX_VALUE;		
-		
+        final long result;
+	    if (pathExpr != null && pathExpr.getProperty(
+	            AST2BOpBase.Annotations.ESTIMATED_CARDINALITY) != null) {
+	        
+            final long estCard = pathExpr.getProperty(
+                    AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
+                    Long.MAX_VALUE); 
+	            
+            result = (estCard < Long.MAX_VALUE) ? 
+                    estCard + zeroMatchAdjustment : Long.MAX_VALUE;
+                
+        } else {
+	            
+            result = Long.MAX_VALUE;
+                   
+        }
+	                
+        if (log.isDebugEnabled()) {
+            log.debug("reported cardinality: " + result);
+        }
+        
+        return result;
+        
 	}
 
     
