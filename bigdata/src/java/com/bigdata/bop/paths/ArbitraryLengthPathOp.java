@@ -48,6 +48,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -254,6 +255,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             
         	this.varsToDrop = (IVariable<?>[]) controllerOp
                     .getProperty(Annotations.VARS_TO_DROP);
+        	
+        	if (log.isDebugEnabled()) {
+        	    for (IVariable v : varsToDrop)
+        	        log.debug(v);
+        	}
             
         }
 
@@ -528,7 +534,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 				            	}
 			            		
 			            		// drop the intermediate variables
-			            		dropVars(bs);
+			            		dropVars(bs, true);
 			            		
 //				            	solutionsOut.add(solution);
 			            		solutionsOut.put(newSolutionKey(gearing, bs), bs);
@@ -538,6 +544,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 			            		 */
 			            		final IBindingSet input = bs.clone();
 			            		
+                                dropVars(input, false);
+                                
 			            		input.set(gearing.tVarIn, bs.get(gearing.tVarOut));
 			            		
 			            		input.clear(gearing.tVarOut);
@@ -810,9 +818,9 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
 			            			if (!poutVar.equals(bs.get(gearing.tVarOut))) {
     			            				
-        			    	                	if (log.isDebugEnabled()) {
-        			    	                		log.debug("transitive output does not match incoming binding for output var, dropping");
-        			    	                	}
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("transitive output does not match incoming binding for output var, dropping");
+                                        }
 			    	                	
 			            				continue;
 			            				
@@ -825,6 +833,29 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 				        				 */
 				        				finalOutput.add(parentSolutionIn);
 				        				
+//	                                    /*
+//	                                     * Clone, modify, and accept. Do this to
+//	                                     * pick up non-anonymous variables bound
+//	                                     * by the alp service.
+//	                                     */
+//	                                    final IBindingSet join = parentSolutionIn.clone();
+//	                                    
+//	                                    /*
+//	                                     * Copy any other non-intermediate variables.
+//	                                     */
+//	                                    @SuppressWarnings("rawtypes")
+//	                                    final Iterator<IVariable> vit = bs.vars();
+//	                                    while (vit.hasNext()) {
+//	                                        @SuppressWarnings("rawtypes")
+//	                                        final IVariable v = vit.next();
+//	                                        if (v.isAnonymous()) {
+//	                                            continue;
+//	                                        }
+//	                                        join.set(v, bs.get(v));
+//	                                    }
+//	                                    
+//	                                    finalOutput.add(join);
+	                                    
 				        			}
 			            			
 			            		} else {
@@ -842,6 +873,20 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 		            				final IBindingSet join = parentSolutionIn.clone();
 		            				
 		            				join.set(gearing.outVar, bs.get(gearing.tVarOut));
+		            				
+//		            				/*
+//		            				 * Copy any other non-intermediate variables.
+//		            				 */
+//		            				@SuppressWarnings("rawtypes")
+//                                    final Iterator<IVariable> vit = bs.vars();
+//		            				while (vit.hasNext()) {
+//		            				    @SuppressWarnings("rawtypes")
+//                                        final IVariable v = vit.next();
+//		            				    if (v.isAnonymous()) {
+//		            				        continue;
+//		            				    }
+//		            				    join.set(v, bs.get(v));
+//		            				}
 		            				
 		            				finalOutput.add(join);
 			            			
@@ -961,10 +1006,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
          * (either as a const or as a var) 
          */
 		@SuppressWarnings("unchecked")
-		private boolean canBind(final Gearing gearing, IBindingSet childSolutionIn, IConstant<?> seed) {
-			if ( gearing.outVar == null ) 
+		private boolean canBind(final Gearing gearing, 
+		        final IBindingSet childSolutionIn, final IConstant<?> seed) {
+			if (gearing.outVar == null) 
 				return seed.equals(gearing.outConst);
-			if ( !childSolutionIn.isBound(gearing.outVar) ) 
+			if (!childSolutionIn.isBound(gearing.outVar)) 
 				return true;
 			return seed.equals(childSolutionIn.get(gearing.outVar));
 		}
@@ -1037,13 +1083,15 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 		 * Drop vars bound by nested paths that are not meant to be external
 		 * output.
 		 */
-        private void dropVars(final IBindingSet bs) {
+        private void dropVars(final IBindingSet bs, final boolean anonOnly) {
         	
         	if (varsToDrop != null) {
         		
         		for (IVariable<?> v : varsToDrop) {
-        			
-        			bs.clear(v);
+
+//        		    if (!anonOnly || v.isAnonymous()) {
+        		        bs.clear(v);
+//        		    }
         			
         		}
         		

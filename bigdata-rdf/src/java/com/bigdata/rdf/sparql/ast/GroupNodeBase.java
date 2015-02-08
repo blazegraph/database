@@ -32,6 +32,7 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ModifiableBOpBase;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 
 /**
  * Base class for AST group nodes.
@@ -352,7 +353,7 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             final IVariable<?>[] joinVars = ((GraphPatternGroup<?>) this)
                     .getJoinVars();
 
-            if (joinVars != null) {
+            if (joinVars != null && joinVars.length > 0) {
 
                 sb.append(" JOIN ON (");
 
@@ -380,6 +381,11 @@ public abstract class GroupNodeBase<E extends IGroupMemberNode> extends
             for (FilterNode filter : filters) {
                 sb.append(filter.toString(indent + 1));
             }
+        }
+        
+        if (getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY) != null) {
+            sb.append(" AST2BOpBase.estimatedCardinality=");
+            sb.append(getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY).toString());
         }
 
         if (getQueryHints() != null && !getQueryHints().isEmpty()) {

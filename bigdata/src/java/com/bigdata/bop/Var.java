@@ -45,6 +45,7 @@ final public class Var<E> extends ImmutableBOp implements IVariable<E>,
     	
     }
     
+    @Override
     public boolean isAnonymous() {
     	
     	return anonymous;
