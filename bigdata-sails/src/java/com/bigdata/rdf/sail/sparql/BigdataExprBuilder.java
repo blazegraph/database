@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -56,14 +56,13 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTAskQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingSet;
-import com.bigdata.rdf.sail.sparql.ast.ASTBindingSets;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingValue;
-import com.bigdata.rdf.sail.sparql.ast.ASTBindingVars;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingsClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstruct;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstructQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribe;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribeQuery;
+import com.bigdata.rdf.sail.sparql.ast.ASTGraphGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGroupClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTHavingClause;
@@ -734,10 +733,11 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             final ASTGraphPatternGroup graphPatternGroup = whereClause
                     .getGraphPatternGroup();
 
-            graphPattern = new GroupGraphPattern();
+            graphPattern = scopedGroupGraphPattern(astQuery);
             
-            final GraphPatternGroup<IGroupMemberNode> ret = (GraphPatternGroup<IGroupMemberNode>) graphPatternGroup
-                    .jjtAccept(this, null/* data */);
+            final GraphPatternGroup<IGroupMemberNode> ret = 
+               (GraphPatternGroup<IGroupMemberNode>) graphPatternGroup
+               .jjtAccept(this, null/* data */);
 
             queryRoot.setWhereClause(ret);
 
