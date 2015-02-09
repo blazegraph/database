@@ -2046,7 +2046,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-            acceptStr = req.getHeader("Accept");
+            acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
         }
 
         // Do conneg.
