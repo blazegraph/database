@@ -121,9 +121,6 @@ public class ConnegUtil {
 
 		String acceptHeaderValue = null;
 
-		System.err.println("Output format from query parameter: "
-				+ outputFormat);
-
 		if (outputFormat != null) {
 			switch (outputFormat.toLowerCase()) {
 			case BigdataRDFServlet.OUTPUT_FORMAT_JSON_SHORT:
