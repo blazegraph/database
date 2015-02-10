@@ -445,8 +445,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				req.getHeader("Accept")); 
 		
-        log.warn("Accept Str is acceptStr");
-
         final ConnegUtil util = new ConnegUtil(acceptStr);
 
         // The best RDFFormat for that Accept header.
