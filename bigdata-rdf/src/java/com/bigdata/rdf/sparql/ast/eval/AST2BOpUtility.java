@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -60,11 +61,13 @@ import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
 import com.bigdata.bop.join.JoinTypeEnum;
 import com.bigdata.bop.join.NestedLoopJoinOp;
+import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.join.SolutionSetHashJoinOp;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
+import com.bigdata.bop.rdf.join.MockTermResolverOp;
 import com.bigdata.bop.solutions.DropOp;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
@@ -2964,6 +2967,25 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 // LET / BIND
                 left = addAssignment(left, (AssignmentNode) child, doneSet,
                         joinGroup.getQueryHints(), ctx, false/* projection */);
+
+                // if the variables that are bound in the assignment node are to be
+                // reused, we need to add a ChunkedMaterializationOp on top, to make
+                // sure they are properly resolved against the Bigdata dictionary
+                // (otherwise, those are dummy nodes with a dummy term ID, so they
+                // cannot be used in joins, filters, etc. on top)
+                Set<IVariable<IV>> xVars = new HashSet<IVariable<IV>>();
+                AssignmentNode childAsAssignmentNode = (AssignmentNode)child;
+                xVars.add(childAsAssignmentNode.getVar());
+                
+                left = addMockTermResolverOp(
+                      left,//
+                      xVars,//
+                      ChunkedMaterializationOp.Annotations.DEFAULT_MATERIALIZE_INLINE_IVS,
+                      null,//
+                      joinGroup.getQueryHints(),//
+                      ctx//
+                      );              
+                
                 continue;
             } else if (child instanceof BindingsClause) {
 //                // LET / BIND
@@ -4974,4 +4996,53 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
     }
 
+    
+    
+    /**
+     * Use a pipeline operator which resolves mocked terms in the binding set
+     * against the dictionary.
+     * 
+     * @param left
+     *            The left (upstream) operator that immediately proceeds the
+     *            materialization steps.
+     * @param vars
+     *            The variables pointing to mocked IVs to be resolved.
+     * @param queryHints
+     *            The query hints from the dominating AST node.
+     * @param ctx
+     *            The evaluation context.
+     * 
+     * @return The final bop added to the pipeline by this method. If there are
+     *         no variables that require resolving, then this just returns
+     *         <i>left</i>.
+     * 
+     * @see MockTermResolverOp
+     */
+    protected static PipelineOp addMockTermResolverOp(//
+            PipelineOp left,//
+            final Set<IVariable<IV>> vars,//
+            final boolean materializeInlineIvs,//
+            final Long cutoffLimit,//
+            final Properties queryHints,//
+            final AST2BOpContext ctx//
+            ) {
+
+        final int nvars = vars.size();
+
+        if (nvars == 0)
+            return left;
+
+        final long timestamp = ctx.getLexiconReadTimestamp();
+
+        final String ns = ctx.getLexiconNamespace();
+
+        return (PipelineOp) applyQueryHints(new MockTermResolverOp(leftOrEmpty(left),
+            new NV(MockTermResolverOp.Annotations.VARS, vars.toArray(new IVariable[nvars])),//
+            new NV(MockTermResolverOp.Annotations.RELATION_NAME, new String[] { ns }), //
+            new NV(MockTermResolverOp.Annotations.TIMESTAMP, timestamp), //
+            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
+            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+            ), queryHints, ctx);
+    }
+    
 }

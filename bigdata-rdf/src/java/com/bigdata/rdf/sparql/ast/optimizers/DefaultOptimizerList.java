@@ -467,7 +467,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * in which they should be evaluated.  After this optimizer runs, the
          * group node order is also the evaluation order.
          */
-        add(new ASTJoinOrderByTypeOptimizer());
+//        add(new ASTJoinOrderByTypeOptimizer());
 
         /**
          * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
