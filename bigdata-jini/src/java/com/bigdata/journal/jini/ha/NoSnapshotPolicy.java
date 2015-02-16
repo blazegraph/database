@@ -34,7 +34,7 @@ import com.bigdata.ha.msg.IHASnapshotRequest;
 public class NoSnapshotPolicy implements ISnapshotPolicy {
 
     @Override
-    public void init(HAJournal jnl) {
+    public void init(final HAJournal jnl) {
         // NOP
     }
     
@@ -45,6 +45,7 @@ public class NoSnapshotPolicy implements ISnapshotPolicy {
         
     }
 
+    @Override
     public IHASnapshotRequest newSnapshotRequest() {
 
         return new HASnapshotRequest(100/* percentLogSize */);

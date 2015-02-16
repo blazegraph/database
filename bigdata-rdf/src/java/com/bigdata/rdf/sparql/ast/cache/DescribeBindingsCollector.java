@@ -31,7 +31,6 @@ import info.aduna.iteration.CloseableIteration;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
@@ -51,7 +50,7 @@ public class DescribeBindingsCollector implements
             .getLogger(DescribeBindingsCollector.class);
     
     private final IVariable<?>[] originalVars;
-    private final ConcurrentHashSet<BigdataValue> describedResources;
+    private final Set<BigdataValue> describedResources;
     private final CloseableIteration<BindingSet, QueryEvaluationException> src;
     private boolean open = true;
 
@@ -61,12 +60,13 @@ public class DescribeBindingsCollector implements
      *            The set of variables whose distinct bound values will be
      *            reported.
      * @param describedResources
-     *            The set of distinct bound values for those variables.
+     *            The set of distinct bound values for those variables (a high
+     *            concurrency, thread-safe set).
      * @param src
      *            The source iterator.
      */
     public DescribeBindingsCollector(final Set<IVariable<?>> originalVars,
-            final ConcurrentHashSet<BigdataValue> describedResources,
+            final Set<BigdataValue> describedResources,
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
         if (originalVars == null)

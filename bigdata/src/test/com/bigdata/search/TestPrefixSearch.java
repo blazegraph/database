@@ -29,12 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.StringReader;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
@@ -46,7 +42,7 @@ import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
+public class TestPrefixSearch extends AbstractSearchTest {
 
     /**
      * 
@@ -74,16 +70,8 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
         final TimeUnit unit = TimeUnit.MILLISECONDS;
         final String regex = null;
 
-        final Properties properties = getProperties();
-        
-        final IIndexManager indexManager = getStore(properties);
+        init();
 
-        try {
-
-            final String NAMESPACE = "test";
-
-            final FullTextIndex<Long> ndx = new FullTextIndex<Long>(indexManager,
-                    NAMESPACE, ITx.UNISOLATED, properties);
 
             /*
              * Index document(s).
@@ -93,16 +81,15 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             final String languageCode = "EN";
             {
 
-                ndx.create();
 
-                final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, ndx);
+                final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, getNdx());
 
                 // index a document. ("The" is a stopword).
-                ndx.index(buffer, docId, fieldId, languageCode,
+                getNdx().index(buffer, docId, fieldId, languageCode,
                         new StringReader("The quick brown dog"));
 
                 // index a document. ("The" is a stopword).
-                ndx.index(buffer, docId + 1, fieldId, languageCode,
+                getNdx().index(buffer, docId + 1, fieldId, languageCode,
                         new StringReader("The slow brown cow"));
 
                 buffer.flush();
@@ -112,7 +99,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
             /* Search (exact match on one document, partial match on the other) */
             {
 
-                final Hiterator<?> itr = ndx.search(new FullTextQuery("The quick brown dog",
+                final Hiterator<?> itr = getNdx().search(new FullTextQuery("The quick brown dog",
                         languageCode, false/* prefixMatch */
                         , regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
@@ -120,7 +107,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
                 if (log.isInfoEnabled())
                     log.info("hits:" + itr);
 
-                assertEquals(2, ndx.count(new FullTextQuery("The quick brown dog",
+                assertEquals(2, getNdx().count(new FullTextQuery("The quick brown dog",
                         languageCode, false/* prefixMatch */)));
 
                 assertTrue(itr.hasNext());
@@ -143,13 +130,13 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx.search(new FullTextQuery("The qui bro do",
+                final Hiterator<?> itr = getNdx().search(new FullTextQuery("The qui bro do",
                         languageCode, true/*prefixMatch*/, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                         minRank, maxRank, timeout, unit));
                 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
                 
-                assertEquals(2, ndx.count(new FullTextQuery("The qui bro do",
+                assertEquals(2, getNdx().count(new FullTextQuery("The qui bro do",
                         languageCode, true/*prefixMatch*/)));
 
                 assertTrue(itr.hasNext());
@@ -172,14 +159,14 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("brown", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled())
                     log.info("hits:" + itr);
 
-                assertEquals(2, ndx
+                assertEquals(2, getNdx()
                         .count(new FullTextQuery("brown", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit)));
 
@@ -190,13 +177,13 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("brown", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
-                assertEquals(2, ndx
+                assertEquals(2, getNdx()
                         .count(new FullTextQuery("brown", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit)));
 
@@ -207,13 +194,13 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("bro", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
                 if(log.isInfoEnabled()) log.info("hits:" + itr);
 
-                assertEquals(2, ndx
+                assertEquals(2, getNdx()
                         .count(new FullTextQuery("bro", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                         minRank, maxRank, timeout, unit)));
 
@@ -224,7 +211,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("bro", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
@@ -240,7 +227,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("qui", languageCode, true/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
@@ -256,7 +243,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("qui", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
@@ -272,7 +259,7 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
              */
             {
 
-                final Hiterator<?> itr = ndx
+                final Hiterator<?> itr = getNdx()
                         .search(new FullTextQuery("quick", languageCode, false/* prefixMatch */, regex, matchAllTerms, false/* matchExact*/, minCosine, maxCosine,
                                 minRank, maxRank, timeout, unit));
 
@@ -283,11 +270,6 @@ public class TestPrefixSearch extends ProxyTestCase<IIndexManager> {
 
             }
 
-        } finally {
-
-            indexManager.destroy();
-
-        }
 
     }
 

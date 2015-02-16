@@ -24,4 +24,7 @@ WHERE {
   # query hint binds for the immediately proceeding basic graph pattern.
   hint:Prior hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1000 .
 
+  # query hint binds for the immediately proceeding basic graph pattern.
+  #hint:Prior hint:com.bigdata.bop.IPredicate.fullyBufferedReadThreshold 5000 .
+
 }

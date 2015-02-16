@@ -40,7 +40,8 @@ import org.openrdf.model.Value;
  *         an API that is aimed at vectored (for GPU) execution with 2D
  *         partitioning (for out-of-core, multi-node).
  */
-public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
+public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST>,
+        IBindingExtractor<VS, ES, ST> {
 
     /**
      * One time initialization before the {@link IGASProgram} is executed.
@@ -50,13 +51,14 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      */
     void before(IGASContext<VS, ES, ST> ctx);
 
-    /**
-     * One time initialization after the {@link IGASProgram} is executed.
-     * 
-     * @param ctx
-     *            The evaluation context.
-     */
-    void after(IGASContext<VS, ES, ST> ctx);
+//    /**
+//     * Return a default reduction that will be applied after the
+//     * {@link IGASProgram} is executed.
+//     * 
+//     * @return The default reduction -or- <code>null</code> if no such reduction
+//     *         is defined.
+//     */
+//    <T> IReducer<VS, ES, ST, T> getDefaultAfterOp();
 
     /**
      * Callback to initialize the state for each vertex in the initial frontier
@@ -200,5 +202,5 @@ public interface IGASProgram<VS, ES, ST> extends IGASOptions<VS, ES, ST> {
      *         the frontier is non-empty).
      */
     boolean nextRound(IGASContext<VS, ES, ST> ctx);
-    
+
 }

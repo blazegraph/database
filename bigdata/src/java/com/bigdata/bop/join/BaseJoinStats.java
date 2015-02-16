@@ -84,6 +84,7 @@ public class BaseJoinStats extends BOpStats {
      */
     public final CAT accessPathUnitsIn = new CAT();
 
+    @Override
     public void add(final BOpStats o) {
 
         super.add(o);

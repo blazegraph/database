@@ -22,11 +22,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+/**
+ * A collection of proxied tests for the SPARQL 1.1 protocol.
+ */
 public class TestProtocolAll  extends TestCase  {
     public static Test suite() {
         final TestSuite suite = ProxySuiteHelper.suiteWithOptionalProxy("SPARQL 1.1 Protocol",TestMode.quads,TestMode.triples, TestMode.sids);

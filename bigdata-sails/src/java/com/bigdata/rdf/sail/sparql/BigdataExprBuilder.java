@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.openrdf.query.algebra.TupleExpr;
+import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
@@ -56,14 +56,13 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTAskQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTBaseDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingSet;
-import com.bigdata.rdf.sail.sparql.ast.ASTBindingSets;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingValue;
-import com.bigdata.rdf.sail.sparql.ast.ASTBindingVars;
 import com.bigdata.rdf.sail.sparql.ast.ASTBindingsClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstruct;
 import com.bigdata.rdf.sail.sparql.ast.ASTConstructQuery;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribe;
 import com.bigdata.rdf.sail.sparql.ast.ASTDescribeQuery;
+import com.bigdata.rdf.sail.sparql.ast.ASTGraphGraphPattern;
 import com.bigdata.rdf.sail.sparql.ast.ASTGraphPatternGroup;
 import com.bigdata.rdf.sail.sparql.ast.ASTGroupClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTHavingClause;
@@ -147,7 +146,9 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
         if (log.isInfoEnabled())
             log.info("\n" + node.dump(">"));
 
-        return (QueryRoot) node.getQuery().jjtAccept(this, null);
+        final QueryRoot query = (QueryRoot) node.getQuery().jjtAccept(this, null);
+        
+        return query;
 
     }
 
@@ -732,10 +733,11 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             final ASTGraphPatternGroup graphPatternGroup = whereClause
                     .getGraphPatternGroup();
 
-            graphPattern = new GroupGraphPattern();
+            graphPattern = scopedGroupGraphPattern(astQuery);
             
-            final GraphPatternGroup<IGroupMemberNode> ret = (GraphPatternGroup<IGroupMemberNode>) graphPatternGroup
-                    .jjtAccept(this, null/* data */);
+            final GraphPatternGroup<IGroupMemberNode> ret = 
+               (GraphPatternGroup<IGroupMemberNode>) graphPatternGroup
+               .jjtAccept(this, null/* data */);
 
             queryRoot.setWhereClause(ret);
 
@@ -879,10 +881,13 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
     private void handleBindings(final ASTQuery astQuery,
             final QueryBase queryRoot) throws VisitorException {
 
-        if(!(queryRoot instanceof QueryRoot)) {
-            // Only allowed on the QueryRoot
-            return;
-        }
+        /*
+         * VALUES clause is now allowed on subqueries.
+         */
+//        if(!(queryRoot instanceof QueryRoot)) {
+//            // Only allowed on the QueryRoot
+//            return;
+//        }
         
         final ASTBindingsClause bindingsClause = astQuery.getBindingsClause();
 
@@ -890,11 +895,11 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
             return;
 
         final BindingsClause bindingSets = visit(bindingsClause, null/* data */);
-
+        
         if (bindingSets.getBindingSetsCount() > 0) {
 
             // Attach the binding sets (if any).
-            ((QueryRoot) queryRoot).setBindingsClause(bindingSets);
+            queryRoot.setBindingsClause(bindingSets);
 
         }
 
@@ -913,12 +918,12 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
     {
 
         // The ordered list of variable bindings.
-        final ASTBindingVars varNodes = (ASTBindingVars) node.jjtGetChild(0); 
-        final int nvars = varNodes.jjtGetNumChildren(); 
+        final List<ASTVar> varNodes = node.jjtGetChildren(ASTVar.class); 
+        final int nvars = varNodes.size(); 
         final LinkedHashSet<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>(nvars);
 
         {
-            for (Node varNode : varNodes.jjtGetChildren()) {
+            for (ASTVar varNode : varNodes) {
                 final VarNode var = (VarNode) varNode.jjtAccept(this, data);
                 final IVariable<?> v = var.getValueExpression();
                 if (!vars.add(v)) {
@@ -932,15 +937,14 @@ public class BigdataExprBuilder extends GroupGraphPatternBuilder {
          */
         {
 
-            final ASTBindingSets bindingSetsNode = (ASTBindingSets) node
-                    .jjtGetChild(1);
-
+            final List<ASTBindingSet> bindingNodes = node.jjtGetChildren(ASTBindingSet.class);
+            
             final List<IBindingSet> bindingSets = new LinkedList<IBindingSet>();
 
             final IVariable<?>[] declaredVars = vars
                     .toArray(new IVariable[nvars]);
 
-            for (Node bindingNode : bindingSetsNode.jjtGetChildren()) {
+            for (ASTBindingSet bindingNode : bindingNodes) {
 
                 final IBindingSet bindingSet = (IBindingSet) bindingNode
                         .jjtAccept(this, declaredVars);

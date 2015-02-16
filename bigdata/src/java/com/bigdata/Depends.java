@@ -55,8 +55,11 @@ public class Depends {
 
     private static class OrderByName implements Comparator<Dependency> {
 
-        public int compare(Dependency o1, Dependency o2) {
+        @Override
+        public int compare(final Dependency o1, final Dependency o2) {
+
             return o1.getName().compareTo(o2.getName());
+
         }
         
     }
@@ -64,6 +67,7 @@ public class Depends {
     @SuppressWarnings("unused")
     private static class OrderByLicense implements Comparator<Dependency> {
 
+        @Override
         public int compare(Dependency o1, Dependency o2) {
             return o1.licenseURL().compareTo(o2.licenseURL());
         }
@@ -93,18 +97,22 @@ public class Depends {
 
         }
 
+        @Override
         final public String getName() {
             return component;
         }
 
+        @Override
         final public String projectURL() {
             return projectURL;
         }
 
+        @Override
         final public String licenseURL() {
             return licenseURL;
         }
         
+        @Override
         public String toString() {
             
             return "{name=" + component + ", project=" + projectURL
@@ -237,9 +245,9 @@ public class Depends {
             "http://site.icu-project.org/",
             "http://source.icu-project.org/repos/icu/icu/trunk/license.html");
 
-    private final static Dep nxparser = new Dep("nxparser",
-            "http://sw.deri.org/2006/08/nxparser/",
-            "http://sw.deri.org/2006/08/nxparser/license.txt");
+//    private final static Dep nxparser = new Dep("nxparser",
+//            "http://sw.deri.org/2006/08/nxparser/",
+//            "http://sw.deri.org/2006/08/nxparser/license.txt");
 
     private final static Dep nanohttp = new Dep("nanohttp",
             "http://elonen.iki.fi/code/nanohttpd/",
@@ -257,6 +265,28 @@ public class Depends {
     
     private final static Dep servletApi = new ApacheDep("servlet-api",
             "http://tomcat.apache.org");
+
+    /**
+     * Dual licensed under apache 2.0 and LGPL 2.1.  We use the apache 2.0 
+     * license.
+     */
+    private final static Dep jacksonCore = new Dep("jackson-core", 
+            "http://wiki.fasterxml.com/JacksonHome",
+            "http://www.apache.org/licenses/LICENSE-2.0.html");
+
+    private final static Dep blueprintsCore = new Dep("blueprints-core", 
+            "https://github.com/tinkerpop/blueprints",
+            "https://github.com/tinkerpop/blueprints/blob/master/LICENSE.txt");
+
+    private final static Dep rexsterCore = new Dep("rexster-core", 
+            "https://github.com/tinkerpop/rexster",
+            "https://github.com/tinkerpop/rexster/blob/master/LICENSE.txt");
+
+    // Note: This is a test-only dependency at this time.
+    @SuppressWarnings("unused")
+	private final static Dep hamcrestCore = new Dep("hamcrest-core", 
+            "https://code.google.com/p/hamcrest/",
+    		"http://opensource.org/licenses/BSD-3-Clause");
     
     static private final Dep[] depends;
     static {
@@ -276,14 +306,18 @@ public class Depends {
             apacheHttpClientCache,
             apacheHttpCore,
             apacheHttpMime,
+            // webapp
 //            cweb,//
             slf4j,//
             sesame,//
             icu,//
-            nxparser,//
+//            nxparser,//
             nanohttp,//
             jetty,//
             servletApi,//
+            jacksonCore,//
+            blueprintsCore,//
+            rexsterCore,//
             bigdataGanglia,//
             // scale-out
             jini,//

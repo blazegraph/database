@@ -8,6 +8,7 @@
 @prefix dc:        <http://purl.org/dc/terms/> . 
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
 
+:SAP :bought :sybase .
 _:s1 rdf:subject   :SAP .
 _:s1 rdf:predicate :bought .
 _:s1 rdf:object    :sybase .

@@ -74,9 +74,17 @@ public class GlobalRowStoreHelper {
 
         if (globalRowStore == null) {
 
-            IIndex ndx = indexManager.getIndex(GLOBAL_ROW_STORE_INDEX,
-                    ITx.UNISOLATED);
-
+            /**
+             * The GRS view needs to be protected by an
+             * UnisolatedReadWriteIndex.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/867"> NSS
+             *      concurrency problem with list namespaces and create
+             *      namespace </a>
+             */
+            IIndex ndx = AbstractRelation.getIndex(indexManager,
+                    GLOBAL_ROW_STORE_INDEX, ITx.UNISOLATED);
+            
             if (ndx == null) {
 
                 if (log.isInfoEnabled())
@@ -170,6 +178,13 @@ public class GlobalRowStoreHelper {
         if (log.isInfoEnabled())
             log.info(TimestampUtility.toString(timestamp));
 
+        if (timestamp == ITx.UNISOLATED) {
+
+            /* This version does an implicit create if the GRS does not exist. */
+            return getGlobalRowStore();
+
+        }
+        
         final IIndex ndx;
         
         /**

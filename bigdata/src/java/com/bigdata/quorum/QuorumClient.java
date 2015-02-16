@@ -41,7 +41,8 @@ import java.util.UUID;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface QuorumClient<S extends Remote> extends QuorumListener {
+public interface QuorumClient<S extends Remote> extends QuorumListener,
+        ServiceLookup<S> {
 
     /**
      * The fully qualified identifier of the logical service whose quorum state

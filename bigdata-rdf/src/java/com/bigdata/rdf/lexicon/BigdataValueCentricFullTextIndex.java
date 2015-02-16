@@ -423,6 +423,12 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 
 	    	for (Map.Entry<IV<?,?>, BigdataValue> e : terms.entrySet()) {
 	    		
+	    		if (Thread.interrupted()) {
+	    			
+                    throw new RuntimeException(new InterruptedException());
+                    
+	    		}
+	    		
 	    		final IV<?,?> iv = e.getKey();
 	    		
 	    		final BigdataValue term = e.getValue();
@@ -487,6 +493,12 @@ public class BigdataValueCentricFullTextIndex extends FullTextIndex implements
 	    	final Map<IV<?,?>, BigdataValue> terms = lex.getTerms(iv2Hit.keySet());
 
 	    	for (Map.Entry<IV<?,?>, BigdataValue> e : terms.entrySet()) {
+	    		
+	    		if (Thread.interrupted()) {
+	    			
+                    throw new RuntimeException(new InterruptedException());
+                    
+	    		}
 	    		
 	    		final IV<?,?> iv = e.getKey();
 	    		

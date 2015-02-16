@@ -36,8 +36,11 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
@@ -161,11 +164,28 @@ public class SD {
             + "KB/IsolatableIndices");
 
     /**
-     * A highly available deployment.
+     * A highly available deployment - this feature refers to the presence of
+     * the {@link HAGlue} interface, the capability for online backups, and the
+     * existence of a targer {@link #ReplicationFactor}. You must consult the
+     * target {@link #ReplicationFactor} in order to determine whether the
+     * database is in principle capable of tolerating one or more failures and
+     * the actual #of running joined instances to determine whether the database
+     * can withstand a failure.
      */
     static public final URI HighlyAvailable = new URIImpl(BDFNS
             + "HighlyAvailable");
 
+    /**
+     * The value of this feature is the target replication factor for the
+     * database expressed as an <code>xsd:int</code>. If this is ONE (1), then
+     * the database is setup with a quorum and has the capability for online
+     * backup, but it is not replicated. TWO (2) indicates mirroring, but is not
+     * highly available. THREE (3) is the minimum configuration that can
+     * withstand a failure.
+     */
+    static public final URI ReplicationFactor = new URIImpl(BDFNS
+            + "replicationFactor");
+    
     /**
      * An {@link IBigdataFederation}.
      */
@@ -275,6 +295,10 @@ public class SD {
     static public final URI TURTLE = new URIImpl(
             "http://www.w3.org/ns/formats/Turtle");
 
+    // RDR specific extension of TURTLE.
+    static public final URI TURTLE_RDR = new URIImpl(
+            "http://www.bigdata.com/ns/formats/Turtle-RDR");
+
     /**
      * Unique URI for N3.
      * 
@@ -315,7 +339,11 @@ public class SD {
      */
     static public final URI NQUADS = new URIImpl(
             "http://sw.deri.org/2008/07/n-quads/#n-quads");
-    
+
+    // RDR specific extension of N-Triples.
+    static public final URI NTRIPLES_RDR = new URIImpl(
+            "http://www.bigdata.com/ns/formats/N-Triples-RDR");
+
     /*
      * SPARQL results
      */
@@ -379,7 +407,7 @@ public class SD {
     /**
      * The service end point (from the constructor).
      */
-    protected final String serviceURI;
+    protected final String[] serviceURI;
 
     /**
      * The value factory used to create values for the service description graph
@@ -415,7 +443,7 @@ public class SD {
      * @see #describeService()
      */
     public SD(final Graph g, final AbstractTripleStore tripleStore,
-            final String serviceURI) {
+            final String... serviceURI) {
 
         if (g == null)
             throw new IllegalArgumentException();
@@ -425,6 +453,13 @@ public class SD {
         
         if (serviceURI == null)
             throw new IllegalArgumentException();
+
+        if (serviceURI.length == 0)
+            throw new IllegalArgumentException();
+
+        for (String s : serviceURI)
+            if (s == null)
+                throw new IllegalArgumentException();
 
         this.g = g;
         
@@ -498,7 +533,11 @@ public class SD {
      */
     protected void describeServiceEndpoints() {
 
-        g.add(aService, SD.endpoint, g.getValueFactory().createURI(serviceURI));
+        for (String uri : serviceURI) {
+
+            g.add(aService, SD.endpoint, g.getValueFactory().createURI(uri));
+
+        }
 
     }
     
@@ -522,8 +561,6 @@ public class SD {
      *      URIs)
      * 
      * @see #inputFormat
-     * 
-     *      TODO Add an explicit declaration for SIDS mode data interchange?
      */
     protected void describeInputFormats() {
         
@@ -535,7 +572,11 @@ public class SD {
         g.add(aService, SD.inputFormat, SD.TRIG);
         // g.add(service, SD.inputFormat, SD.BINARY); // TODO BINARY
         g.add(aService, SD.inputFormat, SD.NQUADS);
-
+		if (tripleStore.getStatementIdentifiers()) {
+			// RDR specific data interchange.
+			g.add(aService, SD.inputFormat, SD.NTRIPLES_RDR);
+			g.add(aService, SD.inputFormat, SD.TURTLE_RDR);
+        }
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_XML);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_JSON);
         g.add(aService, SD.inputFormat, SD.SPARQL_RESULTS_CSV);
@@ -641,7 +682,15 @@ public class SD {
 
                 final AbstractJournal jnl = (AbstractJournal) indexManager;
 
-                if (jnl.isHighlyAvailable()) {
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = jnl
+                        .getQuorum();
+                
+                if (quorum != null) {
+
+                    final int k = quorum.replicationFactor();
+                    
+                    g.add(aService, SD.ReplicationFactor, tripleStore
+                            .getValueFactory().createLiteral(k));
 
                     g.add(aService, SD.feature, HighlyAvailable);
 

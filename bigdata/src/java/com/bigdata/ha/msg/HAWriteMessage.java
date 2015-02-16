@@ -159,6 +159,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
         return compressorKey;
     }
 
+    @Override
  	public String toString() {
 
         return getClass().getName() //
@@ -347,7 +348,9 @@ public class HAWriteMessage extends HAWriteMessageBase implements
      * @return
      */
     public static boolean isDataCompressed() {
-    	return compressData;
+
+        return compressData;
+        
     }
     
     @Override
@@ -375,6 +378,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 
     }
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
 			ClassNotFoundException {
 
@@ -414,6 +418,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 		firstOffset = in.readLong();
 	}
 
+    @Override
 	public void writeExternal(final ObjectOutput out) throws IOException {
 		super.writeExternal(out);
         if (currentVersion >= VERSION1 && uuid != null) {
@@ -469,6 +474,7 @@ public class HAWriteMessage extends HAWriteMessageBase implements
 //        return compressor.compress(buffer);
 //    }
 
+    @Override
     public ByteBuffer expand(final ByteBuffer buffer) {
 
         final String compressorKey = getCompressorKey();

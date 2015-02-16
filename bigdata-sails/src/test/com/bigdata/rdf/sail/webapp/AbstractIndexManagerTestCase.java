@@ -144,5 +144,8 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
         }
         
     }
+
+	public void tearDownAfterSuite() {
+	}
     
 }

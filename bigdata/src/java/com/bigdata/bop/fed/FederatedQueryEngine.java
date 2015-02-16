@@ -702,6 +702,7 @@ public class FederatedQueryEngine extends QueryEngine {
      * <p>
      * {@inheritDoc}
      */
+    @Override
     public void cancelQuery(final UUID queryId, final Throwable cause) {
 
         // lookup query by id.

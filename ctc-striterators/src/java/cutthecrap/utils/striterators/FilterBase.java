@@ -171,6 +171,7 @@ public abstract class FilterBase implements IFilter, Cloneable {
     /**
      * Human readable representation of the filter chain.
      */
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());

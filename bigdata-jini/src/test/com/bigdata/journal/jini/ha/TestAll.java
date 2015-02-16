@@ -74,6 +74,11 @@ public class TestAll extends TestCase {
         // Basic tests for a single HAJournalServer (quorum does not meet)
         suite.addTestSuite(TestHAJournalServer.class);
 
+        // HA1 test suite.
+        suite.addTestSuite(TestHA1JournalServer.class);
+        suite.addTestSuite(TestHA1SnapshotPolicy.class);
+        suite.addTestSuite(TestHA1SnapshotPolicy2.class);
+
         // HA2 test suite (k=3, but only 2 services are running).
         suite.addTestSuite(TestHA2JournalServer.class);
 
@@ -86,6 +91,9 @@ public class TestAll extends TestCase {
         // HA3 test suite focusing on changing the leader.
         suite.addTestSuite(TestHA3ChangeLeader.class);
 
+        // HA3 test suite focusing on sudden kills.
+        suite.addTestSuite(TestHA3JustKills.class);
+
         // HA3 snapshot policy test suite.
         suite.addTestSuite(TestHA3SnapshotPolicy.class);
         suite.addTestSuite(TestHA3SnapshotPolicy2.class);
@@ -96,12 +104,26 @@ public class TestAll extends TestCase {
 //        // Test suite for the global write lock.
 //        suite.addTestSuite(TestHAJournalServerGlobalWriteLock.class);
 
+        // Test suite for issuing a CANCEL request for Query or Update.
+        suite.addTestSuite(TestHA3CancelQuery.class);
+        
         // Test suite for utility to compute and compare HALog digests.
         suite.addTestSuite(TestHA3DumpLogs.class);
 
         // Verify ability to override the HAJournal implementation class.
         suite.addTestSuite(TestHAJournalServerOverride.class); 
 
+        // The HA load balancer test suite.
+        suite.addTest(TestAll_LBS.suite());
+        
+        // HA5 test suite.
+        suite.addTestSuite(TestHA5JournalServer.class);
+        suite.addTestSuite(TestHA5JournalServerWithHALogs.class);
+
+        /*
+         * Stress tests.
+         */
+        
         // Test suite of longer running stress tests for an HA3 cluster.
         suite.addTestSuite(StressTestHA3JournalServer.class);
 

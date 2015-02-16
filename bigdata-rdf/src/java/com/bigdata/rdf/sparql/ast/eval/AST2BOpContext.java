@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collections;
@@ -5,7 +28,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.bop.BOp;
@@ -15,6 +37,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IdFactory;
 import com.bigdata.bop.NamedSolutionSetRefUtility;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.SimpleIdFactory;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -39,6 +62,8 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.cache.ICacheConnection;
 import com.bigdata.rdf.sparql.ast.cache.IDescribeCache;
+import com.bigdata.rdf.sparql.ast.hints.IQueryHint;
+import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -50,12 +75,11 @@ import com.bigdata.service.IBigdataFederation;
 /**
  * Convenience class for passing around the various pieces of context necessary
  * to construct the bop pipeline.
- *      FIXME Rolling back r7319 which broke UNION processing. 
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     /**
-     * The {@link ASTContainer}
+     * The {@link ASTContainer} and never <code>null</code>.
      */
 	public final ASTContainer astContainer;
 	
@@ -64,7 +88,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 	 * 
 	 * @see #nextId()
 	 */
-	private final AtomicInteger idFactory;
+	private final IdFactory idFactory;
 	
 	/**
 	 * The KB instance.
@@ -88,12 +112,24 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      */
     public final IDescribeCache describeCache;
 
-	/**
-	 * The query hints from the original {@link #query}.
-	 * 
-	 * @see QueryHints
-	 * @see ASTQueryHintOptimizer
-	 */
+    /**
+     * The query hints from the original {@link #query}.
+     * <p>
+     * Note: This acts as a default source for query hints to be applied to the
+     * generated AST nodes. In addition, the {@link ASTQueryHintOptimizer} uses
+     * registered {@link IQueryHint} implementations to annotate the original
+     * AST as one of the steps when transforming it into the optimized AST. This
+     * is done both for the global {@link #queryHints}s and for magic predicates
+     * using the {@link QueryHints#NAMESPACE} that appear in the query. Once a
+     * query hint is set on an AST node, it will eventually be copied across to
+     * {@link PipelineOp}s generated from that AST node.
+     * 
+     * @see QueryHints
+     * @see QueryHintRegistry
+     * @see ASTQueryHintOptimizer
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+     *      Clean up query hints </a>
+     */
     public final Properties queryHints;
     
     /**
@@ -289,6 +325,9 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     /**
      * Static analysis object initialized once we apply the AST optimizers and
      * used by {@link AST2BOpUtility}.
+     * <p>
+     * Note: This is not initialized earlier since it holds a reference to the
+     * optimized AST.
      */
     StaticAnalysis sa = null;
 
@@ -332,8 +371,9 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     /**
      * 
-     * @param queryRoot
-     *            The root of the query.
+     * @param astContainer
+     *            The top-level {@link ASTContainer} for the query or update
+     *            request to be evaluated (required).
      * @param db
      *            The KB instance.
      * 
@@ -346,7 +386,15 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *            {@link FunctionRegistry}.
      */
     public AST2BOpContext(final ASTContainer astContainer,
-                final AbstractTripleStore db) {
+            final AbstractTripleStore db) {
+
+        this(astContainer, db, new SimpleIdFactory());
+        
+    }
+
+    // Note: Exposed to AST2BOpRTO
+    AST2BOpContext(final ASTContainer astContainer,
+            final AbstractTripleStore db, final IdFactory idFactory) {
 
         if (astContainer == null)
             throw new IllegalArgumentException();
@@ -354,18 +402,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         if (db == null)
             throw new IllegalArgumentException();
 
+        if (idFactory == null)
+            throw new IllegalArgumentException();
+        
         this.astContainer = astContainer;
 
         this.db = db;
 
-        this.optimizers = new DefaultOptimizerList();
+        this.optimizers = new DefaultOptimizerList(db.isBottomUpEvaluation());
 
-        /*
-         * Note: The ids are assigned using incrementAndGet() so ONE (1) is the
-         * first id that will be assigned when we pass in ZERO (0) as the
-         * initial state of the AtomicInteger.
-         */
-        this.idFactory = new AtomicInteger(0);
+        this.idFactory = idFactory;
         
         this.queryEngine = QueryEngineFactory.getQueryController(db
                 .getIndexManager());
@@ -457,10 +503,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
     
-    /**      FIXME Rolling back r7319 which broke UNION processing. */
+    @Override
     public int nextId() {
 
-        return idFactory.incrementAndGet();
+        return idFactory.nextId();
+//        return idFactory.incrementAndGet();
 
     }
 

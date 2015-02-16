@@ -106,7 +106,13 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 		/**
 		 * Sample offsets are computed randomly.
 		 */
-		RANDOM;
+		RANDOM,
+        /**
+         * The samples will be dense and may bave a front bias. This mode
+         * emphasizes the locality of the samples on the index pages and
+         * minimizes the IO associated with sampling.
+         */
+        DENSE;
 	}
 
 	/**
@@ -323,6 +329,9 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 						seed(), limit, accessPath.getFromKey(), accessPath
 								.getToKey());
 				break;
+            case DENSE:
+                advancer = new DenseSampleAdvancer<E>();
+                break;
 			default:
 				throw new UnsupportedOperationException("SampleType="
 						+ sampleType);
@@ -338,6 +347,23 @@ public class SampleIndex<E> extends AbstractAccessPathOp<E> {
 
 	}
 
+	/**
+	 * Dense samples in key order (simple index scan).
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+	 * @param <E>
+	 */
+	private static class DenseSampleAdvancer<E> extends Advancer<E> {
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        protected void advance(final ITuple<E> tuple) {
+            // NOP
+        }
+	    
+	}
+	
 	/**
 	 * An advancer pattern which is designed to take evenly distributed samples
 	 * from an index. The caller specifies the #of tuples to be sampled. This

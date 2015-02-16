@@ -33,6 +33,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
@@ -94,9 +95,9 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * @see HTreeHashJoinUtility
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class HTreeHashJoinOp<E> extends HashJoinOp<E> {
+public class HTreeHashJoinOp<E> extends HashJoinOp<E> implements
+        ISingleThreadedOp {
 
     /**
      * 
@@ -117,7 +118,7 @@ public class HTreeHashJoinOp<E> extends HashJoinOp<E> {
         
     }
     
-    public HTreeHashJoinOp(final BOp[] args, NV... annotations) {
+    public HTreeHashJoinOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
 
@@ -132,9 +133,7 @@ public class HTreeHashJoinOp<E> extends HashJoinOp<E> {
 
         super(args, annotations);
 
-        if (getMaxParallel() != 1)
-            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-                    + "=" + getMaxParallel());
+        assertMaxParallelOne();
 
         // Note: This is no longer true. It is now shared via the IQueryAttributes.
 //        // shared state is used to share the hash table.

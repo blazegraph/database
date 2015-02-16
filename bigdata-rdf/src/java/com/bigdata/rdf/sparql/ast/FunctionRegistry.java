@@ -52,6 +52,7 @@ import com.bigdata.rdf.internal.constraints.LcaseBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.MathBOp.MathOp;
 import com.bigdata.rdf.internal.constraints.NotBOp;
+import com.bigdata.rdf.internal.constraints.NowBOp;
 import com.bigdata.rdf.internal.constraints.NumericBOp;
 import com.bigdata.rdf.internal.constraints.NumericBOp.NumericOp;
 import com.bigdata.rdf.internal.constraints.OrBOp;
@@ -71,6 +72,7 @@ import com.bigdata.rdf.internal.constraints.StrlenBOp;
 import com.bigdata.rdf.internal.constraints.StrstartsBOp;
 import com.bigdata.rdf.internal.constraints.SubstrBOp;
 import com.bigdata.rdf.internal.constraints.TrueBOp;
+import com.bigdata.rdf.internal.constraints.UUIDBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XsdStrBOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
@@ -137,14 +139,15 @@ public class FunctionRegistry {
 
     public static final URI IF = new URIImpl(SPARQL_FUNCTIONS+"if");
 
-    public static final URI NOW = new URIImpl(SPARQL_FUNCTIONS+"now");
-    public static final URI YEAR = new URIImpl(SPARQL_FUNCTIONS+"year-from-dateTime");
-    public static final URI MONTH = new URIImpl(SPARQL_FUNCTIONS+"month-from-dateTime");
-    public static final URI DAY = new URIImpl(SPARQL_FUNCTIONS+"day-from-dateTime");
-    public static final URI HOURS = new URIImpl(SPARQL_FUNCTIONS+"hours-from-dateTime");
-    public static final URI MINUTES = new URIImpl(SPARQL_FUNCTIONS+"minutes-from-dateTime");
-    public static final URI SECONDS = new URIImpl(SPARQL_FUNCTIONS+"seconds-from-dateTime");
-    public static final URI TIMEZONE = new URIImpl(SPARQL_FUNCTIONS+"tz");
+    public static final URI NOW = new URIImpl(XPATH_FUNCTIONS+"now");
+    public static final URI YEAR = new URIImpl(XPATH_FUNCTIONS+"year-from-dateTime");
+    public static final URI MONTH = new URIImpl(XPATH_FUNCTIONS+"month-from-dateTime");
+    public static final URI DAY = new URIImpl(XPATH_FUNCTIONS+"day-from-dateTime");
+    public static final URI HOURS = new URIImpl(XPATH_FUNCTIONS+"hours-from-dateTime");
+    public static final URI MINUTES = new URIImpl(XPATH_FUNCTIONS+"minutes-from-dateTime");
+    public static final URI SECONDS = new URIImpl(XPATH_FUNCTIONS+"seconds-from-dateTime");
+    public static final URI TZ = new URIImpl(XPATH_FUNCTIONS+"tz");
+    public static final URI TIMEZONE = new URIImpl(XPATH_FUNCTIONS+"timezone-from-dateTime");
 
     public static final URI MD5 = new URIImpl(SPARQL_FUNCTIONS+"md5");
     public static final URI SHA1 = new URIImpl(SPARQL_FUNCTIONS+"sha1");
@@ -153,6 +156,9 @@ public class FunctionRegistry {
     public static final URI SHA384 = new URIImpl(SPARQL_FUNCTIONS+"sha384");
     public static final URI SHA512 = new URIImpl(SPARQL_FUNCTIONS+"sha512");
 
+    public static final URI UUID = new URIImpl(SPARQL_FUNCTIONS+"uuid");
+    public static final URI STRUUID = new URIImpl(SPARQL_FUNCTIONS+"struuid");
+    
     public static final URI STR_DT = new URIImpl(SPARQL_FUNCTIONS+"strdt");
     public static final URI STR_LANG = new URIImpl(SPARQL_FUNCTIONS+"strlang");
     public static final URI LCASE = FN.LOWER_CASE;//new URIImpl(XPATH_FUNCTIONS+"lower-case");
@@ -209,7 +215,7 @@ public class FunctionRegistry {
     public static final URI SUBTRACT = new URIImpl(XPATH_FUNCTIONS+"numeric-subtract");
     public static final URI MULTIPLY = new URIImpl(XPATH_FUNCTIONS+"numeric-multiply");
     public static final URI DIVIDE = new URIImpl(XPATH_FUNCTIONS+"numeric-divide");
-
+    
     public static final URI ABS   = FN.NUMERIC_ABS;//new URIImpl(XPATH_FUNCTIONS+"numeric-abs");
     public static final URI ROUND = FN.NUMERIC_ROUND;//new URIImpl(SPARQL_FUNCTIONS+"numeric-round");
     public static final URI CEIL  = FN.NUMERIC_CEIL;//new URIImpl(SPARQL_FUNCTIONS+"numeric-ceil");
@@ -709,8 +715,11 @@ public class FunctionRegistry {
 
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
                 final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                
+                final String baseURI = (String)
+                        scalarValues.get(IriBOp.Annotations.BASE_URI);
 
-                return new IriBOp(ve, globals);
+                return new IriBOp(ve, baseURI, globals);
 
             }
         });
@@ -916,6 +925,44 @@ public class FunctionRegistry {
 	    add(SECONDS,new DateFactory(DateOp.SECONDS));
 
 	    add(TIMEZONE,new DateFactory(DateOp.TIMEZONE));
+
+        add(TZ,new DateFactory(DateOp.TZ));
+
+        add(NOW,new Factory() {
+            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                if (args != null && args.length > 0)
+                    throw new IllegalArgumentException("no args for NOW()");
+
+                return new NowBOp(globals);
+
+            }
+        });
+
+        add(UUID,new Factory() {
+            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                if (args != null && args.length > 0)
+                    throw new IllegalArgumentException("no args for UUID()");
+
+                return new UUIDBOp(globals, false);
+
+            }
+        });
+
+        add(STRUUID,new Factory() {
+            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+                    Map<String, Object> scalarValues, final ValueExpressionNode... args) {
+
+                if (args != null && args.length > 0)
+                    throw new IllegalArgumentException("no args for STRUUID()");
+
+                return new UUIDBOp(globals, true);
+
+            }
+        });
 
 	    add(MD5,new DigestFactory(DigestOp.MD5));
 
@@ -1314,7 +1361,7 @@ public class FunctionRegistry {
             final IValueExpression<? extends IV> left =
                 AST2BOpUtility.toVE(globals, args[0]);
 
-            return new DateBOp(left, op);
+            return new DateBOp(left, op, globals);
 
         }
 

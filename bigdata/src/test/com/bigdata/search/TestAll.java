@@ -72,6 +72,8 @@ public class TestAll extends TestCase {
 
         // search backed by EDS.
         suite.addTest(proxySuite(new TestEDS("EDS Search"),"EDS"));
+        
+        suite.addTestSuite(TestLanguageRange.class);
 
         return suite;
 
@@ -104,6 +106,16 @@ public class TestAll extends TestCase {
         
         // test verifies search index is restart safe.
         suite.addTestSuite(TestSearchRestartSafe.class);
+        
+        // Check behavior of DefaultAnalyzerFactory, see also trac 915
+        suite.addTestSuite(TestDefaultAnalyzerFactory.class);
+        
+        // Check default behavior of ConfigurableAnalyzerFactory
+        // which is intended to be the same as the intended
+        // behavior of DefaultAnalyzerFactory
+        suite.addTestSuite(TestConfigurableAsDefaultAnalyzerFactory.class);
+        suite.addTestSuite(TestConfigurableAnalyzerFactory.class);
+        suite.addTestSuite(TestUnconfiguredAnalyzerFactory.class);
 
         return suite;
     }

@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
@@ -44,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Test suite for the proposed standardization of "reification done right".
@@ -582,5 +584,253 @@ public class TestReificationDoneRightParser extends
 		assertSameAST(sparql, expected, actual);
 
 	}
-	
+
+    /**
+     * A unit test when the triple reference pattern is a constant.
+     * 
+     * <pre>
+     * prefix : <http://example.com/>
+     * SELECT ?a {
+     *    ?d ?e <<?a ?b ?c>> . 
+     * }
+     * </pre>
+     * 
+     * Should be translated as :
+     * 
+     * <pre>
+     * SP(?a, ?b, ?c) as ?sid-1 .
+     * SP(?d, ?e, ?-sid-1).
+     * </pre>
+     * 
+     * Note that the SP for the first bound triple pattern will enforce the
+     * semantics that the triple must exist in the data in order for the query
+     * to succeed.
+     */
+    public void test_triple_ref_pattern_all_vars()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql //
+                = "prefix : <http://example.com/>\n" //
+                + "select ?a {\n"//
+                + "  ?d ?e <<?a ?b ?c>> .\n"
+                + "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final VarNode a = new VarNode("a");
+            final VarNode b = new VarNode("b");
+            final VarNode c = new VarNode("c");
+            final VarNode d = new VarNode("d");
+            final VarNode e = new VarNode("e");
+            final VarNode sid = new VarNode("-sid-1");
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("", "http://example.com/");
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("a"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            // SP(?a, ?b, ?c) as ?sid .
+            final StatementPatternNode sp1 = new StatementPatternNode(//
+                    a,//
+                    b,//
+                    c,//
+                    null/* c */,//
+                    Scope.DEFAULT_CONTEXTS);
+            sp1.setSid(sid);
+            
+            // SP(?d, ?e, ?sid).
+            final StatementPatternNode sp2 = new StatementPatternNode(//
+                    d,//
+                    e,//
+                    sid,//
+                    null/* c */,//
+                    Scope.DEFAULT_CONTEXTS);
+            
+            whereClause.addChild(sp1);
+            
+            whereClause.addChild(sp2);
+            
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A unit test when the triple reference pattern is a constant.
+     * 
+     * <pre>
+     * prefix : <http://example.com/>
+     * SELECT ?a {
+     *    <<?a ?b ?c>> ?d ?e . 
+     * }
+     * </pre>
+     * 
+     * Should be translated as :
+     * 
+     * <pre>
+     * SP(?a, ?b, ?c) as ?sid-1 .
+     * SP(?-sid-1, ?d, ?e).
+     * </pre>
+     * 
+     * Note that the SP for the first bound triple pattern will enforce the
+     * semantics that the triple must exist in the data in order for the query
+     * to succeed.
+     */
+    public void test_triple_ref_pattern_all_vars2()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql //
+                = "prefix : <http://example.com/>\n" //
+                + "select ?a {\n"//
+                + "  <<?a ?b ?c>> ?d ?e .\n"
+                + "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final VarNode a = new VarNode("a");
+            final VarNode b = new VarNode("b");
+            final VarNode c = new VarNode("c");
+            final VarNode d = new VarNode("d");
+            final VarNode e = new VarNode("e");
+            final VarNode sid = new VarNode("-sid-1");
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("", "http://example.com/");
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("a"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            // SP(?a, ?b, ?c) as ?sid .
+            final StatementPatternNode sp1 = new StatementPatternNode(//
+                    a,//
+                    b,//
+                    c,//
+                    null/* c */,//
+                    Scope.DEFAULT_CONTEXTS);
+            sp1.setSid(sid);
+            
+            // SP(?sid, ?d, ?e).
+            final StatementPatternNode sp2 = new StatementPatternNode(//
+                    sid,//
+                    d,//
+                    e,//
+                    null/* c */,//
+                    Scope.DEFAULT_CONTEXTS);
+            
+            whereClause.addChild(sp1);
+            
+            whereClause.addChild(sp2);
+            
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A unit test when the triple reference pattern is a constant.
+     * 
+     * <pre>
+     * prefix : <http://example.com/>
+     * SELECT ?a {
+     *    BIND( <<?a ?b ?c>> as ?sid ) .
+     *    ?d ?e ?sid . 
+     * }
+     * </pre>
+     * 
+     * Should be translated as :
+     * 
+     * <pre>
+     * SP(?a, ?b, ?c) as ?sid .
+     * SP(?d, ?e, ?sid).
+     * </pre>
+     * 
+     * Note that the SP for the first bound triple pattern will enforce the
+     * semantics that the triple must exist in the data in order for the query
+     * to succeed.
+     */
+    public void test_triple_ref_pattern_all_vars_with_explicit_bind()
+            throws MalformedQueryException, TokenMgrError, ParseException {
+
+        final String sparql //
+                = "prefix : <http://example.com/>\n" //
+                + "select ?a {\n"//
+                + "  BIND( <<?a ?b ?c>> AS ?sid) .\n"//
+                + "  ?d ?e ?sid.\n"
+                + "}";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        {
+            
+            final VarNode a = new VarNode("a");
+            final VarNode b = new VarNode("b");
+            final VarNode c = new VarNode("c");
+            final VarNode d = new VarNode("d");
+            final VarNode e = new VarNode("e");
+            final VarNode sid = new VarNode("sid");
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                expected.setPrefixDecls(prefixDecls);
+                prefixDecls.put("", "http://example.com/");
+            }
+
+            final ProjectionNode projection = new ProjectionNode();
+            projection.addProjectionVar(new VarNode("a"));
+            expected.setProjection(projection);
+
+            final JoinGroupNode whereClause = new JoinGroupNode();
+            expected.setWhereClause(whereClause);
+
+            // SP(?a, ?b, ?c) as ?sid .
+            final StatementPatternNode sp1 = new StatementPatternNode(//
+                    a,//
+                    b,//
+                    c,//
+                    null/* c */,//
+                    Scope.DEFAULT_CONTEXTS);
+            sp1.setSid(sid);
+            
+            // SP(?d, ?e, ?sid).
+            final StatementPatternNode sp2 = new StatementPatternNode(//
+                    d,//
+                    e,//
+                    sid,//
+                    null/* c */,//
+                    Scope.DEFAULT_CONTEXTS);
+            
+            whereClause.addChild(sp1);
+            
+            whereClause.addChild(sp2);
+            
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
 }

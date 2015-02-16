@@ -981,7 +981,12 @@ abstract public class WriteCacheService implements IWriteCache {
 
             while (true) {
 
-                assert !halt;
+            	/*
+            	 * Replace assert !halt; since it is set in WriteCacheService.close()
+            	 */
+                if (halt) {
+                    throw new RuntimeException(firstCause.get());
+                }
 
                 // Await dirty cache buffer.
                 final WriteCache cache = awaitDirtyBuffer();
@@ -1151,6 +1156,7 @@ abstract public class WriteCacheService implements IWriteCache {
                     done = WriteCache.transferTo(cache/* src */,
                             curCompactingCache/* dst */, serviceMap, 0/*threshold*/);
                     if (done) {
+                        // Everything was compacted.  Send just the address metadata (empty cache block).
                         sendAddressMetadata(cache);
                         
                         if (log.isDebugEnabled())
@@ -1231,7 +1237,7 @@ abstract public class WriteCacheService implements IWriteCache {
          * been allocated on the leader in the same order in which the leader
          * made those allocations. This information is used to infer the order
          * in which the allocators for the different allocation slot sizes are
-         * created. This method will synchronous send those address notices and
+         * created. This method will synchronously send those address notices and
          * and also makes sure that the followers see the recycled addresses
          * records so they can keep both their allocators and the actual
          * allocations synchronized with the leader.
@@ -1244,13 +1250,15 @@ abstract public class WriteCacheService implements IWriteCache {
          * @throws InterruptedException
          * @throws ExecutionException
          * @throws IOException
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
          */
         private void sendAddressMetadata(final WriteCache cache)
                 throws IllegalStateException, InterruptedException,
                 ExecutionException, IOException {
 
-            if (quorum == null || !quorum.isHighlyAvailable()
-                    || !quorum.getClient().isLeader(quorumToken)) {
+            if (quorum == null) { //|| !quorum.isHighlyAvailable()
+//                    || !quorum.getClient().isLeader(quorumToken)) {
                 return;
             }
 
@@ -1344,20 +1352,15 @@ abstract public class WriteCacheService implements IWriteCache {
         private void writeCacheBlock(final WriteCache cache)
                 throws InterruptedException, ExecutionException, IOException {
 
-            /*
-             * IFF HA
+            /**
+             * IFF HA and this is the quorum leader.
              * 
-             * TODO isHA should be true even if the quorum is not highly
-             * available since there still could be other services in the write
-             * pipeline (e.g., replication to an offline HAJournalServer prior
-             * to changing over into an HA3 quorum or off-site replication). The
-             * unit tests need to be updated to specify [isHighlyAvailable] for
-             * ALL quorum based test runs.
+             * Note: This is true for HA1 as well. The code path enabled by this
+             * is responsible for writing the HALog files.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
              */
-            final boolean isHA = quorum != null && quorum.isHighlyAvailable();
-
-            // IFF HA and this is the quorum leader.
-            final boolean isHALeader = isHA
+            final boolean isHALeader = quorum != null
                     && quorum.getClient().isLeader(quorumToken);
 
             /*
@@ -1438,13 +1441,23 @@ abstract public class WriteCacheService implements IWriteCache {
                  * then clean up the documentation here (see the commented
                  * out version of this line below).
                  */
-                quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate()); 
-                
-                // ASYNC MSG RMI + NIO XFER.
-                remoteWriteFuture = quorumMember.replicate(null/* req */, pkg.getMessage(),
-                		pkg.getData().duplicate());
-                
-                counters.get().nsend++;
+                quorumMember.logWriteCacheBlock(pkg.getMessage(), pkg.getData().duplicate());
+
+                /*
+                 * TODO Do we want to always support the replication code path
+                 * when a quorum exists (that is, also for HA1) in case there
+                 * are pipeline listeners that are not HAJournalServer
+                 * instances? E.g., for offsite replication?
+                 */
+                if (quorum.replicationFactor() > 1) {
+
+                    // ASYNC MSG RMI + NIO XFER.
+                    remoteWriteFuture = quorumMember.replicate(null/* req */,
+                            pkg.getMessage(), pkg.getData().duplicate());
+
+                    counters.get().nsend++;
+
+                }
 
                 /*
                  * The quorum leader logs the write cache block here. For the

@@ -327,7 +327,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
         }
 
         @Override
-        protected void doMemberRemove() {
+        protected void doMemberRemove(final UUID service) {
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -340,7 +340,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
             try {
                 zk.delete(logicalServiceId + "/" + QUORUM + "/"
                                 + QUORUM_MEMBER + "/" + QUORUM_MEMBER_PREFIX
-                                + serviceIdStr, -1/* anyVersion */);
+                                + service.toString(), -1/* anyVersion */);
             } catch (NoNodeException e) {
                 // ignore.
             } catch (KeeperException e) {
@@ -414,7 +414,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
         }
 
         @Override
-        protected void doPipelineRemove() {
+        protected void doPipelineRemove(final UUID service) {
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -446,7 +446,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
                         }
                         final QuorumServiceState state = (QuorumServiceState) SerializerUtil
                                 .deserialize(b);
-                        if (serviceId.equals(state.serviceUUID())) {
+                        if (service.equals(state.serviceUUID())) {
                             zk.delete(zpath + "/" + s, -1/* anyVersion */);
                             return;
                         }
@@ -636,7 +636,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
          * handles a concurrent delete by a simple retry loop.
          */
         @Override
-        protected void doWithdrawVote() {
+        protected void doWithdrawVote(final UUID service) {
             // zpath for votes.
             final String votesZPath = getVotesZPath();
             if (log.isInfoEnabled())
@@ -724,7 +724,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
                         Thread.currentThread().interrupt();
                         return;
                     }
-                    if (serviceId.equals(state.serviceUUID())) {
+                    if (service.equals(state.serviceUUID())) {
                         // found our vote.
                         try {
                             // delete our vote.
@@ -761,7 +761,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
                             }
                             // done.
                             if (log.isInfoEnabled())
-                                log.info("withdrawn: serviceId=" + serviceIdStr
+                                log.info("withdrawn: serviceId=" + service.toString()
                                         + ", lastCommitTime=" + lastCommitTime);
                             return;
                         } catch (NoNodeException e) {
@@ -836,7 +836,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
         }
 
         @Override
-        protected void doServiceLeave() {
+        protected void doServiceLeave(final UUID service) {
             // get a valid zookeeper connection object.
             final ZooKeeper zk;
             try {
@@ -871,7 +871,7 @@ public class ZKQuorumImpl<S extends Remote, C extends ZKQuorumClient<S>> extends
                         }
                         final QuorumServiceState state = (QuorumServiceState) SerializerUtil
                                 .deserialize(b);
-                        if (serviceId.equals(state.serviceUUID())) {
+                        if (service.equals(state.serviceUUID())) {
                             // Found this service.
                             zk.delete(zpath + "/" + s, -1/* anyVersion */);
                             return;

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Iterator;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -188,20 +190,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
             	
             	final IValueExpressionNode ve = filter.getValueExpressionNode();
 
-            	if (ve instanceof SubqueryFunctionNodeBase) {
-
-                    final SubqueryFunctionNodeBase subqueryFunction = (SubqueryFunctionNodeBase) ve;
-
-                    final GraphPatternGroup<IGroupMemberNode> graphPattern = subqueryFunction
-                            .getGraphPattern();
-
-                    if (graphPattern != null) {
-
-                    	optimize(ctx, sa, bSets, graphPattern);
-                    	
-                    }
-                    
-            	}
+            	optimize(ctx, sa, bSets, ve);
             	
             } else if (child instanceof ArbitraryLengthPathNode) {
             	
@@ -274,6 +263,35 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
     	}
 
     }
+
+	private void optimize(final AST2BOpContext ctx, final StaticAnalysis sa,
+			final IBindingSet[] bSets, final IValueExpressionNode ve) {
+		if (ve instanceof SubqueryFunctionNodeBase) {
+
+		    final SubqueryFunctionNodeBase subqueryFunction = (SubqueryFunctionNodeBase) ve;
+
+		    final GraphPatternGroup<IGroupMemberNode> graphPattern = subqueryFunction
+		            .getGraphPattern();
+
+		    if (graphPattern != null) {
+
+		    	optimize(ctx, sa, bSets, graphPattern);
+		    	
+		    }
+		    
+		} else {
+			Iterator<BOp> it = ((BOp)ve).argIterator();
+			while (it.hasNext()) {
+				
+				BOp b = it.next();
+				if (b instanceof IValueExpressionNode) {
+					
+					optimize(ctx, sa, bSets, (IValueExpressionNode)b);
+					
+				}
+			}
+		}
+	}
     
     /**
      * Subclasses can do the work of optimizing a join group here.

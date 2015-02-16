@@ -80,8 +80,9 @@ public class RWWriteCacheService extends WriteCacheService implements IWriteCach
             final long fileExtent)
             throws InterruptedException {
 
-        final boolean highlyAvailable = getQuorum() != null
-                && getQuorum().isHighlyAvailable();
+//        final boolean highlyAvailable = getQuorum() != null
+//                && getQuorum().isHighlyAvailable();
+        final boolean highlyAvailable = getQuorum() != null;
 
         return new FileChannelScatteredWriteCache(buf, true/* useChecksum */,
                 highlyAvailable,

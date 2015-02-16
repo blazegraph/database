@@ -87,6 +87,7 @@ public class MemoryGroupByOp extends GroupByOp {
      * Returns <code>false</code>. This is a generalized aggregation operator
      * and may be used to evaluate any aggregation request.
      */
+    @Override
     final public boolean isPipelinedAggregationOp() {
 
         return false;
@@ -145,6 +146,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new GroupByTask(this, context));
@@ -165,6 +167,7 @@ public class MemoryGroupByOp extends GroupByOp {
          */
         private final IConstant<?>[] vals;
 
+        @Override
 		public String toString() {
 			return super.toString() + //
 					"{group=" + Arrays.toString(vals) + //
@@ -234,10 +237,12 @@ public class MemoryGroupByOp extends GroupByOp {
             this.hash = java.util.Arrays.hashCode(vals);
         }
 
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
@@ -368,6 +373,7 @@ public class MemoryGroupByOp extends GroupByOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
 
 			final ICloseableIterator<IBindingSet[]> itr = context
@@ -509,13 +515,7 @@ public class MemoryGroupByOp extends GroupByOp {
          *         for the group was dropped (type error or violated HAVING
          *         constraint).
          */
-        public IBindingSet aggregate(final Iterable<IBindingSet> solutions) {
-
-            if (!solutions.iterator().hasNext()) {
-                // Drop empty group.
-                return null;
-            }
-
+        private IBindingSet aggregate(final Iterable<IBindingSet> solutions) {
             /**
              * The intermediate solution with all bindings produced when
              * evaluating this solution group. Evaluation begins by binding any
@@ -698,7 +698,7 @@ public class MemoryGroupByOp extends GroupByOp {
      *            will be bound.
      * @param selectDependency
      *            When <code>true</code>, some aggregates bind variables which
-     *            are relied on both other aggregates. In this case, this method
+     *            are relied on by other aggregates. In this case, this method
      *            must ensure that those bindings become visible.
      * @param aggregates
      *            The binding set on which the results are being bound (by the
@@ -776,7 +776,8 @@ public class MemoryGroupByOp extends GroupByOp {
                 expr.reset();
                 
                 for (IBindingSet bset : solutions) {
-                    Object constants[]=new Object[expr.arity()];
+                    
+                    final Object constants[] = new Object[expr.arity()];
 
                     for (int i=0;i<expr.arity();i++){
 
@@ -914,12 +915,14 @@ public class MemoryGroupByOp extends GroupByOp {
 
         }
 
+        @Override
         public int hashCode() {
 
             return hash;
 
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;

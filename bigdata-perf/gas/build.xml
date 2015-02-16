@@ -54,4 +54,17 @@
       </java>
    </target>
 
+   <target name="run-ram-gas-engine"
+          description="Run a RAM GAS Engine performance test.">
+      <java classname="com.bigdata.rdf.graph.impl.ram.RAMGASRunner"
+            fork="true" failonerror="true"
+            >
+         <arg line="-seed ${seed} -nsamples ${nsamples} -nthreads ${nthreads} ${scheduler} ${load} com.bigdata.rdf.graph.analytics.${analytic} ${journalPropertyFile}" />
+         <jvmarg line="${jvmArgs}" />
+         <classpath>
+            <path refid="runtime.classpath" />
+         </classpath>
+      </java>
+   </target>
+
 </project>

@@ -1,120 +1,368 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
-"http://www.w3.org/TR/html4/loose.dtd">
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
-<title>bigdata&#174; NanoSparqlServer</title>
-<!-- $Id$ -->
-</head>
-<body>
+<!DOCTYPE html>
+<html lang="en">
+  <head profile="http://www.w3.org/2005/10/profile">
+    <link rel="icon" 
+      type="image/png" 
+      href="/bigdata/html/favicon.ico" />
+    <!-- meta charset="utf-8" -->
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+    <title>Blazegraph Workbench</title>
+    <link rel="stylesheet" href="/bigdata/html/css/vendor/codemirror.css">
+    <link rel="stylesheet" href="/bigdata/html/css/style.css">
+    <!-- junit test marker: index.html -->
+  </head>
 
-<h2>Welcome to bigdata&#174;.</h2>  
-<p>Please consult the 
-<a href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer"> 
-documentation</a> for information on using the NanoSparqlServer's REST Api.
-</p>
+  <body>
+    <div id="container">
 
-<p>
-The following URLs should be active when deployed in the default configuration:
-</p>
-<dl>
-<dt>http://hostname:port/bigdata</dt>
-<dd>This page.</dd>
-<dt>http://hostname:port/bigdata/sparql</dt>
-<dd>The SPARQL REST API (<a href="sparql">Service Description + VoID Description</a>).</dd>
-<dt>http://hostname:port/bigdata/namespace</dt>
-<dd>VoID <a href="namespace">graph of available KBs</a> from this service.</dd>
-<dt>http://hostname:port/bigdata/status</dt>
-<dd>A <a href="status">status</a> page.</dd>
-<dt>http://hostname:port/bigdata/counters</dt>
-<dd>A <a href="counters"> performance counters</a> page.</dd>
-</dl>
+      <div id="top">
+        <img src="/bigdata/html/images/logo.png" id="logo">
+        <form id="search-form"><label for="search-text">SEARCH:</label> <input type="text" id="search-text"><button type="submit"><span>&nbsp;</span></button></form>
+      </div>
 
-<p>
-Where <i>hostname</i> is the name of this host and <i>port</i> is the port at
-which this page was accessed.
-</p>
+      <div id="tab-selector">
+        <a data-target="splash" class="active">Welcome</a>
+        <a data-target="query">Query</a>
+        <a data-target="update">Update</a>
+        <a data-target="explore">Explore</a>
+        <a data-target="namespaces">Namespaces</a>
+        <a data-target="status">Status</a>
+        <a data-target="health">Health</a>
+        <a data-target="performance">Performance</a>
+        <p>Current namespace: <span id="current-namespace"></span></p>
+      </div>
 
-<!-- Note: Some applications (firefox 7) can not handle a GET with a very long
-     URL.  For that reason ONLY this operation defaults to a POST.  You SHOULD
-     use GET for database queries since they are, by and large, idempotent. 
-     -->
-<h2><a href="http://www.w3.org/TR/sparql11-query/"> SPARQL Query </a></h2>
-<FORM action="sparql" method="post" name="QUERY">
-   <P>
-   <TEXTAREA name="query" rows="10" cols="80" title="Enter SPARQL Query."
-   >SELECT * { ?s ?p ?o } LIMIT 1</TEXTAREA>
-   </P><P>
-   Tenant Namespace
-   <INPUT type="text" name="namespace" title="Tenant namespace."
-   > (leave empty for default KB)
-   </P><P>
-   <INPUT type="submit" value="Send" title="Submit query.">
-   <INPUT type="checkbox" name="explain" value="true"
-          title="Explain query plan rather than returning the query results."
-          > Explain
-   <INPUT type="checkbox" name="analytic" value="true"
-          title="Enable the analytic query package."
-          > Analytic
-   <INPUT type="checkbox" name="xhtml" value="true"
-          title="Request XHTML response (results formatted as table)."
-          checked="checked"
-          > XHTML
-   </P>
-</FORM>
-<h2><a href="http://www.w3.org/TR/sparql11-update/">SPARQL Update</a></h2>
-<FORM action="sparql" method="post">
-   <P>
-   <TEXTAREA name="update" rows="10" cols="80" title="Enter SPARQL Update."
-   >
-PREFIX dc: &lt;http:&#47;&#47;purl.org&#47;dc&#47;elements&#47;1.1&#47;&gt;
-INSERT DATA
-{ 
-  &lt;http:&#47;&#47;example&#47;book1&gt; dc:title "A new book" ;
-                         dc:creator "A.N.Other" .
-}</TEXTAREA>
-   </P><P>
-   Tenant Namespace
-   <INPUT type="text" name="namespace" title="Tenant namespace."
-   > (leave empty for default KB)
-   </P><P>
-   <INPUT type="submit" value="Send" title="Submit Update.">
-   <!--INPUT type="checkbox" name="explain" value="true"
-          title="Explain query plan rather than returning the query results."
-          > Explain-->
-   <INPUT type="checkbox" name="analytic" value="true"
-          title="Enable the analytic query package."
-          > Analytic
-   <INPUT type="checkbox" name="monitor" value="true"
-          title="Monitor the execution of the UPDATE request."
-          checked="checked"
-          > Monitor
-   </P>
-</FORM>
-<p>
-<!-- Note: Some common characters need to be escaped here and also in the SPARQL
-     examples above.
- -->
-Here are some useful namespaces:
-</p>
-<pre>
-prefix dc:   &lt;http:&#47;&#47;purl.org&#47;dc&#47;elements&#47;1.1&#47;&gt;
-prefix xsd:  &lt;http:&#47;&#47;www.w3.org&#47;2001&#47;XMLSchema#&gt;
-prefix rdfs: &lt;http:&#47;&#47;www.w3.org&#47;2000&#47;01&#47;rdf-schema#&gt;
-prefix rdf:  &lt;http:&#47;&#47;www.w3.org&#47;1999&#47;02&#47;22-rdf-syntax-ns#&gt;
-prefix owl:  &lt;http:&#47;&#47;www.w3.org&#47;2002&#47;07&#47;owl#&gt;
-prefix foaf: &lt;http:&#47;&#47;xmlns.com&#47;foaf&#47;0.1&#47;&gt;
-prefix hint: &lt;http:&#47;&#47;www.bigdata.com&#47;queryHints#&gt; 
-</pre>
-<!-- Note: Use SPARQL Update "LOAD" instead.
-<h2>Upload Data (URL):</h2>
-<form action="sparql" method="post">
-    <p>
-    <textarea name="uri" rows="1" cols="100">file:/</textarea>
-    </p><p>
-    <input type="submit" value="Upload">
-    </p>
-</form>
--->
-</body>
+      <div class="tab" id="splash-tab">
+
+        <div class="splashbox">
+          <p>
+            Welcome to BlazeGraph!
+          </p>
+        </div>
+        <div class="splashbox">
+          <p>
+            Graphs in a Blaze instance are segregated by namespace. To get started, navigate to the "Namespaces" tab to create a new namespace <a href="#namespaces">[click here]</a>.
+          </p>
+        </div>
+        <div class="splashbox">
+          <p>
+            Through the workbench you can:
+            <li>Load data or issue SPARQL Updates through the "Update" tab.</li>
+            <li>Issue SPARQL queries through the "Query" tab.</li>
+            <li>Explore your data navigationally through the "Explore" tab.</li>
+            <li>Create or modify namespaces within your database through the "Namespaces" tab.</li>
+            <li>View the status of running queries through the "Status" tab (advanced).</li>
+            <li>Check performance of your BlazeGraph instance through the "Performance" tab (advanced).</li>
+          </p>
+        </div>
+        <div class="splashbox">
+            For more information on getting started with Blaze, please visit our
+          <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> or our
+          <a href="http://www.blazegraph.com">Website</a>.
+        </div>
+        <div class="splashbox">
+            For instructions on getting started writing Blaze clients, see
+          <a href="http://www.blazegraph.com/sesame">Sesame</a> or 
+          <a href="http://www.blazegraph.com/blueprints">Blueprints</a>.
+        </div>
+      </div>
+
+      <div class="tab" id="update-tab">
+
+        <div class="box">
+
+          <div class="links">
+            <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> -
+            <a href="http://www.w3.org/TR/sparql11-update/">SPARQL Update</a>
+          </div>
+
+          <div class="namespace-shortcuts">
+          </div>
+
+          <div id="update-box-container">
+            <textarea id="update-box" placeholder="(Type in or drag a file containing RDF data, a SPARQL update or a file path or URL)"></textarea>
+          </div>
+          <p id="large-file-message">Your file <span id="filename"></span> is too large to display here, but will be uploaded as normal. <a href="#" id="clear-file">Remove file</a></p>
+          <p>
+            <input type="file" id="update-file"><br>
+            <label for="update-type">Type:</label>
+            <select id="update-type">
+              <option value="sparql" selected="selected">SPARQL Update</option>
+              <option value="rdf">RDF Data</option>
+              <option value="path">File Path or URL</option>
+            </select>
+            <label for="rdf-type">Format:</label>
+            <select id="rdf-type" disabled>
+              <option value="n-quads">N-Quads</option>
+              <option value="n-triples">N-Triples</option>
+              <option value="n-triples-RDR">N-Triples-RDR</option>
+              <option value="n3">Notation3</option>
+              <option value="rdf/xml">RDF/XML</option>
+              <option value="json">JSON</option>
+              <option value="trig">TriG</option>
+              <option value="trix">TriX</option>
+              <option value="turtle">Turtle</option>
+              <option value="turtle-RDR">Turtle-RDR</option>
+            </select>
+          </p>
+          <a href="#" class="advanced-features-toggle">Advanced features</a>
+          <div class="advanced-features">
+            <input type="checkbox" id="update-analytic"> <label for="update-analytic">Analytic</label>
+            <input type="checkbox" id="update-monitor"> <label for="update-monitor">Monitor</label>
+            <input type="checkbox" id="use-lbs-update" class="use-lbs"> <label for="use-lbs-update">LBS</label>
+          </div>
+          <hr class="shadow">
+          <button id="update-update">Update</button>
+
+        </div>
+
+        <div class="error-box" id="update-response">
+          <span></span>
+          <iframe name="update-response-container"></iframe>
+        </div>
+
+        <div class="box" id="update-clear-container">
+          <button id="update-clear">Clear output</button>
+        </div>
+
+      </div>
+
+      <div class="tab" id="query-tab">
+        <div class="box">
+
+          <div class="links">
+            <a href="http://wiki.blazegraph.com/wiki/index.php/Main_Page">Wiki</a> -
+            <a href="http://www.w3.org/TR/sparql11-query/">SPARQL Query</a>
+          </div>
+
+          <div class="namespace-shortcuts">
+          </div>
+
+          <form id="query-form">
+            <textarea id="query-box" name="query" placeholder="(Input a SPARQL query)"></textarea>
+
+            <a href="#" class="advanced-features-toggle">Advanced features</a>
+
+            <div class="advanced-features">
+              <input type="checkbox" id="query-explain"> <label for="query-explain">Explain</label>
+              <input type="checkbox" id="query-details"> <label for="query-details">(Details)</label>
+              <input type="checkbox" name="analytic" value="true" id="query-analytic"> <label for="query-analytic">Analytic</label>
+              <input type="checkbox" name="RTO" value="true" id="query-rto"> <label for="query-rto">Runtime Query Optimizer</label>
+              <input type="checkbox" id="use-lbs-query" class="use-lbs"> <label for="use-lbs-query">LBS</label>
+            </div>
+
+            <hr class="shadow">
+
+            <div id="update-buttons">
+              <input type="submit" value="Execute">
+              <input type="reset" value="Clear">
+            </div>
+
+          </form>
+
+        </div>
+
+        <div id="query-response" class="error-box">
+        </div>
+
+        <div id="query-pagination" class="box">
+          Total results: <span id="total-results"></span>, displaying <span id="current-results"></span>
+          <select id="results-per-page">
+            <option>25</option>
+            <option selected>50</option>
+            <option>100</option>
+            <option>all</option>
+          </select> per page
+          <div id="page-selector">
+            <button id="previous-page">&#9664;</button>
+            Page <input type="text" id="current-page"> of <span id="result-pages"></span>
+            <button id="next-page">&#9654;</button>            
+          </div>
+          <div id="query-datatypes">
+            <input type="checkbox" id="show-datatypes"> <label for="show-datatypes">Show datatypes</label>
+            <input type="checkbox" id="show-languages"> <label for="show-languages">Show languages</label>
+          </div>
+        </div>
+
+        <div id="query-explanation" class="box">
+        </div>
+
+        <div id="query-history" class="box">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Query</th>
+                <th>Results</th>
+                <th>Execution Time</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <button id="query-history-clear">Clear history</button>
+        </div>
+
+        <div id="query-export-container" class="box">
+          <button id="query-export">Export</button>
+          <button id="query-response-clear">Clear</button>
+        </div>
+
+      </div>
+
+      <div id="query-export-modal" class="modal">
+        <h1>Export</h1>
+        <p>
+          <label for="export-format">Format: </label>
+          <select id="export-format">
+            <optgroup id="rdf-formats" label="RDF"></optgroup>
+            <optgroup id="non-rdf-formats" label="Other"></optgroup>
+          </select>
+        </p>
+        <p>
+          <label for="export-filename">Filename: </label>
+          <input type="text" id="export-filename" value="export">
+          .<span id="export-filename-extension"></span>
+        </p>
+        <p>
+          <button id="query-download">Export</button>
+          <button class="modal-cancel">Cancel</button>
+        </p>
+      </div>
+
+      <div id="custom-namespace-modal" class="modal">
+        <h1>Custom namespaces</h1>
+        <ul></ul>
+        <label for="custom-namespace-namespace">Namespace: </label><input type="text" id="custom-namespace-namespace"><br>
+        <label for="custom-namespace-uri">URI: </label><input type="text" id="custom-namespace-uri"><br>
+        <p></p>
+        <button id="add-custom-namespace">Add</button>
+        <button class="modal-cancel">Close</button>
+      </div>
+
+      <div class="tab" id="explore-tab">
+
+        <div class="box">
+          <p>Enter a URI to begin navigation <form id="explore-form"><input type="text"> <input type="submit"></form></p>
+        </div>
+
+        <div id="explore-results">
+          <div class="box" id="explore-header"></div>
+          <div class="box" id="explore-outgoing"></div>
+          <div class="box" id="explore-incoming"></div>
+          <div class="box" id="explore-attributes"></div>
+        </div>
+
+      </div>
+
+      <div class="tab" id="status-tab">
+
+        <div class="box">
+          <div id="status-text"></div>
+          <ul id="running-queries"></ul>
+        </div>
+
+      </div>
+
+      <div class="tab" id="health-tab">
+
+        <div class="box" id="health-overview">
+          <div class="box">
+            <h1>Overview</h1>
+            <p class="health-status">Status: <span></span></p>
+            <p class="health-details">Details: <span></span></p>
+            <p class="health-version">Version: <span></span></p>
+            <p class="health-timestamp">Timestamp: <span></span></p>
+          </div>
+        </div>
+
+        <div id="health-services"></div>
+
+        <div class="box">
+          <p><a href="#" id="health-refresh">Refresh</a></p>
+        </div>
+
+      </div>
+
+      <div class="tab" id="performance-tab">
+
+        <div class="box"></div>
+        
+      </div>
+
+      <div class="tab" id="namespaces-tab">
+        
+        <div class="box">
+          <h1>Namespaces</h1>
+          <table id="namespaces-list"></table>
+          <br>
+          <a href="/bigdata/namespace">Download VoID description of all namespaces</a>
+        </div>
+
+        <div id="namespace-properties" class="box">
+          <h1></h1>
+          <table></table>
+        </div>
+
+        <div class="box">
+          <h1>Create namespace</h1>
+          <p>
+		There a number of features to enable.  There's full documentation <a href="http://wiki.blazegraph.com/wiki/index.php/GettingStarted#So_how_do_I_put_the_database_in_triple_store_versus_quad_store_mode.3F">here</a>.  You must select "Use" after you have created the KB.
+	  </p>
+		<br>
+	  <p><h2>A quick reference is below:</h2>
+		<ol>
+			<br>
+			<li>o PropertyGraph:  Select <i>triples</i>.</li>
+			<br>
+			<li>o RDF + SPARQL with named graphs:  Select <i>quads</i> mode.</li>
+			<br>
+			<li>o Support for <a href="http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right">Reification Done Right (RDR)</a>.  Select <i>rdr</i> mode.</li>
+			<br>
+		</ol>
+		<br>
+          </p>
+          <form id="namespace-create">
+            <label for="new-namespace-name">Name:</label>
+            <input type="text" id="new-namespace-name">
+            <label for="new-namespace-mode">Mode:</label>
+            <select id="new-namespace-mode">
+              <option>triples</option>
+              <option>rdr</option>
+              <option>quads</option>
+            </select>
+            <label for="new-namespace-inference">Inference:</label>
+            <input type="checkbox" id="new-namespace-inference">
+            <span id="inference-quads-incompatible">Inference is incompatible with quads mode</span>
+            <label for="new-namespace-index">Full text index:</label>
+            <input type="checkbox" id="new-namespace-index">
+            <br>
+            <br>
+            <input type="submit" value="Create namespace">
+          </form>
+          <ul id="namespace-create-errors"></ul>
+        </div>
+
+      </div>
+
+      <div id="links"><a href="http://www.blazegraph.com" target="_blank">Blazegraph</a> - <a href="http://wiki.blazegraph.com/" target="_blank">Wiki</a></div>
+
+    </div>
+
+    <div id="overlay"></div>
+
+    <!--[if IE]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/bigdata/html/js/vendor/jquery.min.js"><\/script>')</script>
+    <script src="/bigdata/html/js/vendor/jquery.hotkeys.js"></script>
+    <script src="/bigdata/html/js/vendor/codemirror.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-addons/matchbrackets.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-addons/placeholder.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-modes/javascript.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-modes/ntriples.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-modes/sparql.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-modes/turtle.js"></script>
+    <script src="/bigdata/html/js/vendor/cm-modes/xml.js"></script>
+    <script src="/bigdata/html/js/workbench.js"></script>
+  </body>
 </html>

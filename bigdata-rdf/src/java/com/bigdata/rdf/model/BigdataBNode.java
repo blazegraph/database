@@ -67,4 +67,14 @@ public interface BigdataBNode extends BigdataResource, BNode {
 	 */
 	public boolean isStatementIdentifier();
 	
+	/**
+	 * Set the statement that this blank node models.
+	 */
+	public void setStatement(BigdataStatement stmt);
+	
+	/**
+	 * Get the statement that this blank node models.
+	 */
+	public BigdataStatement getStatement();
+	
 }

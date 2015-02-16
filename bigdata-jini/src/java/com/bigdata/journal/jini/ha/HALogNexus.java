@@ -32,7 +32,15 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -43,6 +51,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.concurrent.FutureTaskInvariantMon;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
 import com.bigdata.ha.halog.HALogReader;
 import com.bigdata.ha.halog.HALogWriter;
@@ -56,6 +67,7 @@ import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.HALogIndex.HALogRecord;
 import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
 import com.bigdata.util.ChecksumError;
@@ -116,11 +128,11 @@ public class HALogNexus implements IHALogWriter {
      */
     volatile IHAWriteMessage lastLiveHAWriteMessage = null;
     
-    /*
-     * Set to protect log files against deletion while a digest is
-     * computed.  This is checked by deleteHALogs.
+    /**
+     * Set to protect log files against deletion while a digest is computed.
+     * This is checked by {@link #deleteHALogs(long, long)}.
      */
-    private  final AtomicInteger logAccessors = new AtomicInteger();
+    private final AtomicInteger logAccessors = new AtomicInteger();
 
     /**
      * Filter visits all HALog files <strong>except</strong> the current HALog
@@ -206,12 +218,41 @@ public class HALogNexus implements IHALogWriter {
      */
     private final HALogIndex haLogIndex;
 
+    /**
+     * The maximum amount of time in milliseconds to await the synchronous purge
+     * of HALog files during a 2-phase commit.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/780"
+     *      >Incremental or asynchronous purge of HALog files</a>
+     * 
+     * @see HAJournalServer.ConfigurationOptions#HA_LOG_PURGE_TIMEOUT
+     */
+    private final long haLogPurgeTimeout;
+    
     public HALogNexus(final HAJournalServer server,
             final HAJournal journal, final Configuration config)
             throws IOException, ConfigurationException {
 
         this.journal = journal;
-        
+
+        {
+            haLogPurgeTimeout = (Long) config
+                    .getEntry(
+                            HAJournalServer.ConfigurationOptions.COMPONENT,
+                            HAJournalServer.ConfigurationOptions.HA_LOG_PURGE_TIMEOUT,
+                            Long.TYPE,
+                            HAJournalServer.ConfigurationOptions.DEFAULT_HA_LOG_PURGE_TIMEOUT);
+
+            if (haLogPurgeTimeout < 0) {
+                throw new ConfigurationException(
+                        HAJournalServer.ConfigurationOptions.HA_LOG_PURGE_TIMEOUT
+                                + "="
+                                + haLogPurgeTimeout
+                                + " : must be GTE ZERO");
+            }
+
+        }
+
         // Note: This is the effective service directory.
         final File serviceDir = server.getServiceDir(); 
 
@@ -1001,24 +1042,108 @@ public class HALogNexus implements IHALogWriter {
     
     /**
      * Protects logs from removal while a digest is being computed
-     * @param earliestDigest
      */
     void addAccessor() {
-    	if (logAccessors.incrementAndGet() == 1) {
-    		if (log.isInfoEnabled())
-    			log.info("Access protection added");
-    	}
+        if (logAccessors.incrementAndGet() == 1) {
+            if (log.isDebugEnabled())
+                log.debug("Access protection added");
+        }
     }
-    
+
     /**
      * Releases current protection against log removal
      */
     void releaseAccessor() {
-    	if (logAccessors.decrementAndGet() == 0) {
-    		if (log.isInfoEnabled())
-    			log.info("Access protection removed");
-    	}
+        final long tmp;
+        if ((tmp = logAccessors.decrementAndGet()) == 0) {
+            if (log.isDebugEnabled())
+                log.debug("Access protection removed");
+        }
+        if (tmp < 0)
+            throw new RuntimeException("Decremented to a negative value: "
+                    + tmp);
     }
+    
+    /**
+     * Class purges all HALog files LT the specified commit counter. This class
+     * is intended to run asynchronously in order to avoid large latency during
+     * a commit in which many HALog files may be released.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/780"
+     *      >Incremental or asynchronous purge of HALog files</a>
+     *      
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private class DeleteHALogsTask implements Callable<Void> {
+
+        private final long token;
+        private final long earliestRetainedSnapshotCommitCounter;
+
+        DeleteHALogsTask(final long token,
+                final long earliestRetainedSnapshotCommitCounter) {
+            this.token = token;
+            this.earliestRetainedSnapshotCommitCounter = earliestRetainedSnapshotCommitCounter;
+        }
+        
+        @Override
+        public Void call() throws Exception {
+
+            final long nfiles = haLogIndex.getEntryCount();
+            
+            long ndeleted = 0L, totalBytes = 0L;
+
+            final Iterator<IHALogRecord> itr = getHALogs();
+            
+            while(itr.hasNext() && logAccessors.get() == 0) {
+                
+                final IHALogRecord r = itr.next();
+
+                final long closingCommitCounter = r.getCommitCounter();
+                
+                final boolean deleteFile = closingCommitCounter < earliestRetainedSnapshotCommitCounter;
+
+                if (!deleteFile) {
+
+                    // No more files to delete.
+                    break;
+
+                }
+
+                if (!journal.getQuorum().isQuorumFullyMet(token)) {
+                    /*
+                     * Halt operation.
+                     * 
+                     * Note: This is not an error, but we can not remove
+                     * snapshots or HALogs if this invariant is violated.
+                     */
+                    break;
+                }
+
+                // The HALog file to be removed.
+                final File logFile = getHALogFile(closingCommitCounter);
+
+                // Remove that HALog file from the file system and our index.
+                removeHALog(logFile);
+
+                ndeleted++;
+
+                totalBytes += r.sizeOnDisk();
+
+            }
+
+            if (haLog.isInfoEnabled())
+                haLog.info("PURGED LOGS: nfound=" + nfiles + ", ndeleted="
+                        + ndeleted + ", totalBytes=" + totalBytes
+                        + ", earliestRetainedSnapshotCommitCounter="
+                        + earliestRetainedSnapshotCommitCounter);
+            
+            // done
+            return null;
+            
+        }
+        
+    } // class DeleteHALogsTask
     
     /**
      * Delete HALogs that are no longer required.
@@ -1028,60 +1153,126 @@ public class HALogNexus implements IHALogWriter {
      *            retained snapshot. We need to retain any HALogs that are GTE
      *            this commit counter since they will be applied to that
      *            snapshot.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/780"
+     *      >Incremental or asynchronous purge of HALog files</a>
      */
     void deleteHALogs(final long token,
             final long earliestRetainedSnapshotCommitCounter) {
 
-        final long nfiles = haLogIndex.getEntryCount();
-        
-        long ndeleted = 0L, totalBytes = 0L;
+        synchronized (deleteHALogFuture) {
 
-        final Iterator<IHALogRecord> itr = getHALogs();
-        
-        while(itr.hasNext() && logAccessors.get() == 0) {
-            
-            final IHALogRecord r = itr.next();
+            {
+                final Future<Void> f = deleteHALogFuture.get();
 
-            final long closingCommitCounter = r.getCommitCounter();
-            
-            final boolean deleteFile = closingCommitCounter < earliestRetainedSnapshotCommitCounter;
+                if (f != null) {
 
-            if (!deleteFile) {
+                    /*
+                     * Existing task. Check to see if done or still running.
+                     */
 
-                // No more files to delete.
-                break;
+                    if (!f.isDone()) {
+                        // Still releasing some HALogs from a previous request.
+                        return;
+                    }
 
+                    try {
+                        f.get();
+                    } catch (InterruptedException e) {
+                        // propagate interrupt.
+                        Thread.currentThread().interrupt();
+                        return;
+                    } catch (CancellationException e) {
+                        /*
+                         * Note: This is not an error. If the invariants are
+                         * violated, the task will be cancelled. The task is
+                         * "safe" as long as the invariants are valid.
+                         */
+                        log.warn("Cancelled: " + e);
+                    } catch (ExecutionException e) {
+                        log.error(e, e);
+                    }
+
+                    // clear reference.
+                    deleteHALogFuture.set(null);
+
+                }
             }
 
-            if (!journal.getQuorum().isQuorumFullyMet(token)) {
-                /*
-                 * Halt operation.
-                 * 
-                 * Note: This is not an error, but we can not remove
-                 * snapshots or HALogs if this invariant is violated.
-                 */
-                break;
+            /*
+             * Start new request.
+             */
+
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+                    .getQuorum();
+
+            final QuorumService<HAGlue> localService = quorum.getClient();
+
+            // Task sends an HALog file along the pipeline.
+            final FutureTask<Void> ft = new FutureTaskInvariantMon<Void>(
+                    new DeleteHALogsTask(token,
+                            earliestRetainedSnapshotCommitCounter), quorum) {
+
+                @Override
+                protected void establishInvariants() {
+                    assertQuorumMet();
+                    assertJoined(localService.getServiceId());
+                    assertMember(localService.getServiceId());
+                }
+
+            };
+
+            // save reference to prevent concurrent execution of this task
+            deleteHALogFuture.set(ft);
+            
+            // Run task.
+            journal.getExecutorService().submit(ft);
+
+            /*
+             * Wait up to a deadline for the HALogs to be purged. If this
+             * operation can not be completed synchronously, then it will
+             * continus asynchronously while the invariants remain valid.
+             * 
+             * Note: Some of the unit tests were written to assume that the
+             * purge of the HALog files was synchronous. This assumption is no
+             * longer valid since we will purge the HALog files asynchronously
+             * in order to avoid latency during a commit when a large number of
+             * HALog files must be purged.
+             */
+            if (haLogPurgeTimeout > 0) {
+                try {
+                    ft.get(haLogPurgeTimeout, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    // propagate interrupt.
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (CancellationException e) {
+                    /*
+                     * Note: This is not an error. If the invariants are
+                     * violated, the task will be cancelled. The task is "safe"
+                     * as long as the invariants are valid.
+                     */
+                    log.warn("Cancelled: " + e);
+                    return;
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    // ignore.
+                }
             }
-
-            // The HALog file to be removed.
-            final File logFile = getHALogFile(closingCommitCounter);
-
-            // Remove that HALog file from the file system and our index.
-            removeHALog(logFile);
-
-            ndeleted++;
-
-            totalBytes += r.sizeOnDisk();
-
+            
         }
-
-        if (haLog.isInfoEnabled())
-            haLog.info("PURGED LOGS: nfound=" + nfiles + ", ndeleted="
-                    + ndeleted + ", totalBytes=" + totalBytes
-                    + ", earliestRetainedSnapshotCommitCounter="
-                    + earliestRetainedSnapshotCommitCounter);
-
+        
     }
+
+    /**
+     * Reference is used to avoid concurrent execution of multiple instances of
+     * the {@link DeleteHALogsTask}.
+     * <p>
+     * Note: This {@link AtomicReference} also doubles as a monitor object to
+     * provide a guard for {@link #deleteHALogs(long, long)}.
+     */
+    private final AtomicReference<Future<Void>> deleteHALogFuture = new AtomicReference<Future<Void>>();
     
     /**
      * Delete all HALog files (except the current one). The {@link #haLogIndex}

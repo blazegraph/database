@@ -63,19 +63,18 @@ import com.bigdata.relation.accesspath.AccessPath;
  * database.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DistinctTermAdvancer extends Advancer<SPO> {
 
     private static final long serialVersionUID = 2500001864793869957L;
 
-    private final int arity;
+//    private final int arity;
 
     private transient IKeyBuilder keyBuilder;
 
-    public DistinctTermAdvancer(final int arity) {
+    public DistinctTermAdvancer(final int arityIsIgnored) {
         
-        this.arity = arity;
+//        this.arity = arity;
         
     }
 
@@ -91,7 +90,7 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
              * This is Ok since the iterator pattern is single threaded.
              */
 
-            assert arity == 3 || arity == 4;
+//            assert arity == 3 || arity == 4;
             
             keyBuilder = KeyBuilder.newInstance();
 
@@ -104,6 +103,7 @@ public class DistinctTermAdvancer extends Advancer<SPO> {
         final byte[] key = tuple.getKey();
         
         keyBuilder.reset();
+
         IVUtility.decode(key).encode(keyBuilder);
         
         final byte[] fromKey = keyBuilder.getKey();

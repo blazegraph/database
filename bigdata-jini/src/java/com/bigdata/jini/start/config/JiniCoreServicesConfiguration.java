@@ -380,9 +380,9 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
      * 
      * @throws IOException
      */
-    static public ServiceRegistrar[] getServiceRegistrars(int maxCount,
+    static public ServiceRegistrar[] getServiceRegistrars(final int maxCount,
             final String[] groups, final LookupLocator[] locators,
-            long timeout, final TimeUnit unit) throws InterruptedException,
+            final long timeout, final TimeUnit unit) throws InterruptedException,
             IOException {
         
         final Object signal = new Object();
@@ -394,7 +394,8 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
                  */
                 new DiscoveryListener() {
 
-                    public void discarded(DiscoveryEvent e) {
+                    @Override
+                    public void discarded(final DiscoveryEvent e) {
 
                         if(log.isDebugEnabled())
                             log.debug("discarded: "+e);
@@ -403,14 +404,15 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
                     }
 
-                    public void discovered(DiscoveryEvent e) {
+                    @Override
+                    public void discovered(final DiscoveryEvent e) {
 
                         if(log.isDebugEnabled())
                             log.debug("discovered: "+e);
                         
                         synchronized (signal) {
 
-                            signal.notify();
+                            signal.notifyAll();
 
                         }
 
@@ -429,10 +431,24 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
             long remaining = nanos;
             
-            while (remaining > 0 && registrars.length < maxCount) {
+            while (registrars.length < maxCount) {
 
                 remaining = nanos - (System.nanoTime() - begin);
+
+                if (remaining <= 0) {
+
+                    // Note: Avoids negative timeout fo signal.wait().
+                    break;
+                    
+                }
                 
+                if (log.isDebugEnabled())
+                    log.debug("timeout="
+                            + TimeUnit.NANOSECONDS.toMillis(timeout)
+                            + "ms, remaining: "
+                            + TimeUnit.NANOSECONDS.toMillis(remaining)
+                            + "ms, #registrars=" + registrars.length);
+
                 synchronized (signal) {
 
                     try {
@@ -446,7 +462,7 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
                     }
 
                     if(log.isDebugEnabled())
-                        log.debug("woke up.");
+                        log.debug("woke up");
 
                 }
 

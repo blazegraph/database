@@ -309,7 +309,8 @@ public class TestUnion extends TestCase2 {
                 new NV(Union.Annotations.BOP_ID, sliceId),//
                 new NV(Union.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.SHARED_STATE,true)//
+                new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false)//
                 ));
         
         final BOp query = sliceOp;

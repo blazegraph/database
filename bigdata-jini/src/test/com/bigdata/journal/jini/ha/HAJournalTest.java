@@ -43,16 +43,20 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.PIDUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.IHA2PhaseAbortMessage;
@@ -74,6 +78,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -84,9 +89,12 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
+import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService.IHAProgressListener;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
@@ -94,6 +102,8 @@ import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
+import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 
@@ -121,6 +131,16 @@ public class HAJournalTest extends HAJournal {
 
         return new HAGlueTestImpl(serviceId);
 
+    }
+
+    /**
+     * The service implementation object that gets exported (not the proxy, but
+     * the thing that gets exported as the {@link HAGlueTest} proxy).
+     */
+    public HAGlueTestImpl getRemoteImpl() {
+        
+        return (HAGlueTestImpl) getHAJournalServer().getRemoteImpl();
+        
     }
     
     /**
@@ -228,7 +248,7 @@ public class HAJournalTest extends HAJournal {
 //        public Future<Void> reopenZookeeperConnection() throws IOException;
 
         /**
-         * Set a fail point on a future invocation of the specified methosuper. The
+         * Set a fail point on a future invocation of the specified method. The
          * method must be declared by the {@link HAGlue} interface or by one of
          * the interfaces which it extends. The method will throw a
          * {@link SpuriousTestException} when the failure criteria are
@@ -237,23 +257,23 @@ public class HAJournalTest extends HAJournal {
          * @param name
          *            The name method to fail.
          * @param parameterTypes
-         *            The parameter types for that methosuper.
+         *            The parameter types for that method.
          * @param nwait
-         *            The #of invocations to wait before failing the methosuper.
+         *            The #of invocations to wait before failing the method.
          * @param nfail
-         *            The #of times to fail the methosuper.
+         *            The #of times to fail the method.
          */
         public void failNext(final String name,
                 final Class<?>[] parameterTypes, final int nwait,
                 final int nfail) throws IOException;
 
         /**
-         * Clear any existing fail request for the specified methosuper.
+         * Clear any existing fail request for the specified method.
          * 
          * @param name
          *            The name method to fail.
          * @param parameterTypes
-         *            The parameter types for that methosuper.
+         *            The parameter types for that method.
          */
         public void clearFail(final String name, final Class<?>[] parameterTypes)
                 throws IOException;
@@ -273,7 +293,20 @@ public class HAJournalTest extends HAJournal {
          * @see IHA2PhaseCommitMessage#failCommit_beforeClosingHALog()
          */
         public void failCommit_beforeClosingHALog() throws IOException;
-        
+
+        /**
+         * Message may be used to force a write replication failure when the
+         * specified number of bytes have been received for the live or
+         * historical writes for the given commit point. Only one such trigger
+         * is honored at a time. This method sets the trigger. The trigger is
+         * not removed automatically but may take responsiblity for removing
+         * itself once it runs.
+         * 
+         * @see HAJournalServer.HAQuorumService#progressListenerRef
+         */
+        public void failWriteReplication(IHAProgressListener listener)
+                throws IOException;
+
         /**
          * Set the next value to be reported by {@link BasicHA#nextTimestamp()}.
          * <p>
@@ -308,6 +341,38 @@ public class HAJournalTest extends HAJournal {
          */
         public void simpleTransaction_abort() throws IOException, Exception;
         
+        /**
+         * Supports consistency checking between HA services
+         */
+        public StoreState getStoreState() throws IOException;
+     
+        /**
+         * Gets and clears a root cause that was set on the remote service. This
+         * is used to inspect the root cause when an RMI method is interrupted
+         * in the local JVM. Since the RMI was interrupted, we can not observe
+         * the outcome or root cause of the associated failure on the remote
+         * service. However, test glue can explicitly set that root cause such
+         * that it can then be reported using this method.
+         */
+        public Throwable getAndClearLastRootCause() throws IOException;
+
+        /**
+         * Variant that does not clear out the last root cause.
+         */
+        public Throwable getLastRootCause() throws IOException;
+
+        /**
+         * Set the {@link IHALoadBalancerPolicy} for each active instance of the
+         * {@link HALoadBalancerServlet}.
+         * 
+         * @param policy
+         *            The policy.
+         *            
+         * @throws IOException
+         */
+        public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy)
+                throws IOException;
+        
     }
 
     /**
@@ -339,13 +404,13 @@ public class HAJournalTest extends HAJournal {
      * <p>
      * Note: Any method lookup failures are logged @ ERROR. All of the
      * {@link HAGlue} methods on {@link HAGlueTestImpl} are annotated with this
-     * methosuper. If any of them can not resolve itself, then the method will fail,
+     * method. If any of them can not resolve itself, then the method will fail,
      * which is why we log all such method resolution failures here.
      * 
      * @param name
-     *            The name of the methosuper.
+     *            The name of the method.
      * @param parameterTypes
-     *            The parameter types of the methosuper.
+     *            The parameter types of the method.
      * 
      * @return The {@link Method} and never <code>null</code>.
      * 
@@ -416,7 +481,7 @@ public class HAJournalTest extends HAJournal {
      * 
      * @see HAJournal.HAGlueService
      */
-    private class HAGlueTestImpl extends HAJournal.HAGlueService
+    class HAGlueTestImpl extends HAJournal.HAGlueService
             implements HAGlue, HAGlueTest, RemoteDestroyAdmin {
 
         /**
@@ -458,7 +523,7 @@ public class HAJournalTest extends HAJournal {
                 false);
 
         private final AtomicLong nextTimestamp = new AtomicLong(-1L);
-        
+
         private HAGlueTestImpl(final UUID serviceId) {
 
             super(serviceId);
@@ -497,8 +562,8 @@ public class HAJournalTest extends HAJournal {
             /*
              * Verify we can find the method in the map.
              * 
-             * Note: This is a cross check on Methosuper.hashCode() and
-             * Methosuper.equals(), not a data race check on the CHM.
+             * Note: This is a cross check on method.hashCode() and
+             * method.equals(), not a data race check on the CHM.
              */
             if (failSet.get(m) == null) {
 
@@ -548,9 +613,9 @@ public class HAJournalTest extends HAJournal {
          * {@link #failSet} and (b) it is due to fail on this invocation.
          * 
          * @param name
-         *            The name of the methosuper.
+         *            The name of the method.
          * @param parameterTypes
-         *            The parameter types for the methosuper.
+         *            The parameter types for the method.
          */
         protected void checkMethod(final String name,
                 final Class<?>[] parameterTypes) {
@@ -568,11 +633,11 @@ public class HAJournalTest extends HAJournal {
             // Determine whether method will fail on this invocation.
             final boolean willFail = n >= d.nwait && n < (d.nwait + d.nfail);
 
-            // Check conditions for failing the methosuper.
+            // Check conditions for failing the method.
             if (willFail) {
 
                 /*
-                 * Fail the methosuper.
+                 * Fail the method.
                  */
 
                 log.error("Will fail HAGlue method: m=" + m + ", n=" + n
@@ -587,7 +652,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         // /**
-        // * Set a fail point on the next invocation of the specified methosuper.
+        // * Set a fail point on the next invocation of the specified method.
         // */
         // public void failNext(final Method m) {
         //
@@ -631,6 +696,7 @@ public class HAJournalTest extends HAJournal {
 
         private class EnterErrorStateTask implements Runnable {
 
+            @Override
             public void run() {
 
                 @SuppressWarnings("unchecked")
@@ -780,7 +846,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public long awaitHAReady(long timeout, TimeUnit unit)
+        public long awaitHAReady(final long timeout, final TimeUnit unit)
                 throws InterruptedException, TimeoutException,
                 AsynchronousQuorumCloseException {
 
@@ -792,7 +858,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public IHARootBlockResponse getRootBlock(IHARootBlockRequest msg) {
+        public IHARootBlockResponse getRootBlock(final IHARootBlockRequest msg) {
 
             checkMethod("getRootBlock",
                     new Class[] { IHARootBlockRequest.class });
@@ -836,7 +902,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public IHADigestResponse computeDigest(IHADigestRequest req)
+        public IHADigestResponse computeDigest(final IHADigestRequest req)
                 throws IOException, NoSuchAlgorithmException, DigestException {
 
             checkMethod("computeDigest", new Class[] { IHADigestRequest.class });
@@ -846,8 +912,9 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public IHALogDigestResponse computeHALogDigest(IHALogDigestRequest req)
-                throws IOException, NoSuchAlgorithmException, DigestException {
+        public IHALogDigestResponse computeHALogDigest(
+                final IHALogDigestRequest req) throws IOException,
+                NoSuchAlgorithmException, DigestException {
 
             checkMethod("computeHALogDigest",
                     new Class[] { IHALogDigestRequest.class });
@@ -858,7 +925,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHASnapshotDigestResponse computeHASnapshotDigest(
-                IHASnapshotDigestRequest req) throws IOException,
+                final IHASnapshotDigestRequest req) throws IOException,
                 NoSuchAlgorithmException, DigestException {
 
             checkMethod("computeHASnapshotDigest",
@@ -869,8 +936,8 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<IHASnapshotResponse> takeSnapshot(IHASnapshotRequest req)
-                throws IOException {
+        public Future<IHASnapshotResponse> takeSnapshot(
+                final IHASnapshotRequest req) throws IOException {
 
             checkMethod("takeSnapshot",
                     new Class[] { IHASnapshotRequest.class });
@@ -880,7 +947,8 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> rebuildFromLeader(IHARemoteRebuildRequest req) throws IOException {
+        public Future<Void> rebuildFromLeader(final IHARemoteRebuildRequest req)
+                throws IOException {
 
             checkMethod("restoreFromLeader",
                     new Class[] { IHARemoteRebuildRequest.class });
@@ -906,7 +974,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public void gatherMinimumVisibleCommitTime(
-                IHAGatherReleaseTimeRequest req) throws IOException {
+                final IHAGatherReleaseTimeRequest req) throws IOException {
 
             checkMethod("gatherMinimumVisibleCommitTime",
                     new Class[] { IHAGatherReleaseTimeRequest.class });
@@ -917,7 +985,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHANotifyReleaseTimeResponse notifyEarliestCommitTime(
-                IHANotifyReleaseTimeRequest req) throws IOException,
+                final IHANotifyReleaseTimeRequest req) throws IOException,
                 InterruptedException, BrokenBarrierException {
 
             checkMethod("notifyEarliestCommitTime",
@@ -1020,7 +1088,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> abort2Phase(IHA2PhaseAbortMessage abortMessage) {
+        public Future<Void> abort2Phase(final IHA2PhaseAbortMessage abortMessage) {
 
             checkMethod("abort2Phase",
                     new Class[] { IHA2PhaseAbortMessage.class });
@@ -1064,19 +1132,30 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+
+            checkMethod("resetPipeline", new Class[] {IHAPipelineResetRequest.class});
+
+            return super.resetPipeline(req);
+        }
+
+        @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             checkMethod("receiveAndReplicate", new Class[] {
-                    IHASyncRequest.class, IHAWriteMessage.class });
+                    IHASyncRequest.class, IHASendState.class,
+                    IHAWriteMessage.class });
 
-            return super.receiveAndReplicate(req, msg);
+            return super.receiveAndReplicate(req, snd, msg);
 
         }
 
         @Override
         public IHAWriteSetStateResponse getHAWriteSetState(
-                IHAWriteSetStateRequest req) {
+                final IHAWriteSetStateRequest req) {
 
             checkMethod("getHAWriteSetState",
                     new Class[] { IHAWriteSetStateRequest.class });
@@ -1087,7 +1166,7 @@ public class HAJournalTest extends HAJournal {
 
         @Override
         public IHALogRootBlocksResponse getHALogRootBlocksForWriteSet(
-                IHALogRootBlocksRequest msg) throws IOException {
+                final IHALogRootBlocksRequest msg) throws IOException {
 
             checkMethod("getHALogRootBlocksForWriteSet",
                     new Class[] { IHALogRootBlocksRequest.class });
@@ -1097,7 +1176,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<Void> sendHALogForWriteSet(IHALogRequest msg)
+        public Future<Void> sendHALogForWriteSet(final IHALogRequest msg)
                 throws IOException {
 
             checkMethod("sendHALogForWriteSet",
@@ -1108,7 +1187,7 @@ public class HAJournalTest extends HAJournal {
         }
 
         @Override
-        public Future<IHASendStoreResponse> sendHAStore(IHARebuildRequest msg)
+        public Future<IHASendStoreResponse> sendHAStore(final IHARebuildRequest msg)
                 throws IOException {
 
             checkMethod("sendHAStore", new Class[] { IHARebuildRequest.class });
@@ -1162,6 +1241,12 @@ public class HAJournalTest extends HAJournal {
 
             return null;
         
+        }
+
+		@Override
+        public StoreState getStoreState() throws IOException {
+            return ((IHABufferStrategy) (getIndexManager().getBufferStrategy()))
+                    .getStoreState();
         }
 
 //		@Override
@@ -1308,6 +1393,109 @@ public class HAJournalTest extends HAJournal {
             }
 
         }
+
+        @Override
+        public void failWriteReplication(final IHAProgressListener listener)
+                throws IOException {
+
+            final Quorum<HAGlue, QuorumService<HAGlue>> quorum = getQuorum();
+            
+            // Note: Throws IllegalStateException if quorum is not running.
+            final QuorumService<HAGlue> quorumService = quorum.getClient();
+            
+            ((HAQuorumService<?, ?>) quorumService).progressListenerRef
+                    .set(listener);
+
+        }
+
+        @Override
+        public Throwable getAndClearLastRootCause() throws IOException {
+
+            final Throwable t = lastRootCause.getAndSet(null/* newValue */);
+
+            if (t != null)
+                log.warn("lastRootCause: " + t, t);
+
+            return t;
+
+        }
+        
+        @Override
+        public Throwable getLastRootCause() throws IOException {
+
+            final Throwable t = lastRootCause.get();
+
+            if (t != null)
+                log.warn("lastRootCause: " + t, t);
+
+            return t;
+
+        }
+        public void setLastRootCause(final Throwable t) {
+
+            if (log.isInfoEnabled())
+                log.info("Setting lastRootCause: " + t);
+            
+            lastRootCause.set(t);
+            
+        }
+        
+        /**
+         * @see HAGlueTest#getAndClearLastRootCause()
+         */
+        private AtomicReference<Throwable> lastRootCause = new AtomicReference<Throwable>();
+
+        /**
+         * Change the {@link IHALoadBalancerPolicy}.
+         * <p>
+         * TODO There are some intrinsic problems with this method that should
+         * be resolved before exposing it as an administrative API on the
+         * {@link HAGlue} interface.
+         * <p>
+         * (1) This only applies to running instances of the
+         * {@link HALoadBalancerServlet}. If an instance is started after this
+         * method is called, it will run with the as-configured
+         * {@link IHALoadBalancerPolicy} instance of the one specified in the
+         * last invocation of this method.
+         * <p>
+         * (2) There are various race conditions that exist with respect to: (a)
+         * the atomic change over of the {@link IHALoadBalancerPolicy} during an
+         * in-flight request; and (b) the atomic destroy of the old policy once
+         * there are no more in-flight requests using that old policy.
+         * <p>
+         * (3) Exposing this method is just begging for trouble with the WAR
+         * artifact when deployed under a non-jetty container since it will drag
+         * in the jetty ProxyServlet.
+         * 
+         * TODO Either the {@link IHALoadBalancerPolicy} needs to be
+         * serializable or we need to pass along the class name and the
+         * configuration parameters. For this case, the configuration should be
+         * set from the caller specified values rather than those potentially
+         * associated with <code>web.xml</code> , especially since
+         * <code>web.xml</code> might not even have the necessary configuration
+         * parameters defined for the caller specified policy.
+         */
+        @Override
+        public void setHALoadBalancerPolicy(final IHALoadBalancerPolicy policy)
+                throws IOException {
+
+            if (policy == null)
+                throw new IllegalArgumentException();
+
+            if (log.isInfoEnabled())
+                log.info("Will set LBS policy: " + policy);
+            
+            final HAJournalServer haJournalServer = getHAJournalServer();
+
+            final WebAppContext wac = haJournalServer.getWebAppContext();
+            
+            if (log.isInfoEnabled())
+                log.info("Will set LBS: wac=" + wac + ", policy: " + policy);
+
+            HALoadBalancerServlet.setLBSPolicy(wac.getServletContext(), policy);
+
+        }
+        
         
     } // class HAGlueTestImpl
 

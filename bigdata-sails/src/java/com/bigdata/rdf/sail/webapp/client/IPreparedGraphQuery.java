@@ -37,6 +37,24 @@ import org.openrdf.query.GraphQueryResult;
  */
 public interface IPreparedGraphQuery extends IPreparedQuery {
 
+    /**
+     * Evaluate the graph query.
+     * 
+     * @return The result.
+     * 
+     * @throws Exception
+     */
 	GraphQueryResult evaluate() throws Exception;
 
+    /**
+     * Evaluate the graph query, notify the specified listener when complete.
+     * 
+     * @param  listener
+     *              The query listener.
+     * @return The result.
+     * 
+     * @throws Exception
+     */
+    GraphQueryResult evaluate(IPreparedQueryListener listener) 
+            throws Exception;
 }

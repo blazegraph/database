@@ -1,0 +1,19 @@
+PREFIX : <http://test/bar#>
+#SELECT ?employeeNum (COUNT(?type) AS ?total)
+SELECT (COUNT(*) as ?count)
+WHERE {
+  
+  # Control all RTO parameters for repeatable behavior.
+  hint:Group hint:optimizer "Runtime".
+  hint:Group hint:RTO-sampleType "DENSE".
+  hint:Group hint:RTO-limit "100".
+  hint:Group hint:RTO-nedges "1".
+  
+  ?order a <http://test/bar#Order> .
+  ?order <http://test/bar#orderItems> ?item .
+  ?item <http://test/bar#beverageType> "Beer" .
+  ?item <http://test/bar#beverageType> ?type .
+  ?order <http://test/bar#employee> ?employee .
+  ?employee <http://test/bar#employeeNum> ?employeeNum .
+}
+#GROUP BY ?employeeNum

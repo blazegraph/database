@@ -39,6 +39,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.CompareBOp;
 import com.bigdata.rdf.internal.constraints.IVValueExpression;
@@ -262,7 +263,7 @@ public class TestAST extends TestCase {
         groupBy.addExpr(new AssignmentNode(new VarNode("s"), new VarNode("s")));
 
         final HavingNode havingBy = new HavingNode();
-        havingBy.addExpr(new ValueExpressionNode(new CompareBOp(Var.var("x"),
+        havingBy.addExpr(new LegacyTestValueExpressionNode(new CompareBOp(Var.var("x"),
                 Var.var("y"), CompareOp.GT)));
 
     	final OrderByNode orderBy = new OrderByNode();
@@ -331,7 +332,7 @@ public class TestAST extends TestCase {
     }
     
     public FilterNode filter(final int id) {
-        return new FilterNode(new ValueExpressionNode(new Filter(id)));
+        return new FilterNode(new LegacyTestValueExpressionNode(new Filter(id)));
     }
     
     public Predicate pred(final int id) {
@@ -345,8 +346,23 @@ public class TestAST extends TestCase {
     	return new Filter(id);
 		
     }
-    
-    private static final class Filter extends XSDBooleanIVValueExpression {
+    /**
+     * @deprecated This was just for compatibility with SOp2ASTUtility. It is
+     *             only used by the test suite now. 
+     */
+    @Deprecated
+    private static final class LegacyTestValueExpressionNode extends ValueExpressionNode {
+		private LegacyTestValueExpressionNode(IValueExpression<? extends IV> ve) {
+			super(ve);
+		}
+
+		@Override
+		public String toString(int i) {
+			return toShortString();
+		}
+	}
+
+	private static final class Filter extends XSDBooleanIVValueExpression {
     	
     	/**
          * 

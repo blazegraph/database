@@ -52,7 +52,7 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
     public interface Annotations extends AbstractStatementContainer.Annotations {
 
         /**
-         * Boolean property (default {@value #DEFAULT_ALL_GRAPHS}) which is
+         * Boolean property (default {@value #DEFAULT_NATIVE_DISTINCT}) which is
          * <code>true</code> iff a native DISTINCT {@link ISPO} filter should be
          * applied (large cardinality is expected for the constructed graph).
          * When <code>false</code>, a JVM based DISTINCT {@link ISPO} filter
@@ -66,7 +66,23 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
          */
         String NATIVE_DISTINCT = "nativeDistinct";
 
+        /**
+         * Internal boolean property (default {@value #DEFAULT_DISTINCT_QUDS}) which is
+         * <code>true</code> when used internally for constructing sets of quads rather 
+         * than sets of triples.
+         * <p>
+         * Note: This can only be set programmatically using {@link ConstructNode#setDistinctQuads(boolean)}
+         * <p>
+         * Note: When this property is set and mixed quads are detected or suspected then the {@link #NATIVE_DISTINCT} property is ignored.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
+         *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
+         */
+        String DISTINCT_QUADS = "quadsDistinct";
+
         boolean DEFAULT_NATIVE_DISTINCT = false;
+        
+        boolean DEFAULT_DISTINCT_QUADS = false;
 
     }
 
@@ -143,6 +159,17 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
         
     }
     
+    public boolean isDistinctQuads() {
+    	
+        return getProperty(Annotations.DISTINCT_QUADS,
+                Annotations.DEFAULT_DISTINCT_QUADS);
+    	
+    }
+	public void setDistinctQuads(final boolean quads) {
+		
+        setProperty(Annotations.DISTINCT_QUADS, quads);
+	}
+    
     @Override
     public String toString(final int indent) {
 
@@ -166,5 +193,6 @@ public class ConstructNode extends AbstractStatementContainer<StatementPatternNo
         return sb.toString();
 
     }
+
 
 }

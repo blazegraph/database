@@ -76,6 +76,7 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
     private final IValueExpression<?>[] select2;
     private final IConstraint[] having2;
 
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName());
@@ -101,6 +102,7 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
      * {@link IAggregate} functions. All {@link IAggregate} functions have been
      * lifted out into {@link #aggExpr}.
      */
+    @Override
     public IValueExpression<?>[] getSelect2() {
         return select2;
     }
@@ -112,6 +114,7 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
      * {@link IAggregate} functions. All {@link IAggregate} functions have been
      * lifted out into {@link #aggExpr}.
      */
+    @Override
     public IConstraint[] getHaving2() {
         return having2;
     }
@@ -460,6 +463,7 @@ public class GroupByRewriter implements IGroupByRewriteState, IVariableFactory,
      * Return a new anonymous variable (this is overridden by some unit tests in
      * order to have predictable variable names).
      */
+    @Override
     public IVariable<?> var() {
 
         return Var.var();

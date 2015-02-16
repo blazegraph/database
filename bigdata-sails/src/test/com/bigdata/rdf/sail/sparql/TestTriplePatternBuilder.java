@@ -92,7 +92,7 @@ public class TestTriplePatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -137,7 +137,7 @@ public class TestTriplePatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -181,7 +181,7 @@ public class TestTriplePatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -225,7 +225,7 @@ public class TestTriplePatternBuilder extends
                     makeIV(valueFactory.createURI("http://www.bigdata.com/o")));
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -270,7 +270,7 @@ public class TestTriplePatternBuilder extends
                     makeIV(valueFactory.createURI("http://www.bigdata.com/o")));
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -315,7 +315,7 @@ public class TestTriplePatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -363,7 +363,7 @@ public class TestTriplePatternBuilder extends
             final VarNode x = new VarNode("x");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -399,7 +399,7 @@ public class TestTriplePatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -439,7 +439,7 @@ public class TestTriplePatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -495,7 +495,7 @@ public class TestTriplePatternBuilder extends
                     makeIV(valueFactory.createURI("http://www.bigdata.com/bar")));
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -540,7 +540,7 @@ public class TestTriplePatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -596,7 +596,7 @@ public class TestTriplePatternBuilder extends
                     makeIV(valueFactory.createURI("http://www.bigdata.com/goo")));
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -647,7 +647,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -703,7 +703,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/");
             }
@@ -769,7 +769,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/");
             }
@@ -840,7 +840,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/");
             }
@@ -920,7 +920,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/");
             }
@@ -1008,7 +1008,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
             }
@@ -1105,7 +1105,7 @@ public class TestTriplePatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/ns#");
                 prefixDecls.put("rdf", RDF.NAMESPACE);
@@ -1220,7 +1220,7 @@ public class TestTriplePatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/ns#");
                 prefixDecls.put("rdf", RDF.NAMESPACE);
@@ -1330,7 +1330,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("xsd", XSD.NAMESPACE);
                 prefixDecls.put("", "http://example.org/ns#");
@@ -1432,7 +1432,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/ns#");
             }
@@ -1544,7 +1544,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.org/ns#");
             }
@@ -1653,7 +1653,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("dc", DCElementsVocabularyDecl.NAMESPACE);
             }
@@ -1733,7 +1733,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("dc", DCElementsVocabularyDecl.NAMESPACE);
             }
@@ -1805,7 +1805,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("dc", DCElementsVocabularyDecl.NAMESPACE);
             }
@@ -1876,7 +1876,7 @@ public class TestTriplePatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("dc", DCElementsVocabularyDecl.NAMESPACE);
             }

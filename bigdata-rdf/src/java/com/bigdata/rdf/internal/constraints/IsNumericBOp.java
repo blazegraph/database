@@ -76,7 +76,7 @@ public class IsNumericBOp extends XSDBooleanIVValueExpression {
         if (iv == null)
             throw new SparqlTypeErrorException.UnboundVarException();
 
-    	return iv.isNumeric();
+    	return iv.isNumeric() && !iv.isExtension();
 
     }
     

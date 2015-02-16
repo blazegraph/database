@@ -69,9 +69,11 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.data.ACL;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
+import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.ha.msg.HASnapshotDigestRequest;
@@ -84,8 +86,9 @@ import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.jini.util.JiniUtil;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
-import com.bigdata.journal.jini.ha.HAJournalServer.ConfigurationOptions;
+import com.bigdata.journal.StoreState;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.AbstractQuorumClient;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
@@ -94,7 +97,11 @@ import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
 import com.bigdata.util.InnerCause;
@@ -108,7 +115,7 @@ import com.bigdata.zookeeper.ZooHelper;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class AbstractHA3JournalServerTestCase extends
+public abstract class AbstractHA3JournalServerTestCase extends
         AbstractHAJournalServerTestCase implements DiscoveryListener {
 
     /** Quorum client used to monitor (or act on) the logical service quorum. */
@@ -131,8 +138,9 @@ public class AbstractHA3JournalServerTestCase extends
      * Implementation listens for the death of the child process and can be used
      * to decide when the child process is no longer executing.
      */
-    private static class ServiceListener implements IServiceListener {
+    static class ServiceListener implements IServiceListener {
 
+        @SuppressWarnings("unused")
         private volatile HAGlue haGlue;
         private volatile ProcessHelper processHelper;
         private volatile boolean dead = false;
@@ -150,13 +158,14 @@ public class AbstractHA3JournalServerTestCase extends
             this.haGlue = haGlue;
         }
 
-        @SuppressWarnings("unused")
-        public HAGlue getHAGlue() {
+//        @SuppressWarnings("unused")
+//        public HAGlue getHAGlue() {
+//
+//            return haGlue;
+//            
+//        }
 
-            return haGlue;
-            
-        }
-
+        @Override
         public void add(final ProcessHelper processHelper) {
 
             if (processHelper == null)
@@ -216,22 +225,41 @@ public class AbstractHA3JournalServerTestCase extends
      * The {@link Remote} interfaces for these services (if started and
      * successfully discovered).
      */
-    private HAGlue serverA = null, serverB = null, serverC = null;
+    protected HAGlue serverA = null;
+
+	protected HAGlue serverB = null;
+
+	protected HAGlue serverC = null;
 
     /**
      * {@link UUID}s for the {@link HAJournalServer}s.
      */
-    private UUID serverAId = UUID.randomUUID(), serverBId = UUID.randomUUID(),
-            serverCId = UUID.randomUUID();
+    private UUID serverAId = UUID.randomUUID();
+
+	private UUID serverBId = UUID.randomUUID();
+
+	private UUID serverCId = UUID.randomUUID();
+
+    /**
+     * The HTTP ports at which the services will respond.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
+     *      of embedded NSS jetty server using jetty-web.xml </a>
+     */
+    protected final int A_JETTY_PORT = 8090;
+	protected final int B_JETTY_PORT = A_JETTY_PORT + 1;
+	protected final int C_JETTY_PORT = B_JETTY_PORT + 1;
 
     /**
      * These {@link IServiceListener}s are used to reliably detect that the
      * corresponding process starts and (most importantly) that it is really
      * dies once it has been shutdown or destroyed.
      */
-    private ServiceListener serviceListenerA = null, serviceListenerB = null;
+    protected ServiceListener serviceListenerA = null;
 
-	protected ServiceListener serviceListenerC = null;
+	protected ServiceListener serviceListenerB = null;
+
+    protected ServiceListener serviceListenerC = null;
     
     private LookupDiscoveryManager lookupDiscoveryManager = null;
 
@@ -266,6 +294,10 @@ public class AbstractHA3JournalServerTestCase extends
         return zookeeper;
     }
     
+    /**
+     * Return the negotiated zookeeper session timeout in milliseconds (if
+     * available) and otherwise the requested zookeeper session timeout.
+     */
     protected int getZKSessionTimeout() {
         final ZooKeeper zookeeper = this.zookeeper;
         if (zookeeper != null) {
@@ -514,16 +546,16 @@ public class AbstractHA3JournalServerTestCase extends
             serviceListenerA = serviceListenerC =serviceListenerB = null;
         }
 
-    	
+        
     }
 
     protected UUID[] getServices(final HAGlue[] members) throws IOException {
         final UUID[] services = new UUID[members.length];
         for (int m = 0; m < members.length; m++) {
-        	services[m] = members[m].getServiceId();
+            services[m] = members[m].getServiceId();
         }
         
-    	return services;
+        return services;
     }
     
     /**
@@ -926,7 +958,8 @@ public class AbstractHA3JournalServerTestCase extends
      * @return true unless an exception was encountered (a <code>true</code>
      *         return is not a sure indicator of success).
      */
-    protected boolean trySignal(final SignalEnum signalEnum, final int pid){
+    static protected boolean trySignal(final SignalEnum signalEnum,
+            final int pid) {
 
         final String cmd = "kill -" + signalEnum.symbol() + " " + pid;
 
@@ -1099,14 +1132,42 @@ public class AbstractHA3JournalServerTestCase extends
 
     }
 
-    private void safeShutdown(final HAGlue haGlue, final File serviceDir,
+    /**
+     * Debug class to explicitly ask one service to remove another.
+     * 
+     * This emulates the behaviour of the service in receiving correct notification
+     * of a target service failure -for example after a wire pull or sure kill.
+     * 
+     */
+    protected static class ForceRemoveService extends IndexManagerCallable<Void> {
+
+        private static final long serialVersionUID = 1L;
+        private final UUID service;
+
+        ForceRemoveService(final UUID service) {
+            this.service = service;
+        }
+        
+        @Override
+        public Void call() throws Exception {
+
+            final HAJournal ha = (HAJournal) this.getIndexManager();
+            
+            ha.getQuorum().getActor().forceRemoveService(service);
+            
+            return null;
+        }
+        
+    }
+
+    void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener) {
 
         safeShutdown(haGlue, serviceDir, serviceListener, false/* now */);
 
     }
     
-    private void safeShutdown(final HAGlue haGlue, final File serviceDir,
+    protected void safeShutdown(final HAGlue haGlue, final File serviceDir,
             final ServiceListener serviceListener, final boolean now) {
 
         if (haGlue == null)
@@ -1325,6 +1386,32 @@ public class AbstractHA3JournalServerTestCase extends
     }
 
     /**
+     * Return the zookeeper client configuration file.
+     */
+    final protected String getZKConfigFile() {
+
+        return "zkClient.config";
+        
+    }
+    
+    /**
+     * The as-configured replication factor.
+     * <p>
+     * Note: This is defined in the HAJournal.config file, which is where the
+     * {@link HAJournalServer} gets the correct value. We also need to have the
+     * replicationFactor on hand for the test suite so we can setup the quorum
+     * in the test fixture correctly. However, it is difficult to reach the
+     * appropriate HAJournal.config file from the text fixture during
+     * {@link #setUp()}. Therefore, for the test setup, this is achieved by
+     * overriding this abstract method in the test class.
+     */
+    protected int replicationFactor() {
+
+        return 3;
+        
+    }
+
+    /**
      * Return Zookeeper quorum that can be used to reflect (or act on) the
      * distributed quorum state for the logical service.
      * 
@@ -1338,7 +1425,7 @@ public class AbstractHA3JournalServerTestCase extends
             KeeperException, IOException {
 
         final Configuration config = ConfigurationProvider
-                .getInstance(new String[] { SRC_PATH + "zkClient.config" });
+                .getInstance(new String[] { SRC_PATH + getZKConfigFile() });
 
         zkClientConfig = new ZookeeperClientConfig(config);
 
@@ -1349,7 +1436,7 @@ public class AbstractHA3JournalServerTestCase extends
         // Note: Save reference.
         this.zookeeper = new ZooKeeper(zoohosts, sessionTimeout, new Watcher() {
             @Override
-            public void process(WatchedEvent event) {
+            public void process(final WatchedEvent event) {
                 if (log.isInfoEnabled())
                     log.info(event);
             }
@@ -1399,9 +1486,19 @@ public class AbstractHA3JournalServerTestCase extends
         logicalServiceZPath = logicalServiceZPathPrefix + "/"
                 + logicalServiceId;
 
-        final int replicationFactor = (Integer) config.getEntry(
-                ZookeeperClientConfig.Options.NAMESPACE,
-                ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);        
+        /**
+         * Note: This is defined in the HAJournal.config file, which is where
+         * the HAJournalServer gets the correct value.
+         * 
+         * However, we also need to have the replicationFactor on hand for the
+         * test suite so we can setup the quorum in the test fixture correctly.
+         */
+        final int replicationFactor = replicationFactor();
+//        {
+//            replicationFactor = (Integer) config.getEntry(
+//                    ConfigurationOptions.COMPONENT,
+//                    ConfigurationOptions.REPLICATION_FACTOR, Integer.TYPE);
+//        }
 
 //        if (!zka.awaitZookeeperConnected(10, TimeUnit.SECONDS)) {
 //
@@ -1436,6 +1533,7 @@ public class AbstractHA3JournalServerTestCase extends
         }
 
         // Quorum that can be used to monitor the distributed quorum state.
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         final Quorum<HAGlue, QuorumClient<HAGlue>> quorum = (Quorum) new ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>>(
                 replicationFactor);//, zka, acl);
 
@@ -1507,21 +1605,23 @@ public class AbstractHA3JournalServerTestCase extends
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    abstract private class StartServerTask implements Callable<HAGlue> {
+    abstract class StartServerTask implements Callable<HAGlue> {
 
         private final String name;
         private final String configName;
         private final UUID serverId;
+        private final int jettyPort;
         private final ServiceListener serviceListener;
         protected final boolean restart;
 
         public StartServerTask(final String name, final String configName,
-                final UUID serverId, final ServiceListener serviceListener,
-                final boolean restart) {
+                final UUID serverId, final int jettyPort,
+                final ServiceListener serviceListener, final boolean restart) {
 
             this.name = name;
             this.configName = configName;
             this.serverId = serverId;
+            this.jettyPort = jettyPort;
             this.serviceListener = serviceListener;
             this.restart = restart;
 
@@ -1529,8 +1629,8 @@ public class AbstractHA3JournalServerTestCase extends
         
         final public HAGlue start() throws Exception {
 
-            return startServer(name, configName, serverId, serviceListener,
-                    restart);
+            return startServer(name, configName, serverId, jettyPort,
+                    serviceListener, restart);
 
         }
         
@@ -1540,7 +1640,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         public StartATask(final boolean restart) {
 
-            super("A", "HAJournal-A.config", serverAId,
+            super("A", "HAJournal-A.config", serverAId, A_JETTY_PORT,
                     serviceListenerA = new ServiceListener(), restart);
 
         }
@@ -1566,7 +1666,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         public StartBTask(final boolean restart) {
 
-            super("B", "HAJournal-B.config", serverBId,
+            super("B", "HAJournal-B.config", serverBId, B_JETTY_PORT,
                     serviceListenerB = new ServiceListener(), restart);
 
         }
@@ -1592,7 +1692,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         public StartCTask(final boolean restart) {
 
-            super("C", "HAJournal-C.config", serverCId,
+            super("C", "HAJournal-C.config", serverCId, C_JETTY_PORT,
                     serviceListenerC = new ServiceListener(), restart);
 
         }
@@ -1663,9 +1763,11 @@ public class AbstractHA3JournalServerTestCase extends
         return serverCId;
     }
 
-    private HAGlue startServer(final String name,
-            final String sourceConfigFileName, final UUID serviceId,
-            final ServiceListener serviceListener,
+    private HAGlue startServer(final String name,//
+            final String sourceConfigFileName, //
+            final UUID serviceId,//
+            final int jettyPort,//
+            final ServiceListener serviceListener,//
             final boolean restart) throws Exception {
 
         final String configFile = SRC_PATH + sourceConfigFileName;
@@ -1693,6 +1795,46 @@ public class AbstractHA3JournalServerTestCase extends
             // security policy
             copyFile(new File("policy.all"),
                     new File(serviceDir, "policy.all"), false/* append */);
+
+            /**
+             * We need to setup a traditional webapp.
+             * <p>
+             * Note: We should test all of the behaviors of the web app as
+             * deployed, assuming that we are using a standard WAR deployment
+             * here.
+             * <p>
+             * Note: In fact, we don't really need to have the index.html page
+             * for the existing test suite. Just web.xml and jetty.xml. Notice
+             * that web.xml does not require any html resources unless you also
+             * specify XHTML output for a SPARQL SELECT or the like. Right now,
+             * it deploys a copy of everything in bigdata-war/src, so you could
+             * write tests to the whole REST API and UX.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/730"
+             *      > Allow configuration of embedded NSS jetty server using
+             *      jetty-web.xml </a>
+             */
+            /*
+             * Setup a copy of the webapp rooted on the service directory.
+             * 
+             * Note: We could do this with custom jetty.xml or web.xml files as
+             * well. This is a bit brute force, but maybe it is more useful for
+             * that.
+             * 
+             * TODO The webapp is being deployed to the serviceDir in order
+             * to avoid complexities with the parent and child process paths
+             * to the serviceDir and the webappDir.
+             */
+            {
+                final File webAppDir = serviceDir;
+                // webAppDir = new File(serviceDir, "bigdata-war/src");
+                if (!webAppDir.exists() && !webAppDir.mkdirs()) {
+                    throw new IOException("Could not create directory: "
+                            + webAppDir);
+                }
+                copyFiles(new File("bigdata-war/src"), webAppDir);
+            }
 
             // log4j configuration.
             copyFile(new File(
@@ -1726,7 +1868,15 @@ public class AbstractHA3JournalServerTestCase extends
 
         // Add override for the serviceDir.
         final String[] overrides = ConfigMath.concat(
-                new String[] { "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")" },
+                new String[] { //
+                    // The service directory.
+                    "bigdata.serviceDir=new java.io.File(\"" + serviceDir + "\")",
+//                    // Where to find jetty.xml
+//                    HAJournalServer.ConfigurationOptions.COMPONENT + "."
+//                    + HAJournalServer.ConfigurationOptions.JETTY_XML
+//                    + "=\"bigdata-war/src/jetty.xml\"",
+//                    + "=\"" + serviceDir + "/bigdata-war/src/jetty.xml\"",
+                },
                 testOverrides);
 
         // Config file + overrides from perspective of this JVM.
@@ -1736,14 +1886,14 @@ public class AbstractHA3JournalServerTestCase extends
         // Config file + overrides from perspective of the child process.
         final String[] childArgs = ConfigMath.concat(new String[] {
                 installedConfigFileName, // as installed.
-                "bigdata.serviceDir=new java.io.File(\".\")" // relative to the serviceDir!
+//                "bigdata.serviceDir=new java.io.File(\".\")" // relative to the serviceDir!
                 }, testOverrides // plus anything from the test case.
                 );
 
         final Configuration config = ConfigurationProvider.getInstance(ourArgs);
         
         final ServiceConfiguration serviceConfig = new HAJournalServerConfiguration(
-                name, config, serviceId, /*serviceDir,*/ childArgs);
+                name, config, serviceId, jettyPort, /*serviceDir,*/ childArgs);
 
         final AbstractServiceStarter<?> serviceStarter = serviceConfig
                 .newServiceStarter(serviceListener);
@@ -1993,11 +2143,20 @@ public class AbstractHA3JournalServerTestCase extends
 
         private final String serviceName;
         private final UUID serviceId;
+        private final int jettyPort;
+        /**
+         * The value of this environment variable is passed down. You can set
+         * this environment variable to force jetty to dump its internal start
+         * after start.
+         */
+        private final boolean jettyDumpStart = Boolean
+                .getBoolean("jetty.dump.start");
 //        private final File serviceDir;
         private final String[] args;
         
         public HAJournalServerConfiguration(final String serviceName,
-                final Configuration config, final UUID serviceId,
+                final Configuration config, final UUID serviceId, //
+                final int jettyPort,
                 /*final File serviceDirIsIgnored, */ final String[] args)
                 throws ConfigurationException {
 
@@ -2010,7 +2169,7 @@ public class AbstractHA3JournalServerTestCase extends
             if (serviceId == null)
                 throw new IllegalArgumentException();
 
-            if (serviceDir == null)
+            if (serviceDir == null) // ??? This is checking a variable in the base class. is that deliberate?
                 throw new IllegalArgumentException();
 
             if (args == null)
@@ -2025,6 +2184,8 @@ public class AbstractHA3JournalServerTestCase extends
             this.serviceName = serviceName;
 
             this.serviceId = serviceId;
+
+            this.jettyPort = jettyPort;
             
 //            this.serviceDir = serviceDir;
             
@@ -2069,6 +2230,28 @@ public class AbstractHA3JournalServerTestCase extends
             private final String TEST_LOGICAL_SERVICE_ID = "test.logicalServiceId";
             
             /**
+             * Used to override the port at which jetty sets up the http
+             * connection.
+             */
+            private final String TEST_JETTY_PORT = NanoSparqlServer.SystemProperties.JETTY_PORT;
+
+            /**
+             * The path in the local file system to the root of the web
+             * application. This is <code>bigdata-war/src</code> in the source
+             * code, but the webapp gets deployed to the serviceDir for this
+             * test suite.
+             */
+            private final String JETTY_RESOURCE_BASE = NanoSparqlServer.SystemProperties.JETTY_RESOURCE_BASE;
+
+            private final String JETTY_OVERRIDE_WEB_XML = NanoSparqlServer.SystemProperties.JETTY_OVERRIDE_WEB_XML;
+
+            /**
+             * Used to override the <code>jetty.dump.start</code> environment
+             * property.
+             */
+            private final String TEST_JETTY_DUMP_START = NanoSparqlServer.SystemProperties.JETTY_DUMP_START;
+
+            /**
              * The absolute effective path of the service directory. This is
              * overridden on the {@link #TEST_SERVICE_DIR} environment variable
              * and in the deployed HAJournal.config file in order to have the
@@ -2109,6 +2292,18 @@ public class AbstractHA3JournalServerTestCase extends
 
                 cmds.add("-D" + TEST_LOGICAL_SERVICE_ID + "="
                         + getLogicalServiceId());
+
+                // Override the HTTP port for jetty.
+                cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
+
+                // Override the location of the webapp as deployed.
+                cmds.add("-D" + JETTY_RESOURCE_BASE + "=.");
+
+                // Override the location of the override-web.xml file as deployed.
+                cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
+
+                // Override the jetty.dump.start.
+                cmds.add("-D" + TEST_JETTY_DUMP_START + "=" + jettyDumpStart);
 
                 super.addCommandArgs(cmds);
                 
@@ -2374,37 +2569,37 @@ public class AbstractHA3JournalServerTestCase extends
      * @throws InterruptedException
      * @throws AsynchronousQuorumCloseException
      */
-	protected long awaitFullyMetQuorum(final int ticks) throws IOException,
-			AsynchronousQuorumCloseException, InterruptedException,
-			TimeoutException {
+    protected long awaitFullyMetQuorum(final int ticks) throws IOException,
+            AsynchronousQuorumCloseException, InterruptedException,
+            TimeoutException {
 
-		// Wait for a quorum met.
-		final long token = quorum.awaitQuorum(awaitQuorumTimeout * ticks,
-				TimeUnit.MILLISECONDS);
+        // Wait for a quorum met.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout * ticks,
+                TimeUnit.MILLISECONDS);
 
-		// Wait for a fully met quorum.
-		assertCondition(new Runnable() {
-			public void run() {
-				try {
-					// Verify quorum is FULLY met for that token.
-					assertTrue(quorum.isQuorumFullyMet(token));
-				} catch (Exception e) {
-					// Quorum is not fully met.
-					fail("Not Met", e);
-				}
-			}
-		}, awaitQuorumTimeout * ticks,
-		TimeUnit.MILLISECONDS);
+        // Wait for a fully met quorum.
+        assertCondition(new Runnable() {
+            public void run() {
+                try {
+                    // Verify quorum is FULLY met for that token.
+                    assertTrue(quorum.isQuorumFullyMet(token));
+                } catch (Exception e) {
+                    // Quorum is not fully met.
+                    fail("Not Met", e);
+                }
+            }
+        }, awaitQuorumTimeout * ticks,
+        TimeUnit.MILLISECONDS);
 
-		return token;
+        return token;
 
-	}
+    }
 
-	protected long awaitFullyMetQuorum() throws IOException,
-			AsynchronousQuorumCloseException, InterruptedException,
-			TimeoutException {
-		return awaitFullyMetQuorum(2); // default 2 ticks
-	}
+    protected long awaitFullyMetQuorum() throws IOException,
+            AsynchronousQuorumCloseException, InterruptedException,
+            TimeoutException {
+        return awaitFullyMetQuorum(2); // default 2 ticks
+    }
 
     /**
      * Wait until the quorum meets at the successor of the given token.
@@ -2615,6 +2810,25 @@ public class AbstractHA3JournalServerTestCase extends
     }
 
     /**
+     * Commits update transaction with LBS after awaiting quorum.
+     */
+    protected void simpleTransactionLBS() throws IOException, Exception {
+
+        // Await quorum meet.
+        final long token = quorum.awaitQuorum(awaitQuorumTimeout,
+                TimeUnit.MILLISECONDS);
+
+        // Figure out which service is the leader.
+        final HAGlue leader = quorum.getClient().getLeader(token);
+
+        // Wait until that service is ready to act as the leader.
+        assertEquals(HAStatusEnum.Leader, awaitNSSAndHAReady(leader));
+
+        simpleTransaction_noQuorumCheckLBS(leader);
+        
+    }
+
+    /**
      * Immediately issues a simple transaction against the service.
      * 
      * @param leader
@@ -2625,6 +2839,42 @@ public class AbstractHA3JournalServerTestCase extends
      */
     protected void simpleTransaction_noQuorumCheck(final HAGlue leader)
             throws IOException, Exception {
+
+        simpleTransaction_noQuorumCheck(leader, false/* useLoadBalancer */);
+
+    }
+
+    /**
+     * Immediately issues a simple transaction against the service with LBS.
+     * 
+     * @param leader
+     *            The service (must be the leader to succeed).
+     *            
+     * @throws IOException
+     * @throws Exception
+     */
+    protected void simpleTransaction_noQuorumCheckLBS(final HAGlue leader)
+            throws IOException, Exception {
+
+        simpleTransaction_noQuorumCheck(leader, true/* useLoadBalancer */);
+
+    }
+
+    /**
+     * Immediately issues a simple transaction against the service.
+     * 
+     * @param haGlue
+     *            The service (must be the leader to succeed unless using the
+     *            load balancer).
+     * @param useLoadBalancer
+     *            When <code>true</code> the LBS will be used and the update
+     *            request may be directed to any service and will be proxied to
+     *            the leader if necessary.
+     * @throws IOException
+     * @throws Exception
+     */
+    protected void simpleTransaction_noQuorumCheck(final HAGlue haGlue,
+            final boolean useLoadBalancer) throws IOException, Exception {
         
         final StringBuilder sb = new StringBuilder();
         sb.append("DROP ALL;\n");
@@ -2636,9 +2886,17 @@ public class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
-            
-     }
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+                useLoadBalancer, client);
+        try {
+        	repo.prepareUpdate(updateStr).evaluate();
+        } finally {
+        	repo.close();
+        	client.stop();
+        }
+
+    }
     
     /**
      * Verify that an attempt to read on the specified service is disallowed.
@@ -2658,9 +2916,18 @@ public class AbstractHA3JournalServerTestCase extends
 
         try {
 
-            getRemoteRepository(haGlue).prepareUpdate(updateStr).evaluate();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+        	try {
+        		repo.prepareUpdate(updateStr).evaluate();
+        	} finally {
+        		repo.close();
+        		client.stop();
+        	}
 
         } catch (HttpException ex) {
+        	
+        	log.warn("Status Code: " + ex.getStatusCode(), ex);
 
             assertEquals("statusCode", 405, ex.getStatusCode());
 
@@ -2677,8 +2944,14 @@ public class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-         
-            getRemoteRepository(haGlue).prepareTupleQuery(queryStr).evaluate();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+        	try {
+        		repo.prepareTupleQuery(queryStr).evaluate();
+        	} finally {
+        		repo.close();
+        		client.stop();
+        	}
             
         } catch (HttpException ex) {
             
@@ -2688,6 +2961,39 @@ public class AbstractHA3JournalServerTestCase extends
         
     }
     
+    protected void assertStoreStates(final HAGlue[] services) throws IOException {
+        if (services.length < 2)
+            return; // nothing to compare
+
+        final StoreState test = ((HAGlueTest) services[0]).getStoreState();
+        final String tname = serviceName(services[0]);
+
+        for (int s = 1; s < services.length; s++) {
+            final StoreState other = ((HAGlueTest) services[s]).getStoreState();
+
+            if (!test.equals(other)) {
+                final String oname = serviceName(services[s]);
+                final String msg = "StoreState mismatch \n" + tname + "\n"
+                        + test.toString() + "\n" + oname + "\n"
+                        + other.toString();
+                fail(msg);
+            }
+        }
+    }
+    
+    protected String serviceName(final HAGlue s) {
+        if (s == serverA) {
+            return "serverA";
+        } else if (s == serverB) {
+            return "serverB";
+        } else if (s == serverC) {
+            return "serverC";
+        } else {
+            return "NA";
+        }
+    }
+
+    
     /**
      * Task loads a large data set.
      */
@@ -2695,6 +3001,7 @@ public class AbstractHA3JournalServerTestCase extends
         
         private final long token;
         private final boolean reallyLargeLoad;
+        private final boolean dropAll;
 
         /**
          * Large load.
@@ -2708,6 +3015,10 @@ public class AbstractHA3JournalServerTestCase extends
             
         }
         
+
+        public LargeLoadTask(long token, boolean reallyLargeLoad) {
+            this(token, reallyLargeLoad, true/*dropAll*/);
+        }
         /**
          * Either large or really large load.
          * 
@@ -2716,17 +3027,20 @@ public class AbstractHA3JournalServerTestCase extends
          * @param reallyLargeLoad
          *            if we will also load the 3 degrees of freedom file.
          */
-        public LargeLoadTask(final long token, final boolean reallyLargeLoad) {
+        public LargeLoadTask(final long token, final boolean reallyLargeLoad, final boolean dropAll) {
 
             this.token = token;
             
             this.reallyLargeLoad = reallyLargeLoad;
+
+            this.dropAll = dropAll;
 
         }
 
         public Void call() throws Exception {
 
             final StringBuilder sb = new StringBuilder();
+            if (dropAll)
             sb.append("DROP ALL;\n");
             sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
             sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
@@ -2748,7 +3062,14 @@ public class AbstractHA3JournalServerTestCase extends
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
 
-            getRemoteRepository(leader).prepareUpdate(updateStr).evaluate();
+           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+            final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
+        	try {
+        		repo.prepareUpdate(updateStr).evaluate();
+        	} finally {
+        		repo.close();
+        		client.stop();
+        	}
 
             // Verify quorum is still valid.
             quorum.assertQuorum(token);
@@ -2820,12 +3141,12 @@ public class AbstractHA3JournalServerTestCase extends
             ExecutionException, TimeoutException {
 
         try {
-			assertTrue(token == awaitFullyMetQuorum((int) (longLoadTimeoutMillis/awaitQuorumTimeout)));
-		} catch (AsynchronousQuorumCloseException e) {
-			throw new RuntimeException(e);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+            assertTrue(token == awaitFullyMetQuorum((int) (longLoadTimeoutMillis/awaitQuorumTimeout)));
+        } catch (AsynchronousQuorumCloseException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         
         return !ft.isDone();
 
@@ -2900,6 +3221,7 @@ public class AbstractHA3JournalServerTestCase extends
         awaitNSSAndHAReady(haGlue);
         // Wait until self-reports RunMet.
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
                     final String extendedRunState = haGlue.getExtendedRunState();
@@ -2915,6 +3237,22 @@ public class AbstractHA3JournalServerTestCase extends
     }
 
     /**
+     * Assert that a snapshot exists for the specific commit point.
+     * 
+     * @param snapshotDir
+     *            The snapshot directory for the service.
+     * @param commitCounter
+     *            The commit point.
+     */
+    protected void assertSnapshotExists(final File snapshotDir,
+            long commitCounter) {
+
+        assertTrue(CommitCounterUtility.getCommitCounterFile(snapshotDir,
+                commitCounter, SnapshotManager.SNAPSHOT_EXT).exists());
+        
+    }
+    
+    /**
      * Await the specified snapshot.
      * 
      * @param server
@@ -2929,6 +3267,7 @@ public class AbstractHA3JournalServerTestCase extends
 
         // Wait until self-reports RunMet.
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 try {
 

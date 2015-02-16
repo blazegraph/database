@@ -55,7 +55,6 @@ import com.bigdata.util.config.LogUtil;
  * the copyright banner is always written out on bigdata startup.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Banner {
 
@@ -70,7 +69,6 @@ public class Banner {
      * Environment variables understood by the {@link Banner} class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public interface Options {
 
@@ -93,6 +91,9 @@ public class Banner {
 
     }
     
+    /**
+     * Display the banner, dependencies, etc.
+     */
     static public void banner() {
         
         if(didBanner.compareAndSet(false/*expect*/, true/*update*/)) {
@@ -133,7 +134,7 @@ public class Banner {
                     maxLicenseLen = Math.min(80, maxLicenseLen);
 
                     final Formatter f = new Formatter(sb);
-
+                    try {
                     final String fmt1 = "" //
                             + "%-" + maxNameLen + "s"//
 //                            + " %-" + maxProjectLen + "s" //
@@ -150,6 +151,9 @@ public class Banner {
                                 dep.licenseURL()//
                                 );
 
+                    }
+                    } finally {
+                    	f.close();
                     }
                 }
                 
@@ -249,23 +253,52 @@ public class Banner {
     }
 
     /**
-     * Use reflection to discover and report on the bigdata build information. A
-     * <code>com.bigdata.BuildInfo</code> is built when the JAR is created.
-     * However, it may not be present when running under an IDE from the source
-     * code and, therefore, there MUST NOT be any compile time references to the
-     * <code>com.bigdata.BuildInfo</code> class. This method uses reflection to
-     * avoid a compile time dependency.
+     * An interface which declares the keys for the map returned by
+     * {@link Banner#getBuildInfo()} .
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public interface BuildInfoMeta {
+        /** The bigdata release version. */
+        String buildVersion = "buildVersion";
+        /** The source code revision. */
+        String svnRevision = "svnRevision";
+        /** The source code repository URL for the branch. */
+        String svnURL = "svnURL";
+        /** The timestamp of the build. */
+        String buildTimestamp = "buildTimestamp";
+        /** The username that performed the build. */
+        String buildUser = "buildUser";
+        /** The hostname on which the build was performed. */
+        String buildHost = "buildHost";
+        /** The OS architecture on which the build was performed. */
+        String osArch = "osArch";
+        /** The OS name on which the build was performed. */
+        String osName = "osName";
+        /** The OS version on which the build was performed. */
+        String osVersion = "osVersion";
+    }
+    
+    /**
+     * Method used to discover and report on the bigdata build information. A
+     * <code>com.bigdata.BuildInfo</code> class is built when the JAR is
+     * created. However, it may not be present when running under an IDE from
+     * the source code and, therefore, there MUST NOT be any compile time
+     * references to the <code>com.bigdata.BuildInfo</code> class. This method
+     * uses reflection to avoid a compile time dependency.
      * <p>
-     * Note: This method works fine. However, the problem with exposing the
-     * information is that people running from an IDE can observe <em>stale</em>
-     * data from old <code>com.bigdata.BuildInfo</code> class files left from a
-     * previous build of a JAR. This makes the information good for deployed
-     * versions of the JAR but potentially misleading when people are running
-     * under an IDE.
+     * Note: This method works fine. However, people running from an IDE will
+     * observe <em>stale</em> data from old <code>com.bigdata.BuildInfo</code>
+     * class files left from a previous build of a JAR. This makes the
+     * information good for deployed versions of the JAR but potentially
+     * misleading when people are running under an IDE.
      * 
      * @return Build info metadata iff available.
+     * 
+     * @see BuildInfoMeta
      */
-    private synchronized static Map<String,String> getBuildInfo() {
+    public synchronized static Map<String,String> getBuildInfo() {
 
         if (buildInfoRef.get() == null) {
 
@@ -341,13 +374,44 @@ public class Banner {
 
         final StringBuilder s = new StringBuilder();
 
-        s.append("\nbuildVersion=" + getBuildInfo().get("buildVersion"));
+        s.append("\nbuildVersion=" + getBuildInfo().get(BuildInfoMeta.buildVersion));
 
 //        s.append("\nsvnRevision =" + getBuildInfo().get("svnRevision"));
         
         return s.toString();
 
     }
+    
+   /**
+    * Attempts to return the build version (aka the release version) from the
+    * <code>com.bigdata.BuildInfo</code> class. This class is generated by
+    * <code>build.xml</code> and is NOT available from the IDE. It is correct
+    * discovered using reflection.
+    * 
+    * @return Build version if available and <code>null</code> otherwise.
+    * 
+    * @see #getBuildInfo()
+    */
+   public final static String getVersion() {
+
+      if (getBuildInfo().isEmpty()) {
+
+         return null;
+
+      }
+
+      return getBuildInfo().get(BuildInfoMeta.buildVersion);
+
+   }
+   
+   /**
+    * Return the banner.
+    */
+   public static String getBanner() {
+	   
+	   return banner;
+	   
+   }
     
     /**
      * Outputs the banner and exits.
@@ -362,14 +426,14 @@ public class Banner {
     }
     
     private static final String banner =//
-        "\nBIGDATA(R)"+//
+        "\nBlazeGraph(TM) Graph Engine"+//
         "\n"+//
         "\n                   Flexible"+//
         "\n                   Reliable"+//
         "\n                  Affordable"+//
         "\n      Web-Scale Computing for the Enterprise"+//
         "\n"+//
-        "\nCopyright SYSTAP, LLC 2006-2013.  All rights reserved."+//
+        "\nCopyright SYSTAP, LLC 2006-2015.  All rights reserved."+//
         "\n"+//
         "\n"+AbstractStatisticsCollector.fullyQualifiedHostName+//
         "\n"+new Date()+//

@@ -81,6 +81,7 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
      * A thread-safe iterator that will visit all known formats (declared by
      * {@link Iterable}).
      */
+    @Override
     public Iterator<PropertiesFormat> iterator() {
         
         return formats.iterator();
@@ -182,7 +183,9 @@ public class PropertiesFormat extends FileFormat implements Iterable<PropertiesF
      * @see #getMIMETypes()
      */
     public static PropertiesFormat forMIMEType(final String mimeType) {
+
         return forMIMEType(mimeType, null);
+        
     }
 
     /**

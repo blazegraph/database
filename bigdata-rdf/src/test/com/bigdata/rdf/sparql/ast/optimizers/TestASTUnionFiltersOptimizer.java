@@ -32,7 +32,6 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -289,6 +288,35 @@ public class TestASTUnionFiltersOptimizer extends AbstractOptimizerTestCase {
 								joinGroupNode(filter(knownUnbound(varNode(w)))) 
 								)
 							) ) );
+			
+		}}.test();
+	}
+
+	/**
+	 * This optimizer cannot help in this case.
+	 */
+	public void test_ticket905() {
+		new Helper(){
+			QueryRoot unchanged() {
+				return select( varNode(w), 
+					where ( joinGroupNode(
+							    statementPatternNode(constantNode(a),constantNode(b),varNode(w)),
+							    filter(bound(varNode(w))),
+							    statementPatternNode(varNode(x),constantNode(b),varNode(w)),
+							    unionNode(
+									joinGroupNode(
+			    						    bind(constantNode(a), varNode(x) )
+											),
+									joinGroupNode(
+					    					bind(constantNode(b), varNode(x) )
+											)
+									)
+							) ) );
+			}
+			{
+			given = unchanged();
+			
+			expected = unchanged();
 			
 		}}.test();
 	}

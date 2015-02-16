@@ -48,6 +48,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.config.Configuration;
@@ -1546,16 +1547,19 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
         
     }
 
-	/**
-	 * When {@link #getRawRecords()} returns <code>true</code>, this method
-	 * returns the maximum byte length of a <code>byte[]</code> value which may
-	 * be stored in a B+Tree leaf (default {@link Options#MAX_REC_LEN}. Values
-	 * larger than this will be automatically converted into raw record
-	 * references.
-	 * 
-	 * @see Options#MAX_REC_LEN
-	 * @see Options#DEFAULT_MAX_REC_LEN
-	 */
+    /**
+     * When {@link #getRawRecords()} returns <code>true</code>, this method
+     * returns the maximum byte length of a <code>byte[]</code> value will be be
+     * stored in a B+Tree leaf (default {@link Options#MAX_REC_LEN}) while
+     * values larger than this will be automatically converted into raw record
+     * references. Note that this method returns the configured value regardless
+     * of the value of {@link #getRawRecords()} - the caller must check
+     * {@link #getRawRecords()} in order to correctly interpret the value
+     * returned by this method.
+     * 
+     * @see Options#MAX_REC_LEN
+     * @see Options#DEFAULT_MAX_REC_LEN
+     */
 	public final int getMaxRecLen() {return maxRecLen;}
 
 	/**
@@ -2096,9 +2100,16 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 //        this.addrSer = AddressSerializer.INSTANCE;
         
 //        this.nodeKeySer = PrefixSerializer.INSTANCE;
+        final Class keyRabaCoder;
+        if (this instanceof HTreeIndexMetadata) {
+        	keyRabaCoder = FrontCodedRabaCoderDupKeys.class;
+        } else {
+        	keyRabaCoder = DefaultFrontCodedRabaCoder.class;
+        }
+        
         this.nodeKeysCoder = newInstance(getProperty(indexManager, properties,
                 namespace, Options.NODE_KEYS_CODER,
-                DefaultFrontCodedRabaCoder.class.getName()), IRabaCoder.class);
+                keyRabaCoder.getName()), IRabaCoder.class);
 
         // this.tupleSer = DefaultTupleSerializer.newInstance();
         {
@@ -2116,7 +2127,7 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
 
             final IRabaCoder leafKeysCoder = newInstance(getProperty(
                     indexManager, properties, namespace,
-                    Options.LEAF_KEYS_CODER, DefaultFrontCodedRabaCoder.class
+                    Options.LEAF_KEYS_CODER, keyRabaCoder
                             .getName()), IRabaCoder.class);
 
             final IRabaCoder valuesCoder = newInstance(getProperty(
@@ -2899,9 +2910,17 @@ public class IndexMetadata implements Serializable, Externalizable, Cloneable,
      * specified for <i>this</i> index.
      * </p>
      */
+    @Override
     public IKeyBuilder getKeyBuilder() {
 
         return getTupleSerializer().getKeyBuilder();
+        
+    }
+
+    @Override
+    public IKeyBuilder getPrimaryKeyBuilder() {
+
+        return getTupleSerializer().getPrimaryKeyBuilder();
         
     }
     

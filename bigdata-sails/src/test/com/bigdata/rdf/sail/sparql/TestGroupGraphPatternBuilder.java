@@ -107,7 +107,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -141,7 +141,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -184,7 +184,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -225,7 +225,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -277,7 +277,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
             
@@ -330,7 +330,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -385,7 +385,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -447,7 +447,7 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -522,7 +522,7 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -599,7 +599,7 @@ public class TestGroupGraphPatternBuilder extends
             final VarNode o = new VarNode("o");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -659,7 +659,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -702,7 +702,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
             
@@ -747,7 +747,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -794,7 +794,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -844,7 +844,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -895,7 +895,7 @@ public class TestGroupGraphPatternBuilder extends
         {
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -941,7 +941,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -989,7 +989,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1038,7 +1038,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1091,10 +1091,7 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
-            {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
-                expected.setPrefixDecls(prefixDecls);
-            }
+            expected.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             final ProjectionNode projection = new ProjectionNode();
             projection.addProjectionVar(new VarNode("s"));
@@ -1116,6 +1113,7 @@ public class TestGroupGraphPatternBuilder extends
                     serviceRefIV), groupNode);
 
             serviceNode.setExprImage(serviceExpr);
+            serviceNode.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             whereClause.addArg(serviceNode);
             
@@ -1148,7 +1146,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1174,6 +1172,7 @@ public class TestGroupGraphPatternBuilder extends
             serviceNode.setSilent(true);
 
             serviceNode.setExprImage(serviceExpr);
+            serviceNode.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             whereClause.addArg(serviceNode);
 
@@ -1203,7 +1202,7 @@ public class TestGroupGraphPatternBuilder extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -1227,6 +1226,7 @@ public class TestGroupGraphPatternBuilder extends
                     groupNode);
 
             serviceNode.setExprImage(serviceExpr);
+            serviceNode.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
 
             whereClause.addArg(serviceNode);
 
@@ -1259,7 +1259,7 @@ public class TestGroupGraphPatternBuilder extends
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
         {
 
-            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
             {
                 prefixDecls.put("", "http://www.bigdata.com/");
                 expected.setPrefixDecls(prefixDecls);
@@ -1289,6 +1289,56 @@ public class TestGroupGraphPatternBuilder extends
             serviceNode.setPrefixDecls(prefixDecls);
 
             whereClause.addArg(serviceNode);
+
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+     * A unit test for an OPTIONAL wrapping a SERVICE.
+     */
+    public void test_optional_SERVICE() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String serviceExpr = "service ?s { ?s ?p ?o  }";
+
+        final String sparql = "select ?s where { optional { " + serviceExpr
+                + " } }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final ServiceNode service;
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                final JoinGroupNode serviceGraph = new JoinGroupNode();
+                serviceGraph.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+                service = new ServiceNode(new VarNode("s"), serviceGraph);
+                service.setExprImage(serviceExpr);
+                service.setPrefixDecls(PrefixDeclProcessor.defaultDecls);
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode(true/* optional */);
+                whereClause.addChild(wrapperGroup);
+                wrapperGroup.addChild(service);
+            }
 
         }
 

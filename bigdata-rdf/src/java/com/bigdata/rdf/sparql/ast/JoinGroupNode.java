@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Iterator;
@@ -8,8 +31,8 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.constraints.InBOp;
+import com.bigdata.rdf.sparql.ast.hints.OptimizerQueryHint;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * An optional or non-optional collection of query nodes that run together in
@@ -30,6 +53,15 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
          * parent chain to locate the dominating graph context.
          */
         String CONTEXT = "context";
+        
+        /**
+         * A property that may be set by a query hint. When set, the value is a
+         * {@link QueryOptimizerEnum}.
+         * 
+         * @see QueryHints#OPTIMIZER
+         * @see OptimizerQueryHint
+         */
+        String OPTIMIZER = QueryHints.OPTIMIZER;
         
     }
     
@@ -149,6 +181,7 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
     }
 
+    @Override
     final public boolean isOptional() {
         
         return getProperty(Annotations.OPTIONAL, Annotations.DEFAULT_OPTIONAL);
@@ -172,6 +205,20 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 
         setProperty(Annotations.MINUS, minus);
         
+    }
+
+    /**
+     * Return the {@link QueryOptimizerEnum} that is in effect for this
+     * {@link JoinGroupNode}. This will be the value specified through
+     * {@link QueryHints#OPTIMIZER} and otherwise the default value given by
+     * {@link QueryHints#DEFAULT_OPTIMIZER}.
+     * 
+     * @return The effective query optimizer for this join group.
+     */
+    final public QueryOptimizerEnum getQueryOptimizer() {
+
+        return getProperty(Annotations.OPTIMIZER, QueryHints.DEFAULT_OPTIMIZER);
+
     }
     
 	/**

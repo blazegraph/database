@@ -29,6 +29,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.Future;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -42,6 +45,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
+import com.bigdata.rdf.task.AbstractApiTask;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -58,11 +62,41 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     /**
      * The name of the {@link ServletContext} attribute whose value is the
+     * {@link BigdataRDFContext}.
+     */
+    static public final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
+            .getName();
+    
+    /**
+     * The name of the {@link ServletContext} attribute whose value is the
      * {@link IIndexManager}.
      */
     /*package*/ static final transient String ATTRIBUTE_INDEX_MANAGER = 
         IIndexManager.class.getName();
 
+    /**
+     * The {@link ServletContext} attribute whose value is the prefix for the
+     * HALoadBalancerServlet (DO NOT LINK JAVADOC) iff it is running.
+     * <p>
+     * Note: Do NOT reference the <code>HALoadBalancerServlet</code> or anything
+     * in the <code>com.bigdata.rdf.sail.webapp.lbs</code> package here. It will
+     * drag in the jetty dependencies and that breaks the tomcat WAR deployment.
+     */
+    static final String ATTRIBUTE_LBS_PREFIX = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.prefix";
+    
+    /**
+     * The {@link ServletContext} attribute that is managed by the
+     * HALoadBalancerServlet (DO NOT LINK JAVADOC) and which maintains a
+     * collection of the active instances of that servlet. This is used to
+     * administer the IHALoadBalancerPolicy associated with the load balancer
+     * servlet instances.
+     * <p>
+     * Note: Do NOT reference the <code>HALoadBalancerServlet</code> or anything
+     * in the <code>com.bigdata.rdf.sail.webapp.lbs</code> package here. It will
+     * drag in the jetty dependencies and that breaks the tomcat WAR deployment.
+     */
+    static final String ATTRIBUTE_LBS_INSTANCES = "com.bigdata.rdf.sail.webapp.HALoadBalancerServlet.instances";
+    
 //    /**
 //     * The {@link ServletContext} attribute whose value is the
 //     * {@link SparqlCache}.
@@ -91,12 +125,19 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         HTTP_BADREQUEST = HttpServletResponse.SC_BAD_REQUEST,
         HTTP_METHOD_NOT_ALLOWED = HttpServletResponse.SC_METHOD_NOT_ALLOWED,
 		HTTP_INTERNALERROR = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-		HTTP_NOTIMPLEMENTED = HttpServletResponse.SC_NOT_IMPLEMENTED;
+        HTTP_NOTIMPLEMENTED = HttpServletResponse.SC_NOT_IMPLEMENTED;
 
-    protected <T> T getRequiredServletContextAttribute(final String name) {
+    static <T> T getRequiredServletContextAttribute(
+            final ServletContext servletContext, final String name) {
+
+        if (servletContext == null)
+            throw new IllegalArgumentException();
+
+        if (name == null)
+            throw new IllegalArgumentException();
 
         @SuppressWarnings("unchecked")
-        final T v = (T) getServletContext().getAttribute(name);
+        final T v = (T) servletContext.getAttribute(name);
 
         if (v == null)
             throw new RuntimeException("Not set: " + name);
@@ -105,15 +146,81 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
     }
 
+    static final SparqlEndpointConfig getConfig(
+            final ServletContext servletContext) {
+
+        return getBigdataRDFContext(servletContext).getConfig();
+
+    }
+
+    protected final BigdataRDFContext getBigdataRDFContext() {
+        
+        return getBigdataRDFContext(getServletContext());
+        
+    }
+
+    static final BigdataRDFContext getBigdataRDFContext(
+            final ServletContext servletContext) {
+
+//        if (m_context == null) {
+//
+//            m_context = 
+        return getRequiredServletContextAttribute(servletContext,
+                ATTRIBUTE_RDF_CONTEXT);
+
+//        }
+//
+//        return m_context;
+
+    }
+
+//    private volatile BigdataRDFContext m_context;
+
     /**
      * The backing {@link IIndexManager}.
      */
-	protected IIndexManager getIndexManager() {
-	
-	    return getRequiredServletContextAttribute(ATTRIBUTE_INDEX_MANAGER);
-	    
-	}
+    protected IIndexManager getIndexManager() {
+        
+        return getIndexManager(getServletContext());
+        
+    }
 
+    /**
+     * The backing {@link IIndexManager}.
+     */
+    static public IIndexManager getIndexManager(final ServletContext servletContext) {
+
+        return getRequiredServletContextAttribute(servletContext,
+                ATTRIBUTE_INDEX_MANAGER);
+
+    }
+
+    /**
+     * Submit a task and return a {@link Future} for that task. The task will be
+     * run on the appropriate executor service depending on the nature of the
+     * backing database and the view required by the task.
+     * 
+     * @param task
+     *            The task.
+     * 
+     * @return The {@link Future} for that task.
+     * 
+     * @throws DatasetNotFoundException
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+     *      Concurrent unisolated operations against multiple KBs </a>
+     */
+    protected <T> Future<T> submitApiTask(final AbstractRestApiTask<T> task)
+            throws DatasetNotFoundException {
+
+        final IIndexManager indexManager = getIndexManager();
+
+        return AbstractApiTask.submitApiTask(indexManager, task);
+        
+    }
+    
 //    /**
 //     * Return the {@link Quorum} -or- <code>null</code> if the
 //     * {@link IIndexManager} is not participating in an HA {@link Quorum}.
@@ -137,10 +244,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA
      * enabled.
      */
-    protected HAStatusEnum getHAStatus() {
-        
-        final IIndexManager indexManager = getIndexManager();
+    static public HAStatusEnum getHAStatus(final IIndexManager indexManager) {
 
+        if (indexManager == null)
+            throw new IllegalArgumentException();
+        
         if (indexManager instanceof AbstractJournal) {
 
             // Note: Invocation against local object (NOT RMI).
@@ -163,10 +271,20 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * 
      * @throws IOException
      */
-    protected boolean isWritable(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+    static boolean isWritable(final ServletContext servletContext,
+            final HttpServletRequest req, final HttpServletResponse resp)
+            throws IOException {
         
-        final HAStatusEnum haStatus = getHAStatus();
+        if (getConfig(servletContext).readOnly) {
+            
+            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+                    "Not writable.");
+
+            // Not writable.  Response has been committed.
+            return false;
+            
+        }
+        final HAStatusEnum haStatus = getHAStatus(getIndexManager(servletContext));
         if (haStatus == null) {
             // No quorum.
             return true;
@@ -195,10 +313,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
      * 
      * @throws IOException
      */
-    protected boolean isReadable(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+    static boolean isReadable(final ServletContext ctx,
+            final HttpServletRequest req, final HttpServletResponse resp)
+            throws IOException {
 
-        final HAStatusEnum haStatus = getHAStatus();
+        final HAStatusEnum haStatus = getHAStatus(getIndexManager(ctx));
         if (haStatus == null) {
             // No quorum.
             return true;
@@ -279,7 +398,99 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 //        return getRequiredServletContextAttribute(ATTRIBUTE_SPARQL_CACHE);
 //        
 //    }
-    
+
+    /**
+     * Return the serviceURI(s) for this service (one or more).
+     * 
+     * @param req
+     *            The request.
+     *            
+     * @return The known serviceURIs for this service.
+     */
+    static public String[] getServiceURIs(final ServletContext servletContext,
+            final HttpServletRequest req) {
+
+        // One or more.
+        final List<String> serviceURIs = new LinkedList<String>();
+
+        /*
+         * Figure out the service end point.
+         * 
+         * Note: This is just the requestURL as reported. This makes is
+         * possible to support virtual hosting and similar http proxy
+         * patterns since the SPARQL end point is just the URL at which the
+         * service is responding.
+         */
+        final String uri;
+        {
+            
+            final StringBuffer sb = req.getRequestURL();
+
+            final int indexOf = sb.indexOf("?");
+
+            if (indexOf == -1) {
+                uri = sb.toString();
+            } else {
+                uri = sb.substring(0, indexOf);
+            }
+            serviceURIs.add(uri);
+
+        }
+
+        /**
+         * If the load balancer servlet is registered, then get its effective
+         * service URI. This will be a load balanced version of the serviceURI
+         * that we obtained above. We are trying to go from
+         * 
+         * http://localhost:8080/bigdata/sparql
+         * 
+         * to
+         * 
+         * http://localhost:8080/bigdata/LBS/sparql
+         * 
+         * where LBS is the prefix of the load balancer servlet.
+         */
+        {
+            final String prefix = (String) servletContext.getAttribute(
+                    ATTRIBUTE_LBS_PREFIX);
+
+            if (prefix != null) {
+                
+                // locate the // in the protocol.
+                final int doubleSlash = uri.indexOf("//");
+                
+                // skip past that and locate the next /
+                final int nextSlash = uri
+                        .indexOf('/', doubleSlash + 2/* fromIndex */);
+
+                // The ContextPath for the webapp. This should be the next thing
+                // in the [uri].
+                final String contextPath = servletContext.getContextPath();
+
+                // The index of the end of the ContextPath.
+                final int endContextPath = nextSlash
+                        + contextPath.length();
+
+                // everything up to the *start* of the ContextPath
+                final String baseURL = uri.substring(0/* beginIndex */,
+                        nextSlash/* endIndex */);
+
+                final String s = baseURL // base URL
+                        + prefix // LBS prefix (includes ContextPath)
+                        + (prefix.endsWith("/") ? "" : "/")
+                        + uri.substring(endContextPath + 1) // remainder of requestURL.
+                        ;
+
+                serviceURIs.add(s);
+                
+            }
+            
+        }
+
+        return serviceURIs.toArray(new String[serviceURIs.size()]);
+        
+    }
+
     static public void buildResponse(final HttpServletResponse resp,
             final int status, final String mimeType) throws IOException {
 

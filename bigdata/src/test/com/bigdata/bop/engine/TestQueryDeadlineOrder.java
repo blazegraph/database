@@ -25,6 +25,7 @@ package com.bigdata.bop.engine;
 
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase2;
 
@@ -155,20 +156,26 @@ public class TestQueryDeadlineOrder extends TestCase2 {
         final AbstractRunningQuery runningQuery1 = queryEngine.eval(UUID.randomUUID(),
                 query1, new ListBindingSet());
 
-        runningQuery1.setDeadline(now + 10000);
+        final long deadline1Millis = now + 10000/* millis */;
+        
+        runningQuery1.setDeadline(deadline1Millis);
         
         Thread.sleep(2);
         
         final AbstractRunningQuery runningQuery2 = queryEngine.eval(UUID.randomUUID(),
                 query2, new ListBindingSet());
 
-        runningQuery2.setDeadline(now + 20000);
+        final long deadline2Millis = now + 20000/* millis */;
+        
+        runningQuery2.setDeadline(deadline2Millis);
 
         final QueryDeadline queryDeadline1 = new QueryDeadline(
-                runningQuery1.getDeadline(), runningQuery1);
+                TimeUnit.MILLISECONDS.toNanos(runningQuery1.getDeadline()),
+                runningQuery1);
 
         final QueryDeadline queryDeadline2 = new QueryDeadline(
-                runningQuery2.getDeadline(), runningQuery2);
+                TimeUnit.MILLISECONDS.toNanos(runningQuery2.getDeadline()),
+                runningQuery2);
 
         // The earlier deadline is LT the later deadline.
         assertTrue(queryDeadline1.compareTo(queryDeadline2) < 0);
@@ -180,6 +187,15 @@ public class TestQueryDeadlineOrder extends TestCase2 {
         assertEquals(0, queryDeadline1.compareTo(queryDeadline1));
         assertEquals(0, queryDeadline2.compareTo(queryDeadline2));
 
+        /*
+         * Verify that the query deadline (millis) was converted to nanos for
+         * QueryDeadline object.
+         */
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(deadline1Millis),
+                queryDeadline1.deadlineNanos);
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(deadline2Millis),
+                queryDeadline2.deadlineNanos);
+        
     }
     
 }

@@ -23,12 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.eval;
 
-import com.bigdata.rdf.sparql.ast.QueryHints;
-import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -128,6 +128,7 @@ public class TestAll extends TestCase {
         // Test suite for SPARQL 1.1 BINDINGS clause
         suite.addTestSuite(TestBindings.class);
         suite.addTestSuite(TestBindHeisenbug708.class);
+        suite.addTestSuite(TestTicket887.class);
 
         // Complex queries.
         suite.addTestSuite(TestComplexQuery.class);
@@ -138,6 +139,9 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTCK.class);
 
+        // additional bottom-up evaluation tests.
+        suite.addTestSuite(TestTicket1087.class);
+        
 		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*
@@ -166,6 +170,29 @@ public class TestAll extends TestCase {
 
         // test suite for custom functions.
         suite.addTestSuite(TestCustomFunction.class);
+
+        // test suite for BIND + GRAPH ticket.
+        suite.addTestSuite(TestBindGraph1007.class);
+
+        // test suite for a sub-select with an empty PROJECTION.
+        suite.addTestSuite(TestTicket946.class);
+
+        // SELECT COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern}
+        // @see #1037 (fast-range-count optimizer)
+        suite.addTest(TestFastRangeCountOptimizer.suite());
+
+        // SELECT (DISTINCT|REDUCED) ?property WHERE { ?x ?property ?y . }
+        // @see #1035 (distinct-term-scan optimizer)
+        suite.addTest(TestDistinctTermScanOptimizer.suite());
+
+        // SELECT (COUNT(*) as ?count) ?z WHERE {  ?x rdf:type ?z  } GROUP BY ?z
+        // @see #1059 (combination of fast-range-count and distinct-term-scan)
+        suite.addTest(TestSimpleGroupByAndCountOptimizer.suite());
+        
+        /*
+         * Runtime Query Optimizer (RTO).
+         */
+        suite.addTest(com.bigdata.rdf.sparql.ast.eval.rto.TestAll.suite());
 
         /*
          * SPARQL 1.1 UPDATE

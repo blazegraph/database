@@ -61,7 +61,6 @@ import cutthecrap.utils.striterators.Striterator;
  * reporting purposes.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class EventReceiver implements IEventReceivingService,
         IEventReportingService {
@@ -155,8 +154,7 @@ public class EventReceiver implements IEventReceivingService,
     }
 
     /**
-     * Acquire and return the write lock for the {@link EventBTree}. The caller
-     * MUST {@link Lock#unlock()} the lock!
+     * Return the write lock for the {@link EventBTree}. 
      */
     public Lock getWriteLock() {
         
@@ -169,7 +167,6 @@ public class EventReceiver implements IEventReceivingService,
      * serialized {@link Event}s. 
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class EventBTree extends BTree {
 

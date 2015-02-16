@@ -139,25 +139,24 @@ import com.bigdata.util.concurrent.WriteTaskCounters;
  *       or a period of time then that might do it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class WriteExecutorService extends ThreadPoolExecutor {
 
     /**
-     * Main log for the {@link WriteExecutorService}.
+     * Main logger for the {@link WriteExecutorService}.
      */
-    protected static final Logger log = Logger
+    private static final Logger log = Logger
             .getLogger(WriteExecutorService.class);
 
     /**
      * True iff the {@link #log} level is INFO or less.
      */
-    final protected static boolean INFO = log.isInfoEnabled();
+    final private static boolean INFO = log.isInfoEnabled();
 
     /**
      * True iff the {@link #log} level is DEBUG or less.
      */
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final private static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Uses the {@link OverflowManager} log for things relating to synchronous
@@ -453,13 +452,13 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * The threads that are running our tasks (so that we can interrupt them
      * if necessary).
      */
-    final private ConcurrentHashMap<Thread,AbstractTask> active = new ConcurrentHashMap<Thread,AbstractTask>();
+    final private ConcurrentHashMap<Thread,AbstractTask<?>> active = new ConcurrentHashMap<Thread,AbstractTask<?>>();
 
     /**
      * The set of tasks that make it into the commit group (so that we can set
      * the commit time on each of them iff the group commit succeeds).
      */
-    final private Map<Thread,AbstractTask> commitGroup = new LinkedHashMap<Thread, AbstractTask>();
+    final private Map<Thread,AbstractTask<?>> commitGroup = new LinkedHashMap<Thread, AbstractTask<?>>();
     
     /** #of write tasks completed since the last commit. */
     final private AtomicInteger nwrites = new AtomicInteger(0);
@@ -805,7 +804,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      * @param r
      *            The {@link AbstractTask}.
      */
-    protected void beforeTask(final Thread t, final AbstractTask r) {
+    protected void beforeTask(final Thread t, final AbstractTask<?> r) {
 
         if (t == null)
             throw new NullPointerException();
@@ -875,7 +874,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *            The exception thrown -or- <code>null</code> if the task
      *            completed successfully.
      */
-    protected void afterTask(final AbstractTask r, final Throwable t) {
+    protected void afterTask(final AbstractTask<?> r, final Throwable t) {
         
         if (r == null)
             throw new NullPointerException();
@@ -1043,7 +1042,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         } finally {
         
             // Remove since thread is no longer running the task.
-            final ITask tmp = active.remove(Thread.currentThread());
+            final ITask<?> tmp = active.remove(Thread.currentThread());
 
             if(trackActiveSetInMDC) {
 
@@ -1238,7 +1237,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         final Thread currentThread = Thread.currentThread();
         
         // the task that invoked this method.
-        final ITask r = active.get(currentThread);
+        final ITask<?> r = active.get(currentThread);
         
         /*
          * If an abort is in progress then throw an exception.
@@ -2149,7 +2148,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          * enough.]
          */
 
-        final AbstractTask[] a = active.values().toArray(new AbstractTask[0]);
+        final AbstractTask<?>[] a = active.values().toArray(new AbstractTask[0]);
 
         final TaskAndTime[] b = new TaskAndTime[a.length];
 
@@ -2195,7 +2194,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private static class TaskAndTime implements Comparable<TaskAndTime> {
 
         private final long now;
-        private final AbstractTask task;
+        private final AbstractTask<?> task;
         /** The elapsed milliseconds for work performed on this task. */
         private final long elapsedRunTime;
         /** The #of milliseconds ago that work began on this task. */
@@ -2208,6 +2207,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         }
         private final State state;
         
+        @Override
         public String toString() {
             return "TaskAndTime{" + task.toString() + ",elapsedRunTime="
                     + TimeUnit.NANOSECONDS.toMillis(elapsedRunTime)
@@ -2215,7 +2215,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                     + ",state=" + state + "}";
         }
         
-        TaskAndTime(final AbstractTask task, final long now) {
+        TaskAndTime(final AbstractTask<?> task, final long now) {
             this.task = task;
             this.now = now;
             if (task.nanoTime_finishedWork != 0L) {
@@ -2238,6 +2238,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
         /**
          * Places into order by decreasing {@link #elapsedRunTime}.
          */
+        @Override
         public int compareTo(final TaskAndTime o) {
 
             if (elapsedRunTime < o.elapsedRunTime)
@@ -2417,7 +2418,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
                 assert nwrites.get() == commitGroup.size();
                 
-                for (AbstractTask task : commitGroup.values()) {
+                for (AbstractTask<?> task : commitGroup.values()) {
                 
                     task.commitTime = timestamp;
                     
@@ -2543,14 +2544,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             if (INFO)
                 log.info("Interrupting tasks awaiting commit.");
             
-            final Iterator<Map.Entry<Thread, AbstractTask>> itr = active
+            final Iterator<Map.Entry<Thread, AbstractTask<?>>> itr = active
                     .entrySet().iterator();
 
             int ninterrupted = 0;
             
             while (itr.hasNext()) {
 
-                final Map.Entry<Thread,AbstractTask> entry = itr.next();
+                final Map.Entry<Thread,AbstractTask<?>> entry = itr.next();
                 
                 // set flag to deny access to resources.
                 

@@ -35,8 +35,20 @@ public interface IMimeTypes {
          * General purpose binary <code>application/octet-stream</code>.
          */
         MIME_DEFAULT_BINARY = "application/octet-stream",
+		/**
+		 * Used for NSS mutation operation responses.
+		 */
         MIME_APPLICATION_XML = "application/xml",
+	    /**
+	     * Used to interchange {@link Properties} objects.
+	     */
+        MIME_PROPERTIES_XML = "application/xml",
         MIME_TEXT_JAVASCRIPT = "text/javascript",
+	    /**
+	     * Used to interchange GraphML (blueprints).
+	     */
+	    MIME_GRAPH_ML = "application/graphml+xml",        	    
+        MIME_APPLICATION_JSON = "application/json",
         /**
          * The traditional encoding of URL query parameters within a POST
          * message body.

@@ -84,11 +84,11 @@ public abstract class ProcessReaderHelper extends
      */
     public String readLine() throws IOException, InterruptedException {
         
-        final Thread t = Thread.currentThread();
+//        final Thread t = Thread.currentThread();
         
         while(getActiveProcess().isAlive()) {
             
-            if(t.isInterrupted()) {
+            if(Thread.interrupted()) {
                 
                 throw new InterruptedException();
                 

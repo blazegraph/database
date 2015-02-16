@@ -15,6 +15,9 @@
 */
 package com.bigdata.rdf.graph;
 
+import java.util.Set;
+
+import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -92,7 +95,7 @@ public interface IGASState<VS,ES, ST> {
 
     /**
      * Get the state for the edge using the appropriate factory. If this is the
-     * first visit for that edge, then the state is initialized using the
+     * first visit for that vertex, then the state is initialized using the
      * factory. Otherwise the existing state is returned.
      * 
      * @param v
@@ -104,6 +107,30 @@ public interface IGASState<VS,ES, ST> {
      */
     ES getState(Statement e);
 
+    /**
+     * Return <code>true</code> iff the specified vertex has an associated
+     * vertex state object - this is interpreted as meaning that the vertex has
+     * been "visited".
+     * 
+     * @param v
+     *            The vertex.
+     * @return <code>true</code> iff there is vertex state associated with that
+     *         vertex.
+     */
+    boolean isVisited(Value v);
+    
+    /**
+     * Return <code>true</code> iff the specified vertices all have an associated
+     * vertex state object - this is interpreted as meaning that the vertex has
+     * been "visited".
+     * 
+     * @param v
+     *            The vertices.
+     * @return <code>true</code> iff there is vertex state associated with all
+     *         specified vertices.
+     */
+    boolean isVisited(Set<Value> v);
+    
     /**
      * The current frontier.
      */
@@ -148,6 +175,18 @@ public interface IGASState<VS,ES, ST> {
      * @return The other end of the link.
      */
     Value getOtherVertex(Value u, Statement e);
+    
+    /**
+     * Return the link attribute, if there is one.
+     * 
+     * @param u
+     *            One end of the link.
+     * @param e
+     *            The link.
+     * 
+     * @return The other end of the link.
+     */
+    Literal getLinkAttr(Value u, Statement e);
     
     /**
      * Return a useful representation of an edge (non-batch API, debug only).
@@ -226,7 +265,11 @@ public interface IGASState<VS,ES, ST> {
      * @return The edge decoded from that vertex and <code>null</code> iff the
      *         vertex is not an edge.
      * 
-     *         TODO RDR : Link to an RDR wiki page as well.
+     * @see <a href="http://www.bigdata.com/whitepapers/reifSPARQL.pdf" >
+     *      Reification Done Right </a>
+     *      
+     * @see <a href="http://wiki.bigdata.com/wiki/index.php/RDF_GAS_API" > RDF
+     *      GAS API</a>
      */
     Statement decodeStatement(Value v);
  
@@ -243,5 +286,24 @@ public interface IGASState<VS,ES, ST> {
      *            Another vertex.
      */
     int compareTo(Value u, Value v);
-    
+
+    /**
+     * Retain only those vertices in the visited set that are found in the
+     * specified collection.
+     * 
+     * @param retainSet The set of vertices to be retained.
+     */
+    void retainAll(Set<Value> retainSet);
+
+    /**
+	 * Convert a value into an appropriate internal form.
+	 * 
+	 * @param value
+	 *            The value.
+	 *            
+	 * @return The internal form and <code>null</code> if the argument is
+	 *         <code>null</code>.
+	 */
+	Value asValue(Value value);
+
 }

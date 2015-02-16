@@ -63,6 +63,7 @@ public class MutableValueBuffer implements IRaba {
     /**
      * For B+Tree values.
      */
+    @Override
     final public boolean isKeys() {
      
         return false;
@@ -142,24 +143,28 @@ public class MutableValueBuffer implements IRaba {
         
     }
 
+    @Override
     final public int size() {
 
         return nvalues;
         
     }
 
+    @Override
     final public boolean isEmpty() {
         
         return nvalues == 0;
         
     }
     
+    @Override
     final public boolean isFull() {
 
         return nvalues == values.length;
         
     }
     
+    @Override
     final public int capacity() {
         
         return values.length;
@@ -188,6 +193,7 @@ public class MutableValueBuffer implements IRaba {
         
     }
 
+    @Override
     final public int length(final int index) {
 
         assert rangeCheck(index);
@@ -201,6 +207,7 @@ public class MutableValueBuffer implements IRaba {
 
     }
 
+    @Override
     final public boolean isNull(final int index) {
 
         assert rangeCheck(index);
@@ -209,6 +216,7 @@ public class MutableValueBuffer implements IRaba {
 
     }
     
+    @Override
     final public int copy(final int index, final OutputStream out) {
 
         assert rangeCheck(index);
@@ -232,18 +240,21 @@ public class MutableValueBuffer implements IRaba {
         
     }
     
+    @Override
     final public Iterator<byte[]> iterator() {
 
         return new Iterator<byte[]>() {
 
             int i = 0;
 
+            @Override
             public boolean hasNext() {
 
                 return i < nvalues;
 
             }
 
+            @Override
             public byte[] next() {
 
                 if (!hasNext())
@@ -253,6 +264,7 @@ public class MutableValueBuffer implements IRaba {
 
             }
 
+            @Override
             public void remove() {
 
                 if (isReadOnly())
@@ -281,6 +293,7 @@ public class MutableValueBuffer implements IRaba {
 
     }
     
+    @Override
     public void set(final int index, final byte[] key) {
         
         assert rangeCheck(index);
@@ -289,6 +302,7 @@ public class MutableValueBuffer implements IRaba {
         
     }
 
+    @Override
     public int add(final byte[] key) {
 
         assertNotFull();
@@ -299,6 +313,7 @@ public class MutableValueBuffer implements IRaba {
         
     }
     
+    @Override
     public int add(final byte[] key, final int off, final int len) {
 
         assertNotFull();
@@ -313,6 +328,7 @@ public class MutableValueBuffer implements IRaba {
 
     }
     
+    @Override
     public int add(final DataInput in, final int len) throws IOException {
         
         assertNotFull();
@@ -327,12 +343,14 @@ public class MutableValueBuffer implements IRaba {
 
     }
 
+    @Override
     final public int search(final byte[] searchKey) {
 
         throw new UnsupportedOperationException();
        
     }
     
+    @Override
     public String toString() {
 
         return AbstractRaba.toString(this);

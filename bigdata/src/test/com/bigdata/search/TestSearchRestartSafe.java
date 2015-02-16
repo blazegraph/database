@@ -29,12 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.StringReader;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
@@ -43,7 +40,7 @@ import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
+public class TestSearchRestartSafe extends AbstractSearchTest {
 
     /**
      * 
@@ -100,111 +97,95 @@ public class TestSearchRestartSafe extends ProxyTestCase<IIndexManager> {
         final TimeUnit unit = TimeUnit.MILLISECONDS;
         final String regex = null;
 
-        final Properties properties = getProperties();
-        
-        IIndexManager indexManager = getStore(properties);
+        init();
 
-        try {
 
-            final String NAMESPACE = "test";
+        /*
+         * Index a document.
+         */
+        final long docId = 12L;
+        final int fieldId = 3;
+        final String text = "The quick brown dog";
+        final String languageCode = "EN";
+        {
 
-            /*
-             * Index a document.
-             */
-            final long docId = 12L;
-            final int fieldId = 3;
-            final String text = "The quick brown dog";
-            final String languageCode = "EN";
-            {
+            final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, getNdx());
 
-                final FullTextIndex<Long> ndx = new FullTextIndex<Long>(indexManager,
-                        NAMESPACE, ITx.UNISOLATED, properties);
+            getNdx().index(buffer, docId, fieldId, languageCode,
+                    new StringReader(text));
 
-                ndx.create();
+            getNdx().index(buffer, docId + 1, fieldId, languageCode,
+                    new StringReader("The slow brown cow"));
 
-                final TokenBuffer<Long> buffer = new TokenBuffer<Long>(2, ndx);
+            buffer.flush();
 
-                ndx.index(buffer, docId, fieldId, languageCode,
-                        new StringReader(text));
+        }
 
-                ndx.index(buffer, docId + 1, fieldId, languageCode,
-                        new StringReader("The slow brown cow"));
+        /* Search w/o restart. */
+        {
 
-                buffer.flush();
+        	final FullTextIndex<Long> ndx = new FullTextIndex<Long>(getIndexManager(),
+                    getNamespace(), ITx.UNISOLATED, getSearchProperties());
 
-            }
-
-            /* Search w/o restart. */
-            {
-
-                final FullTextIndex<Long> ndx = new FullTextIndex<Long>(indexManager,
-                        NAMESPACE, ITx.UNISOLATED, properties);
-
-                final Hiterator<?> itr = 
+            final Hiterator<?> itr = 
 //                    ndx.search(
 //                        text, languageCode
 //                        );
+            ndx.search(new FullTextQuery(text,
+                    languageCode, prefixMatch, 
+                    regex, matchAllTerms, false/* matchExact*/, 
+                    minCosine, maxCosine,
+                    minRank, maxRank, timeout, unit));
+            
+            assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
+
+            assertTrue(itr.hasNext());
+
+            final IHit<?> hit1 = itr.next();
+
+            if(log.isInfoEnabled())
+                log.info("hit1:" + hit1);
+
+//                /*
+//                 * Note: with cosine computation only the first hit is visited.
+//                 */
+
+            assertFalse(itr.hasNext());
+
+        }
+
+        /*
+         * Shutdown and restart.
+         */
+        setIndexManager(reopenStore(getIndexManager()));
+
+        /* Search with restart. */
+        {
+        	final FullTextIndex<Long> ndx = new FullTextIndex<Long>(getIndexManager(), getNamespace(), 
+        			ITx.UNISOLATED, getSearchProperties());
+
+
+            final Hiterator<?> itr = // ndx.search(text, languageCode);
                 ndx.search(new FullTextQuery(text,
                         languageCode, prefixMatch, 
                         regex, matchAllTerms, false/* matchExact*/, 
                         minCosine, maxCosine,
                         minRank, maxRank, timeout, unit));
-                
-                assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
-                assertTrue(itr.hasNext());
+            assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
 
-                final IHit<?> hit1 = itr.next();
+            assertTrue(itr.hasNext());
 
-                if(log.isInfoEnabled())
-                    log.info("hit1:" + hit1);
+            final IHit<?> hit1 = itr.next();
 
-//                /*
-//                 * Note: with cosine computation only the first hit is visited.
-//                 */
-
-                assertFalse(itr.hasNext());
-
-            }
-
-            /*
-             * Shutdown and restart.
-             */
-            indexManager = reopenStore(indexManager);
-
-            /* Search with restart. */
-            {
-
-                final FullTextIndex<Long> ndx = new FullTextIndex<Long>(
-                        indexManager, NAMESPACE, ITx.UNISOLATED, properties);
-
-                final Hiterator<?> itr = // ndx.search(text, languageCode);
-                    ndx.search(new FullTextQuery(text,
-                            languageCode, prefixMatch, 
-                            regex, matchAllTerms, false/* matchExact*/, 
-                            minCosine, maxCosine,
-                            minRank, maxRank, timeout, unit));
-
-                assertEquals(1, itr.size()); // Note: 2nd result pruned by cosine.
-
-                assertTrue(itr.hasNext());
-
-                final IHit<?> hit1 = itr.next();
-
-                if(log.isInfoEnabled())
-                    log.info("hit1:" + hit1);
+            if(log.isInfoEnabled())
+                log.info("hit1:" + hit1);
 
 //                /*
 //                 * Note: with cosine computation only the first hit is visited.
 //                 */
 
-                assertFalse(itr.hasNext());
-
-            }
-
-        } finally {
-
-            indexManager.destroy();
+            assertFalse(itr.hasNext());
 
         }
 

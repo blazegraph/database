@@ -33,8 +33,11 @@ import java.io.OutputStreamWriter;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
+import com.bigdata.counters.format.CounterSetFormat;
 import com.bigdata.counters.query.CounterSetSelector;
 import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
@@ -48,7 +51,6 @@ import com.bigdata.service.IService;
  * Servlet for exposing performance counters.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  *          TODO The SPARQL layer needs to be separated from the core bigdata
  *          layer, with the BigdataContext moving into a servlet package in the
@@ -67,42 +69,13 @@ public class CountersServlet extends BigdataServlet {
      */
     private static final long serialVersionUID = 1L;
     
-//    static private final transient Logger log = Logger.getLogger(CountersServlet.class); 
+    static private final transient Logger log = Logger.getLogger(CountersServlet.class); 
 
     /**
      * 
      */
     public CountersServlet() {
     }
-
-//    /**
-//     * Access to the {@link CounterSet} exposed by this service.
-//     */
-//    private final ICounterSetAccess accessor;
-//    
-//    /**
-//     * The service reference iff one one specified to the ctor (may be null).
-//     */
-//    private final IService service;
-//
-//    /**
-//     * The minimum time before a client can force the re-materialization of the
-//     * {@link CounterSet}. This is designed to limit the impact of the client on
-//     * the service.
-//     * 
-//     * TODO Configuration parameter for {@link #minUpdateLatency}
-//     */
-//    private final long minUpdateLatency = 5000;
-//    
-//    /**
-//     * The last materialized {@link CounterSet}.
-//     */
-//    private volatile CounterSet counterSet = null;
-//
-//    /**
-//     * The timestamp of the last materialized {@link CounterSet}.
-//     */
-//    private volatile long lastTimestamp = 0L;
 
     /**
      * Performance counters
@@ -113,59 +86,20 @@ public class CountersServlet extends BigdataServlet {
     @Override
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
+
+        try {
         
-//        final ByteArrayOutputStream baos = new ByteArrayOutputStream(
-//                2 * Bytes.kilobyte32);
-//
-//        final InputStream is;
-
-//        /*
-//         * If the request uri is one of the pre-declared resources then we send
-//         * that resource.
-//         */
-//        final DeclaredResource decl = allowedClassPathResources.get(req.uri);
-//
-//        if (decl != null) {
-//
-//            // send that resource.
-//            return sendClasspathResource(decl);
-//
-//        }
-
-        /*
-         * Materialization the CounterSet iff necessary or stale.
-         * 
-         * Note: This bit needs to be single threaded to avoid concurrent
-         * requests causing concurrent materialization of the counter set.
-         */
-//        final ICounterSelector counterSelector;
-//        synchronized(this) {
-//            
-//            final long now = System.currentTimeMillis();
-//
-//            final long elapsed = now - lastTimestamp;
-//
-//            if (counterSet == null || elapsed > minUpdateLatency/* ms */) {
-//
-//                counterSet = accessor.getCounters();
-//                
-//            }
-//
-//            counterSelector = new CounterSetSelector(counterSet);
-//
-//        }
-
         // TODO Hook this how? (NSS does not define an IService right now)
         final IService service = null;
         
         final IIndexManager indexManager = getIndexManager();
 
-        if(indexManager instanceof IBigdataFederation) {
-        	
-        	((IBigdataFederation<?>)indexManager).reattachDynamicCounters();
-        	
+        if (indexManager instanceof IBigdataFederation) {
+
+            ((IBigdataFederation<?>) indexManager).reattachDynamicCounters();
+
         }
-        
+
         final CounterSet counterSet = ((ICounterSetAccess) indexManager)
                 .getCounters();
 
@@ -175,15 +109,27 @@ public class CountersServlet extends BigdataServlet {
         /*
          * Obtain a renderer.
          * 
-         * @todo This really should pass in the Accept header and our own list
-         * of preferences and do CONNEG for (X)HMTL vs XML vs text/plain.
-         * 
          * @todo if controller state error then send HTTP_BAD_REQUEST
          * 
          * @todo Write XSL and stylesheet for interactive browsing of the
          * CounterSet XML?
          */
-        final String mimeType = MIME_TEXT_HTML;
+
+        // Do conneg.
+        final String acceptStr = req.getHeader("Accept");
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        final CounterSetFormat format = util
+                .getCounterSetFormat(CounterSetFormat.HTML/* fallback */);
+
+//         final String mimeType = MIME_TEXT_HTML;
+        final String mimeType = format.getDefaultMIMEType();
+
+        if (log.isDebugEnabled())
+            log.debug("\nAccept=" + acceptStr + ",\nformat=" + format
+                    + ", mimeType=" + mimeType);
+
         final IRenderer renderer;
         {
 
@@ -191,13 +137,26 @@ public class CountersServlet extends BigdataServlet {
             final URLQueryModel model = URLQueryModel.getInstance(service,
                     req, resp);
 
+            if (log.isDebugEnabled())
+                log.debug("\nmodel=" + model);
+
             renderer = RendererFactory.get(model, counterSelector, mimeType);
-            
+
+            if (log.isDebugEnabled())
+                log.debug("\nrenderer=" + renderer);
+
         }
 
         resp.setStatus(HTTP_OK);
 
-        resp.setContentType(mimeType + "; charset='" + charset + "'");
+        resp.setContentType(mimeType);
+
+        if (format.hasCharset()) {
+
+            // Note: Binary encodings do not specify charset.
+            resp.setCharacterEncoding(format.getCharset().name());
+
+        }
 
         /*
          * Sets the cache behavior -- the data should be good for up to 60
@@ -224,11 +183,16 @@ public class CountersServlet extends BigdataServlet {
 
             w.flush();
 
-//            is = new ByteArrayInputStream(baos.toByteArray());
+        }
+
+        if (log.isTraceEnabled())
+            log.trace("done");
+        
+        } catch (Throwable t) {
+            
+            BigdataRDFServlet.launderThrowable(t, resp, "");
             
         }
-        
-//        copyStream(is, resp.getOutputStream());
 
     }
     

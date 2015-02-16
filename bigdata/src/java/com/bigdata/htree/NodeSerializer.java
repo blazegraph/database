@@ -253,6 +253,19 @@ public class NodeSerializer {
 		 */
         this.nodeCoder = new DefaultDirectoryPageCoder();
 
+        if (!indexMetadata.getTupleSerializer().getLeafKeysCoder().isDuplicateKeys()) {
+            
+            /*
+             * This constraint *could* be relaxed, but the HTree API presumes
+             * that we can have duplicate keys and this check verifies tha the
+             * keys coder supports duplicate keys.
+             */
+
+            throw new IllegalArgumentException(
+                    "The leaf keys coder for HTree should allow duplicate keys.");
+
+        }
+        
 		/*
 		 * Note: We are using the same leaf coder class as the BTree.
 		 */

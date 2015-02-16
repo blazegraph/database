@@ -28,6 +28,7 @@ package com.bigdata.htree;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.EvictionError;
 import com.bigdata.btree.IEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.cache.IHardReferenceQueue;
@@ -37,13 +38,13 @@ import com.bigdata.cache.IHardReferenceQueue;
  * persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DefaultEvictionListener.java 2547 2010-03-24 20:44:07Z thompsonbry $
  */
 public class DefaultEvictionListener implements
         IEvictionListener {
 
 	private static final Logger log = Logger.getLogger(DefaultEvictionListener.class);
-	
+
+	@Override
     public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
 
         final AbstractPage node = (AbstractPage) ref;
@@ -66,6 +67,22 @@ public class DefaultEvictionListener implements
         }
 
         final AbstractHTree htree = node.htree;
+
+        if (htree.error != null) {
+            /**
+             * This occurs if an error was detected against a mutable view of
+             * the index (the unisolated index view) and the caller has not
+             * discarded the index and caused it to be reloaded from the most
+             * recent checkpoint.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate
+             *      BTree objects if error occurs during eviction </a>
+             */
+            throw new IllegalStateException(AbstractHTree.ERROR_ERROR_STATE,
+                    htree.error);
+        }
+
+        try {
 
         // Note: This assert can be violated for a read-only B+Tree since there
         // is less synchronization.
@@ -152,6 +169,34 @@ public class DefaultEvictionListener implements
 //
 //        }
 
-    }
+        } catch (Throwable e) {
+            
+            if (!htree.readOnly) {
+
+                /**
+                 * If the btree is mutable and an eviction fails, then the index
+                 * MUST be discarded.
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/1005">
+                 *      Invalidate BTree objects if error occurs during eviction
+                 *      </a>
+                 */
+                
+                htree.error = e;
+
+                // Throw as Error.
+                throw new EvictionError(e);
+
+            }
+
+            // Launder the throwable.
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+
+            throw new RuntimeException(e);
+
+        }
+
+	}
 
 }

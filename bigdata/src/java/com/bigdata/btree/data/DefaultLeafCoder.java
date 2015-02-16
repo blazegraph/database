@@ -72,6 +72,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
     private IRabaCoder keysCoder;
     private IRabaCoder valsCoder;
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -89,6 +90,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.write(VERSION0);
@@ -100,6 +102,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
     }
 
     /** Yes. */
+    @Override
     final public boolean isLeafDataCoder() {
         
         return true;
@@ -107,12 +110,14 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
     }
 
     /** No. */
+    @Override
     public boolean isNodeDataCoder() {
 
         return false;
         
     }
 
+    @Override
     public String toString() {
 
         return super.toString() + "{keysCoder=" + keysCoder + ", valsCoder="
@@ -149,12 +154,14 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
     }
 
+    @Override
     public ILeafData decode(final AbstractFixedByteArrayBuffer data) {
 
         return new ReadOnlyLeafData(data, keysCoder, valsCoder);
 
     }
 
+    @Override
     public ILeafData encodeLive(final ILeafData leaf, final DataOutputBuffer buf) {
         
         if (leaf == null)
@@ -469,6 +476,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final ILeafData leaf,
             final DataOutputBuffer buf) {
 
@@ -562,6 +570,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 		 */
         private final int O_rawRecords;
         
+        @Override
         public final AbstractFixedByteArrayBuffer data() {
 
             return b;
@@ -931,6 +940,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         /**
          * Always returns <code>true</code>.
          */
+        @Override
         final public boolean isLeaf() {
 
             return true;
@@ -940,6 +950,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         /**
          * Yes.
          */
+        @Override
         final public boolean isReadOnly() {
             
             return true;
@@ -949,6 +960,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         /**
          * Yes.
          */
+        @Override
         final public boolean isCoded() {
             
             return true;
@@ -958,6 +970,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         /**
          * {@inheritDoc}. This field is cached.
          */
+        @Override
         final public int getKeyCount() {
 
             return nkeys;
@@ -976,24 +989,28 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
         /**
          * For a leaf, the #of values is always the #of keys.
          */
+        @Override
         final public int getValueCount() {
             
             return nkeys;
             
         }
         
+        @Override
         final public boolean hasVersionTimestamps() {
             
             return (flags & FLAG_VERSION_TIMESTAMPS) != 0;
             
         }
 
+        @Override
         final public boolean hasDeleteMarkers() {
 
             return (flags & FLAG_DELETE_MARKERS) != 0;
             
         }
 
+        @Override
         final public boolean hasRawRecords() {
 
             return (flags & FLAG_RAW_RECORDS) != 0;
@@ -1006,6 +1023,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 //            
 //        }
 
+        @Override
         public long getMinimumVersionTimestamp() {
 
             if (!hasVersionTimestamps())
@@ -1016,6 +1034,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
+        @Override
         public long getMaximumVersionTimestamp() {
 
             if (!hasVersionTimestamps())
@@ -1025,6 +1044,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
+        @Override
         final public long getVersionTimestamp(final int index) {
 
             if (!hasVersionTimestamps())
@@ -1070,6 +1090,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
+        @Override
         final public boolean getDeleteMarker(final int index) {
 
             if (!hasDeleteMarkers())
@@ -1079,6 +1100,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 
         }
 
+        @Override
         final public long getRawRecord(final int index) {
 
             if (!hasRawRecords())
@@ -1238,18 +1260,21 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 //
 //		}
 
+        @Override
 		final public IRaba getKeys() {
             
             return keys;
             
         }
 
+        @Override
         final public IRaba getValues() {
 
             return vals;
             
         }
 
+        @Override
         public String toString() {
 
             final StringBuilder sb = new StringBuilder();
@@ -1272,6 +1297,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
          * Return <code>true</code> if the leaf encodes the address or the prior and
          * next leaves.
          */
+        @Override
         public final boolean isDoubleLinked() {
 
             return b.getByte(0) == LINKED_LEAF;
@@ -1325,6 +1351,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
 //
 //        }
 
+        @Override
         public final long getPriorAddr() {
             
             if(!isDoubleLinked())
@@ -1334,6 +1361,7 @@ public class DefaultLeafCoder implements IAbstractNodeDataCoder<ILeafData>,
             
         }
         
+        @Override
         public final long getNextAddr() {
             
             if(!isDoubleLinked())

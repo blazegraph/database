@@ -64,8 +64,13 @@ public interface IGASEngine {
      */
     void shutdownNow();
 
+    /**
+     * The parallelism for the SCATTER and GATHER phases.
+     */
+    int getNThreads();
+
     /*
-     * TODO This is a problem since we then need to scope the SailConnection
+     * Note: This is a problem since we then need to scope the SailConnection
      * internally.
      */
 //    /**

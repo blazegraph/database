@@ -65,6 +65,7 @@ final class QueryIdHint extends AbstractQueryHint<UUID> {
 
     @Override
     public void handle(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final UUID value) {
 
         /*

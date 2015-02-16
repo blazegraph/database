@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Iterator;
+
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -67,6 +69,9 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+
+import static org.junit.Assert.*;
+import static org.hamcrest.CoreMatchers.*;
 
 /**
  * Test suite for {@link ASTBottomUpOptimizer}.
@@ -862,7 +867,67 @@ public class TestASTBottomUpOptimizer extends
         assertEquals(expected, queryRoot);
         
     }
+    
+    /**
+     * Tests ill-designed patterns with OPTIONAL nested UNION and
+     * non well designed variable being properly replaced through
+     * subquery. Test case motivated by ticket #1087 (query structurally
+     * equals the query in the test case). 
+     * 
+     * Note that in the query below, variable ?o1 is bound in the outer
+     * join and in the innermost OPTIONAL, but not inside the UNION. This
+     * query is not well designed. Hence, the {@link ASTBottomUpOptimizer}
+     * replaces the inner OPTIONAL pattern through a named subquery (which 
+     * did not properly work for OPTIONAL clauses nested inside UNIONs,
+     * cf. ticket #1078). The test case checks for the presence of such
+     * a {@link NamedSubqueryInclude} in the rewritten query.
+     * 
+     * @throws MalformedQueryException
+     */
+    public void test_illDesignedOptUnionCombo() throws MalformedQueryException {
 
+        String queryStr = 
+            "SELECT * WHERE {" +
+            "  ?s <http://example/p1> ?o1 . " +
+            "  { ?s <http://p2> ?o2 } " +
+            "  UNION " +
+            "  { " +
+            "    ?s <http://p3> ?o3 . " +
+            "    OPTIONAL { ?s <http://p1> ?o1 } " +
+            "  }" +
+            "}";
+       
+        /*
+         * Add the Values used in the query to the lexicon. This makes it
+         * possible for us to explicitly construct the expected AST and
+         * the verify it using equals().
+         */
+        final BigdataValueFactory f = store.getValueFactory();
+        final BigdataURI p1 = f.createURI("http://example/p1");
+        final BigdataURI p2 = f.createURI("http://example/p2");
+        final BigdataURI p3 = f.createURI("http://example/p3");
+        final BigdataValue[] values = new BigdataValue[] { p1, p2, p3 };
+        store.getLexiconRelation().
+            addTerms(values, values.length, false/* readOnly */);
+
+        final ASTContainer astContainer = 
+            new Bigdata2ASTSPARQLParser(store).parseQuery2(queryStr, baseURI);
+
+        final AST2BOpContext context = new AST2BOpContext(astContainer, store);
+
+        QueryRoot queryRoot = astContainer.getOriginalAST();
+
+        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().
+            optimize(context, queryRoot, null/* bindingSets */);
+
+        final Iterator<NamedSubqueryInclude> itr = BOpUtility.visitAll(
+            queryRoot.getWhereClause(), NamedSubqueryInclude.class);
+        
+        assertTrue(itr.hasNext());
+        assertThat(null, is(not(itr.next())));
+        assertFalse(itr.hasNext());
+    }
+    
     /**
      * This test is be based on <code>Filter-nested - 2</code> (Filter on
      * variable ?v which is not in scope).

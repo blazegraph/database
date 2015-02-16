@@ -32,8 +32,6 @@ import java.util.Iterator;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounter;
 import com.bigdata.counters.PeriodEnum;
@@ -43,11 +41,10 @@ import com.bigdata.counters.store.CounterSetBTree;
  * Reads the relevant performance counter data from the store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class CounterSetBTreeSelector implements ICounterSelector {
 
-    protected static final Logger log = Logger.getLogger(CounterSetBTreeSelector.class);
+//    private static final Logger log = Logger.getLogger(CounterSetBTreeSelector.class);
     
     private final CounterSetBTree btree;
     
@@ -65,9 +62,12 @@ public class CounterSetBTreeSelector implements ICounterSelector {
         
     }
 
+    @Override
+    @SuppressWarnings("rawtypes")
     public ICounter[] selectCounters(final int depth, final Pattern pattern,
-            final long fromTime, final long toTime, final PeriodEnum period) {
-        
+            final long fromTime, final long toTime, final PeriodEnum period,
+            final boolean historyRequiredIsIgnored) {
+
         final CounterSet counterSet = btree.rangeIterator(fromTime, toTime,
                 period.toTimeUnit(), pattern, depth);
 

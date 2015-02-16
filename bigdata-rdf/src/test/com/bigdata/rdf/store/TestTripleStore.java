@@ -43,6 +43,7 @@ import org.openrdf.model.impl.BNodeImpl;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
@@ -50,7 +51,9 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.DumpLexicon;
+import com.bigdata.rdf.lexicon.Id2TermWriteProc;
 import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.lexicon.Term2IdWriteProc;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -1453,6 +1456,137 @@ public class TestTripleStore extends AbstractTripleStoreTestCase {
 
     }
 
+    /**
+     * Unit test of the batched parallel resolution of triple patterns.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/866" > Efficient batch
+     *      remove of a collection of triple patterns </a>
+     */
+    public void test_getStatementsUsingTriplePatterns() {
+        
+        final Properties properties = super.getProperties();
+
+        // override the default axiom model.
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.AXIOMS_CLASS,
+                NoAxioms.class.getName());
+
+        final AbstractTripleStore store = getStore(properties);
+
+        try {
+
+            // verify nothing in the store.
+            assertSameIterator(new Statement[] {}, store.getAccessPath(NULL,
+                    NULL, NULL).iterator());
+
+            final BigdataValueFactory f = store.getValueFactory();
+
+            final BigdataURI A = f.createURI("http://www.bigdata.com/A");
+            final BigdataURI B = f.createURI("http://www.bigdata.com/B");
+            final BigdataURI C = f.createURI("http://www.bigdata.com/C");
+            final BigdataURI Person = f.asValue(FOAF.PERSON);
+            final BigdataURI rdfType = f.asValue(RDF.TYPE);
+            final BigdataURI foafKnows = f.asValue(FOAF.KNOWS);
+
+            {
+
+                final IStatementBuffer<Statement> buffer = new StatementBuffer<Statement>(
+                        store, 100);
+
+                buffer.add(A, rdfType, Person);
+                buffer.add(B, rdfType, Person);
+                buffer.add(C, rdfType, Person);
+                
+                buffer.add(A, foafKnows, B);
+                buffer.add(B, foafKnows, A);
+                buffer.add(B, foafKnows, C);
+                buffer.add(C, foafKnows, B);
+
+                buffer.flush();
+            
+            }
+
+            // Empty input.
+            {
+                final BigdataTriplePattern[] triplePatterns = new BigdataTriplePattern[] {};
+                assertSameStatements(
+                        new Statement[] {//
+                        },//
+                        store.getStatements(new ChunkedArrayIterator<BigdataTriplePattern>(
+                                triplePatterns)));
+            }
+
+            // Single pattern matching one statement.
+            {
+                final BigdataTriplePattern[] triplePatterns = new BigdataTriplePattern[] {//
+                    new BigdataTriplePattern(A, rdfType, null),//
+                };
+                assertSameStatements(
+                        new Statement[] {//
+                        new StatementImpl(A, rdfType, Person),//
+                        },//
+                        store.getStatements(new ChunkedArrayIterator<BigdataTriplePattern>(
+                                triplePatterns)));
+            }
+
+            // Single pattern matching three statements.
+            {
+                final BigdataTriplePattern[] triplePatterns = new BigdataTriplePattern[] {//
+                    new BigdataTriplePattern(null, rdfType, Person),//
+                };
+                assertSameStatements(
+                        new Statement[] {//
+                                new StatementImpl(A, rdfType, Person),//
+                                new StatementImpl(B, rdfType, Person),//
+                                new StatementImpl(C, rdfType, Person),//
+                        },//
+                        store.getStatements(new ChunkedArrayIterator<BigdataTriplePattern>(
+                                triplePatterns)));
+            }
+
+            // Two patterns matching various statements.
+            {
+                final BigdataTriplePattern[] triplePatterns = new BigdataTriplePattern[] {//
+                        new BigdataTriplePattern(A, foafKnows, null),//
+                        new BigdataTriplePattern(null, rdfType, Person),//
+                };
+                assertSameIteratorAnyOrder(
+                        new Statement[] {//
+                                new StatementImpl(A, foafKnows, B),//
+                                new StatementImpl(A, rdfType, Person),//
+                                new StatementImpl(B, rdfType, Person),//
+                                new StatementImpl(C, rdfType, Person),//
+                        },//
+                        store.getStatements(new ChunkedArrayIterator<BigdataTriplePattern>(
+                                triplePatterns)));
+            }
+
+            // Three patterns, two of which match various statements.
+            {
+                final BigdataTriplePattern[] triplePatterns = new BigdataTriplePattern[] {//
+                        new BigdataTriplePattern(A, foafKnows, null),//
+                        new BigdataTriplePattern(null, rdfType, Person),//
+                        new BigdataTriplePattern(rdfType, foafKnows, null),// no match
+                };
+                assertSameIteratorAnyOrder(
+                        new Statement[] {//
+                                new StatementImpl(A, foafKnows, B),//
+                                new StatementImpl(A, rdfType, Person),//
+                                new StatementImpl(B, rdfType, Person),//
+                                new StatementImpl(C, rdfType, Person),//
+                        },//
+                        store.getStatements(new ChunkedArrayIterator<BigdataTriplePattern>(
+                                triplePatterns)));
+            }
+
+        } finally {
+            
+            store.__tearDownUnitTest();
+            
+        }
+        
+    }
+    
     private String getVeryLargeURI() {
 
         final int len = 1024000;

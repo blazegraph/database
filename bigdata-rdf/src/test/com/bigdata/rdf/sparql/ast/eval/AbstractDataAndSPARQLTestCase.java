@@ -83,16 +83,26 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 
 public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluationTestCase {
 
+    public AbstractDataAndSPARQLTestCase() {
+    }
+
+    public AbstractDataAndSPARQLTestCase(final String name) {
+        super(name);
+    }
+
 	public class AbsHelper {
 
 		protected final String queryStr;
+		
 		/**
 		 * This is the astContainer of the last query executed.
 		 */
 		protected ASTContainer astContainer;
 
-		public AbsHelper(String queryStr) {
-            this.queryStr = queryStr;
+		public AbsHelper(final String queryStr) {
+
+		    this.queryStr = queryStr;
+		    
 		}
 
 		protected AbstractTripleStore getTripleStore() {
@@ -101,16 +111,33 @@ public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluatio
 		    
 		}
 
-		protected void compareTupleQueryResults(final TupleQueryResult queryResult, final TupleQueryResult expectedResult, final boolean checkOrder)
-				throws QueryEvaluationException {
-					AbstractQueryEngineTestCase.compareTupleQueryResults(getName(),
-							"", store, astContainer, queryResult, expectedResult,
-							false, checkOrder);
-				}
+        protected void compareTupleQueryResults(
+                final TupleQueryResult queryResult,
+                final TupleQueryResult expectedResult, final boolean checkOrder)
+                throws QueryEvaluationException {
 
+            AbstractQueryEngineTestCase.compareTupleQueryResults(getName(), "",
+                    store, astContainer, queryResult, expectedResult, false,
+                    checkOrder);
+            
+        }
 
-		long loadData(final InputStream is, RDFFormat format, String uri) {
-			final RDFParser rdfParser = RDFParserRegistry.getInstance().get(format).getParser();
+        /**
+         * Load data from an input stream.
+         * 
+         * @param is
+         *            The stream (required).
+         * @param format
+         *            The format (required).
+         * @param uri
+         *            The baseURL (required).
+         * @return The #of triples read from the stream.
+         */
+        long loadData(final InputStream is, final RDFFormat format,
+                final String uri) {
+
+            final RDFParser rdfParser = RDFParserRegistry.getInstance()
+                    .get(format).getParser();
 
             rdfParser.setValueFactory(store.getValueFactory());
 
@@ -122,7 +149,12 @@ public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluatio
 
             final AddStatementHandler handler = new AddStatementHandler();
 
-			handler.setContext(new URIImpl(uri));
+            if (getTripleStore().isQuads()) {
+
+                // Set the default context.
+                handler.setContext(new URIImpl(uri));
+
+            }
             
             rdfParser.setRDFHandler(handler);
                         
@@ -170,7 +202,7 @@ public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluatio
 
             public AddStatementHandler() {
 
-                buffer = new StatementBuffer<Statement>(store, 100/* capacity */);
+                buffer = new StatementBuffer<Statement>(store, 1000/* capacity */);
 
             }
 
@@ -180,6 +212,7 @@ public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluatio
                 
             }
             
+            @Override
             public void handleStatement(final Statement stmt)
                     throws RDFHandlerException {
 
@@ -212,13 +245,6 @@ public abstract class AbstractDataAndSPARQLTestCase extends AbstractASTEvaluatio
 
         }
 
-	}
-
-	public AbstractDataAndSPARQLTestCase() {
-	}
-
-	public AbstractDataAndSPARQLTestCase(String name) {
-		super(name);
 	}
 
 }

@@ -17,6 +17,7 @@ package com.bigdata.rdf.graph.util;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailException;
@@ -73,6 +74,13 @@ public class SailGraphLoader extends GraphLoader {
 
         }
 
+    }
+
+    @Override
+    protected ValueFactory getValueFactory() {
+
+        return null;
+        
     }
 
 }

@@ -35,8 +35,6 @@ import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
 import com.bigdata.rdf.graph.impl.GASStats;
 
-import cutthecrap.utils.striterators.IStriterator;
-
 /**
  * Test class for GATHER.
  * 
@@ -87,21 +85,7 @@ public class TestGather extends AbstractSailGraphTestCase {
         public EdgesEnum getScatterEdges() {
             return EdgesEnum.NoEdges;
         }
-
-        /**
-         * {@inheritDoc}
-         * <p>
-         * Overridden to only visit the edges of the graph.
-         */
-        @Override
-        public IStriterator constrainFilter(
-                final IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> ctx,
-                final IStriterator itr) {
-
-            return itr.addFilter(getEdgeOnlyFilter(ctx));
-
-        }
-
+        
         @Override
         public Factory<Value, Set<Statement>> getVertexStateFactory() {
             return new Factory<Value, Set<Statement>>() {

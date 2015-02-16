@@ -18,6 +18,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.solutions.SliceOp.Annotations;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
@@ -33,7 +34,8 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * <p>
  * Computing the value expressions first is not only an efficiency, but is also
  * required in order to detect type errors. When a type error is detected for a
- * value expression the corresponding input solution is dropped. Since the
+ * value expression the corresponding input solution is kept but with no new 
+ * bindings, see trac-765. Since the
  * computed value expressions must become bound on the solutions to be sorted,
  * the caller is responsible for wrapping any value expression more complex than
  * a variable or a constant with an {@link IBind} onto an anonymous variable.
@@ -102,6 +104,11 @@ public class MemorySortOp extends SortOp {
                     + "=" + isLastPassRequested());
         }
         
+        // ORDER_BY must preserve order.
+        if (isReorderSolutions())
+            throw new UnsupportedOperationException(
+                    Annotations.REORDER_SOLUTIONS + "=" + isReorderSolutions());
+
         // required parameter.
         getValueComparator();
         
@@ -284,13 +291,8 @@ public class MemorySortOp extends SortOp {
 
                         } catch (SparqlTypeErrorException ex) {
 
-                            // drop solution with type error.
+                            // log type error, do not drop solution (see trac 765).
                             TypeErrorLog.handleTypeError(ex, expr, stats);
-//                            if (log.isInfoEnabled())
-//                                log.info("Dropping solution due to type error: "
-//                                        + bset);
-                            
-                            continue;
                             
                         }
 

@@ -40,10 +40,9 @@ import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
 import com.bigdata.rdf.graph.impl.GASStats;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.SPO;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Test class for GATHER.
@@ -94,20 +93,6 @@ public class TestGather extends AbstractBigdataGraphTestCase {
         @Override
         public EdgesEnum getScatterEdges() {
             return EdgesEnum.NoEdges;
-        }
-
-        /**
-         * {@inheritDoc}
-         * <p>
-         * Overridden to only visit the edges of the graph.
-         */
-        @Override
-        public IStriterator constrainFilter(
-                final IGASContext<Set<Statement>, Set<Statement>, Set<Statement>> ctx,
-                final IStriterator itr) {
-
-            return itr.addFilter(getEdgeOnlyFilter(ctx));
-
         }
 
         @Override
@@ -232,6 +217,8 @@ public class TestGather extends AbstractBigdataGraphTestCase {
         
         }
 
+        final BigdataValueFactory vf = (BigdataValueFactory) getGraphFixture()
+                .getSail().getValueFactory();
         // gather in-edges for :mike
         {
             
@@ -283,7 +270,7 @@ public class TestGather extends AbstractBigdataGraphTestCase {
      * @throws Exception 
      */
     protected void doGatherTest(final EdgesEnum gatherEdges,
-            final Set<Statement> expected, final Value startingVertex)
+            final Set<? extends Statement> expected, final Value startingVertex)
             throws Exception {
 
         final IGASEngine gasEngine = getGraphFixture()

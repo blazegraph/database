@@ -48,12 +48,12 @@ public class TextRenderer implements IRenderer {
     /**
      * Describes the state of the controller.
      */
-    public final URLQueryModel model;
+    private final URLQueryModel model;
 
     /**
      * Selects the counters to be rendered.
      */
-    final ICounterSelector counterSelector;
+    private final ICounterSelector counterSelector;
 
     /**
      * @param model
@@ -77,7 +77,8 @@ public class TextRenderer implements IRenderer {
 
     }
 
-    public void render(Writer w) throws IOException {
+    @Override
+    public void render(final Writer w) throws IOException {
 
         final IRenderer renderer;
 
@@ -85,8 +86,10 @@ public class TextRenderer implements IRenderer {
         
         case correlated: {
         
-            final ICounter[] counters = counterSelector.selectCounters(model.depth,
-                    model.pattern, model.fromTime, model.toTime, model.period);
+            @SuppressWarnings("rawtypes")
+            final ICounter[] counters = counterSelector.selectCounters(
+                    model.depth, model.pattern, model.fromTime, model.toTime,
+                    model.period, true/* historyRequired */);
             
             final HistoryTable historyTable = new HistoryTable(counters,
                     model.period);
@@ -100,9 +103,11 @@ public class TextRenderer implements IRenderer {
         
         case pivot: {
             
-            final ICounter[] counters = counterSelector.selectCounters(model.depth,
-                    model.pattern, model.fromTime, model.toTime, model.period);
-            
+            @SuppressWarnings("rawtypes")
+            final ICounter[] counters = counterSelector.selectCounters(
+                    model.depth, model.pattern, model.fromTime, model.toTime,
+                    model.period, true/* historyRequired */);
+
             final HistoryTable historyTable = new HistoryTable(counters,
                     model.period);
             

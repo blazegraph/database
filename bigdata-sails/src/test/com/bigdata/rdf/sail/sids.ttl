@@ -1,0 +1,19 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix bigdata: <http://www.bigdata.com/rdf#> .
+@prefix myns: <http://mynamespace.com#> .
+
+<http://localhost/host1> rdf:type <http://domainnamespace.com/host#Host> .
+<<<http://localhost/host1> rdf:type <http://domainnamespace.com/host#Host>>> myns:creator <http://1.com> .
+<<<http://localhost/host1> rdf:type <http://domainnamespace.com/host#Host>>> myns:creator <http://2.com> .
+
+<http://localhost/host1> myns:connectedTo <http://localhost/switch1> .
+<<<http://localhost/host1> myns:connectedTo <http://localhost/switch1>>> myns:creator <http://1.com> .
+
+<http://localhost/host1> myns:connectedTo <http://localhost/switch2> .
+<<<http://localhost/host1> myns:connectedTo <http://localhost/switch2>>> myns:creator <http://2.com> .
+
+<http://localhost/switch1> rdf:type <http://domainnamespace.com/san#Switch> .
+<<<http://localhost/switch1> rdf:type <http://domainnamespace.com/san#Switch>>> myns:creator <http://1.com> .
+
+<http://localhost/switch2> rdf:type <http://domainnamespace.com/san#Switch> .
+<<<http://localhost/switch2> rdf:type <http://domainnamespace.com/san#Switch>>> myns:creator <http://2.com> .

@@ -32,6 +32,12 @@ import java.util.UUID;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 
+/**
+ * FIXME This test suite has known limitations and the utility class that it
+ * tests needs a code review and revision.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
 public class TestHA3DumpLogs extends AbstractHA3JournalServerTestCase {
 
     @Override

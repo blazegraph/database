@@ -56,10 +56,13 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksRequest;
 import com.bigdata.ha.msg.IHALogRootBlocksResponse;
 import com.bigdata.ha.msg.IHARebuildRequest;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
@@ -846,32 +849,20 @@ public class MockQuorumFixture {
                 fixture.memberAdd(serviceId);
             }
 
-            protected void doMemberRemove() {
-                fixture.memberRemove(serviceId);
-            }
-
             protected void doCastVote(final long lastCommitTime) {
                 fixture.castVote(serviceId, lastCommitTime);
-            }
-
-            protected void doWithdrawVote() {
-                fixture.withdrawVote(serviceId);
             }
 
             protected void doPipelineAdd() {
                 fixture.pipelineAdd(serviceId);
             }
 
-            protected void doPipelineRemove() {
-                fixture.pipelineRemove(serviceId);
-            }
-
             protected void doServiceJoin() {
                 fixture.serviceJoin(serviceId);
             }
 
-            protected void doServiceLeave() {
-                fixture.serviceLeave(serviceId);
+            protected void doServiceLeave(final UUID service) {
+                fixture.serviceLeave(service);
             }
 
             protected void doSetToken(final long newToken) {
@@ -889,6 +880,21 @@ public class MockQuorumFixture {
             protected void doClearToken() {
                 fixture.clearToken();
             }
+
+			@Override
+			protected void doMemberRemove(UUID service) {
+				fixture.memberRemove(service);
+			}
+
+			@Override
+			protected void doWithdrawVote(UUID service) {
+				fixture.withdrawVote(service);
+			}
+
+			@Override
+			protected void doPipelineRemove(UUID service) {
+				fixture.pipelineRemove(service);
+			}
 
 //            /**
 //             * {@inheritDoc}
@@ -1302,7 +1308,8 @@ public class MockQuorumFixture {
 
             @Override
             public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                    IHAWriteMessage msg) throws IOException {
+                    final IHASendState snd, IHAWriteMessage msg)
+                    throws IOException {
                 throw new UnsupportedOperationException();
             }
 
@@ -1327,6 +1334,12 @@ public class MockQuorumFixture {
             @Override
             public IHAWriteSetStateResponse getHAWriteSetState(
                     IHAWriteSetStateRequest req) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Future<IHAPipelineResetResponse> resetPipeline(
+                    IHAPipelineResetRequest req) throws IOException {
                 throw new UnsupportedOperationException();
             }
 

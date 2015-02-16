@@ -1,0 +1,20 @@
+# LUBM Q9.  
+PREFIX ub: <http://www.lehigh.edu/~zhp2/2004/0401/univ-bench.owl#>
+#SELECT ?x ?y ?z
+SELECT (COUNT(*) as ?count)
+WHERE {
+
+  # Control all RTO parameters for repeatable behavior.
+  hint:Group hint:optimizer "Runtime".
+  hint:Group hint:RTO-sampleType "DENSE".
+  hint:Group hint:RTO-limit "100".
+  hint:Group hint:RTO-nedges "1".
+
+  ?x a ub:Student .          # v0
+  ?y a ub:Faculty .           # v1
+  ?z a ub:Course .           # v2
+  ?x ub:advisor ?y .         # v3
+  ?y ub:teacherOf ?z .     # v4
+  ?x ub:takesCourse ?z . # v5
+
+}

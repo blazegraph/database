@@ -41,8 +41,6 @@ import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.JiniCoreServi
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.LookupStarter;
 import com.bigdata.util.config.NicUtil;
-import com.bigdata.service.jini.util.LookupStarter;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * Class for starting the jini services.
@@ -149,8 +147,8 @@ public class JiniCoreServicesProcessHelper extends ProcessHelper {
          */
         final ServiceRegistrar[] registrars = JiniCoreServicesConfiguration
                 .getServiceRegistrars(Integer.MAX_VALUE/* maxCount */,
-                        clientConfig.groups, clientConfig.locators, 1500,
-                        TimeUnit.MILLISECONDS);
+                        clientConfig.groups, clientConfig.locators, 
+                        1500/* timeout */, TimeUnit.MILLISECONDS);
 
         if (log.isInfoEnabled())
             log.info("registrars: #found=" + registrars.length + ", #desired="

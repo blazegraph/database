@@ -31,6 +31,7 @@ import java.util.zip.ZipInputStream;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
@@ -94,6 +95,12 @@ abstract public class GraphLoader {
 
     }
 
+    /**
+     * Return the {@link ValueFactory} that will be set on the {@link RDFParser}
+     * . This is necessary for the RDR parser.
+     */
+    abstract protected ValueFactory getValueFactory();
+    
     /**
      * Load a resource from the classpath, the file system, or a URI. GZ
      * compressed files are decompressed. Directories are processed recursively.
@@ -280,6 +287,14 @@ abstract public class GraphLoader {
 
             rdfParser.setStopAtFirstError(false);
 
+            final ValueFactory vf = getValueFactory();
+
+            if (vf != null) {
+            
+                rdfParser.setValueFactory(vf);
+                
+            }
+
             final AddStatementHandler h = newStatementHandler();
 
             rdfParser.setRDFHandler(h);
@@ -332,6 +347,7 @@ abstract public class GraphLoader {
             this.defaultContext = new Resource[0];
         }
 
+        @Override
         public void handleStatement(final Statement stmt)
                 throws RDFHandlerException {
 

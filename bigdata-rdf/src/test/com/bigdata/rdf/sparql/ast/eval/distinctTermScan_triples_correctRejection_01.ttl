@@ -1,0 +1,7 @@
+@prefix : <http://bigdata.com#> .
+
+:s1 :p1 :s1 . # 
+:s1 :p1 :o2 .
+:s1 :p2 :s3 .
+:s2 :p1 :o4 .
+:s2 :p3 :s2 . #

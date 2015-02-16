@@ -31,8 +31,6 @@ import java.math.BigInteger;
 
 import junit.framework.TestCase2;
 
-import org.semanticweb.yars.nx.dt.numeric.XSDUnsignedByte;
-
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;

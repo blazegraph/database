@@ -40,7 +40,6 @@ import com.bigdata.btree.keys.SuccessorUtil;
  * index order.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
 
@@ -51,6 +50,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
      *       {@link ITupleSerializer#serializeKey(Object)}. For example, this
      *       does not play well with the {@link DefaultTupleSerializer}.
      */
+	@Override
     public byte[] getKey(final IKeyBuilder keyBuilder, final E element) {
         
         keyBuilder.reset();
@@ -72,6 +72,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         
     }
 
+	@Override
     public byte[] getFromKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 
@@ -105,6 +106,7 @@ abstract public class AbstractKeyOrder<E> implements IKeyOrder<E> {
         
     }
 
+	@Override
     public byte[] getToKey(final IKeyBuilder keyBuilder,
             final IPredicate<E> predicate) {
 

@@ -61,6 +61,27 @@ public interface IPreparedQuery {
     void setAcceptHeader(String value);
     
     /**
+     * Specify the maximum time in milliseconds that the query will be permitted
+     * to run. A negative or zero value indicates an unlimited query time (which
+     * is the default).
+     * 
+     * @param millis
+     *            The timeout in milliseconds.
+     * 
+     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     */
+    void setMaxQueryMillis(long millis);
+ 
+    /**
+     * Return the maximum time in milliseconds that the query will be permitted
+     * to run. A negative or zero value indicates an unlimited query time (which
+     * is the default).
+     * 
+     * @return The timeout in milliseceonds.
+     */
+    long getMaxQueryMillis();
+    
+    /**
      * Return the value of the specified HTTP header.
      * 
      * @param name

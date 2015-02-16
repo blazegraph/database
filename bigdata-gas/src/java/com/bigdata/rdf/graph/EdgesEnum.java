@@ -83,4 +83,27 @@ public enum EdgesEnum {
         }
     }
 
+    /**
+     * Promote an {@link EdgesEnum} value that was specified with the assumption
+     * that the graph is directed into an {@link EdgesEnum} value that should be
+     * used when the graph is undirected. There is no change for
+     * {@link #NoEdges} and {@link #AllEdges}. If the value is either
+     * {@link #InEdges} or {@link #OutEdges} then it is promoted to
+     * {@link #AllEdges}.
+     */
+    public EdgesEnum asUndirectedTraversal() {
+        switch (this) {
+        case NoEdges:
+        case AllEdges:
+            // No change.
+            return this;
+        case InEdges: 
+        case OutEdges:
+            // promote to AllEdges.
+            return AllEdges;
+        default:
+            throw new UnsupportedOperationException();
+        }
+    }
+    
 }

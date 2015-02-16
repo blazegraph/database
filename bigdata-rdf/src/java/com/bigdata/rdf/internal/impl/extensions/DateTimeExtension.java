@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal.impl.extensions;
 
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -52,6 +53,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.util.InnerCause;
 
 /**
  * This implementation of {@link IExtension} implements inlining for literals
@@ -87,16 +89,17 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
     }
     
     private void resolve(final IDatatypeURIResolver resolver, final URI uri) {
-    	
-    	if (log.isDebugEnabled()) {
-    		log.debug("resolving: " + uri);
-    	}
+
+        if (log.isDebugEnabled()) {
+            log.debug("resolving: " + uri);
+        }
     	
         final BigdataURI val = resolver.resolve(uri);
         datatypes.put(val.getIV(), val);
         
     }
-        
+
+    @Override
     public Set<BigdataURI> getDatatypes() {
         
         return new LinkedHashSet<BigdataURI>(datatypes.values());
@@ -138,18 +141,24 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(s);
         
         if (c.getTimezone() == DatatypeConstants.FIELD_UNDEFINED) {
+            final GregorianCalendar gc = c.toGregorianCalendar();
+            gc.setGregorianChange(new Date(Long.MIN_VALUE));
+            
             final int offsetInMillis = 
 //                defaultTZ.getRawOffset();
-                defaultTZ.getOffset(c.toGregorianCalendar().getTimeInMillis());
+                defaultTZ.getOffset(gc.getTimeInMillis());
             final int offsetInMinutes = 
                 offsetInMillis / 1000 / 60;
             c.setTimezone(offsetInMinutes);
         }
 
+        final GregorianCalendar gc = c.toGregorianCalendar();
+        gc.setGregorianChange(new Date(Long.MIN_VALUE));
+        
         /*
          * Returns the current time as UTC milliseconds from the epoch
          */
-        final long l = c.toGregorianCalendar().getTimeInMillis();
+        final long l = gc.getTimeInMillis();
 
         final AbstractLiteralIV delegate = new XSDNumericIV(l);
 
@@ -176,14 +185,16 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final TimeZone tz = BSBMHACK ? TimeZone.getDefault()/*getTimeZone("GMT")*/ : defaultTZ;
         final GregorianCalendar c = new GregorianCalendar(tz);
+        c.setGregorianChange(new Date(Long.MIN_VALUE));
         c.setTimeInMillis(l);
         
         try {
             
             final BigdataURI dt = datatypes.get(iv.getExtensionIV());
             
-            final XMLGregorianCalendar xmlGC = 
-                DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
+            final DatatypeFactory f = datatypeFactorySingleton;
+
+            final XMLGregorianCalendar xmlGC = f.newXMLGregorianCalendar(c);
 
             String s = xmlGC.toString();
             if (dt.equals(XSD.DATETIME)) {
@@ -219,12 +230,45 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
             
             return (V) vf.createLiteral(s, dt);
 
-        } catch (DatatypeConfigurationException ex) {
+        } catch (RuntimeException ex) {
+
+            if (InnerCause.isInnerCause(ex, InterruptedException.class)) {
+
+                throw ex;
+
+            }
             
             throw new IllegalArgumentException("bad iv: " + iv, ex);
             
         }
+
+    }
+
+    /** Singleton. */
+    private static final DatatypeFactory datatypeFactorySingleton;
+
+    /**
+     * Singleton caching pattern for the Datatype factory reference.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/802">
+     *      Optimize DatatypeFactory instantiation in DateTimeExtension </a>
+     */
+    static {
+
+        DatatypeFactory f = null;
         
+        try {
+
+            f = DatatypeFactory.newInstance();
+
+        } catch (DatatypeConfigurationException ex) {
+
+            log.error("Could not configure DatatypeFactory: " + ex, ex);
+
+        }
+
+        datatypeFactorySingleton = f;
+
     }
 
     /**
@@ -234,5 +278,5 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/277
      */
     static private transient boolean BSBMHACK = Boolean.getBoolean("BSBM_HACK");
-    
+
 }

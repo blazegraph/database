@@ -1,0 +1,35 @@
+<http://www.example.com/person1> <http://www.example.org/schema/age> "39"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<http://www.example.com/person1> <http://www.example.org/schema/name> "Person #1"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/person1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Person> .
+
+<http://www.example.com/person2> <http://www.example.org/schema/age> "29"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<http://www.example.com/person2> <http://www.example.org/schema/name> "Person #2"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/person2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Person> .
+
+<http://www.example.com/person3> <http://www.example.org/schema/age> "19"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<http://www.example.com/person3> <http://www.example.org/schema/name> "Person #3"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/person3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Person> .
+
+<http://www.example.com/post1> <http://www.example.org/schema/content> "Post 1 content"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/post1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Post> .
+<http://www.example.com/post1> <http://www.example.org/schema/postedBy> <http://www.example.com/person1>.
+
+<http://www.example.com/post2> <http://www.example.org/schema/content> "Post 2 content"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/post2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Post> .
+<http://www.example.com/post2> <http://www.example.org/schema/postedBy> <http://www.example.com/person1>.
+
+<http://www.example.com/comment1> <http://www.example.org/schema/content> "Comment 1 content"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/comment1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Comment> .
+<http://www.example.com/comment1> <http://www.example.org/schema/parentPost> <http://www.example.com/post1> .
+<http://www.example.com/comment1> <http://www.example.org/schema/postedBy> <http://www.example.com/person2>.
+
+<http://www.example.com/comment2> <http://www.example.org/schema/content> "Comment 2 content"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://www.example.com/comment2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.example.org/schema/Comment> .
+<http://www.example.com/comment2> <http://www.example.org/schema/parentPost> <http://www.example.com/post1> .
+<http://www.example.com/comment2> <http://www.example.org/schema/postedBy> <http://www.example.com/person3>.
+
+
+
+
+
+

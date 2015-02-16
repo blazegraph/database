@@ -32,7 +32,6 @@ package com.bigdata.rdf.sparql.ast.service;
  * Additional options for native services.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface INativeServiceOptions extends IServiceOptions {
 

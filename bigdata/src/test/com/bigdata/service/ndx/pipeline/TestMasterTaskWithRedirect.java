@@ -496,6 +496,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
                 
             }
 
+            @Override
             public Void call() throws Exception {
 
                 final KeyBuilder keyBuilder = new KeyBuilder(4);
@@ -529,7 +530,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
                     }
 
-                    if (Thread.currentThread().isInterrupted()) {
+                    if (Thread.interrupted()) {
 
                         if (log.isInfoEnabled())
                             log.info("Producer interrupted.");
@@ -591,7 +592,7 @@ public class TestMasterTaskWithRedirect extends AbstractMasterTestCase {
 
                 while(!halt.get()) {
                 
-                    if(Thread.currentThread().isInterrupted()) {
+                    if(Thread.interrupted()) {
                         
                         if(log.isInfoEnabled())
                             log.info("Redirecter interrupted.");

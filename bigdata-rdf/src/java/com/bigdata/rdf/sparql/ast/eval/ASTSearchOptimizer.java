@@ -57,19 +57,18 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 
 /**
- * Translate {@link BD#SEARCH} and related magic predicates into a
+ * Translate {@link BDS#SEARCH} and related magic predicates into a
  * {@link ServiceNode} which will invoke the bigdata search engine.
  * 
  * <pre>
  * with {
  *    select ?subj ?score
  *    where {
- *      ?lit bd:search "foo" .
- *      ?lit bd:relevance ?score .
+ *      ?lit bds:search "foo" .
+ *      ?lit bds:relevance ?score .
  *      ?subj ?p ?lit .
  *    }
  *   ORDER BY DESC(?score)
@@ -88,7 +87,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
     /**
      * The known search URIs.
      * <p>
-     * Note: We can recognize anything in {@link BD#SEARCH_NAMESPACE}, but the
+     * Note: We can recognize anything in {@link BDS#SEARCH_NAMESPACE}, but the
      * predicate still has to be something that we know how to interpret.
      */
     static final Set<URI> searchUris;
@@ -109,6 +108,7 @@ public class ASTSearchOptimizer implements IASTOptimizer {
         set.add(BDS.SUBJECT_SEARCH);
         set.add(BDS.SEARCH_TIMEOUT);
         set.add(BDS.MATCH_REGEX);
+        set.add(BDS.RANGE_COUNT);
         
         searchUris = Collections.unmodifiableSet(set);
         

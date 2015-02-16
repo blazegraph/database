@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='s'/>
+        <variable name='p'/>
+        <variable name='o'/>
+        <variable name='user'/>
+    </head>
+    <results>
+        <result>
+            <binding name='s'>
+               <uri>http://arvados.org/schema/modified_at</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+            </binding>
+            <binding name='o'>
+                <uri>http://www.w3.org/2000/01/rdf-schema#Property</uri>
+            </binding>
+            <binding name='user'>
+                <uri>http://qr1hi/user/12345</uri>
+            </binding>
+        </result>
+    </results>
+</sparql>

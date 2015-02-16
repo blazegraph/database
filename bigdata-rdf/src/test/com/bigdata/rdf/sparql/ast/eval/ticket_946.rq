@@ -1,0 +1,4 @@
+SELECT ?x
+{ BIND(1 as ?x) 
+  { SELECT * { FILTER (true) } }
+}

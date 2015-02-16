@@ -71,9 +71,9 @@ import com.bigdata.rawstore.Bytes;
  */
 public class CSVReader implements Iterator<Map<String, Object>> {
 
-    protected static final Logger log = Logger.getLogger(CSVReader.class);
+    private static final Logger log = Logger.getLogger(CSVReader.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
+//    protected static final boolean INFO = log.isInfoEnabled();
     
     /**
      * The #of characters to buffer in the reader.
@@ -168,7 +168,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
         }
 
-        public Header(String name) {
+        public Header(final String name) {
 
             if (name == null)
                 throw new IllegalArgumentException();
@@ -191,13 +191,13 @@ public class CSVReader implements Iterator<Map<String, Object>> {
          *            
          * @return The parsed value.
          */
-        public Object parseValue(String text) {
+        public Object parseValue(final String text) {
 
                 for (int i = 0; i < formats.length; i++) {
 
                 try {
 
-                    Format f = formats[i];
+                    final Format f = formats[i];
 
                     if (f instanceof DateFormat) {
 
@@ -229,23 +229,41 @@ public class CSVReader implements Iterator<Map<String, Object>> {
         /**
          * Equal if the headers have the same data.
          */
-        public boolean equals(Header o) {
-            
-            if(this==o) return true;
-            
-            return name.equals(o.name);
-            
+        @Override
+        public boolean equals(final Object o) {
+
+            if (this == o)
+                return true;
+
+            if (!(o instanceof Header)) {
+
+                return false;
+
+            }
+
+            return name.equals(((Header) o).name);
+
         }
+        
+//        public boolean equals(final Header o) {
+//            
+//            if(this==o) return true;
+//            
+//            return name.equals(o.name);
+//            
+//        }
         
         /**
          * Based on the header name.
          */
+        @Override
         public int hashCode() {
             
             return name.hashCode();
             
         }
 
+        @Override
         public String toString() {
             
             return name;
@@ -293,7 +311,8 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      */
     protected Header[] headers;
 
-    public CSVReader(InputStream is, String charSet) throws IOException {
+    public CSVReader(final InputStream is, final String charSet)
+            throws IOException {
 
         if (is == null)
             throw new IllegalArgumentException();
@@ -306,7 +325,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
     }
 
-    public CSVReader(Reader r) throws IOException {
+    public CSVReader(final Reader r) throws IOException {
 
         if (r == null)
             throw new IllegalArgumentException();
@@ -340,9 +359,9 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
     }
 
-    public boolean setSkipBlankLines(boolean skipBlankLines) {
+    public boolean setSkipBlankLines(final boolean skipBlankLines) {
 
-        boolean tmp = this.skipBlankLines;
+        final boolean tmp = this.skipBlankLines;
 
         this.skipBlankLines = skipBlankLines;
 
@@ -356,9 +375,9 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
     }
 
-    public boolean setTrimWhitespace(boolean trimWhitespace) {
+    public boolean setTrimWhitespace(final boolean trimWhitespace) {
 
-        boolean tmp = this.trimWhitespace;
+        final boolean tmp = this.trimWhitespace;
 
         this.trimWhitespace = trimWhitespace;
 
@@ -384,10 +403,11 @@ public class CSVReader implements Iterator<Map<String, Object>> {
         
     }
     
-    public long setTailDelayMillis(long tailDelayMillis) {
-        
-        if(tailDelayMillis<0) throw new IllegalArgumentException();
-        
+    public long setTailDelayMillis(final long tailDelayMillis) {
+
+        if (tailDelayMillis < 0)
+            throw new IllegalArgumentException();
+
         long tmp = this.tailDelayMillis;
         
         this.tailDelayMillis = tailDelayMillis;
@@ -396,9 +416,11 @@ public class CSVReader implements Iterator<Map<String, Object>> {
         
     }
     
+    @Override
     public boolean hasNext() {
 
-        if(exhausted) return false;
+        if (exhausted)
+            return false;
         
         if (line != null) {
 
@@ -406,17 +428,19 @@ public class CSVReader implements Iterator<Map<String, Object>> {
             
         }
 
-        final Thread currentThread = Thread.currentThread();
+//        final Thread currentThread = Thread.currentThread();
         
         try {
 
             while (true) {
 
-                if(currentThread.isInterrupted()) {
+                if (Thread.interrupted()) {
 
-                    if(INFO)
+                    if (log.isInfoEnabled())
                         log.info("Interrupted");
                     
+                    exhausted = true;
+
                     return false;
                     
                 }
@@ -469,6 +493,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
     }
 
+    @Override
     public Map<String, Object> next() {
 
         if (!hasNext())
@@ -496,9 +521,9 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      * 
      * @todo allow quoted values that contain commas.
      */
-    protected String[] split(String line) {
+    protected String[] split(final String line) {
 
-        String[] cols = line.split("[,\t]");
+        final String[] cols = line.split("[,\t]");
 
         return cols;
 
@@ -513,7 +538,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      * 
      * @return The column values.
      */
-    protected String[] trim(String[] cols) {
+    protected String[] trim(final String[] cols) {
 
         if (!trimWhitespace)
             return cols;
@@ -553,7 +578,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      */
     protected Map<String, Object> parse(final String[] values) {
 
-        Map<String, Object> map = new TreeMap<String, Object>();
+        final Map<String, Object> map = new TreeMap<String, Object>();
 
         if (headers == null) {
        
@@ -571,9 +596,9 @@ public class CSVReader implements Iterator<Map<String, Object>> {
 
         for (int i = 0; i < values.length; i++) {
 
-            Header h = headers[i];
+            final Header h = headers[i];
 
-            String text = values[i];
+            final String text = values[i];
 
             map.put(h.name, h.parseValue(text));
 
@@ -590,14 +615,14 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      * @param ncols
      *            The #of columns.
      */
-    protected void setDefaultHeaders(int ncols) {
+    protected void setDefaultHeaders(final int ncols) {
 
-        Header[] headers = new Header[ncols];
-        
-        for( int i=0; i<ncols; i++) {
-            
-            headers[i] = new Header(""+(i+1));
-            
+        final Header[] headers = new Header[ncols];
+
+        for (int i = 0; i < ncols; i++) {
+
+            headers[i] = new Header("" + (i + 1));
+    
         }
         
         this.headers = headers;
@@ -612,11 +637,11 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      *            
      * @return The header definitions.
      */
-    protected Header[] parseHeaders(String line) {
+    protected Header[] parseHeaders(final String line) {
 
-        String[] cols = trim(split(line));
+        final String[] cols = trim(split(line));
 
-        Header[] headers = new Header[cols.length];
+        final Header[] headers = new Header[cols.length];
 
         for (int i = 0; i < cols.length; i++) {
 
@@ -661,9 +686,10 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      * @param headers
      *            The headers.
      */
-    public void setHeaders(Header[] headers) {
+    public void setHeaders(final Header[] headers) {
 
-        if(headers==null) throw new IllegalArgumentException();
+        if (headers == null)
+            throw new IllegalArgumentException();
         
         this.headers = headers;
 
@@ -677,7 +703,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
      * @param header
      *            The new {@link Header} definition.
      */
-    public void setHeader(int index,Header header) {
+    public void setHeader(final int index, final Header header) {
         
         if (index < 0 || index > headers.length)
             throw new IndexOutOfBoundsException();
@@ -692,6 +718,7 @@ public class CSVReader implements Iterator<Map<String, Object>> {
     /**
      * Unsupported operation.
      */
+    @Override
     public void remove() {
 
         throw new UnsupportedOperationException();

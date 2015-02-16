@@ -47,7 +47,7 @@ public class TestAll extends TestCase {
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public TestAll(final String arg0) {
      
         super(arg0);
         
@@ -113,6 +113,9 @@ public class TestAll extends TestCase {
 
         // high level query optimization and evaluation.
         suite.addTest(com.bigdata.bop.controller.TestAll.suite());
+
+        // join graph processing (RTO, etc).
+        suite.addTest(com.bigdata.bop.joinGraph.TestAll.suite());
 
         /*
          * Note: This is tested later once we have gone through the core unit

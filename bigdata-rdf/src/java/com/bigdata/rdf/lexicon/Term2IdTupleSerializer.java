@@ -118,12 +118,30 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
     }
 
     /**
+     * Return a {@link LexiconKeyBuilder} that is setup with collation strength
+     * PRIMARY.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/974" >
+     *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
+     */
+    public LexiconKeyBuilder getLexiconPrimaryKeyBuilder() {
+        
+        /*
+         * FIXME We should save off a reference to this to reduce heap churn
+         * and then use that reference in this class.
+         */
+        return new LexiconKeyBuilder(getPrimaryKeyBuilder());
+        
+    }
+
+    /**
      * You can not decode the term:id keys since they include Unicode sort keys
      * and that is a lossy transform.
      * 
      * @throws UnsupportedOperationException
      *             always
      */
+    @Override
     public Object deserializeKey(ITuple tuple) {
         
         throw new UnsupportedOperationException();
@@ -136,6 +154,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      * @param obj
      *            The RDF {@link Value}.
      */
+    @Override
     public byte[] serializeKey(Object obj) {
 
         return getLexiconKeyBuilder().value2Key((Value)obj);
@@ -149,6 +168,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      * @param obj
      *            A term identifier expressed as a {@link TermId}.
      */
+    @Override
     public byte[] serializeVal(final Object obj) {
 
         final IV<?,?> iv = (IV<?,?>) obj;
@@ -169,6 +189,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      * De-serializes the {@link ITuple} as a {@link IV} whose value is the
      * term identifier associated with the key. The key itself is not decodable.
      */
+    @Override
     public IV deserialize(final ITuple tuple) {
 
         final ByteArrayBuffer b = tuple.getValueBuffer();
@@ -187,6 +208,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
      */
     private final static transient byte VERSION = VERSION0;
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -204,6 +226,7 @@ public class Term2IdTupleSerializer extends DefaultTupleSerializer {
 
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         super.writeExternal(out);

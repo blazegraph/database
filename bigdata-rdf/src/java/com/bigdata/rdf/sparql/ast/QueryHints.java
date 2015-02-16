@@ -32,6 +32,7 @@ import java.util.UUID;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.IPredicate.Annotations;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.ap.SampleIndex.SampleType;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -41,6 +42,8 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 
 /**
@@ -55,7 +58,9 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
  * @see QueryHintRegistry
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * 
+ * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" > Clean up
+ *      query hints </a>
  */
 public interface QueryHints {
 
@@ -88,6 +93,57 @@ public interface QueryHints {
     String OPTIMIZER = "optimizer";//QueryHints.class.getName() + ".optimizer";
 
     QueryOptimizerEnum DEFAULT_OPTIMIZER = QueryOptimizerEnum.Static;
+
+    /**
+     * The sampling bias for the runtime query optimizer. Dense sampling
+     * maximizes index locality but reduces robustness to correlations that do
+     * not exist in the head of the access path key range. Random sampling
+     * maximizes robustness, but pays a heavy IO cost. Even sampling also
+     * increases robustness, but will visit every Nth tuple and pays a heavy IO
+     * cost as a result. Thus dense sampling should be much faster but random or
+     * even sampling should detect bias that might not otherwise be exposed to
+     * the runtime query optimizer.
+     * 
+     * @see SampleType
+     */
+    String RTO_SAMPLE_TYPE = "RTO-sampleType";
+
+    SampleType DEFAULT_RTO_SAMPLE_TYPE = SampleType.DENSE;
+
+    /**
+     * The limit for sampling a vertex and the initial limit for cutoff join
+     * evaluation (default {@value #DEFAULT_RTO_LIMIT}). A larger limit and a
+     * random sample will provide a more accurate estimate of the cost of the
+     * join paths but are increase the runtime overhead of the RTO optimizer.
+     * Smaller value can lead to underflow in the cardinality estimates of the
+     * cutoff joins resulting in a longer execution time for the RTO since more
+     * paths may be explored or the explored paths must be deepened in order to
+     * differentiate their costs. Values corresponding to up to the expected
+     * number of triples on an index page should have the same IO cost since
+     * there will be a single page read for the vertex and the output of the
+     * join will be cutoff once the desired number of join results has been
+     * produced.
+     */
+    String RTO_LIMIT = "RTO-limit";
+
+    int DEFAULT_RTO_LIMIT = 100;
+
+    /**
+     * The <i>nedges</i> edges of the join graph having the lowest cardinality
+     * will be used to generate the initial join paths (default
+     * {@value #DEFAULT_NEDGES}). This must be a positive integer. The edges in
+     * the join graph are sorted in order of increasing cardinality and up to
+     * <i>nedges</i> of those edges having the lowest cardinality are used to
+     * form the initial set of join paths. For each edge selected to form a join
+     * path, the starting vertex will be the vertex of that edge having the
+     * lower cardinality. If ONE (1), then only those join paths that start with
+     * the two vertices having the lowest cardinality will be explored (this was
+     * the published behavior for ROX). When greater than ONE, a broader search
+     * of the join paths will be carried out.
+     */
+    String RTO_NEDGES = "RTO-nedges";
+
+    int DEFAULT_RTO_NEDGES = 1;
 
     /**
      * Query hint sets the optimistic threshold for the static join order
@@ -286,31 +342,36 @@ public interface QueryHints {
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/283
      */
-    String QUERYID = "queryId";//QueryHints.class.getName() + ".queryId";
+    String QUERYID = "queryId";
 
     /**
      * This query hint may be applied to any {@link IJoinNode} and marks a
      * particular join to be run first among in a particular group. Only one
      * "run first" join is permitted in a given group. This query hint is not
-     * permitted on optional joins.
+     * permitted on optional joins. This hint must be used with
+     * {@link QueryHintScope#Prior}.
      */
-    String RUN_FIRST = "runFirst";//QueryHints.class.getName() + ".runFirst";
+    String RUN_FIRST = "runFirst";
 
     /**
      * This query hint may be applied to any {@link IJoinNode} and marks a
      * particular join to be run last among in a particular group. Only one
-     * "run last" join is permitted in a given group.
+     * "run last" join is permitted in a given group. This hint must be used
+     * with {@link QueryHintScope#Prior}.
      */
-    String RUN_LAST = "runLast";//QueryHints.class.getName() + ".runLast";
+    String RUN_LAST = "runLast";
 
     /**
      * Query hint indicating whether or not a Sub-Select should be transformed
      * into a <em>named subquery</em>, lifting its evaluation out of the main
-     * body of the query and replacing the subquery with an INCLUDE. This is
-     * similar to {@link #AT_ONCE 'at-once'} evaluation, but creates a different
-     * query plan by lifting out a named subquery. It is also only supported for
-     * a Sub-Select. The {@link #AT_ONCE} query hint can be applied to other
-     * things as well.
+     * body of the query and replacing the subquery with an INCLUDE. This hint
+     * must be used with {@link QueryHintScope#SubQuery}.
+     * <p>
+     * This is similar to {@link #AT_ONCE 'atOnce'} evaluation, but creates a
+     * different query plan by lifting out a named subquery. The
+     * {@link #RUN_ONCE} query hint is only supported for
+     * {@link QueryHintScope#SubQuery} while {@link #AT_ONCE} query hint can be
+     * applied to other things as well.
      * <p>
      * When <code>true</code>, the subquery will be lifted out. When
      * <code>false</code>, the subquery will not be lifted unless other
@@ -326,20 +387,23 @@ public interface QueryHints {
      * 
      * @see #AT_ONCE
      */
-    String RUN_ONCE = "runOnce";//QueryHints.class.getName() + ".runOnce";
+    String RUN_ONCE = "runOnce";
 
     /**
      * Query hint indicating whether or not a JOIN (including SERVICE,
-     * SUB-SELECT, etc) should be run as an "at-once" operator. All solutions
-     * for an "at-once" operator are materialized before the operator is
-     * evaluated. It is then evaluated against those materialized solutions
-     * exactly once.
+     * SUB-SELECT, etc) should be run as an "atOnce" operator. All solutions for
+     * an "atOnce" operator are materialized before the operator is evaluated.
+     * It is then evaluated against those materialized solutions exactly once.
      * <p>
-     * Note: "At-once" evaluation is a general property of the query engine.
-     * This query hint does not change the structure of the query plan, but
-     * simply serves as a directive to the query engine that it should buffer
-     * all source solutions before running the operator. This is more general
+     * Note: "atOnce" evaluation is a general property of the query engine. This
+     * query hint does not change the structure of the query plan, but simply
+     * serves as a directive to the query engine that it should buffer all
+     * source solutions before running the operator. This is more general
      * purpose than the {@link #RUN_ONCE} query hint.
+     * <p>
+     * This query hint is allowed in any scope. The hint is transferred as an
+     * annotation onto all query plan operators generated from the annotated
+     * scope.
      * 
      * @see #RUN_ONCE
      * 
@@ -354,11 +418,14 @@ public interface QueryHints {
     String AT_ONCE = "atOnce";
 
     /**
-     * The target chunk (aka vector size) for the operator.
+     * Sets the target chunk size (aka vector size) for the output buffer of the operator.
      * <p>
-     * Note: The vectored query engine will buffer multiple chunks for an
-     * operator before the producer(s) (the operator(s) feeding into the
-     * annotated operator) must block.
+     * This query hint does not change the structure of the query plan, but
+     * simply serves as a directive to the query engine that it should allocate
+     * an output buffer for the operator that will emit chunks of the indicated
+     * target capacity. This query hint is allowed in any scope, but is
+     * generally used to effect the behavior of a join group, a subquery, or the
+     * entire query.
      * 
      * @see BufferAnnotations#CHUNK_CAPACITY
      */
@@ -366,6 +433,14 @@ public interface QueryHints {
     
     /**
      * The maximum parallelism for the operator within the query.
+     * <p>
+     * Note: "maxParallel" evaluation is a general property of the query engine.
+     * This query hint does not change the structure of the query plan, but
+     * simply serves as a directive to the query engine that it should not allow
+     * more than the indicated number of parallel instances of the operator to
+     * execute concurrently. This query hint is allowed in any scope. The hint is
+     * transferred as an annotation onto all query plan operators generated from
+     * the annotated scope.
      * 
      * @see PipelineOp.Annotations#MAX_PARALLEL
      */
@@ -459,7 +534,7 @@ public interface QueryHints {
 	 */
     String REIFICATION_DONE_RIGHT = "reificationDoneRight";
 
-    boolean DEFAULT_REIFICATION_DONE_RIGHT = false;
+    boolean DEFAULT_REIFICATION_DONE_RIGHT = true;
     
     /**
      * Used to mark a predicate as "range safe" - that is, we can safely
@@ -473,8 +548,57 @@ public interface QueryHints {
      * elements (maximum) should be read from its access path.  This
      * effectively limits the input into the join.
      * 
-     * @see {@link Annotations#CUTOFF_LIMIT}.
+     * @see Annotations#CUTOFF_LIMIT
      */
     String CUTOFF_LIMIT = "cutoffLimit";
-        
+ 
+    /**
+     * Used to specify the query plan for FILTER (NOT) EXISTS. There are two
+     * basic plans: vectored sub-plan and subquery with LIMIT ONE. Each plan has
+     * its advantages.
+     * 
+     * @see FilterExistsModeEnum
+     * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for
+     *      FILTER EXISTS </a>
+     */
+    String FILTER_EXISTS = "filterExists";
+
+    /**
+     * Note: The historical behavior up through bigdata release 1.3.1 is
+     * {@link FilterExistsModeEnum#VectoredSubPlan}.
+     */
+    FilterExistsModeEnum DEFAULT_FILTER_EXISTS = FilterExistsModeEnum.VectoredSubPlan;
+
+	/*
+	 * FIXME I have added system property based query hints that can be used to
+	 * disable the fast-range-count and distinct-term-scan optimizers in case we
+	 * run into more edge cases. These query hints can be removed once we have
+	 * more experience with these optimizers.
+	 */
+    
+    /**
+	 * The name of an property that may be used to enable or disable the
+	 * {@link ASTFastRangeCountOptimizer}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+	 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+	 *      </a>
+	 */
+    String FAST_RANGE_COUNT_OPTIMIZER = "fastRangeCountOptimizer";
+
+	boolean DEFAULT_FAST_RANGE_COUNT_OPTIMIZER = Boolean.valueOf(System
+			.getProperty(FAST_RANGE_COUNT_OPTIMIZER, "true"));
+    
+    /**
+	 * The name of an property that may be used to enable or disable the
+	 * {@link ASTDistinctTermScanOptimizer}.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+	 *      query is slow </a>
+	 */
+    String DISTINCT_TERM_SCAN_OPTIMIZER = "distinctTermScanOptimizer";
+
+	boolean DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER = Boolean.valueOf(System
+			.getProperty(DISTINCT_TERM_SCAN_OPTIMIZER, "true"));
+    
 }

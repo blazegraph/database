@@ -289,18 +289,18 @@ public class SPOTupleSerializer extends DefaultTupleSerializer<SPO,SPO> {
 
         spo.setUserFlag(StatementEnum.isUserFlag(code));
 
-        if (sids) {
-            
-            // SIDs only valid for triples.
-            assert keyOrder.getKeyArity() == 3;
-          
-            if (spo.isExplicit()) {
-                
-                spo.setStatementIdentifier(true);
-            
-            }
-            
-        }
+//        if (sids) {
+//            
+//            // SIDs only valid for triples.
+//            assert keyOrder.getKeyArity() == 3;
+//          
+//            if (spo.isExplicit()) {
+//                
+//                spo.setStatementIdentifier(true);
+//            
+//            }
+//            
+//        }
         
         return spo;
 

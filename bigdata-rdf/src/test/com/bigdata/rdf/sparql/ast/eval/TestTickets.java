@@ -318,4 +318,127 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         ).runTest();
 
     }
+
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/806>
+     *      Incorrect AST generated for OPTIONAL { SELECT }</a>
+     */
+    public void test_ticket_806() throws Exception {
+        
+        new TestHelper("ticket-806",// testURI,
+                "ticket-806.rq",// queryFileURL
+                "ticket-806.trig",// dataFileURL
+                "ticket-806.srx",// resultFileURL
+                false// checkOrder
+        ).runTest();
+        
+    }
+
+    public void test_ticket_765() throws Exception {
+        new TestHelper("ticket-765",// testURI,
+                "ticket-765.rq",// queryFileURL
+                "ticket-765.trig",// dataFileURL
+                "ticket-765.srx",// resultFileURL
+                false // checkOrder (because only one solution)
+        ).runTest();
+    }
+    
+    
+    /**
+     * Original test case associated with ticket 832.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_832a() throws Exception {
+       new TestHelper("ticket_832a",// testURI,
+             "ticket_832a.rq",// queryFileURL
+             "ticket_832a.trig",// dataFileURL
+             "ticket_832a.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Propagation of named graph specification inside subqueries,
+     * simple one level propagation.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_832b() throws Exception {
+       new TestHelper("ticket_832b",// testURI,
+             "ticket_832b.rq",// queryFileURL
+             "ticket_832b.trig",// dataFileURL
+             "ticket_832b.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /**
+     * Propagation of named graph specifications inside subqueries,
+     * advanced two-level propagation.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_832c() throws Exception {
+       new TestHelper("ticket_832c",// testURI,
+             "ticket_832c.rq",// queryFileURL
+             "ticket_832c.trig",// dataFileURL
+             "ticket_832c.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /**
+     * Propagation of named graph specifications inside FILTER NOT EXISTS
+     * clauses, as reported in bug #792/#888
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_792a() throws Exception {
+       new TestHelper("ticket_792a",// testURI,
+             "ticket_792a.rq",// queryFileURL
+             "ticket_792.trig",// dataFileURL
+             "ticket_792a.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /**
+     * Propagation of named graph specifications inside FILTER NOT EXISTS
+     * clauses, as reported in bug #792/#888 (inverse test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_792b() throws Exception {
+       new TestHelper("ticket_792b",// testURI,
+             "ticket_792b.rq",// queryFileURL
+             "ticket_792.trig",// dataFileURL
+             "ticket_792b.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /**
+     * Propagation of named graph specifications inside FILTER EXISTS
+     * clauses, as reported in bug #792/#888 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_792c() throws Exception {
+       new TestHelper("ticket_792c",// testURI,
+             "ticket_792c.rq",// queryFileURL
+             "ticket_792.trig",// dataFileURL
+             "ticket_792c.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /**
+     * Propagation of named graph specifications inside FILTER EXISTS
+     * clauses, as reported in bug #792/#888 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_792d() throws Exception {
+       new TestHelper("ticket_792d",// testURI,
+             "ticket_792d.rq",// queryFileURL
+             "ticket_792.trig",// dataFileURL
+             "ticket_792d.srx"// resultFileURL
+       ).runTest();
+    }
+
 }

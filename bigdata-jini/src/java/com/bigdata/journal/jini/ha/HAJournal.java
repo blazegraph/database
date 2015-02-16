@@ -39,6 +39,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
@@ -54,6 +56,8 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.FutureTaskInvariantMon;
+import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
@@ -91,9 +95,9 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
-import com.bigdata.journal.jini.ha.HAJournalServer.NSSConfigurationOptions;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.RemoteAdministrable;
@@ -266,7 +270,7 @@ public class HAJournal extends Journal {
      * The {@link HAJournalServer} instance that is managing this
      * {@link HAJournal}.
      */
-    protected HAJournalServer getHAJournalServer() {
+    public HAJournalServer getHAJournalServer() {
         
         return server;
         
@@ -418,6 +422,16 @@ public class HAJournal extends Journal {
         // Snapshot manager.
         snapshotManager = new SnapshotManager(server, this, config);
 
+        try {
+            getExecutorService().submit(snapshotManager.init()).get();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e); // TODO Do not wrap.
+        } catch (CancellationException e) {
+            throw e;
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        
     }
 
     /**
@@ -728,6 +742,208 @@ public class HAJournal extends Journal {
 //
 //    }
     
+    /**
+     * Interface for additional performance counters exposed by the
+     * {@link HAJournal}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public interface IHAJournalCounters {
+
+        /**
+         * The namespace for counters pertaining to free space on the various
+         * volumes.
+         */
+        String Volumes = "Volumes";
+
+//        /**
+//         * The configured service directory.
+//         */
+//        String ServiceDir = "ServiceDir";
+//
+//        /**
+//         * The configured data directory (the directory in which the Journal
+//         * file is stored).
+//         */
+//        String DataDir = "DataDir";
+//
+//        /**
+//         * The configured HALog directory.
+//         */
+//        String HALogDir = "HALogDir";
+//
+//        /**
+//         * The configured Snapshot directory.
+//         */
+//        String SnapshotDir = "ShapshotDir";
+//
+//        /**
+//         * The configured tmp directory.
+//         */
+//        String TmpDir = "TmpDir";
+
+        /**
+         * The #of bytes available on the disk volume on which the service
+         * directory is located.
+         * 
+         * @see HAJournalServer#getServiceDir()
+         */
+        String ServiceDirBytesAvailable = "Service Volume Bytes Available";
+
+        /**
+         * The #of bytes available on the disk volume on which the data
+         * directory is located (the directory in which the Journal file
+         * is stored).
+         * 
+         * @see Journal#getDataDir()
+         */
+        String DataDirBytesAvailable = "Data Volume Bytes Available";
+
+        /**
+         * The #of bytes available on the disk volume on which the HALog
+         * directory is located.
+         * 
+         * @see HALogNexus#getHALogDir()
+         */
+        String HALogDirBytesAvailable = "HALog Volume Bytes Available";
+
+        /**
+         * The #of bytes available on the disk volume on which the snapshot
+         * directory is located.
+         * 
+         * @see SnapshotManager#getSnapshotDir()
+         */
+        String SnapshotDirBytesAvailable = "Snapshot Volume Bytes Available";
+
+        /**
+         * The #of bytes available on the disk volume on which the temporary
+         * directory is located.
+         * 
+         * @see Journal#getTmpDir()
+         */
+        String TmpDirBytesAvailable = "Temp Volume Bytes Available";
+
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Overridden to attach additional performance counters.
+     * 
+     * @see IHAJournalCounters
+     */
+    @Override
+    public CounterSet getCounters() {
+    
+        final CounterSet root = super.getCounters();
+        {
+
+            final CounterSet tmp = root.makePath(IHAJournalCounters.Volumes);
+
+            tmp.addCounter(IHAJournalCounters.ServiceDirBytesAvailable,
+                    new Instrument<Long>() {
+                        @Override
+                        public void sample() {
+                            setValue(getFreeSpace(server.getServiceDir()));
+                        }
+                    });
+
+            tmp.addCounter(IHAJournalCounters.DataDirBytesAvailable,
+                    new Instrument<Long>() {
+                        @Override
+                        public void sample() {
+                            final File dir = getDataDir();
+                            if (dir != null) {
+                                // Note: in case Journal is not durable.
+                                setValue(getFreeSpace(dir));
+                            }
+                        }
+                    });
+
+            tmp.addCounter(IHAJournalCounters.HALogDirBytesAvailable,
+                    new Instrument<Long>() {
+                        @Override
+                        public void sample() {
+                            setValue(getFreeSpace(getHALogNexus().getHALogDir()));
+                        }
+                    });
+
+            tmp.addCounter(IHAJournalCounters.SnapshotDirBytesAvailable,
+                    new Instrument<Long>() {
+                        @Override
+                        public void sample() {
+                            setValue(getFreeSpace(getSnapshotManager()
+                                    .getSnapshotDir()));
+                        }
+                    });
+
+            tmp.addCounter(IStoreManagerCounters.TmpDirBytesAvailable,
+                    new Instrument<Long>() {
+                        @Override
+                        public void sample() {
+                            setValue(getFreeSpace(getTmpDir()));
+                        }
+                    });
+
+        }
+
+        return root;
+
+    }
+    
+    /**
+     * Return the free space in bytes on the volume hosting some directory.
+     * 
+     * @param dir
+     *            A directory hosted on some volume.
+     * 
+     * @return The #of bytes of free space remaining for the volume hosting the
+     *         directory -or- <code>-1L</code> if the free space could not be
+     *         determined.
+     */
+    /*
+     * Note: This was written using Apache FileSystemUtil originally. That would
+     * shell out "df" under un*x. Unfortunately, shelling out a child process
+     * requires a commitment from the OS to support a process with as much
+     * process space as the parent. For the data service, that is a lot of RAM.
+     * In general, the O/S allows "over committment" of the available swap
+     * space, but you can run out of swap and then you have a problem. If the
+     * host was configured with scanty swap, then this problem could be
+     * triggered very easily and would show up as "Could not allocate memory".
+     * 
+     * See http://forums.sun.com/thread.jspa?messageID=9834041#9834041
+     */
+    static protected long getFreeSpace(final File dir) {
+        
+        try {
+
+            if(!dir.exists()) {
+                
+                return -1;
+                
+            }
+
+            /*
+             * Note: This return 0L if there is no free space or if the File
+             * does not "name" a partition in the file system semantics. That
+             * is why we check dir.exists() above.
+             */
+
+            return dir.getUsableSpace();
+            
+        } catch(Throwable t) {
+            
+            log.error("Could not get free space: dir=" + dir + " : "
+                            + t, t);
+            
+            // the error is logger and ignored.
+            return -1L;
+            
+        }
+
+    }
+
     /**
      * Extended implementation supports RMI.
      */
@@ -1949,12 +2165,13 @@ public class HAJournal extends Journal {
          * @return an object that implements whatever administration interfaces
          *         are appropriate for the particular service.
          */
+        @Override
         public Object getAdmin() throws RemoteException {
 
             if (log.isInfoEnabled())
                 log.info("serviceID=" + server.getServiceID());
 
-            return server.proxy;
+            return server.getProxy();
 
         }
                 
@@ -1987,26 +2204,43 @@ public class HAJournal extends Journal {
          * Misc.
          */
         
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: The actual port depends on how jetty was configured in
+         * <code>jetty.xml</code>. This returns the port associated with the
+         * first jetty connection.
+         * 
+         * @see <a
+         *      href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+         *      Embedding Jetty </a>
+         */
         @Override
         public int getNSSPort() {
 
-            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
-
-            try {
-
-                final Integer port = (Integer) server.config.getEntry(
-                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
-                        NSSConfigurationOptions.DEFAULT_PORT);
-
-                return port;
-
-            } catch (ConfigurationException e) {
-
-                throw new RuntimeException(e);
-                
-            }
+            return server.getNSSPort();
 
         }
+//        @Override
+//        public int getNSSPort() {
+//
+//            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+//
+//            try {
+//
+//                final Integer port = (Integer) server.config.getEntry(
+//                        COMPONENT, NSSConfigurationOptions.PORT, Integer.TYPE,
+//                        NSSConfigurationOptions.DEFAULT_PORT);
+//
+//                return port;
+//
+//            } catch (ConfigurationException e) {
+//
+//                throw new RuntimeException(e);
+//                
+//            }
+//
+//        }
 
         @Override
         public RunState getRunState() {

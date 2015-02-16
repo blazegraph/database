@@ -43,6 +43,8 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.counters.httpd.CounterSetHTTPD;
 import com.bigdata.counters.linux.StatisticsCollectorForLinux;
@@ -81,9 +83,22 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     /** The path prefix under which all counters for this host are found. */
     static final public String hostPathPrefix;
 
+    /**
+     * This static code block is responsible obtaining the canonical hostname.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
     static {
     
-		String s;
+		String s = System.getProperty(BigdataStatics.HOSTNAME);
+        if (s != null) {
+            // Trim whitespace.
+            s = s.trim();
+        }
+        if (s != null && s.length() != 0) {
+            log.warn("Hostname override: hostname=" + s);
+        } else {
 		try {
 			/*
 			 * Note: This should be the host *name* NOT an IP address of a
@@ -96,6 +111,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 			log.error("Could not resolve name for host: " + t);
 			s = NicUtil.getIpAddressByLocalHost();
 			log.warn("Falling back to " + s);
+		}
 		}
         
         fullyQualifiedHostName = s;
@@ -121,6 +137,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * The interval in seconds at which the counter values are read from the
      * host platform.
      */
+    @Override
     public int getInterval() {
 
         return interval;
@@ -209,8 +226,15 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * <p>
      * Note: Subclasses MUST extend this method to initialize their own
      * counters.
+     * 
+     * TODO Why does this use the older <code>synchronized</code> pattern with a
+     * shared {@link #countersRoot} object rather than returning a new object
+     * per request? Check assumptions in the scale-out and local journal code
+     * bases for this.
      */
-    synchronized public CounterSet getCounters() {
+	@Override
+    synchronized 
+    public CounterSet getCounters() {
         
         if (countersRoot == null) {
 
@@ -303,6 +327,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
             serviceRoot.addCounter(IProcessCounters.Memory_runtimeFreeMemory,
                     new Instrument<Long>() {
+                        @Override
                         public void sample() {
                             setValue(Runtime.getRuntime().freeMemory());
                         }
@@ -310,6 +335,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
 
             serviceRoot.addCounter(IProcessCounters.Memory_runtimeTotalMemory,
                     new Instrument<Long>() {
+                        @Override
                         public void sample() {
                             setValue(Runtime.getRuntime().totalMemory());
                         }
@@ -583,6 +609,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Start collecting host performance data -- must be extended by the
      * concrete subclass.
      */
+    @Override
     public void start() {
 
         if (log.isInfoEnabled())
@@ -596,6 +623,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      * Stop collecting host performance data -- must be extended by the concrete
      * subclass.
      */
+    @Override
     public void stop() {
         
         if (log.isInfoEnabled())
@@ -618,6 +646,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      
         final Thread t = new Thread() {
             
+            @Override
             public void run() {
                 
                 AbstractStatisticsCollector.this.stop();
@@ -754,7 +783,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
      *             if no implementation is available for your operating system.
      */
     public static void main(final String[] args) throws InterruptedException {
-
+        Banner.banner();
         final int DEFAULT_COUNT = 10;
         final int nargs = args.length;
         final int interval;

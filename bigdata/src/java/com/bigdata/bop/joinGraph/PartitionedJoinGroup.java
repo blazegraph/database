@@ -12,19 +12,12 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BOpIdFactory;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.bset.EndOp;
-import com.bigdata.bop.join.PipelineJoin;
 import com.bigdata.bop.joinGraph.rto.JoinGraph;
-import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis_CanJoin;
 
 /**
@@ -963,197 +956,180 @@ public class PartitionedJoinGroup {
 
     }
 
-	/**
-	 * Generate a query plan from an ordered collection of predicates.
-	 * 
-	 * @param distinct
-	 *            <code>true</code> iff only the distinct solutions are desired.
-	 * @param selected
-	 *            The variable(s) to be projected out of the join graph.
-	 * @param preds
-	 *            The join path which will be used to execute the join graph.
-	 * @param constraints
-	 *            The constraints on the join graph.
-	 * 
-	 * @return The query plan.
-	 * 
-	 *         FIXME Select only those variables required by downstream
-	 *         processing or explicitly specified by the caller (in the case
-	 *         when this is a subquery, the caller has to declare which
-	 *         variables are selected and will be returned out of the subquery).
-	 * 
-	 *         FIXME For scale-out, we need to either mark the join's evaluation
-	 *         context based on whether or not the access path is local or
-	 *         remote (and whether the index is key-range distributed or hash
-	 *         partitioned).
-	 * 
-	 *         FIXME Add a method to generate a runnable query plan from the
-	 *         collection of predicates and constraints on the
-	 *         {@link PartitionedJoinGroup} together with an ordering over the
-	 *         join graph. This is a bit different for the join graph and the
-	 *         optionals in the tail plan. The join graph itself should either
-	 *         be a {@link JoinGraph} operator which gets evaluated at run time
-	 *         or reordered by whichever optimizer is selected for the query
-	 *         (query hints).
-	 * 
-	 * @todo The order of the {@link IPredicate}s in the tail plan is currently
-	 *       unchanged from their given order (optional joins without
-	 *       constraints can not reduce the selectivity of the query). However,
-	 *       it could be worthwhile to run optionals with constraints before
-	 *       those without constraints since the constraints can reduce the
-	 *       selectivity of the query. If we do this, then we need to reorder
-	 *       the optionals based on the partial order imposed what variables
-	 *       they MIGHT bind (which are not bound by the join graph).
-	 * 
-	 * @todo multiple runFirst predicates can be evaluated in parallel unless
-	 *       they have shared variables. When there are no shared variables,
-	 *       construct a TEE pattern such that evaluation proceeds in parallel.
-	 *       When there are shared variables, the runFirst predicates must be
-	 *       ordered based on those shared variables (at which point, it is
-	 *       probably an error to flag them as runFirst).
-	 */
-	static public PipelineOp getQuery(final BOpIdFactory idFactory,
-			final boolean distinct, final IVariable<?>[] selected,
-			final IPredicate<?>[] preds, final IConstraint[] constraints) {
-
-		/*
-		 * Reserve ids used by the join graph or its constraints.
-		 */
-		{
-			for (IPredicate<?> p : preds) {
-				idFactory.reserve(p.getId());
-			}
-			if (constraints != null) {
-				for (IConstraint c : constraints) {
-					final Iterator<BOp> itr = BOpUtility
-							.preOrderIteratorWithAnnotations(c);
-					while (itr.hasNext()) {
-						final BOp y = itr.next();
-						final Integer anId = (Integer) y
-								.getProperty(BOp.Annotations.BOP_ID);
-						if (anId != null)
-							idFactory.reserve(anId.intValue());
-					}
-				}
-			}
-		}
-
-        // figure out which constraints are attached to which predicates.
-        final IConstraint[][] assignedConstraints = PartitionedJoinGroup
-                .getJoinGraphConstraints(preds, constraints, null/*knownBound*/,
-                		true/*pathIsComplete*/);
-        
-//        final PipelineJoin<?>[] joins = new PipelineJoin[preds.length];
-
-        PipelineOp lastOp = null;
-
-        final Set<IVariable<?>> knownBound = new LinkedHashSet<IVariable<?>>();
-        
-        for (int i = 0; i < preds.length; i++) {
-
-            // The next vertex in the selected join order.
-            final IPredicate<?> p = preds[i];
-
-            // Annotations for this join.
-            final List<NV> anns = new LinkedList<NV>();
-
-            anns.add(new NV(PipelineJoin.Annotations.PREDICATE, p));
-
-            anns.add(new NV(PipelineJoin.Annotations.BOP_ID, idFactory
-                    .nextId()));
-
-//          anns.add(new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.ANY));
+//	/**
+//	 * Generate a query plan from an ordered collection of predicates.
+//	 * 
+//	 * @param distinct
+//	 *            <code>true</code> iff only the distinct solutions are desired.
+//	 * @param selected
+//	 *            The variable(s) to be projected out of the join graph.
+//	 * @param preds
+//	 *            The join path which will be used to execute the join graph.
+//	 * @param constraints
+//	 *            The constraints on the join graph.
+//	 * 
+//	 * @return The query plan.
+//	 * 
+//	 *         FIXME Select only those variables required by downstream
+//	 *         processing or explicitly specified by the caller (in the case
+//	 *         when this is a subquery, the caller has to declare which
+//	 *         variables are selected and will be returned out of the subquery).
+//	 * 
+//	 *         FIXME For scale-out, we need to either mark the join's evaluation
+//	 *         context based on whether or not the access path is local or
+//	 *         remote (and whether the index is key-range distributed or hash
+//	 *         partitioned).
+//	 * 
+//	 *         FIXME Add a method to generate a runnable query plan from the
+//	 *         collection of predicates and constraints on the
+//	 *         {@link PartitionedJoinGroup} together with an ordering over the
+//	 *         join graph. This is a bit different for the join graph and the
+//	 *         optionals in the tail plan. The join graph itself should either
+//	 *         be a {@link JoinGraph} operator which gets evaluated at run time
+//	 *         or reordered by whichever optimizer is selected for the query
+//	 *         (query hints).
+//	 * 
+//	 * @todo The order of the {@link IPredicate}s in the tail plan is currently
+//	 *       unchanged from their given order (optional joins without
+//	 *       constraints can not reduce the selectivity of the query). However,
+//	 *       it could be worthwhile to run optionals with constraints before
+//	 *       those without constraints since the constraints can reduce the
+//	 *       selectivity of the query. If we do this, then we need to reorder
+//	 *       the optionals based on the partial order imposed what variables
+//	 *       they MIGHT bind (which are not bound by the join graph).
+//	 * 
+//	 * @todo multiple runFirst predicates can be evaluated in parallel unless
+//	 *       they have shared variables. When there are no shared variables,
+//	 *       construct a TEE pattern such that evaluation proceeds in parallel.
+//	 *       When there are shared variables, the runFirst predicates must be
+//	 *       ordered based on those shared variables (at which point, it is
+//	 *       probably an error to flag them as runFirst).
+//	 */
+//	static public PipelineOp getQuery(final BOpIdFactory idFactory,
+//			final boolean distinct, final IVariable<?>[] selected,
+//			final IPredicate<?>[] preds, final IConstraint[] constraints) {
 //
-//          anns.add(new NV(PipelineJoin.Annotations.SELECT, vars.toArray(new IVariable[vars.size()])));
-
-			if (assignedConstraints[i] != null
-					&& assignedConstraints[i].length > 0) {
-				// attach constraints to this join.
-				anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
-						assignedConstraints[i]));
-			}
-
-			// collect variables used as arguments by this predicate.
-			final Set<IVariable<?>> pvars = new LinkedHashSet<IVariable<?>>();
-			{
-				final Iterator<IVariable<?>> vitr = BOpUtility
-						.getArgumentVariables(p);
-				while (vitr.hasNext()) {
-					pvars.add(vitr.next());
-				}
-			}
-
-			// figure out if there are ANY shared variables.
-			boolean shared = false;
-			{
-				for(IVariable<?> v : pvars) {
-					if(knownBound.contains(v)) {
-						shared = true;
-						break;
-					}
-				}
-			}
-
-			/*
-			 * FIXME Explore the merit of this optimization with MikeP,
-			 * including consideration of the PIPELINE_QUEUE_CAPACITY and
-			 * whether or not to request an analytic join (hash join).
-			 */
-			if (false && !shared) {
-				System.err.println("Full cross product join: " + p);
-				/*
-				 * Force at-once evaluation to ensure that we evaluate the AP
-				 * for [p] exactly once.
-				 */
-				anns.add(new NV(PipelineOp.Annotations.PIPELINED, false));
-			}
-
-			final PipelineJoin<?> joinOp = new PipelineJoin(//
-					lastOp == null ? new BOp[0] : new BOp[] { lastOp }, //
-					anns.toArray(new NV[anns.size()])//
-			);
-
-			// Add predicate argument variables to [knownBound].
-			knownBound.addAll(pvars);
-			
-            lastOp = joinOp;
-
-        }
-
-		if (distinct) {
-			lastOp = new JVMDistinctBindingSetsOp(new BOp[] { lastOp }, NV
-					.asMap(new NV[] {
-							new NV(PipelineOp.Annotations.BOP_ID, idFactory
-									.nextId()), //
-							new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
-									BOpEvaluationContext.CONTROLLER),//
-							new NV(PipelineOp.Annotations.SHARED_STATE, true),//
-							new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,
-									selected),//
-					})//
-			);
-		}
-
-        /*
-         * FIXME Why does wrapping with this slice appear to be
-         * necessary? (It is causing runtime errors when not wrapped).
-         * Is this a bopId collision which is not being detected?
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/227
-         * 
-         * [This should perhaps be moved into the caller.]
-         */
-        lastOp = new EndOp(new BOp[] { lastOp }, NV
-                .asMap(new NV[] {
-                        new NV(JoinGraph.Annotations.BOP_ID, idFactory.nextId()), //
-                        new NV(JoinGraph.Annotations.EVALUATION_CONTEXT,
-                                BOpEvaluationContext.CONTROLLER)//
-//                        new NV(PipelineOp.Annotations.SHARED_STATE,true),//
-                        }) //
-        );
-
-        return lastOp;
-
-    }
+//		/*
+//		 * Reserve ids used by the join graph or its constraints.
+//		 */
+//	    idFactory.reserveIds(preds, constraints);
+////		{
+////			for (IPredicate<?> p : preds) {
+////				idFactory.reserve(p.getId());
+////			}
+////			if (constraints != null) {
+////				for (IConstraint c : constraints) {
+////					final Iterator<BOp> itr = BOpUtility
+////							.preOrderIteratorWithAnnotations(c);
+////					while (itr.hasNext()) {
+////						final BOp y = itr.next();
+////						final Integer anId = (Integer) y
+////								.getProperty(BOp.Annotations.BOP_ID);
+////						if (anId != null)
+////							idFactory.reserve(anId.intValue());
+////					}
+////				}
+////			}
+////		}
+//
+//        // figure out which constraints are attached to which predicates.
+//        final IConstraint[][] assignedConstraints = PartitionedJoinGroup
+//                .getJoinGraphConstraints(preds, constraints, null/*knownBound*/,
+//                		true/*pathIsComplete*/);
+//        
+////        final PipelineJoin<?>[] joins = new PipelineJoin[preds.length];
+//
+//        PipelineOp lastOp = null;
+//
+//        final Set<IVariable<?>> knownBound = new LinkedHashSet<IVariable<?>>();
+//        
+//        for (int i = 0; i < preds.length; i++) {
+//
+//            // The next vertex in the selected join order.
+//            final IPredicate<?> p = preds[i];
+//
+//            // Annotations for this join.
+//            final List<NV> anns = new LinkedList<NV>();
+//
+//            anns.add(new NV(PipelineJoin.Annotations.PREDICATE, p));
+//
+//            anns.add(new NV(PipelineJoin.Annotations.BOP_ID, idFactory
+//                    .nextId()));
+//
+////          anns.add(new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT, BOpEvaluationContext.ANY));
+////
+////          anns.add(new NV(PipelineJoin.Annotations.SELECT, vars.toArray(new IVariable[vars.size()])));
+//
+//			if (assignedConstraints[i] != null
+//					&& assignedConstraints[i].length > 0) {
+//				// attach constraints to this join.
+//				anns.add(new NV(PipelineJoin.Annotations.CONSTRAINTS,
+//						assignedConstraints[i]));
+//			}
+//
+//			// collect variables used as arguments by this predicate.
+//			final Set<IVariable<?>> pvars = new LinkedHashSet<IVariable<?>>();
+//			{
+//				final Iterator<IVariable<?>> vitr = BOpUtility
+//						.getArgumentVariables(p);
+//				while (vitr.hasNext()) {
+//					pvars.add(vitr.next());
+//				}
+//			}
+//
+//			// figure out if there are ANY shared variables.
+//			boolean shared = false;
+//			{
+//				for(IVariable<?> v : pvars) {
+//					if(knownBound.contains(v)) {
+//						shared = true;
+//						break;
+//					}
+//				}
+//			}
+//
+//			/*
+//			 * FIXME Explore the merit of this optimization with MikeP,
+//			 * including consideration of the PIPELINE_QUEUE_CAPACITY and
+//			 * whether or not to request an analytic join (hash join).
+//			 */
+//			if (false && !shared) {
+//				System.err.println("Full cross product join: " + p);
+//				/*
+//				 * Force at-once evaluation to ensure that we evaluate the AP
+//				 * for [p] exactly once.
+//				 */
+//				anns.add(new NV(PipelineOp.Annotations.PIPELINED, false));
+//			}
+//
+//			final PipelineJoin<?> joinOp = new PipelineJoin(//
+//					lastOp == null ? new BOp[0] : new BOp[] { lastOp }, //
+//					anns.toArray(new NV[anns.size()])//
+//			);
+//
+//			// Add predicate argument variables to [knownBound].
+//			knownBound.addAll(pvars);
+//			
+//            lastOp = joinOp;
+//
+//        }
+//
+//		if (distinct) {
+//			lastOp = new JVMDistinctBindingSetsOp(new BOp[] { lastOp }, NV
+//					.asMap(new NV[] {
+//							new NV(PipelineOp.Annotations.BOP_ID, idFactory
+//									.nextId()), //
+//							new NV(PipelineOp.Annotations.EVALUATION_CONTEXT,
+//									BOpEvaluationContext.CONTROLLER),//
+//							new NV(PipelineOp.Annotations.SHARED_STATE, true),//
+//							new NV(JVMDistinctBindingSetsOp.Annotations.VARIABLES,
+//									selected),//
+//					})//
+//			);
+//		}
+//
+//        return lastOp;
+//
+//    }
 
 }

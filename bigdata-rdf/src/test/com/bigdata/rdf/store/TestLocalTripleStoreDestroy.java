@@ -41,6 +41,7 @@ import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.sparse.ITPS;
+import com.bigdata.sparse.SparseRowStore;
 
 /**
  * Test suite to verify the semantics of destroying a {@link LocalTripleStore},
@@ -94,11 +95,18 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
 
         try {
 
+            final long lastCommitTime = store.getIndexManager().getLastCommitTime();
+            
             // Note: Will be in lexical order for Unicode.
-            final String[] namespaces = getNamespaces(indexManager).toArray(
-                    new String[] {});
-
-            assertEquals(new String[] { namespace }, namespaces);
+            assertEquals(
+                    new String[] { namespace },
+                    getNamespaces(indexManager, ITx.UNISOLATED).toArray(
+                            new String[] {}));
+            // Note found before the create.
+            assertEquals(
+                    new String[] {},
+                    getNamespaces(indexManager, lastCommitTime - 1).toArray(
+                            new String[] {}));
 
             assertTrue(store == indexManager.getResourceLocator().locate(
                     store.getNamespace(), ITx.UNISOLATED));
@@ -118,9 +126,16 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
              */
             store.destroy();
 
-            // global row store entry is gone.
-            assertTrue(getNamespaces(indexManager).isEmpty());
+            // Did not go through a commit on the LTS.
+            assertEquals(lastCommitTime, store.getIndexManager()
+                    .getLastCommitTime());
 
+            // global row store entry is gone.
+            assertTrue(getNamespaces(indexManager, ITx.UNISOLATED).isEmpty());
+
+            // but not in the last commited view.
+            assertFalse(getNamespaces(indexManager, lastCommitTime).isEmpty());
+            
             // resources can not be located.
             assertTrue(null == indexManager.getResourceLocator().locate(
                     namespace, ITx.UNISOLATED));
@@ -134,6 +149,18 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
                     ITx.UNISOLATED));
             assertNull(indexManager.getIndex(primaryStatementIndexName,
                     ITx.UNISOLATED));
+            // but not at the last commit time.
+            assertNotNull(indexManager.getIndex(primaryStatementIndexName,
+                    lastCommitTime));
+
+            /*
+             * Commit.
+             */
+            store.commit();
+            
+            // No longer present at the last commit time.
+            assertTrue(getNamespaces(indexManager,
+                    store.getIndexManager().getLastCommitTime()).isEmpty());
             
         } finally {
 
@@ -175,8 +202,8 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
             store.addTerm(store.getValueFactory().createLiteral("bigdata"));
             
             // Note: Will be in lexical order for Unicode.
-            final String[] namespaces = getNamespaces(indexManager).toArray(
-                    new String[] {});
+            final String[] namespaces = getNamespaces(indexManager,
+                    ITx.UNISOLATED).toArray(new String[] {});
 
             assertEquals(new String[] { namespace }, namespaces);
 
@@ -202,7 +229,7 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
             store.destroy();
 
             // global row store entry is gone.
-            assertTrue(getNamespaces(indexManager).isEmpty());
+            assertTrue(getNamespaces(indexManager,ITx.UNISOLATED).isEmpty());
 
             // resources can not be located.
             assertTrue(null == indexManager.getResourceLocator().locate(
@@ -222,6 +249,32 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
             assertNotNull(indexManager.getResourceLocator().locate(namespace,
                     commitTime-1));
             
+            /*
+             * Commit the destroy.
+             */
+            store.commit();
+            
+
+            // global row store entry is gone.
+            assertTrue(getNamespaces(indexManager,ITx.UNISOLATED).isEmpty());
+
+            // resources can not be located.
+            assertTrue(null == indexManager.getResourceLocator().locate(
+                    namespace, ITx.UNISOLATED));
+            assertTrue(null == indexManager.getResourceLocator().locate(
+                    namespaceLexiconRelation, ITx.UNISOLATED));
+            assertTrue(null == indexManager.getResourceLocator().locate(
+                    namespaceSPORelation, ITx.UNISOLATED));
+
+            // indicies are gone.
+            assertNull(indexManager.getIndex(lexiconRelationIndexName,
+                    ITx.UNISOLATED));
+            assertNull(indexManager.getIndex(primaryStatementIndexName,
+                    ITx.UNISOLATED));
+            
+            // The committed version of the triple store remains visible.
+            assertNotNull(indexManager.getResourceLocator().locate(namespace,
+                    commitTime-1));
         } finally {
 
             indexManager.destroy();
@@ -234,15 +287,24 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
      */
-    static private List<String> getNamespaces(final IIndexManager indexManager) {
+    static private List<String> getNamespaces(final IIndexManager indexManager,
+            final long timestamp) {
     
         // the triple store namespaces.
         final List<String> namespaces = new LinkedList<String>();
 
+        final SparseRowStore grs = indexManager.getGlobalRowStore(timestamp);
+
+        if (grs == null) {
+
+            return namespaces;
+
+        }
+        
         // scan the relation schema in the global row store.
         @SuppressWarnings("unchecked")
-        final Iterator<ITPS> itr = (Iterator<ITPS>) indexManager
-                .getGlobalRowStore().rangeIterator(RelationSchema.INSTANCE);
+        final Iterator<ITPS> itr = (Iterator<ITPS>) grs
+                .rangeIterator(RelationSchema.INSTANCE);
 
         while (itr.hasNext()) {
 
@@ -348,7 +410,7 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
                  * 
                  * Note: Will be in lexical order for Unicode.
                  */
-                final String[] namespaces = getNamespaces(indexManager)
+                final String[] namespaces = getNamespaces(indexManager,ITx.UNISOLATED)
                         .toArray(new String[] {});
                 assertEquals(new String[] { namespace, namespace1 }, namespaces);
 
@@ -404,7 +466,7 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
                 kb.destroy();
 
                 // global row store entry is gone.
-                final String[] namespaces = getNamespaces(indexManager).toArray(
+                final String[] namespaces = getNamespaces(indexManager,ITx.UNISOLATED).toArray(
                         new String[] {});
                 assertEquals(new String[] { namespace1 }, namespaces);
 
@@ -438,7 +500,7 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
                  * 
                  * Note: Will be in lexical order for Unicode.
                  */
-                final String[] namespaces = getNamespaces(indexManager).toArray(
+                final String[] namespaces = getNamespaces(indexManager,ITx.UNISOLATED).toArray(
                         new String[] {});
                 assertEquals(new String[] { namespace1 }, namespaces);
 
@@ -477,7 +539,7 @@ public class TestLocalTripleStoreDestroy extends ProxyTestCase {
                 kb1.destroy();
 
                 // global row store entry is gone.
-                assertTrue(getNamespaces(indexManager).isEmpty());
+                assertTrue(getNamespaces(indexManager,ITx.UNISOLATED).isEmpty());
 
                 // resources can not be located.
                 assertTrue(null == indexManager.getResourceLocator().locate(

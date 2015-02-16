@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.osx;
 
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import com.bigdata.counters.AbstractProcessCollector;
@@ -72,17 +72,19 @@ public class VMStatCollector extends AbstractProcessCollector implements
             
         }
         
-        public I(String path) {
-            
-            assert path != null;
-            
+        public I(final String path) {
+
+            if (path == null)
+                throw new IllegalArgumentException();
+
             this.path = path;
             
         }
 
+        @Override
         public long lastModified() {
 
-            return lastModified;
+            return lastModified.get();
             
         }
 
@@ -90,6 +92,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
          * @throws UnsupportedOperationException
          *             always.
          */
+        @Override
         public void setValue(T value, long timestamp) {
            
             throw new UnsupportedOperationException();
@@ -108,20 +111,20 @@ public class VMStatCollector extends AbstractProcessCollector implements
         protected final double scale;
 
         DI(final String path) {
-        	
-        	this(path,1d);
+
+            this(path, 1d);
 
         }
 
         DI(final String path, final double scale) {
-            
-            super( path );
-            
+
+            super(path);
+
             this.scale = scale;
-            
+
         }
-        
-        
+
+        @Override
         public Double getValue() {
          
             final Double value = (Double) vals.get(path);
@@ -143,12 +146,13 @@ public class VMStatCollector extends AbstractProcessCollector implements
      * are paths into the {@link CounterSet}. The values are the data most
      * recently read from <code>vmstat</code>.
      */
-    final private Map<String, Object> vals = new HashMap<String, Object>();
-    
+    private final Map<String, Object> vals = new ConcurrentHashMap<String, Object>();
+
 	/**
 	 * The timestamp associated with the most recently collected values.
 	 */
-	private long lastModified = System.currentTimeMillis();
+    private final AtomicLong lastModified = new AtomicLong(
+            System.currentTimeMillis());
 
 	/**
 	 * The {@link Pattern} used to split apart the rows read from
@@ -166,7 +170,8 @@ public class VMStatCollector extends AbstractProcessCollector implements
         super(interval);
         
     }
-    
+
+    @Override
     public List<String> getCommand() {
 
 		final List<String> command = new LinkedList<String>();
@@ -180,14 +185,13 @@ public class VMStatCollector extends AbstractProcessCollector implements
         
     }
 
-    /**
-     * Declares the counters that we will collect
-     */
+    @Override
     public CounterSet getCounters() {
         
 		final CounterSet root = new CounterSet();
 
-		inst = new LinkedList<I>();
+	    @SuppressWarnings("rawtypes")
+        final List<I> inst = new LinkedList<I>();
 
 		/*
 		 * Note: Counters are all declared as Double to facilitate aggregation.
@@ -209,19 +213,17 @@ public class VMStatCollector extends AbstractProcessCollector implements
 		 */
 		inst.add(new DI(IHostCounters.Memory_Bytes_Free));
 
-		for (Iterator<I> itr = inst.iterator(); itr.hasNext();) {
+        for (@SuppressWarnings("rawtypes") I i : inst) {
 
-			final I i = itr.next();
+            root.addCounter(i.getPath(), i);
 
-			root.addCounter(i.getPath(), i);
+        }
 
-		}
-
-		return root;
+        return root;
         
     }
-    private List<I> inst = null;
 
+    @Override
     public AbstractProcessReader getProcessReader() {
         
         return new VMStatReader();
@@ -249,6 +251,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
 	 */
     private class VMStatReader extends ProcessReaderHelper {
         
+        @Override
         protected ActiveProcess getActiveProcess() {
             
             if (activeProcess == null)
@@ -357,7 +360,7 @@ public class VMStatCollector extends AbstractProcessCollector implements
                 try {
 
                     // timestamp
-                    lastModified = System.currentTimeMillis();
+                    lastModified.set(System.currentTimeMillis());
 
                     final String[] fields = pattern.split(data.trim(), 0/* limit */);
                     

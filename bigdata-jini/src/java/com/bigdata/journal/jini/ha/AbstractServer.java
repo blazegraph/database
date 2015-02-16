@@ -202,7 +202,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      * 
      * @see ConfigurationOptions
      */
-    private ServiceID serviceID;
+    private final AtomicReference<ServiceID> serviceIDRef = new AtomicReference<ServiceID>();
     
     /**
      * The directory for the service. This is the directory within which the
@@ -311,12 +311,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     /**
      * The service implementation object.
      */
-    protected Remote impl;
+    private Remote impl;
 
     /**
      * The exported proxy for the service implementation object.
      */
-    protected Remote proxy;
+    private Remote proxy;
 
     /**
      * The name of the host on which the server is running.
@@ -349,10 +349,23 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     /**
      * The exported proxy for the service implementation object.
+     * 
+     * @see #getRemoteImpl()
      */
     public Remote getProxy() {
         
         return proxy;
+        
+    }
+    
+    /**
+     * The service implementation object.
+     * 
+     * @see #getProxy()
+     */
+    public Remote getRemoteImpl() {
+        
+        return impl;
         
     }
     
@@ -364,7 +377,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
      */
     public ServiceID getServiceID() {
         
-        return serviceID;
+        return serviceIDRef.get();
         
     }
     
@@ -661,14 +674,11 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
             if (serviceIdFile.exists()) {
 
+                final ServiceID tmp;
                 try {
 
-                    // Read from file, set on class.
-                    this.serviceID = readServiceId(serviceIdFile);
-
-                    if (log.isInfoEnabled())
-                        log.info("Existing service instance: serviceID="
-                                + serviceID);
+                    // Read from file.
+                    tmp = readServiceId(serviceIdFile);
 
                 } catch (IOException ex) {
 
@@ -677,6 +687,12 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                     throw new AssertionError();// keeps compiler happy.
 
                 }
+
+                if (log.isInfoEnabled())
+                    log.info("Existing service instance: serviceID=" + tmp);
+
+                // Set the ServiceID that we read from the file.
+                setServiceID(tmp);
 
             } else {
 
@@ -712,9 +728,10 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                  * want to use that ServiceID and not whatever was in the
                  * Configuration.
                  */
-                UUID serviceUUID = this.serviceID == null ? null : JiniUtil
-                        .serviceID2UUID(this.serviceID);
-                
+                final ServiceID serviceID = getServiceID();
+                UUID serviceUUID = serviceID == null ? null : JiniUtil
+                        .serviceID2UUID(serviceID);
+
                 for (Entry e : entries) {
 
                     if (e instanceof Name && serviceName == null) {
@@ -783,13 +800,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                 // if serviceUUID assigned then set ServiceID from it now.
                 if (serviceUUID != null) {
 
-                    if (this.serviceID != null) {
+                    // Convert ServiceID read from Configuration.
+                    final ServiceID tmp = JiniUtil.uuid2ServiceID(serviceUUID);
 
-                        // Convert ServiceID read from Configuration.
-                        final ServiceID tmp = JiniUtil
-                                .uuid2ServiceID(serviceUUID);
+                    // Already assigned ServiceID (may be null).
+                    final ServiceID existingServiceID = getServiceID();
+                    
+                    if (existingServiceID != null) {
 
-                        if (!this.serviceID.equals(tmp)) {
+                       // Already set.
+                       if (!existingServiceID.equals(tmp)) {
 
                             /*
                              * This is a paranoia check on the Configuration and
@@ -803,19 +823,21 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                                             + serviceIdFile
                                             + " : Configuration=" + tmp
                                             + ", but expected ="
-                                            + this.serviceID);
+                                            + existingServiceID);
 
                         }
                         
-                    }
+                    } else {
 
-                    // Set serviceID.
-                    this.serviceID = JiniUtil.uuid2ServiceID(serviceUUID);
+                        // Set serviceID.
+                        setServiceID(JiniUtil.uuid2ServiceID(serviceUUID));
+
+                    }
 
                     if (!serviceIdFile.exists()) {
 
                         // write the file iff it does not exist.
-                        writeServiceIDOnFile(this.serviceID);
+                        writeServiceIDOnFile(tmp);
 
                     } else {
                         /*
@@ -823,16 +845,16 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                          * assigned ServiceID.
                          */
                         try {
-                            final ServiceID tmp = readServiceId(serviceIdFile);
-                            if (!this.serviceID.equals(tmp)) {
+                            final ServiceID tmp2 = readServiceId(serviceIdFile);
+                            if (!tmp.equals(tmp2)) {
                                 /*
                                  * The assigned ServiceID and ServiceID written
                                  * on the file do not agree.
                                  */
                                 throw new RuntimeException(
-                                        "Entry has ServiceID=" + this.serviceID
+                                        "Entry has ServiceID=" + tmp
                                                 + ", but file as ServiceID="
-                                                + tmp);
+                                                + tmp2);
                             }
                         } catch (IOException e1) {
                             throw new RuntimeException(e1);
@@ -847,11 +869,15 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
                      * ourselves.
                      */
                     
-                    // set serviceID.
-                    this.serviceID = JiniUtil.uuid2ServiceID(UUID.randomUUID());
+                    // Generate a random ServiceID.
+                    final ServiceID tmp = JiniUtil.uuid2ServiceID(UUID
+                            .randomUUID());
                     
-                    // write the file iff it does not exist.
-                    writeServiceIDOnFile(this.serviceID);
+                    // Set our ServiceID.
+                    setServiceID(tmp);
+                    
+                    // Write the file iff it does not exist.
+                    writeServiceIDOnFile(tmp);
 
                 }
                 
@@ -895,7 +921,7 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     public String toString() {
         
         // note: MAY be null.
-        final ServiceID serviceID = this.serviceID;
+        final ServiceID serviceID = this.serviceIDRef.get();
                 
         return getClass().getName()
                 + "{serviceName="
@@ -1140,7 +1166,9 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             // The as-configured Entry[] attributes.
             final Entry[] attributes = entries.toArray(new Entry[0]);
 
-            if (this.serviceID != null) {
+            final ServiceID serviceID = getServiceID();
+            
+            if (serviceID != null) {
 
                 /*
                  * We read the serviceID from local storage (either the
@@ -1175,27 +1203,29 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
             throw new AssertionError();// keeps compiler happy.
         }
 
-        /*
-         * Note: This is synchronized in case set via listener by the
-         * JoinManager, which would be rather fast action on its part.
-         */
-        synchronized (this) {
-
-            if (this.serviceID != null) {
-
-                /*
-                 * Notify the service that it's service UUID has been set.
-                 * 
-                 * @todo Several things currently depend on this notification.
-                 * In effect, it is being used as a proxy for the service
-                 * registration event.
-                 */
-
-                notifyServiceUUID(serviceID);
-
-            }
-
-        }
+//        /*
+//         * Note: This is synchronized in case set via listener by the
+//         * JoinManager, which would be rather fast action on its part.
+//         */
+//        synchronized (this) {
+//
+//            final ServiceID serviceID = getServiceID();
+//
+//            if (serviceID != null) {
+//
+//                /*
+//                 * Notify the service that it's service UUID has been set.
+//                 * 
+//                 * @todo Several things currently depend on this notification.
+//                 * In effect, it is being used as a proxy for the service
+//                 * registration event.
+//                 */
+//
+//                notifyServiceUUID(serviceID);
+//
+//            }
+//
+//        }
 
     }
     
@@ -1300,6 +1330,25 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
         
     }
 
+    private void setServiceID(final ServiceID newValue) {
+
+        if (newValue == null)
+            throw new IllegalArgumentException();
+
+        if (!serviceIDRef.compareAndSet(null/* expect */, newValue)) {
+
+            throw new IllegalStateException(
+                    "ServiceID may not be changed: ServiceID="
+                            + serviceIDRef.get() + ", proposed=" + newValue);
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("serviceID=" + newValue + ", serviceUUID="
+                    + JiniUtil.serviceID2UUID(newValue));
+
+    }
+    
     /**
      * This method is responsible for saving the {@link ServiceID} on stable
      * storage when it is invoked. It will be invoked iff the {@link ServiceID}
@@ -1311,28 +1360,13 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
     @Override
     synchronized public void serviceIDNotify(final ServiceID serviceID) {
 
-        if (serviceID == null)
-            throw new IllegalArgumentException();
-        
-        if (log.isInfoEnabled())
-            log.info("serviceID=" + serviceID + ", serviceUUID="
-                    + JiniUtil.serviceID2UUID(serviceID));
-
-        if (this.serviceID != null && !this.serviceID.equals(serviceID)) {
-
-            throw new IllegalStateException(
-                    "ServiceID may not be changed: ServiceID=" + this.serviceID
-                            + ", proposed=" + serviceID);
-            
-        }
-        
-        this.serviceID = serviceID;
+        setServiceID(serviceID);
 
         assert serviceIdFile != null : "serviceIdFile not defined?";
 
         writeServiceIDOnFile(serviceID);
 
-        notifyServiceUUID(serviceID);
+//        notifyServiceUUID(serviceID);
         
         /*
          * Update the Entry[] for the service registrars to reflect the assigned
@@ -1380,7 +1414,8 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
                 if (log.isInfoEnabled())
                     log.info("ServiceID saved: file=" + serviceIdFile
-                            + ", serviceID=" + serviceID);
+                            + ", serviceID=" + serviceID + ", serviceUUID="
+                            + JiniUtil.serviceID2UUID(serviceID));
 
             } finally {
 
@@ -1396,35 +1431,14 @@ abstract public class AbstractServer implements Runnable, LeaseListener,
 
     }
     
-    /**
-     * Notify the {@link AbstractService} that it's service UUID has been set.
-     */
-    synchronized protected void notifyServiceUUID(final ServiceID serviceID) {
-
-        if (serviceID == null)
-            throw new IllegalArgumentException();
-        
-        if (this.serviceID != null && !this.serviceID.equals(serviceID)) {
-
-            throw new IllegalStateException(
-                    "ServiceID may not be changed: ServiceID=" + this.serviceID
-                            + ", proposed=" + serviceID);
-            
-        }
-        
-//        if(impl != null && impl instanceof AbstractService) {
+//    /**
+//     * Notify the {@link AbstractService} that it's service UUID has been set.
+//     */
+//    final protected void notifyServiceUUID(final ServiceID newValue) {
 //
-//            final UUID serviceUUID = JiniUtil.serviceID2UUID(serviceID);
-//
-//            final AbstractService service = ((AbstractService) impl);
-//            
-//            service.setServiceUUID(serviceUUID);
-//           
-//        }
-
-        this.serviceID = serviceID;
-
-    }
+//        setServiceID(newValue);
+//        
+//    }
     
     /**
      * Logs a message. If the service is no longer registered with any

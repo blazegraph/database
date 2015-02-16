@@ -56,11 +56,6 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
          */
         String NAMED_SUBQUERIES = "namedSubqueries";
 
-        /**
-         * The BINDINGS clause (optional).
-         */
-        String BINDINGS_CLAUSE = "bindingsClause";
-        
     }
 
     /**
@@ -96,6 +91,7 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public Map<String, String> getPrefixDecls() {
 
@@ -108,6 +104,7 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
 
     }
 
+    @Override
     public void setPrefixDecls(final Map<String, String> prefixDecls) {
 
         setProperty(Annotations.PREFIX_DECLS, prefixDecls);
@@ -139,12 +136,14 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
 //        
 //    }
 
+    @Override
     public void setDataset(final DatasetNode dataset) {
 
         setProperty(Annotations.DATASET, dataset);
 
     }
 
+    @Override
     public DatasetNode getDataset() {
 
         return (DatasetNode) getProperty(Annotations.DATASET);
@@ -152,8 +151,8 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
     }
     
     /**
-     * Return the node for the named subqueries -or- <code>null</code> if there
-     * it does not exist.
+     * Return the node for the named subqueries -or- <code>null</code> if it
+     * does not exist.
      * 
      * @see #getNamedSubqueriesNotNull()
      */
@@ -198,26 +197,7 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
 
     }
 
-    /**
-     * Set the BINDINGS.
-     * 
-     * @param bindings
-     */
-    public void setBindingsClause(final BindingsClause bindings) {
-
-        setProperty(Annotations.BINDINGS_CLAUSE, bindings);
-
-    }
-
-    /**
-     * Return the BINDINGS.
-     */
-    public BindingsClause getBindingsClause() {
-
-        return (BindingsClause) getProperty(Annotations.BINDINGS_CLAUSE);
-
-    }
-    
+    @Override
     public String toString(final int indent) {
         
         final String s = indent(indent);
@@ -234,7 +214,7 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
         
         final DatasetNode dataset = getDataset();
 
-        final BindingsClause bindings = getBindingsClause();
+//        final BindingsClause bindings = getBindingsClause();
 
         final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
 
@@ -286,7 +266,7 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
             
         }
 
-        if(prefixDecls != null) {
+        if (prefixDecls != null) {
 
             for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
 
@@ -322,11 +302,11 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
         
         sb.append(super.toString(indent));
 
-        if (bindings != null) {
-
-            sb.append(bindings.toString(indent + 1));
-
-        }
+//        if (bindings != null) {
+//
+//            sb.append(bindings.toString(indent + 1));
+//
+//        }
 
         return sb.toString();
         

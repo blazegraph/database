@@ -46,15 +46,22 @@ import cutthecrap.utils.striterators.ICloseableIterator;
 /**
  * An operator for conditional routing of binding sets in a pipeline. The
  * operator will copy binding sets either to the default sink (if a condition is
- * satisfied) and to the alternate sink otherwise.
+ * satisfied) and otherwise to the alternate sink (iff one is specified). If a
+ * solution fails the constraint and the alternate sink is not specified, then
+ * the solution is dropped.
  * <p>
  * Conditional routing can be useful where a different data flow is required
  * based on the type of an object (for example a term identifier versus an
  * inline term in the RDF database) or where there is a need to jump around a
  * join group based on some condition.
+ * <p>
+ * Conditional routing will cause reordering of solutions when the alternate
+ * sink is specified as some solutions will flow to the primary sink while
+ * others flow to the alterate sink.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @version $Id: ConditionalRoutingOp.java 7773 2014-01-11 12:49:05Z thompsonbry
+ *          $
  */
 public class ConditionalRoutingOp extends PipelineOp {
 
@@ -80,8 +87,10 @@ public class ConditionalRoutingOp extends PipelineOp {
      * 
      * @param op
      */
-    public ConditionalRoutingOp(ConditionalRoutingOp op) {
+    public ConditionalRoutingOp(final ConditionalRoutingOp op) {
+        
         super(op);
+        
     }
 
     /**
@@ -90,12 +99,17 @@ public class ConditionalRoutingOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public ConditionalRoutingOp(BOp[] args, Map<String, Object> annotations) {
+    public ConditionalRoutingOp(final BOp[] args,
+            final Map<String, Object> annotations) {
+
         super(args, annotations);
+
     }
 
-    public ConditionalRoutingOp(BOp[] args, NV... anns) {
+    public ConditionalRoutingOp(final BOp[] args, final NV... anns) {
+
         this(args, NV.asMap(anns));
+
     }
 
     /**
@@ -107,6 +121,7 @@ public class ConditionalRoutingOp extends PipelineOp {
         
     }
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ConditionalRouteTask(this, context));
@@ -143,7 +158,7 @@ public class ConditionalRoutingOp extends PipelineOp {
             
             this.sink = context.getSink();
 
-            this.sink2 = context.getSink2();
+            this.sink2 = context.getSink2(); // MAY be null.
 
 //            if (sink2 == null)
 //                throw new IllegalArgumentException();
@@ -153,6 +168,7 @@ public class ConditionalRoutingOp extends PipelineOp {
 
         }
 
+        @Override
         public Void call() throws Exception {
             try {
                 while (source.hasNext()) {
@@ -163,25 +179,36 @@ public class ConditionalRoutingOp extends PipelineOp {
                     stats.unitsIn.add(chunk.length);
 
                     final IBindingSet[] def = new IBindingSet[chunk.length];
-                    final IBindingSet[] alt = new IBindingSet[chunk.length];
-                    
+                    final IBindingSet[] alt = sink2 == null ? null
+                            : new IBindingSet[chunk.length];
+
                     int ndef = 0, nalt = 0;
 
-                    for(int i=0; i<chunk.length; i++) {
+                    for (int i = 0; i < chunk.length; i++) {
+
+                        if (i % 20 == 0 && Thread.interrupted()) {
+
+                            // Eagerly notice if the operator is interrupted.
+                            throw new RuntimeException(
+                                    new InterruptedException());
+
+                        }
 
                         final IBindingSet bset = chunk[i].clone();
 
                         if (condition.accept(bset)) {
 
+                            // solution passes condition. default sink.
                             def[ndef++] = bset;
-                            
-                        } else {
-                            
+
+                        } else if (sink2 != null) {
+
+                            // solution fails condition. alternative sink.
                             alt[nalt++] = bset;
-                            
+
                         }
-                        
-                    }
+
+                   }
 
                     if (ndef > 0) {
                         if (ndef == def.length)
@@ -205,20 +232,20 @@ public class ConditionalRoutingOp extends PipelineOp {
 
                 sink.flush();
                 if (sink2 != null)
-                	sink2.flush();
-                
+                    sink2.flush();
+
                 return null;
-                
+
             } finally {
                 source.close();
                 sink.close();
                 if (sink2 != null)
-                	sink2.close();
-                
+                    sink2.close();
+
             }
 
-        }
+        } // call()
 
-    }
+    } // ConditionalRoutingTask.
 
 }

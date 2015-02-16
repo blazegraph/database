@@ -14,7 +14,9 @@ import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IReorderableNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.Annotations;
 
@@ -213,6 +215,16 @@ public final class StaticOptimizer {
 		}
 
 		/*
+		 * Always choose a ZERO cardinality tail first, regardless of ancestry.
+		 */
+		for (int i = 0; i < arity; i++) {
+		    if (cardinality(i) == 0) {
+		        preferredFirstTail = i;
+		        break;
+		    }
+		}
+		
+		/*
 		 * If there was no "run first" query hint, then go to the ancestry.
 		 */
 		if (preferredFirstTail == -1)
@@ -231,8 +243,20 @@ public final class StaticOptimizer {
 				order[0] = preferredFirstTail;
 				order[1] = preferredFirstTail == 0 ? 1 : 0;
 			} else {
-				order[0] = cardinality(0) <= cardinality(1) ? 0 : 1;
-				order[1] = cardinality(0) <= cardinality(1) ? 1 : 0;
+				if (cardinality(0) == cardinality(1) && 
+						nodes.get(0) instanceof StatementPatternNode &&
+						nodes.get(1) instanceof StatementPatternNode) {
+					final VarNode sid0 = ((StatementPatternNode) nodes.get(0)).sid();
+					final VarNode sid1 = ((StatementPatternNode) nodes.get(1)).sid();
+					if (sid0 != null && sid1 == null) {
+						order[0] = 1;
+						order[1] = 0;
+					}
+				}
+				if (order[0] == -1) {
+					order[0] = cardinality(0) <= cardinality(1) ? 0 : 1;
+					order[1] = cardinality(0) <= cardinality(1) ? 1 : 0;
+				}
 			}
 			return computeJoinCardinality(getTail(0), getTail(1));
 		}

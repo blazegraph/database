@@ -23,28 +23,31 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.File;
+import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletContextListener;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.ContextHandler;
-import org.eclipse.jetty.server.handler.HandlerList;
-import org.eclipse.jetty.server.handler.ResourceHandler;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.openrdf.rio.RDFParser;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.xml.XmlConfiguration;
 
 import com.bigdata.Banner;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rdf.store.DataLoader;
+import com.bigdata.resources.IndexManager;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -57,36 +60,163 @@ import com.bigdata.util.config.NicUtil;
  *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=NanoSparqlServer">
  *      NanoSparqlServer </a> on the wiki.
  * 
- * @todo Add an "?explain" URL query parameter and show the execution plan and
- *       costs (or make this a navigable option from the set of running queries
- *       to drill into their running costs and offer an opportunity to kill them
- *       as well).
+ * @see <a href="http://www.eclipse.org/jetty/documentation/current/"> Jetty
+ *      Documentation </a>
  * 
- * @todo Add command (or UI) to kill a running query, e.g., from the view of the
- *       long running queries.
+ * @see <a href="http://wiki.eclipse.org/Jetty/Reference/jetty.xml_syntax" >
+ *      Jetty XML Reference </a>
+ * 
+ * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+ *      Embedding Jetty </a>
  * 
  * @todo If the addressed instance uses full transactions, then mutation should
- *       also use a full transaction.
+ *       also use a full transaction. Does it?
  * 
  * @todo Remote command to advance the read-behind point. This will let people
  *       bulk load a bunch of stuff before advancing queries to read from the
  *       new consistent commit point.
- * 
- * @todo Review the settings for the {@link RDFParser} instances, e.g.,
- *       verifyData, preserveBNodeIds, etc. Perhaps we should use the same
- *       defaults as the {@link DataLoader}? Regardless, collect the logic to
- *       setup the parser in a single place for the webapp.
- * 
- * @todo It is possible that we could have concurrent requests which each get
- *       the unisolated connection. This could cause two problems: (1) we could
- *       exhaust our request pool, which would cause the server to block; and
- *       (2) I need to verify that the exclusive semaphore logic for the
- *       unisolated sail connection works with cross thread access. Someone had
- *       pointed out a bizarre hole in this....
  */
 public class NanoSparqlServer {
-	
-	static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
+    
+    static private final Logger log = Logger.getLogger(NanoSparqlServer.class);
+
+    public interface SystemProperties {
+
+        /**
+         * The name of the system property that can be used to override the default
+         * HTTP port in the bundled <code>jetty.xml</code> file.
+         */
+        String JETTY_PORT = "jetty.port";
+        
+        /**
+         * The name of the system property that can be used to override the
+         * location of the <code>jetty.xml</code> file that will be used to
+         * configure jetty (default {@value #DEFAULT_JETTY_XML}).
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+         *      Allow configuration of embedded NSS jetty server using
+         *      jetty-web.xml </a>
+         * 
+         * @see #DEFAULT_JETTY_XML
+         */
+        String JETTY_XML = "jettyXml";
+
+        /**
+         * The default value works when deployed under the IDE with the
+         * <code>bigdata-war/src</code> directory on the classpath. When
+         * deploying outside of that context, the value needs to be set
+         * explicitly.
+         */
+        String DEFAULT_JETTY_XML = "jetty.xml";
+
+        /**
+         * The timeout in seconds that we will await the start of the jetty
+         * {@link Server} (default {@value #DEFAULT_JETTY_START_TIMEOUT}).
+         */
+        String JETTY_STARTUP_TIMEOUT = "jetty.start.timeout";
+
+        String DEFAULT_JETTY_STARTUP_TIMEOUT = "10";
+
+        /**
+         * When <code>true</code>, the state of jetty will be dumped onto a
+         * logger after the server start.
+         */
+        String JETTY_DUMP_START = "jetty.dump.start";
+        
+        /**
+         * This property specifies the resource path for the web application. In
+         * order for this mechanism to work, the <code>jetty.xml</code> file
+         * MUST contain a line which allows the resourceBase of the web
+         * application to be set from an environment variable. For example:
+         * 
+         * <pre>
+         * &lt;SystemProperty name="jetty.resourceBase" default="bigdata-war/src" /&gt;
+         * </pre>
+         * 
+         * The <code>jetty.resourceBase</code> variable may identify either a
+         * file or a resource on the class path. To force the use of the web
+         * application embedded within the <code>bigdata.jar</code> you need to
+         * specify a JAR URL along the following lines (using the appropriate
+         * file path and jar name and version:
+         * 
+         * <pre>
+         * jar:file:../lib/bigdata-1.3.0.jar!/bigdata-war/src
+         * </pre>
+         * 
+         * The use of absolute file paths are recommended for reliable
+         * resolution.
+         * <p>
+         * The order of preference is:
+         * <ol>
+         * <li><code>jetty.resourceBase</code> is specified. The value of this
+         * environment variable will be used to locate the web application.</li>
+         * <li>
+         * <code>jetty.resourceBase</code> is not specified (either
+         * <code>null</code> or whitespace).
+         * <ol>
+         * <li>An attempt is made to locate the <code>bigdata-war/src</code>
+         * resource in the file system (relative to the current working
+         * directory). If found, the <code>jetty.resourceBase</code> environment
+         * variable is set to this resource using a <code>file:</code> style
+         * URL. This will cause jetty to use the web application directory in
+         * the file system.</li>
+         * <li>
+         * An attempt is made to locate the resource
+         * <code>/WEB-INF/web.xml</code> using the classpath (this handles the
+         * case when running under the eclipse IDE). If found, the the
+         * <code>jetty.resourceBase</code> is set to the URL formed by removing
+         * the trailing <code>WEB-INF/web.xml</code> for the located resource.
+         * This will cause jetty to use the web application resource on the
+         * classpath. If there are multiple such resources on the classpath, the
+         * first such resource will be discovered and used.</li>
+         * <li>An attempt is made to locate the resource
+         * <code>bigdata-war/src/WEB-INF/web.xml</code> using the classpath
+         * (this handles the case when running from the command line using a
+         * bigdata JAR). If found, the the <code>jetty.resourceBase</code> is
+         * set to the URL formed by the trailing <code>WEB-INF/web.xml</code>
+         * for the located resource. This will cause jetty to use the web
+         * application resource on the classpath. If there are multiple such
+         * resources on the classpath, the first such resource will be
+         * discovered and used.</li>
+         * <li>
+         * Otherwise, the <code>jetty.resourceBase</code> environment variable
+         * is not modified and the default location specified in the
+         * <code>jetty.xml</code> file will be used. If jetty is unable to
+         * resolve that resource, then the web application will not start.</li>
+         * </ol>
+         * </ol>
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/939" > NSS does not
+         *      start from command line: bigdata-war/src not found </a>
+         */
+        String JETTY_RESOURCE_BASE = "jetty.resourceBase";
+
+        /**
+         * The location of the <code>override-web.xml</code> resource. The
+         * default is given in <code>jetty.xml</code> and serves to locate the
+         * resource when deployed under an IDE. If not explicitly given, value
+         * of the environment variable is set by the same logic that sets the
+         * {@link #JETTY_RESOURCE_BASE} environment variable. This allows the
+         * <code>override-web.xml</code> resource to be found in its default
+         * location (which is the same directory / package as the
+         * <code>web.xml</code> file) while still preserving the ability to
+         * override the location of that resource explicitly by setting the
+         * environment variable before starting the server.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/940" > ProxyServlet in
+         *      web.xml breaks tomcat WAR (HA LBS) </a>
+         */
+        String JETTY_OVERRIDE_WEB_XML = "jetty.overrideWebXml";
+        
+        /**
+         * The location to over propertyFile used to create the servlet.  This
+         * to allow overriding the default value via passing a Java Property at
+         * the command line.
+         */
+        
+        String BIGDATA_PROPERTY_FILE = "bigdata.propertyFile";
+
+    }
 
     /**
      * Run an httpd service exposing a SPARQL endpoint. The service will respond
@@ -124,6 +254,16 @@ public class NanoSparqlServer {
      *            </dl>
      *            and <i>options</i> are any of:
      *            <dl>
+     *            <dt>-jettyXml</dt>
+     *            <dd>The location of the jetty.xml resource that will be used
+     *            to start the {@link Server} (default is the file in the JAR).
+     *            The default will locate the <code>jetty.xml</code> resource
+     *            that is bundled with the JAR. This preserves the historical
+     *            behavior. If you want to use a different
+     *            <code>jetty.xml</code> file, just override this property on
+     *            the command line -or- specify the
+     *            {@link NanoSparqlServer.SystemProperties#JETTY_XML} system
+     *            property.</dd>
      *            <dt>-nthreads</dt>
      *            <dd>The #of threads which will be used to answer SPARQL
      *            queries (default
@@ -132,7 +272,7 @@ public class NanoSparqlServer {
      *            <dd>Force a compacting merge of all shards on all data
      *            services in a bigdata federation (this option should only be
      *            used for benchmarking purposes).</dd>
-     *            <dt>readLock</dt>
+     *            <dt>-readLock</dt>
      *            <dd>The commit time against which the server will assert a
      *            read lock by holding open a read-only transaction against that
      *            commit point OR <code>-1</code> (MINUS ONE) to assert a read
@@ -141,18 +281,18 @@ public class NanoSparqlServer {
      *            will default to read against the most recent commit point on
      *            the database. Regardless, each query will be issued against a
      *            read-only transaction.</dt>
-     *            </dl>
-     *            <dt>servletContextListenerClass</dt>
+     *            <dt>-servletContextListenerClass</dt>
      *            <dd>The name of a class that extends
      *            {@link BigdataRDFServletContextListener}. This allows you to
      *            hook the {@link ServletContextListener} events.</dd>
+     *            </dl>
      *            </p>
      */
-//	 *            <dt>bufferCapacity [#bytes]</dt>
-//	 *            <dd>Specify the capacity of the buffers used to decouple the
-//	 *            query evaluation from the consumption of the HTTP response by
-//	 *            the client. The capacity may be specified in bytes or
-//	 *            kilobytes, e.g., <code>5k</code>.</dd>
+//   *            <dt>bufferCapacity [#bytes]</dt>
+//   *            <dd>Specify the capacity of the buffers used to decouple the
+//   *            query evaluation from the consumption of the HTTP response by
+//   *            the client. The capacity may be specified in bytes or
+//   *            kilobytes, e.g., <code>5k</code>.</dd>
     public static void main(final String[] args) throws Exception {
 
         Banner.banner();
@@ -163,6 +303,18 @@ public class NanoSparqlServer {
         boolean forceOverflow = false;
         Long readLock = null;
         String servletContextListenerClass = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
+        
+        /*
+         * Note: This default will locate the jetty.xml resource that is bundled
+         * with the JAR. This preserves the historical behavior. If you want to
+         * use a different jetty.xml file, just override this property on the
+         * command line.
+         */
+        String jettyXml = System.getProperty(//
+                SystemProperties.JETTY_XML,//
+                "bigdata-war/src/jetty.xml"//
+//                SystemProperties.DEFAULT_JETTY_XML
+                );
 
         /*
          * Handle all arguments starting with "-". These should appear before
@@ -193,6 +345,8 @@ public class NanoSparqlServer {
                     }
                 } else if (arg.equals("-servletContextListenerClass")) {
                     servletContextListenerClass = args[++i];
+                } else if (arg.equals("-jettyXml")) {
+                    jettyXml = args[++i];
                 } else {
                     usage(1/* status */, "Unknown argument: " + arg);
                 }
@@ -289,24 +443,98 @@ public class NanoSparqlServer {
                 servletContextListenerClass);
 
         // Create the service.
-        final Server server = NanoSparqlServer.newInstance(port, propertyFile,
-                initParams);
+        final Server server = NanoSparqlServer.newInstance(port, jettyXml,
+                null/* indexManager */, initParams);
 
-        // Start the service.
-        server.start();
+        awaitServerStart(server);
+
+        // Wait for the service to terminate.
+        server.join();
+
+    }
+
+    /**
+     * Await a {@link Server} start up to a timeout.
+     * 
+     * @parma server The {@link Server} to start.
+     * @throws InterruptedException
+     * @throws TimeoutException
+     * @throws Exception
+     */
+    public static void awaitServerStart(final Server server)
+            throws InterruptedException, TimeoutException, Exception {
+
+//        Note: Does not appear to help.
+//        
+//        final WebAppContext wac = getWebApp(server);
+//
+//        if (wac == null)
+//            throw new Exception("WebApp is not available?");
+
+        final long timeout = Long.parseLong(System.getProperty(
+                SystemProperties.JETTY_STARTUP_TIMEOUT,
+                SystemProperties.DEFAULT_JETTY_STARTUP_TIMEOUT));
+        
+        boolean ok = false;
+        final long begin = System.nanoTime();
+        final long nanos = TimeUnit.SECONDS.toNanos(timeout);
+        long remaining = nanos;
+        try {
+            // Start Server.
+            log.warn("Starting NSS");
+            server.start();
+            // Await running.
+            remaining = nanos - (System.nanoTime() - begin);
+            while (server.isStarting() && !server.isRunning()
+                   /* && !wac.isRunning() */ && remaining > 0) {
+                Thread.sleep(100/* ms */);
+                // remaining = nanos - (now - begin) [aka elapsed]
+                remaining = nanos - (System.nanoTime() - begin);
+            }
+            if (remaining < 0) {
+                throw new TimeoutException();
+            }
+//            if (!wac.isRunning())
+//                throw new Exception("WebApp is not running?");
+            ok = true;
+        } finally {
+            if (!ok) {
+                // Complain if Server did not start.
+                final String msg = "Server did not start.";
+                System.err.println(msg);
+                log.fatal(msg);
+                if (server != null) {
+                    /*
+                     * Support the jetty dump-after-start semantics.
+                     */
+                    if (Boolean.getBoolean(SystemProperties.JETTY_DUMP_START)) {
+                        log.warn(server.dump());
+                    }
+                    server.stop();
+                    server.destroy();
+                }
+            }
+        }
+
+        /*
+         * Support the jetty dump-after-start semantics.
+         */
+        if (Boolean.getBoolean(SystemProperties.JETTY_DUMP_START)) {
+            log.warn(server.dump());
+        }
 
         /*
          * Report *an* effective URL of this service.
          * 
-         * Note: This is an effective local URL (and only one of them, and
-         * even then only one for the first connector). It does not reflect
-         * any knowledge about the desired external deployment URL for the
-         * service end point.
+         * Note: This is an effective local URL (and only one of them, and even
+         * then only one for the first connector). It does not reflect any
+         * knowledge about the desired external deployment URL for the service
+         * end point.
          */
         final String serviceURL;
         {
 
-            final int actualPort = server.getConnectors()[0].getLocalPort();
+            final int actualPort = getLocalPort(server);
 
             String hostAddr = NicUtil.getIpAddress("default.nic", "default",
                     true/* loopbackOk */);
@@ -320,353 +548,510 @@ public class NanoSparqlServer {
             serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
                     .toExternalForm();
 
-            System.out.println("serviceURL: " + serviceURL);
+            final String msg = "serviceURL: " + serviceURL;
 
+            System.out.println(msg);
+            
+            if (log.isInfoEnabled())
+                log.warn(msg);
+            
         }
         
-        // Wait for the service to terminate.
-        server.join();
-
     }
-
+    
     /**
-     * Variant used when you already have the {@link IIndexManager} on hand.
+     * Start the embedded {@link Server}.
+     * <p>
+     * Note: The port override argument given here is applied by setting the
+     * {@link NanoSparqlServer.SystemProperties#JETTY_PORT} System property. The
+     * old value of that property is restored afterwards, but there is a
+     * side-effect which could be visible to concurrent threads.
      * 
      * @param port
      *            The port on which the service will run -OR- ZERO (0) for any
      *            open port.
      * @param indexManager
-     *            The {@link IIndexManager}.
+     *            The {@link IIndexManager} (optional).
      * @param initParams
      *            Initialization parameters for the web application as specified
-     *            by {@link ConfigParams}.
+     *            by {@link ConfigParams} (optional).
      * 
      * @return The server instance.
      * 
-     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
-     *      Embedding Jetty </a>
+     * @see SystemProperties
      */
     static public Server newInstance(final int port,
             final IIndexManager indexManager,
             final Map<String, String> initParams) throws Exception {
-
-        final Server server = new Server(port);
-
-        final ServletContextHandler context = getContextHandler(server,
-                initParams);
-
-        // Force the use of the caller's IIndexManager.
-        context.setAttribute(IIndexManager.class.getName(), indexManager);
         
-        final HandlerList handlers = new HandlerList();
+        // The jetty.xml resource to be used.
+        final String jettyXml = System.getProperty(SystemProperties.JETTY_XML,
+                SystemProperties.DEFAULT_JETTY_XML);
 
-        final ResourceHandler resourceHandler = new ResourceHandler();
-        
-        setupStaticResources(server, resourceHandler);
-
-        handlers.setHandlers(new Handler[] {
-                context,//
-                resourceHandler,//
-//                new DefaultHandler()//
-                });
-
-        server.setHandler(handlers);
-
-        return server;
+        return newInstance(port, jettyXml, indexManager, initParams);
         
     }
 
     /**
-     * Variant used when the life cycle of the {@link IIndexManager} will be
-     * managed by the server.
+     * Start the embedded {@link Server}.
+     * <p>
+     * Note: The port override argument given here is applied by setting the
+     * {@link NanoSparqlServer.SystemProperties#JETTY_PORT} System property. The
+     * old value of that property is restored afterwards, but there is a
+     * side-effect which could be visible to concurrent threads.
      * 
      * @param port
      *            The port on which the service will run -OR- ZERO (0) for any
      *            open port.
-     * @param propertyFile
-     *            The <code>.properties</code> file (for a standalone database
-     *            instance) or the <code>.config</code> file (for a federation).
+     * @param jettyXml
+     *            The location of the <code>jetty.xml</code> resource.
+     * @param indexManager
+     *            The {@link IIndexManager} (optional).
      * @param initParams
      *            Initialization parameters for the web application as specified
-     *            by {@link ConfigParams}.
+     *            by {@link ConfigParams} (optional).
      * 
      * @return The server instance.
      * 
-     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
-     *      Embedding Jetty </a>
+     * @see SystemProperties
      */
-    static public Server newInstance(final int port, final String propertyFile,
+    synchronized// synchronized to avoid having the side-effect on the port visible to concurrent jetty starts.
+    static public Server newInstance(final int port,
+            final String jettyXml,
+            final IIndexManager indexManager,
             final Map<String, String> initParams) throws Exception {
 
-        final Server server = new Server(port);
-
-        final ServletContextHandler context = getContextHandler(server,
-                initParams);
-
-        final HandlerList handlers = new HandlerList();
-
-        final ResourceHandler resourceHandler = new ResourceHandler();
+        if (jettyXml == null)
+            throw new IllegalArgumentException();
         
-        setupStaticResources(server, resourceHandler);
+        // Set the property to override the value in jetty.xml.
+        final String oldport = System.setProperty(SystemProperties.JETTY_PORT,
+                Integer.toString(port));
 
-        /**
-         * Note: There appear to be plenty of ways to setup JSP support for
-         * embedded jetty, and plenty of ways to get it wrong. I wound up adding
-         * to the classpath the following jars for jetty 7.2.2 to get this
-         * running:
-         * 
-         * <pre>
-         * com.sun.el_1.0.0.v201004190952.jar
-         * ecj-3.6.jar
-         * javax.el_2.1.0.v201004190952.jar
-         * javax.servlet.jsp.jstl_1.2.0.v201004190952.jar
-         * javax.servlet.jsp_2.1.0.v201004190952.jar
-         * jetty-jsp-2.1-7.2.2.v20101205.jar
-         * org.apache.jasper.glassfish_2.1.0.v201007080150.jar
-         * org.apache.taglibs.standard.glassfish_1.2.0.v201004190952.jar
-         * </pre>
-         * 
-         * With those jars on the class path, the following code will run
-         * JSP pages.
-         * 
-         * Note: In order for this to work, it must also be supported in the
-         * alternative newInstance() method above.
+        try {
+
+            return newInstance(jettyXml, indexManager, initParams);
+            
+        } finally {
+
+            if (oldport != null) {
+
+                // Restore the old value for the port.
+                System.setProperty(SystemProperties.JETTY_PORT, oldport);
+
+            }
+
+        }
+        
+    }
+
+    /**
+     * Variant used when you already have the {@link IIndexManager}.
+     * <p>
+     * When the optional {@link IIndexManager} argument is specified, it will be
+     * set as an attribute on the {@link WebAppContext}. This will cause the
+     * webapp to use the pre-existing {@link IIndexManager} rather than
+     * attempting to open a new {@link IIndexManager} based on the
+     * <code>propertyFile</code> init parameter specified in
+     * <code>web.xml</code>. The HA initialization pattern relies on this.
+     * <p>
+     * When the {@link IIndexManager} is NOT specified, the life cycle of the
+     * {@link IIndexManager} will be managed by the server and the
+     * {@link IndexManager} instance will be opened (and eventually closed) by
+     * the {@link BigdataRDFServletContextListener} based on the configured
+     * value of the <code>propertyFile</code> init parameter in
+     * <code>web.xml</code>. This form is used by {@link #main(String[])} and
+     * can be used with either the {@link Journal} or the scale-out
+     * architecture.
+     * 
+     * @param jettyXml
+     *            The <code>jetty.xml</code> file that will be used to configure
+     *            jetty.
+     * @param indexManager
+     *            The {@link IIndexManager} (optional).
+     * @param initParams
+     *            Optional map containing overrides for the init parameters
+     *            declared in <code>web.xml</code>.
+     * 
+     * @return The server instance.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+     *      Allow configuration of embedded NSS jetty server using jetty-web.xml
+     *      </a>
+     */
+    static public Server newInstance(//
+            final String jettyXml,//
+            final IIndexManager indexManager,//
+            final Map<String, String> initParams//
+    ) throws Exception {
+
+        if (jettyXml == null)
+            throw new IllegalArgumentException();
+
+        // Used to search the classpath for jetty.xml.
+        final ClassLoader classLoader = NanoSparqlServer.class
+                .getClassLoader();
+//        final ClassLoader classLoader = indexManager.getClass()
+//                .getClassLoader();
+ 
+        /*
+         * Configure the jetty Server using a jetty.xml file. In turn, the
+         * jetty.xml file configures the webapp using a web.xml file. The caller
+         * can override the location of the jetty.xml file using the [jetty.xml]
+         * environment variable if they need to change the way in which either
+         * jetty or the webapp are configured. You can also override many of the
+         * properties in the [jetty.xml] file using environment variables. For
+         * example, they can also override the location of the web application
+         * (including the web.xml file) using the [jetty.resourceBase]
+         * environment variable.
          */
-//        if (false/* jsp */) {
-//            final URL warUrl = getStaticResourceURL(server, "jsp"/* path */);
-//            final WebAppContext webappHandler = new WebAppContext(
-//                    warUrl.toExternalForm(), "/jsp");
-//            handlers.setHandlers(new Handler[] {
-//                context,//
-//                resourceHandler,//
-//                webappHandler,
-////                new DefaultHandler()//
-//                });
-//      } else {
-            handlers.setHandlers(new Handler[] {
-                    context,//
-                    resourceHandler,//
-//                    webappHandler,
-//                    new DefaultHandler()//
-                    });
-//        }
+        final Server server;
+        {
 
-        server.setHandler(handlers);
+            // Find the effective jetty.xml URL.
+            final URL jettyXmlURL = getEffectiveJettyXmlURL(classLoader,
+                    jettyXml);
+
+            // Build the server configuration from that jetty.xml resource.
+            final XmlConfiguration configuration;
+            {
+                // Open jetty.xml resource.
+                final Resource jettyConfig = Resource.newResource(jettyXmlURL);
+                InputStream is = null;
+                try {
+                    is = jettyConfig.getInputStream();
+                    // Build configuration.
+                    configuration = new XmlConfiguration(is);
+                } finally {
+                    if (is != null) {
+                        is.close();
+                    }
+                }
+            }
+
+            // Configure/apply jetty.resourceBase overrides.
+            configureEffectiveResourceBase(classLoader);
+
+            // Configure the jetty server.
+            server = (Server) configuration.configure();
+
+        }
+
+        /*
+         * Configure any overrides for the web application init-params.
+         */
+        configureWebAppOverrides(server, indexManager, initParams);
 
         return server;
         
     }
 
+    private static URL getEffectiveJettyXmlURL(final ClassLoader classLoader,
+            final String jettyXml) throws MalformedURLException {
+
+        // Locate jetty.xml.
+        final URL jettyXmlUrl;
+        boolean isFile = false;
+        boolean isClassPath = false;
+        if (new File(jettyXml).exists()) {
+
+            // Check the file system.
+            // jettyXmlUrl = new File(jettyXml).toURI();
+            jettyXmlUrl = new URL("file:" + jettyXml);
+            isFile = true;
+
+        } else {
+
+            // Check the classpath.
+            jettyXmlUrl = classLoader.getResource(jettyXml);
+            // jettyXmlUrl =
+            // classLoader.getResource("bigdata-war/src/jetty.xml");
+            isClassPath = true;
+
+        }
+
+        if (jettyXmlUrl == null) {
+
+            throw new RuntimeException("Not found: " + jettyXml);
+
+        }
+
+        if (log.isInfoEnabled())
+            log.info("jetty configuration: jettyXml=" + jettyXml + ", isFile="
+                    + isFile + ", isClassPath=" + isClassPath
+                    + ", jettyXmlUrl=" + jettyXmlUrl);
+     
+        return jettyXmlUrl;
+        
+    }
+
     /**
-     * Construct a {@link ServletContextHandler}.
-     * <p>
-     * Note: The {@link ContextHandler} uses the longest prefix of the request
-     * URI (the contextPath) to select a specific {@link Handler}.
+     * Search (a) the local file system; and (b) the classpath for the web
+     * application. If the resource is located, then set the
+     * [jetty.resourceBase] property. This search sequence gives preference to
+     * the local file system and then searches the classpath (which jetty does
+     * not known how to do by itself.)
      * 
-     * @param initParams
-     *            The init parameters, per the web.xml definition.
+     * @throws MalformedURLException
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/939" > NSS does not start
+     *      from command line: bigdata-war/src not found </a>
      */
-    static private ServletContextHandler getContextHandler(
-            final Server server,
-            final Map<String, String> initParams) throws Exception {
+    private static void configureEffectiveResourceBase(
+            final ClassLoader classLoader) throws MalformedURLException {
 
-        if (initParams == null)
-            throw new IllegalArgumentException();
-        
-        final ServletContextHandler context = new ServletContextHandler(
-                ServletContextHandler.NO_SECURITY
-//                        | ServletContextHandler.NO_SESSIONS
-                        );
+        // Check the environment variable.
+        String resourceBaseStr = System
+                .getProperty(SystemProperties.JETTY_RESOURCE_BASE);
 
-//        /*
-//         * Setup resolution for the static web app resources (index.html).
-//         */
-//        setupStaticResources(server, context);
-        
-        /*
-         * Register a listener which will handle the life cycle events for the
-         * ServletContext.
-         */
-        {
+        // true iff declared as an environment variable.
+        final boolean isDeclared = resourceBaseStr != null
+                && resourceBaseStr.trim().length() > 0;
+        boolean isFile = false; // iff found in local file system.
+        boolean isClassPath = false; // iff found on classpath.
 
-            String className = initParams
-                    .get(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS);
+        if (!isDeclared) {
 
-            if (className == null)
-                className = ConfigParams.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS;
+            /*
+             * jetty.resourceBase not declared in the environment.
+             */
 
-            final Class<BigdataRDFServletContextListener> cls = (Class<BigdataRDFServletContextListener>) Class
-                    .forName(className);
+            // The default location to check in the file system.
+            final File file = new File("bigdata-war/src");
 
-            if (!BigdataRDFServletContextListener.class.isAssignableFrom(cls)) {
-            
-                throw new RuntimeException("Invalid option: "
-                        + ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS + "="
-                        + className + ":: Class does not extend "
-                        + BigdataRDFServletContextListener.class);
+            final URL resourceBaseURL;
+            if (file.exists()) {
+
+                // Check the file system.
+                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
+                isFile = true;
+
+            } else {
+
+                /*
+                 * Check the classpath.
+                 * 
+                 * Note: When checking the classpath we need to test different
+                 * resources depending on whether we are running under the
+                 * eclipse IDE or at the command line!
+                 */
+                URL tmp = null;
+                String src = null;
+                if (tmp == null) {
+                    /**
+                     * Eclipse IDE class path.
+                     * 
+                     * Note: This is what gets found when running under eclipse.
+                     * The URL will be in the configured build directory for the
+                     * eclipse project. So, something like:
+                     * 
+                     * <pre>
+                     * file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_3_0_NEW_SVN/bin/WEB-INF/web.xml
+                     * </pre>
+                     */
+                    tmp = classLoader.getResource(src = "/WEB-INF/web.xml");
+                }
+//                if (tmp == null)// Eclipse IDE class path (system class loader).
+//                    tmp = ClassLoader.getSystemClassLoader().getResource(
+//                            src = "WEB-INF/web.xml");
+//                if (tmp == null)
+//                    tmp = classLoader // JAR class path.
+//                            .getResource(src = "/bigdata-war/src/WEB-INF/web.xml");
+                if (tmp == null) {
+                    /**
+                     * JAR class path (system class loader).
+                     * 
+                     * Note: This is what gets located when we run from the
+                     * command line (outside of eclipse). The resulting JAR URL
+                     * will be something like:
+                     * 
+                     * <pre>
+                     * jar:file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_3_0_NEW_SVN/ant-build/lib/bigdata-1.3.0-20140517.jar!/bigdata-war/src/WEB-INF/web.xml
+                     * </pre>
+                     */
+                    tmp = ClassLoader.getSystemClassLoader().getResource(
+                            src = "bigdata-war/src/WEB-INF/web.xml");
+                }
+                if (tmp != null) {
+                    if (src != null) {
+                        if(log.isInfoEnabled())
+                            log.info("Found: src=" + src + ", url=" + tmp);
+                    }
+                    final String s = tmp.toExternalForm();
+                    final int endIndex = s.lastIndexOf("WEB-INF/web.xml");
+                    final String t = s.substring(0, endIndex);
+                    resourceBaseURL = new URL(t);
+                } else {
+                    resourceBaseURL = null;
+                }
+                isClassPath = resourceBaseURL != null;
 
             }
 
-            final BigdataRDFServletContextListener listener = cls.newInstance();
+            if (resourceBaseURL != null) {
 
-            context.addEventListener(listener);
+                /*
+                 * We found the resource either in the file system or in the
+                 * classpath.
+                 * 
+                 * Explicitly set the discovered value on the jetty.resourceBase
+                 * property. This will cause jetty to use the version of that
+                 * resource that we discovered above.
+                 * 
+                 * Note: If we did not find the resource, then the default value
+                 * from the jetty.xml SystemProperty expression will be used by
+                 * jetty. If it can not find a resource using that default
+                 * value, then the startup will fail. We leave this final check
+                 * to jetty itself since it will interpret the jetty.xml file
+                 * itself.
+                 */
+                final String tmp = resourceBaseURL.toExternalForm();
+
+                System.setProperty(SystemProperties.JETTY_RESOURCE_BASE,
+                        tmp);
+
+                final URL overrideWebXmlURL = new URL(tmp
+                        + (tmp.endsWith("/") ? "" : "/")
+                        + "WEB-INF/override-web.xml");
+
+                System.setProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML,
+                        overrideWebXmlURL.toExternalForm());
+                
+            }
 
         }
 
-        /*
-         * Set the servlet context properties.
-         */
-        for (Map.Entry<String, String> e : initParams.entrySet()) {
-
-            context.setInitParameter(e.getKey(), e.getValue());
-            
-        }
-
-        // Performance counters.
-        context.addServlet(new ServletHolder(new CountersServlet()),
-                "/counters");
-
-        // Status page.
-        context.addServlet(new ServletHolder(new StatusServlet()), "/status");
-
-        // Core RDF REST API, including SPARQL query and update.
-        context.addServlet(new ServletHolder(new RESTServlet()), "/sparql/*");
-
-        // Multi-Tenancy API.
-        context.addServlet(new ServletHolder(new MultiTenancyServlet()),
-                "/namespace/*");
-        
-        /**
-         * Note: JSP pages for the servlet 2.5 specification add the following
-         * dependencies:
-         * 
-         * <pre>
-         *     ant-1.6.5.jar
-         *     core-3.1.1.jar
-         *     jsp-2.1.jar
-         *     jsp-api-2.1.jar
-         * </pre>
-         * 
-         * @see http://docs.codehaus.org/display/JETTY/Embedding+Jetty
-         */
-
-//        context.setResourceBase("bigdata-war/src/html");
-//        
-//        context.setWelcomeFiles(new String[]{"index.html"});
-        
-        return context;
+        if (log.isInfoEnabled())
+            log.info("jetty configuration"//
+                    + ": resourceBaseStr=" + resourceBaseStr
+                    + ", isDeclared="
+                    + isDeclared + ", isFile=" + isFile
+                    + ", isClassPath="
+                    + isClassPath
+                    + ", jetty.resourceBase(effective)="
+                    + System.getProperty(SystemProperties.JETTY_RESOURCE_BASE)
+                    + ", jetty.overrideWebXml(effective)="
+                    + System.getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML));
         
     }
-
+    
     /**
-     * Setup access to the web app resources, especially index.html.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
-     * 
-     * @param server
-     * @param context
+     * Configure the webapp (overrides, IIndexManager, etc.)
+     * <p>
+     * Note: These overrides are achieved by setting the {@link WebAppContext}
+     * attribute named
+     * {@link BigdataRDFServletContextListener#INIT_PARAM_OVERRIDES}. The
+     * {@link BigdataRDFServletContextListener} then consults the attribute when
+     * reporting the effective value of the init-params. This convoluted
+     * mechanism is required because you can not otherwise override the
+     * init-params without editing <code>web.xml</code>.
      */
-    private static void setupStaticResources(final Server server,
-            final ServletContextHandler context) {
+    private static void configureWebAppOverrides(//
+            final Server server,//
+            final IIndexManager indexManager,//
+            final Map<String, String> initParams//
+    ) {
 
-        final URL url = getStaticResourceURL(server, "html");
+        final WebAppContext wac = getWebApp(server);
 
-        if(url != null) {
+        if (wac == null) {
 
             /*
-             * We have located the resource. Set it as the resource base from
-             * which static content will be served.
+             * This is a fatal error. If we can not set the IIndexManager, the
+             * NSS will try to interpret the propertyFile in web.xml rather than
+             * using the one that is already open and specified by the caller.
+             * Among other things, that breaks the HAJournalServer startup.
              */
 
-            final String webDir = url.toExternalForm();
+            throw new RuntimeException("Could not locate "
+                    + WebAppContext.class.getName());
 
-            context.setResourceBase(webDir);
+        }
 
-            context.setContextPath("/");
+        /*
+         * Force the use of the caller's IIndexManager. This is how we get the
+         * NSS to use the already open Journal for the HAJournalServer.
+         */
+        if (indexManager != null) {
+
+            // Set the IIndexManager attribute on the WebAppContext.
+            wac.setAttribute(IIndexManager.class.getName(), indexManager);
+
+        }
+
+        /*
+         * Note: You simply can not override the init parameters specified in
+         * web.xml. Therefore, this sets the overrides on an attribute. The
+         * attribute is then consulted when the web app starts and its the
+         * override values are used if given.
+         */
+        if (initParams != null) {
+
+            wac.setAttribute(
+                    BigdataRDFServletContextListener.INIT_PARAM_OVERRIDES,
+                    initParams);
 
         }
 
     }
 
     /**
-     * Setup access to the welcome page (index.html).
-     */
-    private static void setupStaticResources(final Server server,
-            final ResourceHandler context) {
-
-        context.setDirectoriesListed(false); // Nope!
-
-        final URL url = getStaticResourceURL(server, "html");
-
-        if(url != null) {
-            
-            /*
-             * We have located the resource. Set it as the resource base from
-             * which static content will be served.
-             */
-
-            final String webDir = url.toExternalForm();
-
-            context.setResourceBase(webDir);
-
-            // FIXME Set to locate the flot files as part of the CountersServlet
-            // setup.
-            // resource_handler.setResourceBase(config.resourceBase);
-
-            // Note: FileResource or ResourceCollection.
-//            resourceHandler.setBaseResource(new FileResource(...));
-            
-            context.setWelcomeFiles(new String[]{"index.html"});
-
-//            context.setContextPath("/");
-
-        }
-
-    }
-
-    /**
-     * Return the URL for the static web app resources (index.html).
+     * Return the {@link WebAppContext} for the {@link Server}.
      * 
      * @param server
-     * 
-     * @return The URL for the web app resource directory -or- <code>null</code>
-     *         if it could not be found on the class path.
-     * 
-     * @see https://sourceforge.net/apps/trac/bigdata/ticket/330
+     *            The {@link Server}.
+     *            
+     * @return The {@link WebAppContext} associated with the bigdata webapp.
      */
-    private static URL getStaticResourceURL(final Server server, final String path) {
-        
-        /*
-         * This is the resource path in the JAR.
-         */
-        final String WEB_DIR_JAR = "bigdata-war/src"
-                + (path == null ? "" : "/" + path);
+    public static WebAppContext getWebApp(final Server server) {
+
+        final WebAppContext wac = server
+                .getChildHandlerByClass(WebAppContext.class);
 
         /*
-         * This is the resource path in the IDE when NOT using the JAR.
-         * 
-         * Note: You MUST have "bigdata-war/src" on the build path for the IDE.
+         * Note: This assumes that this is the webapp for bigdata. If there are
+         * multiple webapps then this assumption is no longer valid and things
+         * will break.
          */
-        final String WEB_DIR_IDE = path; // "html";
-
-        URL url = server.getClass().getClassLoader().getResource(WEB_DIR_JAR);
-
-        if (url == null && path != null) {
-
-            url = server.getClass().getClassLoader().getResource(path);// "html");
-
-        }
-
-        if (url == null) {
-
-            log.error("Could not locate: " + WEB_DIR_JAR + ", " + WEB_DIR_IDE
-                    + ", -or- " + path);
-        }
-
-        return url;
+ 
+        return wac;
 
     }
+    
+    /**
+     * Best effort attempt to return the port at which the local jetty
+     * {@link Server} is receiving http connections.
+     * 
+     * @param server
+     *            The server.
+     *            
+     * @return The local port.
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>.
+     */
+    public static int getLocalPort(final Server server) {
 
+        if (server == null)
+            throw new IllegalArgumentException();
+
+        final Connector[] a = server.getConnectors();
+        
+        if (a.length == 0) {
+         
+            /*
+             * This will happen if there are no configured connectors in
+             * jetty.xml, jetty-http.xml, etc. 
+             */
+            
+            throw new IllegalStateException("No connectors?");
+            
+        }
+        
+        return ((ServerConnector) a[0]).getLocalPort();
+
+    }
+    
     /**
      * Print the optional message on stderr, print the usage information on
      * stderr, and then force the program to exit with the given status code.
@@ -676,7 +1061,7 @@ public class NanoSparqlServer {
      * @param msg
      *            The optional message
      */
-    private static void usage(final int status, final String msg) {
+    protected static void usage(final int status, final String msg) {
 
         if (msg != null) {
 

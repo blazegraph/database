@@ -1,31 +1,38 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package com.bigdata.bop.joinGraph.rto;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpEvaluationContext;
-import com.bigdata.bop.BOpIdFactory;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.bop.NV;
-import com.bigdata.bop.PipelineOp;
-import com.bigdata.bop.engine.IRunningQuery;
-import com.bigdata.bop.engine.LocalChunkMessage;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.bop.join.PipelineJoinStats;
-import com.bigdata.bop.joinGraph.PartitionedJoinGroup;
-import com.bigdata.striterator.Dechunkerator;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpRTO;
 
 /**
  * A join path is an ordered sequence of N {@link Vertex vertices} and
@@ -78,7 +85,7 @@ import com.bigdata.striterator.Dechunkerator;
  */
 public class Path {
 
-    private static final transient Logger log = Logger.getLogger(Path.class);
+//    private static final transient Logger log = Logger.getLogger(Path.class);
 
     /**
      * An ordered list of the vertices in the {@link Path}.
@@ -159,18 +166,27 @@ public class Path {
 	 */
     final public long sumEstCost;
 
-	/**
-	 * Combine the cumulative expected cardinality and the cumulative expected
-	 * tuples read to produce an overall measure of the expected cost of the
-	 * join path if it were to be fully executed.
-	 * 
-	 * @return The cumulative estimated cost of the join path.
-	 * 
-	 *         TODO Compute this incrementally as estCost using estRead and
-	 *         estCard and then take the running sum as sumEstCost and update
-	 *         the JGraph trace appropriately.
-	 */
-	private static long getCost(final long sumEstRead, final long sumEstCard) {
+    /**
+     * Combine the cumulative expected cardinality and the cumulative expected
+     * tuples read to produce an overall measure of the expected cost of the
+     * join path if it were to be fully executed.
+     * 
+     * @return The cumulative estimated cost of the join path.
+     * 
+     *         TODO Compute this incrementally as estCost using estRead and
+     *         estCard and then take the running sum as sumEstCost and update
+     *         the JGraph trace appropriately. [Refactor into an IPathCost
+     *         interface. It should have visibility into the full path and also
+     *         allow visibility into the vertex cost for generality.]
+     * 
+     *         TODO Add a cost function API, e.g., IPathCost. This gets passed
+     *         into Path to compute a score. We also compute a score for a
+     *         vertex. Add query hints for both so we can control the behavior.
+     *         The default should be estCard, but estRead or a weighted
+     *         combination of estCard and estRead are also possible cost
+     *         functions.
+     */
+    private static long getCost(final long sumEstRead, final long sumEstCard) {
 
 		final long total;
 //		total = sumEstCard + sumEstRead; // intermediate results + IO.
@@ -181,6 +197,7 @@ public class Path {
         
     }
 
+	@Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append("Path{[");
@@ -607,9 +624,9 @@ public class Path {
      * 
      * @throws Exception
      */
-    public Path addEdge(final QueryEngine queryEngine, final int limit,
-            final Vertex vnew, final IConstraint[] constraints,
-            final boolean pathIsComplete)
+    public Path addEdge(final QueryEngine queryEngine,
+            final JoinGraph joinGraph, final int limit, final Vertex vnew,
+            final IConstraint[] constraints, final boolean pathIsComplete)
             throws Exception {
 
         if (vnew == null)
@@ -668,8 +685,9 @@ public class Path {
             
         }
 
-        final EdgeSample edgeSample2 = cutoffJoin(//
+        final EdgeSample edgeSample2 = AST2BOpRTO.cutoffJoin(//
                 queryEngine,//
+                joinGraph,//
                 limit, //
                 preds2,//
                 constraints,//
@@ -691,41 +709,47 @@ public class Path {
 
     }
 
-	/**
-	 * Cutoff join of the last vertex in the join path.
-	 * <p>
-	 * <strong>The caller is responsible for protecting against needless
-	 * re-sampling.</strong> This includes cases where a sample already exists
-	 * at the desired sample limit and cases where the sample is already exact.
-	 * 
-	 * @param queryEngine
-	 *            The query engine.
-	 * @param limit
-	 *            The limit for the cutoff join.
-	 * @param path
-	 *            The path segment, which must include the target vertex as the
-	 *            last component of the path segment.
-	 * @param constraints
-	 *            The constraints declared for the join graph (if any). The
-	 *            appropriate constraints will be applied based on the variables
-	 *            which are known to be bound as of the cutoff join for the last
-	 *            vertex in the path segment.
-	 * @param pathIsComplete
-	 *            <code>true</code> iff all vertices in the join graph are
-	 *            incorporated into this path.
-	 * @param sourceSample
-	 *            The input sample for the cutoff join. When this is a one-step
-	 *            estimation of the cardinality of the edge, then this sample is
-	 *            taken from the {@link VertexSample}. When the edge (vSource,
-	 *            vTarget) extends some {@link Path}, then this is taken from
-	 *            the {@link EdgeSample} for that {@link Path}.
-	 * 
-	 * @return The result of sampling that edge.
-	 * 
-	 * @throws Exception
-	 */
+    /**
+     * Cutoff join of the last vertex in the join path.
+     * <p>
+     * <strong>The caller is responsible for protecting against needless
+     * re-sampling.</strong> This includes cases where a sample already exists
+     * at the desired sample limit and cases where the sample is already exact.
+     * 
+     * @param queryEngine
+     *            The query engine.
+     * @param joinGraph
+     *            The pipeline operator that is executing the RTO. This defines
+     *            the join graph (vertices, edges, and constraints) and also
+     *            provides access to the AST and related metadata required to
+     *            execute the join graph.
+     * @param limit
+     *            The limit for the cutoff join.
+     * @param path
+     *            The path segment, which must include the target vertex as the
+     *            last component of the path segment.
+     * @param constraints
+     *            The constraints declared for the join graph (if any). The
+     *            appropriate constraints will be applied based on the variables
+     *            which are known to be bound as of the cutoff join for the last
+     *            vertex in the path segment.
+     * @param pathIsComplete
+     *            <code>true</code> iff all vertices in the join graph are
+     *            incorporated into this path.
+     * @param sourceSample
+     *            The input sample for the cutoff join. When this is a one-step
+     *            estimation of the cardinality of the edge, then this sample is
+     *            taken from the {@link VertexSample}. When the edge (vSource,
+     *            vTarget) extends some {@link Path}, then this is taken from
+     *            the {@link EdgeSample} for that {@link Path}.
+     * 
+     * @return The result of sampling that edge.
+     * 
+     * @throws Exception
+     */
     static public EdgeSample cutoffJoin(//
             final QueryEngine queryEngine,//
+            final JoinGraph joinGraph,//
             final int limit,//
             final IPredicate<?>[] path,//
             final IConstraint[] constraints,//
@@ -733,282 +757,9 @@ public class Path {
             final SampleBase sourceSample//
     ) throws Exception {
 
-        if (path == null)
-            throw new IllegalArgumentException();
-
-        if (limit <= 0)
-            throw new IllegalArgumentException();
-
-        // The access path on which the cutoff join will read.
-        final IPredicate<?> pred = path[path.length - 1];
-
-        if (pred == null)
-            throw new IllegalArgumentException();
-
-        if (sourceSample == null)
-            throw new IllegalArgumentException();
-        
-        if (sourceSample.getSample() == null)
-            throw new IllegalArgumentException();
-        
-        // Figure out which constraints attach to each predicate.
-        final IConstraint[][] constraintAttachmentArray = PartitionedJoinGroup
-                .getJoinGraphConstraints(path, constraints, null/*knownBound*/,
-                		pathIsComplete);
-
-        // The constraint(s) (if any) for this join.
-        final IConstraint[] c = constraintAttachmentArray[path.length - 1];
-        
-        /*
-         * Setup factory for bopIds with reservations for ones already in use.
-         */
-        final BOpIdFactory idFactory = new BOpIdFactory();
-
-        // Reservation for the bopId used by the predicate.
-        idFactory.reserve(pred.getId());
-        
-        // Reservations for the bopIds used by the constraints.
-        if (c != null) {
-            for (IConstraint x : c) {
-                if (log.isTraceEnabled())
-                    log.trace(Arrays.toString(BOpUtility.getPredIds(path))
-                            + ": constraint: " + x);
-                final Iterator<BOp> itr = BOpUtility
-                        .preOrderIteratorWithAnnotations(x);
-                while (itr.hasNext()) {
-                    final BOp y = itr.next();
-                    final Integer anId = (Integer) y
-                            .getProperty(BOp.Annotations.BOP_ID);
-                    if (anId != null)
-                        idFactory.reserve(anId.intValue());
-                }
-            }
-        }
-
-        /*
-         * Set up a cutoff pipeline join operator which makes an accurate
-         * estimate of the #of input solutions consumed and the #of output
-         * solutions generated. From that, we can directly compute the join hit
-         * ratio.
-         * 
-         * Note: This approach is preferred to injecting a "RowId" column as the
-         * estimates are taken based on internal counters in the join operator
-         * and the join operator knows how to cutoff evaluation as soon as the
-         * limit is satisfied, thus avoiding unnecessary effort.
-         */
-
-        final int joinId = idFactory.nextId();
-        final Map<String, Object> anns = NV.asMap(//
-            new NV(BOp.Annotations.BOP_ID, joinId),//
-            new NV(PipelineJoin.Annotations.PREDICATE, pred),//
-            // Note: does not matter since not executed by the query
-            // controller.
-            // // disallow parallel evaluation of tasks
-            // new NV(PipelineOp.Annotations.MAX_PARALLEL,1),
-            // disallow parallel evaluation of chunks.
-            new NV(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS, 0),
-            // disable access path coalescing
-            new NV( PipelineJoin.Annotations.COALESCE_DUPLICATE_ACCESS_PATHS, false), //
-            // pass in constraints on this join.
-            new NV(PipelineJoin.Annotations.CONSTRAINTS, c),//
-            // cutoff join.
-            new NV(PipelineJoin.Annotations.LIMIT, (long) limit),
-            /*
-             * Note: In order to have an accurate estimate of the
-             * join hit ratio we need to make sure that the join
-             * operator runs using a single PipelineJoinStats
-             * instance which will be visible to us when the query
-             * is cutoff. In turn, this implies that the join must
-             * be evaluated on the query controller.
-             * 
-             * @todo This implies that sampling of scale-out joins
-             * must be done using remote access paths.
-             */
-            new NV(PipelineJoin.Annotations.SHARED_STATE, true),//
-            new NV(PipelineJoin.Annotations.EVALUATION_CONTEXT,
-                    BOpEvaluationContext.CONTROLLER)//
-            );
-
-        @SuppressWarnings("unchecked")
-        final PipelineJoin<?> joinOp = new PipelineJoin(new BOp[] {}, anns);
-
-        final PipelineOp queryOp = joinOp;
-
-        // run the cutoff sampling of the edge.
-        final UUID queryId = UUID.randomUUID();
-        final IRunningQuery runningQuery = queryEngine.eval(//
-                queryId,//
-                queryOp,//
-                null,// attributes
-                new LocalChunkMessage(queryEngine, queryId, joinOp
-                        .getId()/* startId */, -1 /* partitionId */,
-                        sourceSample.getSample()));
-
-        final List<IBindingSet> result = new LinkedList<IBindingSet>();
-        try {
-        	int nresults = 0;
-            try {
-                IBindingSet bset = null;
-                // Figure out the #of source samples consumed.
-                final Iterator<IBindingSet> itr = new Dechunkerator<IBindingSet>(
-                        runningQuery.iterator());
-                while (itr.hasNext()) {
-                    bset = itr.next();
-					result.add(bset);
-					if (nresults++ >= limit) {
-						// Break out if cutoff join over produces!
-						break;
-                    }
-                }
-            } finally {
-            	// ensure terminated regardless.
-                runningQuery.cancel(true/* mayInterruptIfRunning */);
-            }
-		} finally {
-			// verify no problems.
-			if (runningQuery.getCause() != null) {
-				// wrap throwable from abnormal termination.
-				throw new RuntimeException(runningQuery.getCause());
-            }
-        }
-
-        // The join hit ratio can be computed directly from these stats.
-        final PipelineJoinStats joinStats = (PipelineJoinStats) runningQuery
-                .getStats().get(joinId);
-
-        if (log.isTraceEnabled())
-            log.trace(Arrays.toString(BOpUtility.getPredIds(path)) + ": "
-                    + joinStats.toString());
-
-        // #of solutions in.
-        final int inputCount = (int) joinStats.inputSolutions.get();
-
-        // #of solutions out.
-        final long outputCount = joinStats.outputSolutions.get();
-
-        // #of solutions out as adjusted for various edge conditions.
-        final long adjustedCard;
-        
-        // cumulative range count of the sampled access paths.
-        final long sumRangeCount = joinStats.accessPathRangeCount.get();
-
-        final EstimateEnum estimateEnum;
-        if (sourceSample.estimateEnum == EstimateEnum.Exact
-                && outputCount < limit) {
-            /*
-             * Note: If the entire source vertex is being fed into the cutoff
-             * join and the cutoff join outputCount is LT the limit, then the
-             * sample is the actual result of the join. That is, feeding all
-             * source solutions into the join gives fewer than the desired
-             * number of output solutions.
-             */
-            estimateEnum = EstimateEnum.Exact;
-            adjustedCard = outputCount;
-        } else if (inputCount == 1 && outputCount == limit) {
-            /*
-             * If the inputCount is ONE (1) and the outputCount is the limit,
-             * then the estimated cardinality is a lower bound as more than
-             * outputCount solutions might be produced by the join when
-             * presented with a single input solution.
-             * 
-             * However, this condition suggests that the sum of the sampled
-             * range counts is a much better estimate of the cardinality of this
-             * join.
-             * 
-             * For example, consider a join feeding a rangeCount of 16 into a
-             * rangeCount of 175000. With a limit of 100, we estimated the
-             * cardinality at 1600L (lower bound). In fact, the cardinality is
-             * 16*175000. This falsely low estimate can cause solutions which
-             * are really better to be dropped.
-             */
-            // replace outputCount with the sum of the sampled range counts.
-            adjustedCard = sumRangeCount;
-            estimateEnum = EstimateEnum.LowerBound;
-        } else if ((sourceSample.estimateEnum != EstimateEnum.Exact)
-                /*&& inputCount == Math.min(sourceSample.limit,
-                        sourceSample.estimatedCardinality) */ && outputCount == 0) {
-            /*
-             * When the source sample was not exact, the inputCount is EQ to the
-             * lesser of the source range count and the source sample limit, and
-             * the outputCount is ZERO (0), then feeding in all source solutions
-             * is not sufficient to generate any output solutions. In this case,
-             * the estimated join hit ratio appears to be zero. However, the
-             * estimation of the join hit ratio actually underflowed and the
-             * real join hit ratio might be a small non-negative value. A real
-             * zero can only be identified by executing the full join.
-             * 
-             * Note: An apparent join hit ratio of zero does NOT imply that the
-             * join will be empty (unless the source vertex sample is actually
-             * the fully materialized access path - this case is covered above).
-             * 
-             * path   sourceCard  *          f (      in     read      out    limit  adjCard) =    estCard  : sumEstCard  joinPath
-             *     15       4800L *       0.00 (     200      200        0      300        0) =          0  :       3633  [ 3  1  6  5 ]
-
-             */
-            estimateEnum = EstimateEnum.Underflow;
-            adjustedCard = outputCount;
-        } else {
-            estimateEnum = EstimateEnum.Normal;
-            adjustedCard = outputCount;
-        }
-
-        /*
-         * The #of tuples read from the sampled access paths. This is part of
-         * the cost of the join path, even though it is not part of the expected
-         * cardinality of the cutoff join.
-         * 
-         * Note: While IOs is a better predictor of latency, it is possible to
-         * choose a pipelined join versus a hash join once the query plan has
-         * been decided. Their IO provides are both correlated to the #of tuples
-         * read.
-         */
-        final long tuplesRead = joinStats.accessPathUnitsIn.get();
-
-		/*
-		 * Compute the hit-join ratio based on the adjusted cardinality
-		 * estimate.
-		 */
-		final double f = adjustedCard == 0 ? 0
-				: (adjustedCard / (double) inputCount);
-//      final double f = outputCount == 0 ? 0
-//      : (outputCount / (double) inputCount);
-
-		// estimated output cardinality of fully executed operator.
-        final long estCard = (long) (sourceSample.estCard * f);
-
-		/*
-		 * estimated tuples read for fully executed operator
-		 * 
-		 * TODO The actual IOs depend on the join type (hash join versus
-		 * pipeline join) and whether or not the file has index order (segment
-		 * versus journal). A hash join will read once on the AP. A pipeline
-		 * join will read once per input solution. A key-range read on a segment
-		 * uses multi-block IO while a key-range read on a journal uses random
-		 * IO. Also, remote access path reads are more expensive than sharded
-		 * or hash partitioned access path reads in scale-out.
-		 */
-		final long estRead = (long) (sumRangeCount * f);
-
-        final EdgeSample edgeSample = new EdgeSample(//
-                sourceSample,//
-                inputCount,//
-                tuplesRead,//
-                sumRangeCount,//
-                outputCount, //
-                adjustedCard,//
-                f, //
-                // args to SampleBase
-                estCard, // estimated output cardinality if fully executed.
-                estRead, // estimated tuples read if fully executed.
-                limit, //
-                estimateEnum,//
-                result.toArray(new IBindingSet[result.size()]));
-
-        if (log.isDebugEnabled())
-            log.debug(Arrays.toString(BOpUtility.getPredIds(path))
-                    + ": newSample=" + edgeSample);
-
-        return edgeSample;
+        // Note: Delegated to the AST/RTO integration class.
+        return AST2BOpRTO.cutoffJoin(queryEngine, joinGraph, limit, path,
+                constraints, pathIsComplete, sourceSample);
 
     }
 

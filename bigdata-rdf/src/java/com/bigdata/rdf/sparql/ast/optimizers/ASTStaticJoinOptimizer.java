@@ -51,7 +51,6 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IReorderableNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -64,7 +63,6 @@ import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 
@@ -240,28 +238,30 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     static boolean isStaticOptimizer(final IEvaluationContext context,
             final JoinGroupNode joinGroup) {
 
-        QueryOptimizerEnum optimizer = null;
+        return QueryOptimizerEnum.Static.equals(joinGroup.getQueryOptimizer());
 
-        if (joinGroup.getProperty(QueryHints.OPTIMIZER) != null) {
-
-//            optimizer = QueryOptimizerEnum.valueOf(joinGroup
-//                    .getQueryHint(QueryHints.OPTIMIZER));
-            optimizer = (QueryOptimizerEnum) joinGroup
-                    .getProperty(QueryHints.OPTIMIZER);
-            
-            return optimizer == QueryOptimizerEnum.Static;
-            
-//        } else {
+//        QueryOptimizerEnum optimizer = null;
 //
-//            optimizer = context == null || context.queryHints == null ? QueryOptimizerEnum.Static
-//                    : QueryOptimizerEnum.valueOf(context.queryHints
-//                            .getProperty(QueryHints.OPTIMIZER,
-//                                    QueryOptimizerEnum.Static.toString()));
-
-        }
-
-//        return optimizer == QueryOptimizerEnum.Static;
-        return QueryHints.DEFAULT_OPTIMIZER == QueryOptimizerEnum.Static;
+//        if (joinGroup.getProperty(QueryHints.OPTIMIZER) != null) {
+//
+////            optimizer = QueryOptimizerEnum.valueOf(joinGroup
+////                    .getQueryHint(QueryHints.OPTIMIZER));
+//            optimizer = (QueryOptimizerEnum) joinGroup
+//                    .getProperty(QueryHints.OPTIMIZER);
+//            
+//            return optimizer == QueryOptimizerEnum.Static;
+//            
+////        } else {
+////
+////            optimizer = context == null || context.queryHints == null ? QueryOptimizerEnum.Static
+////                    : QueryOptimizerEnum.valueOf(context.queryHints
+////                            .getProperty(QueryHints.OPTIMIZER,
+////                                    QueryOptimizerEnum.Static.toString()));
+//
+//        }
+//
+////        return optimizer == QueryOptimizerEnum.Static;
+//        return QueryHints.DEFAULT_OPTIMIZER == QueryOptimizerEnum.Static;
 
     }
     

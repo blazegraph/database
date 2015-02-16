@@ -85,6 +85,8 @@
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath"
 		 debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}"
 	     encoding="${javac.encoding}"
+         source="${javac.source}"
+           target="${javac.target}"
 	     	>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
@@ -124,7 +126,7 @@
 		<bottom>
 			<![CDATA[
 <i>
-Portions copyright &#169; 2006-2009 SYSTAP, LLC. All Rights Reserved.<br>
+Portions copyright &#169; 2006-2014 SYSTAP, LLC. All Rights Reserved.<br>
 Portions copyright &#169; 2005-2009 Sebastiano Vigna
 </i>]]></bottom>
 			<tag name="todo" scope="all" description="TODO:" />

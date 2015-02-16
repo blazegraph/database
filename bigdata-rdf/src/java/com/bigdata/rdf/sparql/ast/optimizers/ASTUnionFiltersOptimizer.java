@@ -134,6 +134,8 @@ public class ASTUnionFiltersOptimizer implements IASTOptimizer {
             			
             			canOptimize = false;
             			
+            			break;
+            			
             		} else {
             			
             			union = (UnionNode) child;
@@ -156,6 +158,8 @@ public class ASTUnionFiltersOptimizer implements IASTOptimizer {
             		
             		// something else in the group other than a union and filters
             		canOptimize = false;
+            		
+            		break;
             		
             	}
             	

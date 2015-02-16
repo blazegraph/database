@@ -115,6 +115,7 @@ public class TestHA3SnapshotPolicy2 extends AbstractHA3BackupTestCase {
         final HAGlue serverB = startB();
 
         // Await quorum meet.
+        @SuppressWarnings("unused")
         final long token = awaitMetQuorum();
         
         // Wait until both services are ready.
@@ -130,14 +131,38 @@ public class TestHA3SnapshotPolicy2 extends AbstractHA3BackupTestCase {
         // Verify/await snapshot on A.
         awaitSnapshotExists(serverA, commitCounter);
 
+        // Verify existence of the snapshot file.
+        assertSnapshotExists(getSnapshotDirA(), commitCounter);
+        
         // Verify/await snapshot on B.
         awaitSnapshotExists(serverB, commitCounter);
 
+        // Verify existence of the snapshot file.
+        assertSnapshotExists(getSnapshotDirB(), commitCounter);
+
+        /*
+         * Restart B and verify that the service is await of the snapshot
+         * after a restart.
+         */
+        restartB();
+
+        // Verify existence of the snapshot file after restart.
+        assertSnapshotExists(getSnapshotDirB(), commitCounter);
+
+        /*
+         * Restart A and verify that the service is await of the snapshot
+         * after a restart.
+         */
+        restartA();
+
+        // Verify existence of the snapshot file after restart.
+        assertSnapshotExists(getSnapshotDirA(), commitCounter);
+        
     }
 
     /**
      * Verify that C snapshots the journal when it enters RunMet after
-     * resynchronizing from A+B. (This can just be start A+B, await quorum meet,
+     * resynchronizing from A+B. (This can be just start A+B, await quorum meet,
      * then start C. C will resync from the leader. The snapshot should be taken
      * when resync is done and we enter RunMet.)
      */

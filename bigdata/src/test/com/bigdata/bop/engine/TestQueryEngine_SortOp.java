@@ -72,6 +72,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  */
 public class TestQueryEngine_SortOp extends TestCase2 {
 
+    @Override
     public Properties getProperties() {
 
         final Properties p = new Properties(super.getProperties());
@@ -240,6 +241,7 @@ public class TestQueryEngine_SortOp extends TestCase2 {
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),// 
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
         }));
 
         final UUID queryId = UUID.randomUUID();

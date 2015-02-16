@@ -1,0 +1,540 @@
+This is a minor release of bigdata(R).
+
+Bigdata is a horizontally-scaled, open-source architecture for indexed data with an emphasis on RDF capable of loading 1B triples in under one hour on a 15 node cluster.  Bigdata operates in both a single machine mode (Journal), highly available replication cluster mode (HAJournalServer), and a horizontally sharded cluster mode (BigdataFederation).  The Journal provides fast scalable ACID indexed storage for very large data sets, up to 50 billion triples / quads.  The HAJournalServer adds replication, online backup, horizontal scaling of query, and high availability.  The federation provides fast scalable shard-wise parallel indexed storage using dynamic sharding and shard-wise ACID updates and incremental cluster size growth.  Both platforms support fully concurrent readers with snapshot isolation.
+
+Distributed processing offers greater throughput but does not reduce query or update latency.  Choose the Journal when the anticipated scale and throughput requirements permit.  Choose the HAJournalServer for high availability and linear scaling in query throughput.  Choose the BigdataFederation when the administrative and machine overhead associated with operating a cluster is an acceptable tradeoff to have essentially unlimited data scaling and throughput.
+
+See [1,2,8] for instructions on installing bigdata(R), [4] for the javadoc, and [3,5,6] for news, questions, and the latest developments. For more information about SYSTAP, LLC and bigdata, see [7].
+
+Starting with the 1.0.0 release, we offer a WAR artifact [8] for easy installation of the single machine RDF database.  For custom development and cluster installations we recommend checking out the code from SVN using the tag for this release. The code will build automatically under eclipse.  You can also build the code using the ant script.  The cluster installer requires the use of the ant script.
+
+Starting with the 1.3.0 release, we offer a tarball artifact [10] for easy installation of the HA replication cluster.  
+
+You can download the WAR (standalone) or HA artifacts from:
+
+http://sourceforge.net/projects/bigdata/
+
+You can checkout this release from:
+
+https://svn.code.sf.net/p/bigdata/code/tags/BIGDATA_RELEASE_1_3_2
+
+Critical or otherwise of note in this minor release:
+
+- Stored query facility (#989).
+- Improved locality for small allocation slots (#986).
+- Improved scalability for RWStore (#936).
+- Various improvements for the workbench.
+- Various improvements for property graphs.
+- Critical bug fix for hasStatements() for unisolated indices (#855, #1005).
+- Critical bug fix for ConcurrentWeakValueHashMap (#1004).
+- Critical bug fix for query timeouts (#772, #865).
+- Critical bug fix for RWStore (#973).
+- Security fix for Apache commons-fileupload (#1010).
+
+New features in 1.3.x:
+
+- Java 7 is now required.
+- High availability [10].
+- High availability load balancer.
+- New RDF/SPARQL workbench.
+- Blueprints API.
+- RDF Graph Mining Service (GASService) [12].
+- Reification Done Right (RDR) support [11].
+- Property Path performance enhancements.
+- Plus numerous other bug fixes and performance enhancements. 
+
+Feature summary:
+
+- Highly Available Replication Clusters (HAJournalServer [10])
+- Single machine data storage to ~50B triples/quads (RWStore);
+- Clustered data storage is essentially unlimited (BigdataFederation);
+- Simple embedded and/or webapp deployment (NanoSparqlServer);
+- Triples, quads, or triples with provenance (SIDs);
+- Fast RDFS+ inference and truth maintenance;
+- Fast 100% native SPARQL 1.1 evaluation;
+- Integrated "analytic" query package;
+- %100 Java memory manager leverages the JVM native heap (no GC);
+
+Road map [3]:
+
+- Column-wise indexing;
+- Runtime Query Optimizer for quads; 
+- Performance optimization for scale-out clusters; and
+- Simplified deployment, configuration, and administration for scale-out clusters.
+
+Change log:
+
+  Note: Versions with (*) MAY require data migration. For details, see [9].
+
+1.3.2:
+
+- http://trac.bigdata.com/ticket/1016 (Jetty/LBS issues when deployed as WAR under tomcat)
+- http://trac.bigdata.com/ticket/1010 (Upgrade apache http components to 1.3.1 (security))
+- http://trac.bigdata.com/ticket/1005 (Invalidate BTree objects if error occurs during eviction)
+- http://trac.bigdata.com/ticket/1004 (Concurrent binding problem)
+- http://trac.bigdata.com/ticket/1002 (Concurrency issues in JVMHashJoinUtility caused by MAX_PARALLEL query hint override)
+- http://trac.bigdata.com/ticket/1000 (Add configuration option to turn off bottom-up evaluation)
+- http://trac.bigdata.com/ticket/999  (Extend BigdataSailFactory to take arbitrary properties)
+- http://trac.bigdata.com/ticket/998  (SPARQL Update through BigdataGraph)
+- http://trac.bigdata.com/ticket/996  (Add custom prefix support for query results)
+- http://trac.bigdata.com/ticket/995  (Allow general purpose SPARQL queries through BigdataGraph)
+- http://trac.bigdata.com/ticket/992  (Deadlock between AbstractRunningQuery.cancel(), QueryLog.log(), and ArbitraryLengthPathTask)
+- http://trac.bigdata.com/ticket/990  (Query hints not recognized in FILTERs)
+- http://trac.bigdata.com/ticket/989  (Stored query service)
+- http://trac.bigdata.com/ticket/988  (Bad performance for FILTER EXISTS)
+- http://trac.bigdata.com/ticket/987  (maven build is broken)
+- http://trac.bigdata.com/ticket/986  (Improve locality for small allocation slots)
+- http://trac.bigdata.com/ticket/985  (Deadlock in BigdataTriplePatternMaterializer)
+- http://trac.bigdata.com/ticket/975  (HA Health Status Page)
+- http://trac.bigdata.com/ticket/974  (Name2Addr.indexNameScan(prefix) uses scan + filter)
+- http://trac.bigdata.com/ticket/973  (RWStore.commit() should be more defensive)
+- http://trac.bigdata.com/ticket/971  (Clarify HTTP Status codes for CREATE NAMESPACE operation)
+- http://trac.bigdata.com/ticket/968  (no link to wiki from workbench)
+- http://trac.bigdata.com/ticket/966  (Failed to get namespace under concurrent update)
+- http://trac.bigdata.com/ticket/965  (Can not run LBS mode with HA1 setup)
+- http://trac.bigdata.com/ticket/961  (Clone/modify namespace to create a new one)
+- http://trac.bigdata.com/ticket/960  (Export namespace properties in XML/Java properties text format)
+- http://trac.bigdata.com/ticket/938  (HA Load Balancer)
+- http://trac.bigdata.com/ticket/936  (Support larger metabits allocations)
+- http://trac.bigdata.com/ticket/932  (Bigdata/Rexster integration)
+- http://trac.bigdata.com/ticket/919  (Formatted Layout for Status pages)
+- http://trac.bigdata.com/ticket/899  (REST API Query Cancellation)
+- http://trac.bigdata.com/ticket/885  (Panels do not appear on startup in Firefox)
+- http://trac.bigdata.com/ticket/884  (Executing a new query should clear the old query results from the console)
+- http://trac.bigdata.com/ticket/882  (Abbreviate URIs that can be namespaced with one of the defined common namespaces)
+- http://trac.bigdata.com/ticket/880  (Can't explore an absolute URI with < >)
+- http://trac.bigdata.com/ticket/878  (Explore page looks weird when empty)
+- http://trac.bigdata.com/ticket/873  (Allow user to go use browser back & forward buttons to view explore history)
+- http://trac.bigdata.com/ticket/865  (OutOfMemoryError instead of Timeout for SPARQL Property Paths)
+- http://trac.bigdata.com/ticket/858  (Change explore URLs to include URI being clicked so user can see what they've clicked on before)
+- http://trac.bigdata.com/ticket/855  (AssertionError: Child does not have persistent identity)
+- http://trac.bigdata.com/ticket/850  (Search functionality in workbench)
+- http://trac.bigdata.com/ticket/847  (Query results panel should recognize well known namespaces for easier reading)
+- http://trac.bigdata.com/ticket/845  (Display the properties for a namespace)
+- http://trac.bigdata.com/ticket/843  (Create new tabs for status & performance counters, and add per namespace service/VoID description links)
+- http://trac.bigdata.com/ticket/837  (Configurator for new namespaces)
+- http://trac.bigdata.com/ticket/836  (Allow user to create namespace in the workbench)
+- http://trac.bigdata.com/ticket/830  (Output RDF data from queries in table format)
+- http://trac.bigdata.com/ticket/829  (Export query results)
+- http://trac.bigdata.com/ticket/828  (Save selected namespace in browser)
+- http://trac.bigdata.com/ticket/827  (Explore tab in workbench)
+- http://trac.bigdata.com/ticket/826  (Create shortcut to execute load/query)
+- http://trac.bigdata.com/ticket/823  (Disable textarea when a large file is selected)
+- http://trac.bigdata.com/ticket/820  (Allow non-file:// URLs to be loaded)
+- http://trac.bigdata.com/ticket/819  (Retrieve default namespace on page load)
+- http://trac.bigdata.com/ticket/772  (Query timeout only checked at operator start/stop)
+- http://trac.bigdata.com/ticket/765  (order by expr skips invalid expressions)
+- http://trac.bigdata.com/ticket/587  (JSP page to configure KBs)
+- http://trac.bigdata.com/ticket/343  (Stochastic assert in AbstractBTree#writeNodeOrLeaf() in CI)
+
+1.3.1:
+
+- http://trac.bigdata.com/ticket/242   (Deadlines do not play well with GROUP_BY, ORDER_BY, etc.)
+- http://trac.bigdata.com/ticket/256   (Amortize RTO cost)
+- http://trac.bigdata.com/ticket/257   (Support BOP fragments in the RTO.)
+- http://trac.bigdata.com/ticket/258   (Integrate RTO into SAIL)
+- http://trac.bigdata.com/ticket/259   (Dynamically increase RTO sampling limit.)
+- http://trac.bigdata.com/ticket/526   (Reification done right)
+- http://trac.bigdata.com/ticket/580   (Problem with the bigdata RDF/XML parser with sids)
+- http://trac.bigdata.com/ticket/622   (NSS using jetty+windows can lose connections (windows only; jdk 6/7 bug))
+- http://trac.bigdata.com/ticket/624   (HA Load Balancer)
+- http://trac.bigdata.com/ticket/629   (Graph processing API)
+- http://trac.bigdata.com/ticket/721   (Support HA1 configurations)
+- http://trac.bigdata.com/ticket/730   (Allow configuration of embedded NSS jetty server using jetty-web.xml)
+- http://trac.bigdata.com/ticket/759   (multiple filters interfere)
+- http://trac.bigdata.com/ticket/763   (Stochastic results with Analytic Query Mode)
+- http://trac.bigdata.com/ticket/774   (Converge on Java 7.)
+- http://trac.bigdata.com/ticket/779   (Resynchronization of socket level write replication protocol (HA))
+- http://trac.bigdata.com/ticket/780   (Incremental or asynchronous purge of HALog files)
+- http://trac.bigdata.com/ticket/782   (Wrong serialization version)
+- http://trac.bigdata.com/ticket/784   (Describe Limit/offset don't work as expected)
+- http://trac.bigdata.com/ticket/787   (Update documentations and samples, they are OUTDATED)
+- http://trac.bigdata.com/ticket/788   (Name2Addr does not report all root causes if the commit fails.)
+- http://trac.bigdata.com/ticket/789   (ant task to build sesame fails, docs for setting up bigdata for sesame are ancient)
+- http://trac.bigdata.com/ticket/790   (should not be pruning any children)
+- http://trac.bigdata.com/ticket/791   (Clean up query hints)
+- http://trac.bigdata.com/ticket/793   (Explain reports incorrect value for opCount)
+- http://trac.bigdata.com/ticket/796   (Filter assigned to sub-query by query generator is dropped from evaluation)
+- http://trac.bigdata.com/ticket/797   (add sbt setup to getting started wiki)
+- http://trac.bigdata.com/ticket/798   (Solution order not always preserved)
+- http://trac.bigdata.com/ticket/799   (mis-optimation of quad pattern vs triple pattern)
+- http://trac.bigdata.com/ticket/802   (Optimize DatatypeFactory instantiation in DateTimeExtension)
+- http://trac.bigdata.com/ticket/803   (prefixMatch does not work in full text search)
+- http://trac.bigdata.com/ticket/804   (update bug deleting quads)
+- http://trac.bigdata.com/ticket/806   (Incorrect AST generated for OPTIONAL { SELECT })
+- http://trac.bigdata.com/ticket/808   (Wildcard search in bigdata for type suggessions)
+- http://trac.bigdata.com/ticket/810   (Expose GAS API as SPARQL SERVICE)
+- http://trac.bigdata.com/ticket/815   (RDR query does too much work)
+- http://trac.bigdata.com/ticket/816   (Wildcard projection ignores variables inside a SERVICE call.)
+- http://trac.bigdata.com/ticket/817   (Unexplained increase in journal size)
+- http://trac.bigdata.com/ticket/821   (Reject large files, rather then storing them in a hidden variable)
+- http://trac.bigdata.com/ticket/831   (UNION with filter issue)
+- http://trac.bigdata.com/ticket/841   (Using "VALUES" in a query returns lexical error)
+- http://trac.bigdata.com/ticket/848   (Fix SPARQL Results JSON writer to write the RDR syntax)
+- http://trac.bigdata.com/ticket/849   (Create writers that support the RDR syntax)
+- http://trac.bigdata.com/ticket/851   (RDR GAS interface)
+- http://trac.bigdata.com/ticket/852   (RemoteRepository.cancel() does not consume the HTTP response entity.)
+- http://trac.bigdata.com/ticket/853   (Follower does not accept POST of idempotent operations (HA))
+- http://trac.bigdata.com/ticket/854   (Allow override of maximum length before converting an HTTP GET to an HTTP POST)
+- http://trac.bigdata.com/ticket/855   (AssertionError: Child does not have persistent identity)
+- http://trac.bigdata.com/ticket/862   (Create parser for JSON SPARQL Results)
+- http://trac.bigdata.com/ticket/863   (HA1 commit failure)
+- http://trac.bigdata.com/ticket/866   (Batch remove API for the SAIL)
+- http://trac.bigdata.com/ticket/867   (NSS concurrency problem with list namespaces and create namespace)
+- http://trac.bigdata.com/ticket/869   (HA5 test suite)
+- http://trac.bigdata.com/ticket/872   (Full text index range count optimization)
+- http://trac.bigdata.com/ticket/874   (FILTER not applied when there is UNION in the same join group)
+- http://trac.bigdata.com/ticket/876   (When I upload a file I want to see the filename.)
+- http://trac.bigdata.com/ticket/877   (RDF Format selector is invisible)
+- http://trac.bigdata.com/ticket/883   (CANCEL Query fails on non-default kb namespace on HA follower.)
+- http://trac.bigdata.com/ticket/886   (Provide workaround for bad reverse DNS setups.)
+- http://trac.bigdata.com/ticket/887   (BIND is leaving a variable unbound)
+- http://trac.bigdata.com/ticket/892   (HAJournalServer does not die if zookeeper is not running)
+- http://trac.bigdata.com/ticket/893   (large sparql insert optimization slow?)
+- http://trac.bigdata.com/ticket/894   (unnecessary synchronization)
+- http://trac.bigdata.com/ticket/895   (stack overflow in populateStatsMap)
+- http://trac.bigdata.com/ticket/902   (Update Basic Bigdata Chef Cookbook)
+- http://trac.bigdata.com/ticket/904   (AssertionError:  PropertyPathNode got to ASTJoinOrderByType.optimizeJoinGroup)
+- http://trac.bigdata.com/ticket/905   (unsound combo query optimization: union + filter)
+- http://trac.bigdata.com/ticket/906   (DC Prefix Button Appends "</li>")
+- http://trac.bigdata.com/ticket/907   (Add a quick-start ant task for the BD Server "ant start")
+- http://trac.bigdata.com/ticket/912   (Provide a configurable IAnalyzerFactory)
+- http://trac.bigdata.com/ticket/913   (Blueprints API Implementation)
+- http://trac.bigdata.com/ticket/914   (Settable timeout on SPARQL Query (REST API))
+- http://trac.bigdata.com/ticket/915   (DefaultAnalyzerFactory issues)
+- http://trac.bigdata.com/ticket/920   (Content negotiation orders accept header scores in reverse)
+- http://trac.bigdata.com/ticket/939   (NSS does not start from command line: bigdata-war/src not found.)
+- http://trac.bigdata.com/ticket/940   (ProxyServlet in web.xml breaks tomcat WAR (HA LBS)
+
+1.3.0:
+
+- http://trac.bigdata.com/ticket/530 (Journal HA)
+- http://trac.bigdata.com/ticket/621 (Coalesce write cache records and install reads in cache)
+- http://trac.bigdata.com/ticket/623 (HA TXS)
+- http://trac.bigdata.com/ticket/639 (Remove triple-buffering in RWStore)
+- http://trac.bigdata.com/ticket/645 (HA backup)
+- http://trac.bigdata.com/ticket/646 (River not compatible with newer 1.6.0 and 1.7.0 JVMs)
+- http://trac.bigdata.com/ticket/648 (Add a custom function to use full text index for filtering.)
+- http://trac.bigdata.com/ticket/651 (RWS test failure)
+- http://trac.bigdata.com/ticket/652 (Compress write cache blocks for replication and in HALogs)
+- http://trac.bigdata.com/ticket/662 (Latency on followers during commit on leader)
+- http://trac.bigdata.com/ticket/663 (Issue with OPTIONAL blocks)
+- http://trac.bigdata.com/ticket/664 (RWStore needs post-commit protocol)
+- http://trac.bigdata.com/ticket/665 (HA3 LOAD non-responsive with node failure)
+- http://trac.bigdata.com/ticket/666 (Occasional CI deadlock in HALogWriter testConcurrentRWWriterReader)
+- http://trac.bigdata.com/ticket/670 (Accumulating HALog files cause latency for HA commit)
+- http://trac.bigdata.com/ticket/671 (Query on follower fails during UPDATE on leader)
+- http://trac.bigdata.com/ticket/673 (DGC in release time consensus protocol causes native thread leak in HAJournalServer at each commit)
+- http://trac.bigdata.com/ticket/674 (WCS write cache compaction causes errors in RWS postHACommit())
+- http://trac.bigdata.com/ticket/676 (Bad patterns for timeout computations)
+- http://trac.bigdata.com/ticket/677 (HA deadlock under UPDATE + QUERY)
+- http://trac.bigdata.com/ticket/678 (DGC Thread and Open File Leaks: sendHALogForWriteSet())
+- http://trac.bigdata.com/ticket/679 (HAJournalServer can not restart due to logically empty log file)
+- http://trac.bigdata.com/ticket/681 (HAJournalServer deadlock: pipelineRemove() and getLeaderId())
+- http://trac.bigdata.com/ticket/684 (Optimization with skos altLabel)
+- http://trac.bigdata.com/ticket/686 (Consensus protocol does not detect clock skew correctly)
+- http://trac.bigdata.com/ticket/687 (HAJournalServer Cache not populated)
+- http://trac.bigdata.com/ticket/689 (Missing URL encoding in RemoteRepositoryManager)
+- http://trac.bigdata.com/ticket/690 (Error when using the alias "a" instead of rdf:type for a multipart insert)
+- http://trac.bigdata.com/ticket/691 (Failed to re-interrupt thread in HAJournalServer)
+- http://trac.bigdata.com/ticket/692 (Failed to re-interrupt thread)
+- http://trac.bigdata.com/ticket/693 (OneOrMorePath SPARQL property path expression ignored)
+- http://trac.bigdata.com/ticket/694 (Transparently cancel update/query in RemoteRepository)
+- http://trac.bigdata.com/ticket/695 (HAJournalServer reports "follower" but is in SeekConsensus and is not participating in commits.)
+- http://trac.bigdata.com/ticket/701 (Problems in BackgroundTupleResult)
+- http://trac.bigdata.com/ticket/702 (InvocationTargetException on /namespace call)
+- http://trac.bigdata.com/ticket/704 (ask does not return json)
+- http://trac.bigdata.com/ticket/705 (Race between QueryEngine.putIfAbsent() and shutdownNow())
+- http://trac.bigdata.com/ticket/706 (MultiSourceSequentialCloseableIterator.nextSource() can throw NPE)
+- http://trac.bigdata.com/ticket/707 (BlockingBuffer.close() does not unblock threads)
+- http://trac.bigdata.com/ticket/708 (BIND heisenbug - race condition on select query with BIND)
+- http://trac.bigdata.com/ticket/711 (sparql protocol: mime type application/sparql-query)
+- http://trac.bigdata.com/ticket/712 (SELECT ?x { OPTIONAL { ?x eg:doesNotExist eg:doesNotExist } } incorrect)
+- http://trac.bigdata.com/ticket/715 (Interrupt of thread submitting a query for evaluation does not always terminate the AbstractRunningQuery)
+- http://trac.bigdata.com/ticket/716 (Verify that IRunningQuery instances (and nested queries) are correctly cancelled when interrupted)
+- http://trac.bigdata.com/ticket/718 (HAJournalServer needs to handle ZK client connection loss)
+- http://trac.bigdata.com/ticket/720 (HA3 simultaneous service start failure)
+- http://trac.bigdata.com/ticket/723 (HA asynchronous tasks must be canceled when invariants are changed)
+- http://trac.bigdata.com/ticket/725 (FILTER EXISTS in subselect)
+- http://trac.bigdata.com/ticket/726 (Logically empty HALog for committed transaction)
+- http://trac.bigdata.com/ticket/727 (DELETE/INSERT fails with OPTIONAL non-matching WHERE)
+- http://trac.bigdata.com/ticket/728 (Refactor to create HAClient)
+- http://trac.bigdata.com/ticket/729 (ant bundleJar not working)
+- http://trac.bigdata.com/ticket/731 (CBD and Update leads to 500 status code)
+- http://trac.bigdata.com/ticket/732 (describe statement limit does not work)
+- http://trac.bigdata.com/ticket/733 (Range optimizer not optimizing Slice service)
+- http://trac.bigdata.com/ticket/734 (two property paths interfere)
+- http://trac.bigdata.com/ticket/736 (MIN() malfunction)
+- http://trac.bigdata.com/ticket/737 (class cast exception)
+- http://trac.bigdata.com/ticket/739 (Inconsistent treatment of bind and optional property path)
+- http://trac.bigdata.com/ticket/741 (ctc-striterators should build as independent top-level project (Apache2))
+- http://trac.bigdata.com/ticket/743 (AbstractTripleStore.destroy() does not filter for correct prefix)
+- http://trac.bigdata.com/ticket/746 (Assertion error)
+- http://trac.bigdata.com/ticket/747 (BOUND bug)
+- http://trac.bigdata.com/ticket/748 (incorrect join with subselect renaming vars)
+- http://trac.bigdata.com/ticket/754 (Failure to setup SERVICE hook and changeLog for Unisolated and Read/Write connections)
+- http://trac.bigdata.com/ticket/755 (Concurrent QuorumActors can interfere leading to failure to progress)
+- http://trac.bigdata.com/ticket/756 (order by and group_concat)
+- http://trac.bigdata.com/ticket/760 (Code review on 2-phase commit protocol)
+- http://trac.bigdata.com/ticket/764 (RESYNC failure (HA))
+- http://trac.bigdata.com/ticket/770 (alpp ordering)
+- http://trac.bigdata.com/ticket/772 (Query timeout only checked at operator start/stop.)
+- http://trac.bigdata.com/ticket/776 (Closed as duplicate of #490)
+- http://trac.bigdata.com/ticket/778 (HA Leader fail results in transient problem with allocations on other services)
+- http://trac.bigdata.com/ticket/783 (Operator Alerts (HA))
+
+1.2.4:
+
+- http://trac.bigdata.com/ticket/777 (ConcurrentModificationException in ASTComplexOptionalOptimizer)
+
+1.2.3:
+
+- http://trac.bigdata.com/ticket/168 (Maven Build)
+- http://trac.bigdata.com/ticket/196 (Journal leaks memory).
+- http://trac.bigdata.com/ticket/235 (Occasional deadlock in CI runs in com.bigdata.io.writecache.TestAll)
+- http://trac.bigdata.com/ticket/312 (CI (mock) quorums deadlock)
+- http://trac.bigdata.com/ticket/405 (Optimize hash join for subgroups with no incoming bound vars.)
+- http://trac.bigdata.com/ticket/412 (StaticAnalysis#getDefinitelyBound() ignores exogenous variables.)
+- http://trac.bigdata.com/ticket/485 (RDFS Plus Profile)
+- http://trac.bigdata.com/ticket/495 (SPARQL 1.1 Property Paths)
+- http://trac.bigdata.com/ticket/519 (Negative parser tests)
+- http://trac.bigdata.com/ticket/531 (SPARQL UPDATE for SOLUTION SETS)
+- http://trac.bigdata.com/ticket/535 (Optimize JOIN VARS for Sub-Selects)
+- http://trac.bigdata.com/ticket/555 (Support PSOutputStream/InputStream at IRawStore)
+- http://trac.bigdata.com/ticket/559 (Use RDFFormat.NQUADS as the format identifier for the NQuads parser)
+- http://trac.bigdata.com/ticket/570 (MemoryManager Journal does not implement all methods).
+- http://trac.bigdata.com/ticket/575 (NSS Admin API)
+- http://trac.bigdata.com/ticket/577 (DESCRIBE with OFFSET/LIMIT needs to use sub-select)
+- http://trac.bigdata.com/ticket/578 (Concise Bounded Description (CBD))
+- http://trac.bigdata.com/ticket/579 (CONSTRUCT should use distinct SPO filter)
+- http://trac.bigdata.com/ticket/583 (VoID in ServiceDescription)
+- http://trac.bigdata.com/ticket/586 (RWStore immedateFree() not removing Checkpoint addresses from the historical index cache.)
+- http://trac.bigdata.com/ticket/590 (nxparser fails with uppercase language tag)
+- http://trac.bigdata.com/ticket/592 (Optimize RWStore allocator sizes)
+- http://trac.bigdata.com/ticket/593 (Ugrade to Sesame 2.6.10)
+- http://trac.bigdata.com/ticket/594 (WAR was deployed using TRIPLES rather than QUADS by default)
+- http://trac.bigdata.com/ticket/596 (Change web.xml parameter names to be consistent with Jini/River)
+- http://trac.bigdata.com/ticket/597 (SPARQL UPDATE LISTENER)
+- http://trac.bigdata.com/ticket/598 (B+Tree branching factor and HTree addressBits are confused in their NodeSerializer implementations)
+- http://trac.bigdata.com/ticket/599 (BlobIV for blank node : NotMaterializedException)
+- http://trac.bigdata.com/ticket/600 (BlobIV collision counter hits false limit.)
+- http://trac.bigdata.com/ticket/601 (Log uncaught exceptions)
+- http://trac.bigdata.com/ticket/602 (RWStore does not discard logged deletes on reset())
+- http://trac.bigdata.com/ticket/607 (History service / index)
+- http://trac.bigdata.com/ticket/608 (LOG BlockingBuffer not progressing at INFO or lower level)
+- http://trac.bigdata.com/ticket/609 (bigdata-ganglia is required dependency for Journal)
+- http://trac.bigdata.com/ticket/611 (The code that processes SPARQL Update has a typo)
+- http://trac.bigdata.com/ticket/612 (Bigdata scale-up depends on zookeper)
+- http://trac.bigdata.com/ticket/613 (SPARQL UPDATE response inlines large DELETE or INSERT triple graphs)
+- http://trac.bigdata.com/ticket/614 (static join optimizer does not get ordering right when multiple tails share vars with ancestry)
+- http://trac.bigdata.com/ticket/615 (AST2BOpUtility wraps UNION with an unnecessary hash join)
+- http://trac.bigdata.com/ticket/616 (Row store read/update not isolated on Journal)
+- http://trac.bigdata.com/ticket/617 (Concurrent KB create fails with "No axioms defined?")
+- http://trac.bigdata.com/ticket/618 (DirectBufferPool.poolCapacity maximum of 2GB)
+- http://trac.bigdata.com/ticket/619 (RemoteRepository class should use application/x-www-form-urlencoded for large POST requests)
+- http://trac.bigdata.com/ticket/620 (UpdateServlet fails to parse MIMEType when doing conneg.)
+- http://trac.bigdata.com/ticket/626 (Expose performance counters for read-only indices)
+- http://trac.bigdata.com/ticket/627 (Environment variable override for NSS properties file)
+- http://trac.bigdata.com/ticket/628 (Create a bigdata-client jar for the NSS REST API)
+- http://trac.bigdata.com/ticket/631 (ClassCastException in SIDs mode query)
+- http://trac.bigdata.com/ticket/632 (NotMaterializedException when a SERVICE call needs variables that are provided as query input bindings)
+- http://trac.bigdata.com/ticket/633 (ClassCastException when binding non-uri values to a variable that occurs in predicate position)
+- http://trac.bigdata.com/ticket/638 (Change DEFAULT_MIN_RELEASE_AGE to 1ms)
+- http://trac.bigdata.com/ticket/640 (Conditionally rollback() BigdataSailConnection if dirty)
+- http://trac.bigdata.com/ticket/642 (Property paths do not work inside of exists/not exists filters)
+- http://trac.bigdata.com/ticket/643 (Add web.xml parameters to lock down public NSS end points)
+- http://trac.bigdata.com/ticket/644 (Bigdata2Sesame2BindingSetIterator can fail to notice asynchronous close())
+- http://trac.bigdata.com/ticket/650 (Can not POST RDF to a graph using REST API)
+- http://trac.bigdata.com/ticket/654 (Rare AssertionError in WriteCache.clearAddrMap())
+- http://trac.bigdata.com/ticket/655 (SPARQL REGEX operator does not perform case-folding correctly for Unicode data)
+- http://trac.bigdata.com/ticket/656 (InFactory bug when IN args consist of a single literal)
+- http://trac.bigdata.com/ticket/647 (SIDs mode creates unnecessary hash join for GRAPH group patterns)
+- http://trac.bigdata.com/ticket/667 (Provide NanoSparqlServer initialization hook)
+- http://trac.bigdata.com/ticket/669 (Doubly nested subqueries yield no results with LIMIT)
+- http://trac.bigdata.com/ticket/675 (Flush indices in parallel during checkpoint to reduce IO latency)
+- http://trac.bigdata.com/ticket/682 (AtomicRowFilter UnsupportedOperationException)
+
+1.2.2:
+
+- http://trac.bigdata.com/ticket/586 (RWStore immedateFree() not removing Checkpoint addresses from the historical index cache.)
+- http://trac.bigdata.com/ticket/602 (RWStore does not discard logged deletes on reset())
+- http://trac.bigdata.com/ticket/603 (Prepare critical maintenance release as branch of 1.2.1)
+
+1.2.1:
+
+- http://trac.bigdata.com/ticket/533 (Review materialization for inline IVs)
+- http://trac.bigdata.com/ticket/539 (NotMaterializedException with REGEX and Vocab)
+- http://trac.bigdata.com/ticket/540 (SPARQL UPDATE using NSS via index.html)
+- http://trac.bigdata.com/ticket/541 (MemoryManaged backed Journal mode)
+- http://trac.bigdata.com/ticket/546 (Index cache for Journal)
+- http://trac.bigdata.com/ticket/549 (BTree can not be cast to Name2Addr (MemStore recycler))
+- http://trac.bigdata.com/ticket/550 (NPE in Leaf.getKey() : root cause was user error)
+- http://trac.bigdata.com/ticket/558 (SPARQL INSERT not working in same request after INSERT DATA)
+- http://trac.bigdata.com/ticket/562 (Sub-select in INSERT cause NPE in UpdateExprBuilder)
+- http://trac.bigdata.com/ticket/563 (DISTINCT ORDER BY)
+- http://trac.bigdata.com/ticket/567 (Failure to set cached value on IV results in incorrect behavior for complex UPDATE operation)
+- http://trac.bigdata.com/ticket/568 (DELETE WHERE fails with Java AssertionError)
+- http://trac.bigdata.com/ticket/569 (LOAD-CREATE-LOAD using virgin journal fails with "Graph exists" exception)
+- http://trac.bigdata.com/ticket/571 (DELETE/INSERT WHERE handling of blank nodes)
+- http://trac.bigdata.com/ticket/573 (NullPointerException when attempting to INSERT DATA containing a blank node)
+
+1.2.0: (*)
+
+- http://trac.bigdata.com/ticket/92  (Monitoring webapp)
+- http://trac.bigdata.com/ticket/267 (Support evaluation of 3rd party operators)
+- http://trac.bigdata.com/ticket/337 (Compact and efficient movement of binding sets between nodes.)
+- http://trac.bigdata.com/ticket/433 (Cluster leaks threads under read-only index operations: DGC thread leak)
+- http://trac.bigdata.com/ticket/437 (Thread-local cache combined with unbounded thread pools causes effective memory leak: termCache memory leak & thread-local buffers)
+- http://trac.bigdata.com/ticket/438 (KeyBeforePartitionException on cluster)
+- http://trac.bigdata.com/ticket/439 (Class loader problem)
+- http://trac.bigdata.com/ticket/441 (Ganglia integration)
+- http://trac.bigdata.com/ticket/443 (Logger for RWStore transaction service and recycler)
+- http://trac.bigdata.com/ticket/444 (SPARQL query can fail to notice when IRunningQuery.isDone() on cluster)
+- http://trac.bigdata.com/ticket/445 (RWStore does not track tx release correctly)
+- http://trac.bigdata.com/ticket/446 (HTTP Repostory broken with bigdata 1.1.0)
+- http://trac.bigdata.com/ticket/448 (SPARQL 1.1 UPDATE)
+- http://trac.bigdata.com/ticket/449 (SPARQL 1.1 Federation extension)
+- http://trac.bigdata.com/ticket/451 (Serialization error in SIDs mode on cluster)
+- http://trac.bigdata.com/ticket/454 (Global Row Store Read on Cluster uses Tx)
+- http://trac.bigdata.com/ticket/456 (IExtension implementations do point lookups on lexicon)
+- http://trac.bigdata.com/ticket/457 ("No such index" on cluster under concurrent query workload)
+- http://trac.bigdata.com/ticket/458 (Java level deadlock in DS)
+- http://trac.bigdata.com/ticket/460 (Uncaught interrupt resolving RDF terms)
+- http://trac.bigdata.com/ticket/461 (KeyAfterPartitionException / KeyBeforePartitionException on cluster)
+- http://trac.bigdata.com/ticket/463 (NoSuchVocabularyItem with LUBMVocabulary for DerivedNumericsExtension)
+- http://trac.bigdata.com/ticket/464 (Query statistics do not update correctly on cluster)
+- http://trac.bigdata.com/ticket/465 (Too many GRS reads on cluster)
+- http://trac.bigdata.com/ticket/469 (Sail does not flush assertion buffers before query)
+- http://trac.bigdata.com/ticket/472 (acceptTaskService pool size on cluster)
+- http://trac.bigdata.com/ticket/475 (Optimize serialization for query messages on cluster)
+- http://trac.bigdata.com/ticket/476 (Test suite for writeCheckpoint() and recycling for BTree/HTree)
+- http://trac.bigdata.com/ticket/478 (Cluster does not map input solution(s) across shards)
+- http://trac.bigdata.com/ticket/480 (Error releasing deferred frees using 1.0.6 against a 1.0.4 journal)
+- http://trac.bigdata.com/ticket/481 (PhysicalAddressResolutionException against 1.0.6)
+- http://trac.bigdata.com/ticket/482 (RWStore reset() should be thread-safe for concurrent readers)
+- http://trac.bigdata.com/ticket/484 (Java API for NanoSparqlServer REST API)
+- http://trac.bigdata.com/ticket/491 (AbstractTripleStore.destroy() does not clear the locator cache)
+- http://trac.bigdata.com/ticket/492 (Empty chunk in ThickChunkMessage (cluster))
+- http://trac.bigdata.com/ticket/493 (Virtual Graphs)
+- http://trac.bigdata.com/ticket/496 (Sesame 2.6.3)
+- http://trac.bigdata.com/ticket/497 (Implement STRBEFORE, STRAFTER, and REPLACE)
+- http://trac.bigdata.com/ticket/498 (Bring bigdata RDF/XML parser up to openrdf 2.6.3.)
+- http://trac.bigdata.com/ticket/500 (SPARQL 1.1 Service Description)
+- http://www.openrdf.org/issues/browse/SES-884        (Aggregation with an solution set as input should produce an empty solution as output)
+- http://www.openrdf.org/issues/browse/SES-862        (Incorrect error handling for SPARQL aggregation; fix in 2.6.1)
+- http://www.openrdf.org/issues/browse/SES-873        (Order the same Blank Nodes together in ORDER BY)
+- http://trac.bigdata.com/ticket/501 (SPARQL 1.1 BINDINGS are ignored)
+- http://trac.bigdata.com/ticket/503 (Bigdata2Sesame2BindingSetIterator throws QueryEvaluationException were it should throw NoSuchElementException)
+- http://trac.bigdata.com/ticket/504 (UNION with Empty Group Pattern)
+- http://trac.bigdata.com/ticket/505 (Exception when using SPARQL sort & statement identifiers)
+- http://trac.bigdata.com/ticket/506 (Load, closure and query performance in 1.1.x versus 1.0.x)
+- http://trac.bigdata.com/ticket/508 (LIMIT causes hash join utility to log errors)
+- http://trac.bigdata.com/ticket/513 (Expose the LexiconConfiguration to Function BOPs)
+- http://trac.bigdata.com/ticket/515 (Query with two "FILTER NOT EXISTS" expressions returns no results)
+- http://trac.bigdata.com/ticket/516 (REGEXBOp should cache the Pattern when it is a constant)
+- http://trac.bigdata.com/ticket/517 (Java 7 Compiler Compatibility)
+- http://trac.bigdata.com/ticket/518 (Review function bop subclass hierarchy, optimize datatype bop, etc.)
+- http://trac.bigdata.com/ticket/520 (CONSTRUCT WHERE shortcut)
+- http://trac.bigdata.com/ticket/521 (Incremental materialization of Tuple and Graph query results)
+- http://trac.bigdata.com/ticket/525 (Modify the IChangeLog interface to support multiple agents)
+- http://trac.bigdata.com/ticket/527 (Expose timestamp of LexiconRelation to function bops)
+- http://trac.bigdata.com/ticket/532 (ClassCastException during hash join (can not be cast to TermId))
+- http://trac.bigdata.com/ticket/533 (Review materialization for inline IVs)
+- http://trac.bigdata.com/ticket/534 (BSBM BI Q5 error using MERGE JOIN)
+
+1.1.0 (*)
+
+ - http://trac.bigdata.com/ticket/23  (Lexicon joins)
+ - http://trac.bigdata.com/ticket/109 (Store large literals as "blobs")
+ - http://trac.bigdata.com/ticket/181 (Scale-out LUBM "how to" in wiki and build.xml are out of date.)
+ - http://trac.bigdata.com/ticket/203 (Implement an persistence capable hash table to support analytic query)
+ - http://trac.bigdata.com/ticket/209 (AccessPath should visit binding sets rather than elements for high level query.)
+ - http://trac.bigdata.com/ticket/227 (SliceOp appears to be necessary when operator plan should suffice without)
+ - http://trac.bigdata.com/ticket/232 (Bottom-up evaluation semantics).
+ - http://trac.bigdata.com/ticket/246 (Derived xsd numeric data types must be inlined as extension types.)
+ - http://trac.bigdata.com/ticket/254 (Revisit pruning of intermediate variable bindings during query execution)
+ - http://trac.bigdata.com/ticket/261 (Lift conditions out of subqueries.)
+ - http://trac.bigdata.com/ticket/300 (Native ORDER BY)
+ - http://trac.bigdata.com/ticket/324 (Inline predeclared URIs and namespaces in 2-3 bytes)
+ - http://trac.bigdata.com/ticket/330 (NanoSparqlServer does not locate "html" resources when run from jar)
+ - http://trac.bigdata.com/ticket/334 (Support inlining of unicode data in the statement indices.)
+ - http://trac.bigdata.com/ticket/364 (Scalable default graph evaluation)
+ - http://trac.bigdata.com/ticket/368 (Prune variable bindings during query evaluation)
+ - http://trac.bigdata.com/ticket/370 (Direct translation of openrdf AST to bigdata AST)
+ - http://trac.bigdata.com/ticket/373 (Fix StrBOp and other IValueExpressions)
+ - http://trac.bigdata.com/ticket/377 (Optimize OPTIONALs with multiple statement patterns.)
+ - http://trac.bigdata.com/ticket/380 (Native SPARQL evaluation on cluster)
+ - http://trac.bigdata.com/ticket/387 (Cluster does not compute closure)
+ - http://trac.bigdata.com/ticket/395 (HTree hash join performance)
+ - http://trac.bigdata.com/ticket/401 (inline xsd:unsigned datatypes)
+ - http://trac.bigdata.com/ticket/408 (xsd:string cast fails for non-numeric data)
+ - http://trac.bigdata.com/ticket/421 (New query hints model.)
+ - http://trac.bigdata.com/ticket/431 (Use of read-only tx per query defeats cache on cluster)
+
+1.0.3
+
+ - http://trac.bigdata.com/ticket/217 (BTreeCounters does not track bytes released)
+ - http://trac.bigdata.com/ticket/269 (Refactor performance counters using accessor interface)
+ - http://trac.bigdata.com/ticket/329 (B+Tree should delete bloom filter when it is disabled.)
+ - http://trac.bigdata.com/ticket/372 (RWStore does not prune the CommitRecordIndex)
+ - http://trac.bigdata.com/ticket/375 (Persistent memory leaks (RWStore/DISK))
+ - http://trac.bigdata.com/ticket/385 (FastRDFValueCoder2: ArrayIndexOutOfBoundsException)
+ - http://trac.bigdata.com/ticket/391 (Release age advanced on WORM mode journal)
+ - http://trac.bigdata.com/ticket/392 (Add a DELETE by access path method to the NanoSparqlServer)
+ - http://trac.bigdata.com/ticket/393 (Add "context-uri" request parameter to specify the default context for INSERT in the REST API)
+ - http://trac.bigdata.com/ticket/394 (log4j configuration error message in WAR deployment)
+ - http://trac.bigdata.com/ticket/399 (Add a fast range count method to the REST API)
+ - http://trac.bigdata.com/ticket/422 (Support temp triple store wrapped by a BigdataSail)
+ - http://trac.bigdata.com/ticket/424 (NQuads support for NanoSparqlServer)
+ - http://trac.bigdata.com/ticket/425 (Bug fix to DEFAULT_RDF_FORMAT for bulk data loader in scale-out)
+ - http://trac.bigdata.com/ticket/426 (Support either lockfile (procmail) and dotlockfile (liblockfile1) in scale-out)
+ - http://trac.bigdata.com/ticket/427 (BigdataSail#getReadOnlyConnection() race condition with concurrent commit)
+ - http://trac.bigdata.com/ticket/435 (Address is 0L)
+ - http://trac.bigdata.com/ticket/436 (TestMROWTransactions failure in CI)
+ 
+1.0.2
+
+ - http://trac.bigdata.com/ticket/32  (Query time expansion of (foo rdf:type rdfs:Resource) drags in SPORelation for scale-out.)
+ - http://trac.bigdata.com/ticket/181 (Scale-out LUBM "how to" in wiki and build.xml are out of date.)
+ - http://trac.bigdata.com/ticket/356 (Query not terminated by error.)
+ - http://trac.bigdata.com/ticket/359 (NamedGraph pattern fails to bind graph variable if only one binding exists.)
+ - http://trac.bigdata.com/ticket/361 (IRunningQuery not closed promptly.)
+ - http://trac.bigdata.com/ticket/371 (DataLoader fails to load resources available from the classpath.)
+ - http://trac.bigdata.com/ticket/376 (Support for the streaming of bigdata IBindingSets into a sparql query.)
+ - http://trac.bigdata.com/ticket/378 (ClosedByInterruptException during heavy query mix.)
+ - http://trac.bigdata.com/ticket/379 (NotSerializableException for SPOAccessPath.)
+ - http://trac.bigdata.com/ticket/382 (Change dependencies to Apache River 2.2.0)
+
+1.0.1 (*)
+
+ - http://trac.bigdata.com/ticket/107 (Unicode clean schema names in the sparse row store).
+ - http://trac.bigdata.com/ticket/124 (TermIdEncoder should use more bits for scale-out).     
+ - http://trac.bigdata.com/ticket/225 (OSX requires specialized performance counter collection classes).
+ - http://trac.bigdata.com/ticket/348 (BigdataValueFactory.asValue() must return new instance when DummyIV is used).
+ - http://trac.bigdata.com/ticket/349 (TermIdEncoder limits Journal to 2B distinct RDF Values per triple/quad store instance).
+ - http://trac.bigdata.com/ticket/351 (SPO not Serializable exception in SIDS mode (scale-out)).
+ - http://trac.bigdata.com/ticket/352 (ClassCastException when querying with binding-values that are not known to the database).
+ - http://trac.bigdata.com/ticket/353 (UnsupportedOperatorException for some SPARQL queries).
+ - http://trac.bigdata.com/ticket/355 (Query failure when comparing with non materialized value).
+ - http://trac.bigdata.com/ticket/357 (RWStore reports "FixedAllocator returning null address, with freeBits".)
+ - http://trac.bigdata.com/ticket/359 (NamedGraph pattern fails to bind graph variable if only one binding exists.)
+ - http://trac.bigdata.com/ticket/362 (log4j - slf4j bridge.)
+
+For more information about bigdata(R), please see the following links:
+
+[1] http://wiki.bigdata.com/wiki/index.php/Main_Page
+[2] http://wiki.bigdata.com/wiki/index.php/GettingStarted
+[3] http://wiki.bigdata.com/wiki/index.php/Roadmap
+[4] http://www.bigdata.com/bigdata/docs/api/
+[5] http://sourceforge.net/projects/bigdata/
+[6] http://www.bigdata.com/blog 
+[7] http://www.systap.com/bigdata.htm
+[8] http://sourceforge.net/projects/bigdata/files/bigdata/
+[9] http://wiki.bigdata.com/wiki/index.php/DataMigration
+[10] http://wiki.bigdata.com/wiki/index.php/HAJournalServer
+[11] http://www.bigdata.com/whitepapers/reifSPARQL.pdf
+[12] http://wiki.bigdata.com/wiki/index.php/RDF_GAS_API
+
+About bigdata: 
+
+Bigdata(R) is a horizontally-scaled, general purpose storage and computing fabric for ordered data (B+Trees), designed to operate on either a single server or a cluster of commodity hardware. Bigdata(R) uses dynamically partitioned key-range shards in order to remove any realistic scaling limits - in principle, bigdata(R) may be deployed on 10s, 100s, or even thousands of machines and new capacity may be added incrementally without requiring the full reload of all data. The bigdata(R) RDF database supports RDFS and OWL Lite reasoning, high-level query (SPARQL), and datum level provenance. 

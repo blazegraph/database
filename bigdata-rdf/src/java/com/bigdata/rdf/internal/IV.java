@@ -29,17 +29,21 @@ package com.bigdata.rdf.internal;
 
 import java.io.Serializable;
 
+import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
- * Interface for the internal representation of an RDF Value (the representation
- * which is encoded within the statement indices).
+ * Interface for the internal representation of an RDF {@link Value} (the
+ * representation which is encoded within the statement indices).
  * 
  * @param <V>
  *            The generic type for the RDF {@link Value} implementation.
@@ -208,16 +212,17 @@ public interface IV<V extends BigdataValue, T> extends Serializable,
 //    String bnodeId();
     
     /**
-     * Each concrete IV implementation will implement one of the corresponding
-     * openrdf Value interfaces depending on the type of value the IV represents
-     * (URI, BNode, or Literal). This method signifies whether or not the IV
-     * can deliver the information needed by those interfaces with or without
-     * materialization.  For example, inline numerics can implement the entire
-     * Literal interface without needing to be materialized into a 
-     * BigdataLiteral. TermIds cannot answer any of the requests in the openrdf
-     * interfaces without materialization (all the relevant information is in
-     * the lexicon indices).  Even some inlines need materialization.  For
-     * example, ...
+     * Each concrete {@link IV} implementation will implement one of the
+     * corresponding openrdf {@link Value} interfaces depending on the type of
+     * value the {@link IV} represents ({@link URI}, {@link BNode}, or
+     * {@link Literal}). This method signifies whether or not the IV can deliver
+     * the information needed by those interfaces with or without
+     * materialization. For example, inline numerics can implement the entire
+     * {@link Literal} interface without needing to be materialized into a
+     * {@link BigdataLiteral}. {@link TermId}s cannot answer any of the requests
+     * in the openrdf interfaces without materialization (all the relevant
+     * information is in the lexicon indices). Even some inlines need
+     * materialization. For example, ...
      */
     boolean needsMaterialization();
 

@@ -39,7 +39,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  *      Federated Query and Custom Services</a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface CustomServiceFactory extends ServiceFactory {
 

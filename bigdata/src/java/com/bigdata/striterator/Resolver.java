@@ -75,7 +75,8 @@ abstract public class Resolver<I extends Iterator<E>, E, F> implements
         
     }
     
-    public IChunkedIterator<F> filter(I src) {
+    @Override
+    public IChunkedIterator<F> filter(final I src) {
 
         return new ChunkedResolvingIterator<I, E, F>(src, this);
         
@@ -139,24 +140,28 @@ abstract public class Resolver<I extends Iterator<E>, E, F> implements
             
         }
         
+        @Override
         public IKeyOrder<F> getKeyOrder() {
 
             return filter.keyOrder;
             
         }
 
+        @Override
         public boolean hasNext() {
 
             return src.hasNext();
             
         }
 
+        @Override
         public F next() {
             
             return filter.resolve( src.next() );
             
         }
 
+        @Override
         @SuppressWarnings("unchecked")
         public F[] nextChunk() {
 
@@ -245,7 +250,8 @@ abstract public class Resolver<I extends Iterator<E>, E, F> implements
             
         }
 
-        public F[] nextChunk(IKeyOrder<F> keyOrder) {
+        @Override
+        public F[] nextChunk(final IKeyOrder<F> keyOrder) {
 
             if (keyOrder == null)
                 throw new IllegalArgumentException();
@@ -264,12 +270,14 @@ abstract public class Resolver<I extends Iterator<E>, E, F> implements
             
         }
 
+        @Override
         public void remove() {
 
             src.remove();
             
         }
 
+        @Override
         public void close() {
 
             if (src instanceof ICloseableIterator) {

@@ -1,0 +1,25 @@
+# BSBM Q1 on pc100.
+
+PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?product ?label
+WHERE { 
+
+  # Control all RTO parameters for repeatable behavior.
+  hint:Query hint:optimizer "Runtime".
+  hint:Query hint:RTO-sampleType "DENSE".
+  hint:Query hint:RTO-limit "100".
+  hint:Query hint:RTO-nedges "1".
+
+    ?product rdfs:label ?label .
+    ?product a <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType7> .
+    ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature33> . 
+    ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature22> . 
+    ?product bsbm:productPropertyNumeric1 ?value1 . 
+    FILTER (?value1 > 282) 
+    }
+ORDER BY ?label
+LIMIT 10

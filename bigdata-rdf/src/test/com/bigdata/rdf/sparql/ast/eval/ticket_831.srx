@@ -1,0 +1,88 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='s'/>
+        <variable name='p'/>
+        <variable name='o'/>
+    </head>
+    <results>
+<!--
+:person1                                                                                  
+    a :Person ; 
+    :age 21;                                                                 
+    :name "Person 1".   
+-->
+    <result>
+            <binding name='s'>
+               <uri>http://example.org/data/person1</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+            </binding>
+            <binding name='o'>
+                <uri>http://example.org/data/Person</uri>
+            </binding>
+       </result>
+       <result>
+            <binding name='s'>
+               <uri>http://example.org/data/person1</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://example.org/data/age</uri>
+            </binding>
+            <binding name='o'>
+                <literal datatype="http://www.w3.org/2001/XMLSchema#integer">21</literal>
+            </binding>
+        </result>
+       <result>
+            <binding name='s'>
+               <uri>http://example.org/data/person1</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://example.org/data/name</uri>
+            </binding>
+            <binding name='o'>
+                <literal>Person 1</literal>
+            </binding>
+        </result>
+<!--
+:person2                                                                                  
+    a :Person ;  
+    :age 11;                                                                    
+    :name "Person 2".
+    -->
+       <result>
+            <binding name='s'>
+               <uri>http://example.org/data/person2</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://www.w3.org/1999/02/22-rdf-syntax-ns#type</uri>
+            </binding>
+            <binding name='o'>
+                <uri>http://example.org/data/Person</uri>
+            </binding>
+       </result>
+       <result>
+            <binding name='s'>
+               <uri>http://example.org/data/person2</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://example.org/data/age</uri>
+            </binding>
+            <binding name='o'>
+                <literal datatype="http://www.w3.org/2001/XMLSchema#integer">11</literal>
+            </binding>
+        </result>
+       <result>
+            <binding name='s'>
+               <uri>http://example.org/data/person2</uri>
+            </binding>
+            <binding name='p'>
+                <uri>http://example.org/data/name</uri>
+            </binding>
+            <binding name='o'>
+                <literal>Person 2</literal>
+            </binding>
+        </result>
+    </results>
+</sparql>

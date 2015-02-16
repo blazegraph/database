@@ -37,6 +37,16 @@ public interface IPreparedSparqlUpdate {
 
     void evaluate() throws Exception;
     
+    /**
+     * Evaluate and notify the specified listener when complete.
+     * 
+     * @param listener
+     *          The query listener.
+     *          
+     * @throws Exception
+     */
+    void evaluate(IPreparedQueryListener listener) throws Exception;
+    
     UUID getQueryId();
 
 }

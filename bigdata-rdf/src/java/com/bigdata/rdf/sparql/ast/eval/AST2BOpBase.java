@@ -40,6 +40,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.cost.SubqueryCostReport;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 
 /**
  * Base class provides support for triples, sids, and quads mode joins which
@@ -93,6 +94,16 @@ public class AST2BOpBase {
          */
         String SCOPE = AST2BOpBase.class.getName() + ".scope";
 
+        /**
+         * Boolean annotation indicates whether the generated JOIN is simple (a
+         * single JOIN operator with optional constraints but without any
+         * variable materialization requirements) or complex (a JOIN operator
+         * associated with at least one constraint which requires the
+         * materialization of variables that are not already known to be
+         * materialized).
+         */
+        String SIMPLE_JOIN = AST2BOpBase.class.getName() + ".simpleJoin";
+        
         /*
          * Query planner and cost estimates.
          */
@@ -162,6 +173,133 @@ public class AST2BOpBase {
 
     }
 
+//    /**
+//     * Apply any query hints to the operator as annotations of that operator.
+//     * <p>
+//     * Note: This method is responsible for transferring query hints from
+//     * {@link ASTBase#getQueryHints()} onto a generated {@link PipelineOp}.
+//     * 
+//     * @param op
+//     *            The operator.
+//     * @param queryHints
+//     *            The query hints (from {@link ASTBase#getQueryHints()}).
+//     * 
+//     * @return A copy of that operator to which the query hints (if any) have
+//     *         been applied. If there are no query hints then the original
+//     *         operator is returned.
+//     * 
+//     * @deprecated by
+//     *             {@link #applyQueryHints(PipelineOp, ASTBase, AST2BOpContext)}
+//     *             which allows by global and AST node specific query hints to
+//     *             be applied.
+//     *             
+//     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+//     *      Clean up query hints </a>
+//     */
+//    @Deprecated
+//    protected static PipelineOp applyQueryHints(PipelineOp op,
+//            final Properties queryHints) {
+//
+//        return _applyQueryHints(op, queryHints);
+//
+//    }
+
+    /**
+     * Apply any query hints to the operator as annotations of that operator.
+     * <p>
+     * Note: This method is responsible for transferring query hints from
+     * {@link ASTBase#getQueryHints()} onto a generated {@link PipelineOp}.
+     * 
+     * @param op
+     *            The pipeline operator generated from some AST node.
+     * @param node
+     *            The AST node from which the pipeline operator was generated
+     *            (required). The query hints (from
+     *            {@link ASTBase#getQueryHints()}) will be applied to that
+     *            pipeline operator.
+     * @param ctx
+     *            The evaluation context (ignored). Global query hints declared
+     *            here will be applied to the generated pipeline operator.
+     *            Global hints are applied <strong>first</strong> so they can be
+     *            override by AST node specific hints.
+     * 
+     * @return A copy of that operator to which the query hints (if any) have
+     *         been applied. If there are no query hints then the original
+     *         operator is returned.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+     *      Clean up query hints </a>
+     */
+    protected static PipelineOp applyQueryHints(PipelineOp op,
+            final ASTBase node, final AST2BOpContext ctx) {
+
+        /*
+         * Note: The global query hints are transferred onto the AST nodes by
+         * the ASTQueryHintOptimizer and the registered IQueryHint classes. They
+         * do NOT need to be reapplied here.
+         */
+//        // Apply global query hints from ASTContext.
+//        op = _applyQueryHints(op, ctx.queryHints);
+
+//        if (node != null) {
+            // Apply ASTBase node specific query hints.
+            op = _applyQueryHints(op, node.getQueryHints());
+//        }
+
+        return op;
+        
+    }
+
+    /**
+     * Apply any query hints to the operator as annotations of that operator.
+     * <p>
+     * Note: This method is responsible for transferring query hints from
+     * {@link ASTBase#getQueryHints()} onto a generated {@link PipelineOp}.
+     * <p>
+     * Note: This alternative form is for use within caller contexts in which
+     * (due to historical reasons) we have the query hints object for the AST
+     * node, but not the AST node itself. This pattern shows up in the join()
+     * methods since the {@link StatementPatternNode} is not passed through.
+     * 
+     * @param op
+     *            The pipeline operator generated from some AST node (required).
+     * @param nodeQueryHints
+     *            The query hints for the AST node from which the pipeline
+     *            operator was generated or its dominating operator context
+     *            since not all operators have query hints applied (required).
+     * @param ctx
+     *            The evaluation context (ignored). Global query hints declared
+     *            here will be applied to the generated pipeline operator.
+     *            Global hints are applied <strong>first</strong> so they can be
+     *            override by AST node specific hints.
+     * 
+     * @return A copy of that operator to which the query hints (if any) have
+     *         been applied. If there are no query hints then the original
+     *         operator is returned.
+     * 
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/791" >
+     *      Clean up query hints </a>
+     */
+    protected static PipelineOp applyQueryHints(PipelineOp op,
+            final Properties nodeQueryHints, final AST2BOpContext ctx) {
+
+        /*
+         * Note: The global query hints are transferred onto the AST nodes by
+         * the ASTQueryHintOptimizer and the registered IQueryHint classes. They
+         * do NOT need to be reapplied here.
+         */
+//        // Apply global query hints from ASTContext.
+//        op = _applyQueryHints(op, ctx.queryHints);
+
+//        if (nodeQueryHints != null) {
+            // Apply ASTBase node specific query hints.
+            op = _applyQueryHints(op, nodeQueryHints);
+//        }
+
+        return op;
+        
+    }
+
     /**
      * Apply any query hints to the operator as annotations of that operator.
      * <p>
@@ -171,13 +309,13 @@ public class AST2BOpBase {
      * @param op
      *            The operator.
      * @param queryHints
-     *            The query hints (from {@link ASTBase#getQueryHints()}).
+     *            The query hints (optional).
      * 
      * @return A copy of that operator to which the query hints (if any) have
      *         been applied. If there are no query hints then the original
      *         operator is returned.
      */
-    protected static PipelineOp applyQueryHints(PipelineOp op,
+    private static PipelineOp _applyQueryHints(PipelineOp op,
             final Properties queryHints) {
 
         if (queryHints == null)
@@ -191,8 +329,8 @@ public class AST2BOpBase {
 
             final String value = queryHints.getProperty(name);
 
-            if (log.isInfoEnabled())
-                log.info("Query hint: op=" + (op.getClass().getSimpleName())
+            if (log.isDebugEnabled())
+                log.debug("Query hint: op=" + (op.getClass().getSimpleName())
                         + " [" + name + "=" + value + "]");
 
             op = (PipelineOp) op.setProperty(name, value);

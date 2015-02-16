@@ -38,8 +38,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.BOp;
@@ -69,6 +69,7 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.Chunkerator;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -211,7 +212,7 @@ public class ServiceCallJoin extends PipelineOp {
 
         private final AbstractTripleStore db;
 
-        private final ClientConnectionManager cm;
+        private final HttpClient cm;
         
         private final IVariableOrConstant<?> serviceRef;
 
@@ -571,6 +572,7 @@ public class ServiceCallJoin extends PipelineOp {
 
             }
 
+            @Override
             public Void call() throws Exception {
 
                 final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
@@ -592,7 +594,7 @@ public class ServiceCallJoin extends PipelineOp {
                         chunk), null/* stats */);
 
                 // The iterator draining the subquery
-                ICloseableIterator<IBindingSet> serviceSolutionItr = null;
+                ICloseableIterator<IBindingSet[]> serviceSolutionItr = null;
                 try {
 
                     /*
@@ -609,10 +611,13 @@ public class ServiceCallJoin extends PipelineOp {
                          * Do a hash join of the source solutions with the
                          * solutions from the service, outputting any solutions
                          * which join.
+                         * 
+                         * Note: 
                          */
                         
-                        state.hashJoin(serviceSolutionItr, unsyncBuffer);
-                        
+                        state.hashJoin(serviceSolutionItr, null/* stats */,
+                                unsyncBuffer);
+
                     }
 
                 } finally {
@@ -671,26 +676,35 @@ public class ServiceCallJoin extends PipelineOp {
              *         SILENT is <code>true</code>.
              * 
              * @throws Exception
+             * 
+             *             TODO RECHUNKING Push down the
+             *             ICloseableIterator<IBindingSet[]> return type into
+             *             the {@link ServiceCall} interface and the various
+             *             ways in which we can execute a service call. Do this
+             *             as part of vectoring solutions in and out of service
+             *             calls?
              */
-            private ICloseableIterator<IBindingSet> doServiceCall(
+            private ICloseableIterator<IBindingSet[]> doServiceCall(
                     final ServiceCall<? extends Object> serviceCall,
                     final IBindingSet[] left) throws Exception {
 
                 try {
                     
+                    final ICloseableIterator<IBindingSet> itr;
+                    
                     if (serviceCall instanceof BigdataServiceCall) {
 
-                        return doBigdataServiceCall(
+                        itr = doBigdataServiceCall(
                                 (BigdataServiceCall) serviceCall, left);
 
                     } else if (serviceCall instanceof ExternalServiceCall) {
 
-                        return doExternalServiceCall(
+                        itr = doExternalServiceCall(
                                 (ExternalServiceCall) serviceCall, left);
 
                     } else if (serviceCall instanceof RemoteServiceCall) {
 
-                        return doRemoteServiceCall(
+                        itr = doRemoteServiceCall(
                                 (RemoteServiceCall) serviceCall, left);
 
                     } else {
@@ -698,6 +712,12 @@ public class ServiceCallJoin extends PipelineOp {
                         throw new AssertionError();
 
                     }
+
+                    
+                    final ICloseableIterator<IBindingSet[]> itr2 = new Chunkerator<IBindingSet>(
+                            itr, op.getChunkCapacity(), IBindingSet.class);
+
+                    return itr2;
                     
                 } catch (Throwable t) {
 

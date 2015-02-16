@@ -298,6 +298,7 @@ public class TestNIOChunkMessage extends TestCase2 {
         /**
          * Overridden to expose to the unit test.
          */
+        @Override
         protected void materialize(
                 final ManagedResourceService resourceService,
                 final IAllocationContext allocationContext) {

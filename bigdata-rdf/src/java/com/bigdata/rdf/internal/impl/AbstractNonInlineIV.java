@@ -87,7 +87,8 @@ abstract public class AbstractNonInlineIV<V extends BigdataValue, T>
      */
     final public V asValue(final LexiconRelation lex) {
     
-        throw new UnsupportedOperationException();
+		return getValue();
+//        throw new UnsupportedOperationException();
         
     }
 

@@ -102,7 +102,10 @@ public class TestPipelineJoin extends TestCase2 {
     
     Journal jnl;
     
+    @Override
     public void setUp() throws Exception {
+
+        super.setUp();
         
         jnl = new Journal(getProperties());
 
@@ -136,6 +139,7 @@ public class TestPipelineJoin extends TestCase2 {
 
     }
 
+    @Override
     public void tearDown() throws Exception {
 
         if (jnl != null) {
@@ -143,6 +147,8 @@ public class TestPipelineJoin extends TestCase2 {
             jnl = null;
         }
 
+        super.tearDown();
+        
     }
 
     /**

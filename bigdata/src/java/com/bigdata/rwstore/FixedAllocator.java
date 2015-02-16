@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.journal.ICommitter;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
@@ -49,7 +50,7 @@ import com.bigdata.util.ChecksumUtility;
 public class FixedAllocator implements Allocator {
     
     private static final Logger log = Logger.getLogger(FixedAllocator.class);
-    
+
     private final int cModAllocation = 1 << RWStore.ALLOCATION_SCALEUP;
     private final int cMinAllocation = cModAllocation * 1; // must be multiple of cModAllocation
 
@@ -180,6 +181,8 @@ public class FixedAllocator implements Allocator {
 			
 		    m_store.showWriteCacheDebug(paddr);			
 			
+		    log.warn("Physical address " + paddr + " not accessible for Allocator of size " + m_size);
+			
 			return 0L;
 		}
 	}
@@ -202,20 +205,26 @@ public class FixedAllocator implements Allocator {
 	private ArrayList m_freeList;
 
 	public void setFreeList(final ArrayList list) {
-		m_freeList = list;
-
-		if (!m_pendingContextCommit && hasFree()) {
-			m_freeList.add(this);
-			m_freeWaiting = false;
+		if (m_freeList != list) {
+			m_freeList = list;
+			m_freeWaiting = true;
 		}
+
+		if (!m_pendingContextCommit && hasFree() && meetsSmallSlotThreshold()) {
+			addToFreeList();
+		}
+		
 	}
 	
 	/**
 	 * To support postHACommit an allocator can be removed from the current freelist
 	 */
 	void removeFromFreeList() {
-		if (m_freeList != null)
+		if (m_freeList != null) {
+			// log.warn("Removing allocator " + m_index + " from free list");
 			m_freeList.remove(this);
+			m_freeWaiting = true;
+		}
 		
 	}
 
@@ -403,9 +412,13 @@ public class FixedAllocator implements Allocator {
 		final int calcFree = calcFreeBits();
 		final int calcLiveFree = calcLiveFreeBits();
 		
-		return m_freeBits == calcFree
+		final boolean ret =  m_freeBits == calcFree
 			&& (m_freeBits + m_freeTransients) == calcLiveFree;
+				
+		if (!ret)
+			throw new AssertionError("m_free: " + m_freeBits + ", calcFree: " + calcFree);
 		
+		return ret;		
 	}
 
 	// read does not read in m_size since this is read to determine the class of
@@ -464,6 +477,13 @@ public class FixedAllocator implements Allocator {
 
 	private int m_startAddr = 0;
 	private int m_endAddr = 0;
+	
+	/**
+	 * For "small slot" allocators the allocation search is
+	 * always from bit areas with less than a maximum density to
+	 * ensure that writes have better locality.
+	 */
+	int m_allocIndex = -1;
 
     /**
      * The #of int32 values in a single {@link AllocBlock} region. The
@@ -528,6 +548,51 @@ public class FixedAllocator implements Allocator {
 
 		m_freeTransients = 0;
 		m_freeBits = 32 * m_bitSize * numBlocks;
+	}
+	
+	/**
+	 * find the allocationIndex of first "sparsely committed" AllocBlock.
+	 * 
+	 * Checks the committed bits of all the AllocBlocks until one is found with
+	 * > 50% free (or less than 50% allocated) of the committed bits.
+	 * @param store 
+	 * @param i 
+	 */
+	void resetAllocIndex() {
+		resetAllocIndex(0);
+	}
+	
+	void resetAllocIndex(final int start) {
+		m_allocIndex = start;
+		
+		if (m_size <= 1024) {
+			for (int a = m_allocIndex/m_bitSize; a < m_allocBlocks.size(); a++) {
+				final AllocBlock ab = m_allocBlocks.get(a);
+				
+				checkBlock(ab);
+				
+				for (int i = (m_allocIndex%m_bitSize); i < m_bitSize; i++) {
+					// first check if transients are already full
+					if (ab.m_transients[i] != 0xFFFFFFFF) {
+						// then check maximum 50% commit allocated
+						if (Integer.bitCount(ab.m_commit[i]) < 16) { 
+							final AllocBlock abr = m_allocBlocks.get(m_allocIndex/m_bitSize);
+							assert abr == ab;
+							
+							return;
+						}
+					}
+					m_allocIndex++;
+				}
+			}
+			
+			// must remove from free list if we cannot set the alloc Index for a small slot
+			if (start == 0) {
+				removeFromFreeList();
+			} else {
+				resetAllocIndex(0);
+			}
+		}
 	}
 	
 	/**
@@ -691,6 +756,7 @@ public class FixedAllocator implements Allocator {
 			try {
 	            if (log.isDebugEnabled())
 	                checkBits();
+	            
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 					
@@ -719,7 +785,7 @@ public class FixedAllocator implements Allocator {
             if (log.isDebugEnabled())
                 checkBits();
 
-			return true;
+    		return true;
 		} else if (addr >= m_startAddr && addr < m_endAddr) {
 
 			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
@@ -753,14 +819,37 @@ public class FixedAllocator implements Allocator {
 	
 	private void checkFreeList() {
 		if (m_freeWaiting && !m_pendingContextCommit) {
-			if (m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
-				m_freeWaiting = false;
+			if (meetsSmallSlotThreshold()) {
 				
-				if (log.isDebugEnabled())
-					log.debug("Returning Allocator to FreeList - " + m_size);
+				addToFreeList();
 				
-				m_freeList.add(this);
+				resetAllocIndex(0);				
 			}
+		}
+	}
+	
+	private void addToFreeList() {
+		assert m_freeWaiting;
+		
+		m_freeWaiting = false;
+		m_freeList.add(this);
+		m_allocIndex = -1;
+		
+		if (log.isDebugEnabled())
+			log.debug("Returning Allocator to FreeList - " + m_size);
+	}
+	
+	private boolean meetsSmallSlotThreshold() {
+		// check threshold for all slots
+		if (m_freeBits < m_store.cDefaultFreeBitsThreshold) {
+			return false;
+		}
+		
+		// then check for small slots
+		if (m_size <= m_store.cSmallSlot) { // it's a small slotSMALL_SLOT_TYPE
+			return m_freeBits > m_store.cSmallSlotThreshold;
+		} else {
+			return true;
 		}
 	}
 
@@ -768,96 +857,189 @@ public class FixedAllocator implements Allocator {
 	 * The introduction of IAllocationContexts has added some complexity to
 	 * the older concept of a free list.  With AllocationContexts it is
 	 * possibly for allocator to have free space available but this being
-	 * restricted to a specific AllocaitonContext.  The RWStore alloc method
-	 * must therefore handle the 
+	 * restricted to a specific AllocationContext.
+	 * <p>
+	 * In addition to the standard free allocation search we want to add a
+	 * "density" restriction for small slots to encourage the aggregation
+	 * of writes (by increasing the likelihood of sibling slot allocation).
+	 * <p>
+	 * There is some "Do What I mean" complexity here, with difficulty in 
+	 * determining a good rule to identify an initial allocation point.  There
+	 * is a danger of significantly reducing the allocation efficiency of
+	 * short transactions if we too naively check committed bit density.  We
+	 * should only do this when identifying the initial allocation, and when
+	 * the allocIndex is incremented.
 	 */
-	public int alloc(final RWStore store, final int size, final IAllocationContext context) {
+	public int alloc(final RWStore store, final int size,
+			final IAllocationContext context) {
 		try {
-        if (size <= 0)
-            throw new IllegalArgumentException(
-                    "Allocate requires positive size, got: " + size);
+			if (size <= 0)
+				throw new IllegalArgumentException(
+						"Allocate requires positive size, got: " + size);
 
-        if (size > m_size)
-            throw new IllegalArgumentException(
-                    "FixedAllocator with slots of " + m_size 
-                    + " bytes requested allocation for "+ size + " bytes");
+			if (size > m_size)
+				throw new IllegalArgumentException(
+						"FixedAllocator with slots of " + m_size
+								+ " bytes requested allocation for " + size
+								+ " bytes");
 
-	    int addr = -1;
+			if (m_freeBits == 0) {
+				throw new IllegalStateException("Request to allocate from " + m_size + "byte slot FixedAllocator with zero bits free - should not be on the Free List");
+			}
+			
+			int addr = -1;
+			
+			// Special allocation for small slots
+			if (m_size <= m_store.cSmallSlot) {
+				return allocFromIndex(size);
+			}
 
-		final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
-		int count = -1;
-		while (addr == -1 && iter.hasNext()) {
-			count++;
+			final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+			int count = -1;
+			while (addr == -1 && iter.hasNext()) {
+				count++;
 
-			final AllocBlock block = iter.next();
-			if (block.m_addr == 0) {
-				int blockSize = 32 * m_bitSize;
+				final AllocBlock block = iter.next();
+				checkBlock(block);
+				
+				addr = block.alloc(m_size);
+			}
+
+			if (addr != -1) {
+
+				addr += 3; // Tweak to ensure non-zero address for offset 0
+
+				if (--m_freeBits == 0) {
+					if (log.isTraceEnabled())
+						log.trace("Remove from free list");
+					removeFromFreeList();
+
+					// Should have been first on list, now check for first
+					if (m_freeList.size() > 0) {
+						if (log.isDebugEnabled()) {
+							final FixedAllocator nxt = (FixedAllocator) m_freeList
+									.get(0);
+							log.debug("Freelist head: " + nxt.getSummaryStats());
+						}
+					}
+				}
+
+				addr += (count * 32 * m_bitSize);
+
+				final int value = -((m_index << RWStore.OFFSET_BITS) + addr);
+
 				if (m_statsBucket != null) {
-					m_statsBucket.addSlots(blockSize);
+					m_statsBucket.allocate(size);
 				}
-				blockSize *= m_size;
-				blockSize >>= RWStore.ALLOCATION_SCALEUP;
 
-				block.m_addr = grabAllocation(store, blockSize);
-				if (log.isDebugEnabled())
-					log.debug("Allocation block at " + block.m_addr + " of " + (blockSize << 16) + " bytes");
+				return value;
+			} else {
+				StringBuilder sb = new StringBuilder();
+				sb.append("FixedAllocator returning null address, with freeBits: "
+						+ m_freeBits + "\n");
 
-				if (m_startAddr == 0) {
-					m_startAddr = block.m_addr;
+				for (AllocBlock ab : m_allocBlocks) {
+					sb.append(ab.show() + "\n");
 				}
-				m_endAddr = block.m_addr - blockSize;
+
+				log.error(sb);
+
+				return 0;
 			}
-			addr = block.alloc(m_size);
-		}
-
-		if (addr != -1) {
-
-			addr += 3; // Tweak to ensure non-zero address for offset 0
-			
-	    	if (--m_freeBits == 0) {
-	    		if (log.isTraceEnabled())
-	    			log.trace("Remove from free list");
-				m_freeList.remove(this);
-				m_freeWaiting = true;
-
-				// Should have been first on list, now check for first
-				if (m_freeList.size() > 0) {
-                    if (log.isDebugEnabled()) {
-    					final FixedAllocator nxt = (FixedAllocator) m_freeList.get(0);
-                        log.debug("Freelist head: " + nxt.getSummaryStats());
-                    }
-				}
-			}
-
-			addr += (count * 32 * m_bitSize);
-
-			final int value = -((m_index << RWStore.OFFSET_BITS) + addr);
-			
-			if (m_statsBucket != null) {
-				m_statsBucket.allocate(size);
-			}
-			
-			return value;
-		} else {
- 			StringBuilder sb = new StringBuilder();
-			sb.append("FixedAllocator returning null address, with freeBits: " + m_freeBits + "\n");
-		
-    		for (AllocBlock ab: m_allocBlocks) {
-    			sb.append(ab.show() + "\n");
-    		}
-    		
-    		log.error(sb);
-
-			return 0;
-		}
 		} finally {
-            if (log.isDebugEnabled())
-                checkBits();
+			if (log.isDebugEnabled())
+				checkBits();
 		}
+	}
+	
+	void checkBlock(final AllocBlock block) {
+		if (block.m_addr == 0) {
+			int blockSize = 32 * m_bitSize;
+			if (m_statsBucket != null) {
+				m_statsBucket.addSlots(blockSize);
+			}
+			blockSize *= m_size;
+			blockSize >>= RWStore.ALLOCATION_SCALEUP;
+
+			block.m_addr = grabAllocation(m_store, blockSize);
+			if (log.isDebugEnabled())
+				log.debug("Allocation block at " + block.m_addr
+						+ " of " + (blockSize << 16) + " bytes");
+
+			if (m_startAddr == 0) {
+				m_startAddr = block.m_addr;
+			}
+			m_endAddr = block.m_addr - blockSize;
+		}
+
+	}
+	
+	int allocFromIndex(final int size) {
+		
+		if (m_allocIndex == -1) {
+			resetAllocIndex();
+			
+			if (m_allocIndex == -1) {
+				throw new AssertionError("Unable to set AllocIndex with m_freeBits: " + m_freeBits);
+			}
+		}
+		
+        if (log.isDebugEnabled())
+            checkBits();
+
+
+		if (m_freeBits != calcFreeBits()) {
+			final int calc = calcFreeBits();
+			throw new AssertionError("m_freeBits != calcFreeBits() : " + m_freeBits + "!=" + calc);
+		}
+
+		// there MUST be bits free in the m_allocIndex block
+		final AllocBlock ab = m_allocBlocks.get(m_allocIndex/m_bitSize);
+		
+		if (ab.m_addr == 0) {
+			throw new AssertionError("No allocation for AllocBlock with m_allocIndex: " + m_allocIndex);
+		}
+		
+		final int abblock = m_allocIndex % m_bitSize;
+		
+		assert ab.m_transients[abblock] != 0xFFFFFFFF; // not all set
+		
+		final int bit = RWStore.fndBit(ab.m_transients[abblock]);
+		
+		assert bit >= 0;
+		
+		m_freeBits--;
+		
+		final int abit = (abblock*32) + bit;
+		RWStore.setBit(ab.m_live, abit);
+		RWStore.setBit(ab.m_transients, abit);
+		
+		// Note +3 for address teak for special low order bits
+		final int addr = -((m_index << RWStore.OFFSET_BITS) + (m_allocIndex*32) + (bit + 3));
+		
+		// Now check current index
+		if (ab.m_transients[abblock] == 0xFFFFFFFF) {
+			// find next allocIndex
+			resetAllocIndex(m_allocIndex+1);
+		}
+		
+		if (m_freeBits != calcFreeBits()) {
+			throw new AssertionError("m_freeBits != calcFreeBits()");
+		}
+		// assert m_freeBits == calcFreeBits();
+
+		if (m_statsBucket != null) {
+			m_statsBucket.allocate(size);
+		}
+
+		return addr;
 	}
 
 	protected int grabAllocation(RWStore store, int blockSize) {
-		return store.allocBlock(blockSize);
+		
+		final int ret =  store.allocBlock(blockSize);
+		
+		return ret;
 	}
 
 	public boolean hasFree() {
@@ -1037,8 +1219,15 @@ public class FixedAllocator implements Allocator {
 		}
 		
 		m_freeTransients = transientbits();
+		m_freeBits = calcFreeBits();
+		
+		// Ensure allocIndex is reset
+		m_allocIndex = -1;
 		
 		assert calcSessionFrees();
+		
+		if (log.isDebugEnabled())
+			checkBits();
 		
 		return isolatedWrites;
 	}
@@ -1142,6 +1331,8 @@ public class FixedAllocator implements Allocator {
 		}
 		
 		ab.setBitExternal(bit);
+		
+		m_freeBits--;
 	}
 
 	public int getSlotSize() {
@@ -1228,8 +1419,8 @@ public class FixedAllocator implements Allocator {
     	
 		if (m_pendingContextCommit) {
 			m_pendingContextCommit = false;
-			if (hasFree()) {
-				m_freeList.add(this);
+			if (m_freeWaiting && meetsSmallSlotThreshold()) {
+				addToFreeList();
 			}
 		}
 		
@@ -1238,14 +1429,16 @@ public class FixedAllocator implements Allocator {
 
 			// Handle re-addition to free list once transient frees are
 			// added back
-			if (m_freeWaiting && m_freeBits >= m_store.cDefaultFreeBitsThreshold) {
-				m_freeList.add(this);
-				m_freeWaiting = false;
+			if (m_freeWaiting && meetsSmallSlotThreshold()) {
+				addToFreeList();
 			}
 
 			m_freeTransients = 0;
 			
 		}
+		
+		if (log.isDebugEnabled())
+			checkBits();
 		
 	}
 
@@ -1296,6 +1489,79 @@ public class FixedAllocator implements Allocator {
 			log.trace("FA index: " + m_index + ", freed: " + count);
 		
 		return count;
+	}
+
+	/**
+	 * Determines if the provided physical address is within an allocated slot
+	 * @param addr
+	 * @return
+	 */
+	public boolean verifyAllocatedAddress(long addr) {
+		if (log.isTraceEnabled())
+			log.trace("Checking Allocator " + m_index + ", size: " + m_size);
+
+		final Iterator<AllocBlock> blocks = m_allocBlocks.iterator();
+		final long range = m_size * m_bitSize * 32;
+		while (blocks.hasNext()) {
+			final int startAddr = blocks.next().m_addr;
+			if (startAddr != 0) {
+				final long start = RWStore.convertAddr(startAddr);
+				final long end = start + range;
+				
+				if (log.isTraceEnabled())
+					log.trace("Checking " + addr + " between " + start + " - " + end);
+				
+				if (addr >= start && addr < end)
+					return true;
+			} else {
+				break;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Add a copy of the currently committed allocation data to the snapshot.  This is used by the snapshot
+	 * mechanism to ensure that a file copy, taken over the course of multiple commits, will contain the
+	 * correct allocation data from the time the snapshot was taken.
+	 */
+	void snapshot(final ISnapshotData tm) {
+		if (m_diskAddr > 0)
+			tm.put(m_store.metaBit2Addr(m_diskAddr), commitData());
+	}
+	
+	/**
+	 * Returns the 1K committed allocation data by writing the commit data for each allocation block.
+	 */
+	byte[] commitData() {
+		try {			
+			final byte[] buf = new byte[1024];
+			final DataOutputStream str = new DataOutputStream(new FixedOutputStream(buf));
+			try {
+                str.writeInt(m_size);
+                
+                final Iterator<AllocBlock> iter = m_allocBlocks.iterator();
+                while (iter.hasNext()) {
+                    final AllocBlock block = iter.next();
+
+                    str.writeInt(block.m_addr);
+                    for (int i = 0; i < m_bitSize; i++) {
+                    	    str.writeInt(block.m_commit[i]);
+                    }
+
+                }
+                // add checksum
+                final int chk = ChecksumUtility.getCHK().checksum(buf,
+                        str.size());
+                str.writeInt(chk);
+			} finally {
+			    str.close();
+			}
+
+			return buf;
+		} catch (IOException e) {
+			throw new StorageTerminalError("Error on write", e);
+		}
 	}
 
 }

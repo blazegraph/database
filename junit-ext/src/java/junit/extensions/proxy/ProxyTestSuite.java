@@ -25,6 +25,8 @@ import junit.framework.TestSuite;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.sail.webapp.AbstractIndexManagerTestCase;
+
 /**
  * <p>
  * A simple wrapper around {@link TestSuite} that permits the caller to specify
@@ -367,5 +369,7 @@ public class ProxyTestSuite
 	}
 
     }
+
+	
     
 }

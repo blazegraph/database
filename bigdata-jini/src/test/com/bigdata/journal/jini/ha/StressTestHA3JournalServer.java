@@ -75,6 +75,13 @@ public class StressTestHA3JournalServer extends AbstractHA3JournalServerTestCase
         super(name);
     }
 
+    @Override
+    protected int replicationFactor() {
+
+        return 3;
+        
+    }
+
     /**
      * Complex hack to override the {@link HAJournal} properties.
      * 

@@ -996,13 +996,15 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
     }
 
+    @Override
     public Set<String> getIndexNames() {
 
         return indexNames;
         
     }
 
-    @SuppressWarnings("unchecked")
+    @Override
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Iterator<IKeyOrder<ISPO>> getKeyOrders() {
 
         return (Iterator) keyOrders.iterator();
@@ -2610,6 +2612,19 @@ public class SPORelation extends AbstractRelation<ISPO> {
 
         return sb;
 
+    }
+
+    /**
+     * Checks whether one of the associated triple indices uses delete markers.
+     * 
+     * @return true if some index uses delete markers
+     */
+    public boolean indicesHaveDeleteMarkers() {
+       /**
+        *  actually, either none of the triple indices or all of them uses
+        *  delete markers, so it suffices to probe the primary index
+        */
+       return getPrimaryIndex().getIndexMetadata().getDeleteMarkers();
     }
 
     /**

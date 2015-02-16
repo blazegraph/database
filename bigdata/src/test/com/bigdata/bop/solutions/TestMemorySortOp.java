@@ -42,6 +42,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
@@ -132,6 +133,7 @@ public class TestMemorySortOp extends TestCase2 {
 				new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
 						BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
 		}));
@@ -244,6 +246,7 @@ public class TestMemorySortOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
@@ -332,6 +335,8 @@ public class TestMemorySortOp extends TestCase2 {
      * solutions in which those variables are not bound will cause type errors.
      * Unless the value expressions are evaluated before we sort the solutions
      * those type errors will propagate out of the sort and fail the query.
+     * Correct treatment is to treat the type errors as unbound variables
+     * see trac-765
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void testComputedValueExpressions() 
@@ -348,7 +353,8 @@ public class TestMemorySortOp extends TestCase2 {
 
         final ISortOrder<?> sors[] = new ISortOrder[] { //
                 new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS,new GlobalAnnotations(getName(), ITx.READ_COMMITTED))), false/* asc */),//
-                new SortOrder(y, false/* asc */) //
+                new SortOrder(y, false/* asc */), //
+                new SortOrder(x, true/* asc */), //
         };
 
         final int sortOpId = 1;
@@ -360,6 +366,7 @@ public class TestMemorySortOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(MemorySortOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                new NV(MemorySortOp.Annotations.SHARED_STATE, true),//
                 new NV(MemorySortOp.Annotations.LAST_PASS, true),//
         }));
@@ -386,16 +393,16 @@ public class TestMemorySortOp extends TestCase2 {
         //
         final IBindingSet expected [] = new IBindingSet []
         {
-//              new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { _1 }    ) // dropped by type error.
-//            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )  // dropped by type error.
-//            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { _3 }    ) // dropped by type error.
-              new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _5 } )
+             new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _5 } )
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _4 } )
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _4, _2 } )
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _4, _1 } )
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _3 } )
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _2, _2 } )
             , new ListBindingSet ( new IVariable<?> [] { x, y }, new IConstant [] { _1, _1 } )
+            , new ListBindingSet ( new IVariable<?> [] { y },    new IConstant [] { _1 }    ) // type error.
+            , new ListBindingSet ( new IVariable<?> [] {},       new IConstant [] {}       )  // type error.
+            , new ListBindingSet ( new IVariable<?> [] { x },    new IConstant [] { _3 }    ) // type error.
         } ;
 
         final BOpStats stats = query.newStats () ;
@@ -437,7 +444,7 @@ public class TestMemorySortOp extends TestCase2 {
 
         assertEquals ( 1, stats.chunksIn.get () ) ;
         assertEquals ( 10, stats.unitsIn.get () ) ;
-        assertEquals ( 7, stats.unitsOut.get () ) ;
+        assertEquals ( 10, stats.unitsOut.get () ) ;
         assertEquals(1, stats.chunksOut.get());
     }
 

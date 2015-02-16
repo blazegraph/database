@@ -34,31 +34,31 @@ public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
         return node.childrenAccept(this, data);
     }
 
-    public Object visit(ASTUpdateContainer node, Object data)
+	public Object visit(ASTInlineData node, Object data)
 		throws VisitorException
 	{
 		return node.childrenAccept(this, data);
 	}
+
+	public Object visit(ASTUnparsedQuadDataBlock node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTUpdateContainer node, Object data)
+        throws VisitorException
+    {
+        return node.childrenAccept(this, data);
+    }
 
 	public Object visit(ASTAdd node, Object data)
-		throws VisitorException
-	{
-		return node.childrenAccept(this, data);
-	}
-
-    public Object visit(ASTBindingSet node, Object data)
         throws VisitorException
     {
         return node.childrenAccept(this, data);
     }
 
-    public Object visit(ASTBindingVars node, Object data)
-        throws VisitorException
-    {
-        return node.childrenAccept(this, data);
-    }
-
-    public Object visit(ASTBindingSets node, Object data)
+	public Object visit(ASTBindingSet node, Object data)
         throws VisitorException
     {
         return node.childrenAccept(this, data);
@@ -779,6 +779,18 @@ public abstract class ASTVisitorBase implements SyntaxTreeBuilderVisitor {
 	}
 
 	public Object visit(ASTString node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTUUID node, Object data)
+		throws VisitorException
+	{
+		return node.childrenAccept(this, data);
+	}
+
+	public Object visit(ASTSTRUUID node, Object data)
 		throws VisitorException
 	{
 		return node.childrenAccept(this, data);

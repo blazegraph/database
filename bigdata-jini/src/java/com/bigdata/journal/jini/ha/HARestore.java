@@ -40,6 +40,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
@@ -47,7 +48,13 @@ import com.bigdata.journal.Options;
 
 /**
  * Utility class may be used to apply HALog files to a {@link Journal}, rolling
- * it forward to a specific commit point.
+ * it forward to a specific commit point. This class can decompress a snapshot
+ * file for processing. It can also identify the most recent snapshot in the
+ * snapshot directory, and then decompress that snapshot for processing. When
+ * starting with a snapshot, the target journal file may be specified on the
+ * command line.
+ * 
+ * @see #main(String[])
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -58,9 +65,21 @@ public class HARestore {
      */
     private static final Logger haLog = Logger.getLogger("com.bigdata.haLog");
 
+    /** The journal to be rolled forward. */
     private final Journal journal;
+    /**
+     * The directory containing the HALog files to be applied to that journal.
+     */
     private final File haLogDir;
 
+    /**
+     * 
+     * @param journal
+     *            The journal to be rolled forward.
+     * @param haLogDir
+     *            The directory containing the HALog files to be applied to that
+     *            journal.
+     */
     public HARestore(final Journal journal, final File haLogDir) {
 
         if (journal == null)
@@ -349,43 +368,68 @@ public class HARestore {
     }
 
     /**
-     * Apply HALog file(s) to the journal. Each HALog file represents a single
-     * native transaction on the database and will advance the journal by one
-     * commit point. The journal will go through a local commit protocol as each
-     * HALog is applied. HALogs will be applied starting with the first commit
-     * point GT the current commit point on the journal. You may optionally
-     * specify a stopping criteria, e.g., the last commit point that you wish to
-     * restore. If no stopping criteria is specified, then all HALog files in
-     * the specified directory will be applied and the journal will be rolled
-     * forward to the most recent transaction. The HALog files are not removed,
-     * making this process safe.
+     * Apply HALog file(s) to a journal or snapshot file. If the file specified
+     * is a snapshot, then it is uncompressed into the current working directory
+     * to obtain a journal file and the HALogs are applied to that journal. If
+     * the file specified is a journal, then the HALog files are simply rolled
+     * forward against that journal. If the file is a directory, it is assumed
+     * to be the snapshot directory. In this case, the most recent snapshot file
+     * is located, decompressed to obtain a journal file, and then rolled
+     * forward by applying any more recent HALog files.
+     * <p>
+     * Each HALog file represents a single native transaction on the database
+     * and will advance the journal by one commit point. The journal will go
+     * through a local commit protocol as each HALog is applied. HALogs will be
+     * applied starting with the first commit point GT the current commit point
+     * on the journal. You may optionally specify a stopping criteria, e.g., the
+     * last commit point that you wish to restore. If no stopping criteria is
+     * specified, then all HALog files in the specified directory will be
+     * applied and the journal will be rolled forward to the most recent
+     * transaction. The HALog files are not removed, making this process safe.
      * 
      * @param args
-     *            <code>[options] journalFile haLogDir</code><br>
-     *            where <code>journalFile</code> is the name of the journal file<br>
+     *            <code>[options] journalOrSnapshotFileOrSnapshotDir haLogDir</code>
+     * <br>
+     *            where <code>journalOrSnapshotFileOrSnapshotDir</code> is the
+     *            name of the journal file (ending in <code>.jnl</code>), the
+     *            name of a specific snapshot file (ending in
+     *            <code>.jnl.gz</code>), or the name of the snapshot directory
+     *            (this is generally a directory named <code>snapshot</code>
+     *            that is a child of the service directory) <br>
      *            where <code>haLogDir</code> is the name of a directory
-     *            containing zero or more HALog files<br>
+     *            containing zero or more HALog files (this is generally a
+     *            directory name <code>HALog</code> that is a child of the
+     *            service directory)<br>
      *            where <code>options</code> are any of:
      *            <dl>
      *            <dt>-l</dt>
-     *            <dd>List available commit points, but do not apply them. This
-     *            option provides information about the current commit point on
-     *            the journal and the commit points available in the HALog
-     *            files.</dd>
+     *            <dd>List available commit points, but do not apply
+     *            them. This option provides information about the current
+     *            commit point on the journal and the commit points available in
+     *            the HALog files.</dd>
      *            <dt>-h commitCounter</dt>
      *            <dd>The last commit counter that will be applied (halting
      *            point for restore).</dd>
+     *            <dt>-o journalFile</dt>
+     *            <dd>When restoring from a snapshot, this parameter specifies
+     *            the name of the journal file to be created.  It is an error
+     *            if the file exists (this utility will not overwrite an existing
+     *            journal file).</dd>
      *            </dl>
      * 
      * @return <code>0</code> iff the operation was fully successful.
-     * @throws IOException 
      * 
-     * @throws Exception
-     *             if the {@link UUID}s or other critical metadata of the
-     *             journal and the HALogs differ.
-     * @throws Exception
+     * @throws IOException
      *             if an error occcur when reading an HALog or writing on the
      *             journal.
+     * @throws NoSnapshotException
+     *             if you specify a snapshot directory to be searched, but no
+     *             snapshot files are found. This can happend you specify the
+     *             wrong directory. It can also happen if you are using the
+     *             {@link NoSnapshotPolicy} and never took a snapshot!
+     * @throws RuntimeException
+     *             if the {@link UUID}s or other critical metadata of the
+     *             journal and the HALogs differ.
      */
     public static void main(final String[] args) throws IOException {
 
@@ -400,6 +444,8 @@ public class HARestore {
         int i = 0;
 
         boolean listCommitPoints = false;
+        
+        String decompressTargetFile = null;
 
         // Defaults to Long.MAX_VALUE.
         long haltingCommitCounter = Long.MAX_VALUE;
@@ -423,10 +469,16 @@ public class HARestore {
 
             else if (arg.equals("-h")) {
 
-                haltingCommitCounter = Long.parseLong(args[i + 1]);
+                haltingCommitCounter = Long.parseLong(args[++i]);
 
             }
 
+            else if (arg.equals("-o")) {
+
+                decompressTargetFile = args[++i];
+
+            }
+            
             else
                 throw new RuntimeException("Unknown argument: " + arg);
 
@@ -446,12 +498,48 @@ public class HARestore {
         // HALogDir.
         final File haLogDir = new File(args[i++]);
 
-        /*
-         * Decompress the snapshot onto a temporary file in the current working
-         * directory.
-         */
+        if(journalFile.isDirectory()) {
 
+            /*
+             * File is a directory.
+             * 
+             * We assume that it is the snapshot directory.
+             * 
+             * Locate the most recent snapshot in that directory structure.
+             */
+        
+            final File tmp = CommitCounterUtility.findGreatestCommitCounter(
+                    journalFile, SnapshotManager.SNAPSHOT_FILTER);
+
+            if (tmp == null) {
+
+                /*
+                 * There are no snapshot files.
+                 * 
+                 * Note: This can happen if you specify the wrong directory. It
+                 * can also happen if you are using the NoSnapshotPolicy and
+                 * never took a snapshot!
+                 */
+
+                throw new NoSnapshotException("No snapshot file(s): "
+                        + journalFile);
+
+            }
+
+            System.out.println("Most recent snapshot: " + tmp);
+
+            journalFile = tmp;
+            
+        }
+        
         if (journalFile.getName().endsWith(SnapshotManager.SNAPSHOT_EXT)) {
+
+            /*
+             * File is a snapshot.
+             * 
+             * Decompress the snapshot onto either a temporary file or the file
+             * specified by the caller (in which case the file must not exist).
+             */
 
             // source is the snapshot.
             final File in = journalFile;
@@ -459,10 +547,24 @@ public class HARestore {
             final long commitCounter = SnapshotManager
                     .parseCommitCounterFile(journalFile.getName());
 
-            // temporary file in the same directory as the snapshot.
-            final File out = File.createTempFile("" + commitCounter + "-",
-                    Journal.Options.JNL, journalFile.getAbsoluteFile()
-                            .getParentFile());
+            final File out;
+            if (decompressTargetFile == null) {
+                /*
+                 * Temporary file in the current working directory
+                 */
+                out = File.createTempFile("restored-from-snapshot" + "-"
+                        + commitCounter + "-", Journal.Options.JNL, journalFile
+                        .getAbsoluteFile().getParentFile());
+            } else {
+                /*
+                 * Decompress onto a file specified by the caller.
+                 */
+                out = new File(decompressTargetFile);
+                if (out.exists()) {
+                    // Do not decompress onto an existing file.
+                    throw new IOException("File exists: " + out);
+                }
+            }
 
             System.out.println("Decompressing " + in + " to " + out);
             
@@ -473,7 +575,9 @@ public class HARestore {
             
         }
 
-        // Validate journal file.
+        /*
+         * Log some metadata about the journal file.
+         */
         {
 
             System.out.println("Journal File: " + journalFile);
@@ -501,6 +605,9 @@ public class HARestore {
 
         }
 
+        /*
+         * Open the journal.
+         */
         try {
 
             final Properties properties = new Properties();
@@ -521,6 +628,9 @@ public class HARestore {
 
             try {
 
+                /*
+                 * Apply zero or more HALog files to roll forward the journal.
+                 */
                 final HARestore util = new HARestore(journal, haLogDir);
 
                 util.restore(listCommitPoints, haltingCommitCounter);
@@ -538,6 +648,12 @@ public class HARestore {
             System.exit(1);
 
         }
+
+    }
+
+    private static void usage(final String[] args) {
+
+        System.err.println("usage: (-l|-h haltingCommitPoint|-o outputJournalFile) <journalFile|snapshotFile|snapshotDir> haLogDir");
 
     }
 
@@ -575,12 +691,6 @@ public class HARestore {
                     + ", log=" + lrb);
 
         }
-
-    }
-
-    private static void usage(final String[] args) {
-
-        System.err.println("usage: (-l|-h commitPoint) <journalFile> haLogDir");
 
     }
 

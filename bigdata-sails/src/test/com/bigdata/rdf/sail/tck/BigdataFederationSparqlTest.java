@@ -32,13 +32,13 @@ import junit.framework.TestSuite;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
-import org.openrdf.query.parser.sparql.ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQLASTQueryTest;
-import org.openrdf.query.parser.sparql.SPARQLQueryTest;
+import org.openrdf.query.parser.sparql.manifest.ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.dataset.DatasetRepository;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
@@ -71,7 +71,7 @@ import com.bigdata.service.jini.JiniFederation;
  */
 public class BigdataFederationSparqlTest 
 //extends SPARQLQueryTest
-extends SPARQLASTQueryTest
+extends SPARQLQueryTest
 {
 
     /**
@@ -103,7 +103,12 @@ extends SPARQLASTQueryTest
         if(hideDatasetTests)
             suite1 = BigdataSparqlTest.filterOutTests(suite1,"dataset");
         
-        suite1 = BigdataSparqlTest.filterOutTests(suite1, "property-paths");
+        suite1 = BigdataSparqlTest.filterOutTests(suite1, BigdataSparqlTest.badTests);
+
+        if (!BigdataStatics.runKnownBadTests)
+            suite1 = BigdataSparqlTest.filterOutTests(suite1, BigdataSparqlTest.knownBadTests);
+
+        //        suite1 = BigdataSparqlTest.filterOutTests(suite1, "property-paths");
         
         /**
          * BSBM BI use case query 5
@@ -148,7 +153,7 @@ extends SPARQLASTQueryTest
      */
     public static TestSuite fullSuite() throws Exception {
         
-        final Factory factory = new Factory() {
+        final SPARQLQueryTest.Factory factory = new SPARQLQueryTest.Factory() {
         
             public SPARQLQueryTest createSPARQLQueryTest(String URI,
                     String name, String query, String results, Dataset dataSet,
@@ -175,7 +180,7 @@ extends SPARQLASTQueryTest
         suite.addTest(ManifestTest.suite(factory));
 
         // SPARQL 1.1
-        suite.addTest(SPARQL11ManifestTest.suite(factory));
+        suite.addTest(SPARQL11ManifestTest.suite(factory, true, true, false));
         
         return suite;
 
@@ -211,18 +216,19 @@ extends SPARQLASTQueryTest
 		}
 	}
 
-    @Override protected Repository newRepository ()
+    @Override 
+    protected Repository newRepository ()
         throws Exception
     {
         return new DatasetRepository ( new BigdataSailRepository ( _sail = new BigdataSail ( newTripleStore () ) ) ) ;
     }
 
-    @Override
-    protected Repository createRepository() throws Exception {
-        Repository repo = newRepository();
-        repo.initialize();
-        return repo;
-    }
+//    @Override
+//    protected Repository createRepository() throws Exception {
+//        Repository repo = newRepository();
+//        repo.initialize();
+//        return repo;
+//    }
 
 	protected BigdataSailRepositoryConnection getQueryConnection(Repository dataRep)
 			throws Exception {

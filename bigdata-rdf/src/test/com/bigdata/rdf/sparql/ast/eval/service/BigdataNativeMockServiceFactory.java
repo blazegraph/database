@@ -29,16 +29,12 @@ package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.List;
 
-import org.openrdf.model.URI;
-
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 
 import cutthecrap.utils.striterators.ICloseableIterator;

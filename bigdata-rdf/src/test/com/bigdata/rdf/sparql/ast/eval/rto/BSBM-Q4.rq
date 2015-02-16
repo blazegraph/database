@@ -1,0 +1,41 @@
+# BSBM Q4 on pc100.
+
+PREFIX bsbm-inst: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/>
+PREFIX bsbm: <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?product ?label ?propertyTextual
+WHERE {
+
+    { 
+
+  # Note: The RTO is only applied to one of the join groups to make the
+  # test code simpler.
+  #
+  # Control all RTO parameters for repeatable behavior.
+  hint:Group hint:optimizer "Runtime".
+  hint:Group hint:RTO-sampleType "DENSE".
+  hint:Group hint:RTO-limit "100".
+  hint:Group hint:RTO-nedges "1".
+
+       ?product rdfs:label ?label .
+       ?product rdf:type <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType19> .
+       ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature158> .
+      ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature865> .
+       ?product bsbm:productPropertyTextual1 ?propertyTextual .
+      ?product bsbm:productPropertyNumeric1 ?p1 .
+      FILTER ( ?p1 > 217 )
+    } UNION {
+       ?product rdfs:label ?label .
+       ?product rdf:type <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductType19> .
+       ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature158> .
+      ?product bsbm:productFeature <http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/instances/ProductFeature872> .
+       ?product bsbm:productPropertyTextual1 ?propertyTextual .
+      ?product bsbm:productPropertyNumeric2 ?p2 .
+      FILTER ( ?p2> 124 ) 
+    } 
+}
+ORDER BY ?label
+OFFSET 5
+LIMIT 10

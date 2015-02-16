@@ -45,6 +45,7 @@ import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
@@ -106,7 +107,7 @@ public class InsertServlet extends BigdataRDFServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -132,15 +133,15 @@ public class InsertServlet extends BigdataRDFServlet {
 	 */
 	private void doPostWithBody(final HttpServletRequest req,
 			final HttpServletResponse resp) throws IOException {
-
-	    final long begin = System.currentTimeMillis();
 	    
         final String baseURI = req.getRequestURL().toString();
         
-        final String namespace = getNamespace(req);
-
         final String contentType = req.getContentType();
 
+        if (contentType == null)
+            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Content-Type not specified.");
+        
         if (log.isInfoEnabled())
             log.info("Request body: " + contentType);
 
@@ -149,8 +150,9 @@ public class InsertServlet extends BigdataRDFServlet {
          * UpdateServlet fails to parse MIMEType when doing conneg. </a>
          */
 
-        final RDFFormat format = RDFFormat
-                .forMIMEType(new MiniMime(contentType).getMimeType());
+		final String mimeTypeStr = new MiniMime(contentType).getMimeType();
+
+		final RDFFormat format = RDFFormat.forMIMEType(mimeTypeStr);
 
         if (format == null) {
 
@@ -170,32 +172,13 @@ public class InsertServlet extends BigdataRDFServlet {
         if (rdfParserFactory == null) {
 
             buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-                    "Parser factory not found: Content-Type="
-                            + contentType + ", format=" + format);
-        	
-        	return;
+                    "Parser factory not found: Content-Type=" + contentType
+                            + ", format=" + format);
+
+            return;
 
         }
 
-//        /*
-//         * Allow the caller to specify the default context.
-//         */
-//        final Resource defaultContext;
-//        {
-//            final String s = req.getParameter("context-uri");
-//            if (s != null) {
-//                try {
-//                    defaultContext = new URIImpl(s);
-//                } catch (IllegalArgumentException ex) {
-//                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-//                            ex.getLocalizedMessage());
-//                    return;
-//                }
-//            } else {
-//                defaultContext = null;
-//            }
-//        }
-        
         /*
          * Allow the caller to specify the default contexts.
          */
@@ -217,16 +200,87 @@ public class InsertServlet extends BigdataRDFServlet {
 
         try {
             
+            submitApiTask(
+                    new InsertWithBodyTask(req, resp, getNamespace(req),
+                            ITx.UNISOLATED, baseURI, defaultContext,
+                            rdfParserFactory)).get();
+            
+        } catch (Throwable t) {
+
+            BigdataRDFServlet.launderThrowable(t, resp,
+                    "INSERT-WITH-BODY: baseURI=" + baseURI + ", context-uri="
+                            + Arrays.toString(defaultContext));
+
+        }
+
+    }
+
+    /**
+	 * 
+	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+	 *         Thompson</a>
+	 * 
+	 * TODO #1056 (Add ability to set RIO options to REST API and workbench)
+	 */
+    private static class InsertWithBodyTask extends AbstractRestApiTask<Void> {
+
+        private final String baseURI;
+        private final Resource[] defaultContext;
+        private final RDFParserFactory rdfParserFactory;
+
+        /**
+         * 
+         * @param namespace
+         *            The namespace of the target KB instance.
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
+         * @param baseURI
+         *            The base URI for the operation.
+         * @param defaultContext
+         *            The context(s) for triples without an explicit named graph
+         *            when the KB instance is operating in a quads mode.
+         * @param rdfParserFactory
+         *            The factory for the {@link RDFParser}. This should have
+         *            been chosen based on the caller's knowledge of the
+         *            appropriate content type.
+         */
+        public InsertWithBodyTask(final HttpServletRequest req,
+                final HttpServletResponse resp,
+                final String namespace, final long timestamp,
+                final String baseURI, final Resource[] defaultContext,
+                final RDFParserFactory rdfParserFactory) {
+            super(req, resp, namespace, timestamp);
+            this.baseURI = baseURI;
+            this.defaultContext = defaultContext;
+            this.rdfParserFactory = rdfParserFactory;
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+
             final AtomicLong nmodified = new AtomicLong(0L);
 
             BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
             try {
 
-                conn = getBigdataRDFContext()
-                        .getUnisolatedConnection(namespace);
+                conn = getUnisolatedConnection();
 
-                /*
+                /**
                  * There is a request body, so let's try and parse it.
+                 * 
+                 * FIXME This does not handle .gz or .zip files. We handle this
+                 * in the
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/991" >REST API:
+                 *      INSERT does not handle .gz</a>
                  */
 
                 final RDFParser rdfParser = rdfParserFactory.getParser();
@@ -252,36 +306,32 @@ public class InsertServlet extends BigdataRDFServlet {
                 // Commit the mutation.
                 conn.commit();
 
-                final long elapsed = System.currentTimeMillis() - begin;
-                
-                reportModifiedCount(resp, nmodified.get(), elapsed);
-                
-                return;
+                success = true;
 
-            } catch(Throwable t) {
-                
-                if(conn != null)
-                    conn.rollback();
-                
-                throw new RuntimeException(t);
+                final long elapsed = System.currentTimeMillis() - begin;
+
+                reportModifiedCount(nmodified.get(), elapsed);
+
+                return (Void) null;
 
             } finally {
 
-                if (conn != null)
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
                     conn.close();
-                
+
+                }
+
             }
 
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
-            
         }
-
+        
     }
 
-	/**
+    /**
 	 * POST with URIs of resources to be inserted (loads the referenced
 	 * resources).
 	 * 
@@ -326,25 +376,6 @@ public class InsertServlet extends BigdataRDFServlet {
             
         }
 
-//        /*
-//         * Allow the caller to specify the default context.
-//         */
-//        final Resource defaultContext;
-//        {
-//            final String s = req.getParameter("context-uri");
-//            if (s != null) {
-//                try {
-//                    defaultContext = new URIImpl(s);
-//                } catch (IllegalArgumentException ex) {
-//                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
-//                            ex.getLocalizedMessage());
-//                    return;
-//                }
-//            } else {
-//                defaultContext = null;
-//            }
-//        }
-
         /*
          * Allow the caller to specify the default contexts.
          */
@@ -366,25 +397,75 @@ public class InsertServlet extends BigdataRDFServlet {
 
         try {
 
-            final AtomicLong nmodified = new AtomicLong(0L);
+            submitApiTask(
+                    new InsertWithURLsTask(req, resp, namespace,
+                            ITx.UNISOLATED, defaultContext, urls)).get();
 
+        } catch (Throwable t) {
+
+            launderThrowable(t, resp, "uri=" + urls + ", context-uri="
+                    + Arrays.toString(defaultContext));
+
+        }
+
+    }
+	
+    private static class InsertWithURLsTask extends AbstractRestApiTask<Void> {
+
+        private final Vector<URL> urls;
+        private final Resource[] defaultContext;
+
+        /**
+         * 
+         * @param namespace
+         *            The namespace of the target KB instance.
+         * @param timestamp
+         *            The timestamp used to obtain a mutable connection.
+         * @param baseURI
+         *            The base URI for the operation.
+         * @param defaultContext
+         *            The context(s) for triples without an explicit named graph
+         *            when the KB instance is operating in a quads mode.
+         * @param urls
+         *            The {@link URL}s whose contents will be parsed and loaded
+         *            into the target KB.
+         */
+        public InsertWithURLsTask(final HttpServletRequest req,
+                final HttpServletResponse resp, final String namespace,
+                final long timestamp, final Resource[] defaultContext,
+                final Vector<URL> urls) {
+            super(req, resp, namespace, timestamp);
+            this.urls = urls;
+            this.defaultContext = defaultContext;
+        }
+        
+        @Override
+        public boolean isReadOnly() {
+            return false;
+        }
+
+        @Override
+        public Void call() throws Exception {
+
+            final long begin = System.currentTimeMillis();
+            
             BigdataSailRepositoryConnection conn = null;
+            boolean success = false;
             try {
 
-                conn = getBigdataRDFContext().getUnisolatedConnection(
-                        namespace);
+                conn = getUnisolatedConnection();
+
+                final AtomicLong nmodified = new AtomicLong(0L);
 
                 for (URL url : urls) {
 
-                    // Use the default context if one was given and otherwise
-                    // the URI from which the data are being read.
-//                    final Resource defactoContext = defaultContext == null ? new URIImpl(
-//                            url.toExternalForm()) : defaultContext;
-                	final Resource[] defactoContext = 
-                			defaultContext.length == 0 
-                			? new Resource[] { new URIImpl(url.toExternalForm()) } 
-                			: defaultContext;
-                    
+                        // Use the default context if one was given and otherwise
+                        // the URI from which the data are being read.
+//                        final Resource defactoContext = defaultContext == null ? new URIImpl(
+//                                url.toExternalForm()) : defaultContext;
+                    final Resource[] defactoContext = defaultContext.length == 0 ? new Resource[] { new URIImpl(
+                            url.toExternalForm()) } : defaultContext;
+
                     URLConnection hconn = null;
                     try {
 
@@ -399,14 +480,20 @@ public class InsertServlet extends BigdataRDFServlet {
                         /**
                          * There is a request body, so let's try and parse it.
                          * 
-                         * <a href=
-                         * "https://sourceforge.net/apps/trac/bigdata/ticket/620"
-                         * > UpdateServlet fails to parse MIMEType when doing
-                         * conneg. </a>
+                         * @see <a href=
+                         *      "https://sourceforge.net/apps/trac/bigdata/ticket/620"
+                         *      > UpdateServlet fails to parse MIMEType when
+                         *      doing conneg. </a>
+                         * 
+                         *      FIXME This does not handle .gz or .zip files. We
+                         *      handle this in the
+                         * 
+                         * @see <a href="http://trac.bigdata.com/ticket/991"
+                         *      >REST API: INSERT does not handle .gz</a>
                          */
 
                         final String contentType = hconn.getContentType();
-                        
+
                         RDFFormat format = RDFFormat.forMIMEType(new MiniMime(
                                 contentType).getMimeType());
 
@@ -415,10 +502,24 @@ public class InsertServlet extends BigdataRDFServlet {
                             /*
                              * Try to get the RDFFormat from the URL's file
                              * path.
+                             * 
+                             * FIXME GROUP COMMIT: There is a potential issue
+                             * where the existing code commits the response and
+                             * returns, e.g., from the InsertServlet. Any task
+                             * that does not fail (thrown exception) will
+                             * commit. This means that mutations operations that
+                             * fail will still attempt to join a commit point.
+                             * This is inappropriate and could cause resource
+                             * leaks (e.g., if the operation failed after
+                             * writing on the Journal). We really should throw
+                             * out a typed exception, but in launderThrowable()
+                             * ignore that typed exception if the response has
+                             * already been committed. That way the task will
+                             * not join a commit point.
                              */
-       
+
                             format = RDFFormat.forFileName(url.getFile());
-                            
+
                         }
 
                         if (format == null) {
@@ -428,7 +529,7 @@ public class InsertServlet extends BigdataRDFServlet {
                                     "Content-Type not recognized as RDF: "
                                             + contentType);
 
-                            return;
+                            return null;
 
                         }
 
@@ -436,12 +537,12 @@ public class InsertServlet extends BigdataRDFServlet {
                                 .getInstance().get(format);
 
                         if (rdfParserFactory == null) {
-                        	buildResponse(resp, HTTP_INTERNALERROR,
+                            buildResponse(resp, HTTP_INTERNALERROR,
                                     MIME_TEXT_PLAIN,
                                     "Parser not found: Content-Type="
                                             + contentType);
-                        	
-                        	return;
+
+                            return null;
                         }
 
                         final RDFParser rdfParser = rdfParserFactory
@@ -457,66 +558,66 @@ public class InsertServlet extends BigdataRDFServlet {
                         rdfParser
                                 .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-                        rdfParser.setRDFHandler(new AddStatementHandler(conn
-                                .getSailConnection(), nmodified, defactoContext));
+                        rdfParser
+                                .setRDFHandler(new AddStatementHandler(conn
+                                        .getSailConnection(), nmodified,
+                                        defactoContext));
 
                         /*
                          * Run the parser, which will cause statements to be
                          * inserted.
                          */
 
-                        rdfParser.parse(hconn.getInputStream(), url
-                                .toExternalForm()/* baseURL */);
+                        rdfParser.parse(hconn.getInputStream(),
+                                url.toExternalForm()/* baseURL */);
 
                     } finally {
 
                         if (hconn instanceof HttpURLConnection) {
                             /*
                              * Disconnect, but only after we have loaded all the
-                             * URLs. Disconnect is optional for java.net. It is a
-                             * hint that you will not be accessing more resources on
-                             * the connected host. By disconnecting only after all
-                             * resources have been loaded we are basically assuming
-                             * that people are more likely to load from a single
-                             * host.
+                             * URLs. Disconnect is optional for java.net. It is
+                             * a hint that you will not be accessing more
+                             * resources on the connected host. By disconnecting
+                             * only after all resources have been loaded we are
+                             * basically assuming that people are more likely to
+                             * load from a single host.
                              */
                             ((HttpURLConnection) hconn).disconnect();
                         }
 
                     }
-                    
-                    } // next URI.
+
+                } // next URI.
 
                 // Commit the mutation.
                 conn.commit();
                 
+                success = true;
+
                 final long elapsed = System.currentTimeMillis() - begin;
 
-                reportModifiedCount(resp, nmodified.get(), elapsed);
-
-            } catch(Throwable t) {
+                reportModifiedCount(nmodified.get(), elapsed);
                 
-                if(conn != null)
-                    conn.rollback();
+                return null;
                 
-                throw new RuntimeException(t);
-
             } finally {
 
-                if (conn != null)
+                if (conn != null) {
+
+                    if (!success)
+                        conn.rollback();
+
                     conn.close();
+
+                }
 
             }
 
-        } catch (Exception ex) {
-
-            // Will be rendered as an INTERNAL_ERROR.
-            throw new RuntimeException(ex);
-            
         }
-
+        
     }
-    
+	
 	/**
      * Helper class adds statements to the sail as they are visited by a parser.
      */
@@ -571,10 +672,10 @@ public class InsertServlet extends BigdataRDFServlet {
             }
 
             if (c.length >= 2) {
-            	// added to more than one context
-            	nmodified.addAndGet(c.length);
+                // added to more than one context
+                nmodified.addAndGet(c.length);
             } else {
-            	nmodified.incrementAndGet();
+                nmodified.incrementAndGet();
             }
 
         }

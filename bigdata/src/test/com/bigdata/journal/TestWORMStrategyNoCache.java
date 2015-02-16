@@ -35,7 +35,6 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.journal.ha.TestHAWORMStrategy;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -44,7 +43,7 @@ import com.bigdata.rawstore.IRawStore;
  * to operation when caching is disabled.
  * <p>
  * Note: The HA journal requires that cache be enabled. However, the HA journal
- * is tested by a different test suite. See {@link TestHAWORMStrategy}.
+ * is tested by a different test suite. 
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

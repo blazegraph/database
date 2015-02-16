@@ -92,6 +92,8 @@ public class TestAll_HTree extends TestCase {
         suite.addTestSuite(TestReopen.class);
         // test of storing null values under a key with persistence.
         suite.addTestSuite(TestNullValues.class);
+        // test duplicate keys (with index checkpoint).
+        suite.addTestSuite(TestDuplicates.class);
 
         /*
          * test of transient HTree's (no backing store).

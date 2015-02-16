@@ -39,7 +39,7 @@ import com.bigdata.btree.keys.KeyBuilder;
 
 /**
  * Correctness test suite for unisolated writes on one or more indices. The
- * tests in this suite validate that the unisolated writes resulting in a commit
+ * tests in this suite validate that the unisolated writes result in a commit
  * and that the committed data may be read back by an unisolated read task. Some
  * tests write on more than one index in order to verify that the writes and
  * reads are performed against the expected index. The stress test additionally
@@ -47,7 +47,6 @@ import com.bigdata.btree.keys.KeyBuilder;
  * list and that writes are NOT lost in large commit groups.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
 
@@ -61,7 +60,7 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
     /**
      * @param name
      */
-    public TestUnisolatedWriteTasks(String name) {
+    public TestUnisolatedWriteTasks(final String name) {
         super(name);
     }
 
@@ -117,15 +116,18 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
 //                                
 //        journal.submit(
                 
-                new AbstractTask(journal,ITx.UNISOLATED,resource) {
+                new AbstractTask<Object>(journal,ITx.UNISOLATED,resource) {
 
+                    @Override
                     protected Object doTask() throws Exception {
 
-                        log.info("Will register " + getOnlyResource());
+                        if(log.isInfoEnabled())
+                            log.info("Will register " + getOnlyResource());
 
                         getJournal().registerIndex(getOnlyResource(),new IndexMetadata(resource[0], indexUUID));
                         
-                        log.info("Will write on " + getOnlyResource());
+                        if(log.isInfoEnabled())
+                            log.info("Will write on " + getOnlyResource());
                         
                         final IIndex ndx = getIndex(getOnlyResource());
 
@@ -158,12 +160,14 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
          * Submit task to validate the committed unisolated write on the named
          * index.
          */
-        journal.submit(new AbstractTask(journal, ITx.READ_COMMITTED,
+        journal.submit(new AbstractTask<Object>(journal, ITx.READ_COMMITTED,
                 resource) {
 
+                    @Override
                     protected Object doTask() throws Exception {
 
-                        log.info("Will read from " + getOnlyResource());
+                        if(log.isInfoEnabled())
+                            log.info("Will read from " + getOnlyResource());
                         
                         final IIndex ndx = getIndex(getOnlyResource());
 
@@ -264,8 +268,9 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
         }
 
         // submit task to create index and do batch insert on that index.
-        journal.submit(new AbstractTask(journal, ITx.UNISOLATED, resource) {
+        journal.submit(new AbstractTask<Object>(journal, ITx.UNISOLATED, resource) {
 
+            @Override
             protected Object doTask() throws Exception {
 
                 getJournal().registerIndex(resource[0], //
@@ -315,13 +320,14 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
          * Submit task to validate the committed unisolated write on the named
          * index.
          */
-        journal.submit(new AbstractTask(journal, ITx.READ_COMMITTED, resource) {
+        journal.submit(new AbstractTask<Object>(journal, ITx.READ_COMMITTED, resource) {
 
+                    @Override
                     protected Object doTask() throws Exception {
 
                         {
                             
-                            IIndex ndx = getIndex("foo");
+                            final IIndex ndx = getIndex("foo");
 
                             assertEquals("indexUUID", indexUUID1, ndx
                                     .getIndexMetadata().getIndexUUID());
@@ -500,8 +506,9 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
         // submit task to create indices and do batch inserts those indices.
         journal.submit(
 
-                new AbstractTask(journal, ITx.UNISOLATED,resource) {
+                new AbstractTask<Object>(journal, ITx.UNISOLATED,resource) {
 
+                    @Override
                     protected Object doTask() throws Exception {
                         
                         // register all indices.
@@ -549,9 +556,10 @@ public class TestUnisolatedWriteTasks extends ProxyTestCase<Journal> {
          * index.
          */
         journal.submit(
-                new AbstractTask(journal, ITx.READ_COMMITTED, resource) {
+                new AbstractTask<Object>(journal, ITx.READ_COMMITTED, resource) {
 
                     // verify the writes on each index.
+                    @Override
                     protected Object doTask() throws Exception {
 
                         for(int i=0; i<nindices; i++) {

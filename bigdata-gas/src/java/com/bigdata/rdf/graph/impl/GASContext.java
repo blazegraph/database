@@ -15,13 +15,20 @@
 */
 package com.bigdata.rdf.graph.impl;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.graph.EdgesEnum;
@@ -33,7 +40,11 @@ import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.IStaticFrontier;
+import com.bigdata.rdf.graph.TraversalDirectionEnum;
 import com.bigdata.rdf.graph.util.GASUtil;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IFilter;
 
 public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
@@ -56,6 +67,56 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
      */
     private final IGASProgram<VS, ES, ST> program;
 
+    /**
+     * Whether or not the edges of the graph will be traversed with directed
+     * graph semantics (default is {@link TraversalDirectionEnum#Forward}).
+     */
+    private final AtomicReference<TraversalDirectionEnum> traversalDirection = new AtomicReference<TraversalDirectionEnum>(
+            TraversalDirectionEnum.Forward);
+    
+    /**
+     * The maximum number of iterations (defaults to {@link Integer#MAX_VALUE}).
+     */
+    private final AtomicInteger maxIterations = new AtomicInteger(
+            Integer.MAX_VALUE);
+
+    /**
+     * The maximum number of vertices (defaults to {@link Integer#MAX_VALUE}).
+     */
+    private final AtomicInteger maxVertices = new AtomicInteger(
+            Integer.MAX_VALUE);
+
+    /**
+     * An optional constraint on the type of the visited links.
+     */
+    private final AtomicReference<URI> linkType = new AtomicReference<URI>(null);
+    
+    /**
+     * An optional constraint on the type of the visited link attributes.
+     */
+    private final AtomicReference<URI> linkAttributeType = new AtomicReference<URI>(null);
+    
+    /**
+     * An optional {@link IReducer} that will executed after the
+     * {@link IGASProgram}.
+     */
+    private final AtomicReference<IReducer<VS, ES, ST, ?>> afterOp = new AtomicReference<IReducer<VS, ES, ST, ?>>(
+            null);
+
+    /**
+     * A collection of target vertices for the program to reach.
+     */
+    private final Set<Value> targetVertices = 
+    		Collections.synchronizedSet(new LinkedHashSet<Value>());
+    
+    /**
+     * The maximum number of iterations after the target vertices have been
+     * reached. Default behavior is to continue on even after the targets have
+     * been reached.
+     */
+    private final AtomicInteger maxIterationsAfterTargets = new AtomicInteger(
+            Integer.MAX_VALUE);
+    
     /**
      * 
      * @param namespace
@@ -115,8 +176,65 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         program.before(this);
         
+		if (log.isTraceEnabled()) {
+			log.trace("# of targets: " + targetVertices.size());
+			log.trace("max iterations after targets: " + maxIterationsAfterTargets.get());
+		}
+
         while (!gasState.frontier().isEmpty()) {
 
+            /*
+             * Check halting conditions.
+             * 
+             * Note: We could also halt on maxEdges since that is tracked in the
+             * GASStats.
+             */
+            
+            if (targetVertices.size() > 0 && 
+            		getMaxIterationsAfterTargets() < Integer.MAX_VALUE) {
+            	
+	            if (gasState.isVisited(targetVertices)) {
+	            	
+	            	/*
+	            	 * If we've reached all target vertices then halt the
+	            	 * program N rounds from now where 
+	            	 * N = maxIterationsAfterTargets.
+	            	 */
+	            	synchronized(this.maxIterations) {
+	            		
+	        			this.maxIterations.set(Math.min(getMaxIterations(),
+	    					(int) total.getNRounds() + getMaxIterationsAfterTargets()));
+	        			
+	            	}
+	            	
+	            	if (log.isTraceEnabled()) {
+	            		log.trace("All targets reached at round " + 
+	            				total.getNRounds() + ", halting at round " + 
+	            				this.maxIterations.get());
+	            	}
+	            	
+	            }
+	            	
+            }
+            
+            if (total.getNRounds() + 1 > getMaxIterations()) {
+
+                log.warn("Halting: maxIterations=" + getMaxIterations()
+                        + ", #rounds=" + total.getNRounds());
+
+                break;
+
+            }
+
+            if (total.getFrontierSize() >= getMaxVisited()) {
+
+                log.warn("Halting: maxVertices=" + getMaxVisited()
+                        + ", frontierSize=" + total.getFrontierSize());
+            
+                break;
+
+            }
+            
             final GASStats roundStats = new GASStats();
 
             doRound(roundStats);
@@ -130,8 +248,19 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
         gasState.traceState();
 
-        program.after(this);
-        
+        // Optional post-reduction.
+        {
+            
+            final IReducer<VS, ES, ST, ?> op = getRunAfterOp();
+
+            if (op != null) {
+
+                gasState.reduce(op);
+
+            }
+
+        }
+
         // Done
         return total;
 
@@ -180,8 +309,10 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * APPLY is done before the SCATTER - this would not work if we pushed
          * down the APPLY into the SCATTER).
          */
-        final EdgesEnum gatherEdges = program.getGatherEdges();
-        final EdgesEnum scatterEdges = program.getScatterEdges();
+        final EdgesEnum gatherEdges = getTraversalDirection().asTraversed(
+                program.getGatherEdges());
+        final EdgesEnum scatterEdges = getTraversalDirection().asTraversed(
+                program.getScatterEdges());
         final boolean pushDownApplyInGather;
         final boolean pushDownApplyInScatter;
         final boolean runApplyStage;
@@ -336,25 +467,92 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
     /**
      * Do APPLY.
      * 
-     * TODO The apply() should be parallelized. For some algorithms, there is a
-     * moderate amount of work per vertex in apply(). Use {@link #nthreads} to
-     * set the parallelism.
-     * <p>
-     * Note: This is very similar to the {@link IGASState#reduce(IReducer)}
-     * operation. This operates over the frontier. reduce() operates over the
-     * activated vertices. Both need fine grained parallelism. Both can have
-     * either light or moderately heavy operations (a dot product would be an
-     * example of a heavier operation).
+     * @return The #of vertices for which the operation was executed.
+     * 
+     * @throws Exception
      */
-    private void apply(final IStaticFrontier f) {
+    private void apply(final IStaticFrontier f) throws Exception {
 
-        for (Value u : f) {
+//      for (Value u : f) {
+//
+//          program.apply(gasState, u, null/* sum */);
+//
+//      }
 
-            program.apply(gasState, u, null/* sum */);
+        // Note: Return value of ApplyReducer is currently ignored.
+        reduceOverFrontier(f, new ApplyReducer<Void>());
+        
+    }
 
+    private class ApplyReducer<T> implements IReducer<VS, ES, ST, T> {
+
+        @Override
+        public void visit(final IGASState<VS, ES, ST> state, final Value u) {
+
+            program.apply(state, u, null/* sum */);
+            
+        }
+
+        @Override
+        public T get() {
+
+            // Note: Nothing returned right now.
+            return null;
+            
         }
 
     }
+    
+    /**
+     * Reduce over the frontier (used for apply()).
+     * 
+     * @param f
+     *            The frontier.
+     * @param op
+     *            The {@link IReducer}.
+     * 
+     * @return The {@link IReducer#get() result}.
+     * 
+     * @throws Exception
+     */
+    public <T> T reduceOverFrontier(final IStaticFrontier f,
+            final IReducer<VS, ES, ST, T> op) throws Exception {
+
+        if (f == null)
+            throw new IllegalArgumentException();
+
+        if (op == null)
+            throw new IllegalArgumentException();
+
+        class ReduceVertexTaskFactory implements VertexTaskFactory<Long> {
+
+            @Override
+            public Callable<Long> newVertexTask(final Value u) {
+
+                return new Callable<Long>() {
+
+                    @Override
+                    public Long call() {
+
+                        // program.apply(gasState, u, null/* sum */);
+                        op.visit(gasState, u);
+
+                        // Nothing returned by visit().
+                        return ONE;
+
+                    };
+                };
+
+            };
+        }
+
+        gasEngine.newFrontierStrategy(new ReduceVertexTaskFactory(), f).call();
+
+        // Return reduction.
+        return op.get();
+
+    }
+    private static final Long ONE = Long.valueOf(1L);
 
     /**
      * @param inEdges
@@ -512,6 +710,7 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
          * 
          * @return The #of visited edges.
          */
+        @Override
         public Long call() throws Exception {
 
             final boolean TRACE = log.isTraceEnabled();
@@ -656,4 +855,214 @@ public class GASContext<VS, ES, ST> implements IGASContext<VS, ES, ST> {
 
     } // GatherTask
 
+    @Override
+    public void setMaxIterations(final int newValue) {
+
+        if (newValue <= 0)
+            throw new IllegalArgumentException();
+        
+        this.maxIterations.set(newValue);
+        
+    }
+
+    @Override
+    public TraversalDirectionEnum getTraversalDirection() {
+
+        return traversalDirection.get();
+
+    }
+
+    @Override
+    public void setTraversalDirection(final TraversalDirectionEnum newVal) {
+
+        if (newVal == null)
+            throw new IllegalArgumentException();
+
+        traversalDirection.set(newVal);
+
+    }
+    
+    @Override
+    public int getMaxIterations() {
+
+        return maxIterations.get();
+        
+    }
+
+    @Override
+    public void setMaxVisited(int newValue) {
+
+        if (newValue <= 0)
+            throw new IllegalArgumentException();
+        
+        this.maxVertices.set(newValue);
+        
+    }
+
+    @Override
+    public int getMaxVisited() {
+
+        return maxVertices.get();
+        
+    }
+
+    @Override
+    public URI getLinkType() {
+        
+        return linkType.get();
+        
+    }
+
+    @Override
+    public void setLinkType(final URI linkType) {
+        
+        this.linkType.set(linkType);
+        
+    }
+
+    @Override
+    public URI getLinkAttributeType() {
+        
+        return linkAttributeType.get();
+        
+    }
+
+    @Override
+    public void setLinkAttributeType(final URI linkAttributeType) {
+        
+        this.linkAttributeType.set(linkAttributeType);
+        
+    }
+    
+    @Override
+    public void setTargetVertices(final Value[] targetVertices) {
+    	
+    	this.targetVertices.addAll(Arrays.asList(targetVertices));
+    	
+    }
+
+    @Override
+    public Set<Value> getTargetVertices() {
+    	
+    	return this.targetVertices;
+    	
+    }
+    
+    @Override
+    public void setMaxIterationsAfterTargets(final int newValue) {
+
+        if (newValue < 0)
+            throw new IllegalArgumentException();
+        
+        this.maxIterationsAfterTargets.set(newValue);
+        
+    }
+
+    @Override
+    public int getMaxIterationsAfterTargets() {
+
+        return maxIterationsAfterTargets.get();
+        
+    }
+
+
+
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * The default implementation only visits the edges.
+//     */
+//    @Override
+//    public IStriterator getConstrainEdgeFilter(final IStriterator itr) {
+//
+//        return itr.addFilter(getEdgeOnlyFilter());
+//
+//    }
+
+//    /**
+//     * Return an {@link IFilter} that will only visit the edges of the graph.
+//     * 
+//     * @see IGASState#isEdge(Statement)
+//     */
+//    protected IFilter getEdgeOnlyFilter() {
+//
+//        return new EdgeOnlyFilter(this);
+//        
+//    }
+//    
+//    /**
+//     * Filter visits only edges (filters out attribute values).
+//     * <p>
+//     * Note: This filter is pushed down onto the AP and evaluated close to the
+//     * data.
+//     */
+//    private class EdgeOnlyFilter extends Filter {
+//        private static final long serialVersionUID = 1L;
+//        private final IGASState<VS, ES, ST> gasState;
+//        private EdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
+//            this.gasState = ctx.getGASState();
+//        }
+//        @Override
+//        public boolean isValid(final Object e) {
+//            return gasState.isEdge((Statement) e);
+//        }
+//    };
+    
+    /**
+     * Return a filter that only visits the edges of graph that are instances of
+     * the specified link attribute type.
+     * <p>
+     * Note: For bigdata, the visited edges can be decoded to recover the
+     * original link as well. 
+     * 
+     * @see IGASState#isLinkAttrib(Statement, URI)
+     * @see IGASState#decodeStatement(Value)
+     */
+    protected IFilter getLinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
+            final URI linkAttribType) {
+
+        return new LinkAttribFilter(ctx, linkAttribType);
+
+    }
+
+    /**
+     * Filter visits only edges where the {@link Statement} is an instance of
+     * the specified link attribute type. For bigdata, the visited edges can be
+     * decoded to recover the original link as well.
+     */
+    private class LinkAttribFilter extends Filter {
+        private static final long serialVersionUID = 1L;
+
+        private final IGASState<VS, ES, ST> gasState;
+        private final URI linkAttribType;
+        
+        public LinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
+                final URI linkAttribType) {
+            if (linkAttribType == null)
+                throw new IllegalArgumentException();
+            this.gasState = ctx.getGASState();
+            this.linkAttribType = linkAttribType;
+        }
+
+        @Override
+        public boolean isValid(final Object e) {
+            return gasState.isLinkAttrib((Statement) e, linkAttribType);
+        }
+    }
+
+    @Override
+    public <T> void setRunAfterOp(final IReducer<VS, ES, ST, T> afterOp) {
+
+        this.afterOp.set(afterOp);
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T> IReducer<VS, ES, ST, T> getRunAfterOp() {
+
+        return (IReducer<VS, ES, ST, T>) afterOp.get();
+
+    }
+    
 } // GASContext

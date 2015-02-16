@@ -74,6 +74,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
 	    
 	}
 	
+    @Override
     public IValueExpressionNode getValueExpressionNode() {
 
         return (IValueExpressionNode) get(0);
@@ -87,7 +88,7 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
 
         sb.append("\n");
         sb.append(indent(indent));
-        sb.append("FILTER( ").append(getValueExpressionNode()).append(" )");
+        sb.append("FILTER( ").append(getValueExpressionNode().toString(indent+1)).append(" )");
 
 //        if (getQueryHints() != null) {
 //            sb.append("\n");

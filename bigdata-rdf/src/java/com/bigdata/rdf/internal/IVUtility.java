@@ -66,6 +66,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.internal.impl.uri.FullyInlineURIIV;
+import com.bigdata.rdf.internal.impl.uri.IPv4AddrIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
 import com.bigdata.rdf.internal.impl.uri.VocabURIByteIV;
@@ -437,7 +438,7 @@ public class IVUtility {
             final ISPO spo = SPOKeyOrder.SPO.decodeKey(key, o);
             // all spos that have a sid are explicit
             spo.setStatementType(StatementEnum.Explicit);
-            spo.setStatementIdentifier(true);
+//            spo.setStatementIdentifier(true);
             // create a sid iv and return it
             return new SidIV(spo);
         }
@@ -522,8 +523,9 @@ public class IVUtility {
             
             o += namespaceIV.byteLength();
             
-            final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV = (FullyInlineTypedLiteralIV<BigdataLiteral>) decodeFromOffset(
-                    key, o);
+            final AbstractLiteralIV<BigdataLiteral, ?> localNameIV = 
+                    (AbstractLiteralIV<BigdataLiteral, ?>) decodeFromOffset(
+                            key, o);
             
             final IV iv = new URIExtensionIV<BigdataURI>(localNameIV,
                     namespaceIV);
@@ -535,6 +537,18 @@ public class IVUtility {
         // The data type
         final DTE dte = AbstractIV.getDTE(flags);
         switch (dte) {
+// deprecated in favor of the extensible InlineURIFactory
+//        case XSDBoolean: {
+//        	/*
+//        	 * TODO Using XSDBoolean so that we can know how to decode this thing
+//           * as an IPAddrIV.  We need to fix the Extension mechanism for URIs.
+//           * Extension is already used above. 
+//        	 */
+//        	final byte[] addr = new byte[5];
+//        	System.arraycopy(key, o, addr, 0, 5);
+//            final Inet4Address ip = new Inet4Address(addr);
+//            return new IPv4AddrIV(ip);
+//        }
         case XSDByte: {
             final byte x = key[o];//KeyBuilder.decodeByte(key[o]);
             return new VocabURIByteIV<BigdataURI>(x);
@@ -691,6 +705,18 @@ public class IVUtility {
                     : iv;
             }
             return decodeInlineUnicodeLiteral(key,o);
+        }
+        case Extension: {
+            /*
+             * TODO Set up an extended DTE mechanism and check the byte after
+             * the flags for the extended DTE. Right now I am just hickacking
+             * Extension for IPv4.
+             */
+            final byte[] addr = new byte[5];
+            System.arraycopy(key, o, addr, 0, 5);
+            final Inet4Address ip = new Inet4Address(addr);
+            final AbstractLiteralIV iv = new IPv4AddrIV(ip);
+            return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
         }
         default:
             throw new UnsupportedOperationException("dte=" + dte);

@@ -41,7 +41,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @see StatementEnum
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo A mutable coded value raba could be implemented for the statement
  *       indices. With a fixed bit length per value, we can represent the data
@@ -71,6 +70,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
     /**
      * No.
      */
+    @Override
     final public boolean isKeyCoder() {
         
         return false;
@@ -80,12 +80,20 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
     /**
      * Yes.
      */
+    @Override
     final public boolean isValueCoder() {
 
         return true;
         
     }
 
+    @Override
+    public boolean isDuplicateKeys() {
+
+        return false;
+        
+    }
+    
     /**
      * Sole constructor (handles de-serialization also).
      */
@@ -93,12 +101,14 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
     }
 
+    @Override
     public void writeExternal(ObjectOutput out) throws IOException {
 
         // NOP
 
     }
 
+    @Override
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -106,6 +116,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -118,6 +129,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
     }
 
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         if (raba == null)
@@ -164,6 +176,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
     }
 
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new CodedRabaImpl(data);
@@ -184,6 +197,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
          */
         private final int size;
         
+        @Override
         final public AbstractFixedByteArrayBuffer data() {
 
             return data;
@@ -193,24 +207,28 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
         /**
          * No.
          */
+        @Override
         final public boolean isKeys() {
          
             return false;
             
         }
 
+        @Override
         final public int size() {
             
             return size;
             
         }
 
+        @Override
         final public int capacity() {
             
             return size;
             
         }
 
+        @Override
         final public boolean isEmpty() {
             
             return size == 0;
@@ -220,6 +238,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
         /**
          * Always <code>true</code>.
          */
+        @Override
         final public boolean isFull() {
 
             return true;
@@ -292,6 +311,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
         }
         
+        @Override
         final public int copy(final int index, final OutputStream os) {
 
             final byte bits = getBits(index);
@@ -319,6 +339,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
             
         }
 
+        @Override
         final public byte[] get(final int index) {
 
             final byte bits = getBits(index);
@@ -337,6 +358,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
 
         }
 
+        @Override
         final public boolean isNull(final int index) {
 
             return getBits(index) == 7;
@@ -348,6 +370,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
          * 
          * {@inheritDoc}
          */
+        @Override
         final public int length(final int index) {
             
             if (isNull(index))
@@ -360,6 +383,7 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
         /**
          * Not supported.
          */
+        @Override
         final public int search(final byte[] searchKey) {
 
             throw new UnsupportedOperationException();
@@ -367,5 +391,5 @@ public class FastRDFValueCoder2 implements Externalizable, IRabaCoder {
         }
         
     }
-    
+
 }

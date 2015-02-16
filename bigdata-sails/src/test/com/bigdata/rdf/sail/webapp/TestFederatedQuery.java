@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) � 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) 2001-2007
 
 All rights reserved.
 
@@ -79,6 +79,7 @@ import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.util.ModelUtil;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQuery;
@@ -91,7 +92,6 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.dawg.DAWGTestResultSetUtil;
 import org.openrdf.query.impl.MutableTupleQueryResult;
 import org.openrdf.query.impl.TupleQueryResultBuilder;
-import org.openrdf.query.parser.sparql.FOAF;
 import org.openrdf.query.resultio.QueryResultIO;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
@@ -206,16 +206,16 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      *            the index of the repository, starting with 1
      * @return
      */
-    protected String getRepositoryUrl(int i) {
+    protected String getRepositoryUrl(final int i) {
 
-        return getRepositoryUrlBase() + i;
+        return getRepositoryUrlBase() + i + "/sparql";
 
     }
     
     protected String getRepositoryUrlBase() {
         
-        return m_serviceURL + requestPath + "/namespace/" + namespace + "_";
-        
+        return m_serviceURL + "/namespace/" + namespace + "_";
+
     }
     
     /**

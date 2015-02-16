@@ -74,7 +74,7 @@ public class JVMHashIndexOp extends HashIndexOp {
 
     }
 
-    public JVMHashIndexOp(final BOp[] args, NV... annotations) {
+    public JVMHashIndexOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         

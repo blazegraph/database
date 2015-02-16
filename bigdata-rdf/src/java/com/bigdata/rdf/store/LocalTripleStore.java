@@ -33,6 +33,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -55,13 +56,13 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
     final static private Logger log = Logger.getLogger(LocalTripleStore.class);
 
-    private final Journal store;
+    private final IJournal store;
 
     /**
      * The backing embedded database.
      */
     @Override
-    public Journal getIndexManager() {
+    public IJournal getIndexManager() {
         
         return store;
         
@@ -160,7 +161,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
         super(indexManager, namespace, timestamp, properties);
 
-        store = (Journal) indexManager;
+        store = (IJournal) indexManager;
         
     }
 

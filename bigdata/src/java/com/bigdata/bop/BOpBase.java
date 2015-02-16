@@ -175,6 +175,7 @@ public class BOpBase extends CoreBaseBOp {
 
     }
 
+    @Override
     final public Map<String, Object> annotations() {
 
         return Collections.unmodifiableMap(annotations);
@@ -234,6 +235,7 @@ public class BOpBase extends CoreBaseBOp {
         
     }
     
+    @Override
     public BOp get(final int index) {
         
         return args[index];
@@ -286,6 +288,7 @@ public class BOpBase extends CoreBaseBOp {
 
     }
 
+    @Override
     public int arity() {
         
         return args.length;
@@ -297,6 +300,7 @@ public class BOpBase extends CoreBaseBOp {
      * <p>
      * Note: This is much less efficient than {@link #argIterator()}.
      */
+    @Override
     final public List<BOp> args() {
 
         return Collections.unmodifiableList(Arrays.asList(args));
@@ -309,6 +313,7 @@ public class BOpBase extends CoreBaseBOp {
      * The iterator does not support removal. (This is more efficient than
      * #args()).
      */
+    @Override
     final public Iterator<BOp> argIterator() {
     	
     	return new ArgIterator();
@@ -339,6 +344,7 @@ public class BOpBase extends CoreBaseBOp {
 	}
 
     // shallow copy
+    @Override
     public BOp[] toArray() {
 
         final BOp[] a = new BOp[args.length];
@@ -475,6 +481,7 @@ public class BOpBase extends CoreBaseBOp {
 //
 //    }
 
+    @Override
     public Object getProperty(final String name) {
 
         return annotations.get(name);
@@ -543,6 +550,7 @@ public class BOpBase extends CoreBaseBOp {
         
     }
 
+    @Override
     public BOpBase setProperty(final String name, final Object value) {
 
         final BOpBase tmp = (BOpBase) this.clone();

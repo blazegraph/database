@@ -150,7 +150,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
             final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
-            spo.setStatementIdentifier(true);
+//            spo.setStatementIdentifier(true);
 
             doEncodeDecodeTest(spo, SPOKeyOrder.SPO);
 
@@ -160,7 +160,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
             final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
-            spo.setStatementIdentifier(true);
+//            spo.setStatementIdentifier(true);
 
             doEncodeDecodeTest(spo, SPOKeyOrder.POS);
 
@@ -170,7 +170,7 @@ public class TestSPOTupleSerializer extends TestCase2 {
 
             final SPO spo = new SPO(_3, _1, _2, StatementEnum.Explicit);
 
-            spo.setStatementIdentifier(true);
+//            spo.setStatementIdentifier(true);
             
             doEncodeDecodeTest(spo, SPOKeyOrder.OSP);
             

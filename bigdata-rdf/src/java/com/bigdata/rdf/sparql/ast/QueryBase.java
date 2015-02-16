@@ -28,6 +28,7 @@ import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.QueryRoot.Annotations;
 
 /**
  * Contains the projection clause, where clause, and solution modified clauses.
@@ -106,6 +107,11 @@ abstract public class QueryBase extends QueryNodeBase implements
 
         long DEFAULT_TIMEOUT = Long.MAX_VALUE;
 
+        /**
+         * The BINDINGS clause (optional).
+         */
+        String BINDINGS_CLAUSE = "bindingsClause";
+        
     }
 
     /**
@@ -178,6 +184,12 @@ abstract public class QueryBase extends QueryNodeBase implements
     public void setConstruct(final ConstructNode construct) {
 
         setProperty(Annotations.CONSTRUCT, construct);
+        
+        if (construct != null) {
+        	
+		   setQueryType(QueryType.CONSTRUCT);
+		   
+        }
         
     }
     
@@ -433,6 +445,26 @@ abstract public class QueryBase extends QueryNodeBase implements
         setProperty(Annotations.TIMEOUT, timeout);
     }
 
+    /**
+     * Set the BINDINGS.
+     * 
+     * @param bindings
+     */
+    public void setBindingsClause(final BindingsClause bindings) {
+
+        setProperty(Annotations.BINDINGS_CLAUSE, bindings);
+
+    }
+
+    /**
+     * Return the BINDINGS.
+     */
+    public BindingsClause getBindingsClause() {
+
+        return (BindingsClause) getProperty(Annotations.BINDINGS_CLAUSE);
+
+    }
+    
 	public String toString(final int indent) {
 		
 	    final String s = indent(indent);
@@ -447,6 +479,7 @@ abstract public class QueryBase extends QueryNodeBase implements
         final HavingNode having = getHaving();
         final OrderByNode orderBy = getOrderBy();
         final SliceNode slice = getSlice();
+        final BindingsClause bindings = getBindingsClause();
 
         if (getQueryType() != null) {
 
@@ -506,6 +539,20 @@ abstract public class QueryBase extends QueryNodeBase implements
         if (slice != null) {
 
             sb.append(slice.toString(indent));
+
+        }
+
+        if (getQueryHints() != null && !getQueryHints().isEmpty()) {
+            sb.append("\n");
+            sb.append(indent(indent));
+            sb.append(Annotations.QUERY_HINTS);
+            sb.append("=");
+            sb.append(getQueryHints().toString());
+        }
+        
+        if (bindings != null) {
+
+            sb.append(bindings.toString(indent + 1));
 
         }
 

@@ -47,20 +47,13 @@ Modifications:
 
 package com.bigdata.rdf.store;
 
-import java.io.StringWriter;
-import java.io.Writer;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Statement;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFWriter;
-import org.openrdf.rio.RDFWriterFactory;
-import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
@@ -71,9 +64,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rio.StatementBuffer;
-import com.bigdata.rdf.rio.StatementCyclesException;
 import com.bigdata.rdf.rio.UnificationException;
-import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOComparator;
@@ -297,49 +288,49 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 
             }
 
-            final BigdataStatementIterator itr = store.getStatements(null, null, null);
-            
-            try {
-
-                final Writer w = new StringWriter();
-                
-//                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
-                
-                final RDFWriterFactory writerFactory = RDFWriterRegistry
-                        .getInstance().get(RDFFormat.RDFXML);
-                
-                assertNotNull(writerFactory);
-                
-                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
-                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
-                            + writerFactory.getClass());
-                
-                final RDFWriter rdfWriter = writerFactory.getWriter(w);
-                
-                rdfWriter.startRDF();
-
-                while(itr.hasNext()) {
-                
-                    final Statement stmt = itr.next();
-                    
-                    rdfWriter.handleStatement(stmt);
-                    
-                }
-                
-                rdfWriter.endRDF();
-                
-                if (log.isInfoEnabled())
-                    log.info(w.toString());
-                
-            } catch(Exception ex) {
-                
-                throw new RuntimeException(ex);
-                
-            } finally {
-                
-                itr.close();
-                
-            }
+//            final BigdataStatementIterator itr = store.getStatements(null, null, null);
+//            
+//            try {
+//
+//                final Writer w = new StringWriter();
+//                
+////                RDFXMLWriter rdfWriter = new RDFXMLWriter(w);
+//                
+//                final RDFWriterFactory writerFactory = RDFWriterRegistry
+//                        .getInstance().get(RDFFormat.RDFXML);
+//                
+//                assertNotNull(writerFactory);
+//                
+//                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
+//                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
+//                            + writerFactory.getClass());
+//                
+//                final RDFWriter rdfWriter = writerFactory.getWriter(w);
+//                
+//                rdfWriter.startRDF();
+//
+//                while(itr.hasNext()) {
+//                
+//                    final Statement stmt = itr.next();
+//                    
+//                    rdfWriter.handleStatement(stmt);
+//                    
+//                }
+//                
+//                rdfWriter.endRDF();
+//                
+//                if (log.isInfoEnabled())
+//                    log.info(w.toString());
+//                
+//            } catch(Exception ex) {
+//                
+//                throw new RuntimeException(ex);
+//                
+//            } finally {
+//                
+//                itr.close();
+//                
+//            }
             
             /*
              * Verify after restart.
@@ -768,7 +759,10 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
                 StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
 
                 // statement about itself is a cycle.
-                buf.add(sid1, rdfType, A, sid1);
+                buf.add(sid1, RDF.TYPE, A);
+                buf.add(sid1, RDF.SUBJECT, sid1);
+                buf.add(sid1, RDF.PREDICATE, RDF.TYPE);
+                buf.add(sid1, RDF.OBJECT, A);
 
                 /*
                  * Flush to the database, resolving statement identifiers as
@@ -778,9 +772,9 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
                     buf.flush();
 
-                    fail("Expecting: " + StatementCyclesException.class);
+                    fail("Expecting: " + UnificationException.class);
 
-                } catch (StatementCyclesException ex) {
+                } catch (UnificationException ex) {
 
                     System.err.println("Ignoring expected exception: " + ex);
 
@@ -830,21 +824,28 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
             {
                 StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
 
-                // a cycle with a period of one.
-                buf.add(sid2, rdfType, B, sid1);
-                buf.add(sid1, rdfType, B, sid2);
-                
                 /*
                  * Flush to the database, resolving statement identifiers as
                  * necessary.
                  */
                 try {
 
+                    // a cycle with a period of one.
+                    buf.add(sid2, RDF.TYPE, B);
+    	            buf.add(sid1, RDF.SUBJECT, sid2);
+    	            buf.add(sid1, RDF.PREDICATE, RDF.TYPE);
+    	            buf.add(sid1, RDF.OBJECT, B);
+
+                    buf.add(sid1, RDF.TYPE, B);
+    	            buf.add(sid2, RDF.SUBJECT, sid1);
+    	            buf.add(sid2, RDF.PREDICATE, RDF.TYPE);
+    	            buf.add(sid2, RDF.OBJECT, B);
+
                     buf.flush();
 
-                    fail("Expecting: "+StatementCyclesException.class);
+                    fail("Expecting: "+UnificationException.class);
                     
-                } catch(StatementCyclesException ex) {
+                } catch(UnificationException ex) {
                     
                     System.err.println("Ignoring expected exception: "+ex);
                     
@@ -888,16 +889,23 @@ public class TestStatementIdentifiers extends AbstractTripleStoreTestCase {
 
             StatementBuffer buf = new StatementBuffer(store, 100/* capacity */);
             
-            // same blank node in both two distinct statement is an error.
-            buf.add(A, rdfType, C, sid1);
-            buf.add(B, rdfType, C, sid1);
-            
             /*
              * Flush to the database, resolving statement identifiers as
              * necessary.
              */
             try {
 
+	            // same blank node in both two distinct statement is an error.
+	            buf.add(A, RDF.TYPE, C);
+	            buf.add(sid1, RDF.SUBJECT, A);
+	            buf.add(sid1, RDF.PREDICATE, RDF.TYPE);
+	            buf.add(sid1, RDF.OBJECT, C);
+	
+	            buf.add(B, RDF.TYPE, C);
+	            buf.add(sid1, RDF.SUBJECT, B);
+	            buf.add(sid1, RDF.PREDICATE, RDF.TYPE);
+	            buf.add(sid1, RDF.OBJECT, C);
+            
                 buf.flush();
 
                 fail("Expecting: "+UnificationException.class);

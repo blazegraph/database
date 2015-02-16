@@ -33,11 +33,13 @@ package com.bigdata.journal;
  * execute after the index has been dropped will NOT be able to see the index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * 
+ * @see RegisterIndexTask
  */
-public class DropIndexTask extends AbstractTask {
+public class DropIndexTask extends AbstractTask<Boolean> {
 
-    public DropIndexTask(IConcurrencyManager concurrencyManager, String name) {
+    public DropIndexTask(final IConcurrencyManager concurrencyManager,
+            final String name) {
 
         super(concurrencyManager, ITx.UNISOLATED, name);
 
@@ -51,9 +53,10 @@ public class DropIndexTask extends AbstractTask {
      *         therefore was dropped. <code>false</code> is returned iff the
      *         index did not exist at the time that this task was executed.
      */
-    public Object doTask() throws Exception {
+    @Override
+    public Boolean doTask() throws Exception {
 
-        String name = getOnlyResource();
+        final String name = getOnlyResource();
 
         try {
 

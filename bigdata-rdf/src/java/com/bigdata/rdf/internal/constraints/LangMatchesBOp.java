@@ -38,7 +38,12 @@ import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValue;
 
 /**
- * Implements the langMatches SPARQL operator.
+ * Implements the <a
+ * href="http://www.w3.org/TR/sparql11-query/#func-langMatches" >langMatches</a>
+ * SPARQL operator.
+ * 
+ * @see http://www.w3.org/TR/sparql11-query/#func-langMatches
+ * @see http://www.ietf.org/rfc/rfc4647.txt
  */
 public class LangMatchesBOp extends XSDBooleanIVValueExpression 
 		implements INeedsMaterialization {
@@ -48,6 +53,18 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 	 */
 	private static final long serialVersionUID = 5910711647357240974L;
 	
+    /**
+     * 
+     * @param tag
+     *            The language tag.
+     * @param range
+     *            The language range (allows "*", a language range such as "EN"
+     *            or "DE", or an extended language range such as "de-DE" or
+     *            "de-Latn-DE").
+     * 
+     * @see http://www.ietf.org/rfc/rfc4647.txt
+     */
+    @SuppressWarnings("rawtypes")
     public LangMatchesBOp(
     		final IValueExpression<? extends IV> tag, 
     		final IValueExpression<? extends IV> range) { 
@@ -61,7 +78,7 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
      */
     public LangMatchesBOp(final BOp[] args, final Map<String, Object> anns) {
 
-    	super(args, anns);
+        super(args, anns);
     	
         if (args.length != 2 || args[0] == null || args[1] == null)
             throw new IllegalArgumentException();
@@ -75,6 +92,7 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
         super(op);
     }
 
+    @Override
     protected boolean accept(final IBindingSet bs) {
         
         final IV<?, ?> tag = get(0).get(bs);
@@ -118,39 +136,47 @@ public class LangMatchesBOp extends XSDBooleanIVValueExpression
 //        	log.debug(rangeVal);
 //        }
 
-//		if (QueryEvaluationUtil.isSimpleLiteral(tagVal)
-//				&& QueryEvaluationUtil.isSimpleLiteral(rangeVal))
-//		{
         final String langTag = ((Literal) tagVal).getLabel();
         final String langRange = ((Literal) rangeVal).getLabel();
 
-		boolean result = false;
-		if (langRange.equals("*")) {
-			result = langTag.length() > 0;
-		}
-		else if (langTag.length() == langRange.length()) {
-			result = langTag.equalsIgnoreCase(langRange);
-		}
-		else if (langTag.length() > langRange.length()) {
-			// check if the range is a prefix of the tag
-		    final String prefix = langTag.substring(0, langRange.length());
-			result = prefix.equalsIgnoreCase(langRange) && langTag.charAt(langRange.length()) == '-';
-		}
+        boolean result = false;
 
-		return result;
-//		}
-//
-//		throw new SparqlTypeErrorException();
-		
+        if (langRange.equals("*")) {
+        
+            // Note: Must have a language tag to match.
+            result = langTag.length() > 0;
+            
+        } else if (langTag.length() == langRange.length()) {
+            
+            // Same length, same characters (case insensitive).
+            result = langTag.equalsIgnoreCase(langRange);
+            
+        } else if (langTag.length() > langRange.length()) {
+            
+            /*
+             * Check if the range is a prefix of the tag. If the range is longer
+             * the match must terminate on a "-" boundary in the language range.
+             */
+
+            final String prefix = langTag.substring(0, langRange.length());
+
+            result = prefix.equalsIgnoreCase(langRange)
+                    && langTag.charAt(langRange.length()) == '-';
+
+        }
+
+        return result;
+
     }
     
     /**
      * This bop can only work with materialized terms.  
      */
+    @Override
     public Requirement getRequirement() {
-    	
-    	return INeedsMaterialization.Requirement.ALWAYS;
-    	
+
+        return INeedsMaterialization.Requirement.ALWAYS;
+
     }
-    
+
 }

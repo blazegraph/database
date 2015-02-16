@@ -310,7 +310,7 @@ abstract public class WriteCache implements IWriteCache {
         
         /**
          * When a record is used as a read cache then the readCount is
-         * maintained as a metric on its access. �This could be used to
+         * maintained as a metric on its access. This could be used to
          * determine eviction/compaction.
          * <p>
          * Note: volatile to guarantee visibility of updates. Might do better
@@ -509,7 +509,8 @@ abstract public class WriteCache implements IWriteCache {
      * @param isHighlyAvailable
      *            when <code>true</code> the whole record checksum is maintained
      *            for use when replicating the write cache along the write
-     *            pipeline.
+     *            pipeline.  This needs to be <code>true</code> for HA1 as well
+     *            since we need to write the HALog.
      * @param bufferHasData
      *            when <code>true</code> the caller asserts that the buffer has
      *            data (from a replicated write), in which case the position

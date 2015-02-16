@@ -64,7 +64,6 @@ import com.bigdata.service.IServiceShutdown;
  * segment resources and the concurrency control from the journal itself.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IResourceManager extends IServiceShutdown {
 
@@ -135,7 +134,7 @@ public interface IResourceManager extends IServiceShutdown {
      * 
      * @see FusedView
      */
-    public AbstractBTree[] getIndexSources(String name, long timestamp);
+    AbstractBTree[] getIndexSources(String name, long timestamp); // non-GIST
 
     /**
      * Examine the partition metadata (if any) for the {@link BTree}. If the
@@ -151,7 +150,7 @@ public interface IResourceManager extends IServiceShutdown {
      * 
      * @return The source(s) for the view associated with that {@link BTree}.
      */
-    public AbstractBTree[] getIndexSources(String name, long timestamp, BTree btree);
+    AbstractBTree[] getIndexSources(String name, long timestamp, BTree btree); // non-GIST
     
     /**
      * Return a view of the named index as of the specified timestamp.
@@ -191,7 +190,7 @@ public interface IResourceManager extends IServiceShutdown {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" >
      *      GIST </a>
      */
-    public ILocalBTreeView getIndex(String name, long timestamp);
+    ILocalBTreeView getIndex(String name, long timestamp); // non-GIST
 
     /**
      * Return non-<code>null</code> iff <i>name</i> is the name of an
@@ -297,26 +296,17 @@ public interface IResourceManager extends IServiceShutdown {
      */
     public IBigdataFederation<?> getFederation();
     
-//    /**
-//     * Return the ordered {@link UUID}[] of the physical {@link IDataService}
-//     * failover chain for the logical {@link IDataService} whose resources are
-//     * under management by this class.
-//     * 
-//     * @deprecated This is not used right now and might go away.
-//     */
-//    public UUID[] getDataServiceUUIDs();
-
-	/**
-	 * Return the {@link BTreeCounters} for the named index. If none exist, then
-	 * a new instance is atomically created and returned to the caller. This
-	 * facilitates the reuse of the same {@link BTreeCounters} instance for all
-	 * views of the named index.
-	 * 
-	 * @param name
-	 *            The name of the index.
-	 * 
-	 * @return The counters for that index and never <code>null</code>.
-	 */
-    public BTreeCounters getIndexCounters(final String name);
+    /**
+     * Return the {@link BTreeCounters} for the named index. If none exist, then
+     * a new instance is atomically created and returned to the caller. This
+     * facilitates the reuse of the same {@link BTreeCounters} instance for all
+     * views of the named index.
+     * 
+     * @param name
+     *            The name of the index.
+     * 
+     * @return The counters for that index and never <code>null</code>.
+     */
+    BTreeCounters getIndexCounters(final String name); // non-GIST
     
 }

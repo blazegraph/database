@@ -29,12 +29,10 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
-import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.rmi.Remote;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -58,6 +56,7 @@ import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
@@ -112,7 +111,6 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
-import com.bigdata.util.config.NicUtil;
 import com.sun.jini.start.LifeCycle;
 
 /**
@@ -346,6 +344,27 @@ public class HAJournalServer extends AbstractServer {
         String DEFAULT_HA_LOG_DIR = "HALog";
 
         /**
+         * The maximum amount of time in milliseconds to await the synchronous
+         * release of older HALog files during a 2-phase commit (default
+         * {@value #DEFAULT_HA_LOG_PURGE_TIMEOUT}). This MAY be ZERO to not
+         * wait. Large timeouts can cause significant latency during a 2-phase
+         * commit if a large number of HALog files should be released
+         * accordinging to the {@link IRestorePolicy}.
+         * 
+         * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/780"
+         *      >Incremental or asynchronous purge of HALog files</a>
+         */
+        String HA_LOG_PURGE_TIMEOUT = "HALogPurgeTimeout";
+
+        /**
+         * The default is ZERO (0L) milliseconds, which is probably what we
+         * always want. However, the existence of this option allows us to
+         * revert to the old behavior using a configuration change or by
+         * changing the default.
+         */
+        long DEFAULT_HA_LOG_PURGE_TIMEOUT = 0L; // milliseconds
+
+        /**
          * The name of the directory in which periodic snapshots of the journal
          * will be written. Each snapshot is a full copy of the journal.
          * Snapshots are compressed and therefore may be much more compact than
@@ -360,6 +379,19 @@ public class HAJournalServer extends AbstractServer {
          * {@link AbstractServer.ConfigurationOptions#SERVICE_DIR}.
          */
         String DEFAULT_SNAPSHOT_DIR = "snapshot";
+
+        /**
+         * The number of threads that will be used for a parallel scan of the
+         * files in the {@link #HA_LOG_DIR} and {@link #SNAPSHOT_DIR} in order
+         * to accelerate the service start. The minimum is ONE (1). The default
+         * is {@value #DEFAULT_STARTUP_THREADS}.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+         *      (optimization) </a>
+         */
+        String STARTUP_THREADS = "startupThreads";
+        
+        int DEFAULT_STARTUP_THREADS = 20;
 
         /**
          * The policy that specifies when a new snapshot will be taken. The
@@ -418,28 +450,60 @@ public class HAJournalServer extends AbstractServer {
          */
         boolean DEFAULT_ONLINE_DISASTER_RECOVERY = false;
 
+        /**
+         * The location of the <code>jetty.xml</code> file that will be used to
+         * configure jetty (default {@value #DEFAULT_JETTY_XML}).
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+         *      Allow configuration of embedded NSS jetty server using
+         *      jetty-web.xml </a>
+         * 
+         * @see #DEFAULT_JETTY_XML
+         */
+        String JETTY_XML = NanoSparqlServer.SystemProperties.JETTY_XML;
+
+        /**
+         * The default value works when deployed under the IDE with the
+         * <code>bigdata-war/src</code> directory on the classpath. When
+         * deploying outside of that context, the value needs to be set
+         * explicitly.
+         */
+        String DEFAULT_JETTY_XML = NanoSparqlServer.SystemProperties.DEFAULT_JETTY_XML;
+
     }
     
-    /**
-     * Configuration options for the {@link NanoSparqlServer}.
-     */
-    public interface NSSConfigurationOptions extends ConfigParams {
-        
-        String COMPONENT = NanoSparqlServer.class.getName();
-        
-        /**
-         * The port at which the embedded {@link NanoSparqlServer} will respond
-         * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
-         * (0) to use a random open port. 
-         * 
-         * TODO We should be able to specify the interface, not just the port. Is
-         * there any way to do that with jetty?
-         */
-        String PORT = "port";
-
-        int DEFAULT_PORT = 8080;
-        
-    }
+//    /**
+//     * Configuration options for the {@link NanoSparqlServer}.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+//     *      Allow configuration of embedded NSS jetty server using jetty-web.xml
+//     *      </a>
+//     */
+//    @Deprecated
+//    public interface NSSConfigurationOptions extends ConfigParams {
+//
+//        @Deprecated
+//        String COMPONENT = NanoSparqlServer.class.getName();
+//        
+//        /**
+//         * The port at which the embedded {@link NanoSparqlServer} will respond
+//         * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
+//         * (0) to use a random open port.
+//         * 
+//         * @deprecated This has been replaced by the use of <code>web.xml</code>
+//         *             and <code>jetty.xml</code>.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
+//         *      Allow configuration of embedded NSS jetty server using
+//         *      jetty-web.xml </a>
+//         */
+//        @Deprecated
+//        String PORT = "port";
+//
+//        @Deprecated
+//        int DEFAULT_PORT = 8080;
+//
+//    }
 
     /**
      * The journal.
@@ -503,6 +567,22 @@ public class HAJournalServer extends AbstractServer {
      */
     private volatile Server jettyServer;
 
+    /**
+     * Exposed to the test suite.
+     */
+    WebAppContext getWebAppContext() {
+
+        final Server server = jettyServer;
+        
+        if (server == null)
+            throw new IllegalStateException();
+
+        final WebAppContext wac = NanoSparqlServer.getWebApp(server);
+
+        return wac;
+        
+    }
+    
     /**
      * Enum of the run states. The states are labeled by the goal of the run
      * state.
@@ -698,10 +778,24 @@ public class HAJournalServer extends AbstractServer {
             /*
              * Zookeeper quorum.
              */
+            @SuppressWarnings({ "unchecked", "rawtypes" })
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum = (Quorum) new ZKQuorumImpl<HAGlue, HAQuorumService<HAGlue, HAJournal>>(
                     replicationFactor);
 
-            // The HAJournal.
+            /**
+             * The HAJournal.
+             * 
+             * FIXME This step can block for a long time if we have a lot of
+             * HALogs to scan. While it blocks, the REST API (including the LBS)
+             * is down. This means that client requests to the service end point
+             * can not be proxied to a service that is online. The problem is
+             * the interaction with the BigdataRDFServletContextListener which
+             * needs to (a) set the IIndexManager on the ServletContext; and (b)
+             * initiate the default KB create (if it is the quorum leader).
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal
+             *      start() (optimization) </a>
+             */
             this.journal = newHAJournal(this, config, quorum);
             
         }
@@ -804,6 +898,36 @@ public class HAJournalServer extends AbstractServer {
      * {@inheritDoc}
      * <p>
      * Note: called from {@link AbstractServer#run()}
+     * 
+     * FIXME We should be able to start the NSS while still reading the HALog
+     * files from the disk. The action to start the {@link HAQuorumService}
+     * should await a {@link Future} for the journal start. Thus, the
+     * {@link HAJournal} start needs to be turned into a {@link Callable} or
+     * {@link Runnable}.
+     * <p>
+     * In fact, the journal open is very fast. The slow part is the building an
+     * index over the HALogs and (to a lesser extent) over the snapshots. Those
+     * index builds can run in parallel, but we need to have a critical section
+     * in which we check some necessary conditions, especially whether the last
+     * HALog is valid.
+     * <p>
+     * We need to push a start() computation into both the {@link HALogNexus}
+     * and the {@link SnapshotManager}. This could be done with an interface
+     * that is also shared by the {@link HAJournal}. The interface could provide
+     * some reporting on the startup process, but most critical is that it
+     * provides a {@link Future} for evaluating that process.
+     * <p>
+     * The {@link Future} can evaluate to the outcome of that startup procedure.
+     * <p>
+     * The startup procedure should use multiple threads (or async IO) to reduce
+     * the startup latency. It could use the executor on the journal for this.
+     * <p>
+     * We could parallelize the HALog and snapshot startup then enter a critical
+     * section in which we validate the consistency of those resources with
+     * respect to the HAJournal's current root block.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+     *      (optimization) </a>
      */
     @Override
     protected void startUpHook() { 
@@ -3416,6 +3540,42 @@ public class HAJournalServer extends AbstractServer {
         }
 
         @Override
+        protected void incReceive(final IHASyncRequest req,
+                final IHAWriteMessage msg, final int nreads,
+                final int rdlen, final int rem) throws Exception {
+
+//            if (log.isTraceEnabled())
+//                log.trace("HA INCREMENTAL PROGRESS: msg=" + msg + ", nreads="
+//                        + nreads + ", rdlen=" + rdlen + ", rem=" + rem);
+            
+            final IHAProgressListener l = progressListenerRef.get();
+            
+            if (l != null) {
+
+                l.incReceive(req, msg, nreads, rdlen, rem);
+                
+            }
+            
+        }
+
+        /**
+         * Interface for receiving notice of incremental write replication
+         * progress.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+         */
+        public static interface IHAProgressListener {
+
+            void incReceive(final IHASyncRequest req,
+                    final IHAWriteMessage msg, final int nreads,
+                    final int rdlen, final int rem) throws Exception;
+            
+        }
+
+        // Note: Exposed to HAJournal's HAGlue implementation.
+        final AtomicReference<IHAProgressListener> progressListenerRef = new AtomicReference<IHAProgressListener>();
+
+        @Override
         protected void handleReplicatedWrite(final IHASyncRequest req,
                 final IHAWriteMessage msg, final ByteBuffer data)
                 throws Exception {
@@ -3592,6 +3752,16 @@ public class HAJournalServer extends AbstractServer {
                             // propagate interrupt
                             Thread.currentThread().interrupt();
                             return;
+                        }
+                        // Add check for ClosedByInterruptException - but is this sufficient if the channel is now closed?
+                        if (InnerCause.isInnerCause(t,
+                                ClosedByInterruptException.class)) {
+                            // propagate interrupt
+                            // Thread.currentThread().interrupt();
+                            
+                            // wrap and re-throw
+                            throw new RuntimeException(t);
+                            // return;
                         }
                         /*
                          * Error handler.
@@ -4182,6 +4352,16 @@ public class HAJournalServer extends AbstractServer {
                      * 
                      * Note: This is not an error, but we can not remove
                      * snapshots or HALogs if this invariant is violated.
+                     * 
+                     * Note: We do not permit HALog files to be purged if the
+                     * quorum is not fully met. This is done in order to prevent
+                     * a situation a leader would not have sufficient log files
+                     * on hand to restore the failed service. If this were to
+                     * occur, then the failed service would have to undergo a
+                     * disaster rebuild rather than simply resynchronizing from
+                     * the leader. Hence, HALog files are NOT purged unless the
+                     * quorum is fully met (all services for its replication
+                     * count are joined with the met quorum).
                      */
                     return;
                 }
@@ -4388,54 +4568,15 @@ public class HAJournalServer extends AbstractServer {
      * Note: We need to wait for a quorum meet since this will create the KB
      * instance if it does not exist and we can not write on the
      * {@link HAJournal} until we have a quorum meet.
+     * 
+     * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
+     *      Embedding Jetty </a>
+     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
+     *      of embedded NSS jetty server using jetty-web.xml </a>
      */
     private void startNSS() {
 
         try {
-
-            final String COMPONENT = NSSConfigurationOptions.COMPONENT;
-
-            final String namespace = (String) config.getEntry(COMPONENT,
-                    NSSConfigurationOptions.NAMESPACE, String.class,
-                    NSSConfigurationOptions.DEFAULT_NAMESPACE);
-
-            final Integer queryPoolThreadSize = (Integer) config.getEntry(
-                    COMPONENT, NSSConfigurationOptions.QUERY_THREAD_POOL_SIZE,
-                    Integer.TYPE,
-                    NSSConfigurationOptions.DEFAULT_QUERY_THREAD_POOL_SIZE);
-
-            final boolean create = (Boolean) config.getEntry(COMPONENT,
-                    NSSConfigurationOptions.CREATE, Boolean.TYPE,
-                    NSSConfigurationOptions.DEFAULT_CREATE);
-
-            final Integer port = (Integer) config.getEntry(COMPONENT,
-                    NSSConfigurationOptions.PORT, Integer.TYPE,
-                    NSSConfigurationOptions.DEFAULT_PORT);
-
-            final String servletContextListenerClass = (String) config
-                    .getEntry(
-                            COMPONENT,
-                            NSSConfigurationOptions.SERVLET_CONTEXT_LISTENER_CLASS,
-                            String.class,
-                            NSSConfigurationOptions.DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS);
-
-            log.warn("Starting NSS: port=" + port);
-
-            final Map<String, String> initParams = new LinkedHashMap<String, String>();
-            {
-
-                initParams.put(ConfigParams.NAMESPACE, namespace);
-
-                initParams.put(ConfigParams.QUERY_THREAD_POOL_SIZE,
-                        queryPoolThreadSize.toString());
-
-                // Note: Create will be handled by the QuorumListener (above).
-                initParams.put(ConfigParams.CREATE, Boolean.toString(create));
-
-                initParams.put(ConfigParams.SERVLET_CONTEXT_LISTENER_CLASS,
-                        servletContextListenerClass);
-
-            }
 
             if (jettyServer != null && jettyServer.isRunning()) {
 
@@ -4443,48 +4584,24 @@ public class HAJournalServer extends AbstractServer {
 
             }
 
-            // Setup the embedded jetty server for NSS webapp.
-            jettyServer = NanoSparqlServer.newInstance(port, journal,
-                    initParams);
+            // The location of the jetty.xml file.
+            final String jettyXml = (String) config.getEntry(
+                    ConfigurationOptions.COMPONENT,
+                    ConfigurationOptions.JETTY_XML, String.class,
+                    ConfigurationOptions.DEFAULT_JETTY_XML);
 
-            // Start the server.
-            jettyServer.start();
+                // Note: if we do this, push the serviceDir down into newInstance().
+//                if (!jettyXml.startsWith("/")) {
+//                    // Assume that the path is relative to the serviceDir.
+//                    jettyXml = getServiceDir() + File.separator + jettyXml;
+//                }
+                
+                // Setup the embedded jetty server for NSS webapp.
+            jettyServer = NanoSparqlServer
+                    .newInstance(jettyXml, journal, null/* initParams */);
 
-            /*
-             * Report *an* effective URL of this service.
-             * 
-             * Note: This is an effective local URL (and only one of them, and
-             * even then only one for the first connector). It does not reflect
-             * any knowledge about the desired external deployment URL for the
-             * service end point.
-             */
-            final String serviceURL;
-            {
-
-                final int actualPort = jettyServer.getConnectors()[0]
-                        .getLocalPort();
-
-                String hostAddr = NicUtil.getIpAddress("default.nic",
-                        "default", true/* loopbackOk */);
-
-                if (hostAddr == null) {
-
-                    hostAddr = "localhost";
-
-                }
-
-                serviceURL = new URL("http", hostAddr, actualPort, ""/* file */)
-                        .toExternalForm();
-
-                final String msg = "logicalServiceZPath: "
-                        + logicalServiceZPath + "\n" + "serviceURL: "
-                        + serviceURL;
-
-                System.out.println(msg);
-                if (log.isInfoEnabled())
-                    log.info(msg);
-
-            }
+            // Wait until the server starts (up to a timeout).
+            NanoSparqlServer.awaitServerStart(jettyServer);
 
         } catch (Exception e1) {
 
@@ -4496,8 +4613,27 @@ public class HAJournalServer extends AbstractServer {
     }
     
     /**
-     * Conditionally create the default KB instance as identified by the
-     * {@link NSSConfigurationOptions}.
+     * The actual port depends on how jetty was configured in
+     * <code>jetty.xml</code>. This returns the port associated with the first
+     * connection for the jetty {@link Server}.
+     * 
+     * @return The port associated with the first connection for the jetty
+     *         {@link Server}.
+     * 
+     * @throws IllegalArgumentException
+     *             if the jetty {@link Server} is not running.
+     */
+    int getNSSPort() {
+
+        return NanoSparqlServer.getLocalPort(jettyServer);
+
+    }
+    
+    /**
+     * Conditionally create the default KB instance as identified in
+     * <code>web.xml</code>.
+     * 
+     * @see ConfigParams
      * 
      * @throws ConfigurationException
      * @throws ExecutionException
@@ -4506,15 +4642,59 @@ public class HAJournalServer extends AbstractServer {
     private void conditionalCreateDefaultKB() throws ConfigurationException,
             InterruptedException, ExecutionException {
 
-        final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+        final Server server = this.jettyServer;
 
-        final String namespace = (String) config.getEntry(COMPONENT,
-                NSSConfigurationOptions.NAMESPACE, String.class,
-                NSSConfigurationOptions.DEFAULT_NAMESPACE);
+        if (server == null)
+            throw new IllegalStateException();
 
-        final boolean create = (Boolean) config.getEntry(COMPONENT,
-                NSSConfigurationOptions.CREATE, Boolean.TYPE,
-                NSSConfigurationOptions.DEFAULT_CREATE);
+        /*
+         * TODO This currently relies on the WebAppContext's initParams. This is
+         * somewhat fragile, but that is where this information is declared.
+         */
+        final WebAppContext wac = NanoSparqlServer.getWebApp(server);
+
+        if (wac == null)
+            throw new RuntimeException("Could not locate webapp.");
+        
+        final String namespace;
+        {
+         
+            String s = wac.getInitParameter(ConfigParams.NAMESPACE);
+
+            if (s == null)
+                s = ConfigParams.DEFAULT_NAMESPACE;
+
+            namespace = s;
+            
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.NAMESPACE + "=" + namespace);
+
+        }
+
+        final boolean create;
+        {
+            
+            final String s = wac.getInitParameter(ConfigParams.CREATE);
+
+            if (s != null)
+                create = Boolean.valueOf(s);
+            else
+                create = ConfigParams.DEFAULT_CREATE;
+        
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.CREATE + "=" + create);
+
+        }
+
+//        final String COMPONENT = NSSConfigurationOptions.COMPONENT;
+//
+//        final String namespace = (String) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.NAMESPACE, String.class,
+//                NSSConfigurationOptions.DEFAULT_NAMESPACE);
+//
+//        final boolean create = (Boolean) config.getEntry(COMPONENT,
+//                NSSConfigurationOptions.CREATE, Boolean.TYPE,
+//                NSSConfigurationOptions.DEFAULT_CREATE);
 
         if (create) {
 

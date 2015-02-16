@@ -10,6 +10,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -120,30 +121,39 @@ public class BigdataStatementIteratorImpl
                 
                 final IV<?,?> s = spo.s();
 
-                if (bnodes == null || !bnodes.containsKey(s))
-                    ivs.add(s);
+//                if (bnodes == null || !bnodes.containsKey(s))
+//                    ivs.add(s);
+                
+                handleIV(s, ivs);
             
             }
 
-            ivs.add(spo.p());
+//            ivs.add(spo.p());
 
+            handleIV(spo.p(), ivs);
+            
             {
 
                 final IV<?,?> o = spo.o();
 
-                if (bnodes == null || !bnodes.containsKey(o))
-                    ivs.add(o);
+//                if (bnodes == null || !bnodes.containsKey(o))
+//                    ivs.add(o);
 
+                handleIV(o, ivs);
+                
             }
 
             {
              
                 final IV<?,?> c = spo.c();
 
-                if (c != null
-                        && (bnodes == null || !bnodes.containsKey(c)))
-                    ivs.add(c);
+//                if (c != null
+//                        && (bnodes == null || !bnodes.containsKey(c)))
+//                    ivs.add(c);
 
+                if (c != null) 
+                	handleIV(c, ivs);
+                
             }
 
         }
@@ -225,6 +235,53 @@ public class BigdataStatementIteratorImpl
 
     }
 
+    /**
+     * Add the IV to the list of terms to materialize, and also
+     * delegate to {@link #handleSid(SidIV, Collection, boolean)} if it's a
+     * SidIV.
+     */
+    private void handleIV(final IV<?, ?> iv, 
+    		final Collection<IV<?, ?>> ids) {
+    	
+//    	if (iv instanceof SidIV) {
+//    		
+//    		handleSid((SidIV<?>) iv, ids);
+//    		
+//    	}
+    		
+    	if (bnodes == null || !bnodes.containsKey(iv)) {
+    	
+    		ids.add(iv);
+    		
+    	}
+    	
+    }
+    
+//    /**
+//     * Sids need to be handled specially because their individual ISPO
+//     * components might need materialization as well.
+//     */
+//    private void handleSid(final SidIV<?> sid,
+//    		final Collection<IV<?, ?>> ids) {
+//    	
+//    	final ISPO spo = sid.getInlineValue();
+//    	
+//    	handleIV(spo.s(), ids);
+//    	
+//    	handleIV(spo.p(), ids);
+//    	
+//    	handleIV(spo.o(), ids);
+//    	
+//    	if (spo.c() != null) {
+//    		
+//        	handleIV(spo.c(), ids);
+//    		
+//    	}
+//
+//    }
+
+
+    
     /**
      * Resolve a term identifier to the {@link BigdataValue}, checking the
      * {@link #bnodes} map if it is defined.

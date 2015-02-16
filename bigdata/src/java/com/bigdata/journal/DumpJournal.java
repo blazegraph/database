@@ -311,17 +311,22 @@ public class DumpJournal {
                     
                 }
 
-            } catch( RuntimeException ex) {
+            } catch( Throwable t) {
                 
-                ex.printStackTrace();
+                t.printStackTrace();
 
-                System.err.println("Error: "+ex+" on file: "+file);
+                System.err.println("Error: " + t + " on file: " + file);
+
+                // Abnormal completion.
+                System.exit(1);
                 
             }
             
             System.out.println("==================================");
 
         }
+
+        System.out.println("Normal completion");
         
     }
     
@@ -668,9 +673,6 @@ public class DumpJournal {
     
     /**
      * Dump metadata about each named index as of the specified commit record.
-     * 
-     * @param journal
-     * @param commitRecord
      */
     private void dumpNamedIndicesMetadata(final PrintWriter out,
             final List<String> namespaces, final ICommitRecord commitRecord,

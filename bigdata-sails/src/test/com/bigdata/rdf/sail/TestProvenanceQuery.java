@@ -31,6 +31,7 @@ import java.io.Writer;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -41,16 +42,14 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.algebra.evaluation.QueryBindingSet;
-import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailConnection;
 
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.model.BigdataStatementImpl;
-import com.bigdata.rdf.rio.rdfxml.BigdataRDFXMLWriterFactory;
 import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.store.DataLoader;
 
@@ -63,6 +62,8 @@ import com.bigdata.rdf.store.DataLoader;
  */
 public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 
+	private final transient static Logger log = Logger.getLogger(TestProvenanceQuery.class);
+	
     public TestProvenanceQuery() {
         
     }
@@ -97,18 +98,17 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
             final DataLoader dataLoader = sail.database.getDataLoader();
 
             dataLoader.loadData(
-                    "bigdata-sails/src/test/com/bigdata/rdf/sail/provenance01.rdf",
-                    ""/*baseURL*/, RDFFormat.RDFXML);
+                    "bigdata-sails/src/test/com/bigdata/rdf/sail/provenance01.ttlx",
+                    ""/*baseURL*/, ServiceProviderHook.TURTLE_RDR);
             
         }
         
         /*
-         * Serialize as RDF/XML using a vendor specific extension to represent
-         * the statement identifiers and statements about statements.
+         * Serialize as RDF/XML.
          * 
          * Note: This is just for debugging.
          */
-        {
+		if (log.isInfoEnabled()) {
          
             final BigdataStatementIterator itr = sail.database.getStatements(null, null, null);
             final String rdfXml;
@@ -121,10 +121,6 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
                         .getInstance().get(RDFFormat.RDFXML);
                 
                 assertNotNull(writerFactory);
-                
-                if (!(writerFactory instanceof BigdataRDFXMLWriterFactory))
-                    fail("Expecting " + BigdataRDFXMLWriterFactory.class + " not "
-                            + writerFactory.getClass());
                 
                 final RDFWriter rdfWriter = writerFactory.getWriter(w);
 
@@ -154,8 +150,7 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
             }
 
             // write the rdf/xml
-            if (log.isInfoEnabled())
-                log.info(rdfXml);
+            log.info(rdfXml);
 
         }
         
@@ -196,7 +191,8 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
 //                            new Var("Y"))),
 //                new ProjectionElemList(new ProjectionElem[] { new ProjectionElem( "Y" )}));
 
-            final String q = "select ?Y where { ?SID <"+dcCreator+"> ?Y . graph ?SID { <"+y+"> <"+RDF.TYPE+"> <"+B+"> . } }";
+//            final String q = "select ?Y where { ?SID <"+dcCreator+"> ?Y . graph ?SID { <"+y+"> <"+RDF.TYPE+"> <"+B+"> . } }";
+            final String q = "select ?Y where { <<<"+y+"> <"+RDF.TYPE+"> <"+B+">>> <"+dcCreator+"> ?Y . }";
             
             /*
              * Create a data set consisting of the contexts to be queried.
@@ -204,10 +200,10 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
              * Note: a [null] DataSet will cause context to be ignored when the
              * query is processed.
              */
-            final DatasetImpl dataSet = null; //new DatasetImpl();
-
-            final BindingSet bindingSet = new QueryBindingSet();
-
+//            final DatasetImpl dataSet = null; //new DatasetImpl();
+//
+//            final BindingSet bindingSet = new QueryBindingSet();
+//
 //            final CloseableIteration<? extends BindingSet, QueryEvaluationException> itr = conn
 //                    .evaluate(tupleExpr, dataSet, bindingSet, true/* includeInferred */);
 

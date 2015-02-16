@@ -28,7 +28,8 @@ abstract public class AbstractGraphFixture implements
         SailConnection cxn = null;
         try {
             cxn = getSail().getConnection();
-            new SailGraphLoader(cxn).loadGraph(null/* fallback */, resources);
+            cxn.begin();
+            newSailGraphLoader(cxn).loadGraph(null/* fallback */, resources);
             cxn.commit();
             ok = true;
         } finally {
@@ -38,6 +39,12 @@ abstract public class AbstractGraphFixture implements
                 cxn.close();
             }
         }
+
+    }
+
+    protected SailGraphLoader newSailGraphLoader(SailConnection cxn) {
+
+        return new SailGraphLoader(cxn);
 
     }
 

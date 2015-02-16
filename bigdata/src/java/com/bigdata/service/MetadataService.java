@@ -1192,7 +1192,7 @@ abstract public class MetadataService extends DataService implements
         
         /**
          * @parma fed
-         * @param journal
+         * @param concurrencyManager
          * @param name
          *            The name of the metadata index for some scale-out index.
          */

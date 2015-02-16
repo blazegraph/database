@@ -44,6 +44,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 
@@ -271,7 +272,7 @@ public interface IHABufferStrategy extends IBufferStrategy {
      *             if the service is not joined with the met quorum for that
      *             token at any point during the operation.
      */
-    void writeOnStream(OutputStream os,
+    void writeOnStream(OutputStream os, ISnapshotData coreData,
             Quorum<HAGlue, QuorumService<HAGlue>> quorum, long token)
             throws IOException, QuorumException;
 
@@ -280,4 +281,11 @@ public interface IHABufferStrategy extends IBufferStrategy {
      */
     WriteCacheService getWriteCacheService();
     
+    /**
+     * A StoreState object references critical transient data that can be used
+     * to determine a degree of consistency between stores, specifically for an
+     * HA context.
+     */
+    StoreState getStoreState();
+
 }

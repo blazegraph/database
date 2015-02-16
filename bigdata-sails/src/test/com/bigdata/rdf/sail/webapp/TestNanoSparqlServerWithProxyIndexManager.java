@@ -37,9 +37,11 @@ import junit.framework.TestResult;
 import junit.framework.TestSuite;
 import junit.textui.ResultPrinter;
 
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.RWStrategy;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -60,23 +62,7 @@ import com.bigdata.service.jini.JiniFederation;
  * queries which exercise the context position; and the default-graph and
  * named-graph URL query parameters for quads.
  * 
- * @todo Security model?
- * 
- * @todo An NQUADS RDFWriter needs to be written. Then we can test NQUADS
- *       interchange.
- * 
- * @todo A SPARQL result sets JSON parser needs to be written (Sesame bundles a
- *       writer, but not a parser) before we can test queries which CONNEG for a
- *       JSON result set.
- * 
- * @todo Tests which verify the correct rejection of illegal or ill-formed
- *       requests.
- * 
- * @todo Test suite for reading from a historical commit point.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestNanoSparqlServer.java 4398 2011-04-14 13:55:29Z thompsonbry
- *          $
  */
 public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         extends AbstractIndexManagerTestCase<S> {
@@ -101,7 +87,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager() {
 
-		this(null/* name */, getTemporaryJournal(), TestMode.triples);
+		this(null/* name */, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
 
 	}
 
@@ -110,19 +96,43 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager(String name) {
 
-		this(name, getTemporaryJournal(), TestMode.triples);
+		this(name, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
 
 	}
 
 	static Journal getTemporaryJournal() {
+	
+		return getTemporaryJournal(false/*use_rwstore*/);
+		
+	}
+	
+	static Journal getTemporaryJournal(final boolean use_rwstore) {
 
 		final Properties properties = new Properties();
 
-		properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-				BufferMode.Transient.toString());
+		if (use_rwstore) {
+			
+			// Use the RWStore for some specific test suites.
+			
+			properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+					BufferMode.DiskRW.toString());
+			
+			properties.setProperty(
+					com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
+			
+			properties.setProperty(com.bigdata.journal.Options.DELETE_ON_CLOSE,
+					"true");
 
-		properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT, ""
-				+ (Bytes.megabyte32 * 1));
+		} else {
+
+			// Otherwise use a transient in-memory buffer.
+			
+			properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+					BufferMode.Transient.toString());
+			
+			properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT,
+					"" + (Bytes.megabyte32 * 1));
+		}
 
 		return new Journal(properties);
 
@@ -176,7 +186,14 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
                     getTemporaryJournal(), TestMode.triples);
         }
     }
-    
+
+    public static class test_NSS_RWStore extends TestCase {
+        public static Test suite() {
+            return TestNanoSparqlServerWithProxyIndexManager.suite(
+                    getTemporaryJournal(true/*RWStore*/), TestMode.triples);
+        }
+    }
+
     /**
      * The {@link TestMode#quads} test suite.
      */
@@ -204,7 +221,18 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	public static TestSuite suite(final IIndexManager indexManager,
 			final TestMode testMode) {
 
+		final boolean RWStoreMode = indexManager instanceof AbstractJournal
+				&& ((AbstractJournal) indexManager).getBufferStrategy() instanceof RWStrategy;
+
 		final ProxyTestSuite suite = createProxyTestSuite(indexManager,testMode);
+
+        if(RWStoreMode) {
+        	
+			// RWSTORE SPECIFIC TEST SUITE.
+			suite.addTestSuite(TestRWStoreTxBehaviors.class);
+        	
+        } else {
+
 
         /*
          * List any non-proxied tests (typically bootstrapping tests).
@@ -217,15 +245,15 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          * Proxied test suites.
          */
 		
-		//Protocol
+		// Protocol
 		suite.addTest(TestProtocolAll.suite());
         
         // Multi-tenancy API.
         suite.addTestSuite(TestMultiTenancyAPI.class);
 
-        // RemoteRepository test (nano sparql server client-wrapper)
+        // RemoteRepository test (nano sparql server client-wrapper using Jetty)
         suite.addTestSuite(TestNanoSparqlClient.class);
-
+        
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
         
@@ -233,6 +261,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         suite.addTestSuite(TestInsertFilterFalse727.class);
         suite.addTestSuite(TestCBD731.class);
         
+        suite.addTestSuite(TestService794.class);
 
         // SPARQL UPDATE test suite.
         switch(testMode) {
@@ -241,10 +270,13 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
             break;
         case sids:
             // TODO SIDS mode UPDATE test suite.
+        	suite.addTestSuite(TestRDROperations.class);
             break;
         case quads:
             // QUADS mode UPDATE test suite. 
             suite.addTestSuite(TestSparqlUpdate.class);
+            suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
+            suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
             break;
         default: throw new UnsupportedOperationException();
         }
@@ -252,6 +284,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         // SPARQL 1.1 Federated Query.
         suite.addTestSuite(TestFederatedQuery.class);
 
+        }
+        
         return suite;
     
     }
@@ -544,5 +578,11 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		System.out.println(msg);
         
     }
+    
+    @Override
+	public void tearDownAfterSuite() {
+		this.m_indexManager.destroy();
+		this.m_indexManager = null;
+	}
     
 }

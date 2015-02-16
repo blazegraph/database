@@ -52,7 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.2.3-SNAPSHOT</version>
+   <version>1.5.0-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>bigdata(R)</name>
     <description>Bigdata(R) Maven Build</description>
@@ -75,27 +75,31 @@ dependencies.
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
       <icu.version>4.8</icu.version>
-      <zookeeper.version>3.3.3</zookeeper.version>
-      <sesame.version>2.6.10</sesame.version>
+      <zookeeper.version>3.4.5</zookeeper.version>
+      <sesame.version>2.7.13</sesame.version>
       <slf4j.version>1.6.1</slf4j.version>
-      <jetty.version>7.2.2.v20101205</jetty.version>
+      <jetty.version>9.2.3.v20140905</jetty.version>
+      <servlet.version>3.1.0</servlet.version>
       <lucene.version>3.0.0</lucene.version>
       <apache.commons_codec.version>1.4</apache.commons_codec.version>
-      <apache.commons_fileupload.version>1.2.2</apache.commons_fileupload.version>
+      <apache.commons_fileupload.version>1.3.1</apache.commons_fileupload.version>
       <apache.commons_io.version>2.1</apache.commons_io.version>
       <apache.commons_logging.version>1.1.1</apache.commons_logging.version>
       <apache.httpclient.version>4.1.3</apache.httpclient.version>
       <apache.httpclient_cache.version>4.1.3</apache.httpclient_cache.version>
       <apache.httpcore.version>4.1.4</apache.httpcore.version>
       <apache.httpmime.version>4.1.3</apache.httpmime.version>
-      <nxparser.version>1.2.3</nxparser.version>
       <colt.version>1.2.0</colt.version>
       <highscalelib.version>1.1.2</highscalelib.version>
       <log4j.version>1.2.17</log4j.version>
-      <fastutil.version>5.1.5</fastutil.version>
+      <fastutil.version>6.5.16</fastutil.version>
       <dsiutils.version>1.0.6-020610</dsiutils.version>
-      <lgplutils.version>1.0.6-020610</lgplutils.version>
-      <bigdata.ganglia.version>1.0.1</bigdata.ganglia.version>
+      <lgplutils.version>1.0.7-270114</lgplutils.version>
+      <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
+      <jackson.version>2.2.3</jackson.version>
+      <blueprints.version>2.5.0</blueprints.version>
+      <jettison.version>1.3.3</jettison.version>
+      <rexster.version>2.5.0</rexster.version>
     </properties>
     <!-- TODO Can we declare the versions of the dependencies here as
          properties and have them be substituted in for us? Can we pick
@@ -173,18 +177,6 @@ dependencies.
       <id>bigdata.releases</id>
       <url>http://www.systap.com/maven/releases/</url>
     </repository>
-    <repository>
-      <id>nxparser-repo</id>
-      <url>http://nxparser.googlecode.com/svn/repository</url>
-    </repository>
-    <repository>
-      <id>nxparser-snapshots</id>
-      <url>http://nxparser.googlecode.com/svn/snapshots</url>
-    </repository>
-    <repository>
-      <id>aduna-opensource.releases</id>
-      <url>http://repo.aduna-software.org/maven2/releases/</url>
-    </repository>
     <!-- 
     <repository>
       <id>jetty.releases</id>
@@ -205,11 +197,6 @@ dependencies.
            <groupId>com.github.stephenc.high-scale-lib</groupId>
            <artifactId>high-scale-lib</artifactId>
            <version>${highscalelib.version}</version>
-       </dependency>
-       <dependency>
-           <groupId>org.semanticweb.yars</groupId>
-           <artifactId>nxparser</artifactId>
-           <version>${nxparser.version}</version>
        </dependency>
        <dependency>
            <groupId>colt</groupId>
@@ -306,6 +293,21 @@ dependencies.
            <artifactId>commons-logging</artifactId>
            <version>${apache.commons_logging.version}</version>
        </dependency>
+		<dependency>
+		   <groupId>com.fasterxml.jackson.core</groupId>
+		   <artifactId>jackson-core</artifactId>
+		   <version>${jackson.version}</version>
+		</dependency>
+        <dependency>
+           <groupId>com.tinkerpop.blueprints</groupId>
+           <artifactId>blueprints-core</artifactId>
+           <version>${blueprints.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.tinkerpop.rexster</groupId>
+          <artifactId>rexster-core</artifactId>
+          <version>${rexster.version}</version>
+        </dependency>
        <!--                                                           -->
        <!-- artifacts that we publish (because they are not readily   -->
        <!-- available) but we do not maintain.                        -->
@@ -317,11 +319,11 @@ dependencies.
 mvn deploy:deploy-file \
    -DgroupId=it.unimi \
    -DartifactId=fastutil \
-   -Dversion=5.1.5 \
+   -Dversion=6.5.16 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/unimi/fastutil-5.1.5.jar
+   -Dfile=bigdata/lib/unimi/fastutil-6.5.16.jar
                -->
            <groupId>it.unimi</groupId>
            <artifactId>fastutil</artifactId>
@@ -356,15 +358,15 @@ mvn deploy:deploy-file \
 mvn deploy:deploy-file \
    -DgroupId=com.bigdata \
    -DartifactId=bigdata-ganglia \
-   -Dversion=1.0.1 \
+   -Dversion=1.0.4 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/bigdata-ganglia-1.0.1.jar
+   -Dfile=bigdata/lib/bigdata-ganglia-1.0.4.jar
         -->
            <groupId>com.bigdata</groupId>
            <artifactId>bigdata-ganglia</artifactId>
-           <version>1.0.1</version>
+           <version>${bigdata.ganglia.version}</version>
            <optional>true</optional>
        </dependency>
        <!-- 
@@ -387,15 +389,109 @@ mvn deploy:deploy-file \
 mvn deploy:deploy-file \
    -DgroupId=com.bigdata \
    -DartifactId=lgpl-utils \
-   -Dversion=1.0.6-020610 \
+   -Dversion=1.0.7-270114 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/lgpl-utils-1.0.6-020610.jar
+   -Dfile=bigdata/lib/lgpl-utils-1.0.7-270114.jar
            -->
            <groupId>com.bigdata</groupId>
            <artifactId>lgpl-utils</artifactId>
            <version>${lgplutils.version}</version>
        </dependency>
+    <!-- jetty dependencies for the REST API 
+    jetty-continuation
+    jetty-http
+    jetty-io
+    jetty-jmx
+    jetty-jndi
+    jetty-server
+    jetty-util
+    jetty-webapp
+    jetty-servlet
+    jetty-security
+    jetty-xml
+    jetty-rewrite
+    jetty-proxy
+    servlet-api
+    javax.servlet-api
+    
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-continuation</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-http</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-io</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-jmx</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-jndi</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+	   <dependency>
+		  <groupId>org.eclipse.jetty</groupId>
+		  <artifactId>jetty-server</artifactId>
+		  <version>${jetty.version}</version>
+	   </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-security</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-xml</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-rewrite</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-client</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-proxy</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>servlet-api</artifactId>
+			<version>${servlet-version}</version>
+         <scope>provided</scope>
+		</dependency>
+		-->
    </dependencies>
 </project>

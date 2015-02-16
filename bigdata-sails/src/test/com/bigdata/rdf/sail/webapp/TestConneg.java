@@ -33,27 +33,62 @@ import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.counters.format.CounterSetFormat;
+
 /**
  * Test suite for content negotiation helper class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestConneg extends TestCase2 {
 
+	
+//	static {
+//		
+//		new BigdataSPARQLResultsJSONParserFactory();
+//		
+//	}
+	
     /**
      * 
      */
     public TestConneg() {
+        
     }
 
     /**
      * @param name
      */
-    public TestConneg(String name) {
+    public TestConneg(final String name) {
+
         super(name);
+        
     }
+
+    public void test_conneg_no_Accept_headser() {
     
+        final String acceptStr = null;
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        assertNull(util.getRDFFormat());
+
+        assertEquals(RDFFormat.N3, util.getRDFFormat(RDFFormat.N3));
+
+    }
+
+    public void test_conneg_empty_Accept_headser() {
+        
+        final String acceptStr = "";
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        assertNull(util.getRDFFormat());
+
+        assertEquals(RDFFormat.N3, util.getRDFFormat(RDFFormat.N3));
+
+    }
+
     /*
      * Tests where the best format is an RDF data interchange format.
      */
@@ -68,7 +103,11 @@ public class TestConneg extends TestCase2 {
 
             assertEquals(format.getName(), format, util.getRDFFormat());
 
-            assertNull(format.getName(), util.getTupleQueryResultFormat());
+            if (!format.getName().equals("JSON")) {
+
+                assertNull(format.getName(), util.getTupleQueryResultFormat());
+
+            }
 
             assertSameArray(new ConnegScore[] {//
                     new ConnegScore(1f, format) },//
@@ -90,8 +129,12 @@ public class TestConneg extends TestCase2 {
 
             final ConnegUtil util = new ConnegUtil(format.getDefaultMIMEType());
 
-            assertNull(format.getName(), util.getRDFFormat());
+            if (!format.getName().equals("SPARQL/JSON")) {
+                
+            	assertNull(format.getName(), util.getRDFFormat());
 
+            }
+            
             assertEquals(format.getName(), format,
                     util.getTupleQueryResultFormat());
 
@@ -134,8 +177,27 @@ public class TestConneg extends TestCase2 {
         assertNull(util.getRDFFormat());
 
         assertSameArray(new ConnegScore[] {//
-                new ConnegScore(.3f, TupleQueryResultFormat.BINARY),//
                 new ConnegScore(.5f, TupleQueryResultFormat.SPARQL),//
+                new ConnegScore(.3f, TupleQueryResultFormat.BINARY),//
+                },//
+                util.getScores(TupleQueryResultFormat.class));
+
+        assertEquals(TupleQueryResultFormat.SPARQL,
+                util.getTupleQueryResultFormat());
+
+    }
+
+    public void test_conneg_sparql_result_set_03b() {
+
+        final String acceptStr = "text/xhtml,application/x-binary-rdf-results-table;q=.4,application/sparql-results+xml;q=.2";
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        assertNull(util.getRDFFormat());
+
+        assertSameArray(new ConnegScore[] {//
+                new ConnegScore(.4f, TupleQueryResultFormat.BINARY),//
+                new ConnegScore(.2f, TupleQueryResultFormat.SPARQL),//
                 },//
                 util.getScores(TupleQueryResultFormat.class));
 
@@ -152,7 +214,11 @@ public class TestConneg extends TestCase2 {
 
             final ConnegUtil util = new ConnegUtil(format.getDefaultMIMEType());
 
-            assertNull(format.getName(), util.getRDFFormat());
+            if (!format.getName().equals("SPARQL/JSON")) {
+                
+            	assertNull(format.getName(), util.getRDFFormat());
+            	
+            }
 
             assertEquals(format.getName(), format,
                     util.getBooleanQueryResultFormat());
@@ -166,10 +232,126 @@ public class TestConneg extends TestCase2 {
     }
     
     public void test_conneg_ask_json() {
-    	final ConnegUtil util = new ConnegUtil(BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
-    	final BooleanQueryResultFormat format = util
+
+        final ConnegUtil util = new ConnegUtil(
+                BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON);
+
+        final BooleanQueryResultFormat format = util
                 .getBooleanQueryResultFormat(BooleanQueryResultFormat.SPARQL);
-    	assertFalse(format.toString(),format.toString().toLowerCase().contains("xml"));
+
+        assertFalse(format.toString(), format.toString().toLowerCase()
+                .contains("xml"));
+
     }
 
+    public void test_conneg_counterSet_application_xml() {
+        
+        final String acceptStr = "application/xml";
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        final CounterSetFormat format = util.getCounterSetFormat();
+
+        assertEquals(CounterSetFormat.XML, format);
+
+    }
+    
+    public void test_conneg_counterSet_text_plain() {
+        
+        final String acceptStr = "text/plain";
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        final CounterSetFormat format = util.getCounterSetFormat();
+
+        assertEquals(CounterSetFormat.TEXT, format);
+
+    }
+    
+    public void test_conneg_counterSet_text_html() {
+        
+        final String acceptStr = "text/html";
+
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+        final CounterSetFormat format = util.getCounterSetFormat();
+
+        assertEquals(CounterSetFormat.HTML, format);
+
+    }
+
+    public void test_conneg_counterSet_browser1() {
+
+        final String acceptStr = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8,";
+        
+        final ConnegUtil util = new ConnegUtil(acceptStr);
+
+//        System.out.println(Arrays.toString(util.getScores(CounterSetFormat.class)));
+        
+        assertSameArray(new ConnegScore[] {//
+                new ConnegScore(1f, CounterSetFormat.HTML),//
+                new ConnegScore(.9f, CounterSetFormat.XML),//
+                },//
+                util.getScores(CounterSetFormat.class));
+
+        final CounterSetFormat format = util.getCounterSetFormat();
+
+        assertEquals(CounterSetFormat.HTML, format);
+
+    }
+    
+	public void test_connect_getMimeTypeForQueryParameter2() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_JSON_SHORT;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter3() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_XML;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter4() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_XML_SHORT;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter5() {
+		final String outputFormat = null;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = null;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter6() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_JSON;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+		final String acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+	
+	public void test_connect_getMimeTypeForQueryParameter7() {
+		final String outputFormat = BigdataRDFServlet.OUTPUT_FORMAT_XML;
+		final String correctResult = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+		final String acceptHeader = BigdataRDFServlet.MIME_SPARQL_RESULTS_JSON;
+
+		assertEquals(ConnegUtil.getMimeTypeForQueryParameter(outputFormat,
+				acceptHeader), correctResult);
+	}
+    
 }

@@ -45,7 +45,6 @@ import com.bigdata.rawstore.Bytes;
  * The data MUST be ordered. <code>null</code> values are not allowed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
@@ -59,6 +58,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     private int ratio;
 
+    @Override
     public String toString() {
 
         return super.toString() + "{ratio=" + ratio + "}";
@@ -72,7 +72,6 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     public static class DefaultFrontCodedRabaCoder extends FrontCodedRabaCoder {
 
@@ -91,11 +90,13 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
             
         }
         
+        @Override
         public void readExternal(ObjectInput in) throws IOException,
                 ClassNotFoundException {
             // NOP
         }
 
+        @Override
         public void writeExternal(ObjectOutput out) throws IOException {
             // NOP
         }
@@ -142,18 +143,28 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     final public boolean isKeyCoder() {
 
         return true;
 
     }
 
+    @Override
     final public boolean isValueCoder() {
 
         return false;
 
     }
 
+    @Override
+    public boolean isDuplicateKeys() {
+
+        return false;
+        
+    }
+
+    @Override
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -161,6 +172,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public void writeExternal(ObjectOutput out) throws IOException {
 
         out.writeInt(ratio);
@@ -190,6 +202,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
     /** The byte offset of the start of the front-coded representation. */
     private static final int O_DATA = O_RATIO + SIZEOF_RATIO;
 
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         if (raba == null)
@@ -212,7 +225,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
         // front-code the byte[][].
         final CustomByteArrayFrontCodedList decoder = new CustomByteArrayFrontCodedList(
-                raba.iterator(), ratio);
+                raba.iterator(), ratio, isDuplicateKeys());
 
         try {
 
@@ -242,6 +255,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -255,9 +269,10 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
-        return new CodedRabaImpl(data);
+        return new CodedRabaImpl(data, isDuplicateKeys());
 
     }
 
@@ -278,8 +293,12 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
          * 
          * @param data
          *            The record containing the coded data.
+         * @param hasDups
+         *            <code>true</code> iff the {@link IRabaCoder} supports
+         *            duplicate keys.
          */
-        public CodedRabaImpl(final AbstractFixedByteArrayBuffer data) {
+        public CodedRabaImpl(final AbstractFixedByteArrayBuffer data,
+                final boolean hasDups) {
 
             final byte version = data.getByte(O_VERSION);
 
@@ -297,7 +316,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
             // wrap slice with decoder.
             this.decoder = new CustomByteArrayFrontCodedList(size, ratio, data
-                    .array(), data.off() + O_DATA, data.len());
+                    .array(), data.off() + O_DATA, data.len(), hasDups);
 
             this.data = data;
 
@@ -321,6 +340,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public AbstractFixedByteArrayBuffer data() {
 
             return data;
@@ -330,24 +350,28 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
         /**
          * Represents B+Tree keys.
          */
+        @Override
         final public boolean isKeys() {
 
             return true;
 
         }
 
+        @Override
         final public int size() {
 
             return decoder.size();
 
         }
 
+        @Override
         final public int capacity() {
 
             return decoder.size();
 
         }
 
+        @Override
         final public boolean isEmpty() {
 
             return size() == 0;
@@ -358,6 +382,7 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
          * Always returns <code>true</code> since the front-coded representation
          * is dense.
          */
+        @Override
         final public boolean isFull() {
 
             return true;
@@ -368,24 +393,28 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
          * Always returns <code>false</code> (<code>null</code>s are not
          * allowed).
          */
+        @Override
         final public boolean isNull(final int index) {
 
             return false;
 
         }
 
+        @Override
         final public byte[] get(final int index) {
 
             return decoder.get(index);
 
         }
 
+        @Override
         final public int length(final int index) {
 
             return decoder.arrayLength(index);
 
         }
 
+        @Override
         public int copy(final int index, final OutputStream os) {
 
             try {
@@ -400,12 +429,14 @@ public class FrontCodedRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         public Iterator<byte[]> iterator() {
 
             return decoder.iterator();
 
         }
 
+        @Override
         public int search(final byte[] searchKey) {
 
             // optimization: always keys.

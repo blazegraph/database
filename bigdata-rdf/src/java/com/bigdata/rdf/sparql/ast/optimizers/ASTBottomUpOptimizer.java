@@ -44,10 +44,13 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
+import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -71,7 +74,7 @@ import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
  * Rewrites aspects of queries where bottom-up evaluation would produce
  * different results. This includes joins which are not "well designed" as
  * defined in section 4.2 of "Semantics and Complexity of SPARQL", 2006, Jorge
- * Pérez et al and also FILTERs on variables whose bindings are not in scope.
+ * Prez et al and also FILTERs on variables whose bindings are not in scope.
  * <p>
  * Note: The test suite for this class is a set of DAWG tests which focus on
  * bottom up evaluation semantics, including:
@@ -125,6 +128,16 @@ import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
  * <pre>
  * SELECT ?v
  * { :x :p ?v . { FILTER(?v = 1) } }
+ * </pre>
+ * 
+ * bind07 - BIND (?o not in scope for bind)
+ * 
+ * <pre>
+ * SELECT ?s ?p ?o ?z
+ * {
+ *   ?s ?p ?o .
+ *   { BIND(?o+1 AS ?z) } UNION { BIND(?o+2 AS ?z) }
+ * }
  * </pre>
  * 
  * Nested groups which do not share variables with their parent can be lifted
@@ -524,6 +537,10 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         final NamedSubqueryRoot nsr = new NamedSubqueryRoot(QueryType.SELECT,
                 namedSet);
+        
+        // Copy across query hints for the join group.
+        nsr.setQueryHints(p.getQueryHints());
+        
         {
         
             {
@@ -543,14 +560,17 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                 }
 
             }
-            
-            nsr.setWhereClause(p);
+            // See #1087
+            nsr.setWhereClause(BOpUtility.deepCopy(p));
 
             queryRoot.getNamedSubqueriesNotNull().add(nsr);
             
         }
         
         final NamedSubqueryInclude nsi = new NamedSubqueryInclude(namedSet);
+
+        // Copy across query hints for the join group.
+        nsi.setQueryHints(p.getQueryHints());
 
         if (p.isOptional()) {
 
@@ -586,11 +606,34 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         } else {
 
-            // Replace with named subquery INCLUDE.
-            pp.replaceWith(p, nsi);
-        
+           /**
+            *  Replace with named subquery INCLUDE.
+            *  
+            *  Note: we can not do that starting from pp, since pp is the 
+            *  parent join group node (which may differ from p.getParent().
+            *  
+            *  See ticket #1087 for an example query where this is the case
+            */
+           final IGroupNode<?> ppNode = p.getParent();
+           if (ppNode instanceof  GroupNodeBase) {
+
+              final GroupNodeBase<?> gnb = (GroupNodeBase<?>) ppNode;
+              
+              if (ppNode instanceof JoinGroupNode) {
+                 gnb.replaceWith(p, nsi);                 
+                 
+              } else {
+                 // if the parent is not a JoinGroupNode, we wrap the include
+                 // into a join group node; this is necessary because, for
+                 // instance, INCLUDE is not supported inside all constructs
+                 // (e.g. fails in case we INCLUDE into a UNION operator)
+                 final JoinGroupNode nsiWrapper = new JoinGroupNode();
+                 nsiWrapper.addChild(nsi);
+                 
+                 gnb.replaceWith(p, nsiWrapper);
+              }
+           }        
         }
-       
     }
     
     /**
@@ -719,12 +762,13 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             // For everything in this group.
             for (IGroupMemberNode child : group) {
 
-                // Only consider the FILTERs.
-                if (!(child instanceof FilterNode))
+                // Only consider the FILTERs and BINDs.
+                if (!(child instanceof FilterNode || child instanceof AssignmentNode))
                     continue;
 
-                final FilterNode filter = (FilterNode) child;
-
+                final GroupMemberValueExpressionNodeBase filter = 
+                        (GroupMemberValueExpressionNodeBase) child;
+                
                 if(rewriteUnboundVariablesInFilter(context, maybeBound, map,
                         null/* parent */, filter.getValueExpressionNode())) {
                     
@@ -759,7 +803,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                             filter.getValueExpressionNode());
                     
                 }
-
+                    
             }
 
         }
@@ -863,7 +907,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         }
 
-        ((ASTBase) parent).replaceAllWith(ovar, nvar);
+        if (parent != null)
+            ((ASTBase) parent).replaceAllWith(ovar, nvar);
 
         return true;
 
