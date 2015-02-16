@@ -83,7 +83,7 @@ public class TestSPO extends TestCase2 {
     	
     	doRoundTripTest(expected);
 
-    	expected.setStatementIdentifier(true);
+//    	expected.setStatementIdentifier(true);
     	
     	doRoundTripTest(expected);
 

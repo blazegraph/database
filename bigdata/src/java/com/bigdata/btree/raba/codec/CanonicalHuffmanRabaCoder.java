@@ -202,7 +202,6 @@ import com.bigdata.io.DataOutputBuffer;
  *       the codec and the decoder, which must process 8 bytes at a time.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
@@ -218,21 +217,25 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
      */
     final protected static transient byte VERSION0 = 0x00;
 
+    @Override
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
         // No state.
     }
 
+    @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         // No state.
     }
 
+    @Override
     final public boolean isKeyCoder() {
 
         return true;
 
     }
 
+    @Override
     final public boolean isValueCoder() {
 
         return true;
@@ -666,6 +669,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         /**
          * Return the #of distinct symbols used to generate the code.
          */
+        @Override
         abstract public int getSymbolCount();
 
          /**
@@ -930,6 +934,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
         private final DecoderInputs decoderInputs;
         
+        @Override
         public DecoderInputs decoderInputs() {
 
             return decoderInputs;
@@ -956,12 +961,14 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         final public int byte2symbol(final byte b) {
 
             return byte2symbol.get(b);
 
         }
 
+        @Override
         final public byte symbol2byte(final int symbol) {
 
             return (byte) symbol2byte[symbol];
@@ -1104,6 +1111,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -1111,6 +1119,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         
     }
     
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         final AbstractCodingSetup setup = new RabaCodingSetup(raba);
@@ -1334,6 +1343,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
 
         return new CodedRabaImpl(data);
@@ -1668,6 +1678,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
         }
 
+        @Override
         final public int size() {
 
             return size;
@@ -1677,12 +1688,14 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         /**
          * The capacity is equal to the size (the data are immutable).
          */
+        @Override
         final public int capacity() {
 
             return size;
 
         }
 
+        @Override
         final public boolean isEmpty() {
 
             return size == 0;
@@ -1693,18 +1706,21 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * Always returns <code>true</code> since {@link #size()} ==
          * {@link #capacity()} by definition for this class.
          */
+        @Override
         final public boolean isFull() {
 
             return true;
 
         }
 
+        @Override
         final public boolean isKeys() {
 
             return isKeys;
 
         }
 
+        @Override
         public AbstractFixedByteArrayBuffer data() {
 
             return data;
@@ -1750,6 +1766,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 //
 //        }
 
+        @Override
         public boolean isNull(final int index) {
 
             if (index < 0 || index >= size)
@@ -1774,6 +1791,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * This computes the length of the decoded byte[] by counting the code
          * words for the coded value.
          */
+        @Override
         public int length(final int index) {
 
             if (index < 0 || index >= size)
@@ -1876,6 +1894,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * allocates the byte[]. The second pass decodes into the allocated
          * byte[].
          */
+        @Override
         public byte[] get(final int index) {
 
             if (index < 0 || index >= size)
@@ -2048,6 +2067,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * This decodes the value at the specified index in a single pass onto
          * the caller's stream.
          */
+        @Override
         public int copy(final int index, final OutputStream os) {
 
             if (index < 0 || index >= size)
@@ -2213,6 +2233,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * Basic implementation may be overridden if a faster implementation is
          * available.
          */
+        @Override
         public Iterator<byte[]> iterator() {
 
             /**
@@ -2232,12 +2253,14 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
                 int i = 0;
 
+                @Override
                 public boolean hasNext() {
 
                     return i < size();
 
                 }
 
+                @Override
                 public byte[] next() {
 
                     if (!hasNext())
@@ -2280,6 +2303,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
 
                 }
 
+                @Override
                 public void remove() {
 
                     throw new UnsupportedOperationException();
@@ -2294,6 +2318,7 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
          * This is an efficient binary search performed without materializing the
          * coded byte[][].
          */
+        @Override
         public int search(final byte[] probe) {
 
             if (probe == null)
@@ -2519,5 +2544,12 @@ public class CanonicalHuffmanRabaCoder implements IRabaCoder, Externalizable {
         }
 
     }
+
+	@Override
+	public boolean isDuplicateKeys() {
+
+	    return false;
+	    
+	}
 
 }

@@ -32,7 +32,6 @@ import com.bigdata.rawstore.IMRMW;
  * named indices, and transactions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager {
 

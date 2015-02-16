@@ -38,8 +38,8 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * Base class for static analysis.
@@ -160,7 +160,7 @@ public class StaticAnalysisBase {
             
         } else if (op instanceof ArbitraryLengthPathNode) {
         	
-        	varSet.addAll(((ArbitraryLengthPathNode) op).getProducedBindings());
+        	varSet.addAll(((ArbitraryLengthPathNode) op).getMaybeProducedBindings());
         	
         	// do not recurse
         	return varSet;
@@ -171,7 +171,26 @@ public class StaticAnalysisBase {
         	
         	// do not recurse
         	return varSet;
-        	
+
+        } else if (op instanceof ServiceNode) {
+
+            // @see http://trac.bigdata.com/ticket/816
+            final ServiceNode serviceNode = (ServiceNode) op;
+            
+            // Look for the SERVICE URI, it might be a variable as well.
+            final TermNode uriRef = serviceNode.getServiceRef();
+
+            if (uriRef instanceof VarNode) {
+
+                varSet.add(((VarNode) uriRef).getValueExpression());
+
+            }
+
+            // pick up anything in the group graph pattern.
+            getSpannedVariables(serviceNode.getGraphPattern(), filters, varSet);
+
+            // fall through - look for attached filters.
+
         } else if (op instanceof FilterNode && !filters) {
 
             // DO NOT RECURSE INTO THE FILTER!

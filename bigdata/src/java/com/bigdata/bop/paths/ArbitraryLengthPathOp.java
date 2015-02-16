@@ -48,10 +48,12 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.join.JVMDistinctFilter;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -83,6 +85,10 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * solutions from the subquery with those in the parent context.
  * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
+ * 
+ *         TODO There should be two version of this operator. One for the JVM
+ *         heap and another for the native heap. This will help when large
+ *         amounts of data are materialized by the internal collections.
  */
 public class ArbitraryLengthPathOp extends PipelineOp {
 
@@ -187,6 +193,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ArbitraryLengthPathTask(this, context));
@@ -248,9 +255,15 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             
         	this.varsToDrop = (IVariable<?>[]) controllerOp
                     .getProperty(Annotations.VARS_TO_DROP);
+        	
+        	if (log.isDebugEnabled()) {
+        	    for (IVariable v : varsToDrop)
+        	        log.debug(v);
+        	}
             
         }
 
+        @Override
         public Void call() throws Exception {
             
             try {
@@ -346,10 +359,21 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             }
             
             if (!noInput) {
-
-            	for (IBindingSet parentSolutionIn : chunkIn) {
+                
+                long chunksIn = 0L;
+            	    
+                for (IBindingSet parentSolutionIn : chunkIn) {
 		            	
-	            	final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null;
+                    /**
+                     * @see <a href="http://trac.bigdata.com/ticket/865"
+                     *      >OutOfMemoryError instead of Timeout for SPARQL
+                     *      Property Paths </a>
+                     */
+                    if (chunksIn++ % 10 == 0 && Thread.interrupted()) {
+                        throw new InterruptedException();
+                    }
+
+                    final IConstant<?> key = joinVar != null ? parentSolutionIn.get(joinVar) : null;
 	            	
 	                if (log.isDebugEnabled()) {
 	                	log.debug("adding parent solution for joining: " + parentSolutionIn);
@@ -451,13 +475,16 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
                 try {
             	
-                	/*
-                	 * TODO replace with code that does the PipelineJoins manually
-                	 */
+                	    /*
+                     * TODO Replace with code that does the PipelineJoins
+                     * manually. Unrolling these iterations can be a major
+                     * performance benefit. Another possibility is to use
+                     * the GASEngine to expand the paths.
+                     */
                     runningSubquery = queryEngine.eval(subquery,
                             nextRoundInput.toArray(new IBindingSet[nextRoundInput.size()]));
 
-					long count = 0L;
+					long subqueryChunksOut = 0L; // #of chunks read from subquery
 					try {
 
                         // Declare the child query to the parent.
@@ -476,7 +503,14 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
 			            	for (IBindingSet bs : chunk) {
 				            	
-			            		count++;
+		                    /**
+		                     * @see <a href="http://trac.bigdata.com/ticket/865"
+		                     *      >OutOfMemoryError instead of Timeout for SPARQL
+		                     *      Property Paths </a>
+		                     */
+                            if (subqueryChunksOut++ % 10 == 0 && Thread.interrupted()) {
+			            		    throw new InterruptedException();
+			            		}
 			            		
 			            		if (log.isDebugEnabled()) {
 			            			log.debug("round " + i + " solution: " + bs);
@@ -500,7 +534,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 				            	}
 			            		
 			            		// drop the intermediate variables
-			            		dropVars(bs);
+			            		dropVars(bs, true);
 			            		
 //				            	solutionsOut.add(solution);
 			            		solutionsOut.put(newSolutionKey(gearing, bs), bs);
@@ -510,6 +544,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 			            		 */
 			            		final IBindingSet input = bs.clone();
 			            		
+                                dropVars(input, false);
+                                
 			            		input.set(gearing.tVarIn, bs.get(gearing.tVarOut));
 			            		
 			            		input.clear(gearing.tVarOut);
@@ -532,7 +568,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 						
 				        if (log.isDebugEnabled()) {
 				        	log.debug("done with round " + i + 
-				        			", count=" + count + 
+				        			", count=" + subqueryChunksOut + 
 				        			", totalBefore=" + sizeBefore + 
 				        			", totalAfter=" + solutionsOut.size() +
 				        			", totalNew=" + (solutionsOut.size() - sizeBefore));
@@ -777,13 +813,14 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 			                	 */
 			            		if (parentSolutionIn.isBound(gearing.outVar)) {
 			            			
-			            			// do this later now
-			            			
-			            			if (!bs.get(gearing.tVarOut).equals(parentSolutionIn.get(gearing.outVar))) {
-			            				
-			    	                	if (log.isDebugEnabled()) {
-			    	                		log.debug("transitive output does not match incoming binding for output var, dropping");
-			    	                	}
+			            			// do this now: note already known to be bound per test above.
+			            			final IConstant<?> poutVar = parentSolutionIn.get(gearing.outVar);
+
+			            			if (!poutVar.equals(bs.get(gearing.tVarOut))) {
+    			            				
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("transitive output does not match incoming binding for output var, dropping");
+                                        }
 			    	                	
 			            				continue;
 			            				
@@ -796,6 +833,29 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 				        				 */
 				        				finalOutput.add(parentSolutionIn);
 				        				
+//	                                    /*
+//	                                     * Clone, modify, and accept. Do this to
+//	                                     * pick up non-anonymous variables bound
+//	                                     * by the alp service.
+//	                                     */
+//	                                    final IBindingSet join = parentSolutionIn.clone();
+//	                                    
+//	                                    /*
+//	                                     * Copy any other non-intermediate variables.
+//	                                     */
+//	                                    @SuppressWarnings("rawtypes")
+//	                                    final Iterator<IVariable> vit = bs.vars();
+//	                                    while (vit.hasNext()) {
+//	                                        @SuppressWarnings("rawtypes")
+//	                                        final IVariable v = vit.next();
+//	                                        if (v.isAnonymous()) {
+//	                                            continue;
+//	                                        }
+//	                                        join.set(v, bs.get(v));
+//	                                    }
+//	                                    
+//	                                    finalOutput.add(join);
+	                                    
 				        			}
 			            			
 			            		} else {
@@ -813,6 +873,20 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 		            				final IBindingSet join = parentSolutionIn.clone();
 		            				
 		            				join.set(gearing.outVar, bs.get(gearing.tVarOut));
+		            				
+//		            				/*
+//		            				 * Copy any other non-intermediate variables.
+//		            				 */
+//		            				@SuppressWarnings("rawtypes")
+//                                    final Iterator<IVariable> vit = bs.vars();
+//		            				while (vit.hasNext()) {
+//		            				    @SuppressWarnings("rawtypes")
+//                                        final IVariable v = vit.next();
+//		            				    if (v.isAnonymous()) {
+//		            				        continue;
+//		            				    }
+//		            				    join.set(v, bs.get(v));
+//		            				}
 		            				
 		            				finalOutput.add(join);
 			            			
@@ -932,10 +1006,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
          * (either as a const or as a var) 
          */
 		@SuppressWarnings("unchecked")
-		private boolean canBind(final Gearing gearing, IBindingSet childSolutionIn, IConstant<?> seed) {
-			if ( gearing.outVar == null ) 
+		private boolean canBind(final Gearing gearing, 
+		        final IBindingSet childSolutionIn, final IConstant<?> seed) {
+			if (gearing.outVar == null) 
 				return seed.equals(gearing.outConst);
-			if ( !childSolutionIn.isBound(gearing.outVar) ) 
+			if (!childSolutionIn.isBound(gearing.outVar)) 
 				return true;
 			return seed.equals(childSolutionIn.get(gearing.outVar));
 		}
@@ -1008,13 +1083,15 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 		 * Drop vars bound by nested paths that are not meant to be external
 		 * output.
 		 */
-        private void dropVars(final IBindingSet bs) {
+        private void dropVars(final IBindingSet bs, final boolean anonOnly) {
         	
         	if (varsToDrop != null) {
         		
         		for (IVariable<?> v : varsToDrop) {
-        			
-        			bs.clear(v);
+
+//        		    if (!anonOnly || v.isAnonymous()) {
+        		        bs.clear(v);
+//        		    }
         			
         		}
         		
@@ -1115,6 +1192,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             	
             }
             
+            @Override
             public String toString() {
             	
             	final StringBuilder sb = new StringBuilder();
@@ -1143,7 +1221,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         }
         
         /**
-         * Lifted directly from the JVMDistinctBindingSetsOp.
+         * Lifted directly from the {@link JVMDistinctFilter}.
+         * 
+         * TODO Refactor to use {@link JVMDistinctFilter} directly iff possible
+         * (e.g., a chain of the AALP operator followed by the DISTINCT
+         * solutions operator)
          */
         private final static class SolutionKey {
 
@@ -1156,10 +1238,12 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                 this.hash = java.util.Arrays.hashCode(vals);
             }
 
+            @Override
             public int hashCode() {
                 return hash;
             }
 
+            @Override
             public boolean equals(final Object o) {
                 if (this == o)
                     return true;

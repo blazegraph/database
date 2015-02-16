@@ -46,6 +46,8 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
@@ -55,11 +57,13 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -72,11 +76,6 @@ import com.bigdata.util.InnerCause;
 
 /**
  * A status page for the service.
- * 
- * TODO A remote client can not act to cancel a request that is in the queue
- * until it begins to execute. This is because the UUID is not assigned until
- * the request begins to execute. This is true for both SPARQL QUERY and SPARQL
- * UPDATE requests.
  * 
  * TODO The KB addressed by the request should also be displayed as metadata
  * associated with the request. We should make this a restriction that can be
@@ -95,12 +94,6 @@ public class StatusServlet extends BigdataRDFServlet {
 
     static private final transient Logger log = Logger
             .getLogger(StatusServlet.class);
-
-    /**
-     * The name of a request parameter used to request metadata about the
-     * default namespace.
-     */
-    private static final String SHOW_KB_INFO = "showKBInfo";
 
     /**
      * The name of a request parameter used to request a list of the namespaces
@@ -189,12 +182,27 @@ public class StatusServlet extends BigdataRDFServlet {
     }
 
     /**
+	 * URL request parameter to trigger a thread dump. The thread dump is
+	 * written onto the http response. This is intended to provide an aid when
+	 * analyzing either node-local or distributed deadlocks.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 *      threads to status page </a>
+	 */
+    static final String THREAD_DUMP = "threadDump";
+
+    /**
      * Special HA status request designed for clients that poll to determine the
      * status of an HAJournalServer. This option is exclusive of other
      * parameters.
      */
     static final String HA = "HA";
 
+    /**
+     * Request basic server health information.
+     */
+    static final String HEALTH = "health";
+    
     /**
      * Handles CANCEL requests (terminate a running query).
      */
@@ -225,7 +233,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * Cancel a running query.
      * 
      * <pre>
-     * queryId=<UUID>
+     * queryId=&lt;UUID&gt;
      * </pre>
      * 
      * Note: This DOES NOT build a response unless there is an error. The caller
@@ -237,6 +245,12 @@ public class StatusServlet extends BigdataRDFServlet {
      * @param indexManager
      * 
      * @throws IOException
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     *      Cancellation </a>
+     *      
+     *             FIXME GROUP COMMIT: Review cancellation and leader fail
+     *             scenarios.
      */
     static void doCancelQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final IIndexManager indexManager,
@@ -268,6 +282,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
             if (!tryCancelQuery(queryEngine, queryId)) {
                 if (!tryCancelUpdate(context, queryId)) {
+                    queryEngine.addPendingCancel(queryId);
                     if (log.isInfoEnabled()) {
                         log.info("No such QUERY or UPDATE: " + queryId);
                     }
@@ -383,14 +398,36 @@ public class StatusServlet extends BigdataRDFServlet {
     protected void doGet(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
+		if (req.getParameter(THREAD_DUMP) != null) {
+
+			/*
+			 * Write out a thread dump as an aid to the diagnosis of deadlocks.
+			 * 
+			 * Note: This code path should not obtain any locks. This is
+			 * necessary in order for the code to run even when the server is in
+			 * a deadlock.
+			 */
+			doThreadDump(req, resp);
+			return;
+
+    	}
+    	
         if (req.getParameter(HA) != null
                 && getIndexManager() instanceof AbstractJournal
-                && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+               //  && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
+        		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
             new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
 
             return;
         }
+
+      if (req.getParameter(HEALTH) != null) {
+
+         new HAStatusServletUtil(getIndexManager()).doHealthStatus(req, resp);
+
+         return;
+      }
 
         // IRunningQuery objects currently running on the query controller.
         final boolean showQueries = req.getParameter(SHOW_QUERIES) != null;
@@ -414,9 +451,6 @@ public class StatusServlet extends BigdataRDFServlet {
             if (maxBopLength < 0)
                 maxBopLength = 0;
         }
-
-        // Information about the KB (stats, properties).
-        final boolean showKBInfo = req.getParameter(SHOW_KB_INFO) != null;
 
         // bigdata namespaces known to the index manager.
         final boolean showNamespaces = req.getParameter(SHOW_NAMESPACES) != null;
@@ -454,7 +488,7 @@ public class StatusServlet extends BigdataRDFServlet {
                 final PrintWriter out = new PrintWriter(resp.getOutputStream(),
                         true/* autoFlush */);
 
-                out.print("<pre>\n");
+                out.print("<pre id=\"journal-dump\">\n");
 
                 final DumpJournal dump = new DumpJournal(
                         (Journal) getIndexManager());
@@ -495,31 +529,51 @@ public class StatusServlet extends BigdataRDFServlet {
                 dump.dumpJournal(out, namespaces, dumpHistory, dumpPages,
                         dumpIndices, dumpTuples);
 
+                out.print("\n</pre>");
+
                 // flush PrintStream before resuming writes on Writer.
                 out.flush();
 
                 // close section.
                 // section.close();
-                out.print("\n</pre>");
 
             }
 
             // final boolean showQuorum = req.getParameter(SHOW_QUORUM) != null;
 
-            if (getIndexManager() instanceof AbstractJournal
-                    && ((AbstractJournal) getIndexManager())
-                            .isHighlyAvailable()) {
+            if (getIndexManager() instanceof AbstractJournal) {
 
-                new HAStatusServletUtil(getIndexManager()).
-                        doGet(req, resp, current);
+                final Quorum<HAGlue, QuorumService<HAGlue>> quorum = ((AbstractJournal) getIndexManager())
+                        .getQuorum();
+
+                if (quorum != null) {//&& quorum.isHighlyAvailable()) {
+
+                    new HAStatusServletUtil(getIndexManager()).doGet(req, resp,
+                            current);
+
+                }
 
             }
+            
+			{ // Report the build version (when available). See #1089
+				String buildVer = Banner.getBuildInfo().get(Banner.BuildInfoMeta.buildVersion);
+				if (buildVer == null )
+					buildVer = "N/A";
+				current.node("p").text("Build Version=").node("span")
+						.attr("id", "buildVersion").text(buildVer).close()
+						.close();
+			}
 
-            current.node("br", "Accepted query count="
-                    + getBigdataRDFContext().getQueryIdFactory().get());
+            current.node("p").text("Accepted query count=")
+               .node("span").attr("id", "accepted-query-count")
+               .text("" +getBigdataRDFContext().getQueryIdFactory().get())
+               .close()
+            .close();
 
-            current.node("br", "Running query count="
-                    + getBigdataRDFContext().getQueries().size());
+            current.node("p").text("Running query count=")
+               .node("span").attr("id", "running-query-count")
+               .text("" + getBigdataRDFContext().getQueries().size()).close()
+            .close();
 
             // Offer a link to the "showQueries" page.
             {
@@ -533,46 +587,34 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 current.node("p").text("Show ")
                         //
-                        .node("a").attr("href", showQueriesURL).text("queries")
-                        .close()//
+                        .node("a").attr("href", showQueriesURL)
+                        .attr("id", "show-queries").text("queries").close()
                         .text(", ")//
-                        .node("a").attr("href", showQueriesDetailsURL)//
-                        .text("query details").close()//
+                        .node("a").attr("href", showQueriesDetailsURL)
+                        .attr("id", "show-query-details").text("query details")
+                        .close()//
                         .text(".").close();
 
             }
 
-            if (showNamespaces) {
-
-                long timestamp = getTimestamp(req);
-
-                if (timestamp == ITx.READ_COMMITTED) {
-
-                    // Use the last commit point.
-                    timestamp = getIndexManager().getLastCommitTime();
-
-                }
-
+			if (showNamespaces) {
+			    
                 final List<String> namespaces = getBigdataRDFContext()
-                        .getNamespaces(timestamp);
+                        .getNamespaces(getTimestamp(req));
 
                 current.node("h3", "Namespaces: ");
+                
+                XMLBuilder.Node ul = current.node("ul").attr("id", "namespaces");
 
                 for (String s : namespaces) {
 
-                    current.node("p", s);
+                    ul.node("li", s);
 
                 }
+                
+                ul.close();
 
-            }
-
-            if (showKBInfo) {
-
-                // General information on the connected kb.
-                current.node("pre", getBigdataRDFContext().getKBInfo(
-                        getNamespace(req), getTimestamp(req)).toString());
-
-            }
+			}
 
             /*
              * Performance counters for the QueryEngine.
@@ -620,7 +662,8 @@ public class StatusServlet extends BigdataRDFServlet {
                 //
                 // }
 
-                current.node("pre", counterSet.toString());
+                current.node("p").attr("id",  "counter-set")
+                .text(counterSet.toString()).close();
 
             }
 
@@ -909,6 +952,7 @@ public class StatusServlet extends BigdataRDFServlet {
             
             // Open <p>.
             current.node("p")
+            .attr("class", "update")
             //
 //            .text("solutions=" + solutionsOut)
 //            //
@@ -916,9 +960,12 @@ public class StatusServlet extends BigdataRDFServlet {
 //            //
 //            .text(", children=" + children.length)
             //
-            .text("elapsed=" + elapsedMillis + "ms")
+            .text("elapsed=").node("span")
+               .attr("class", "elapsed").text("" + elapsedMillis).close()
+            .text("ms")
             //
             .text(", ").node("a").attr("href", detailsURL)
+            .attr("class", "details-url")
             .text("details").close()//
             .close();
 
@@ -951,7 +998,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 current.node("h2", "SPARQL");
 
-                current.node("pre", queryString);
+                current.node("p").attr("class", "query-string")
+                .text(queryString).close();
 
             }
 
@@ -964,7 +1012,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Parse Tree");
 
-                    current.node("pre", parseTree.dump(""));
+                    current.node("p").attr("class", "parse-tree")
+                    .text(parseTree.dump("")).close();
 
                 }
 
@@ -975,7 +1024,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Original AST");
 
-                    current.node("pre", originalAST.toString());
+                    current.node("p").attr("class", "original-ast")
+                    .text(originalAST.toString()).close();
 
                 }
                 
@@ -1077,15 +1127,21 @@ public class StatusServlet extends BigdataRDFServlet {
 
             current.node("p")
                     //
-                    .text("solutions=" + solutionsOut)
+                    .text("solutions=").node("span").attr("class", "solutions")
+                       .text(""+ solutionsOut).close()
                     //
-                    .text(", chunks=" + chunksOut)
+                    .text(", chunks=").node("span").attr("class", "chunks")
+                       .text(""+ chunksOut).close()
                     //
-                    .text(", children=" + children.length)
+                    .text(", children=").node("span").attr("class", "children")
+                       .text("" + children.length).close()
                     //
-                    .text(", elapsed=" + elapsedMillis + "ms")
+                    .text(", elapsed=").node("span").attr("class", "elapsed")
+                       .text("" + elapsedMillis).close()
+                    .text("ms, ")
                     //
-                    .text(", ").node("a").attr("href", detailsURL)
+                    .node("a").attr("href", detailsURL)
+                    .attr("class",  "details-url")
                     .text("details").close()//
                     .close();
 
@@ -1120,7 +1176,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 current.node("h2", "SPARQL");
 
-                current.node("pre", queryString);
+                current.node("p").attr("class", "query-string").text(queryString)
+                .close();
 
             }
 
@@ -1133,7 +1190,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Parse Tree");
 
-                    current.node("pre", parseTree.dump(""));
+                    current.node("p").attr("class", "parse-tree")
+                    .text(parseTree.dump("")).close();
 
                 }
 
@@ -1144,7 +1202,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Original AST");
 
-                    current.node("pre", originalAST.toString());
+                    current.node("p").attr("class", "original-ast")
+                    .text(originalAST.toString()).close();
 
                 }
 
@@ -1155,7 +1214,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Optimized AST");
 
-                    current.node("pre", optimizedAST.toString());
+                    current.node("p").attr("class", "optimized-ast")
+                    .text(optimizedAST.toString()).close();
 
                 }
 
@@ -1166,8 +1226,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
                     current.node("h2", "Query Plan");
 
-                    current.node("pre", BOpUtility
-                            .toString(queryPlan));
+                    current.node("p").attr("class", "query-plan")
+                    .text(BOpUtility.toString(queryPlan)).close();
 
                 }
 
@@ -1189,9 +1249,17 @@ public class StatusServlet extends BigdataRDFServlet {
 
             current.node("h2", "Query Evaluation Statistics");
 
+            // iff scale-out.
+            final boolean clusterStats = q.getFederation() != null;
+            // detailed explain not enabled on this code path.
+            final boolean detailedStats = false;
+            // no mutation for query.
+            final boolean mutationStats = false;
+            
             // Format as a table, writing onto the response.
             QueryLog.getTableXHTML(queryString, q, children, w,
-                    !showQueryDetails, maxBopLength);
+                    !showQueryDetails, maxBopLength, clusterStats,
+                    detailedStats, mutationStats);
 
         }
 
@@ -1214,6 +1282,7 @@ public class StatusServlet extends BigdataRDFServlet {
              * Comparator puts the entries into descending order by the query
              * execution time (longest running queries are first).
              */
+        	@Override
             public int compare(final Long o1, final Long o2) {
                 if (o1.longValue() < o2.longValue())
                     return 1;
@@ -1285,5 +1354,47 @@ public class StatusServlet extends BigdataRDFServlet {
         return crosswalkMap;
 
     }
+
+	/**
+	 * Write a thread dump onto the http response as an aid to diagnose both
+	 * node-local and distributed deadlocks.
+	 * <p>
+	 * Note: This code should not obtain any locks. This is necessary in order
+	 * for the code to run even when the server is in a deadlock.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 *      threads to status page </a>
+	 */
+	private static void doThreadDump(final HttpServletRequest req,
+			final HttpServletResponse resp) throws IOException {
+
+		resp.setStatus(HTTP_OK);
+
+		// Do not cache the response.
+		// TODO Alternatively "max-age=1" for max-age in seconds.
+		resp.addHeader("Cache-Control", "no-cache");
+
+		// Plain text response.
+		resp.setContentType(MIME_TEXT_PLAIN);
+
+		final PrintWriter w = resp.getWriter();
+
+		try {
+
+			BigdataStatics.threadDump(w);
+
+			w.flush();
+			
+		} catch (Throwable t) {
+
+			launderThrowable(t, resp, "");
+
+		} finally {
+
+			w.close();
+
+		}
+
+	}
 
 }

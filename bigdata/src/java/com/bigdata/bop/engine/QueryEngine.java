@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,8 +51,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -63,6 +64,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.view.FusedView;
+import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
@@ -70,10 +72,11 @@ import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.IHaltable;
 
@@ -193,7 +196,6 @@ import com.bigdata.util.concurrent.IHaltable;
  * query manager task for the terminated join.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo Expander patterns will continue to exist until we handle the standalone
  *       backchainers in a different manner for scale-out so add support for
@@ -377,10 +379,10 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     private final IIndexManager localIndexManager;
 
     /**
-     * The {@link ClientConnectionManager} is used to make remote HTTP
-     * connections (SPARQL SERVICE call joins).
-     */
-    private final AtomicReference<ClientConnectionManager> clientConnectionManagerRef = new AtomicReference<ClientConnectionManager>();
+	 * The {@link HttpClient} is used to make remote HTTP connections (SPARQL
+	 * SERVICE call joins).
+	 */
+    private final AtomicReference<HttpClient> clientConnectionManagerRef = new AtomicReference<HttpClient>();
     
 //    /**
 //     * A pool used to service IO requests (reads on access paths).
@@ -467,12 +469,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     }
     
     /**
-     * Return the {@link ClientConnectionManager} used to make remote SERVICE
-     * call requests.
-     */
-    public ClientConnectionManager getClientConnectionManager() {
+	 * Return the {@link HttpClient} used to make remote SERVICE call requests.
+	 */
+    public HttpClient getClientConnectionManager() {
 
-        ClientConnectionManager cm = clientConnectionManagerRef.get();
+    	HttpClient cm = clientConnectionManagerRef.get();
         
         if (cm == null) {
 
@@ -498,7 +499,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                      */
                     
                     clientConnectionManagerRef
-                            .set(cm = DefaultClientConnectionManagerFactory
+                            .set(cm = HttpClientConfigurator
                                     .getInstance().newInstance());
 
                 }
@@ -534,7 +535,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
     /**
      * The currently executing queries.
      */
-    final private ConcurrentHashMap<UUID/* queryId */, AbstractRunningQuery> runningQueries = new ConcurrentHashMap<UUID, AbstractRunningQuery>();
+    private final ConcurrentHashMap<UUID/* queryId */, AbstractRunningQuery> runningQueries = new ConcurrentHashMap<UUID, AbstractRunningQuery>();
 
     /**
      * LRU cache used to handle problems with asynchronous termination of
@@ -553,7 +554,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      *       enough that we can not have a false cache miss on a system which is
      *       heavily loaded by a bunch of light queries.
      */
-    private LinkedHashMap<UUID, IHaltable<Void>> doneQueries = new LinkedHashMap<UUID,IHaltable<Void>>(
+    private final LinkedHashMap<UUID, IHaltable<Void>> doneQueries = new LinkedHashMap<UUID,IHaltable<Void>>(
             16/* initialCapacity */, .75f/* loadFactor */, true/* accessOrder */) {
 
         private static final long serialVersionUID = 1L;
@@ -566,6 +567,92 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         }
     };
 
+    /**
+     * A high concurrency cache operating as an LRU designed to close a data
+     * race between the asynchronous start of a submitted query or update
+     * operation and the explicit asynchronous CANCEL of that operation using
+     * its pre-assigned {@link UUID}.
+     * <p>
+     * When a CANCEL request is received, we probe both the
+     * {@link #runningQueries} and the {@link #doneQueries}. If no operation is
+     * associated with that request, then we probe the running UPDATE
+     * operations. Finally, if no such operation was discovered, then the
+     * {@link UUID} of the operation to be cancelled is entered into this
+     * collection.
+     * <p>
+     * Before a query starts, we consult the {@link #pendingCancelLRU}. If the
+     * {@link UUID} of the query is discovered, then the query is cancelled
+     * rather than run.
+     * <p>
+     * Note: The capacity of the backing hard reference queue is quite small.
+     * {@link UUID}s are only entered into this collection if a CANCEL request
+     * is asynchronously received either (a) before; or (b) long enough after a
+     * query or update is executed that is not not found in either the running
+     * queries map or the recently done queries map.
+     * 
+     * TODO There are some cases that are not covered by this. First, we do not
+     * have {@link UUID}s for all REST API methods and thus they can not all be
+     * cancelled. If we allowed an HTTP header to specify the UUID of the
+     * request, then we could associate a UUID with all requests. The ongoing
+     * refactor to support clean interrupt of NSS requests (#753) and the
+     * ongoing refactor to support concurrent unisolated operations against the
+     * same journal (#566) will provide us with the mechanisms to identify all
+     * such operations so we can check their assigned UUIDs and cancel them when
+     * requested.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     *      Cancellation </a>
+     * @see <a href="http://trac.bigdata.com/ticket/753"> HA doLocalAbort()
+     *      should interrupt NSS requests and AbstractTasks </a>
+     * @see <a href="http://trac.bigdata.com/ticket/566"> Concurrent unisolated
+     *      operations against multiple KBs on the same Journal </a>
+     * @see #startEval(UUID, PipelineOp, Map, IChunkMessage)
+     */
+    private final ConcurrentWeakValueCache<UUID, UUID> pendingCancelLRU = new ConcurrentWeakValueCache<>(
+            50/* queueCapacity (SWAG, but see above) */);
+
+    /**
+     * Add a query {@link UUID} to the LRU of query identifiers for which we
+     * have received a CANCEL request, but were unable to find a running QUERY,
+     * recently done query, or running UPDATE request.
+     * 
+     * @param queryId
+     *            The UUID of the operation to be cancelled.
+     *            
+     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     *      Cancellation </a>
+     */
+    public void addPendingCancel(final UUID queryId) {
+
+        if (queryId == null)
+            throw new IllegalArgumentException();
+
+        pendingCancelLRU.putIfAbsent(queryId, queryId);
+
+    }
+    
+    /**
+     * Return <code>true</code> iff the {@link UUID} is the the collection of
+     * {@link UUID}s for which we have already received a CANCEL request.
+     * <p>
+     * Note: The {@link UUID} is removed from the pending cancel collection as a
+     * side-effect.
+     * 
+     * @param queryId
+     *            The {@link UUID} of the operation.
+     * 
+     * @return <code>true</code> if that operation has already been marked for
+     *         cancellation.
+     */
+    public boolean pendingCancel(final UUID queryId) {
+
+        if (queryId == null)
+            throw new IllegalArgumentException();
+        
+        return pendingCancelLRU.remove(queryId) != null;
+
+    }
+    
     /**
      * A queue of {@link ChunkedRunningQuery}s having binding set chunks available for
      * consumption.
@@ -608,7 +695,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * <p>
      * If the deadline has expired, {@link IRunningQuery#cancel(boolean)} will
      * be invoked. In order for a compute bound operator to terminate in a
-     * timely fashion, it MUST periodically test {@link Thread#isInterrupted()}.
+     * timely fashion, it MUST periodically test {@link Thread#interrupted()}.
      * <p>
      * Note: The deadline of a query may be set at most once. Thus, a query
      * which is entered into the {@link #deadlineQueue} may not have its
@@ -667,7 +754,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             throw new IllegalArgumentException();
         }
 
-        deadlineQueue.add(new QueryDeadline(deadline, query));
+        final long deadlineNanos = TimeUnit.MILLISECONDS.toNanos(deadline);
+
+        deadlineQueue.add(new QueryDeadline(deadlineNanos, query));
 
     }
 
@@ -675,7 +764,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Scan the priority queue of queries with a specified deadline, halting any
      * queries whose deadline has expired.
      */
-    static private void checkDeadlines(final long now,
+    static private void checkDeadlines(final long nowNanos,
             final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
         
         /*
@@ -688,7 +777,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
              * Check the head of the deadline queue for any queries whose
              * deadline has expired.
              */
-            checkHeadOfDeadlineQueue(now, deadlineQueue);
+            checkHeadOfDeadlineQueue(nowNanos, deadlineQueue);
 
             if (deadlineQueue.size() > DEADLINE_QUEUE_SCAN_SIZE) {
 
@@ -696,7 +785,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
                  * Scan the deadline queue, removing entries for expired
                  * queries.
                  */
-                scanDeadlineQueue(now, deadlineQueue);
+                scanDeadlineQueue(nowNanos, deadlineQueue);
 
             }
 
@@ -708,7 +797,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * Check the head of the deadline queue for any queries whose deadline has
      * expired.
      */
-    static private void checkHeadOfDeadlineQueue(final long now,
+    static private void checkHeadOfDeadlineQueue(final long nowNanos,
             final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
         
         QueryDeadline x;
@@ -717,7 +806,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         while ((x = deadlineQueue.poll()) != null) {
 
             // test for query done or deadline expired.
-            if (x.checkDeadline(now) == null) {
+            if (x.checkDeadline(nowNanos) == null) {
 
                 /*
                  * This query is known to be done. It was removed from the
@@ -729,7 +818,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 
             }
 
-            if (x.deadline > now) {
+            if (x.deadlineNanos > nowNanos) {
 
                 /*
                  * This query has not yet reached its deadline. That means that
@@ -755,7 +844,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * has not be reached. Therefore, periodically, we need to scan the queue
      * and clear out entries for terminated queries.
      */
-    static private void scanDeadlineQueue(final long now,
+    static private void scanDeadlineQueue(final long nowNanos,
             final PriorityBlockingQueue<QueryDeadline> deadlineQueue) {
 
         final List<QueryDeadline> c = new ArrayList<QueryDeadline>(
@@ -768,7 +857,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
         
         for (QueryDeadline x : c) {
 
-            if (x.checkDeadline(now) != null) {
+            if (x.checkDeadline(nowNanos) != null) {
 
                 // return this query to the deadline queue.
                 deadlineQueue.add(x);
@@ -937,27 +1026,31 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             if(log.isInfoEnabled())
                 log.info("Running: " + this);
             try {
-                long mark = System.currentTimeMillis();
-                long remaining = DEADLINE_CHECK_MILLIS;
+                final long deadline = TimeUnit.MILLISECONDS
+                        .toNanos(DEADLINE_CHECK_MILLIS);
+                long mark = System.nanoTime();
+                long remaining = deadline;
                 while (true) {
                     try {
+                        //log.warn("Polling deadline queue: remaining="+remaining+", deadlinkCheckMillis="+DEADLINE_CHECK_MILLIS);
                         final AbstractRunningQuery q = priorityQueue.poll(
-                                remaining, TimeUnit.MILLISECONDS);
-                        final long now = System.currentTimeMillis();
-                        if ((remaining = now - mark) < 0) {
+                                remaining, TimeUnit.NANOSECONDS);
+                        final long now = System.nanoTime();
+                        if ((remaining = deadline - (now - mark)) < 0) {
+                            //log.error("Checking deadline queue");
                             /*
                              * Check for queries whose deadline is expired.
-                             * 
+                             *
                              * Note: We only do this every DEADLINE_CHECK_MILLIS
                              * and then reset [mark] and [remaining].
-                             * 
+                             *
                              * Note: In queue.pool(), we only wait only up to
                              * the [remaining] time before the next check in
                              * queue.poll().
                              */
                             checkDeadlines(now, deadlineQueue);
                             mark = now;
-                            remaining = DEADLINE_CHECK_MILLIS;
+                            remaining = deadline;
                         }
                         // Consume chunk already on queue for this query.
                         if (q != null && !q.isDone())
@@ -1088,11 +1181,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
-        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
-                log.info("Terminating ClientConnectionManager: " + this);
-            cm.shutdown();
+                log.info("Terminating HttpClient: " + this);
+            try {
+				cm.stop();
+			} catch (Exception e) {
+				log.error("Problem shutting down HttpClient", e);
+			}
         }
         
         // clear the queues
@@ -1141,11 +1238,15 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             s.shutdownNow();
         }
         
-        final ClientConnectionManager cm = clientConnectionManagerRef.get();
+        final HttpClient cm = clientConnectionManagerRef.get();
         if (cm != null) {
             if (log.isInfoEnabled())
-                log.info("Terminating ClientConnectionManager: " + this);
-            cm.shutdown();
+                log.info("Terminating HttpClient: " + this);
+            try {
+				cm.stop();
+			} catch (Exception e) {
+				log.error("Problem stopping HttpClient", e);
+			}
         }
 
         // halt any running queries.
@@ -1688,6 +1789,22 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
 //        if (c != null)
 //            c.startCount.increment();
 
+        if (pendingCancelLRU.containsKey(runningQuery.getQueryId())) {
+            /*
+             * The query was asynchronously scheduled for cancellation.
+             */
+
+            // Cancel the query.
+            runningQuery.cancel(true/* mayInterruptIfRunning */);
+            
+            // Remove from the CANCEL LRU.
+            pendingCancelLRU.remove(runningQuery.getQueryId());
+        
+            // Return the query. It has already been cancelled.
+            return runningQuery;
+            
+        }
+
         // notify query start
         runningQuery.startQuery(msg);
         
@@ -1886,10 +2003,21 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      */
     protected void halt(final AbstractRunningQuery q) {
 
+        boolean interrupted = false;
         lock.lock();
 
         try {
 
+            // notify listener(s)
+            try {
+                fireEvent(q);
+            } catch (Throwable t) {
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+                    // Defer impact until outside of this critical section.
+                    interrupted = true;
+                }
+            }
+            
             // insert/touch the LRU of recently finished queries.
             doneQueries.put(q.getQueryId(), q.getFuture());
 
@@ -1909,6 +2037,9 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
             
         }
 
+        if (interrupted)
+            Thread.currentThread().interrupt();
+        
     }
     
     /**
@@ -1923,7 +2054,8 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * @throws RuntimeException
      *             if the query halted with an error.
      */
-    private void handleDoneQuery(final UUID queryId,final Future<Void> doneQueryFuture) {
+    private void handleDoneQuery(final UUID queryId,
+            final Future<Void> doneQueryFuture) {
         try {
             // Check the Future.
             doneQueryFuture.get();
@@ -1943,6 +2075,90 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
              */
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Listener API for {@link IRunningQuery} life cycle events (start/halt).
+     * <p>
+     * Note: While this interface makes it possible to catch the start and halt
+     * of an {@link IRunningQuery}, it imposes an overhead on the query engine
+     * and the potential for significant latency and other problems depending on
+     * the behavior of the {@link IRunningQueryListener}. This interface was
+     * added to facilitate certain test suites which could not otherwise be
+     * written. It should not be used for protection code.
+     */
+    public interface IRunningQueryListener {
+        
+        void notify(IRunningQuery q);
+        
+    }
+    
+    /** Registered listeners. */
+    private final CopyOnWriteArraySet<IRunningQueryListener> listeners = new CopyOnWriteArraySet<IRunningQueryListener>();
+
+    /** Add a query listener. */
+    public void addListener(final IRunningQueryListener l) {
+
+        if (l == null)
+            throw new IllegalArgumentException();
+
+        listeners.add(l);
+
+    }
+
+    /** Remove a query listener. */
+    public void removeListener(final IRunningQueryListener l) {
+        
+        if (l == null)
+            throw new IllegalArgumentException();
+        
+        listeners.remove(l);
+        
+    }
+
+    /**
+     * Send an event to all registered listeners.
+     */
+    private void fireEvent(final IRunningQuery q) {
+        
+        if (q == null)
+            throw new IllegalArgumentException();
+        
+        if(listeners.isEmpty()) {
+         
+            // NOP
+            return;
+
+        }
+
+        final IRunningQueryListener[] a = listeners
+                .toArray(new IRunningQueryListener[0]);
+
+        for (IRunningQueryListener l : a) {
+
+            final IRunningQueryListener listener = l;
+
+            try {
+
+                // send event.
+                listener.notify(q);
+
+            } catch (Throwable t) {
+
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                    // Propagate interrupt.
+                    throw new RuntimeException(t);
+
+                }
+
+                // Log and ignore.
+                log.error(t, t);
+
+            }
+
+        }
+
     }
 
     /*

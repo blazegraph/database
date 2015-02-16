@@ -36,6 +36,7 @@ import java.util.UUID;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -73,14 +74,10 @@ public abstract class AbstractNanoSparqlServerTestCase<S extends IIndexManager>
     protected String namespace;
 
     /**
-     * The effective {@link NanoSparqlServer} http end point.
+     * The effective {@link NanoSparqlServer} http end point (including the
+     * ContextPath).
      */
     protected String m_serviceURL;
-
-    /**
-     * The request path for the REST API under test.
-     */
-    protected static final String requestPath = "/sparql";
 
     protected TestMode testMode = null;
 
@@ -211,7 +208,7 @@ public abstract class AbstractNanoSparqlServerTestCase<S extends IIndexManager>
 
         }
 
-    	final int port = m_fixture.getConnectors()[0].getLocalPort();
+        final int port = NanoSparqlServer.getLocalPort(m_fixture);
     
     	// log.info("Getting host address");
     
@@ -224,8 +221,8 @@ public abstract class AbstractNanoSparqlServerTestCase<S extends IIndexManager>
     
         }
     
-        m_serviceURL = new URL("http", hostAddr, port, ""/* file */)
-                .toExternalForm();
+        m_serviceURL = new URL("http", hostAddr, port,
+                BigdataStatics.getContextPath()).toExternalForm();
     
         if (log.isInfoEnabled())
             log.info("Setup done: name=" + getName() + ", namespace="

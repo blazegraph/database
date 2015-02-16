@@ -19,6 +19,7 @@ import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
@@ -58,10 +59,9 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * the operator can still be invoked multiple times).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DistinctElementFilter.java 3466 2010-08-27 14:28:04Z
- *          thompsonbry $
  */
-public class PipelinedAggregationOp extends GroupByOp {
+public class PipelinedAggregationOp extends GroupByOp implements
+        ISingleThreadedOp {
 
 	private final static transient Logger log = Logger
 			.getLogger(PipelinedAggregationOp.class);
@@ -83,6 +83,7 @@ public class PipelinedAggregationOp extends GroupByOp {
      * MAY NOT be used to evaluate aggregation requests which use DISTINCT or
      * which nest {@link IAggregate}s in other {@link IAggregate}s.
      */
+    @Override
     public boolean isPipelinedAggregationOp() {
 
         return true;
@@ -135,14 +136,11 @@ public class PipelinedAggregationOp extends GroupByOp {
                     + "=" + isLastPassRequested());
         }
         
-        if (getMaxParallel() != 1) {
-            /*
-             * Note: The operator MUST be single threaded in order to receive
-             * the isLastInvocation notice.
-             */
-            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-                    + "=" + getMaxParallel());
-        }
+        /*
+         * Note: The operator MUST be single threaded in order to receive the
+         * isLastInvocation notice.
+         */
+        assertMaxParallelOne();
 
     }
 
@@ -173,6 +171,7 @@ public class PipelinedAggregationOp extends GroupByOp {
     	
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask(this, context));
@@ -193,6 +192,7 @@ public class PipelinedAggregationOp extends GroupByOp {
          */
         private final IConstant<?>[] vals;
 
+        @Override
         public String toString() {
             return super.toString() + //
                     "{group=" + Arrays.toString(vals) + //
@@ -252,10 +252,12 @@ public class PipelinedAggregationOp extends GroupByOp {
             this.hash = java.util.Arrays.hashCode(vals);
         }
 
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(final Object o) {
             if (this == o)
                 return true;
@@ -622,6 +624,7 @@ public class PipelinedAggregationOp extends GroupByOp {
             
         }
 
+        @Override
         public Void call() throws Exception {
 
             final ICloseableIterator<IBindingSet[]> itr = context

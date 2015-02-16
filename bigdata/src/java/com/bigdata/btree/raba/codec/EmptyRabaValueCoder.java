@@ -46,7 +46,6 @@ import com.bigdata.io.DataOutputBuffer;
  * B+Tree will be <strong>discarded</strong> by this {@link IRabaCoder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
 
@@ -55,6 +54,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
      */
     private static final long serialVersionUID = -8011456562258609162L;
 
+    @Override
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -62,6 +62,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
         
     }
 
+    @Override
     public void writeExternal(ObjectOutput out) throws IOException {
 
         // NOP
@@ -77,6 +78,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
     /**
      * No.  Keys can not be constrained to be empty.
      */
+    @Override
     final public boolean isKeyCoder() {
 
         return false;
@@ -86,12 +88,21 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
     /**
      * Yes.
      */
+    @Override
     final public boolean isValueCoder() {
      
         return true;
         
     }
 
+    @Override
+    public boolean isDuplicateKeys() {
+
+        return false;
+        
+    }
+
+    @Override
     public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         if (raba == null)
@@ -119,6 +130,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
      * <strong>Any data in the {@link IRaba} will be discarded!</strong> Only
      * the {@link IRaba#size()} is maintained.
      */
+    @Override
     public AbstractFixedByteArrayBuffer encode(final IRaba raba,
             final DataOutputBuffer buf) {
 
@@ -140,6 +152,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
 
     }
 
+    @Override
     public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
         
         return new EmptyCodedRaba(data);
@@ -182,6 +195,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
             
         }
         
+        @Override
         final public AbstractFixedByteArrayBuffer data() {
      
             return data;
@@ -191,43 +205,50 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
         /**
          * Yes.
          */
+        @Override
         final public boolean isReadOnly() {
 
             return true;
             
         }
 
+        @Override
         public boolean isKeys() {
             
             return false;
             
         }
         
+        @Override
         final public int capacity() {
         
             return size;
             
         }
 
+        @Override
         final public int size() {
             
             return size;
             
         }
         
+        @Override
         final public boolean isEmpty() {
             
             return size == 0;
             
         }
 
+        @Override
         final public boolean isFull() {
             
             return true;
             
         }
 
-        final public boolean isNull(int index) {
+        @Override
+        final public boolean isNull(final int index) {
             
             if (index < 0 || index >= size)
                 throw new IndexOutOfBoundsException();
@@ -236,7 +257,8 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
             
         }
 
-        final public int length(int index) {
+        @Override
+        final public int length(final int index) {
             
             if (index < 0 || index >= size)
                 throw new IndexOutOfBoundsException();
@@ -245,7 +267,8 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
             
         }
 
-        final public byte[] get(int index) {
+        @Override
+        final public byte[] get(final int index) {
             
             if (index < 0 || index >= size)
                 throw new IndexOutOfBoundsException();
@@ -254,7 +277,8 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
             
         }
 
-        final public int copy(int index, OutputStream os) {
+        @Override
+        final public int copy(final int index, final OutputStream os) {
         
             if (index < 0 || index >= size)
                 throw new IndexOutOfBoundsException();
@@ -263,18 +287,21 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
         
         }
 
+        @Override
         final public Iterator<byte[]> iterator() {
 
             return new Iterator<byte[]>() {
 
                 int i = 0;
 
+                @Override
                 public boolean hasNext() {
 
                     return i < size;
 
                 }
 
+                @Override
                 public byte[] next() {
 
                     i++;
@@ -283,6 +310,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
                     
                 }
 
+                @Override
                 public void remove() {
 
                     throw new UnsupportedOperationException();
@@ -299,6 +327,7 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
          * @throws UnsupportedOperationException
          *             unless the {@link IRaba} represents B+Tree keys.
          */
+        @Override
         final public int search(final byte[] searchKey) {
             
             if (isKeys())
@@ -312,22 +341,27 @@ public class EmptyRabaValueCoder implements IRabaCoder, Externalizable {
          * Mutation API is not supported.
          */
         
+        @Override
         final public int add(byte[] a) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         final public int add(byte[] value, int off, int len) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         final public int add(DataInput in, int len) throws IOException {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         final public void set(int index, byte[] a) {
             throw new UnsupportedOperationException();
         }
 
+        @Override
         final public String toString() {
 
             return AbstractRaba.toString(this);

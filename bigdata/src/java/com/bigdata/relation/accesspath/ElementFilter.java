@@ -138,4 +138,17 @@ public class ElementFilter<R> extends TupleFilter<R> {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Extended to show a human readable representation of the test.
+     */
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(super.toString());
+        sb.append("{test=" + test);
+        sb.append("}");
+        return sb.toString();
+    }
 }

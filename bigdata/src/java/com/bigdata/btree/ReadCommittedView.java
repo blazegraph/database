@@ -76,7 +76,6 @@ import cutthecrap.utils.striterators.IFilter;
  * its public API.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ReadCommittedView implements ILocalBTreeView {
 
@@ -86,7 +85,6 @@ public class ReadCommittedView implements ILocalBTreeView {
      * (b) the lastCommitTime on the journal is changed.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class Basis {
      
@@ -176,96 +174,112 @@ public class ReadCommittedView implements ILocalBTreeView {
         
     }
 
+    @Override
     public ICounter getCounter() {
         
         return getIndex().getCounter();
         
     }
 
+    @Override
     public CounterSet getCounters() {
         
         return getIndex().getCounters();
         
     }
 
+    @Override
     public IndexMetadata getIndexMetadata() {
         
         return getIndex().getIndexMetadata();
         
     }
 
+    @Override
     public IResourceMetadata[] getResourceMetadata() {
         
         return getIndex().getResourceMetadata();
         
     }
 
+    @Override
     public boolean contains(byte[] key) {
         
         return getIndex().contains(key);
         
     }
 
+    @Override
     public boolean contains(Object key) {
         
         return getIndex().contains(key);
         
     }
 
+    @Override
     public byte[] lookup(byte[] key) {
         
         return getIndex().lookup(key);
         
     }
 
+    @Override
     public Object lookup(Object key) {
         
         return getIndex().lookup(key);
         
     }
 
+    @Override
     public byte[] remove(byte[] key) {
 
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public Object remove(Object key) {
 
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public byte[] insert(byte[] key, byte[] value) {
         
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public Object insert(Object key, Object value) {
         
         throw new UnsupportedOperationException();
         
     }
 
+    @Override
     public long rangeCount() {
         
         return getIndex().rangeCount();
         
     }
 
+    @Override
     public long rangeCount(byte[] fromKey, byte[] toKey) {
         
         return getIndex().rangeCount(fromKey, toKey);
         
     }
 
+    @Override
     public long rangeCountExact(byte[] fromKey, byte[] toKey) {
         
         return getIndex().rangeCountExact(fromKey, toKey);
         
     }
 
+    @Override
     public long rangeCountExactWithDeleted(byte[] fromKey, byte[] toKey) {
         
         return getIndex().rangeCountExactWithDeleted(fromKey, toKey);
@@ -283,12 +297,14 @@ public class ReadCommittedView implements ILocalBTreeView {
      * created. In order for newly committed state to be visible you must
      * request a new iterator.
      */
+    @Override
     public ITupleIterator rangeIterator() {
         
         return getIndex().rangeIterator();
         
     }
 
+    @Override
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey,
             int capacity, int flags, IFilter filterCtor) {
         
@@ -297,6 +313,7 @@ public class ReadCommittedView implements ILocalBTreeView {
         
     }
 
+    @Override
     public ITupleIterator rangeIterator(byte[] fromKey, byte[] toKey) {
         
         return getIndex().rangeIterator(fromKey, toKey);
@@ -308,6 +325,7 @@ public class ReadCommittedView implements ILocalBTreeView {
      * read-only contract for the procedures processed by this class.
      */
 
+    @Override
     public void submit(byte[] fromKey, byte[] toKey,
             IKeyRangeIndexProcedure proc, IResultHandler handler) {
         
@@ -315,12 +333,14 @@ public class ReadCommittedView implements ILocalBTreeView {
         
     }
 
+    @Override
     public Object submit(byte[] key, ISimpleIndexProcedure proc) {
 
         return getIndex().submit(key, proc);
         
     }
 
+    @Override
     public void submit(int fromIndex, int toIndex, byte[][] keys,
             byte[][] vals, AbstractKeyArrayIndexProcedureConstructor ctor,
             IResultHandler resultHandler) {
@@ -329,30 +349,34 @@ public class ReadCommittedView implements ILocalBTreeView {
         
     }
 
-    public final BTreeCounters getBTreeCounters() {
-        
-        return getIndex().getBtreeCounters();
-        
-    }
+//    public final BTreeCounters getBTreeCounters() {
+//        
+//        return getIndex().getBtreeCounters();
+//        
+//    }
 
+    @Override
     public IBloomFilter getBloomFilter() {
 
         return getIndex().getBloomFilter();
         
     }
 
+    @Override
     public BTree getMutableBTree() {
 
         return getIndex().getMutableBTree();
         
     }
 
+    @Override
     public int getSourceCount() {
         
         return getIndex().getSourceCount();
         
     }
 
+    @Override
     public AbstractBTree[] getSources() {
 
         return getIndex().getSources();

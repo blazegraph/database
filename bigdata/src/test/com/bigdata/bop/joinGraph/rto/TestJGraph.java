@@ -60,15 +60,15 @@ public class TestJGraph extends TestCase2 {
     /**
      * @param name
      */
-    public TestJGraph(String name) {
+    public TestJGraph(final String name) {
         super(name);
     }
 
-    public void test_something() {
-        
-        fail("write tests");
-        
-    }
+//    public void test_something() {
+//        
+//        fail("write tests");
+//        
+//    }
 
 //    /**
 //     * Test ability to recognize when there is a predicate without any shared

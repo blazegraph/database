@@ -322,6 +322,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     public IQueryNode findParent(final GraphPatternGroup<?> group) {
 
+        return findParent(queryRoot, group);
+
+    }
+
+    public static IQueryNode findParent(final QueryRoot queryRoot,
+            final GraphPatternGroup<?> group) {
+
         if (group == null)
             throw new IllegalArgumentException();
 
@@ -399,7 +406,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      * @return The {@link QueryBase}, {@link ServiceNode}, or {@link FilterNode}
      *         which is the "parent" of <i>theGroup</i>.
      */
-    private IQueryNode findParent2(
+    static public IQueryNode findParent2(
             final GraphPatternGroup<IGroupMemberNode> aGroup,
             final GraphPatternGroup<?> theGroup) {
 
@@ -847,7 +854,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
-        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	vars.addAll(((ArbitraryLengthPathNode) node).getDefinitelyProducedBindings());
         	
         } else if (node instanceof ZeroLengthPathNode) {
         	
@@ -905,8 +912,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             // NOP.
 
-        } else {
+        } else if(node instanceof BindingsClause) {
+
+            final BindingsClause bc = (BindingsClause) node;
             
+            vars.addAll(bc.getDeclaredVariables());
+            
+        } else {
+
             throw new AssertionError(node.toString());
             
         }
@@ -1005,7 +1018,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         } else if (node instanceof ArbitraryLengthPathNode) {
         	
-        	vars.addAll(((ArbitraryLengthPathNode) node).getProducedBindings());
+        	vars.addAll(((ArbitraryLengthPathNode) node).getMaybeProducedBindings());
         	
         } else if (node instanceof ZeroLengthPathNode) {
         	
@@ -1066,6 +1079,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             // NOP
 
+        } else if(node instanceof BindingsClause) {
+
+            final BindingsClause bc = (BindingsClause) node;
+            
+            vars.addAll(bc.getDeclaredVariables());
+
         } else {
             
             throw new AssertionError(node.toString());
@@ -1081,7 +1100,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
 
     // MUST : JOIN GROUP
-    private Set<IVariable<?>> getDefinitelyProducedBindings(
+    Set<IVariable<?>> getDefinitelyProducedBindings(
             final JoinGroupNode node, final Set<IVariable<?>> vars,
             final boolean recursive) {
         // Note: always report what is bound when we enter a group. The caller
@@ -1111,7 +1130,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             } else if (child instanceof ArbitraryLengthPathNode) {
             	
-            	vars.addAll(((ArbitraryLengthPathNode) child).getProducedBindings());
+            	vars.addAll(((ArbitraryLengthPathNode) child).getDefinitelyProducedBindings());
             	
             } else if (child instanceof ZeroLengthPathNode) {
             	
@@ -1165,6 +1184,12 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
                 // NOP
                 
+            } else if(child instanceof BindingsClause) {
+
+                final BindingsClause bc = (BindingsClause) child;
+                
+                vars.addAll(bc.getDeclaredVariables());
+
             } else {
 
                 throw new AssertionError(child.toString());
@@ -1547,7 +1572,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     /**
      * Report "MUST" bound bindings projected by the SERVICE. This involves
      * checking the graph pattern reported by
-     * {@link ServiceNode#getGraphPattern()} .
+     * {@link ServiceNode#getGraphPattern()}.
+     * <p>
+     * Note: If the SERVICE URI is a variable, then it can only become bound
+     * through some other operation. If the SERVICE variable never becomes
+     * bound, then the SERVICE call can not run.
      */
     // MUST : ServiceNode
     public Set<IVariable<?>> getDefinitelyProducedBindings(
@@ -2091,6 +2120,50 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         boundByService.retainAll(incomingBindings);
             
         vars.addAll(boundByService);
+
+        return vars;
+
+    }
+    
+    /**
+     * Return the join variables for a VALUES clause (embedded only - not
+     * top-level).
+     * 
+     * @param bc The VALUES clause (a bunch of solutions)
+     * @param stats A static analysis of those solutions.
+     * @param vars
+     * @return 
+     */
+    public Set<IVariable<?>> getJoinVars(final BindingsClause bc,
+            final ISolutionSetStats stats,
+            final Set<IVariable<?>> vars) {
+
+        /*
+         * The variables which will be definitely bound based on the solutions
+         * in the VALUES clause.
+         * 
+         * Note: Collection is not modifyable, so we copy it.
+         */
+        final Set<IVariable<?>> boundByBindingsClause = new LinkedHashSet<IVariable<?>>(
+                stats.getAlwaysBound());
+
+        /*
+         * The variables which are definitely bound on entry to the join group
+         * in which the VALUES clause appears.
+         */
+        final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
+                bc, new LinkedHashSet<IVariable<?>>());
+        
+        /*
+         * This is only those variables which are bound on entry into the group
+         * in which the VALUES join appears *and* which are "must" bound
+         * variables projected by the VALUES.
+         * 
+         * FIXME Is this the correct semantics? I followed the pattern for SERVICE.
+         */
+        boundByBindingsClause.retainAll(incomingBindings);
+            
+        vars.addAll(boundByBindingsClause);
 
         return vars;
 

@@ -15,25 +15,27 @@
 */
 package com.bigdata.rdf.graph.analytics;
 
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBinder;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASScheduler;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IReducer;
 import com.bigdata.rdf.graph.impl.BaseGASProgram;
-
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Page rank assigns weights to the vertices in a graph based by on the relative
@@ -54,7 +56,7 @@ import cutthecrap.utils.striterators.IStriterator;
  * <dd>sum( neighbor_value / neighbor_num_out_edges ) over the in-edges of the
  * graph.</dd>
  * <dt>Apply</dt>
- * <dd>value = <i>resetProb</i> + (1.0 Ð <i>resetProb</i>) * gatherSum</dd>
+ * <dd>value = <i>resetProb</i> + (1.0 - <i>resetProb</i>) * gatherSum</dd>
  * <dt>Scatter</dt>
  * <dd>if (a) value has significantly changed <code>(fabs(old-new) GT
  * <i>epsilon</i>)</code>; or (b) iterations LT limit</dd>
@@ -118,8 +120,12 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
          * updated in each iteration to the new estimated value by apply().
          */
         public double getValue() {
+
+            synchronized (this) {
             
-            return value;
+                return value;
+                
+            }
             
         }
         
@@ -186,19 +192,6 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
     /**
      * {@inheritDoc}
      * <p>
-     * Overridden to only visit the edges of the graph.
-     */
-    @Override
-    public IStriterator constrainFilter(
-            final IGASContext<PR.VS, PR.ES, Double> ctx, final IStriterator itr) {
-
-        return itr.addFilter(getEdgeOnlyFilter(ctx));
-
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
      * Each vertex is initialized to the reset probability.
      * 
      * FIXME We need to do this efficiently. E.g., using a scan to find all of
@@ -212,10 +205,15 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
 
         final PR.VS us = state.getState(u);
 
-        us.value = resetProb;
+        synchronized (us) {
 
-        us.outEdges = ctx.getGraphAccessor().getEdgeCount(ctx, u,
-                EdgesEnum.OutEdges);
+            us.value = resetProb;
+
+            us.outEdges = ctx.getGraphAccessor().getEdgeCount(ctx, u,
+                    EdgesEnum.OutEdges);
+            
+        }
+        
     }
 
     /**
@@ -235,7 +233,11 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
          * that we used to discover [v] is an out-edge of [v].
          */
 
-        return (vs.value / vs.outEdges);
+        synchronized (vs) {
+         
+            return (vs.value / vs.outEdges);
+            
+        }
 
     }
 
@@ -271,7 +273,9 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
              * from the frontier.
              */
             
-            us.lastChange = 0d;
+            synchronized (us) {
+                us.lastChange = 0d;
+            }
 
             return null;
 
@@ -279,9 +283,13 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
 
         final double newval = resetProb + (1.0 - resetProb) * sum;
         
-        us.lastChange = (newval - us.value);
+        synchronized (us) {
         
-        us.value = newval;
+            us.lastChange = (newval - us.value);
+
+            us.value = newval;
+            
+        }
 
         return us;
         
@@ -332,97 +340,155 @@ public class PR extends BaseGASProgram<PR.VS, PR.ES, Double> {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>{@value Bindings#RANK}</dt>
+     * <dd>The page rank associated with the vertex..</dd>
+     * </dl>
+     */
     @Override
-    public void after(final IGASContext<PR.VS, PR.ES, Double> ctx) {
+    public List<IBinder<PR.VS, PR.ES, Double>> getBinderList() {
 
-        final ConcurrentHashMap<Value, Double> values = new ConcurrentHashMap<Value, Double>();
+        final List<IBinder<PR.VS, PR.ES, Double>> tmp = super.getBinderList();
 
-        ctx.getGASState().reduce(
-                new IReducer<PR.VS, PR.ES, Double, Map<Value, Double>>() {
-
-                    @Override
-                    public void visit(final IGASState<VS, ES, Double> state,
-                            final Value u) {
-
-                        final VS us = state.getState(u);
-
-                        if (us != null) {
-
-                            final double pageRank = us.getValue();
-
-                            // FIXME Why are NaNs showing up?
-                            if (Double.isNaN(pageRank))
-                                return;
-
-                            // FIXME Do infinite values show up?
-                            if (Double.isInfinite(pageRank))
-                                return;
-                            
-                            if (pageRank < minPageRank) {
-                                // Ignore small values.
-                                return;
-                            }
-
-                            /*
-                             * Only report the larger ranked values.
-                             */
-
-                            if (log.isDebugEnabled())
-                                log.debug("v=" + u + ", pageRank=" + pageRank);
-
-                            values.put(u, Double.valueOf(pageRank));
-
-                        }
-
-                    }
-
-                    @Override
-                    public Map<Value, Double> get() {
-
-                        return Collections.unmodifiableMap(values);
-
-                    }
-                });
-
-        class NV implements Comparable<NV> {
-            public final double n;
-            public final Value v;
-            public NV(double n, Value v) {
-                this.n = n;
-                this.v = v;
-            }
+        tmp.add(new BinderBase<PR.VS, PR.ES, Double>() {
+            
             @Override
-            public int compareTo(final NV o) {
-                if (o.n > this.n)
-                    return 1;
-                if (o.n < this.n)
-                    return -1;
-                return 0;
+            public int getIndex() {
+                return Bindings.RANK;
             }
-        }
-
-        final NV[] a = new NV[values.size()];
-
-        int i = 0;
-
-        for (Map.Entry<Value, Double> e : values.entrySet()) {
-        
-            a[i++] = new NV(e.getValue().doubleValue(), e.getKey());
             
-        }
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<PR.VS, PR.ES, Double> state, final Value u) {
 
-        Arrays.sort(a);
+                return vf.createLiteral(state.getState(u).getValue());
 
-        System.out.println("rank, pageRank, vertex");
-        i = 0;
-        for (NV t : a) {
+            }
 
-            System.out.println(i + ", " + t.n + ", " + t.v);
-            
-            i++;
-            
-        }
+        });
+
+        return tmp;
 
     }
+
+    /**
+     * Additional {@link IBindingExtractor.IBinder}s exposed by {@link PR}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    public interface Bindings extends BaseGASProgram.Bindings {
+        
+        /**
+         * The computed page rank for the vertex.
+         */
+        int RANK = 1;
+        
+    }
+
+    /**
+     * Class reports a map containing the page rank associated with each visited
+     * vertex.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public class PageRankReducer implements IReducer<PR.VS, PR.ES, Double, Map<Value,Double>> {
+
+        private final ConcurrentHashMap<Value, Double> values = new ConcurrentHashMap<Value, Double>();
+        
+        @Override
+        public void visit(final IGASState<VS, ES, Double> state,
+                final Value u) {
+
+            final VS us = state.getState(u);
+
+            if (us != null) {
+
+                final double pageRank = us.getValue();
+
+                // FIXME Why are NaNs showing up?
+                if (Double.isNaN(pageRank))
+                    return;
+
+                // FIXME Do infinite values show up?
+                if (Double.isInfinite(pageRank))
+                    return;
+                
+                if (pageRank < minPageRank) {
+                    // Ignore small values.
+                    return;
+                }
+
+                /*
+                 * Only report the larger ranked values.
+                 */
+
+                if (log.isDebugEnabled())
+                    log.debug("v=" + u + ", pageRank=" + pageRank);
+
+                values.put(u, Double.valueOf(pageRank));
+
+            }
+
+        }
+
+        @Override
+        public Map<Value, Double> get() {
+
+            return Collections.unmodifiableMap(values);
+
+        }
+        
+    }
+    
+//    @Override
+//    public void after(final IGASContext<PR.VS, PR.ES, Double> ctx) {
+//
+//        final Map<Value, Double> values = ctx.getGASState().reduce(
+//                new PageRankReducer());
+//
+//        class NV implements Comparable<NV> {
+//            public final double n;
+//            public final Value v;
+//            public NV(double n, Value v) {
+//                this.n = n;
+//                this.v = v;
+//            }
+//            @Override
+//            public int compareTo(final NV o) {
+//                if (o.n > this.n)
+//                    return 1;
+//                if (o.n < this.n)
+//                    return -1;
+//                return 0;
+//            }
+//        }
+//
+//        final NV[] a = new NV[values.size()];
+//
+//        int i = 0;
+//
+//        for (Map.Entry<Value, Double> e : values.entrySet()) {
+//        
+//            a[i++] = new NV(e.getValue().doubleValue(), e.getKey());
+//            
+//        }
+//
+//        Arrays.sort(a);
+//
+//        System.out.println("rank, pageRank, vertex");
+//        i = 0;
+//        for (NV t : a) {
+//
+//            System.out.println(i + ", " + t.n + ", " + t.v);
+//            
+//            i++;
+//            
+//        }
+//
+//    }
 
 }

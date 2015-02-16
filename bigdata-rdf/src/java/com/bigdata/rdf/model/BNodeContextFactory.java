@@ -1,5 +1,6 @@
 package com.bigdata.rdf.model;
 
+import java.util.Date;
 import java.util.UUID;
 
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -89,6 +90,10 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.createBNode(id);
     }
 
+	public BigdataBNode createBNode(BigdataStatement stmt) {
+        return valueFactory.createBNode(stmt);
+    }
+
 	public BigdataLiteral createLiteral(boolean arg0) {
         return valueFactory.createLiteral(arg0);
     }
@@ -146,6 +151,10 @@ public class BNodeContextFactory implements BigdataValueFactory {
     }
 
 	public BigdataLiteral createLiteral(XMLGregorianCalendar arg0) {
+        return valueFactory.createLiteral(arg0);
+    }
+
+    public BigdataLiteral createLiteral(Date arg0) {
         return valueFactory.createLiteral(arg0);
     }
 

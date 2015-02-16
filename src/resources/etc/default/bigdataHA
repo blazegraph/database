@@ -1,0 +1,71 @@
+# Environment for bigdata HA services.
+#
+# binDir   - The directory containing the installed scripts.
+# pidFile  - The pid is written on this file.
+#
+# Note: You MUST provide the location of the executable scripts and the
+# pid file that is written by $binDir/startHAServices.  These SHOULD be
+# absolute path names.
+
+#BD_USER=
+#BD_GROUP=
+
+#binDir=
+#pidFile=
+
+##
+# ServiceStarter JVM options.
+#
+# The ServiceStarter is launched as a JVM with the following JVM options.
+# The other services (including the HAJournalServer) will run inside of 
+# this JVM. This is where you specify the size of the Java heap and the
+# size of the direct memory heap (used for the write cache buffers and
+# some related things).
+##
+if [ -z "$JVM_OPTS" ]; then
+   export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
+#  export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1046"
+   echo "Set JVM_OPTS=${JVM_OPTS}"
+else
+   echo "Using JVM_OPTS=${JVM_OPTS}"
+fi
+
+##
+# The following variables configure the startHAServices script, which 
+# passes them through to HAJournal.config.
+##
+
+# Name of the bigdata gederation of services. Override for real install.
+export FEDNAME=bigdataInstallTest
+
+# This is different for each HA replication cluster in the same federation
+# of services.  If you have multiple such replication cluster, then just
+# given each such cluster its own name.
+export LOGICAL_SERVICE_ID=HAJournalServer-1
+
+# Local directory where the service will store its state.
+export FED_DIR=/var/bigdata/${FEDNAME}
+
+# Apache River - NO default for "LOCATORS".
+export GROUPS="$FEDNAME"
+#export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+
+# Apache ZooKeeper - NO default.
+#export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
+
+# All of these have defaults. Override as necessary.
+#export REPLICATION_FACTOR=3
+#export RMI_PORT=9080
+#export HA_PORT=9090
+#export JETTY_PORT=8080
+#export JETTY_XML=var/jetty/WEB-INF/jetty.xml
+#export JETTY_RESOURCE_BASE=var/jetty
+#export WRITE_CACHE_BUFFER_COUNT=2000
+#export DATA_DIR=
+#export HALOG_DIR=
+#export SNAPSHOT_DIR=
+#export COLLECT_QUEUE_STATISTICS=
+#export COLLECT_PLATFORM_STATISTICS=
+#export GANGLIA_REPORT=
+#export GANGLIA_LISTEN=
+#export SYSSTAT_DIR=

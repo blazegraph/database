@@ -69,6 +69,7 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
+import com.bigdata.striterator.ChunkedArrayIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -300,6 +301,10 @@ public class SearchServiceFactory implements ServiceFactory {
                 
                 assertObjectIsLiteral(sp);
                 
+            } else if (uri.equals(BDS.RANGE_COUNT)) {
+                
+                assertObjectIsVariable(sp);
+                
             } else if(uri.equals(BDS.MATCH_REGEX)) {
                 
             	// a variable for the object is equivalent to regex = null
@@ -367,6 +372,7 @@ public class SearchServiceFactory implements ServiceFactory {
         private final boolean subjectSearch;
         private final Literal searchTimeout;
         private final Literal matchRegex;
+        private final IVariable<?> rangeCountVar;
         
         public SearchCall(
                 final AbstractTripleStore store,
@@ -415,6 +421,7 @@ public class SearchServiceFactory implements ServiceFactory {
 
             IVariable<?> relVar = null;
             IVariable<?> rankVar = null;
+            IVariable<?> rangeCountVar = null;
             Literal minRank = null;
             Literal maxRank = null;
             Literal minRelevance = null;
@@ -439,6 +446,8 @@ public class SearchServiceFactory implements ServiceFactory {
                     relVar = oVar;
                 } else if (BDS.RANK.equals(p)) {
                     rankVar = oVar;
+                } else if (BDS.RANGE_COUNT.equals(p)) {
+                    rangeCountVar = oVar;
                 } else if (BDS.MIN_RANK.equals(p)) {
                     minRank = (Literal) oVal;
                 } else if (BDS.MAX_RANK.equals(p)) {
@@ -484,6 +493,7 @@ public class SearchServiceFactory implements ServiceFactory {
             this.subjectSearch = subjectSearch;
             this.searchTimeout = searchTimeout;
             this.matchRegex = matchRegex;
+            this.rangeCountVar = rangeCountVar;
 
         }
 
@@ -511,6 +521,46 @@ public class SearchServiceFactory implements ServiceFactory {
             }
 
             return (Hiterator) textIndex.search(new FullTextQuery(
+        		s,//
+                query.getLanguage(),// 
+                prefixMatch,//
+                matchRegex == null ? null : matchRegex.stringValue(),
+                matchAllTerms,
+                matchExact,
+                minRelevance == null ? BDS.DEFAULT_MIN_RELEVANCE : minRelevance.doubleValue()/* minCosine */, 
+                maxRelevance == null ? BDS.DEFAULT_MAX_RELEVANCE : maxRelevance.doubleValue()/* maxCosine */, 
+                minRank == null ? BDS.DEFAULT_MIN_RANK/*1*/ : minRank.intValue()/* minRank */,
+                maxRank == null ? BDS.DEFAULT_MAX_RANK/*Integer.MAX_VALUE*/ : maxRank.intValue()/* maxRank */,
+                searchTimeout == null ? BDS.DEFAULT_TIMEOUT/*0L*/ : searchTimeout.longValue()/* timeout */,
+                TimeUnit.MILLISECONDS
+                ));
+        
+        }
+
+        @SuppressWarnings({ "rawtypes", "unchecked" })
+        private int getRangeCount() {
+
+//            final IValueCentricTextIndexer<IHit> textIndex = (IValueCentricTextIndexer) store
+//                    .getLexiconRelation().getSearchEngine();
+            
+        	final ITextIndexer<IHit> textIndex = (ITextIndexer) 
+	    		(this.subjectSearch ?
+	    			store.getLexiconRelation().getSubjectCentricSearchEngine() :
+	    				store.getLexiconRelation().getSearchEngine());
+        	
+            if (textIndex == null)
+                throw new UnsupportedOperationException("No free text index?");
+
+            String s = query.getLabel();
+            final boolean prefixMatch;
+            if (s.indexOf('*') >= 0) {
+                prefixMatch = true;
+                s = s.replaceAll("\\*", "");
+            } else {
+                prefixMatch = false;
+            }
+
+            return textIndex.count(new FullTextQuery(
         		s,//
                 query.getLanguage(),// 
                 prefixMatch,//
@@ -561,7 +611,24 @@ public class SearchServiceFactory implements ServiceFactory {
 
             }
             
-            return new HitConverter(getHiterator());
+            if (rangeCountVar != null) {
+            
+            	final int i = getRangeCount();
+            	
+            	@SuppressWarnings({ "rawtypes", "unchecked" })
+				final ListBindingSet bs = new ListBindingSet(
+            			new IVariable[] { rangeCountVar },
+            			new IConstant[] { new Constant(new XSDNumericIV(i)) });
+            	
+            	return new ChunkedArrayIterator<IBindingSet>(new IBindingSet[] {
+            		bs
+            	});
+            	
+            } else {
+            
+            	return new HitConverter(getHiterator());
+            	
+            }
 
         }
             
@@ -631,11 +698,11 @@ public class SearchServiceFactory implements ServiceFactory {
             
                 final ListBindingSet bs = new ListBindingSet(vars, vals);
                 
-                if (log.isInfoEnabled()) {
-                	log.info(bs);
-                	log.info(query.getClass());
-                	log.info(((BigdataLiteral) query).getIV());
-                	log.info(((BigdataLiteral) query).getIV().getClass());
+                if (log.isTraceEnabled()) {
+                	log.trace(bs);
+                	log.trace(query.getClass());
+                	log.trace(((BigdataLiteral) query).getIV());
+                	log.trace(((BigdataLiteral) query).getIV().getClass());
                 }
                 
                 return bs;

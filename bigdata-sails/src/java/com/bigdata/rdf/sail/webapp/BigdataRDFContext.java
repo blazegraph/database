@@ -72,23 +72,21 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.BufferAnnotations;
-import com.bigdata.bop.IPredicate;
+import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
-import com.bigdata.bop.join.PipelineJoin;
-import com.bigdata.btree.IndexMetadata;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CAT;
 import com.bigdata.io.NullOutputStream;
-import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailQuery;
@@ -99,15 +97,17 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.relation.AbstractResource;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.relation.RelationSchema;
-import com.bigdata.rwstore.RWStore;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -132,11 +132,23 @@ public class BigdataRDFContext extends BigdataBaseContext {
     protected static final String EXPLAIN = "explain";
     
     /**
+     * Optional value for the {@link #EXPLAIN} URL query parameter that may be
+     * used to request more detail in the "EXPLAIN" of a query.
+     */
+    protected static final String EXPLAIN_DETAILS = "details";
+    
+    /**
      * URL Query parameter used to request the "analytic" query hints. MAY be
      * <code>null</code>, in which case we do not set
      * {@link QueryHints#ANALYTIC} query hint.
      */
     protected static final String ANALYTIC = "analytic";
+    
+    /**
+     * URL Query parameter used to request the use of the Runtime Query
+     * Optimizer.
+     */
+    protected static final String RTO = "RTO";
     
     /**
      * URL Query parameter used to request an XHTML response for SPARQL
@@ -158,7 +170,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * 
      * @see #XSL_STYLESHEET
      */
-    protected static final String DEFAULT_XSL_STYLESHEET = "result-to-html.xsl";
+    protected static final String DEFAULT_XSL_STYLESHEET = BigdataStatics
+            .getContextPath() + "/html/result-to-html.xsl";
     
     /**
      * URL Query parameter used to request an incremental XHTML representation
@@ -203,11 +216,21 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     protected static final String NAMESPACE = "namespace";
     
-	private final SparqlEndpointConfig m_config;
+    /**
+     * HTTP header may be used to specify the timeout for a query.
+     * 
+     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     */
+    static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
+
+    private final SparqlEndpointConfig m_config;
 
     /**
      * A thread pool for running accepted queries against the
-     * {@link QueryEngine}.
+     * {@link QueryEngine}. The number of queries that will be processed
+     * concurrently is determined by this thread pool.
+     * 
+     * @see SparqlEndpointConfig#queryThreadPoolSize
      */
     /*package*/final ExecutorService queryService;
 	
@@ -346,13 +369,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
     /**
      * Immediate shutdown interrupts any running queries.
      * 
-     * FIXME Must abort any open transactions. This does not matter for the
-     * standalone database, but it will make a difference in scale-out. The
-     * transaction identifiers could be obtained from the {@link #queries} map.
-     * 
-     * FIXME This must also abort any running updates. Those are currently
-     * running in thread handling the {@link HttpServletRequest}, however it
-     * probably makes sense to execute them on a bounded thread pool as well.
+     * FIXME GROUP COMMIT: Shutdown should abort open transactions (including
+     * queries and updates). This hould be addressed when we handle group commit
+     * since that provides us with a means to recognize and interrupt each
+     * running {@link AbstractRestApiTask}.
      */
     void shutdownNow() {
 
@@ -443,6 +463,36 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
     }
     
+    /**
+     * Invoked if {@link #EXPLAIN} is found as a URL request parameter to
+     * see whether it exists with {@link #EXPLAIN_DETAILS} as a value. We
+     * have to check each value since there might be more than one.
+     * 
+     * @param req
+     *            The request.
+     * @return
+     */
+    static private boolean isExplainDetails(final HttpServletRequest req) {
+
+        final String[] vals = req.getParameterValues(EXPLAIN);
+
+        if (vals == null) {
+
+            return false;
+
+        }
+
+        for (String val : vals) {
+
+            if (val.equals(EXPLAIN_DETAILS))
+                return true;
+
+        }
+
+        return false;
+
+    }
+    
 	/**
      * Abstract base class for running queries handles the timing, pipe,
      * reporting, obtains the connection, and provides the finally {} semantics
@@ -453,6 +503,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     public abstract class AbstractQueryTask implements Callable<Void> {
         
+    	/** The connection used to isolate the query or update request. */
+    	private final BigdataSailRepositoryConnection cxn;
+    	
         /** The namespace against which the query will be run. */
         private final String namespace;
 
@@ -568,10 +621,21 @@ public class BigdataRDFContext extends BigdataBaseContext {
         final boolean explain;
 
         /**
+         * When <code>true</code>, provide an additional level of detail for the
+         * query explanation.
+         */
+        final boolean explainDetails;
+
+        /**
          * When <code>true</code>, enable the "analytic" query hints. 
          */
-        final Boolean analytic;
+        final boolean analytic;
 
+        /**
+         * When <code>true</code>, enable the Runtime Query Optimizer.
+         */
+        final boolean rto;
+        
         /**
          * When <code>true</code>, provide an view of the XHTML representation
          * of the solutions or graph result (SPARQL QUERY)
@@ -631,37 +695,42 @@ public class BigdataRDFContext extends BigdataBaseContext {
             return TimeUnit.NANOSECONDS.toMillis(elapsed);
         }
 
-        /**
-         * 
-         * @param namespace
-         *            The namespace against which the query will be run.
-         * @param timestamp
-         *            The timestamp of the view for that namespace against which
-         *            the query will be run.
-         * @param baseURI
-         *            The base URI.
-         * @param astContainer
-         *            The container with all the information about the submitted
-         *            query, including the original SPARQL query, the parse
-         *            tree, etc.
-         * @param queryType
-         *            The {@link QueryType}.
-         * @param mimeType
-         *            The MIME type to be used for the response. The caller must
-         *            verify that the MIME Type is appropriate for the query
-         *            type.
-         * @param charset
-         *            The character encoding to use with the negotiated MIME
-         *            type (this is <code>null</code> for binary encodings).
-         * @param fileExt
-         *            The file extension (without the leading ".") to use with
-         *            that MIME Type.
-         * @param req
-         *            The request.
-         * @param os
-         *            Where to write the data for the query result.
-         */
+		/**
+		 * Version for SPARQL QUERY.
+		 * 
+		 * @param cxn
+		 *            The connection used to isolate the query or update
+		 *            request.
+		 * @param namespace
+		 *            The namespace against which the query will be run.
+		 * @param timestamp
+		 *            The timestamp of the view for that namespace against which
+		 *            the query will be run.
+		 * @param baseURI
+		 *            The base URI.
+		 * @param astContainer
+		 *            The container with all the information about the submitted
+		 *            query, including the original SPARQL query, the parse
+		 *            tree, etc.
+		 * @param queryType
+		 *            The {@link QueryType}.
+		 * @param mimeType
+		 *            The MIME type to be used for the response. The caller must
+		 *            verify that the MIME Type is appropriate for the query
+		 *            type.
+		 * @param charset
+		 *            The character encoding to use with the negotiated MIME
+		 *            type (this is <code>null</code> for binary encodings).
+		 * @param fileExt
+		 *            The file extension (without the leading ".") to use with
+		 *            that MIME Type.
+		 * @param req
+		 *            The request.
+		 * @param os
+		 *            Where to write the data for the query result.
+		 */
         protected AbstractQueryTask(//
+        		final BigdataSailRepositoryConnection cxn,//
                 final String namespace,//
                 final long timestamp, //
                 final String baseURI,
@@ -675,6 +744,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final OutputStream os//
         ) {
 
+            if (cxn == null)
+                throw new IllegalArgumentException();
             if (namespace == null)
                 throw new IllegalArgumentException();
             if (baseURI == null)
@@ -694,6 +765,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             if (os == null)
                 throw new IllegalArgumentException();
 
+            this.cxn = cxn;
             this.namespace = namespace;
             this.timestamp = timestamp;
             this.baseURI = baseURI;
@@ -706,8 +778,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.req = req;
             this.resp = resp;
             this.explain = req.getParameter(EXPLAIN) != null;
+            this.explainDetails = explain && isExplainDetails(req);
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
+            this.rto = getEffectiveBooleanValue(req.getParameter(RTO),
+                    QueryHints.DEFAULT_OPTIMIZER
+                            .equals(QueryOptimizerEnum.Runtime));
             this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
                     false);
             this.monitor = getEffectiveBooleanValue(req.getParameter(MONITOR),
@@ -718,6 +794,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         }
 
         /**
+         * Version for SPARQL UPDATE.
          * 
          * @param namespace
          *            The namespace against which the query will be run.
@@ -738,6 +815,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            Where to write the data for the query result.
          */
         protected AbstractQueryTask(//
+        		final BigdataSailRepositoryConnection cxn,//
                 final String namespace,//
                 final long timestamp, //
                 final String baseURI,
@@ -751,6 +829,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final OutputStream os//
         ) {
 
+            if (cxn == null)
+                throw new IllegalArgumentException();
             if (namespace == null)
                 throw new IllegalArgumentException();
             if (baseURI == null)
@@ -764,6 +844,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             if (os == null)
                 throw new IllegalArgumentException();
 
+            this.cxn = cxn;
             this.namespace = namespace;
             this.timestamp = timestamp;
             this.baseURI = baseURI;
@@ -776,8 +857,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.req = req;
             this.resp = resp;
             this.explain = req.getParameter(EXPLAIN) != null;
+            this.explainDetails = explain && isExplainDetails(req);
             this.analytic = getEffectiveBooleanValue(
                     req.getParameter(ANALYTIC), QueryHints.DEFAULT_ANALYTIC);
+            this.rto = getEffectiveBooleanValue(req.getParameter(RTO),
+                    QueryHints.DEFAULT_OPTIMIZER
+                            .equals(QueryOptimizerEnum.Runtime));
             this.xhtml = getEffectiveBooleanValue(req.getParameter(XHTML),
                     false);
             this.monitor = getEffectiveBooleanValue(req.getParameter(MONITOR),
@@ -854,13 +939,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Override query if data set protocol parameters were used.
 			overrideDataset(query);
 
-            if (analytic != null) {
+            if (analytic) {
 
                 // Turn analytic query on/off as requested.
-//                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
-//                        analytic.toString());
-                astContainer.setQueryHint(QueryHints.ANALYTIC,
-                        analytic.toString());
+                astContainer.setQueryHint(QueryHints.ANALYTIC, "true");
+
+            }
+
+            if (rto) {
+
+                // Turn analytic query on/off as requested.
+                astContainer.setQueryHint(QueryHints.OPTIMIZER,
+                        QueryOptimizerEnum.Runtime.toString());
                 
             }
 
@@ -907,13 +997,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Override query if data set protocol parameters were used.
             overrideDataset(update);
 
-            if (analytic != null) {
+            if (analytic) {
 
                 // Turn analytic query on/off as requested.
-//                astContainer.getOriginalAST().setQueryHint(QueryHints.ANALYTIC,
-//                        analytic.toString());
-                astContainer.setQueryHint(QueryHints.ANALYTIC,
-                        analytic.toString());
+                astContainer.setQueryHint(QueryHints.ANALYTIC, "true");
+
+            }
+
+            if (rto) {
+
+                // Turn analytic query on/off as requested.
+                astContainer.setQueryHint(QueryHints.OPTIMIZER,
+                        QueryOptimizerEnum.Runtime.toString());
                 
             }
 
@@ -939,6 +1034,30 @@ public class BigdataRDFContext extends BigdataBaseContext {
             m_queries.put(queryId, r);
             m_queries2.put(queryId2, r);
 
+            /**
+             * Handle data races in CANCEL of an UPDATE operation whose
+             * cancellation was requested before it began to execute.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+             *      Cancellation </a>
+             */
+            {
+
+                final QueryEngine queryEngine = QueryEngineFactory
+                        .getQueryController(getIndexManager());
+
+                if (queryEngine.pendingCancel(queryId2)) {
+
+                    /*
+                     * There is a pending CANCEL for this UPDATE request, so
+                     * cancel it now.
+                     */
+                    updateFuture.cancel(true/* mayInterruptIfRunning */);
+
+                }
+
+            }
+            
             return update;
             
         }
@@ -952,17 +1071,41 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            The connection.
          * 
          * @return The query.
+         * 
+         * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
-            final long queryTimeout = getConfig().queryTimeout;
-            
-            if (queryTimeout > 0) {
+            /*
+             * Establish the query timeout. This may be set in web.xml, which
+             * overrides all queries and sets a maximum allowed time for query
+             * execution. This may also be set either via setMaxQuery() or
+             * setMaxQueryMillis() which set a HTTP header (in milliseconds).
+             */
+            long queryTimeoutMillis = getConfig().queryTimeout;
+
+            {
+                final String s = req
+                        .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
+                if (s != null) {
+                    long tmp = StringUtil.toLong(s);
+                    if (tmp != -1L && //
+                            (queryTimeoutMillis == 0/* noLimit */
+                            || //
+                            tmp < queryTimeoutMillis/* shorterLimit */)//
+                    ) {
+                        // Set based on the http header value.
+                        queryTimeoutMillis = tmp;
+                    }
+                }
+            }
+
+            if (queryTimeoutMillis > 0) {
 
                 final QueryRoot originalQuery = astContainer.getOriginalAST();
 
-                originalQuery.setTimeout(queryTimeout);
-                
+                originalQuery.setTimeout(queryTimeoutMillis);
+
             }
             
 //            final ASTContainer astContainer = ((BigdataParsedQuery) parsedQuery)
@@ -1033,85 +1176,133 @@ public class BigdataRDFContext extends BigdataBaseContext {
         abstract protected void doQuery(BigdataSailRepositoryConnection cxn,
                 OutputStream os) throws Exception;
 
-        final public Void call() throws Exception {
-			BigdataSailRepositoryConnection cxn = null;
-            try {
-                cxn = getQueryConnection(namespace, timestamp);
-                if(log.isTraceEnabled())
-                    log.trace("Query running...");
-                beginNanos = System.nanoTime();
-//                try {
-            if (explain && !update) {
-					/*
-					 * The data goes to a bit bucket and we send an
-					 * "explanation" of the query evaluation back to the caller.
-					 * 
-					 * Note: The trick is how to get hold of the IRunningQuery
-					 * object. It is created deep within the Sail when we
-					 * finally submit a query plan to the query engine. We have
-					 * the queryId (on queryId2), so we can look up the
-					 * IRunningQuery in [m_queries] while it is running, but
-					 * once it is terminated the IRunningQuery will have been
-					 * cleared from the internal map maintained by the
-					 * QueryEngine, at which point we can not longer find it.
-					 * 
-					 * Note: We can't do this for UPDATE since it would have
-					 * a side-effect anyway.  The way to "EXPLAIN" an UPDATE 
-					 * is to break it down into the component QUERY bits and
-					 * execute those.
-					 */
-    				doQuery(cxn, new NullOutputStream());
-    			} else {
-    				doQuery(cxn, os);
-                    os.flush();
-                    os.close();
-    			}
-            	if(log.isTraceEnabled())
-            	    log.trace("Query done.");
-//                } catch(Throwable t) {
-//                	/*
-//                	 * Log the query and the exception together.
-//                	 */
-//					log.error(t.getLocalizedMessage() + ":\n" + queryStr, t);
-//                }
-                return null;
-            } catch (Throwable t) {
-                log.error("Will abort: " + t, t);
-                if (cxn != null && !cxn.isReadOnly()) {
-                    /*
-                     * Force rollback of the connection.
-                     * 
-                     * Note: It is possible that the commit has already been
-                     * processed, in which case this rollback() will be a NOP.
-                     * This can happen when there is an IO error when
-                     * communicating with the client, but the database has
-                     * already gone through a commit.
-                     */
-                    cxn.rollback();
-                }
-                throw new Exception(t);
-            } finally {
-                endNanos = System.nanoTime();
-                m_queries.remove(queryId);
-                if (queryId2 != null) m_queries2.remove(queryId2);
-//                if (os != null) {
-//                    try {
-//                        os.close();
-//                    } catch (Throwable t) {
-//                        log.error(t, t);
-//                    }
-//                }
-                if (cxn != null) {
-                    try {
-                        // Force close of the connection.
-                        cxn.close();
-                        if(log.isTraceEnabled())
-                            log.trace("Connection closed.");
-                    } catch (Throwable t) {
-                        log.error(t, t);
+        /**
+         * Task for executing a SPARQL QUERY or SPARQL UPDATE.
+         * <p>
+         * See {@link AbstractQueryTask#update} to decide whether this task is a
+         * QUERY or an UPDATE.
+         * 
+         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+         *         Thompson</a>
+         */
+        private class SparqlRestApiTask extends AbstractRestApiTask<Void> {
+
+            public SparqlRestApiTask(final HttpServletRequest req,
+                    final HttpServletResponse resp, final String namespace,
+                    final long timestamp) {
+
+                super(req, resp, namespace, timestamp);
+                
+            }
+
+            @Override
+            public boolean isReadOnly() {
+             
+                // Read-only unless SPARQL UPDATE.
+                return !AbstractQueryTask.this.update;
+                
+            }
+
+            @Override
+            public Void call() throws Exception {
+//                BigdataSailRepositoryConnection cxn = null;
+//                boolean success = false;
+                try {
+                    // Note: Will be UPDATE connection if UPDATE request!!!
+//                    cxn = getQueryConnection();//namespace, timestamp);
+                    if(log.isTraceEnabled())
+                        log.trace("Query running...");
+                    beginNanos = System.nanoTime();
+                    if (explain && !update) {
+                        /*
+                         * The data goes to a bit bucket and we send an
+                         * "explanation" of the query evaluation back to the caller.
+                         * 
+                         * Note: The trick is how to get hold of the IRunningQuery
+                         * object. It is created deep within the Sail when we
+                         * finally submit a query plan to the query engine. We have
+                         * the queryId (on queryId2), so we can look up the
+                         * IRunningQuery in [m_queries] while it is running, but
+                         * once it is terminated the IRunningQuery will have been
+                         * cleared from the internal map maintained by the
+                         * QueryEngine, at which point we can not longer find it.
+                         * 
+                         * Note: We can't do this for UPDATE since it would have a
+                         * side-effect anyway. The way to "EXPLAIN" an UPDATE is to
+                         * break it down into the component QUERY bits and execute
+                         * those.
+                         */
+                        doQuery(cxn, new NullOutputStream());
+//                        success = true;
+                    } else {
+                        doQuery(cxn, os);
+//                        success = true;
+                        os.flush();
+                        os.close();
                     }
+                    if (log.isTraceEnabled())
+                        log.trace("Query done.");
+                    return null;
+                } finally {
+                    endNanos = System.nanoTime();
+                    m_queries.remove(queryId);
+                    if (queryId2 != null) m_queries2.remove(queryId2);
+//                    if (os != null) {
+//                        try {
+//                            os.close();
+//                        } catch (Throwable t) {
+//                            log.error(t, t);
+//                        }
+//                    }
+//                    if (cxn != null) {
+//                        if (!success && !cxn.isReadOnly()) {
+//                            /*
+//                             * Force rollback of the connection.
+//                             * 
+//                             * Note: It is possible that the commit has already been
+//                             * processed, in which case this rollback() will be a
+//                             * NOP. This can happen when there is an IO error when
+//                             * communicating with the client, but the database has
+//                             * already gone through a commit.
+//                             */
+//                            try {
+//                                // Force rollback of the connection.
+//                                cxn.rollback();
+//                            } catch (Throwable t) {
+//                                log.error(t, t);
+//                            }
+//                        }
+//                        try {
+//                            // Force close of the connection.
+//                            cxn.close();
+//                        } catch (Throwable t) {
+//                            log.error(t, t);
+//                        }
+//                    }
                 }
             }
+            
+        } // class SparqlRestApiTask
+        
+        @Override
+        final public Void call() throws Exception {
+            
+//            final String queryOrUpdateStr = astContainer.getQueryString();
+            
+//            try {
+                
+                return AbstractApiTask.submitApiTask(getIndexManager(),
+                        new SparqlRestApiTask(req, resp, namespace, timestamp))
+                        .get();
+
+//            } catch (Throwable t) {
+//
+//                // FIXME GROUP_COMMIT: check calling stack for existing launderThrowable.
+//                throw BigdataRDFServlet.launderThrowable(t, resp,
+//                        queryOrUpdateStr);
+//
+//            }
+
         } // call()
 
     } // class AbstractQueryTask
@@ -1121,19 +1312,21 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     private class AskQueryTask extends AbstractQueryTask {
 
-        public AskQueryTask(final String namespace, final long timestamp,
+        public AskQueryTask(final BigdataSailRepositoryConnection cxn, 
+        		final String namespace, final long timestamp,
                 final String baseURI,
                 final ASTContainer astContainer, final QueryType queryType,
                 final BooleanQueryResultFormat format,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer, queryType,
+            super(cxn, namespace, timestamp, baseURI, astContainer, queryType,
                     format.getDefaultMIMEType(), format.getCharset(), format
                             .getDefaultFileExtension(), req, resp, os);
 
         }
 
+        @Override
         protected void doQuery(final BigdataSailRepositoryConnection cxn,
                 final OutputStream os) throws Exception {
 
@@ -1159,14 +1352,15 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     private class TupleQueryTask extends AbstractQueryTask {
 
-        public TupleQueryTask(final String namespace, final long timestamp,
+        public TupleQueryTask(final BigdataSailRepositoryConnection cxn,
+        		final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
                 final QueryType queryType, final String mimeType,
                 final Charset charset, final String fileExt,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer, queryType,
+            super(cxn, namespace, timestamp, baseURI, astContainer, queryType,
                     mimeType, charset, fileExt, req, resp, os);
 
 		}
@@ -1244,13 +1438,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 */
     private class GraphQueryTask extends AbstractQueryTask {
 
-        public GraphQueryTask(final String namespace, final long timestamp,
+        public GraphQueryTask(final BigdataSailRepositoryConnection cxn,
+        		final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
                 final QueryType queryType, final RDFFormat format,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer, queryType,
+            super(cxn, namespace, timestamp, baseURI, astContainer, queryType,
                     format.getDefaultMIMEType(), format.getCharset(), format
                             .getDefaultFileExtension(), req, resp, os);
 
@@ -1262,28 +1457,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final BigdataSailGraphQuery query = (BigdataSailGraphQuery) setupQuery(cxn);
             
-            /*
-             * FIXME An error thrown here (such as if format is null and we do
-             * not check it) will cause the response to hang, at least for the
-             * test suite. Look into this further and make the error handling
-             * bullet proof!
-             * 
-             * This may be related to queryId2. That should be imposed on the
-             * IRunningQuery via QueryHints.QUERYID such that the QueryEngine
-             * assigns that UUID to the query. We can then correlate the queryId
-             * to the IRunningQuery, which is important for some of the status
-             * pages. This will also let us INTERRUPT the IRunningQuery if there
-             * is an error during evaluation, which might be necessary. For
-             * example, if the client dies while the query is running. Look at
-             * the old NSS code and see what it was doing and whether this was
-             * logic was lost of simply never implemented.
-             * 
-             * However, I do not see how that would explain the failure of the
-             * ft.get() method to return.
-             */
-//			if(true)
-//			    throw new RuntimeException();
-
             // Note: getQueryTask() verifies that format will be non-null.
             final RDFFormat format = RDFWriterRegistry.getInstance()
                     .getFileFormatForMIMEType(mimeType);
@@ -1294,6 +1467,16 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			query.evaluate(w);
 
         }
+
+	}
+
+	UpdateTask getUpdateTask(final BigdataSailRepositoryConnection cxn,
+			final String namespace, final long timestamp, final String baseURI,
+			final ASTContainer astContainer, final HttpServletRequest req,
+			final HttpServletResponse resp, final OutputStream os) {
+
+		return new UpdateTask(cxn, namespace, timestamp, baseURI, astContainer,
+				req, resp, os);
 
 	}
 
@@ -1308,16 +1491,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         public final AtomicLong commitTime = new AtomicLong(-1);
         
-        public UpdateTask(final String namespace, final long timestamp,
+        public UpdateTask(final BigdataSailRepositoryConnection cxn, 
+        		final String namespace, final long timestamp,
                 final String baseURI, final ASTContainer astContainer,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(namespace, timestamp, baseURI, astContainer,
-//                    null,//queryType
-//                    null,//format.getDefaultMIMEType()
-//                    null,//format.getCharset(), 
-//                    null,//format.getDefaultFileExtension(), 
+            super(cxn, namespace, timestamp, baseURI, astContainer,
                     req,//
                     resp,//
                     os//
@@ -1330,6 +1510,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * <p>
          * This executes the SPARQL UPDATE and formats the HTTP response.
          */
+        @Override
         protected void doQuery(final BigdataSailRepositoryConnection cxn,
                 final OutputStream os) throws Exception {
             
@@ -1337,24 +1518,31 @@ public class BigdataRDFContext extends BigdataBaseContext {
              * Setup a change listener. It will notice the #of mutations.
              */
             final CAT mutationCount = new CAT();
+
             cxn.addChangeLog(new IChangeLog(){
+            
                 @Override
                 public void changeEvent(final IChangeRecord record) {
                     mutationCount.increment();
                 }
+                
                 @Override
                 public void transactionBegin() {
                 }
+                
                 @Override
                 public void transactionPrepare() {
                 }
+                
                 @Override
                 public void transactionCommited(long commitTime) {
                 }
+                
                 @Override
                 public void transactionAborted() {
-                }});
-            
+                }
+            });
+
             // Prepare the UPDATE request.
             final BigdataSailUpdate update = setupUpdate(cxn);
 
@@ -1743,46 +1931,44 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-     * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
-     * <p>
-     * Note: The {@link OutputStream} is passed in rather than the
-     * {@link HttpServletResponse} in order to permit operations such as
-     * "DELETE WITH QUERY" where this method is used in a context which writes
-     * onto an internal pipe rather than onto the {@link HttpServletResponse}.
-     * 
-     * @param namespace
-     *            The namespace associated with the {@link AbstractTripleStore}
-     *            view.
-     * @param timestamp
-     *            The timestamp associated with the {@link AbstractTripleStore}
-     *            view.
-     * @param queryStr
-     *            The query.
-     * @param acceptOverride
-     *            Override the Accept header (optional). This is used by UPDATE
-     *            and DELETE so they can control the {@link RDFFormat} of the
-     *            materialized query results.
-     * @param req
-     *            The request.
-     * @param os
-     *            Where to write the results.
-     * @param update
-     *            <code>true</code> iff this is a SPARQL UPDATE request.
-     * 
-     * @return The task -or- <code>null</code> if the named data set was not
-     *         found. When <code>null</code> is returned, the
-     *         {@link HttpServletResponse} will also have been committed.
-     * @throws IOException 
-     */
+	 * Return the task which will execute the SPARQL Query -or- SPARQL UPDATE.
+	 * <p>
+	 * Note: The {@link OutputStream} is passed in rather than the
+	 * {@link HttpServletResponse} in order to permit operations such as
+	 * "DELETE WITH QUERY" where this method is used in a context which writes
+	 * onto an internal pipe rather than onto the {@link HttpServletResponse}.
+	 * 
+	 * @param namespace
+	 *            The namespace associated with the {@link AbstractTripleStore}
+	 *            view.
+	 * @param timestamp
+	 *            The timestamp associated with the {@link AbstractTripleStore}
+	 *            view.
+	 * @param queryStr
+	 *            The query.
+	 * @param acceptOverride
+	 *            Override the Accept header (optional). This is used by UPDATE
+	 *            and DELETE so they can control the {@link RDFFormat} of the
+	 *            materialized query results.
+	 * @param req
+	 *            The request.
+	 * @param os
+	 *            Where to write the results.
+	 * 
+	 * @return The task.
+	 * 
+	 * @throws IOException
+	 */
     public AbstractQueryTask getQueryTask(//
+    		final BigdataSailRepositoryConnection cxn,//
             final String namespace,//
             final long timestamp,//
             final String queryStr,//
             final String acceptOverride,//
             final HttpServletRequest req,//
             final HttpServletResponse resp,//
-            final OutputStream os,//
-            final boolean update//
+            final OutputStream os//
+//            final boolean update//
             ) throws MalformedQueryException, IOException {
 
         /*
@@ -1790,38 +1976,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         final String baseURI = req.getRequestURL().toString();
 
-        final AbstractTripleStore tripleStore = getTripleStore(namespace,
-                timestamp);
-
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            BigdataServlet.buildResponse(resp, BigdataServlet.HTTP_NOTFOUND,
-                    BigdataServlet.MIME_TEXT_PLAIN);
-            return null;
-        }
-
-        if (update) {
-
-            /*
-             * Parse the query so we can figure out how it will need to be executed.
-             * 
-             * Note: This goes through some pains to make sure that we parse the
-             * query exactly once in order to minimize the resources associated with
-             * the query parser.
-             */
-            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
-                    tripleStore).parseUpdate2(queryStr, baseURI);
-
-            if (log.isDebugEnabled())
-                log.debug(astContainer.toString());
-
-            return new UpdateTask(namespace, timestamp, baseURI, astContainer,
-                    req, resp, os);
-
-        }
-        
         /*
          * Parse the query so we can figure out how it will need to be executed.
          * 
@@ -1829,6 +1983,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * query exactly once in order to minimize the resources associated with
          * the query parser.
          */
+        final AbstractTripleStore tripleStore = cxn.getTripleStore();
         final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
                 tripleStore).parseQuery2(queryStr, baseURI);
 
@@ -1882,7 +2037,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             case CONSTRUCT:
                 /* Generate RDF/XML so we can apply XSLT transform.
                  * 
-                 * FIXME This should be sending back RDFs or using a lens.
+                 * TODO This should be sending back RDFs or using a lens.
                  */
                 acceptStr = RDFFormat.RDFXML.getDefaultMIMEType();
                 break;
@@ -1891,7 +2046,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-            acceptStr = req.getHeader("Accept");
+            acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
         }
 
         // Do conneg.
@@ -1903,7 +2058,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final BooleanQueryResultFormat format = util
                     .getBooleanQueryResultFormat(BooleanQueryResultFormat.SPARQL);
 
-            return new AskQueryTask(namespace, timestamp, baseURI,
+            return new AskQueryTask(cxn, namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, resp, os);
 
         }
@@ -1912,7 +2067,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final RDFFormat format = util.getRDFFormat(RDFFormat.RDFXML);
 
-            return new GraphQueryTask(namespace, timestamp, baseURI,
+            return new GraphQueryTask(cxn, namespace, timestamp, baseURI,
                     astContainer, queryType, format, req, resp, os);
 
         }
@@ -1930,14 +2085,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
                  * XSL style sheet directive.
                  */
                 mimeType = BigdataServlet.MIME_APPLICATION_XML;
-                charset = Charset.forName("UTF-8");
+                charset = Charset.forName(BigdataRDFServlet.UTF8);
                 fileExt = "xml";
             } else {
                 mimeType = format.getDefaultMIMEType();
                 charset = format.getCharset();
                 fileExt = format.getDefaultFileExtension();
             }
-            return new TupleQueryTask(namespace, timestamp, baseURI,
+            return new TupleQueryTask(cxn, namespace, timestamp, baseURI,
                     astContainer, queryType, mimeType, charset, fileExt, req,
                     resp, os);
 
@@ -2003,62 +2158,63 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	}
 
-    /**
-     * Return a connection transaction. When the timestamp is associated with a
-     * historical commit point, this will be a read-only connection. When it is
-     * associated with the {@link ITx#UNISOLATED} view or a read-write
-     * transaction, this will be a mutable connection.
-     * 
-     * @param namespace
-     *            The namespace.
-     * @param timestamp
-     *            The timestamp.
-     * 
-     * @throws RepositoryException
-     */
-    public BigdataSailRepositoryConnection getQueryConnection(
-            final String namespace, final long timestamp)
-            throws RepositoryException {
-
-        /*
-         * Note: [timestamp] will be a read-only tx view of the triple store if
-         * a READ_LOCK was specified when the NanoSparqlServer was started
-         * (unless the query explicitly overrides the timestamp of the view on
-         * which it will operate).
-         */
-        final AbstractTripleStore tripleStore = getTripleStore(namespace,
-                timestamp);
-        
-        if (tripleStore == null) {
-
-            throw new DatasetNotFoundException("Not found: namespace="
-                    + namespace + ", timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-        }
-        
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        repo.initialize();
-
-        if (TimestampUtility.isReadOnly(timestamp)) {
-
-            return (BigdataSailRepositoryConnection) repo
-                    .getReadOnlyConnection(timestamp);
-
-        }
-        
-        // Read-write connection.
-        final BigdataSailRepositoryConnection conn = repo.getConnection();
-        
-        conn.setAutoCommit(false);
-        
-        return conn;
-
-    }
+//    /**
+//     * Return a connection transaction, which may be read-only or support
+//     * update. When the timestamp is associated with a historical commit point,
+//     * this will be a read-only connection. When it is associated with the
+//     * {@link ITx#UNISOLATED} view or a read-write transaction, this will be a
+//     * mutable connection.
+//     * 
+//     * @param namespace
+//     *            The namespace.
+//     * @param timestamp
+//     *            The timestamp.
+//     * 
+//     * @throws RepositoryException
+//     */
+//    public BigdataSailRepositoryConnection getQueryConnection(
+//            final String namespace, final long timestamp)
+//            throws RepositoryException {
+//
+//        /*
+//         * Note: [timestamp] will be a read-only tx view of the triple store if
+//         * a READ_LOCK was specified when the NanoSparqlServer was started
+//         * (unless the query explicitly overrides the timestamp of the view on
+//         * which it will operate).
+//         */
+//        final AbstractTripleStore tripleStore = getTripleStore(namespace,
+//                timestamp);
+//        
+//        if (tripleStore == null) {
+//
+//            throw new DatasetNotFoundException("Not found: namespace="
+//                    + namespace + ", timestamp="
+//                    + TimestampUtility.toString(timestamp));
+//
+//        }
+//        
+//        // Wrap with SAIL.
+//        final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//
+//        repo.initialize();
+//
+//        if (TimestampUtility.isReadOnly(timestamp)) {
+//
+//            return (BigdataSailRepositoryConnection) repo
+//                    .getReadOnlyConnection(timestamp);
+//
+//        }
+//        
+//        // Read-write connection.
+//        final BigdataSailRepositoryConnection conn = repo.getConnection();
+//        
+//        conn.setAutoCommit(false);
+//        
+//        return conn;
+//
+//    }
 
     /**
      * Return a read-only view of the {@link AbstractTripleStore} for the given
@@ -2068,17 +2224,22 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @param namespace
      *            The namespace.
      * @param timestamp
-     *            The timestamp.
+     *            A timestamp -or- a tx identifier.
      * 
      * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
      *         found for that namespace and timestamp.
      * 
-     * @todo enforce historical query by making sure timestamps conform (we do
-     *       not want to allow read/write tx queries unless update semantics are
-     *       introduced ala SPARQL 1.1).
-     * 
-     * @todo Use a distributed read-only tx for queries (it would be nice if a
-     *       tx used 2PL to specify which namespaces it could touch).
+     *         FIXME GROUP_COMMIT: Review all callers. They are suspect. The
+     *         code will sometimes resolve the KB as of the timestamp, but,
+     *         given that the default is to read against the lastCommitTime,
+     *         that does NOT prevent a concurrent destroy or create of a KB that
+     *         invalidates such a pre-condition test. The main reason for such
+     *         pre-condition tests is to provide nice HTTP status code responses
+     *         when an identified namespace does (or does not) exist. The better
+     *         way to handle this is by pushing the pre-condition test down into
+     *         the {@link AbstractRestApiTask} and then throwning out an appropriate
+     *         marked exception that gets correctly converted into an HTTP
+     *         BAD_REQUEST message rather than sending back a stack trace.
      */
     public AbstractTripleStore getTripleStore(final String namespace,
             final long timestamp) {
@@ -2105,8 +2266,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * @throws SailException
      * 
      * @throws RepositoryException
+     * 
+     *             FIXME GROUP COMMIT: This is deprecated by the support for
+     *             {@link RestApiMutationTask}s
      */
-    public BigdataSailRepositoryConnection getUnisolatedConnection(
+    @Deprecated // deprecated by the 
+    BigdataSailRepositoryConnection getUnisolatedConnection(
             final String namespace) throws SailException, RepositoryException {
 
         // resolve the default namespace.
@@ -2136,273 +2301,194 @@ public class BigdataRDFContext extends BigdataBaseContext {
     }
 
     /**
-     * Return various interesting metadata about the KB state.
-     * 
-     * @todo The range counts can take some time if the cluster is heavily
-     *       loaded since they must query each shard for the primary statement
-     *       index and the TERM2ID index.
-     */
-    protected StringBuilder getKBInfo(final String namespace,
-            final long timestamp) {
-
-        final StringBuilder sb = new StringBuilder();
-
-        BigdataSailRepositoryConnection conn = null;
-
-        try {
-
-            conn = getQueryConnection(namespace, timestamp);
-            
-            final AbstractTripleStore tripleStore = conn.getTripleStore();
-
-            sb.append("class\t = " + tripleStore.getClass().getName() + "\n");
-
-            sb
-                    .append("indexManager\t = "
-                            + tripleStore.getIndexManager().getClass()
-                                    .getName() + "\n");
-
-            sb.append("namespace\t = " + tripleStore.getNamespace() + "\n");
-
-            sb.append("timestamp\t = "
-                    + TimestampUtility.toString(tripleStore.getTimestamp())
-                    + "\n");
-
-            sb.append("statementCount\t = " + tripleStore.getStatementCount()
-                    + "\n");
-
-            sb.append("termCount\t = " + tripleStore.getTermCount() + "\n");
-
-            sb.append("uriCount\t = " + tripleStore.getURICount() + "\n");
-
-            sb.append("literalCount\t = " + tripleStore.getLiteralCount() + "\n");
-
-            /*
-             * Note: The blank node count is only available when using the told
-             * bnodes mode.
-             */
-            sb
-                    .append("bnodeCount\t = "
-                            + (tripleStore.getLexiconRelation()
-                                    .isStoreBlankNodes() ? ""
-                                    + tripleStore.getBNodeCount() : "N/A")
-                            + "\n");
-
-            sb.append(IndexMetadata.Options.BTREE_BRANCHING_FACTOR
-                    + "="
-                    + tripleStore.getSPORelation().getPrimaryIndex()
-                            .getIndexMetadata().getBranchingFactor() + "\n");
-
-            sb.append(IndexMetadata.Options.WRITE_RETENTION_QUEUE_CAPACITY
-                    + "="
-                    + tripleStore.getSPORelation().getPrimaryIndex()
-                            .getIndexMetadata()
-                            .getWriteRetentionQueueCapacity() + "\n");
-
-            sb.append("-- All properties.--\n");
-            
-            // get the triple store's properties from the global row store.
-            final Map<String, Object> properties = getIndexManager()
-                    .getGlobalRowStore(timestamp).read(RelationSchema.INSTANCE,
-                            namespace);
-
-            // write them out,
-            for (String key : properties.keySet()) {
-                sb.append(key + "=" + properties.get(key)+"\n");
-            }
-
-            /*
-             * And show some properties which can be inherited from
-             * AbstractResource. These have been mainly phased out in favor of
-             * BOP annotations, but there are a few places where they are still
-             * in use.
-             */
-            
-            sb.append("-- Interesting AbstractResource effective properties --\n");
-            
-            sb.append(AbstractResource.Options.CHUNK_CAPACITY + "="
-                    + tripleStore.getChunkCapacity() + "\n");
-
-            sb.append(AbstractResource.Options.CHUNK_OF_CHUNKS_CAPACITY + "="
-                    + tripleStore.getChunkOfChunksCapacity() + "\n");
-
-            sb.append(AbstractResource.Options.CHUNK_TIMEOUT + "="
-                    + tripleStore.getChunkTimeout() + "\n");
-
-            sb.append(AbstractResource.Options.FULLY_BUFFERED_READ_THRESHOLD + "="
-                    + tripleStore.getFullyBufferedReadThreshold() + "\n");
-
-            sb.append(AbstractResource.Options.MAX_PARALLEL_SUBQUERIES + "="
-                    + tripleStore.getMaxParallelSubqueries() + "\n");
-
-            /*
-             * And show some interesting effective properties for the KB, SPO
-             * relation, and lexicon relation.
-             */
-            sb.append("-- Interesting KB effective properties --\n");
-            
-            sb
-                    .append(AbstractTripleStore.Options.TERM_CACHE_CAPACITY
-                            + "="
-                            + tripleStore
-                                    .getLexiconRelation()
-                                    .getProperties()
-                                    .getProperty(
-                                            AbstractTripleStore.Options.TERM_CACHE_CAPACITY,
-                                            AbstractTripleStore.Options.DEFAULT_TERM_CACHE_CAPACITY) + "\n");
-
-            /*
-             * And show several interesting properties with their effective
-             * defaults.
-             */
-
-            sb.append("-- Interesting Effective BOP Annotations --\n");
-
-            sb.append(BufferAnnotations.CHUNK_CAPACITY
-                    + "="
-                    + tripleStore.getProperties().getProperty(
-                            BufferAnnotations.CHUNK_CAPACITY,
-                            "" + BufferAnnotations.DEFAULT_CHUNK_CAPACITY)
-                    + "\n");
-
-            sb
-                    .append(BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY
-                            + "="
-                            + tripleStore
-                                    .getProperties()
-                                    .getProperty(
-                                            BufferAnnotations.CHUNK_OF_CHUNKS_CAPACITY,
-                                            ""
-                                                    + BufferAnnotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY)
-                            + "\n");
-
-            sb.append(BufferAnnotations.CHUNK_TIMEOUT
-                    + "="
-                    + tripleStore.getProperties().getProperty(
-                            BufferAnnotations.CHUNK_TIMEOUT,
-                            "" + BufferAnnotations.DEFAULT_CHUNK_TIMEOUT)
-                    + "\n");
-
-            sb.append(PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS
-                    + "="
-                    + tripleStore.getProperties().getProperty(
-                            PipelineJoin.Annotations.MAX_PARALLEL_CHUNKS,
-                            "" + PipelineJoin.Annotations.DEFAULT_MAX_PARALLEL_CHUNKS) + "\n");
-
-            sb
-                    .append(IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD
-                            + "="
-                            + tripleStore
-                                    .getProperties()
-                                    .getProperty(
-                                            IPredicate.Annotations.FULLY_BUFFERED_READ_THRESHOLD,
-                                            ""
-                                                    + IPredicate.Annotations.DEFAULT_FULLY_BUFFERED_READ_THRESHOLD)
-                            + "\n");
-
-            // sb.append(tripleStore.predicateUsage());
-
-            if (tripleStore.getIndexManager() instanceof Journal) {
-
-                final Journal journal = (Journal) tripleStore.getIndexManager();
-                
-                final IBufferStrategy strategy = journal.getBufferStrategy();
-                
-                if (strategy instanceof RWStrategy) {
-                
-                    final RWStore store = ((RWStrategy) strategy).getStore();
-                    
-                    store.showAllocators(sb);
-                    
-                }
-                
-            }
-
-        } catch (Throwable t) {
-
-            log.warn(t.getMessage(), t);
-
-        } finally {
-            
-            if(conn != null) {
-                try {
-                    conn.close();
-                } catch (RepositoryException e) {
-                    log.error(e, e);
-                }
-                
-            }
-            
-        }
-
-        return sb;
-
-    }
-
-    /**
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+     *      problem with list namespaces and create namespace </a>
      */
     /*package*/ List<String> getNamespaces(final long timestamp) {
-    
-        // the triple store namespaces.
-        final List<String> namespaces = new LinkedList<String>();
-
-        final SparseRowStore grs = getIndexManager().getGlobalRowStore(
-                timestamp);
-
-        if (grs == null) {
-
-            log.warn("No GRS @ timestamp="
-                    + TimestampUtility.toString(timestamp));
-
-            // Empty.
-            return namespaces;
-            
+        
+        final long tx = newTx(timestamp);
+        
+		try {
+			
+		    return getNamespacesTx(tx);
+			
+		} finally {
+			
+		    abortTx(tx);
+		    
         }
-
-        // scan the relation schema in the global row store.
-        @SuppressWarnings("unchecked")
-        final Iterator<ITPS> itr = (Iterator<ITPS>) grs
-                .rangeIterator(RelationSchema.INSTANCE);
-
-        while (itr.hasNext()) {
-
-            // A timestamped property value set is a logical row with
-            // timestamped property values.
-            final ITPS tps = itr.next();
-
-            // If you want to see what is in the TPS, uncomment this.
-//          System.err.println(tps.toString());
-            
-            // The namespace is the primary key of the logical row for the
-            // relation schema.
-            final String namespace = (String) tps.getPrimaryKey();
-
-            // Get the name of the implementation class
-            // (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
-            final String className = (String) tps.get(RelationSchema.CLASS)
-                    .getValue();
-
-            if (className == null) {
-                // Skip deleted triple store entry.
-                continue;
-            }
-
-            try {
-                final Class<?> cls = Class.forName(className);
-                if (AbstractTripleStore.class.isAssignableFrom(cls)) {
-                    // this is a triple store (vs something else).
-                    namespaces.add(namespace);
-                }
-            } catch (ClassNotFoundException e) {
-                log.error(e,e);
-            }
-
-        }
-
-        return namespaces;
 
     }
+
+	/*package*/ List<String> getNamespacesTx(long tx) {
+
+		final IIndexManager indexManager = getIndexManager();
+		
+        if (tx == ITx.READ_COMMITTED && indexManager instanceof IBigdataFederation) {
+
+			// Use the last commit point for the federation *only*.
+            tx = getIndexManager().getLastCommitTime();
+
+        }
+
+        // the triple store namespaces.
+		final List<String> namespaces = new LinkedList<String>();
+
+		final SparseRowStore grs = getIndexManager().getGlobalRowStore(
+				tx);
+
+		if (grs == null) {
+
+			log.warn("No GRS @ tx="
+					+ TimestampUtility.toString(tx));
+
+			// Empty.
+			return namespaces;
+
+		}
+
+		// scan the relation schema in the global row store.
+		@SuppressWarnings("unchecked")
+		final Iterator<ITPS> itr = (Iterator<ITPS>) grs
+				.rangeIterator(RelationSchema.INSTANCE);
+
+		while (itr.hasNext()) {
+
+			// A timestamped property value set is a logical row with
+			// timestamped property values.
+			final ITPS tps = itr.next();
+
+			// If you want to see what is in the TPS, uncomment this.
+			// System.err.println(tps.toString());
+
+			// The namespace is the primary key of the logical row for the
+			// relation schema.
+			final String namespace = (String) tps.getPrimaryKey();
+
+			// Get the name of the implementation class
+			// (AbstractTripleStore, SPORelation, LexiconRelation, etc.)
+			final String className = (String) tps.get(RelationSchema.CLASS)
+					.getValue();
+
+			if (className == null) {
+				// Skip deleted triple store entry.
+				continue;
+			}
+
+			try {
+				final Class<?> cls = Class.forName(className);
+				if (AbstractTripleStore.class.isAssignableFrom(cls)) {
+					// this is a triple store (vs something else).
+					namespaces.add(namespace);
+				}
+			} catch (ClassNotFoundException e) {
+				log.error(e, e);
+			}
+
+		}
+
+		return namespaces;
+
+	}
     
+	/**
+	 * Obtain a new transaction to protect operations against the specified view
+	 * of the database. This uses the transaction mechanisms to prevent
+	 * recycling during operations NOT OTHERWISE PROTECTED by a
+	 * {@link BigdataSailConnection} for what would otherwise amount to dirty
+	 * reads. This is especially critical for reads on the global row store
+	 * since it can not be protected by the {@link BigdataSailConnection} for
+	 * cases where the KB instance does not yet exist. The presence of such a tx
+	 * does NOT prevent concurrent commits. It only prevents recycling during
+	 * such commits (and even then only on the RWStore backend).
+	 * 
+	 * @param timestamp
+	 *            The timestamp for the desired view.
+	 * 
+	 * @return The transaction identifier -or- <code>timestamp</code> if the
+	 *         {@link IIndexManager} is not a {@link Journal}.
+	 * 
+	 * @see ITransactionService#newTx(long)
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+	 *      problem with list namespaces and create namespace </a>
+	 */
+    public long newTx(final long timestamp) {
+
+        long tx = timestamp; // use dirty reads unless Journal.
+
+        if (getIndexManager() instanceof Journal) {
+            
+            final ITransactionService txs = ((Journal) getIndexManager())
+                    .getLocalTransactionManager().getTransactionService();
+
+            try {
+                tx = txs.newTx(timestamp);
+            } catch (IOException e) {
+                // Note: Local operation.  Will not throw IOException.
+                throw new RuntimeException(e);
+            }
+
+        }
+
+        return tx;
+    }
+
+	/**
+	 * Abort a transaction obtained by {@link #newTx(long)}. This decements the
+	 * native active transaction counter for the RWStore. Once that counter
+	 * reaches zero, recycling will occur the next time an unisolated mutation
+	 * goes through a commit on the journal.
+	 * 
+	 * @param tx
+	 *            The transaction identifier.
+	 */
+	public void abortTx(final long tx) {
+
+	    if (getIndexManager() instanceof Journal) {
+
+			final ITransactionService txs = ((Journal) getIndexManager())
+					.getLocalTransactionManager().getTransactionService();
+
+			try {
+				txs.abort(tx);
+			} catch (IOException e) {
+				// Note: Local operation. Will not throw IOException.
+				throw new RuntimeException(e);
+			}
+
+		}
+
+	}
+	
+	/*
+	 * 
+	 */
+//	/**
+//	 * Commit a transaction obtained by {@link #newTx(long)}
+//	 * 
+//	 * @param tx
+//	 *            The transaction identifier.
+//	 */
+//	public void commitTx(final long tx) {
+//
+//	    if (getIndexManager() instanceof Journal) {
+//
+//            final ITransactionService txs = ((Journal) getIndexManager())
+//                    .getLocalTransactionManager().getTransactionService();
+//
+//            try {
+//                txs.commit(tx);
+//            } catch (IOException e) {
+//                // Note: Local operation. Will not throw IOException.
+//                throw new RuntimeException(e);
+//            }
+//
+//        }
+//
+//    }
+	
 }

@@ -205,4 +205,24 @@ public interface QuorumActor<S extends Remote, C extends QuorumClient<S>> {
      */
     void clearToken();
 
+    /**
+     * Remove the service from the quorum. This should be called when a problem
+     * with the service is reported to the quorum leader, for example as a
+     * result of a failed RMI request or failed socket level write replication.
+     * Such errors arise either from network connectivity or service death.
+     * These problems will generally be cured, but the heatbeat timeout to cure
+     * the problem can cause write replication to block. This method may be used
+     * to force the timely reordering of the pipeline in order to work around
+     * the replication problem. This is not a permenant disabling of the service
+     * - the service may be restarted or may recover and reenter the quorum at
+     * any time.
+     * 
+     * @param serviceId
+     *            The UUID of the service to be removed.
+     *            
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" > HA
+     *      wire pulling and sure kill testing </a>
+     */
+    public void forceRemoveService(UUID serviceId);
+
 }

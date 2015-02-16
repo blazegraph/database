@@ -247,7 +247,7 @@ public class TestNativeDistinctFilter extends TestCase2 {
                     new SPO(setup.brad, setup.knows, setup.fred, StatementEnum.Explicit),// [5]
             }));
 
-            // Iterator should visit the disinct IVs.
+            // Iterator should visit the distinct IVs.
             @SuppressWarnings("unchecked")
             final Iterator<SPO> actual = NativeDistinctFilter.newInstance(
                     SPOKeyOrder.CSPO)

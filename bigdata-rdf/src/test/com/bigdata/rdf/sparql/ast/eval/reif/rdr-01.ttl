@@ -6,27 +6,21 @@
 @prefix rr:       <http://reasoner.example.com/rules#> .
 @prefix rv:       <http://reasoner.example.com/vocabulary#> .
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
+@prefix bd:       <http://bigdata.com/RDF#> .
 
-_:alice
+bd:alice
     rdf:type        foaf:Person ;
     foaf:name       "Alice" ;
     foaf:mbox       <mailto:alice@work> ;
-    foaf:knows      _:bob.
+    foaf:knows      bd:bob.
     
 # The terse syntax:
-#<<_:alice foaf:mbox <mailto:alice@work>>> 
+#<<bd:alice foaf:mbox <mailto:alice@work>>> 
 #   dc:source   <http://hr.example.com/employees#bob> ;
 #   dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
 #
 # The expanded syntax.
-_:s1 rdf:subject _:alice .
-_:s1 rdf:predicate foaf:mbox .
-_:s1 rdf:object <mailto:alice@work> .
-_:s1 rdf:type rdf:Statement .
-_:s1 dc:source   <http://hr.example.com/employees#bob> ;
-     dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
-
-_:s1 rdf:subject _:alice .
+_:s1 rdf:subject bd:alice .
 _:s1 rdf:predicate foaf:mbox .
 _:s1 rdf:object <mailto:alice@work> .
 _:s1 rdf:type rdf:Statement .
@@ -34,31 +28,31 @@ _:s1 dc:source   <http://hr.example.com/employees#bob> ;
      dc:created  "2012-02-05T12:34:00Z"^^xsd:dateTime .
 
 # Terse
-#<<_:alice foaf:knows _:bob>>
+#<<bd:alice foaf:knows bd:bob>>
 #   dc:source      re:engine_1;
 #   rv:rule     rr:rule524 ;
 #   rv:confidence  0.9835 .
 # Expanded
-_:s2 rdf:subject _:alice .
+_:s2 rdf:subject bd:alice .
 _:s2 rdf:predicate foaf:knows .
-_:s2 rdf:object _:bob .
+_:s2 rdf:object bd:bob .
 _:s2 rdf:type rdf:Statement .
 _:s2
    dc:source      re:engine_1;
    rv:rule     rr:rule524 ;
    rv:confidence  0.9835 .
    
-_:bob
+bd:bob
     rdf:type        foaf:Person ;
     foaf:name       "Bob" ;
-    foaf:knows      _:alice ;
+    foaf:knows      bd:alice ;
     foaf:mbox       <mailto:bob@work> ;
     foaf:mbox       <mailto:bob@home> .
 
 # Terse
-# <<_:bob foaf:mbox    <mailto:bob@home>>>
+# <<bd:bob foaf:mbox    <mailto:bob@home>>>
 # Expanded
-_:s3 rdf:subject _:bob .
+_:s3 rdf:subject bd:bob .
 _:s3 rdf:predicate foaf:mbox .
 _:s3 rdf:object <mailto:bob@home> .
 _:s3 rdf:type rdf:Statement .
@@ -68,9 +62,9 @@ _:s3
    dc:source      <http://whatever.nu/profile/bob1975> .
 
 # Terse
-# <<_:bob foaf:mbox <mailto:bob@home>>>
+# <<bd:bob foaf:mbox <mailto:bob@home>>>
 # Expanded
-_:s4 rdf:subject _:bob .
+_:s4 rdf:subject bd:bob .
 _:s4 rdf:predicate foaf:mbox .
 _:s4 rdf:object <mailto:bob@home> .
 _:s4 rdf:type rdf:Statement .

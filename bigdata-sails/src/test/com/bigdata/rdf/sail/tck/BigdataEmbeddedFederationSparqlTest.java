@@ -36,9 +36,9 @@ import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
-import org.openrdf.query.parser.sparql.ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQL11ManifestTest;
-import org.openrdf.query.parser.sparql.SPARQLQueryTest;
+import org.openrdf.query.parser.sparql.manifest.ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
+import org.openrdf.query.parser.sparql.manifest.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
@@ -48,8 +48,8 @@ import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSail.Options;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.resources.ResourceManager;
@@ -65,7 +65,6 @@ import com.bigdata.service.IBigdataFederation;
  * {@link EmbeddedFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
 
@@ -110,7 +109,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         if(hideDatasetTests)
             suite1 = filterOutTests(suite1,"dataset");
 
-        suite1 = filterOutTests(suite1, "property-paths");
+//        suite1 = filterOutTests(suite1, "property-paths");
         
         /**
          * BSBM BI use case query 5
@@ -155,8 +154,9 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
      */
     public static TestSuite suiteEmbeddedFederation() throws Exception {
        
-        final Factory factory = new Factory() {
+        final SPARQLQueryTest.Factory factory = new SPARQLQueryTest.Factory() {
 
+            @Override
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality) {
@@ -166,6 +166,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
                 
             }
 
+            @Override
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
@@ -173,6 +174,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
                 return new BigdataEmbeddedFederationSparqlTest(testURI, name, queryFileURL,
                         resultFileURL, dataSet, laxCardinality, checkOrder) {
 
+                    @Override
                     protected Properties getProperties() {
 
                         final Properties p = new Properties(super
@@ -196,7 +198,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         suite.addTest(ManifestTest.suite(factory));
 
         // SPARQL 1.1
-        suite.addTest(SPARQL11ManifestTest.suite(factory));
+        suite.addTest(SPARQL11ManifestTest.suite(factory, true, true, false));
 
         return suite;
         
@@ -295,7 +297,8 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
 
     }
 
-    protected void tearDownBackend(IIndexManager backend) {
+    @Override
+    protected void tearDownBackend(final IIndexManager backend) {
         
         backend.destroy();
         

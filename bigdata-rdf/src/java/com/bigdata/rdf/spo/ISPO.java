@@ -178,18 +178,18 @@ public interface ISPO extends IElement, Statement {
      */
     boolean isAxiom();
 
-    /**
-     * Mark whether or not the {@link SPO} will permit the statement identifier
-     * to be lazily materialized (default <code>false</code>).
-     * 
-     * @param sid
-     *            If sid is true, this ISPO will produce a sid on-demand when
-     *            requested.
-     * 
-     * @throws IllegalStateException
-     *             unless this is a {@link StatementEnum#Explicit} {@link ISPO}.
-     */
-    void setStatementIdentifier(final boolean sidable);
+//    /**
+//     * Mark whether or not the {@link SPO} will permit the statement identifier
+//     * to be lazily materialized (default <code>false</code>).
+//     * 
+//     * @param sid
+//     *            If sid is true, this ISPO will produce a sid on-demand when
+//     *            requested.
+//     * 
+//     * @throws IllegalStateException
+//     *             unless this is a {@link StatementEnum#Explicit} {@link ISPO}.
+//     */
+//    void setStatementIdentifier(final boolean sidable);
     
     /**
      * The statement identifier (optional). This has nearly identical semantics

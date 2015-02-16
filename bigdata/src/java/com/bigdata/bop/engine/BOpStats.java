@@ -30,7 +30,6 @@ package com.bigdata.bop.engine;
 import java.io.Serializable;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.counters.CAT;
 
 /**
@@ -55,18 +54,15 @@ public class BOpStats implements Serializable {
 	 */
     final public CAT elapsed = new CAT();
 
-	/**
-	 * The #of instances of a given operator which have been created for a given
-	 * query. This provides interesting information about the #of task instances
-	 * for each operator which were required to execute a query.
-	 * 
-	 * TODO Due to the way this is incremented, this is always ONE (1) if
-	 * {@link PipelineOp.Annotations#SHARED_STATE} is <code>true</code> (it
-	 * reflects the #of times {@link #add(BOpStats)} was invoked plus one for
-	 * the ctor rather than the #of times the operator task was invoked). This
-	 * should be changed to reflect the #of operator task instances created
-	 * instead.
-	 */
+    /**
+     * The #of instances of a given operator which have been started (and
+     * successully terminated) for a given query. This provides interesting
+     * information about the #of task instances for each operator which were
+     * required to execute a query.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/793">
+     *      Explain reports incorrect value for opCount</a>
+     */
     final public CAT opCount = new CAT();
     
     /**
@@ -127,10 +123,16 @@ public class BOpStats implements Serializable {
 
     /**
      * Constructor.
+     * <p>
+     * Note: Do not pre-increment {@link #opCount}. See {@link #add(BOpStats)}
+     * and {@link AbstractRunningQuery#haltOp(IHaltOpMessage)}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/793">
+     *      Explain reports incorrect value for opCount</a>
      */
     public BOpStats() {
 
-    	opCount.increment();
+//        opCount.increment();
     	
     }
 
@@ -155,6 +157,7 @@ public class BOpStats implements Serializable {
         mutationCount.add(o.mutationCount.get());
     }
     
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(super.toString());

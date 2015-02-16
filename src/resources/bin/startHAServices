@@ -15,21 +15,16 @@
 # The top-level of the installation.
 pushd `dirname $0` > /dev/null;cd ..;INSTALL_DIR=`pwd`;popd > /dev/null
 
+echo ${INSTALL_DIR}
+
 # Setup the directory for the pid of the ServiceStarter process.
 lockDir=${INSTALL_DIR}/var/lock
 mkdir -p $lockDir
 pidFile=$lockDir/pid
 
-##
-# ServiceStarter JVM options.
-#
-# The ServiceStarter is launched as a JVM with the following JVM options.
-# The other services (including the HAJournalServer) will run inside of 
-# this JVM. This is where you specify the size of the Java heap and the
-# size of the direct memory heap (used for the write cache buffers and
-# some related things).
-##
-export JVM_OPTS="-server -Xmx4G -XX:MaxDirectMemorySize=3000m"
+if [ -f ${INSTALL_DIR}/bin/config.sh ] ; then
+        . ${INSTALL_DIR}/bin/config.sh
+fi
 
 ##
 # HAJournalServer configuration parameter overrides (see HAJournal.config).
@@ -55,29 +50,57 @@ fi
 if [ -z "${FED_DIR}" ]; then
    export FED_DIR=$INSTALL_DIR
 fi
+if [ -z "${JETTY_XML}" ]; then
+   export JETTY_XML="${INSTALL_DIR}/var/jetty/jetty.xml"
+fi
+if [ -z "${JETTY_RESOURCE_BASE}" ]; then
+   export JETTY_RESOURCE_BASE="${INSTALL_DIR}/var/jetty"
+fi
 if [ -z "${GROUPS}" ]; then
     export GROUPS="$FEDNAME"
 fi
 if [ -z "${LOCATORS}" ]; then
-    export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+#  export LOCATORS="jini://bigdata15/,jini://bigdata16/,jini://bigdata17/"
+   echo "Must specify: LOCATORS"
+   exit 1
 fi
 if [ -z "${ZK_SERVERS}" ]; then
-    export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081";
+#   export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081"
+   echo "Must specify: ZK_SERVERS"
+   exit 1
 fi
 
 export HA_OPTS="\
  -DFEDNAME=${FEDNAME}\
  -DLOGICAL_SERVICE_ID=${LOGICAL_SERVICE_ID}\
  -DFED_DIR=${FED_DIR}\
+ -DDATA_DIR=${DATA_DIR}\
  -DREPLICATION_FACTOR=${REPLICATION_FACTOR}\
+ -DGROUPS=${GROUPS}\
+ -DLOCATORS=${LOCATORS}\
+ -DZK_SERVERS=${ZK_SERVERS}\
+ -DRMI_PORT=${RMI_PORT}\
  -DHA_PORT=${HA_PORT}\
- -DNSS_PORT=${NSS_PORT}\
- -DQUERY_THREAD_POOL_SIZE=${QUERY_THREAD_POOL_SIZE}\
+ -DWRITE_CACHE_BUFFER_COUNT=${WRITE_CACHE_BUFFER_COUNT}\
+ "-Dcom.bigdata.hostname=${BIGDATA_HOSTNAME}"\
+ "-Djetty.port=${JETTY_PORT}"\
+ "-Djetty.threads.min=${JETTY_THREADS_MIN}"\
+ "-Djetty.threads.max=${JETTY_THREADS_MAX}"\
+ "-Djetty.threads.timeout=${JETTY_THREADS_TIMEOUT}"\
+ "-Djetty.resourceBase=${JETTY_RESOURCE_BASE}"\
+ "-DJETTY_XML=${JETTY_XML}"\
  -DCOLLECT_QUEUE_STATISTICS=${COLLECT_QUEUE_STATISTICS}\
  -DCOLLECT_PLATFORM_STATISTICS=${COLLECT_PLATFORM_STATISTICS}\
  -DGANGLIA_REPORT=${GANGLIA_REPORT}\
+ -DGANGLIA_LISTEN=${GANGLIA_LISTEN}\
  -DSYSSTAT_DIR=${SYSSTAT_DIR}\
  -Dcom.bigdata.counters.linux.sysstat.path=${SYSSTAT_DIR}\
+ -Dcom.bigdata.rdf.sail.webapp.HALoadBalancerServlet.policy=${LBS_POLICY}\
+ -Dcom.bigdata.rdf.sail.webapp.HALoadBalancerServlet.rewriter=${LBS_REWRITER}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostScoringRule=${LBS_HOST_SCORING_RULE}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.localForwardThreshold=${LBS_LOCAL_FORWARD_THRESHOLD}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostDiscoveryInitialDelay=${LBS_HOST_DISCOVERY_INITIAL_DELAY}\
+ -Dcom.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy.hostDiscoveryDelay=${LBS_HOST_DISCOVERY_DELAY}\
 "
 
 ##

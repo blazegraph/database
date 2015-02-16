@@ -39,7 +39,6 @@ import com.bigdata.service.DataService;
  * Implementation for a standalone journal using single-phase commits.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class JournalTransactionService extends
         AbstractHATransactionService {
@@ -58,6 +57,7 @@ abstract public class JournalTransactionService extends
 
     }
     
+    @Override
     public JournalTransactionService start() {
         
         super.start();
@@ -70,6 +70,7 @@ abstract public class JournalTransactionService extends
      * Extended to register the new tx in the
      * {@link AbstractLocalTransactionManager}.
      */
+    @Override
     protected void activateTx(final TxState state) {
 
         super.activateTx(state);
@@ -88,6 +89,7 @@ abstract public class JournalTransactionService extends
 
     }
 
+    @Override
     protected void deactivateTx(final TxState state) {
 
         super.deactivateTx(state);
@@ -112,6 +114,7 @@ abstract public class JournalTransactionService extends
 
     }
 
+    @Override
     protected long findCommitTime(final long timestamp) {
 
         final ICommitRecord commitRecord = journal.getCommitRecord(timestamp);
@@ -126,6 +129,7 @@ abstract public class JournalTransactionService extends
         
     }
 
+    @Override
     protected long findNextCommitTime(final long commitTime) {
 
         /*
@@ -150,6 +154,7 @@ abstract public class JournalTransactionService extends
         
     }
     
+    @Override
     protected void abortImpl(final TxState state) {
 
         if(state.isReadOnly()) {
@@ -220,6 +225,7 @@ abstract public class JournalTransactionService extends
 
     }
 
+    @Override
     protected long commitImpl(final TxState state) throws ExecutionException,
             InterruptedException {
 
@@ -312,7 +318,7 @@ abstract public class JournalTransactionService extends
             /*
              * FIXME The state changes for the local tx should be atomic across
              * this operation. In order to do that we have to make those changes
-             * inside of SinglePhaseTask while it is holding the lock, but after
+             * inside of SinglePhaseCommit while it is holding the lock, but after
              * it has committed. Perhaps the best way to do this is with a pre-
              * and post- call() API since we can not hold the lock across the
              * task otherwise (it will deadlock).
@@ -382,7 +388,6 @@ abstract public class JournalTransactionService extends
      * coherent commit time for the transaction as a whole.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class SinglePhaseCommit extends AbstractTask<Void> {
 
@@ -411,6 +416,7 @@ abstract public class JournalTransactionService extends
 
         }
 
+        @Override
         public Void doTask() throws Exception {
 
             /*
@@ -446,6 +452,7 @@ abstract public class JournalTransactionService extends
     /**
      * The last commit time from the current root block.
      */
+    @Override
     final public long getLastCommitTime() {
         
         return journal.getRootBlockView().getLastCommitTime();

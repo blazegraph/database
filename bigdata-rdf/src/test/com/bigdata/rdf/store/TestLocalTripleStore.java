@@ -42,7 +42,6 @@ import com.bigdata.journal.Options;
  * various indices are NOT isolatable.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestLocalTripleStore extends AbstractTestCase {
 

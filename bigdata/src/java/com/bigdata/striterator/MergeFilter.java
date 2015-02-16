@@ -70,8 +70,9 @@ public class MergeFilter<I extends Iterator<E>, E extends Comparable<E>>
         
     }
     
+    @Override
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public I filter(I src) {
+    public I filter(final I src) {
 
         return (I) new MergedIterator(chunkSize, src, src2);
 

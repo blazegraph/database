@@ -8,7 +8,8 @@ prefix rv:         <http://reasoner.example.com/vocabulary#>
 select ?who ?src ?conf where {
   ?x foaf:name "Alice" .
   ?y foaf:name ?who .
+#  <<?x foaf:knows ?y>>  rv:confidence ?conf .
   BIND( <<?x foaf:knows ?y>> as ?sid ) .
   ?sid dc:source ?src .
-  ?sid rv:confidence ?src .
+  ?sid rv:confidence ?conf .
 }

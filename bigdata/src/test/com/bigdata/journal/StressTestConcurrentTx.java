@@ -95,27 +95,29 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       index that result in write-write conflicts.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class StressTestConcurrentTx extends ProxyTestCase implements IComparisonTest {
+public class StressTestConcurrentTx extends ProxyTestCase<Journal> implements
+        IComparisonTest {
 
     public StressTestConcurrentTx() {
     }
 
-    public StressTestConcurrentTx(String name) {
+    public StressTestConcurrentTx(final String name) {
 
         super(name);
         
     }
     
-    Journal journal;
+    private Journal journal;
 
-    public void setUpComparisonTest(Properties properties) throws Exception {
+    @Override
+    public void setUpComparisonTest(final Properties properties) throws Exception {
         
         journal = new Journal(properties);
         
     }
     
+    @Override
     public void tearDownComparisonTest() throws Exception {
         
         if (journal != null) {
@@ -160,11 +162,13 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
                     100,// nops
                     .10// abortRate
             );
+
         } finally {
 
             journal.destroy();
 
         }
+        
     }
 
     /**
@@ -405,9 +409,9 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
         private final int nops;
         private final double abortRate;
         
-        final Random r = new Random();
+        private final Random r = new Random();
         
-        public Task(Journal journal,String name, int trial, int keyLen, int nops, double abortRate) {
+        public Task(final Journal journal,final String name, int trial, int keyLen, int nops, double abortRate) {
 
             this.journal = journal;
 
@@ -423,6 +427,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
             
         }
         
+        @Override
         public String toString() {
             
             return super.toString()+"#"+trial;
@@ -435,6 +440,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
          * @return The commit time of the transactions and <code>0L</code> IFF
          *         the transaction was aborted.
          */
+        @Override
         public Long call() throws Exception {
             
             final long tx = journal.newTx(ITx.UNISOLATED);
@@ -445,8 +451,9 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
              * complete.
              */
             
-            journal.submit(new AbstractTask(journal, tx, name) {
+            journal.submit(new AbstractTask<Object>(journal, tx, name) {
                 
+                @Override
                 protected Object doTask() {
                     // Random operations on the named index(s).
 
@@ -532,9 +539,9 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      * @see GenerateExperiment, which may be used to generate a set of
      *      conditions to be run by the {@link ExperimentDriver}.
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(final String[] args) throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
 
 //        properties.setProperty(Options.FORCE_ON_COMMIT,ForceEnum.No.toString());
         
@@ -560,7 +567,7 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
 
         properties.setProperty(TestOptions.ABORT_RATE,".05");
 
-        IComparisonTest test = new StressTestConcurrentTx();
+        final IComparisonTest test = new StressTestConcurrentTx();
         
         test.setUpComparisonTest(properties);
         
@@ -632,7 +639,8 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
      *            There are no "optional" properties - you must make sure that
      *            each property has a defined value.
      */
-    public Result doComparisonTest(Properties properties) throws Exception {
+    @Override
+    public Result doComparisonTest(final Properties properties) throws Exception {
 
         final long timeout = Long.parseLong(properties.getProperty(TestOptions.TIMEOUT));
 
@@ -670,16 +678,16 @@ public class StressTestConcurrentTx extends ProxyTestCase implements IComparison
          * 
          * @param args
          */
-        public static void main(String[] args) throws Exception {
+        public static void main(final String[] args) throws Exception {
             
             // this is the test to be run.
-            String className = StressTestConcurrentTx.class.getName();
+            final String className = StressTestConcurrentTx.class.getName();
             
             /* 
              * Set defaults for each condition.
              */
             
-            Map<String,String> defaultProperties = new HashMap<String,String>();
+            final Map<String,String> defaultProperties = new HashMap<String,String>();
 
             // force delete of the files on close of the journal under test.
             defaultProperties.put(Options.CREATE_TEMP_FILE,"true");

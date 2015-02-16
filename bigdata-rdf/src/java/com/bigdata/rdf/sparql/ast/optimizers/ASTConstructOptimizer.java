@@ -42,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.ConstructNode.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -73,6 +74,9 @@ public class ASTConstructOptimizer implements IASTOptimizer {
         case CONSTRUCT:
             break;
         default:
+        	if (context.nativeDistinctSPO) {
+        	    queryRoot.setProperty(Annotations.NATIVE_DISTINCT, true);
+        	}
             return queryRoot;
         }
 

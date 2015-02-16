@@ -39,7 +39,6 @@ import java.io.Serializable;
  * Factory for instances that do NOT support Unicode.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ASCIIKeyBuilderFactory implements IKeyBuilderFactory, Externalizable {
 
@@ -59,6 +58,7 @@ public class ASCIIKeyBuilderFactory implements IKeyBuilderFactory, Externalizabl
     /**
      * Representation includes all aspects of the {@link Serializable} state.
      */
+    @Override
     public String toString() {
         
         StringBuilder sb = new StringBuilder(getClass().getName());
@@ -87,19 +87,35 @@ public class ASCIIKeyBuilderFactory implements IKeyBuilderFactory, Externalizabl
         
     }
     
+    @Override
     public IKeyBuilder getKeyBuilder() {
 
         return KeyBuilder.newInstance(initialCapacity);
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The PRIMARY is identical to the as-configured {@link IKeyBuilder}
+     * for ASCII.
+     */
+    @Override
+    public IKeyBuilder getPrimaryKeyBuilder() {
+
+        return getKeyBuilder();
+        
+    }
+
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
 
         initialCapacity = in.readInt();
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
        
         out.writeInt(initialCapacity);
         

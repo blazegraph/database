@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import com.bigdata.btree.data.IAbstractNodeData;
+import com.bigdata.btree.data.ILeafData;
 import com.bigdata.rawstore.IRawStore;
 
 /**
@@ -54,6 +55,8 @@ abstract public class PageStats extends BaseIndexStats {
      * {@link #SLOT_SIZES}.
      */
     public long blobs;
+    /** The #of errors encountered during traversal. */
+    public long nerrors;
     /**
      * This map is used to report the histogram of pages based on the actual
      * byte count of the user data in the allocation when the backing slot size
@@ -61,6 +64,14 @@ abstract public class PageStats extends BaseIndexStats {
      */
     public static final int[] SLOT_SIZES = new int[] { 64, 128, 192, 320, 512,
             768, 1024, 2048, 3072, 4096, 8192 };
+    /**
+     * The number of raw record allocations and the byte size of those raw
+     * record allocations.
+     * 
+     * TODO We could also use a histogram over this information (raw records
+     * sizes).
+     */
+    public long nrawRecs = 0, rawRecBytes;
 
     public PageStats() {
 
@@ -98,7 +109,7 @@ abstract public class PageStats extends BaseIndexStats {
 
     /** Return {@link #nodeBytes} plus {@link #leafBytes}. */
     public long getTotalBytes() {
-        return nodeBytes + leafBytes;
+        return nodeBytes + leafBytes + rawRecBytes;
     }
 
     /** The average bytes per node. */
@@ -111,6 +122,11 @@ abstract public class PageStats extends BaseIndexStats {
         return (nleaves == 0 ? 0 : leafBytes / nleaves);
     }
 
+    /** The average bytes per raw record. */
+    public long getBytesPerRawRecord() {
+        return (nrawRecs== 0 ? 0 : rawRecBytes / nrawRecs);
+    }
+
     public String toString() {
         final StringBuilder sb = new StringBuilder();
         sb.append(getClass().getName());
@@ -118,14 +134,18 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append(",m=" + m);
         sb.append(",nnodes=" + nnodes);
         sb.append(",nleaves=" + nleaves);
+        sb.append(",nrawRecs=" + nrawRecs);
         sb.append(",nodeBytes=" + nodeBytes);
         sb.append(",minNodeBytes=" + minNodeBytes);
         sb.append(",maxNodeBytes=" + maxNodeBytes);
         sb.append(",leafBytes=" + leafBytes);
         sb.append(",minLeafBytes=" + minLeafBytes);
         sb.append(",maxLeafBytes=" + maxLeafBytes);
+        sb.append(",rawRecBytes=" + rawRecBytes);
         sb.append(",bytesPerNode=" + getBytesPerNode());
         sb.append(",bytesPerLeaf=" + getBytesPerLeaf());
+        sb.append(",bytesPerRawRec=" + getBytesPerRawRecord());
+        sb.append(",nerrors=" + nerrors);
         final long npages = (nleaves + nnodes);
         for (int i = 0; i < SLOT_SIZES.length; i++) {
             final long slotsThisSize = histogram[i];
@@ -174,15 +194,23 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append('\t');
         sb.append("nentries");
         sb.append('\t');
+        sb.append("nrawRecs");
+        sb.append('\t');
+        sb.append("nerrors");
+        sb.append('\t');
         sb.append("nodeBytes");
         sb.append('\t');
         sb.append("leafBytes");
+        sb.append('\t');
+        sb.append("rawRecBytes");
         sb.append('\t');
         sb.append("totalBytes");
         sb.append('\t');
         sb.append("avgNodeBytes");
         sb.append('\t');
         sb.append("avgLeafBytes");
+        sb.append('\t');
+        sb.append("avgRawRecBytes");
         sb.append('\t');
         sb.append("minNodeBytes");
         sb.append('\t');
@@ -241,15 +269,23 @@ abstract public class PageStats extends BaseIndexStats {
         sb.append('\t');
         sb.append(stats.ntuples);
         sb.append('\t');
+        sb.append(stats.nrawRecs);
+        sb.append('\t');
+        sb.append(stats.nerrors);
+        sb.append('\t');
         sb.append(stats.nodeBytes);
         sb.append('\t');
         sb.append(stats.leafBytes);
+        sb.append('\t');
+        sb.append(stats.rawRecBytes);
         sb.append('\t');
         sb.append(stats.getTotalBytes());
         sb.append('\t');
         sb.append(stats.getBytesPerNode());
         sb.append('\t');
         sb.append(stats.getBytesPerLeaf());
+        sb.append('\t');
+        sb.append(stats.getBytesPerRawRecord());
         sb.append('\t');
         sb.append(stats.minNodeBytes);
         sb.append('\t');
@@ -355,6 +391,20 @@ abstract public class PageStats extends BaseIndexStats {
                     stats.minLeafBytes = nbytes;
                 if (stats.maxLeafBytes < nbytes)
                     stats.maxLeafBytes = nbytes;
+
+                if (node instanceof ILeafData) {
+                    final ILeafData data = (ILeafData) node;
+                    if(data.hasRawRecords()) {
+                        for (int i = 0; i < data.getKeys().size(); i++) {
+                            final long rawAddr = data.getRawRecord(i);
+                            if (rawAddr != IRawStore.NULL) {
+                                stats.nrawRecs++;
+                                stats.rawRecBytes += store
+                                        .getByteCount(rawAddr);
+                            }
+                        }
+                    }
+                }
 
             } else {
 

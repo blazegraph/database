@@ -39,7 +39,6 @@ import java.util.Iterator;
 import java.util.Properties;
 
 import javax.servlet.Servlet;
-import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -48,11 +47,11 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.RepositoryResult;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.journal.IAtomicStore;
@@ -60,7 +59,6 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
-import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -68,7 +66,6 @@ import com.bigdata.util.InnerCause;
  * data and/or SPARQL query layers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class BigdataRDFServlet extends BigdataServlet {
 
@@ -79,13 +76,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     static private final transient Logger log = Logger.getLogger(BigdataRDFServlet.class);
 
-    /**
-     * The name of the {@link ServletContext} attribute whose value is the
-     * {@link BigdataRDFContext}.
-     */
-    static public final transient String ATTRIBUTE_RDF_CONTEXT = BigdataRDFContext.class
-            .getName();
-    
     /**
      * The name of the <code>UTF-8</code> character encoding.
      */
@@ -115,6 +105,16 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	public static final String MIME_SPARQL_QUERY = "application/sparql-query";
 
 	public static final String MIME_SPARQL_UPDATE = "application/sparql-update";
+	
+	public static final String OUTPUT_FORMAT_QUERY_PARAMETER = "format";
+	
+	public static final String OUTPUT_FORMAT_JSON = "sparql-results+json";
+	
+	public static final String OUTPUT_FORMAT_XML = "sparql-results+xml";
+	
+	public static final String OUTPUT_FORMAT_JSON_SHORT = "json";
+	
+	public static final String OUTPUT_FORMAT_XML_SHORT = "xml";
 
     /**
      * 
@@ -123,72 +123,66 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         
     }
 
-    final protected SparqlEndpointConfig getConfig() {
-        
-        return getBigdataRDFContext().getConfig();
-
-    }
-
-    final protected BigdataRDFContext getBigdataRDFContext() {
-
-        if (m_context == null) {
-
-            m_context = getRequiredServletContextAttribute(ATTRIBUTE_RDF_CONTEXT);
-
-        }
-
-        return m_context;
-
-    }
-
-    private volatile BigdataRDFContext m_context;
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note: Overridden to support read-only deployments.
-     * 
-     * @see SparqlEndpointConfig#readOnly
-     * @see ConfigParams#READ_ONLY
-     */
-    @Override
-    protected boolean isWritable(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
-        
-        if(getConfig().readOnly) {
-            
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-                    "Not writable.");
-
-            // Not writable.  Response has been committed.
-            return false;
-            
-        }
-        
-        return super.isWritable(req, resp);
-        
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * Note: Overridden to support read-only deployments.
+//     * 
+//     * @see SparqlEndpointConfig#readOnly
+//     * @see ConfigParams#READ_ONLY
+//     */
+//    @Override
+//    static boolean isWritable(final HttpServletRequest req,
+//            final HttpServletResponse resp) throws IOException {
+//        
+//        if(getConfig().readOnly) {
+//            
+//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+//                    "Not writable.");
+//
+//            // Not writable.  Response has been committed.
+//            return false;
+//            
+//        }
+//        
+//        return super.isWritable(req, resp);
+//        
+//    }
 
     /**
-     * Write the stack trace onto the output stream. This will show up in the
-     * client's response. This code path should be used iff we have already
-     * begun writing the response. Otherwise, an HTTP error status should be
-     * used instead.
-     * 
-     * @param t
-     *            The thrown error.
-     * @param os
-     *            The stream on which the response will be written.
-     * @param queryStr
-     *            The SPARQL Query -or- SPARQL Update command (if available).
-     * 
-     * @return The laundered exception.
-     * 
-     * @throws Exception
-     */
-    protected static RuntimeException launderThrowable(final Throwable t,
-            final HttpServletResponse resp, final String queryStr)
-            throws IOException {
+	 * Best effort to write the stack trace onto the output stream so it will
+	 * show up in the HTTP response. This code path should be used iff we have
+	 * already begun writing the response. Otherwise, an HTTP error status
+	 * should be used instead. REST API methods that have defined HTTP status
+	 * codes (e.g., for {@link HttpServletResponse#SC_BAD_REQUEST}) should
+	 * verify the request before proceeding in order to satisify their API
+	 * semantics.
+	 * <p>
+	 * This method is invoked as follows:
+	 * 
+	 * <pre>
+	 * launderThrowable(...)
+	 * </pre>
+	 * 
+	 * This method MUST be invoked from the top-level where the request is
+	 * handled. The servlet container may ABORT the connection if there is an
+	 * attempt to write onto a closed response. This can cause EOF errors in the
+	 * client.
+	 * 
+	 * @param t
+	 *            The thrown error.
+	 * @param os
+	 *            The stream on which the response will be written.
+	 * @param queryStr
+	 *            The SPARQL Query -or- SPARQL Update command (if available)
+	 *            -or- a summary of the REST API command -or- an empty string if
+	 *            nothing else is more appropriate.
+	 * 
+	 * @see <a href="http://trac.bigdata.com/ticket/1075" > LaunderThrowable
+	 *      should never throw an exception </a>
+	 */
+    protected static void launderThrowable(final Throwable t,
+            final HttpServletResponse resp, final String queryStr) {
         final boolean isQuery = queryStr != null && queryStr.length() > 0;
         try {
             // log an error for the service.
@@ -196,62 +190,89 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         } finally {
             // ignore any problems here.
         }
-        if (resp != null) {
-            if (!resp.isCommitted()) {
-                if (InnerCause.isInnerCause(t,
-                        ConstraintViolationException.class)) {
-                    /*
-                     * A constraint violation is a bad request (the data
-                     * violates the rules) not a server error.
-                     */
-                    resp.setStatus(HTTP_BADREQUEST);
-                    resp.setContentType(MIME_TEXT_PLAIN);
-                } else {
-                    // Internal server error.
-                    resp.setStatus(HTTP_INTERNALERROR);
-                    resp.setContentType(MIME_TEXT_PLAIN);
-                }
-            }
-            OutputStream os = null;
-            try {
-                os = resp.getOutputStream();
-                final PrintWriter w = new PrintWriter(os);
-                if (queryStr != null) {
-                    /*
-                     * Write the query onto the output stream.
-                     */
-                    w.write(queryStr);
-                    w.write("\n");
-                }
-                /*
-                 * Write the stack trace onto the output stream.
-                 */
-                t.printStackTrace(w);
-                w.flush();
-                // flush the output stream.
-                os.flush();
-            } catch (IOException ex) {
-                // Could not write on output stream.
-            } finally {
-                // ignore any problems here.
-            }
-            if (os != null) {
-                try {
-                    // ensure output stream is closed.
-                    os.close();
-                } catch (Throwable t2) {
-                    // ignore any problems here.
-                }
-            }
-        }
-        if (t instanceof RuntimeException) {
-            return (RuntimeException) t;
-        } else if (t instanceof Error) {
-            throw (Error) t;
-        } else if (t instanceof IOException) {
-            throw (IOException) t;
-        } else
-            throw new RuntimeException(t);
+		if (resp == null) {
+			// Nothing can be done.
+			return;
+		}
+		if (!resp.isCommitted()) {
+			/*
+			 * Set appropriate status code.
+			 * 
+			 * Note: A committed response has already had its status code and
+			 * headers written.
+			 */
+			if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+				/*
+				 * The addressed KB does not exist.
+				 */
+				resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t,
+					ConstraintViolationException.class)) {
+				/*
+				 * A constraint violation is a bad request (the data violates
+				 * the rules) not a server error.
+				 */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause
+					.isInnerCause(t, MalformedQueryException.class)) {
+				/*
+				 * Send back a BAD REQUEST (400) along with the text of the
+				 * syntax error message.
+				 * 
+				 * TODO Write unit test for 400 response for bad client request.
+				 */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else {
+				// Internal server error.
+				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			}
+		}
+		/*
+		 * Attempt to write the stack trace on the response.
+		 * 
+		 * Note: If the OutputStream has already been closed then an IOException
+		 * is caught and ignored.
+		 */
+		{
+			OutputStream os = null;
+			try {
+				os = resp.getOutputStream();
+				final PrintWriter w = new PrintWriter(os);
+				if (queryStr != null) {
+					/*
+					 * Write the query onto the output stream.
+					 */
+					w.write(queryStr);
+					w.write("\n");
+				}
+				/*
+				 * Write the stack trace onto the output stream.
+				 */
+				t.printStackTrace(w);
+				w.flush();
+				// flush the output stream.
+				os.flush();
+			} catch (IOException ex) {
+				// Could not write on output stream.
+			} finally {
+				// ignore any problems here.
+			}
+			if (os != null) {
+				try {
+					// ensure output stream is closed.
+					os.close();
+				} catch (Throwable t2) {
+					// ignore any problems here.
+				}
+			}
+		}
+		/*
+		 * Nothing is thrown.
+		 */
     }
 
     /**
@@ -267,14 +288,16 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      *       namespace (or it should be configured for each graph explicitly, or
      *       we should bundle the (namespace,timestamp) together as a single
      *       object).
+     * 
+     * @see QueryServlet#ATTR_TIMESTAMP;
      */
     protected long getTimestamp(final HttpServletRequest req) {
         
-        final String timestamp = req.getParameter("timestamp");
+        final String timestamp = req.getParameter(QueryServlet.ATTR_TIMESTAMP);
         
         if (timestamp == null) {
             
-            return getConfig().timestamp;
+            return getConfig(getServletContext()).timestamp;
             
         }
 
@@ -319,7 +342,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
             }
             
             // use the default namespace.
-            return getConfig().namespace;
+            return getConfig(getServletContext()).namespace;
             
         }
 
@@ -348,12 +371,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * Factory for the {@link PipedInputStream}.
      */
-    protected PipedInputStream newPipedInputStream(final PipedOutputStream os)
-            throws IOException {
+	final static protected PipedInputStream newPipedInputStream(
+			final PipedOutputStream os) throws IOException {
 
-        return new PipedInputStream(os);
+		return new PipedInputStream(os);
 
-    }
+	}
 
     /**
      * Report a mutation count and elapsed time back to the user agent.
@@ -367,10 +390,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportModifiedCount(final HttpServletResponse resp,
+    static protected void reportModifiedCount(final HttpServletResponse resp,
             final long nmodified, final long elapsed) throws IOException {
 
-    	final StringWriter w = new StringWriter();
+        final StringWriter w = new StringWriter();
     	
         final XMLBuilder t = new XMLBuilder(w);
 
@@ -393,7 +416,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    protected void reportRangeCount(final HttpServletResponse resp,
+    static protected void reportRangeCount(final HttpServletResponse resp,
             final long rangeCount, final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
@@ -406,39 +429,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
-    
-    /**
-     * Report the contexts back to the user agent.
-     * 
-     * @param resp
-     *            The response.
-     * @param it
-     *            The iteration of contexts.
-     * @param elapsed
-     *            The elapsed time (milliseconds).
-     * 
-     * @throws IOException
-     */
-    protected void reportContexts(final HttpServletResponse resp,
-            final RepositoryResult<Resource> contexts, final long elapsed) 
-            		throws IOException, RepositoryException {
-
-        final StringWriter w = new StringWriter();
         
-        final XMLBuilder t = new XMLBuilder(w);
-
-        final Node root = t.root("contexts");
-        while (contexts.hasNext()) {
-        	root.node("context")
-        		.attr("uri", contexts.next())
-        		.close();
-        }
-        root.close();
-
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-
-    }
-    
     /**
      * Send an RDF Graph as a response using content negotiation.
      * 
@@ -450,40 +441,62 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        {
+		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
+				req.getHeader("Accept")); 
+		
+        final ConnegUtil util = new ConnegUtil(acceptStr);
 
-            final String acceptStr = req.getHeader("Accept");
+        // The best RDFFormat for that Accept header.
+        RDFFormat format = util.getRDFFormat();
 
-            final ConnegUtil util = new ConnegUtil(acceptStr);
+        if (format == null)
+            format = RDFFormat.RDFXML;
 
-            // The best RDFFormat for that Accept header. 
-            RDFFormat format = util.getRDFFormat();
-            
-            if (format == null)
-                format = RDFFormat.RDFXML;
+		RDFWriterFactory writerFactory = RDFWriterRegistry.getInstance().get(
+				format);
 
-            resp.setStatus(HTTP_OK);
+		if (writerFactory == null) {
 
-            resp.setContentType(format.getDefaultMIMEType());
+			log.warn("No writer for format: format=" + format + ", Accept=\""
+					+ acceptStr + "\"");
 
-            final OutputStream os = resp.getOutputStream();
-            try {
-                final RDFWriter writer = RDFWriterRegistry.getInstance()
-                        .get(format).getWriter(os);
-                writer.startRDF();
-                final Iterator<Statement> itr = g.iterator();
-                while (itr.hasNext()) {
-                    final Statement stmt = itr.next();
-                    writer.handleStatement(stmt);
-                }
-                writer.endRDF();
-                os.flush();
-            } catch (RDFHandlerException e) {
-                log.error(e, e);
-                throw launderThrowable(e, resp, "");
-            } finally {
-                os.close();
+			format = RDFFormat.RDFXML;
+			
+			writerFactory = RDFWriterRegistry.getInstance().get(format);
+			
+		}
+
+//        if (writerFactory == null) {
+//
+//			buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+//					"No writer for format: Accept=\"" + acceptStr
+//							+ "\", format=" + format);
+//			
+//			return;
+//
+//		}
+		
+        resp.setStatus(HTTP_OK);
+
+        resp.setContentType(format.getDefaultMIMEType());
+
+        final OutputStream os = resp.getOutputStream();
+        try {
+            final RDFWriter writer = writerFactory.getWriter(os);
+            writer.startRDF();
+            final Iterator<Statement> itr = g.iterator();
+            while (itr.hasNext()) {
+                final Statement stmt = itr.next();
+                writer.handleStatement(stmt);
             }
+            writer.endRDF();
+            os.flush();
+        } catch (RDFHandlerException e) {
+        	// wrap and rethrow. will be handled by launderThrowable().
+            throw new IOException(e);
+        } finally {
+            os.close();
         }
     }
 
@@ -499,35 +512,31 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        {
+    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
+				req.getHeader("Accept")); 
+        
+        final ConnegUtil util = new ConnegUtil(acceptStr);
 
-            final String acceptStr = req.getHeader("Accept");
+        // The best format for that Accept header.
+        PropertiesFormat format = util.getPropertiesFormat();
 
-            final ConnegUtil util = new ConnegUtil(acceptStr);
+        if (format == null)
+            format = PropertiesFormat.XML;
 
-            // The best format for that Accept header. 
-            PropertiesFormat format = util.getPropertiesFormat();
-            
-            if (format == null)
-                format = PropertiesFormat.XML;
+        resp.setStatus(HTTP_OK);
 
-            resp.setStatus(HTTP_OK);
+        resp.setContentType(format.getDefaultMIMEType());
 
-            resp.setContentType(format.getDefaultMIMEType());
-
-            final OutputStream os = resp.getOutputStream();
-            try {
-                final PropertiesWriter writer = PropertiesWriterRegistry.getInstance()
-                        .get(format).getWriter(os);
-                writer.write(properties);
-                os.flush();
-            } catch (IOException e) {
-                log.error(e, e);
-                throw launderThrowable(e, resp, "");
-            } finally {
-                os.close();
-            }
-        }
+        final OutputStream os = resp.getOutputStream();
+		try {
+			final PropertiesWriter writer = PropertiesWriterRegistry
+					.getInstance().get(format).getWriter(os);
+			writer.write(properties);
+			os.flush();
+		} finally {
+			os.close();
+		}
     }
 
     /**

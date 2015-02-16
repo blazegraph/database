@@ -6,8 +6,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.eclipse.jetty.util.ajax.JSON.Literal;
 import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -190,5 +190,64 @@ public class BigdataGASState<VS, ES, ST> extends GASState<VS, ES, ST> {
         return IVUtility.compare((IV) u, (IV) v);
 
     }
+    
+	@Override
+    @SuppressWarnings("rawtypes")
+    public Value getOtherVertex(final Value u, final Statement e) {
+
+    	if (e.getSubject() instanceof SidIV) {
+    		
+    		final ISPO spo = ((SidIV) e.getSubject()).getInlineValue();
+    		
+    		if (spo.s().equals(u))
+    			return spo.o();
+    		
+    		return spo.s();
+    		
+    	} else {
+    	
+	        if (e.getSubject().equals(u))
+	            return e.getObject();
+	
+	        return e.getSubject();
+	        
+    	}
+
+    }
+
+    /**
+     * This will only work for the BigdataGASState.
+     */
+    @Override
+    public Literal getLinkAttr(final Value u, final Statement e) {
+    	
+    	if (e.getObject() instanceof IV) {
+    		
+    		final IV iv = (IV) e.getObject();
+    		
+    		if (iv.isLiteral()) {
+
+    			if (iv.isInline()) {
+    				
+    				return (Literal) iv;
+    				
+    			} else {
+    				
+    				return (Literal) iv.getValue();
+    				
+    			}
+    			
+    		}
+    		
+    	} else if (e.getObject() instanceof Literal) {
+    		
+    		return (Literal) e.getObject();
+    		
+    	}
+    		
+		return null;
+    	
+    }
+
     
 }

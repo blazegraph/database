@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
@@ -58,6 +59,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -93,13 +95,17 @@ import com.bigdata.config.IntegerValidator;
 import com.bigdata.config.LongRangeValidator;
 import com.bigdata.config.LongValidator;
 import com.bigdata.counters.AbstractStatisticsCollector;
+import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.CommitRequest;
 import com.bigdata.ha.CommitResponse;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.HATXSGlue;
+import com.bigdata.ha.IHAPipelineResetRequest;
+import com.bigdata.ha.IHAPipelineResetResponse;
 import com.bigdata.ha.IIndexManagerCallable;
 import com.bigdata.ha.IJoinedAndNonJoinedServices;
 import com.bigdata.ha.JoinedAndNonJoinedServices;
@@ -132,6 +138,7 @@ import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHARemoteRebuildRequest;
 import com.bigdata.ha.msg.IHARootBlockRequest;
 import com.bigdata.ha.msg.IHARootBlockResponse;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASendStoreResponse;
 import com.bigdata.ha.msg.IHASnapshotDigestRequest;
 import com.bigdata.ha.msg.IHASnapshotDigestResponse;
@@ -147,6 +154,8 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
@@ -240,7 +249,6 @@ import com.bigdata.util.StackInfoReport;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo There are lots of annoying ways in which asynchronously closing the
  *       journal, e.g., using {@link #close()} or {@link #shutdown()} can cause
@@ -549,6 +557,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @see #getName2Addr()
 	 */
 	private volatile Name2Addr _name2Addr;
+	
+	/**
+	 * An atomic state specifying whether a clean abort is required.  This is set
+	 * to true by critical section code in the _abort if it does not complete cleanly.
+	 * <p>
+	 * It is checked in the commit() method ensure updates are protected.
+	 * 
+	 * @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+	 */
+	private final AtomicBoolean abortRequired = new AtomicBoolean(false);
 
 	/**
 	 * Return the "live" BTree mapping index names to the last metadata record
@@ -1382,6 +1400,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 *       into a btree and the btree api could be used to change the
 	 *       persistent properties as necessary.
 	 */
+    @Override
 	final public Properties getProperties() {
 
 		return new Properties(properties);
@@ -1408,6 +1427,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * this service, but tasks run here may submit tasks to the
 	 * {@link ConcurrencyManager}.
 	 */
+    @Override
 	abstract public ExecutorService getExecutorService();
 
 	/**
@@ -1419,6 +1439,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * 
 	 * @see #shutdownNow()
 	 */
+    @Override
 	synchronized public void shutdown() {
 
 		// Note: per contract for shutdown.
@@ -1442,6 +1463,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * 
 	 * @see #shutdown()
 	 */
+    @Override
 	synchronized public void shutdownNow() {
 
 		// Note: per contract for shutdownNow()
@@ -1462,6 +1484,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * Closes out the journal iff it is still open.
 	 */
+    @Override
     protected void finalize() throws Throwable {
         
 		if (_bufferStrategy.isOpen()) {
@@ -1478,6 +1501,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * Return counters reporting on various aspects of the journal.
 	 */
+    @Override
 	public CounterSet getCounters() {
 
 		return CountersFactory.getCounters(this);
@@ -1506,6 +1530,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			final WeakReference<AbstractJournal> ref = new WeakReference<AbstractJournal>(jnl);
 
 			counters.addCounter("file", new Instrument<String>() {
+                @Override
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -1519,6 +1544,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			// + jnl.getFile()));
 
 			counters.addCounter("createTime", new Instrument<Long>() {
+			    @Override
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -1531,6 +1557,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			});
 
 			counters.addCounter("closeTime", new Instrument<Long>() {
+                @Override
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -1543,6 +1570,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			});
 
 			counters.addCounter("commitCount", new Instrument<Long>() {
+                @Override
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -1555,6 +1583,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			});
 
 			counters.addCounter("historicalIndexCacheSize", new Instrument<Integer>() {
+                @Override
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -1564,6 +1593,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			});
 
             counters.addCounter("indexCacheSize", new Instrument<Integer>() {
+                @Override
                 public void sample() {
                     final AbstractJournal jnl = ref.get();
                     if (jnl != null) {
@@ -1573,6 +1603,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             });
 
             counters.addCounter("liveIndexCacheSize", new Instrument<Integer>() {
+                @Override
 				public void sample() {
 					final AbstractJournal jnl = ref.get();
 					if (jnl != null) {
@@ -1584,11 +1615,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				}
 			});
 
-			counters.attach(jnl._bufferStrategy.getCounters());
+            // backing strategy performance counters.
+            counters.attach(jnl._bufferStrategy.getCounters());
 
-			return counters;
+            // commit protocol performance counters.
+            counters.makePath("commit")
+                    .attach(jnl.commitCounters.getCounters());
 
-		}
+            return counters;
+
+        }
 
 	}
 
@@ -1749,6 +1785,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
 	final public File getFile() {
 
 		final IBufferStrategy tmp = getBufferStrategy();
@@ -1912,6 +1949,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @exception IllegalStateException
 	 *                if the journal is open.
 	 */
+	@Override
 	public void deleteResources() {
 
 		if (isOpen())
@@ -2244,6 +2282,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	/**
 	 * Invokes {@link #shutdownNow()}.
 	 */
+    @Override
 	synchronized public void close() {
 
 		// Note: per contract for close().
@@ -2257,6 +2296,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+	@Override
 	synchronized public void destroy() {
 
 		if (log.isInfoEnabled())
@@ -2302,12 +2342,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    @Override
 	final public UUID getUUID() {
 
 		return journalMetadata.get().getUUID();
 
 	}
 
+	@Override
 	final public IResourceMetadata getResourceMetadata() {
 
 		return journalMetadata.get();
@@ -2321,6 +2363,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * journal until the quorum has met and {@link #init()} has been invoked for
 	 * the {@link Quorum}.
 	 */
+    @Override
 	public boolean isOpen() {
 
 		return _bufferStrategy != null && _bufferStrategy.isOpen();
@@ -2332,6 +2375,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * if {@link #closeForWrites(long)} was used to seal the journal against
      * further writes.
      */
+    @Override
     public boolean isReadOnly() {
 
         if (readOnly) {
@@ -2440,12 +2484,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
 	public boolean isStable() {
 
 	    return _bufferStrategy.isStable();
 
 	}
 
+    @Override
 	public boolean isFullyBuffered() {
 
 		return _bufferStrategy.isFullyBuffered();
@@ -2470,17 +2516,17 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
-    /**
-     * Return <code>true</code> if the journal is configured for high
-     * availability.
-     * 
-     * @see QuorumManager#isHighlyAvailable()
-     */
-	public boolean isHighlyAvailable() {
-
-        return quorum == null ? false : quorum.isHighlyAvailable();
-
-	}
+//    /**
+//     * Return <code>true</code> if the journal is configured for high
+//     * availability.
+//     * 
+//     * @see Quorum#isHighlyAvailable()
+//     */
+//	public boolean isHighlyAvailable() {
+//
+//        return quorum == null ? false : quorum.isHighlyAvailable();
+//
+//	}
 
     /**
      * {@inheritDoc}
@@ -2494,6 +2540,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      * through a concurrent {@link #abort()} or {@link #commitNow(long)}. The
      * {@link IRootBlockView} itself is an immutable data structure.
      */
+    @Override
 	final public IRootBlockView getRootBlockView() {
 
 //		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -2561,6 +2608,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
     }
 
+    @Override
     final public long getLastCommitTime() {
 
 //		final ReadLock lock = _fieldReadWriteLock.readLock();
@@ -2594,6 +2642,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * @param committer
 	 *            The commiter.
 	 */
+    @Override
 	final public void setCommitter(final int rootSlot, final ICommitter committer) {
 
 		assertOpen();
@@ -2710,6 +2759,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
 
 		lock.lock();
+		// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+		boolean success = false;
 
 		try {
 
@@ -2722,6 +2773,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			if (_bufferStrategy == null) {
 
 				// Nothing to do.
+				success = true;
+				
 				return;
 
 			}
@@ -2861,8 +2914,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             
 			if (log.isInfoEnabled())
 				log.info("done");
+			
+			success = true; // mark successful abort.
 
 		} finally {
+			// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+			abortRequired.set(!success);
 
 			lock.unlock();
 
@@ -3014,6 +3071,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     
     @Override
 	public long commit() {
+    	
+    	// Critical Section Check. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+    	if (abortRequired.get()) // FIXME Move this into commitNow() after tagging hot fix.
+    		throw new IllegalStateException("Commit cannot be called, a call to abort must be made before further updates");
 
 		// The timestamp to be assigned to this commit point.
 		final long commitTime = nextCommitTimestamp();
@@ -3053,6 +3114,134 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
 	}
 
+    /**
+     * Performance counters for the journal-level commit operations.
+     */
+    private static class CommitCounters implements ICounterSetAccess {
+        /**
+         * Elapsed nanoseconds for the {@link ICommitter#handleCommit(long)}
+         * (flushing dirty pages from the indices into the write cache service).
+         */
+        private final CAT elapsedNotifyCommittersNanos = new CAT();
+        /**
+         * Elapsed nanoseconds for {@link CommitState#writeCommitRecord()}.
+         */
+        private final CAT elapsedWriteCommitRecordNanos = new CAT();
+        /**
+         * Elapsed nanoseconds for flushing the write set from the write cache
+         * service to the backing store (this is the bulk of the disk IO unless
+         * the write cache service fills up during a long running commit, in
+         * which case there is also incremental eviction).
+         */
+        private final CAT elapsedFlushWriteSetNanos = new CAT();
+        /**
+         * Elapsed nanoseconds for the simple atomic commit (non-HA). This
+         * consists of sync'ing the disk (iff double-sync is enabled), writing
+         * the root block, and then sync'ing the disk.
+         */
+        private final CAT elapsedSimpleCommitNanos = new CAT();
+        /**
+         * Elapsed nanoseconds for the entire commit protocol.
+         */
+        private final CAT elapsedTotalCommitNanos = new CAT();
+
+        //
+        // HA counters
+        //
+        
+        /**
+         * Elapsed nanoseconds for GATHER (consensus release time protocol : HA
+         * only).
+         */
+        private final CAT elapsedGatherNanos = new CAT();
+        /**
+         * Elapsed nanoseconds for PREPARE (2-phase commit: HA only).
+         */
+        private final CAT elapsedPrepare2PhaseNanos = new CAT();
+        /**
+         * Elapsed nanoseconds for COMMIT2PHASE (2-phase commit: HA only).
+         */
+        private final CAT elapsedCommit2PhaseNanos = new CAT();
+
+        @Override
+        public CounterSet getCounters() {
+
+            final CounterSet root = new CounterSet();
+
+            root.addCounter("notifyCommittersSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedNotifyCommittersNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+            
+            root.addCounter("writeCommitRecordSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedWriteCommitRecordNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+            
+            root.addCounter("flushWriteSetSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedFlushWriteSetNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+            
+            root.addCounter("simpleCommitSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedSimpleCommitNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+            
+            root.addCounter("totalCommitSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedTotalCommitNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+            
+            //
+            // HA
+            //
+            
+            root.addCounter("gatherSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedGatherNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+            
+            root.addCounter("prepare2PhaseSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedPrepare2PhaseNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+
+            root.addCounter("commit2PhaseSecs", new Instrument<Double>() {
+                @Override
+                public void sample() {
+                    final double secs = (elapsedCommit2PhaseNanos.get() / 1000000000.);
+                    setValue(secs);
+                }
+            });
+
+            return root;
+            
+        }
+    }
+    final private CommitCounters commitCounters = new CommitCounters();
+    
     /**
      * Class to which we attach all of the little pieces of state during
      * {@link AbstractJournal#commitNow(long)}.
@@ -3171,6 +3360,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private boolean notifyCommitters() {
 
+            final long beginNanos = System.nanoTime();
+            
             /*
              * First, run each of the committers accumulating the updated root
              * addresses in an array. In general, these are btrees and they may
@@ -3217,6 +3408,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             rootAddrs[PREV_ROOTBLOCK] = store.m_rootBlockCommitter
                     .handleCommit(commitTime);
 
+            store.commitCounters.elapsedNotifyCommittersNanos.add(System
+                    .nanoTime() - beginNanos);
+            
             // Will do commit.
             return true;
 
@@ -3240,6 +3434,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private void writeCommitRecord() {
 
+            final long beginNanos = System.nanoTime();
+            
             /*
              * Before flushing the commitRecordIndex we need to check for
              * deferred frees that will prune the index.
@@ -3284,6 +3480,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             commitRecordIndexAddr = store._commitRecordIndex
                     .writeCheckpoint();
 
+            store.commitCounters.elapsedWriteCommitRecordNanos.add(System.nanoTime()
+                    - beginNanos);
+            
         }
         
         /**
@@ -3331,7 +3530,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private void flushWriteSet() {
 
+            final long beginNanos = System.nanoTime();
+
             _bufferStrategy.commit();
+
+            store.commitCounters.elapsedFlushWriteSetNanos.add(System.nanoTime()
+                    - beginNanos);
 
         }
 
@@ -3415,6 +3619,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private void gatherPhase() {
 
+            final long beginNanos = System.nanoTime();
+
             /*
              * If not HA, do not do GATHER.
              */
@@ -3425,8 +3631,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             if (quorum == null)
                 return;
 
-            if (!quorum.isHighlyAvailable())
+            if (!quorum.isHighlyAvailable()) {
+                // Gather and 2-phase commit are not used in HA1.
                 return;
+            }
 
             /**
              * CRITICAL SECTION. We need obtain a distributed consensus for the
@@ -3479,6 +3687,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 store._gatherLock.unlock();
 
+                store.commitCounters.elapsedGatherNanos.add(System.nanoTime()
+                        - beginNanos);
+
             }
 
         }
@@ -3496,6 +3707,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          * Simple (non-HA) commit.
          */
         private void commitSimple() {
+            
+            final long beginNanos = System.nanoTime();
             
             /*
              * Force application data to stable storage _before_
@@ -3539,8 +3752,30 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             // reload the commit record from the new root block.
             store._commitRecord = store._getCommitRecord();
 
+            if (quorum != null) {
+                /**
+                 * Write the root block on the HALog file, closing out that
+                 * file.
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
+                 */
+                final QuorumService<HAGlue> localService = quorum.getClient();
+                if (localService != null) {
+                    // Quorum service not asynchronously closed.
+                    try {
+                        // Write the closing root block on the HALog file.
+                        localService.logRootBlock(newRootBlock);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            
             if (txLog.isInfoEnabled())
                 txLog.info("COMMIT: commitTime=" + commitTime);
+
+            store.commitCounters.elapsedSimpleCommitNanos.add(System.nanoTime()
+                    - beginNanos);
 
         }
 
@@ -3588,6 +3823,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         private void prepare2Phase() throws InterruptedException,
                 TimeoutException, IOException {
  
+            final long beginNanos = System.nanoTime();
             boolean didPrepare = false;
             try {
 
@@ -3650,6 +3886,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     }
 
                 }
+                
+                store.commitCounters.elapsedPrepare2PhaseNanos.add(System
+                        .nanoTime() - beginNanos);
 
             }
             
@@ -3666,6 +3905,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         private void commit2Phase() throws Exception {
             
+            final long beginNanos = System.nanoTime();
             boolean didCommit = false;
             try {
 
@@ -3741,6 +3981,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                 }
 
+                store.commitCounters.elapsedCommit2PhaseNanos.add(System
+                        .nanoTime() - beginNanos);
+
             }
 
         }
@@ -3777,6 +4020,8 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */
     // Note: Overridden by StoreManager (DataService).
 	protected long commitNow(final long commitTime) {
+	    
+	    final long beginNanos = System.nanoTime();
 	    
         final WriteLock lock = _fieldReadWriteLock.writeLock();
 
@@ -3843,9 +4088,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                 // Prepare the new root block.
                 cs.newRootBlock();
 
-                if (quorum == null) {
+                if (quorum == null || quorum.replicationFactor() == 1) {
                     
-                    // Non-HA mode.
+                    // Non-HA mode (including HA1).
                     cs.commitSimple();
     
                 } else {
@@ -3891,6 +4136,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 		} finally {
 
 			lock.unlock();
+			
+            commitCounters.elapsedTotalCommitNanos.add(System.nanoTime()
+                    - beginNanos);
+			
         }
         
     }
@@ -4845,7 +5094,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      * 
-     *      TODO Reconcile API tension with {@link IIndex} and
+     *      FIXME GIST Reconcile API tension with {@link IIndex} and
      *      {@link ICheckpointProtocol}, however this method is overridden by
      *      {@link Journal} and is also implemented by
      *      {@link IBigdataFederation}. The central remaining tensions are
@@ -5430,8 +5679,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 	
     /**
+     * {@inheritDoc}
+     * <p>
      * Drops the named index. The index will no longer participate in atomic
-     * commits and will not be visible to new transactions.  Storage will be
+     * commits and will not be visible to new transactions. Storage will be
      * reclaimed IFF the backing store support that functionality.
      */
     @Override
@@ -6621,6 +6872,57 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
     }
+    
+    /**
+     * With lock held to ensure that there is no concurrent commit, copy
+     * key data atomically to ensure recovered snapshot is consistent with
+     * the commit state when the snapshot is taken.  This atomic data snapshot
+     * can be merged with the file data to ensure a valid new store copy.
+     * <p>
+     * If this is not done then it is possible for the allocation data - both
+     * metabits and fixed allocator commit bits - to be overwritten and inconsistent
+     * with the saved root blocks.
+     * 
+     * @throws IOException 
+     */
+	public ISnapshotData snapshotAllocationData(final AtomicReference<IRootBlockView> rbv) throws IOException {
+		final Lock lock = _fieldReadWriteLock.readLock();
+
+		lock.lock();
+		try {
+			final ISnapshotData tm = new SnapshotData();
+			final IBufferStrategy bs = getBufferStrategy();
+			
+			// clone rootblocks
+			final ByteBuffer rb0 = bs.readRootBlock(true/*is rb0*/);
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK0, rb0.array());
+			final ByteBuffer rb1 = bs.readRootBlock(false/*is rb0*/);
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK1, rb1.array());
+			
+			// return last commitCounter
+            final IRootBlockView rbv0 = new RootBlockView(true/* rootBlock0 */, rb0, checker);            
+            final IRootBlockView rbv1 = new RootBlockView(false/* rootBlock0 */, rb1, checker);
+            
+            rbv.set(RootBlockUtility.chooseRootBlock(rbv0, rbv1));
+			
+            // Disabling this test allows demonstration of the need to atomically snapshot the metabits and allocators
+            //	for the RWStore in conjunction with TestHA1SnapshotPolicy.test_snapshot_stressMultipleTx_restore_validate
+			if (bs instanceof RWStrategy) {
+				final RWStore rws = ((RWStrategy) bs).getStore();
+				
+				// get metabits
+				rws.snapshotMetabits(tm);
+				
+				// get committed allocations
+				rws.snapshotAllocators(tm);
+			}
+			
+			
+			return tm;
+		} finally {
+			lock.unlock();
+		}
+	}
 
     /**
      * Implementation hooks into the various low-level operations required to
@@ -7841,13 +8143,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
          */
         @Override
         public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-                final IHAWriteMessage msg) throws IOException {
+                final IHASendState snd, final IHAWriteMessage msg)
+                throws IOException {
 
             if (haLog.isDebugEnabled())
                 haLog.debug("req=" + req + ", msg=" + msg);
 
             final Future<Void> ft = quorum.getClient().receiveAndReplicate(req,
-                    msg);
+                    snd, msg);
 
             return getProxy(ft);
 
@@ -8014,6 +8317,14 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }, null/* result */);
             getExecutorService().execute(ft);
             return getProxy(ft);
+        }
+
+        @Override
+        public Future<IHAPipelineResetResponse> resetPipeline(
+                final IHAPipelineResetRequest req) throws IOException {
+            final Future<IHAPipelineResetResponse> f = quorum.getClient()
+                    .resetPipeline(req);
+            return getProxy(f);
         }
 
         /*
@@ -8241,7 +8552,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         }
 
-
 	};
 
     /**
@@ -8292,4 +8602,61 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
+    public interface ISnapshotEntry {
+    	long getAddress();
+    	byte[] getData();
+    }
+    
+    public interface ISnapshotData {
+    	void put(long addr, byte[] data);
+    	
+    	Iterator<ISnapshotEntry> entries();
+    }
+    
+    static public class SnapshotData implements ISnapshotData {
+    	
+    	final TreeMap<Long, byte[]> m_map = new TreeMap<Long, byte[]>();
+
+		@Override
+		public void put(long addr, byte[] data) {
+			m_map.put(addr, data);
+		}
+
+		@Override
+		public Iterator<ISnapshotEntry> entries() {
+			final Iterator<Map.Entry<Long, byte[]>> entries = m_map.entrySet().iterator();
+			
+			return new Iterator<ISnapshotEntry>() {
+
+				@Override
+				public boolean hasNext() {
+					return entries.hasNext();
+				}
+
+				@Override
+				public ISnapshotEntry next() {
+					final Map.Entry<Long, byte[]> entry = entries.next();
+					return new ISnapshotEntry() {
+
+						@Override
+						public long getAddress() {
+							return entry.getKey();
+						}
+
+						@Override
+						public byte[] getData() {
+							return entry.getValue();
+						}
+						
+					};
+				}
+
+				@Override
+				public void remove() {
+					entries.remove();
+				}
+				
+			};
+		}   	
+    }
 }

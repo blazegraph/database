@@ -27,23 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import java.util.concurrent.atomic.AtomicReference;
 
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
@@ -57,6 +54,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
+import com.bigdata.journal.AbstractJournal.ISnapshotEntry;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
 import com.bigdata.journal.AbstractMROWTestCase;
@@ -66,9 +65,11 @@ import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
+import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.journal.RWStrategy;
+import com.bigdata.journal.TestJournalAbort;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.VerifyCommitRecordIndex;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
@@ -82,7 +83,6 @@ import com.bigdata.util.InnerCause;
  * Test suite for {@link BufferMode#DiskRW} journals.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestRWJournal extends AbstractJournalTestCase {
 
@@ -134,10 +134,20 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 */
 		suite.addTest(TestJournalBasics.suite());
 
+		/*
+		 * TODO This should be a proxied test suite. It is RWStore specific
+		 * right now.
+		 * 
+		 * @see #1021 (Add critical section protection to
+		 * AbstractJournal.abort() and BigdataSailConnection.rollback())
+		 */
+		suite.addTestSuite(TestJournalAbort.class);
+		
 		return suite;
 
 	}
 
+	@Override
 	public Properties getProperties() {
 
         final Properties properties = super.getProperties();
@@ -577,8 +587,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestRawStore extends AbstractRestartSafeTestCase {
 
@@ -646,6 +654,26 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		protected IRawStore getStore() {
 
 			return getStore(0);
+
+		}
+
+		protected IRawStore getSmallSlotStore() {
+
+			return getSmallSlotStore(0);
+
+		}
+
+		protected IRawStore getSmallSlotStore(final int slotSize) {
+
+            final Properties properties = new Properties(getProperties());
+
+            properties.setProperty(
+                    AbstractTransactionService.Options.MIN_RELEASE_AGE, "0");
+
+            properties.setProperty(
+                    RWStore.Options.SMALL_SLOT_TYPE, "" + slotSize);
+
+            return getStore(properties);
 
 		}
 
@@ -830,6 +858,114 @@ public class TestRWJournal extends AbstractJournalTestCase {
 					final long pa = rw.physicalAddress(a);
 					paddrs.put(pa, a);
 				}
+
+			} finally {
+
+				store.destroy();
+
+			}
+
+		}
+
+		/**
+		 * Ensures the allocation of unique addresses by mapping allocated
+		 * address with uniqueness assertion against physical address.
+		 */
+		public void test_addressingContiguous() {
+
+			final Journal store = (Journal) getStore();
+
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				final int cSlotSize = 128;
+				final int cAllocSize = 99;
+				
+				long pap = rw.physicalAddress(rw.alloc(cAllocSize, null));
+				for (int i = 0; i < 500000; i++) {
+					final int a = rw.alloc(cAllocSize, null);
+					final long pa = rw.physicalAddress(a);
+					
+					if (pa != (pap+cSlotSize)) {
+						// for debug
+						rw.physicalAddress(a);
+						fail("Non-Contiguous slots: " + i + ", " + pa + "!=" + (pap+cSlotSize));
+					}
+					
+					pap = pa;
+					
+				}
+				
+				store.commit();
+				
+				final StringBuilder sb = new StringBuilder();
+				rw.showAllocators(sb);
+				
+				log.warn(sb.toString());
+
+			} finally {
+
+				store.destroy();
+
+			}
+
+		}
+
+		/**
+		 * Tests the recycling of small slot alloctors and outputs statistics related
+		 * to contiguous allocations indicative of reduced IOPS.
+		 */
+		public void test_smallSlotRecycling() {
+
+			final Journal store = (Journal) getSmallSlotStore(1024);
+
+			try {
+
+			    final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				final int cSlotSize = 128;
+				final int cAllocSize = 99;
+				
+				int breaks = 0;
+				int contiguous = 0;
+				
+				ArrayList<Integer> recycle = new ArrayList<Integer>();
+				
+				long pap = rw.physicalAddress(rw.alloc(cAllocSize, null));
+				for (int i = 0; i < 500000; i++) {
+					final int a = rw.alloc(cSlotSize, null);
+					final long pa = rw.physicalAddress(a);
+					
+					if (r.nextInt(7) < 5) { // more than 50% recycle
+						recycle.add(a);
+					}
+					
+					if (pa == (pap+cSlotSize)) {
+						contiguous++;
+					} else {
+						breaks++;
+					}
+					
+					pap = pa;
+					
+					if (recycle.size() > 5000) {
+						log.warn("Transient Frees for immediate recyling");
+						for (int e : recycle) {
+							rw.free(e, cAllocSize);
+						}
+						recycle.clear();
+					}
+				}
+				
+				store.commit();
+				
+				final StringBuilder sb = new StringBuilder();
+				rw.showAllocators(sb);
+				
+				log.warn("Contiguous: " + contiguous + ", breaks: " + breaks + "\n" + sb.toString());
 
 			} finally {
 
@@ -1738,6 +1874,27 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			}
 		}
 
+		public void test_snapshotData() throws IOException {
+			final Journal journal = (Journal) getStore(0); // remember no history!
+
+			try {
+				for (int i = 0; i < 100; i++)
+					commitSomeData(journal);
+
+				final AtomicReference<IRootBlockView> rbv = new AtomicReference<IRootBlockView>();
+				final Iterator<ISnapshotEntry> data = journal.snapshotAllocationData(rbv).entries();
+
+				while (data.hasNext()) {
+					final ISnapshotEntry e = data.next();
+					
+					log.info("Position: " + e.getAddress() + ", data size: "
+							+ e.getData().length);
+				}
+			} finally {
+				journal.destroy();
+			}
+		}
+		
 		/**
 		 * Tests whether tasks are able to access and modify data safely by
 		 * emulating transactions by calling activateTx and deactivateTx
@@ -2011,12 +2168,141 @@ public class TestRWJournal extends AbstractJournalTestCase {
             	store.destroy();
             }
 		}
-		
-		public void test_allocCommitFreeWithHistory() {
-			Journal store = (Journal) getStore(4);
+
+        /**
+         * Verify that we correctly restore the RWStore commit state if
+         * {@link RWStore#commit()} is followed by {@link RWStore#reset()}
+         * rather than {@link RWStore#postCommit()}.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitState() {
+			Journal store = (Journal) getStore();
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	final long addr = bs.write(randomData(78));
+
+            	// do 1st half of the RWStore commit protocol.
+            	rws.commit();
+            	            	
+            	// then discard write set.
+            	store.abort();
+            	
+            	assertFalse(bs.isCommitted(addr)); // rolled back
+            	
+            	// now cycle standard commit to confirm correct reset
+            	for (int c = 0; c < 50; c++) {
+            		bs.write(randomData(78));
+            		store.commit();
+            	}
+           	
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+        /**
+         * Test verifies that a failure to retain the commit state in
+         * {@link RWStore#commit()} will cause problems if the write set is
+         * discarded by {@link RWStore#reset()} such that subsequent write sets
+         * run into persistent addressing errors.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitStateError() {
+			final Journal store = (Journal) getStore();
+            try {
+
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	final long addr = bs.write(randomData(78));
+            	
+            	// do first half of the RWStore protocol.
+            	rws.commit();
+
+            /*
+             * remove the commit state such that subsequent abort()/reset()
+             * will fail to correctly restore the pre-commit state.
+             */
+            rws.clearCommitStateRef();
+
+            // abort() succeeds because it is allowed even if commit() was
+            // not called.
+            	store.abort();
+            	
+            	assertFalse(bs.isCommitted(addr)); // rolled back
+            	
+            	try {
+	            	// now cycle standard commit to force an error from bad reset
+	            	for (int c = 0; c < 50; c++) {
+	            		bs.write(randomData(78));
+	            		store.commit();
+	            	}
+	            	fail("Expected failure");
+            	} catch (Exception e) {
+            		// expected
+            		log.info("Expected!");
+            	}
+           	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+        /**
+         * Verify that a double-commit causes an illegal state exception.
+         * Further verify that an {@link RWStore#reset()} allwos us to then
+         * apply and commit new write sets.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         *      not robust to internal failure.</a>
+         */
+		public void test_commitStateIllegal() {
+			final Journal store = (Journal) getStore();
+            try {
+
+            final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	
+            	final RWStore rws = bs.getStore();
+            	
+            	bs.write(randomData(78));
+            	
+            	rws.commit();
+            	
+            	try {
+            		store.commit();
+            		
+            		fail("Expected failure");
+            	} catch (Exception ise) {
+            		if (InnerCause.isInnerCause(ise, IllegalStateException.class)) {
+	            		store.abort();
+	            		
+	            		store.commit();
+            		} else {
+            			fail("Unexpected Exception");
+            		}
+            	}
+           	
+            	
+            } finally {
+            	store.destroy();
+            }
+		}
+		
+		public void test_allocCommitFreeWithHistory() {
+			final Journal store = (Journal) getStore(4);
+            try {
+
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	final long addr = bs.write(randomData(78));
             	
@@ -2959,8 +3245,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestMROW extends AbstractMROWTestCase {
 
@@ -2995,8 +3279,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestMRMW extends AbstractMRMWTestCase {
 
@@ -3031,8 +3313,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
-	 * @version $Id: TestRWJournal.java 4010 2010-12-16 12:44:43Z martyncutcher
-	 *          $
 	 */
 	public static class TestInterrupts extends AbstractInterruptsTestCase {
 	

@@ -71,7 +71,7 @@ public class QueryEngineFactory {
     private static ConcurrentWeakValueCache<IBTreeManager, QueryEngine> standaloneQECache = new ConcurrentWeakValueCache<IBTreeManager, QueryEngine>(
             0/* queueCapacity */
     );
-
+    
     /**
      * Weak value cache to enforce the singleton pattern for
      * {@link IBigdataClient}s (the data services are query engine peers rather

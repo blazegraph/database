@@ -1,0 +1,13 @@
+site :opscode
+
+cookbook "apt"
+cookbook 'java', '~> 1.22.0' 
+cookbook 'ant'
+cookbook 'tomcat'
+cookbook 'subversion'
+cookbook 'lvm'
+cookbook "hadoop"
+cookbook "emacs"
+cookbook "sysstat"
+
+metadata

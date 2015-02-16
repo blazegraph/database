@@ -26,7 +26,7 @@ import org.openrdf.model.Value;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id: IResultHandler.java 2265 2009-10-26 12:51:06Z thompsonbry $
  */
-public interface IReducer<VS,ES, ST, T> {
+public interface IReducer<VS, ES, ST, T> {
 
     /**
      * Method is invoked for each result and is responsible for combining the

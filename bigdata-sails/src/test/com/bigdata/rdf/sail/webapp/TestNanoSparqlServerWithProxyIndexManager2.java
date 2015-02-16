@@ -49,33 +49,11 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 
 /**
- * Test suite for {@link RESTServlet} (SPARQL end point and REST API for RDF
- * data).
+ * A version of the test suite that is intended for local debugging and is NOT
+ * run in CI. This is intended just to make it easier to run specific proxied
+ * test suites.
  * 
- * TODO Add unit tests which exercise the full text index.
- * 
- * TODO Add unit tests which are specific to sids and quads modes. These tests
- * should look at the semantics of interchange of sids or quads specific data;
- * queries which exercise the context position; and the default-graph and
- * named-graph URL query parameters for quads.
- * 
- * @todo Security model?
- * 
- * @todo An NQUADS RDFWriter needs to be written. Then we can test NQUADS
- *       interchange.
- * 
- * @todo A SPARQL result sets JSON parser needs to be written (Sesame bundles a
- *       writer, but not a parser) before we can test queries which CONNEG for a
- *       JSON result set.
- * 
- * @todo Tests which verify the correct rejection of illegal or ill-formed
- *       requests.
- * 
- * @todo Test suite for reading from a historical commit point.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestNanoSparqlServer.java 4398 2011-04-14 13:55:29Z thompsonbry
- *          $
+ * @see TestNanoSparqlServerWithProxyIndexManager
  */
 public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
         extends AbstractIndexManagerTestCase<S> {
@@ -217,14 +195,16 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
          * List any non-proxied tests (typically bootstrapping tests).
          */
         
-        suite.addTestSuite(TestNanoSparqlClient2.class);
 		//Protocol
 		suite.addTest(TestProtocolAll.suite());
 
+        suite.addTestSuite(TestMultiTenancyAPI.class);
+        
         return suite;
     
     }
 
+	@Override
 	@SuppressWarnings("unchecked")
     public S getIndexManager() {
 

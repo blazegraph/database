@@ -29,7 +29,8 @@ package com.bigdata.rdf.sparql.ast.hints;
 
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.IJoinNode;
+import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -42,15 +43,15 @@ public abstract class AbstractChunkSizeHint extends AbstractIntQueryHint {
      * @param name
      * @param defaultValue
      */
-    public AbstractChunkSizeHint(String name, Integer defaultValue) {
+    public AbstractChunkSizeHint(final String name, final Integer defaultValue) {
         super(name, defaultValue);
     }
 
     @Override
-    public void handle(final AST2BOpContext context,
+    public void handle(final AST2BOpContext context, final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final Integer value) {
 
-        if (op instanceof IJoinNode) {
+        if (op instanceof IQueryNode) {
 
             /*
              * Note: This is set on the queryHint Properties object and then
@@ -61,7 +62,19 @@ public abstract class AbstractChunkSizeHint extends AbstractIntQueryHint {
                     value);
 
         }
-    
+
+//        if (QueryHintScope.Query.equals(scope)) {
+// 
+//            /*
+//             * Also stuff the query hint on the global context for things which
+//             * look there.
+//             */
+//
+//            conditionalSetGlobalProperty(context,
+//                    BufferAnnotations.CHUNK_CAPACITY, value);
+//
+//        }
+
     }
 
 }

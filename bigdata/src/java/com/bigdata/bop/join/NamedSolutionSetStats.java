@@ -42,6 +42,7 @@ public class NamedSolutionSetStats extends BOpStats {
 
     public final CAT solutionSetSize = new CAT();
 
+    @Override
     public void add(final BOpStats o) {
 
         super.add(o);

@@ -10,7 +10,15 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
- * AST node models the assignment of a value expression to a variable.
+ * AST node models the assignment of a value expression to a variable
+ * 
+ * <pre>
+ * BIND( valueExpr AS ?var )
+ * </pre>
+ * 
+ * where args[0] is the {@link VarNode}<br>
+ * 
+ * where args[1] is the {@link IValueExpression}<br>
  */
 public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         implements IValueExpressionNode, Comparable<AssignmentNode>,
@@ -37,7 +45,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
-    public AssignmentNode(AssignmentNode op) {
+    public AssignmentNode(final AssignmentNode op) {
 
         super(op);
         
@@ -46,20 +54,35 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
     /**
      * Required shallow copy constructor.
      */
-    public AssignmentNode(BOp[] args, Map<String, Object> anns) {
+    public AssignmentNode(final BOp[] args, final Map<String, Object> anns) {
 
-        super(args, anns);
-        assert args[0] instanceof VarNode;
+		super(args, anns);
+
+		if (!(args[0] instanceof VarNode))
+			throw new IllegalArgumentException();
 
     }
 
+	/**
+	 * The variable onto which the assignment is bound (as a {@link VarNode}).
+	 * 
+	 * @return For <code>BIND(valueExpr AS ?var)</code> this returns
+	 *         <code>?var</code> as a {@link VarNode}.
+	 */
     public VarNode getVarNode() {
         
         return (VarNode) get(0);
         
     }
 
-    public IVariable<IV> getVar() {
+	/**
+	 * The variable onto which the assignment is bound (as an {@link IVariable}).
+	 * 
+	 * @return For <code>BIND(valueExpr AS ?var)</code> this returns
+	 *         <code>?var</code> as an {@link IVariable}.
+	 */
+    @SuppressWarnings("rawtypes")
+	public IVariable<IV> getVar() {
 
         return getVarNode().getValueExpression();
         
@@ -73,30 +96,37 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
      * This assumption is build into the GROUP_BY handling in
      * {@link AST2BOpUtility}.
      */
+    @Override
     public IValueExpressionNode getValueExpressionNode() {
      
         return (IValueExpressionNode) get(1);
         
     }
 
+	@Override
+    @SuppressWarnings("rawtypes")
     public IValueExpression<? extends IV> getValueExpression() {
 
         return getValueExpressionNode().getValueExpression();
         
     }
     
+	@Override
+    @SuppressWarnings("rawtypes")
     public void setValueExpression(final IValueExpression<? extends IV> ve) {
     	
     	getValueExpressionNode().setValueExpression(ve);
     	
     }
-    
+
+    @Override
     public void invalidate() {
         
         getValueExpressionNode().invalidate();
         
     }
 
+    @Override
     public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder(indent(indent));
@@ -135,7 +165,7 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
      * Orders {@link AssignmentNode}s by the variable names.
      */
     @Override
-    public int compareTo(AssignmentNode o) {
+    public int compareTo(final AssignmentNode o) {
 
         return getVar().getName().compareTo(o.getVar().getName());
         
@@ -144,23 +174,22 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
 
     @Override
     public int replaceAllWith(final BOp oldVal, final BOp newVal) {
-    	if (oldVal.equals(get(0)) && !(newVal instanceof VarNode)) {
-    		return 0;
-    	}
-    	return super.replaceAllWith(oldVal, newVal);
+        if (oldVal.equals(get(0)) && !(newVal instanceof VarNode)) {
+            return 0;
+        }
+        return super.replaceAllWith(oldVal, newVal);
     }
 
-
-	@Override
+    @Override
     public ModifiableBOpBase setArgs(final BOp[] args) {
-    	assert args[0] instanceof VarNode;
-    	return super.setArgs(args);
+        assert args[0] instanceof VarNode;
+        return super.setArgs(args);
     }
-    
 
     @Override
     public ModifiableBOpBase setArg(final int index, final BOp newArg) {
-    	assert index != 0 || newArg instanceof VarNode;
-    	return super.setArg(index, newArg);
+        assert index != 0 || newArg instanceof VarNode;
+        return super.setArg(index, newArg);
     }
+
 }

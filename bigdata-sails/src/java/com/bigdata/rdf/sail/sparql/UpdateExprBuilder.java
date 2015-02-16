@@ -31,11 +31,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.openrdf.model.Statement;
 import org.openrdf.query.algebra.StatementPattern.Scope;
+import org.openrdf.repository.sail.helpers.SPARQLUpdateDataBlockParser;
+import org.openrdf.rio.RDFHandlerException;
+import org.openrdf.rio.RDFParseException;
+import org.openrdf.rio.helpers.BasicParserSettings;
+import org.openrdf.rio.helpers.StatementCollector;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.internal.IV;
@@ -65,6 +74,8 @@ import com.bigdata.rdf.sail.sparql.ast.ASTModify;
 import com.bigdata.rdf.sail.sparql.ast.ASTMove;
 import com.bigdata.rdf.sail.sparql.ast.ASTQuadsNotTriples;
 import com.bigdata.rdf.sail.sparql.ast.ASTSolutionsRef;
+import com.bigdata.rdf.sail.sparql.ast.ASTUnparsedQuadDataBlock;
+import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.AddGraph;
@@ -138,7 +149,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         final InsertData op = new InsertData();
 
         // variables are disallowed within DELETE DATA (per the spec).
-        op.setData(doQuadsData(node, data, false/* allowVars */, true/* allowBlankNodes */));
+        op.setData(doUnparsedQuadsDataBlock(node, data, false/* allowVars */, true/* allowBlankNodes */));
 
         return op;
 
@@ -158,7 +169,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
         // variables are disallowed within DELETE DATA (per the spec).
         // blank nodes are disallowed within DELETE DATA (per the spec).
-        op.setData(doQuadsData(node, data, false/* allowVars */, false/* allowBlankNodes */));
+        op.setData(doUnparsedQuadsDataBlock(node, data, false/* allowVars */, false/* allowBlankNodes */));
 
         return op;
    
@@ -171,7 +182,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         
         final GroupGraphPattern parentGP = graphPattern;
         
-        graphPattern = new GroupGraphPattern();
+        graphPattern = scopedGroupGraphPattern(node);
 
         final TermNode contextNode = (TermNode) node.jjtGetChild(0).jjtAccept(
                 this, data);
@@ -729,6 +740,40 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
 
     }
 
+    private BigdataStatement[] doUnparsedQuadsDataBlock(final ASTUpdate node, 
+            final Object data,
+            final boolean allowVars,
+            final boolean allowBlankNodes) throws VisitorException {
+     
+        final ASTUnparsedQuadDataBlock dataBlock = node.jjtGetChild(ASTUnparsedQuadDataBlock.class);
+        
+        final SPARQLUpdateDataBlockParser parser = new SPARQLUpdateDataBlockParser(context.valueFactory);
+        final Collection<Statement> stmts = new LinkedList<Statement>();
+        final StatementCollector sc = new StatementCollector(stmts);
+        parser.setRDFHandler(sc);
+        parser.getParserConfig().addNonFatalError(BasicParserSettings.VERIFY_DATATYPE_VALUES);
+        parser.getParserConfig().addNonFatalError(BasicParserSettings.FAIL_ON_UNKNOWN_DATATYPES);
+        try {
+            // TODO process update context somehow? dataset, base URI, etc.
+            parser.parse(new StringReader(dataBlock.getDataBlock()), "");
+        }
+        catch (RDFParseException e) {
+            throw new VisitorException(e);
+        }
+        catch (RDFHandlerException e) {
+            throw new VisitorException(e);
+        }
+        catch (IOException e) {
+            throw new VisitorException(e);
+        }
+        
+        final BigdataStatement[] a = stmts.toArray(
+                new BigdataStatement[stmts.size()]);
+
+        return a;
+        
+    }
+    
     /**
      * Collect 'QuadData' for an INSERT DATA or DELETE DATA operation. This form
      * does not allow variables in the quads data.
@@ -747,7 +792,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
      *      NullPointerException when attempting to INSERT DATA containing a
      *      blank node </a>
      */
-    private BigdataStatement[] doQuadsData(final Node node, final Object data,
+    private BigdataStatement[] doQuadsData(final ASTUpdate node, final Object data,
             final boolean allowVars,
             final boolean allowBlankNodes) throws VisitorException {
 

@@ -32,12 +32,10 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.IGASContext;
-import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.impl.EdgeOnlyFilter;
 import com.bigdata.rdf.graph.impl.GASEngine;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.IStriterator;
@@ -327,12 +325,11 @@ public class RAMGASEngine extends GASEngine {
 
         }
 
-        @SuppressWarnings({ "unchecked", "rawtypes" })
         private IStriterator getEdges(final boolean inEdges,
                 final IGASContext<?, ?, ?> ctx, final Value u)
                 throws SailException {
 
-            final URI linkTypeIV = (URI) ctx.getGASProgram().getLinkType();
+            final URI linkTypeIV = (URI) ctx.getLinkType();
             if(linkTypeIV != null) {
                 /*
                  * FIXME RDR: We need to use a union of access paths for link
@@ -353,8 +350,10 @@ public class RAMGASEngine extends GASEngine {
             /*
              * Optionally wrap the program specified filter. 
              */
-            return ((IGASProgram) ctx.getGASProgram()).constrainFilter(ctx,
-                    sitr);
+//            return ctx.getConstrainEdgeFilter(sitr);
+            sitr.addFilter(new EdgeOnlyFilter(ctx));
+            
+            return sitr;
 
         }
 

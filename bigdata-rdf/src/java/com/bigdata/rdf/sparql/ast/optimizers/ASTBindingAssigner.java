@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -55,6 +56,11 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
+import cutthecrap.utils.striterators.EmptyIterator;
+import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
+
 /**
  * Examines the source {@link IBindingSet}[]. If there is a single binding set
  * in the source, then any variable bound in that input is rewritten in the AST
@@ -73,7 +79,7 @@ public class ASTBindingAssigner implements IASTOptimizer {
     public IQueryNode optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSet) {
 
-        if (bindingSet == null || bindingSet.length > 1) {
+        if (bindingSet == null || bindingSet.length != 1) {
             /*
              * Used iff there is only one input solution.
              * 
@@ -152,14 +158,24 @@ public class ASTBindingAssigner implements IASTOptimizer {
             final GroupNodeBase<IGroupMemberNode> whereClause,
             final IBindingSet bset) {
 
-        final Map<VarNode, ConstantNode> replacements = new LinkedHashMap<VarNode, ConstantNode>();
+    	doBindingAssignment(whereClause, Collections.EMPTY_MAP, bset);
+    	
+    }
+    
+    private void doBindingAssignment(
+            final GroupNodeBase<IGroupMemberNode> whereClause,
+            final Map<VarNode, ConstantNode> parentReplacements,
+            final IBindingSet bset) {
 
-        final Iterator<BOp> itr = BOpUtility
-                .preOrderIterator((BOp) whereClause);
+        final Map<VarNode, ConstantNode> replacements = new LinkedHashMap<VarNode, ConstantNode>();
+        
+        replacements.putAll(parentReplacements);
+
+        final Iterator<BOp> itr = iterateExcludeGroups(whereClause);
 
         while (itr.hasNext()) {
-
-            final BOp node = (BOp) itr.next();
+        	
+        	final BOp node = itr.next();
 
             if (node instanceof FilterNode) {
 
@@ -204,7 +220,8 @@ public class ASTBindingAssigner implements IASTOptimizer {
                 log.info("Replaced " + nmods + " instances of " + oldVal
                         + " with " + newVal);
 
-            assert nmods > 0; // Failed to replace something.
+            // mods will no longer always be > 0 (subgroups)
+//            assert nmods > 0; // Failed to replace something.
 
             ntotal += nmods;
 
@@ -213,8 +230,109 @@ public class ASTBindingAssigner implements IASTOptimizer {
         if (log.isInfoEnabled())
             log.info("Replaced " + ntotal + " instances of "
                     + replacements.size() + " bound variables with constants");
+        
+        // recurse into the childen
+        for (IGroupMemberNode node : whereClause) {
+
+        	if (node instanceof GroupNodeBase) {
+        		
+        		doBindingAssignment((GroupNodeBase<IGroupMemberNode>) node, replacements, bset);
+        		
+        	}
+        	
+        }
+        
+    }
+    
+    /**
+     * Visits the children (recursively) using pre-order traversal, but does NOT
+     * visit this node.
+     * 
+     * @param stack
+     */
+    @SuppressWarnings("unchecked")
+    private Iterator<BOp> iterateExcludeGroups(final BOp op) {
+    	
+    	return iterateExcludeGroups(0, op);
+    	
+    }
+    
+    /**
+     * Visits the children (recursively) using pre-order traversal, but does NOT
+     * visit this node.
+     * 
+     * @param stack
+     */
+    @SuppressWarnings("unchecked")
+    private Iterator<BOp> iterateExcludeGroups(final int depth, final BOp op) {
+
+        /*
+         * Iterator visits the direct children, expanding them in turn with a
+         * recursive application of the pre-order iterator.
+         */
+    	
+		// mild optimization when no children are present.
+		if (op == null || op.arity() == 0)
+			return EmptyIterator.DEFAULT;
+		
+		if (depth > 0 && op instanceof GroupNodeBase)
+			return EmptyIterator.DEFAULT;
+
+        return new Striterator(op.argIterator()).addFilter(new Expander() {
+
+            private static final long serialVersionUID = 1L;
+
+            /*
+             * Expand each child in turn.
+             */
+            protected Iterator expand(final Object childObj) {
+
+                /*
+                 * A child of this node.
+                 */
+
+                final BOp child = (BOp) childObj;
+
+                /*
+                 * TODO The null child reference which can occur here is the [c]
+                 * of the StatementPatternNode. We might want to make [c] an
+                 * anonymous variable instead of having a [null].
+                 */
+                if (child != null && child.arity() > 0) {
+
+                    /*
+                     * The child is a Node (has children).
+                     * 
+                     * Visit the children (recursive pre-order traversal).
+                     */
+
+                    // append this node in pre-order position.
+                    final Striterator itr = new Striterator(
+                            new SingleValueIterator(child));
+
+                    // append children
+                    itr.append(iterateExcludeGroups(depth + 1, child));
+
+                    return itr;
+
+                } else {
+                    
+                    /*
+                     * The child is a leaf.
+                     */
+
+                    // Visit the leaf itself.
+                    return new SingleValueIterator(child);
+                    
+                }
+
+            }
+            
+        });
 
     }
+
+
 
     /**
      * Gather the VarNodes for variables which have bindings.

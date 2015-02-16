@@ -125,14 +125,21 @@ public class TestJournalBasics extends TestCase {
 //        suite.addTestSuite(TestAddDropIndexTask.class);
         // test writing on one or more unisolated indices and verify read back after the commit.
         suite.addTestSuite(TestUnisolatedWriteTasks.class);
+        // test suite for hierarchical locking (namespace prefixes).
+        suite.addTestSuite(TestHierarchicalLockingTasks.class);
+        // test suite for GIST operations using group commit.
+        //suite.addTestSuite(TestGISTTasks.class);
         // stress test of throughput when lock contention serializes unisolated writers.
         suite.addTestSuite(StressTestLockContention.class);
         // stress test of group commit.
         suite.addTestSuite(StressTestGroupCommit.class);
         // stress tests of writes on unisolated named indices using ConcurrencyManager.
         suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
-        // stress tests of writes on unisolated named indices using UnisolatedReadWriteIndex.
-        suite.addTestSuite(StressTestConcurrentUnisolatedIndices.class);
+        /*
+         * Stress tests of writes on unisolated named indices using
+         * UnisolatedReadWriteIndex.
+         */
+        suite.addTestSuite(StressTestUnisolatedReadWriteIndex.class);
         /*
          * Stress test of concurrent transactions.
          * 

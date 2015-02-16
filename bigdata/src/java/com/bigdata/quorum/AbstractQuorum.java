@@ -1860,22 +1860,22 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             }
         }
 
-        /**
-         * An interruptable version of {@link #memberRemove()}.
-         * <p>
-         * Note: This is used by {@link AbstractQuorum#terminate()}. That code
-         * is already holding the lock in the caller's thread. Therefore it
-         * needs to run these operations in the same thread to avoid a deadlock
-         * with itself.
-         */
-        protected void memberRemoveInterruptable() throws InterruptedException {
-            if (!lock.isHeldByCurrentThread())
-                throw new IllegalMonitorStateException();
-            conditionalServiceLeaveImpl();
-            conditionalPipelineRemoveImpl();
-            conditionalWithdrawVoteImpl();
-            conditionalMemberRemoveImpl();
-        }
+//        /**
+//         * An interruptable version of {@link #memberRemove()}.
+//         * <p>
+//         * Note: This is used by {@link AbstractQuorum#terminate()}. That code
+//         * is already holding the lock in the caller's thread. Therefore it
+//         * needs to run these operations in the same thread to avoid a deadlock
+//         * with itself.
+//         */
+//        protected void memberRemoveInterruptable() throws InterruptedException {
+//            if (!lock.isHeldByCurrentThread())
+//                throw new IllegalMonitorStateException();
+//            conditionalServiceLeaveImpl();
+//            conditionalPipelineRemoveImpl();
+//            conditionalWithdrawVoteImpl();
+//            conditionalMemberRemoveImpl();
+//        }
 
         @Override
         final public void withdrawVote() {
@@ -2289,16 +2289,96 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
 
         abstract protected void doMemberAdd();
 
-        abstract protected void doMemberRemove();
+        final protected void doMemberRemove() {
+            doMemberRemove(serviceId);
+        }
+
+        abstract protected void doMemberRemove(UUID serviceId);
 
         abstract protected void doCastVote(long lastCommitTime);
 
-        abstract protected void doWithdrawVote();
+        final protected void doWithdrawVote() {
+            doWithdrawVote(serviceId);
+        }
+
+        abstract protected void doWithdrawVote(UUID serviceId);
 
         abstract protected void doPipelineAdd();
 
-        abstract protected void doPipelineRemove();
+        final protected void doPipelineRemove() {
+            doPipelineRemove(serviceId);
+        }
 
+        abstract protected void doPipelineRemove(UUID serviceId);
+
+        abstract protected void doServiceJoin();
+
+        final protected void doServiceLeave() {
+            doServiceLeave(serviceId);
+        }
+
+        abstract protected void doServiceLeave(UUID serviceId);
+
+        abstract protected void doSetToken(long newToken);
+
+//        abstract protected void doSetLastValidToken(long newToken);
+//
+//        abstract protected void doSetToken();
+        
+        abstract protected void doClearToken();
+
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Note: This implements an unconditional remove of the specified
+         * service. It is intended to force a different service out of the
+         * pipeline. This code deliberately takes this action unconditionally
+         * and does NOT await the requested state change.
+         * <p>
+         * Note: This code could potentially cause the remote service to
+         * deadlock in one of the conditionalXXX() methods if it is concurrently
+         * attempting to execute quorum action on itself. If this problem is
+         * observed, we should add a timeout to the conditionalXXX() methods
+         * that will force them to fail rather than block forever. This will
+         * then force the service into an error state if its QuorumActor can not
+         * carry out the requested action within a specified timeout.
+         * 
+         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/724" >
+         *      HA wire pulling and sure kill testing </a>
+         */
+        @Override
+        final public void forceRemoveService(final UUID psid) {
+            if (log.isInfoEnabled())
+                log.info("Will force remove of service" + ": thisService="
+                        + serviceId + ", otherServiceId=" + psid);
+            runActorTask(new ForceRemoveServiceTask(psid));
+        }
+
+        private class ForceRemoveServiceTask extends ActorTask {
+            private final UUID psid;
+            ForceRemoveServiceTask(final UUID psid) {
+                this.psid = psid;
+            }
+            @Override
+            protected void doAction() throws InterruptedException {
+                log.warn("Forcing remove of service" + ": thisService="
+                        + serviceId + ", otherServiceId=" + psid);
+                /**
+                 * Note: The JOINED[] entry MUST be removed first in case the
+                 * service is not truely dead.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+                 *      > HA wire pulling and sure kill testing </a>
+                 */
+                doServiceLeave(psid);
+                doWithdrawVote(psid);
+                doPipelineRemove(psid);
+                doMemberRemove(psid);
+            }
+        }
+        
         /**
          * Invoked when our client will become the leader to (a) reorganize the
          * write pipeline such that our client is the first service in the write
@@ -2394,18 +2474,6 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
             return modified;
         }
         
-        abstract protected void doServiceJoin();
-
-        abstract protected void doServiceLeave();
-
-        abstract protected void doSetToken(long newToken);
-
-//        abstract protected void doSetLastValidToken(long newToken);
-//
-//        abstract protected void doSetToken();
-        
-        abstract protected void doClearToken();
-
     }
 
     /**

@@ -69,7 +69,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
     private static final Logger log = Logger
-            .getLogger(TestBigdataExprBuilder.class);
+            .getLogger(AbstractBigdataExprBuilderTestCase.class);
 
     /**
      * 

@@ -282,4 +282,26 @@ public class TestOptionals extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
+    /**
+     * Test case for issue #1079.
+     * 
+     * <pre>
+     * select * where {
+     *   optional { 
+     *     <http://someURI> rdfs:label ?labelPrefered_l_ru. 
+     *     filter( langMatches(lang(?labelPrefered_l_ru),"de") )
+     *   }
+     *   optional { 
+     *     <http://someURI> rdfs:label ?labelPrefered_l_ru. 
+     *     filter( langMatches(lang(?labelPrefered_l_ru),"en") )
+     *   }
+     * }
+     * </pre>
+     */
+    public void test_optionals_emptyWhereClause() throws Exception {
+
+        new TestHelper("optionals_emptyWhereClause").runTest();
+
+    }
+    
 }

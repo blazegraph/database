@@ -32,7 +32,7 @@ public class PushbackIterator<E> implements Iterator<E>, ICloseableIterator<E> {
      */
     private E buffer;
 
-    public PushbackIterator(Iterator<E> src) {
+    public PushbackIterator(final Iterator<E> src) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -41,12 +41,14 @@ public class PushbackIterator<E> implements Iterator<E>, ICloseableIterator<E> {
 
     }
 
+    @Override
     public boolean hasNext() {
 
         return buffer != null || src.hasNext();
 
     }
 
+    @Override
     public E next() {
 
         if (!hasNext())
@@ -92,12 +94,14 @@ public class PushbackIterator<E> implements Iterator<E>, ICloseableIterator<E> {
 
     }
 
+    @Override
     public void remove() {
 
         throw new UnsupportedOperationException();
 
     }
 
+    @Override
     public void close() {
 
         if (src instanceof ICloseableIterator) {

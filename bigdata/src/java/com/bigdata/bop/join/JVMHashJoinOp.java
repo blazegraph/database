@@ -34,6 +34,7 @@ import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -56,9 +57,8 @@ import com.bigdata.relation.accesspath.IAccessPath;
  * @see JVMHashJoinUtility
  *  
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class JVMHashJoinOp<E> extends HashJoinOp<E> {
+public class JVMHashJoinOp<E> extends HashJoinOp<E> implements ISingleThreadedOp {
     
     /**
      * 
@@ -94,9 +94,7 @@ public class JVMHashJoinOp<E> extends HashJoinOp<E> {
 
         super(args, annotations);
 
-        if (getMaxParallel() != 1)
-            throw new UnsupportedOperationException(Annotations.MAX_PARALLEL
-                    + "=" + getMaxParallel());
+        assertMaxParallelOne();
 
         assertAtOnceJavaHeapOp();
 

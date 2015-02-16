@@ -30,12 +30,10 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-
 /**
  * Test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestAll.java 4908 2011-07-13 19:42:43Z thompsonbry $
  */
 public class TestAll extends TestCase {
 
@@ -57,21 +55,29 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
 
-        /*
-         * WebApp Client.
-         */
-        suite.addTest(com.bigdata.rdf.sail.webapp.client.TestAll.suite());
+//        // Test suite of NSS startup behavior and overrides.
+//        suite.addTestSuite(TestNanoSparqlServer.class);
+//
+//        /*
+//         * WebApp Client.
+//         */
+//        suite.addTest(com.bigdata.rdf.sail.webapp.client.TestAll.suite());
+//
+//        /*
+//         * Test suite utility class for building XML/HTML documents.
+//         */
+//        suite.addTestSuite(TestXMLBuilder.class);
+//        
+//        /*
+//         * Test suite for content negotiation.
+//         */
+//        suite.addTestSuite(TestConneg.class);
+//        
+//        /*
+//         * Basic LBS unit tests (ranking and scoring hosts).
+//         */
+//        suite.addTest(com.bigdata.rdf.sail.webapp.lbs.TestAll.suite());
 
-        /*
-         * Test suite utility class for building XML/HTML documents.
-         */
-        suite.addTestSuite(TestXMLBuilder.class);
-        
-        /*
-         * Test suite for content negotiation.
-         */
-        suite.addTestSuite(TestConneg.class);
-        
         /*
          * Core test suite for REST API behavior. This test suite is run for
          * each mode of the database (triples, sids, quads).
@@ -79,13 +85,19 @@ public class TestAll extends TestCase {
          * Note: The test suite can also be run against a federation using the
          * main() routine in TestNanoSparqlServerWithProxyIndexManager.
          */
+
+		// RWStore specific unit tests.
+		suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(
+				TestNanoSparqlServerWithProxyIndexManager
+						.getTemporaryJournal(true/* RWStore */),
+				TestMode.triples));
+
+        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
         
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.triples));
         
-        suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));
-        
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.quads));
-        
+
         return suite;
 
     }

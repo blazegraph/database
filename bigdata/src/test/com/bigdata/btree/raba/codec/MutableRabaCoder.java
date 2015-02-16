@@ -44,7 +44,6 @@ import com.bigdata.io.DataOutputBuffer;
  * and {@link Leaf}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class MutableRabaCoder implements IRabaCoder {
 
@@ -53,7 +52,8 @@ public class MutableRabaCoder implements IRabaCoder {
      */
     private static final long serialVersionUID = -7123556255775810548L;
 
-    public ICodedRaba decode(AbstractFixedByteArrayBuffer data) {
+    @Override
+    public ICodedRaba decode(final AbstractFixedByteArrayBuffer data) {
         
         // Note: an alternative class is used to encode/decode.
         final IRaba raba = SimpleRabaCoder.INSTANCE.decode(data);
@@ -70,13 +70,16 @@ public class MutableRabaCoder implements IRabaCoder {
         
     }
 
-    public AbstractFixedByteArrayBuffer encode(IRaba raba, DataOutputBuffer buf) {
+    @Override
+    public AbstractFixedByteArrayBuffer encode(final IRaba raba,
+            final DataOutputBuffer buf) {
 
         return encodeLive(raba, buf).data();
-        
+
     }
 
-    public ICodedRaba encodeLive(IRaba raba, DataOutputBuffer buf) {
+    @Override
+    public ICodedRaba encodeLive(final IRaba raba, final DataOutputBuffer buf) {
 
         // Note: an alternative class is used to encode/decode.
         final AbstractFixedByteArrayBuffer data = SimpleRabaCoder.INSTANCE
@@ -97,6 +100,7 @@ public class MutableRabaCoder implements IRabaCoder {
     /**
      * Yes.
      */
+    @Override
     final public boolean isKeyCoder() {
         
         return true;
@@ -106,12 +110,20 @@ public class MutableRabaCoder implements IRabaCoder {
     /**
      * Yes.
      */
+    @Override
     final public boolean isValueCoder() {
         
         return true;
         
     }
 
+    @Override
+    public boolean isDuplicateKeys() {
+
+        throw new UnsupportedOperationException();
+        
+    }
+    
     /**
      * {@link MutableKeyBuffer} with mock implementation of {@link ICodedRaba}
      * methods.
@@ -123,7 +135,8 @@ public class MutableRabaCoder implements IRabaCoder {
 
         private final AbstractFixedByteArrayBuffer data;
 
-        public KeysRabaImpl(IRaba raba, AbstractFixedByteArrayBuffer data) {
+        public KeysRabaImpl(final IRaba raba,
+                final AbstractFixedByteArrayBuffer data) {
 
             super(raba.capacity(), raba);
 
@@ -143,21 +156,24 @@ public class MutableRabaCoder implements IRabaCoder {
      * {@link MutableValueBuffer} with mock implementation of {@link ICodedRaba}
      * methods.
      * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
      */
-    private static class ValuesRabaImpl extends MutableValueBuffer implements ICodedRaba {
+    private static class ValuesRabaImpl extends MutableValueBuffer implements
+            ICodedRaba {
 
         private final AbstractFixedByteArrayBuffer data;
-        
-        public ValuesRabaImpl(IRaba raba,AbstractFixedByteArrayBuffer data) {
-            
+
+        public ValuesRabaImpl(final IRaba raba,
+                final AbstractFixedByteArrayBuffer data) {
+
             super(raba.capacity(), raba);
         
             this.data = data;
             
         }
 
+        @Override
         public AbstractFixedByteArrayBuffer data() {
             
             return data;
@@ -165,5 +181,5 @@ public class MutableRabaCoder implements IRabaCoder {
         }
         
     }
-    
+
 }

@@ -16,25 +16,27 @@
 package com.bigdata.rdf.graph.impl;
 
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 
+
+import com.bigdata.rdf.graph.BinderBase;
 import com.bigdata.rdf.graph.EdgesEnum;
 import com.bigdata.rdf.graph.Factory;
 import com.bigdata.rdf.graph.FrontierEnum;
+import com.bigdata.rdf.graph.IBinder;
+import com.bigdata.rdf.graph.IBindingExtractor;
 import com.bigdata.rdf.graph.IGASContext;
 import com.bigdata.rdf.graph.IGASProgram;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.impl.util.VertexDistribution;
-
-import cutthecrap.utils.striterators.Filter;
-import cutthecrap.utils.striterators.IFilter;
-import cutthecrap.utils.striterators.IStriterator;
 
 /**
  * Abstract base class with some useful defaults.
@@ -48,103 +50,6 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
         IGASProgram<VS, ES, ST> {
 
     private static final Logger log = Logger.getLogger(BaseGASProgram.class);
-    
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation does not restrict the visitation to a
-     * connectivity matrix (returns <code>null</code>).
-     */
-    @Override
-    public URI getLinkType() {
-        
-        return null;
-        
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation returns its argument.
-     */
-    @Override
-    public IStriterator constrainFilter(final IGASContext<VS, ES, ST> ctx,
-            final IStriterator itr) {
-
-        return itr;
-        
-    }
-    
-    /**
-     * Return an {@link IFilter} that will only visit the edges of the graph.
-     * 
-     * @see IGASState#isEdge(Statement)
-     */
-    protected IFilter getEdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
-
-        return new EdgeOnlyFilter(ctx);
-        
-    }
-    
-    /**
-     * Filter visits only edges (filters out attribute values).
-     * <p>
-     * Note: This filter is pushed down onto the AP and evaluated close to the
-     * data.
-     */
-    private class EdgeOnlyFilter extends Filter {
-        private static final long serialVersionUID = 1L;
-        private final IGASState<VS, ES, ST> gasState;
-        private EdgeOnlyFilter(final IGASContext<VS, ES, ST> ctx) {
-            this.gasState = ctx.getGASState();
-        }
-        @Override
-        public boolean isValid(final Object e) {
-            return gasState.isEdge((Statement) e);
-        }
-    };
-    
-    /**
-     * Return a filter that only visits the edges of graph that are instances of
-     * the specified link attribute type.
-     * <p>
-     * Note: For bigdata, the visited edges can be decoded to recover the
-     * original link as well. 
-     * 
-     * @see IGASState#isLinkAttrib(Statement, URI)
-     * @see IGASState#decodeStatement(Value)
-     */
-    protected IFilter getLinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
-            final URI linkAttribType) {
-
-        return new LinkAttribFilter(ctx, linkAttribType);
-
-    }
-
-    /**
-     * Filter visits only edges where the {@link Statement} is an instance of
-     * the specified link attribute type. For bigdata, the visited edges can be
-     * decoded to recover the original link as well.
-     */
-    private class LinkAttribFilter extends Filter {
-        private static final long serialVersionUID = 1L;
-
-        private final IGASState<VS, ES, ST> gasState;
-        private final URI linkAttribType;
-        
-        public LinkAttribFilter(final IGASContext<VS, ES, ST> ctx,
-                final URI linkAttribType) {
-            if (linkAttribType == null)
-                throw new IllegalArgumentException();
-            this.gasState = ctx.getGASState();
-            this.linkAttribType = linkAttribType;
-        }
-
-        @Override
-        public boolean isValid(final Object e) {
-            return gasState.isLinkAttrib((Statement) e, linkAttribType);
-        }
-    }
     
 //    /**
 //     * If the vertex is actually an edge, then return the decoded edge.
@@ -163,6 +68,8 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
      * The default implementation returns {@link #getGatherEdges()} and the
      * {@link #getScatterEdges()} if {@link #getGatherEdges()} returns
      * {@value EdgesEnum#NoEdges}. 
+     * 
+     * TODO This ignores {@link IGASContext#isDirectedTraversal()}
      */
     @Override
     public EdgesEnum getSampleEdgesFilter() {
@@ -223,17 +130,17 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
 
     }
     
-    /**
-     * {@inheritDoc}
-     * <p>
-     * The default implementation is a NOP.
-     */
-    @Override
-    public void after(final IGASContext<VS, ES, ST> ctx) {
-    
-        // NOP
-        
-    }
+//    /**
+//     * {@inheritDoc}
+//     * <p>
+//     * The default implementation is a NOP.
+//     */
+//    @Override
+//    public <T> IReducer<VS, ES, ST, T> getDefaultAfterOp() {
+//    
+//        return null; // NOP
+//        
+//    }
     
     /**
      * Populate the initial frontier using all vertices in the graph.
@@ -319,4 +226,56 @@ abstract public class BaseGASProgram<VS, ES, ST> implements
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * <dl>
+     * <dt>{@value Bindings#VISITED}</dt>
+     * <dd>The visited vertex itself.</dd>
+     * </dl>
+     */
+    @Override
+    public List<IBinder<VS, ES, ST>> getBinderList() {
+
+        final List<IBinder<VS, ES, ST>> tmp = new LinkedList<IBinder<VS, ES, ST>>();
+
+        tmp.add(new BinderBase<VS, ES, ST>() {
+
+            @Override
+            public int getIndex() {
+
+                return Bindings.VISITED;
+
+            }
+
+            @Override
+            public Value bind(final ValueFactory vf,
+                    final IGASState<VS, ES, ST> state, final Value u) {
+
+                return u;
+
+            }
+
+        });
+
+        return tmp;
+
+    }
+
+    /**
+     * Interface declares symbolic constants for the {@link IBindingExtractor.IBinder}s reported
+     * by {@link BaseGASProgram#getBinderList()}.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    public interface Bindings {
+        
+        /**
+         * The visited vertex identifier.
+         */
+        int VISITED = 0;
+
+    }
+    
 }

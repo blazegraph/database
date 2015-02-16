@@ -119,7 +119,7 @@ public class EdgeSample extends SampleBase {
 	 *            <i>outputCount</i> as adjusted for a variety of edge
 	 *            conditions).
 	 */
-    EdgeSample(final SampleBase sourceSample,//
+    public EdgeSample(final SampleBase sourceSample,//
             final int inputCount, //
             final long tuplesRead,//
             final long sumRangeCount,//

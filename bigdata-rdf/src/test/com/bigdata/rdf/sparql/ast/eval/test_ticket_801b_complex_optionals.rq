@@ -1,0 +1,27 @@
+# See #801 (Adding OPTIONAL removes solutions)
+#
+select ?name 
+{
+        {
+                select ?p  
+                {
+                        ?p a <http://www.example.org/schema/Person> . 
+                        optional{?p <http://www.example.org/schema/age> ?age.}
+                } 
+                LIMIT 1
+        }
+                
+        {?p <http://www.example.org/schema/name> ?name.}
+        
+        OPTIONAL
+        {       ?post a <http://www.example.org/schema/Post> . 
+                ?post <http://www.example.org/schema/postedBy> ?p.
+                ?post <http://www.example.org/schema/content> ?postContent.
+        }
+        OPTIONAL{      
+                ?comment a <http://www.example.org/schema/Comment> .
+                ?comment <http://www.example.org/schema/parentPost> ?post.
+                ?cperson a <http://www.example.org/schema/Person> .
+                ?comment <http://www.example.org/schema/postedBy> ?cperson .
+        }
+}

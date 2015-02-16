@@ -49,7 +49,7 @@ cd `dirname $0`
 #/sbin/sysctl -w vm.swappiness=0
 
 # Setup the environment.
-source bigdata/bigdataHA.config
+source /etc/default/bigdataHA
 
 if [ -z "$binDir" ]; then
    echo $"$0 : environment not setup: binDir is undefined."
@@ -59,6 +59,23 @@ if [ -z "$pidFile" ]; then
    echo $"$0 : environment not setup: pidFile is undefined"
    exit 1;
 fi
+if [ -z "$BD_USER" ]; then
+   echo $"$0 : environment not setup: BD_USER is undefined"
+   exit 1;
+fi
+if [ -z "$BD_GROUP" ]; then
+   echo $"$0 : environment not setup: BD_GROUP is undefined"
+   exit 1;
+fi
+
+cd $FED_DIR
+
+if [ ! -d "$DATA_DIR/lost+found" ]; then
+	mount /dev/vg/lv_bigdata $DATA_DIR
+	action $"`date` : `hostname` : restoring bigdata journal file: " sudo -u $BD_USER -g $BD_GROUP bin/HARestore
+fi
+
+
 
 #
 # See how we were called.
@@ -78,7 +95,7 @@ case "$1" in
 	    fi
 	fi
 	if [ ! -f "$pidFile" ]; then
-		action $"`date` : `hostname` : bringing up services: " $binDir/startHAServices
+		action $"`date` : `hostname` : bringing up services: " sudo -u $BD_USER -g $BD_GROUP bash -c "source /etc/default/bigdataHA ; $binDir/startHAServices > /dev/null 2>&1 &"
 	else
             echo $"`date` : `hostname` : running as $pid"
 	fi 
@@ -95,7 +112,7 @@ case "$1" in
 		echo $"`date` : `hostname` : $pid died?"
 		rm -f "$pidFile"
 	    else
-		action $"`date` : `hostname` : bringing down services: " kill $pid
+		action $"`date` : `hostname` : bringing down services: " sudo -u $BD_USER -g $BD_GROUP kill $pid
 		rm -f "$pidFile"
 	    fi
 	fi

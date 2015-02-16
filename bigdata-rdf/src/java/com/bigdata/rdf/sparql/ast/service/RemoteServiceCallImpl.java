@@ -29,15 +29,16 @@ package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.UUID;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -48,8 +49,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * adjusting the {@link RemoteServiceOptions} for the service URI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: RemoteServiceCallImpl.java 6060 2012-03-02 16:07:38Z
- *          thompsonbry $
  */
 public class RemoteServiceCallImpl implements RemoteServiceCall {
 
@@ -141,9 +140,12 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
         o.addRequestParam("query", queryStr);
         
         o.addRequestParam("queryId", queryId.toString());
-
-        final RemoteRepository repo = new RemoteRepository(uriStr,
-                new DefaultHttpClient(params.getClientConnectionManager()),
+        
+       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        final RemoteRepositoryManager repo = new RemoteRepositoryManager(//
+                uriStr,//
+                params.getServiceOptions().isBigdataLBS(),// useLBS
+                client,
                 params.getTripleStore().getExecutorService()
                 );
         
@@ -166,14 +168,13 @@ public class RemoteServiceCallImpl implements RemoteServiceCall {
 //            
 ////            queryResult = parseResults(checkResponseCode(doSparqlQuery(opts)));
 
-            queryResult = repo.tupleResults(o, queryId);
+            queryResult = repo.tupleResults(o, queryId, null);
             
         } finally {
 
-            /*
-             * Note: HttpURLConnection.disconnect() is not a "close". close() is
-             * an implicit action for this class.
-             */
+            repo.close();
+            
+            client.stop();
 
         }
 

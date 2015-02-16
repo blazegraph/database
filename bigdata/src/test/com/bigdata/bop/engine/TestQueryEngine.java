@@ -87,7 +87,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @see TestFederatedQueryEngine
  */
@@ -489,6 +488,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                        new NV(
 //                                QueryEngineTestAnnotations.COMBINE_RECEIVED_CHUNKS,
 //                                false),//
@@ -784,6 +784,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                                 BOpEvaluationContext.CONTROLLER),//
                                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
 //                                        // Require the chunked running query impl.
 //                                        new NV(QueryEngine.Annotations.RUNNING_QUERY_CLASS,
 //                                                ChunkedRunningQuery.class.getName()),//
@@ -950,6 +951,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                         BOpEvaluationContext.CONTROLLER),//
                                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         })//
         );
 
@@ -1102,6 +1104,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         })//
         );
 
@@ -1580,6 +1583,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                         new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                         }));
 
         final PipelineOp query = sliceOp;
@@ -1952,6 +1956,7 @@ public class TestQueryEngine extends AbstractQueryEngineTestCase {
                                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                                         BOpEvaluationContext.CONTROLLER),//
                                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                                 }));
 
         final PipelineOp query = sliceOp;

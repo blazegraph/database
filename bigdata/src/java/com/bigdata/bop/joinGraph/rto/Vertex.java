@@ -83,6 +83,7 @@ public class Vertex implements Serializable {
 
     }
 
+    @Override
     public String toString() {
 
         return "Vertex{pred=" + pred + ",sample=" + sample + "}";
@@ -92,6 +93,7 @@ public class Vertex implements Serializable {
     /**
      * Equals is based on a reference test.
      */
+    @Override
     public boolean equals(Object o) {
         return this == o;
     }
@@ -100,6 +102,7 @@ public class Vertex implements Serializable {
      * The hash code is just the {@link BOp.Annotations#BOP_ID} of the
      * associated {@link IPredicate}.
      */
+    @Override
     public int hashCode() {
         return pred.getId();
     }
@@ -148,6 +151,41 @@ public class Vertex implements Serializable {
 
         }
 
+        /*
+         * FIXME RTO: AST2BOpJoins is responsible for constructing the
+         * appropriate access path. Under some cases it can emit a DataSetJoin
+         * followed by a join against the access path. Under other cases, it
+         * will use a SCAN+FILTER pattern and attach a filter. The code below
+         * does not benefit from any of this because the vertex created from the
+         * [pred] before we invoke AST2BOpJoin#join() and hence lacks all of
+         * these interesting and critical annotations. When generating the join
+         * graph, the RTO needs to emit a set of vertices and filters that is
+         * sufficient for joins for named graphs and default graphs. It also
+         * needs to emit a set of predicates and filters that is sufficient for
+         * triples mode joins.
+         * 
+         * Some possible approaches:
+         * 
+         * - For the RTO, always do a DataSetJoin + SP. We would need to support
+         * the DataSetJoin as a Predicate (it does not get modeled that way
+         * right now). The SP would need to have the DISTINCT SPO filter
+         * attached for a default graph join. This might even be a DISTINCT
+         * FILTER that gets into the plan and winds up attached to either the
+         * DataSetJoin or the SP, depending on which runs first. This would give
+         * us two APs plus a visible FILTER rather than ONE AP with some hidden
+         * filters. The DataSetJoin would need to be associated with an AP that
+         * binds the (hidden) graph variable. This could be an opporunity to
+         * generalize for storing those data on the native heap / htree / etc. /
+         * named solution set as well.
+         * 
+         * Basically, this amounts to saying that we will sample both the set of
+         * graphs that are in the named graphs or default graphs data set and
+         * the unconstrained triple pattern AP.
+         * 
+         * - If C is bound, then we should just wind up with a FILTER that is
+         * imposing the DISTINCT SPO (for default graph APs) and do not need to
+         * do anything (for named graph AP)s.
+         */
         final BOpContextBase context = new BOpContextBase(queryEngine);
 
         final IRelation r = context.getRelation(pred);

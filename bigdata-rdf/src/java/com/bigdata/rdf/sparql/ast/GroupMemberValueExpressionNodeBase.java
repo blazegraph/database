@@ -37,12 +37,12 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.INeedsMaterialization;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
+@SuppressWarnings("rawtypes")
 public abstract class GroupMemberValueExpressionNodeBase extends
         GroupMemberNodeBase implements IValueExpressionMetadata {
 
@@ -74,7 +74,7 @@ public abstract class GroupMemberValueExpressionNodeBase extends
 
     }
 
-    abstract IValueExpressionNode getValueExpressionNode();
+    abstract public IValueExpressionNode getValueExpressionNode();
 
     abstract IValueExpression<? extends IV> getValueExpression();
 
@@ -97,6 +97,7 @@ public abstract class GroupMemberValueExpressionNodeBase extends
         
     }
 
+    @Override
     public Set<IVariable<?>> getConsumedVars() {
 
         final Set<IVariable<?>> consumedVars = new LinkedHashSet<IVariable<?>>();
@@ -114,6 +115,7 @@ public abstract class GroupMemberValueExpressionNodeBase extends
 
     }
 
+    @Override
     public ComputedMaterializationRequirement getMaterializationRequirement() {
 
         final IValueExpression<?> ve = getRequiredValueExpression();

@@ -56,16 +56,16 @@ import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.GlobalFileSystemHelper;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
+import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IDirtyListener;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.concurrent.LockManager;
-import com.bigdata.concurrent.LockManagerTask;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.htree.AbstractHTree;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
@@ -82,6 +82,9 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.TaskCounters;
+
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Abstract base class for tasks that may be submitted to the
@@ -113,10 +116,6 @@ import com.bigdata.util.concurrent.TaskCounters;
  * {@link ConcurrencyManager#submit(AbstractTask)} it.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
- * 
- * @todo declare generic type for the return as <? extends Object> to be compatible
- * with {@link ConcurrencyManager#submit(AbstractTask)}
  */
 public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
@@ -163,12 +162,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * The object used to manage access to the resources from which views of the
      * indices are created.
      */
+    @Override
     public final IResourceManager getResourceManager() {
         
         return resourceManager;
         
     }
     
+    @Override
     synchronized public final IJournal getJournal() {
 
         if (journal == null) {
@@ -200,6 +201,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
     }
 
+    /** Guarded by <code>synchronized(AbstractTask)</code>. */
     private IJournal journal;
     
     /**
@@ -261,6 +263,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Cache of named indices resolved by this task for its {@link #timestamp}.
      * 
      * @see #getIndex(String name)
+     * @see #getIndexLocal(String)
      */
     final private Map<String,ILocalBTreeView> indexCache;
 
@@ -279,7 +282,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         boolean registeredIndex = false;
         boolean droppedIndex = false;
         
-        Entry(Name2Addr.Entry entry) {
+        Entry(final Name2Addr.Entry entry) {
             
             super(entry.name, entry.checkpointAddr, entry.commitTime);
             
@@ -292,7 +295,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * @param checkpointAddr
          * @param commitTime
          */
-        Entry(String name, long checkpointAddr, long commitTime) {
+        Entry(final String name, final long checkpointAddr, final long commitTime) {
             
             super(name, checkpointAddr, commitTime);
             
@@ -385,10 +388,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             for(String s : resource) {
                 
                 final Name2Addr.Entry tmp = name2Addr.getEntry(s);
-                
-                if(tmp != null) {
+
+                if (tmp != null) {
                 
                     /*
+                     * Exact match on a named index.
+                     * 
                      * Add a read-only copy of the entry with additional state
                      * for tracking registration and dropping of named indices.
                      * 
@@ -397,6 +402,37 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      */
                     
                     n2a.put(s, new Entry(tmp));
+                    
+                } else {
+                    
+                    /**
+                     * Add a read-only copy of the Name2Addr entry for all
+                     * entries spanned by that namespace. This provides the
+                     * additional state for tracking registration and dropping
+                     * of named indices and also supports hierarchical locking
+                     * pattersn.
+                     * 
+                     * Note: We do NOT fetch the indices here, just copy their
+                     * last checkpoint metadata from Name2Addr.
+                     * 
+                     * @see <a
+                     *      href="http://trac.bigdata.com/ticket/566"
+                     *      > Concurrent unisolated operations against multiple
+                     *      KBs </a>
+                     */
+                    
+                    final Iterator<String> itr = Name2Addr.indexNameScan(s,
+                            name2Addr);
+
+                    while (itr.hasNext()) {
+
+                        final String t = itr.next();
+
+                        final Name2Addr.Entry tmp2 = name2Addr.getEntry(t);
+
+                        n2a.put(t, new Entry(tmp2));
+
+                    }
                     
                 }
                 
@@ -419,9 +455,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     private class DirtyListener implements IDirtyListener {
         
-        final String name;
-        final ICheckpointProtocol btree;
+        private final String name;
+        private final ICheckpointProtocol ndx;
         
+        @Override
         public String toString() {
             
             return "DirtyListener{name="+name+"}";
@@ -437,7 +474,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             this.name = name;
             
-            this.btree = ndx;
+            this.ndx = ndx;
             
         }
         
@@ -445,11 +482,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Add <i>this</i> to the {@link AbstractTask#commitList}.
          * 
          * @param btree
-         *            The {@link BTree} reporting that it is dirty.
+         *            The index reporting that it is dirty.
          */
+        @Override
         public void dirtyEvent(final ICheckpointProtocol btree) {
 
-            assert btree == this.btree;
+            assert btree == this.ndx;
 
             if (commitList.put(name, this) != null) {
 
@@ -505,43 +543,22 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     }
 
     /**
-     * Return a view of the named index appropriate for the timestamp associated
-     * with this task.
+     * {@inheritDoc}
      * <p>
      * Note: There are two ways in which a task may access an
      * {@link ITx#UNISOLATED} index, but in all cases access to the index is
      * delegated to this method. First, the task can use this method directly.
      * Second, the task can use {@link #getJournal()} and then use
      * {@link IJournal#getIndex(String)} on that journal, which is simply
-     * delegated to this method.  See {@link IsolatedActionJournal}.
+     * delegated to this method. See {@link IsolatedActionJournal}.
      * 
-     * @param name
-     *            The name of the index.
-     * 
-     * @throws NullPointerException
-     *             if <i>name</i> is <code>null</code>.
-     * @throws IllegalStateException
-     *             if <i>name</i> is not a declared resource.
-     * @throws StaleLocatorException
-     *             if <i>name</i> identifies an index partition which has been
-     *             split, joined, or moved.
-     * @throws NoSuchIndexException
-     *             if the named index is not registered as of the timestamp.
-     * 
-     * @return The index.
-     * 
-     * @todo modify to return <code>null</code> if the index is not
-     *       registered?
+     * @see http://trac.bigdata.com/ticket/585 (GIST)
      */
     @Override
     synchronized final public ILocalBTreeView getIndex(final String name) {
 
-        if (name == null) {
-
-            // @todo change to IllegalArgumentException for API consistency?
+        if (name == null)
             throw new NullPointerException();
-            
-        }
         
         // validate that this is a declared index.
         assertResource(name);
@@ -594,10 +611,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * index from the store, set the [lastCommitTime], and enter it into
              * the unisolated Name2Addr's cache of unisolated indices.
              */
-            BTree btree;
+            ICheckpointProtocol ndx;
             
             // the unisolated name2Addr object.
-            final Name2Addr name2Addr = resourceManager.getLiveJournal()._getName2Addr();
+            final Name2Addr name2Addr = resourceManager.getLiveJournal()
+                    ._getName2Addr();
 
             synchronized (name2Addr) {
 
@@ -638,46 +656,61 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * But, fetch the btree from the cache to ensure we use the
                      * most recent checkpoint
                      */
-                    btree = null;
+                    ndx = null;
 
-                    final BTree tmpbtree = (BTree) name2Addr.getIndexCache(name);
-                    if (tmpbtree != null)
-                        checkpointAddr = tmpbtree.getCheckpoint().getCheckpointAddr();
+                    final ICheckpointProtocol tmp_ndx = name2Addr
+                            .getIndexCache(name);
+
+                    if (tmp_ndx != null) {
+
+                        checkpointAddr = tmp_ndx.getCheckpoint()
+                                .getCheckpointAddr();
+
+                    }
                     
                 } else {
-                    // recover from unisolated index cache.
-                    btree = (BTree) name2Addr.getIndexCache(name);
+
+                    // Recover from unisolated index cache.
+                    ndx = name2Addr.getIndexCache(name);
+                    
                 }
                 
-                if (btree == null) {
+                if (ndx == null) {
 
-                    final IJournal tmp;
-//                    tmp = resourceManager.getLiveJournal();
-                    tmp = getJournal();// wrap with the IsolatedActionJournal.
+                    // wrap with the IsolatedActionJournal.
+                    final IJournal tmp = getJournal();
+//                  tmp = resourceManager.getLiveJournal();
                     
                     // re-load btree from the store.
-                    btree = BTree.load(//
+                    ndx = Checkpoint.loadFromCheckpoint(//
                             tmp, // backing store.
                             checkpointAddr,//
                             false// readOnly
                             );
 
                     // set the lastCommitTime on the index.
-                    btree.setLastCommitTime(entry.commitTime);
+                    ndx.setLastCommitTime(entry.commitTime);
 
                     // add to the unisolated index cache (must not exist).
-                    name2Addr.putIndexCache(name, btree, false/* replace */);
+                    name2Addr.putIndexCache(name, ndx, false/* replace */);
 
-                    btree.setBTreeCounters(resourceManager
-                            .getIndexCounters(name));
+                    // set performance counters iff the class supports it.
+                    if (ndx instanceof AbstractBTree) {
+                        ((AbstractBTree) ndx).setBTreeCounters(resourceManager
+                                .getIndexCounters(name));
+                    } else if (ndx instanceof AbstractHTree) {
+                        ((AbstractHTree) ndx).setBTreeCounters(resourceManager
+                                .getIndexCounters(name));
+                    }
                     
                 }
 
             }
 
             try {
-             
-                return getUnisolatedIndexView(name, btree);
+
+                // wrap B+Tree as FusedView: FIXME GIST : BTree specific code path.
+                return getUnisolatedIndexView(name, (BTree) ndx);
                 
             } catch (NoSuchStoreException ex) {
                 
@@ -718,10 +751,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Given the name of an index and a {@link BTree}, obtain the view for all
      * source(s) described by the {@link BTree}s index partition metadata (if
-     * any), inserts that view into the {@link #indexCache}, and return the view.
+     * any), inserts that view into the {@link #indexCache}, and return the
+     * view.
      * <p>
-     * Note: This method is used both when registering a new index ({@link #registerIndex(String, BTree)})
-     * and when reading an index view from the source ({@link #getIndex(String)}).
+     * Note: This method is used both when registering a new index (
+     * {@link #registerIndex(String, BTree)}) and when reading an index view
+     * from the source ({@link #getIndex(String)}).
      * 
      * @param name
      *            The index name.
@@ -899,7 +934,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *             
      * @see IIndexManager#dropIndex(String)
      */
-    synchronized public void dropIndex(String name) {
+    synchronized public void dropIndex(final String name) {
 
         if (name == null)
             throw new IllegalArgumentException();
@@ -945,13 +980,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
     }
 
-    /**
+   /**
      * {@link Callable} checkpoints an index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      *         
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675" >
+     * @see <a href="http://trac.bigdata.com/ticket/675" >
      *      Flush indices in parallel during checkpoint to reduce IO latency</a>
      */
     private class CheckpointIndexTask implements Callable<Void> {
@@ -963,7 +998,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             this.l = l;
             
         }
-        
+
+        @Override
         public Void call() throws Exception {
 
             if(log.isInfoEnabled())
@@ -971,7 +1007,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
             try {
 
-                l.btree.writeCheckpoint();
+                l.ndx.writeCheckpoint();
                 
             } catch (Throwable t) {
                 
@@ -998,7 +1034,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The elapsed time in nanoseconds for this operation.
      * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/675"
+     * @see <a href="http://trac.bigdata.com/ticket/675"
      *      >Flush indices in parallel during checkpoint to reduce IO
      *      latency</a>
      */
@@ -1150,7 +1186,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                                 + entry.name);
 
                     name2Addr.registerIndex(entry.name, (BTree)commitList
-                            .get(entry.name).btree);
+                            .get(entry.name).ndx);
 
                 } else {
 
@@ -1181,7 +1217,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                                     + entry.name);
 
                         name2Addr
-                                .putOnCommitList(l.name, l.btree, false/*needsCheckpoint*/);
+                                .putOnCommitList(l.name, l.ndx, false/*needsCheckpoint*/);
 
                     }
                     
@@ -1237,8 +1273,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * fails. The boolean argument indicates whether or not the group commit
      * succeeded. Throws exceptions are trapped and logged.
      */
-    void afterTaskHook(boolean abort) {
+    void afterTaskHook(final boolean abort) {
+        
         ((IsolatedActionJournal) getJournal()).completeTask();
+        
     }
     
     /*
@@ -1249,7 +1287,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Flag is cleared if the task is aborted.  This is used to refuse
      * access to resources for tasks that ignore interrupts.
      */
-    boolean aborted = false;
+    volatile boolean aborted = false;
     
     /**
      * The {@link AbstractTask} increments various counters of interest to the
@@ -1257,6 +1295,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     protected TaskCounters taskCounters;
     
+    @Override
     public TaskCounters getTaskCounters() {
         
         return taskCounters;
@@ -1307,13 +1346,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *            The transaction identifier -or- {@link ITx#UNISOLATED} IFF the
      *            operation is NOT isolated by a transaction -or-
      *            <code> - timestamp </code> to read from the most recent commit
-     *            point not later than the absolute value of <i>timestamp</i>
-     *            (a historical read).
+     *            point not later than the absolute value of <i>timestamp</i> (a
+     *            historical read).
      * @param resource
      *            The resource on which the task will operate. E.g., the names
      *            of the index. When the task is an unisolated write task an
      *            exclusive lock will be requested on the named resource and the
      *            task will NOT run until it has obtained that lock.
+     *            <p>
+     *            The name may identify either a namespace or a concrete index
+     *            object. If a concrete index object is discovered, only that
+     *            index is isolated. Otherwise all indices having the same
+     *            prefix as the namespace are isolated.
      */
     protected AbstractTask(final IConcurrencyManager concurrencyManager,
             final long timestamp, final String resource) {
@@ -1338,6 +1382,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *            task an exclusive lock will be requested on each named
      *            resource and the task will NOT run until it has obtained those
      *            lock(s).
+     *            <p>
+     *            The name may identify either a namespace or a concrete index
+     *            object. If a concrete index object is discovered, only that
+     *            index is isolated. Otherwise all indices having the same
+     *            prefix as the namespace are isolated.
      */
     protected AbstractTask(final IConcurrencyManager concurrencyManager,
             final long timestamp, final String[] resource) {
@@ -1445,7 +1494,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
                 if (transactionManager.getTx(timestamp) == null) {
 
-                    /*
+                    /**
                      * Start tx on this data service.
                      * 
                      * FIXME This should be passing the [readsOnCommitTime] into
@@ -1456,11 +1505,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * submitted primarily for the clustered database
                      * deployment.
                      * 
-                     * @see https://sourceforge.net/apps/trac/bigdata/ticket/266
+                     * @see http://trac.bigdata.com/ticket/266
                      * (refactor native long tx id to thin object)
                      * 
                      * @see <a
-                     * href="http://sourceforge.net/apps/trac/bigdata/ticket/546"
+                     * href="http://trac.bigdata.com/ticket/546"
                      * > Add cache for access to historical index views on the
                      * Journal by name and commitTime. </a>
                      */
@@ -1557,7 +1606,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Return <code>true</code> iff the task declared this as a resource.
      * 
-     * @param name
+     * @param theRequestedResource
      *            The name of a resource.
      * 
      * @return <code>true</code> iff <i>name</i> is a declared resource.
@@ -1565,17 +1614,57 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @throws IllegalArgumentException
      *             if <i>name</i> is <code>null</code>.
      */
-    public boolean isResource(String name) {
-        
-        if (name == null)
+    public boolean isResource(final String theRequestedResource) {
+
+        if (theRequestedResource == null)
             throw new IllegalArgumentException();
-        
-        for(String s : resource) {
-            
-            if(s.equals(name)) return true;
-            
+
+        for (String theDeclaredResource : resource) {
+
+            if (theDeclaredResource.equals(theRequestedResource)) {
+                /*
+                 * Exact match. This resource was declared.
+                 */
+                return true;
+            }
+
+            /**
+             * Look for a prefix that spans one or more resources.
+             * 
+             * Note: Supporting this requires us to support efficient scans of
+             * the indices in Name2Addr since getIndex(name) will fail if the
+             * Name2Addr entry has not been buffered within the [n2a] cache.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/753" > HA
+             *      doLocalAbort() should interrupt NSS requests and
+             *      AbstractTasks </a>
+             * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent
+             *      unisolated operations against multiple KBs </a>
+             */
+            if (theRequestedResource.startsWith(theDeclaredResource)) {
+                
+                // Possible prefix match.
+                
+                if (theRequestedResource.charAt(theDeclaredResource.length()) == '.') {
+
+                    /*
+                     * Prefix match.
+                     * 
+                     * E.g., name:="kb.spo.osp" and the task declared the
+                     * resource "kb". In this case, "kb" is a PREFIX of the
+                     * declared resource and the next character is the separator
+                     * character for the resource names (this last point is
+                     * important to avoid unintended contention between
+                     * namespaces such as "kb" and "kb1").
+                     */
+                    return true;
+
+                }
+
+            }
+
         }
-        
+
         return false;
         
     }
@@ -1708,8 +1797,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * <dt>timestamp</dt>
      * <dd>The {@link #timestamp} specified to the ctor.</dd>
      * <dt>resources</dt>
-     * <dd>The named resource(s) specified to the ctor IFF {@link #INFO} is
-     * <code>true</code></dd>
+     * <dd>The named resource(s) specified to the ctor IFF logging @ INFO or
+     * above.</dd>
      * </dl>
      */
     protected void setupLoggingContext() {
@@ -1883,7 +1972,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * Delegate handles handshaking for writable transactions.
                  */
 
-                final Callable<T> delegate = new InnerReadWriteTxServiceCallable(
+                final Callable<T> delegate = new InnerReadWriteTxServiceCallable<T>(
                         this, tx);
                 
                 return delegate.call();
@@ -1935,8 +2024,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Call {@link #doTask()} for an unisolated write task.
      * 
      * @throws Exception
-     * 
-     * @todo update javadoc to reflect the change in how the locks are acquired.
      */
     private T doUnisolatedReadWriteTask() throws Exception {
         
@@ -2030,7 +2117,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * access to the same resources since the locks were released above.
              */ 
 
-            writeService.afterTask(this, null);
+            writeService.afterTask(this/* task */, null/* cause */);
 
             return ret;
 
@@ -2043,7 +2130,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 if (log.isInfoEnabled())
                     log.info("Task failed: class=" + this + " : " + t2);
                 
-                writeService.afterTask(this, t2);
+                writeService.afterTask(this/* task */, t2/* cause */);
 
             }
 
@@ -2085,46 +2172,53 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         }
 
+        @Override
         public IResourceManager getResourceManager() {
 
             return delegate.getResourceManager();
         
         }
 
+        @Override
         public IJournal getJournal() {
 
             return delegate.getJournal();
             
         }
 
+        @Override
         public String[] getResource() {
 
             return delegate.getResource();
             
         }
 
+        @Override
         public String getOnlyResource() {
 
             return delegate.getOnlyResource();
             
         }
 
+        @Override
         public IIndex getIndex(String name) {
 
             return delegate.getIndex(name);
             
         }
                 
+        @Override
         public TaskCounters getTaskCounters() {
             
             return delegate.getTaskCounters();
             
         }
         
+        @Override
         public String toString() {
             
-            return getClass().getName()+"("+delegate.toString()+")";
-            
+            return getClass().getName() + "(" + delegate.toString() + ")";
+           
         }
         
     }
@@ -2133,11 +2227,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * Inner class used to wrap up the call to {@link AbstractTask#doTask()} for
      * read-write transactions.
      */
-    static protected class InnerReadWriteTxServiceCallable extends DelegateTask {
+    static protected class InnerReadWriteTxServiceCallable<T> extends DelegateTask<T> {
 
-        final Tx tx;
+        private final Tx tx;
         
-        InnerReadWriteTxServiceCallable(AbstractTask delegate, Tx tx) {
+        InnerReadWriteTxServiceCallable(final AbstractTask<T> delegate, final Tx tx) {
             
             super( delegate );
             
@@ -2151,7 +2245,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Wraps up the execution of {@link AbstractTask#doTask()}.
          */
-        public Object call() throws Exception {
+        @Override
+        public T call() throws Exception {
 
             // invoke on the outer class.
 
@@ -2183,9 +2278,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     }
     
     /**
-     * An instance of this class is used as the delegate for a
-     * {@link LockManagerTask} in order to coordinate the acquisition of locks
-     * with the {@link LockManager} before the task can execute and to release
+     * An instance of this class is used as the delegate to coordinate the acquisition of locks
+     * with the {@link NonBlockingLockManager} before the task can execute and to release
      * locks after the task has completed (whether it succeeds or fails).
      * <p>
      * Note: This inner class delegates the execution of the task to
@@ -2197,8 +2291,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * on a given named index are single-threaded and that deadlocks do not
      * prevent tasks from progressing. If there is strong lock contention then
      * writers will be more or less serialized.
-     * 
-     * @todo javadoc update to reflect the {@link NonBlockingLockManager}
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
@@ -2213,6 +2305,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         /**
          * Note: Locks on the named indices are ONLY held during this call.
          */
+        @Override
         public T call() throws Exception {
 
             // The write service on which this task is running.
@@ -2305,7 +2398,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             super();
         }
         
-        public ResubmitException(String msg) {
+        public ResubmitException(final String msg) {
             
             super(msg);
             
@@ -2338,6 +2431,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         @SuppressWarnings("rawtypes")
         private final IResourceLocator resourceLocator;
         
+        @Override
         public String toString() {
 
             return getClass().getName() + "{task=" + AbstractTask.this + "}";
@@ -2434,7 +2528,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * FIXME GIST : Support registration of index types other than BTree
              * (HTree, Stream, etc).
              * 
-             * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+             * @see http://trac.bigdata.com/ticket/585 (GIST)
              */
 
             throw new UnsupportedOperationException();
@@ -2449,6 +2543,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         }
 
+        /**
+         * FIXME GIST This needs to use logic to handle the different types of
+         * index objects that we can create. That logic is currently centralized
+         * in {@link AbstractJournal#register(String, IndexMetadata)}. The same
+         * pattern needs to be put to use here.
+         */
         @Override
         public IIndex registerIndex(final String name,
                 final IndexMetadata indexMetadata) {
@@ -2468,14 +2568,14 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Note: access to an unisolated index is governed by the AbstractTask.
          */
         @Override
-        public ICheckpointProtocol getUnisolatedIndex(String name) {
+        public ICheckpointProtocol getUnisolatedIndex(final String name) {
             try {
 
                 /*
                  * FIXME GIST. This will throw a ClassCastException if the
                  * returned index is an ILocalBTreeView.
                  * 
-                 * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+                 * @see http://trac.bigdata.com/ticket/585 (GIST)
                  */
 
                 return (ICheckpointProtocol) AbstractTask.this.getIndex(name);
@@ -2545,7 +2645,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * in a ClassCastException.
              * 
              * @see <a
-             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/585"
+             *      href="http://trac.bigdata.com/ticket/585"
              *      > GIST </a>
              */
             return (ICheckpointProtocol) resourceManager.getIndex(name, commitTime);
@@ -2577,7 +2677,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             }
             
             // read committed view IFF it exists otherwise [null]
-            return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
+            // TODO Review. Make sure we have tx protection to avoid recycling of the view.
+            final long lastCommitTime = getLastCommitTime();
+            
+            return new GlobalRowStoreHelper(this).get(lastCommitTime);
+
+            //return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
             
         }
 
@@ -2649,12 +2754,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * {@link AbstractTask} will be imposed on access to the
          * {@link ILocatableResource}s.
          * 
-         * FIXME Reconsider the inner journal classes on AbstractTask. This is a
-         * heavy weight mechanism for enforcing isolation for temporary stores.
-         * It would be better to have isolation in the locator mechanism itself.
-         * This will especially effect scale-out query using temporary stores
-         * and will break semantics when the task is isolated by a transaction
-         * rather than unisolated.
+         * FIXME GIST Reconsider the inner journal classes on AbstractTask. This
+         * is a heavy weight mechanism for enforcing isolation for temporary
+         * stores. It would be better to have isolation in the locator mechanism
+         * itself. This will especially effect scale-out query using temporary
+         * stores and will break semantics when the task is isolated by a
+         * transaction rather than unisolated.
          */
         @Override
         public TemporaryStore getTempStore() {
@@ -2662,7 +2767,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return tempStoreFactory.getTempStore();
             
         }
-        private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
+        final private TemporaryStoreFactory tempStoreFactory = new TemporaryStoreFactory();
         
         @Override
         public IResourceLocator<?> getResourceLocator() {
@@ -2696,9 +2801,29 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
          * Disallowed methods (commit protocol and shutdown protocol).
          */
         
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Marks the task as aborted. The task will not commit. However, the
+         * task will continue to execute until control returns from its
+         * {@link AbstractTask#doTask()} method.
+         */
         @Override
         public void abort() {
-            throw new UnsupportedOperationException();
+            aborted = true;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden as NOP. Tasks do not directly invoke commit() on the
+         * Journal.
+         */
+        @Override
+        public long commit() {
+            if (aborted)
+                throw new IllegalStateException("aborted");
+            return 0;
         }
 
         @Override
@@ -2713,11 +2838,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         @Override
         public void deleteResources() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long commit() {
             throw new UnsupportedOperationException();
         }
 
@@ -2939,9 +3059,27 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getHttpdPort();
         }
 
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Overridden to visit the name of all indices that were isolated and to
+         * ignore the timestamp.
+         */
+        @SuppressWarnings("unchecked")
         @Override
-        public Iterator<String> indexNameScan(String prefix, long timestamp) {
-            throw new UnsupportedOperationException();
+        public Iterator<String> indexNameScan(final String prefix,
+                final long timestampIsIgnored) {
+
+            return new Striterator(n2a.values().iterator())
+                    .addFilter(new Resolver() {
+                        private static final long serialVersionUID = 1L;
+
+                        @Override
+                        protected Object resolve(final Object obj) {
+                            return ((Entry)obj).name;
+                        }
+                    });
+
         }
 
         @Override
@@ -2966,7 +3104,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         
         @SuppressWarnings("rawtypes")
         private final DefaultResourceLocator resourceLocator;
-        
+
+        @Override
         public String toString() {
 
             return getClass().getName() + "{task=" + AbstractTask.this + "}";
@@ -3225,7 +3364,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             final IIndexManager tmp = new DelegateIndexManager(this) {
 
-                public IIndex getIndex(String name, long timestampIsIgnored) {
+                @Override
+                public IIndex getIndex(final String name, final long timestampIsIgnored) {
 
                     // last commit time.
                     final long commitTime = delegate.getRootBlockView()
@@ -3522,7 +3662,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      */
     private static class DelegateIndexManager implements IIndexManager {
      
-        private IIndexManager delegate;
+        private final IIndexManager delegate;
         
         public DelegateIndexManager(final IIndexManager delegate) {
             this.delegate = delegate;

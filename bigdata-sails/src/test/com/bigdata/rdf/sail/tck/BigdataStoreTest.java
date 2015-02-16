@@ -33,6 +33,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.tck;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.Iteration;
 import info.aduna.iteration.Iterations;
@@ -50,10 +52,13 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.EmptyBindingSet;
 import org.openrdf.query.impl.MapBindingSet;
+import org.openrdf.query.parser.ParsedTupleQuery;
+import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.sail.RDFStoreTest;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
@@ -77,28 +82,28 @@ public class BigdataStoreTest extends RDFStoreTest {
 
     private static final Logger log = Logger.getLogger(BigdataStoreTest.class);
  
-    /**
-     * Return a test suite using the {@link LocalTripleStore} and pipeline
-     * joins.
-     */
-    public static class LTSWithPipelineJoins extends BigdataStoreTest {
-
-        public LTSWithPipelineJoins(String name) {
-            
-            super(name);
-            
-        }
-        
-        @Override
-        protected Properties getProperties() {
-            
-            final Properties p = new Properties(super.getProperties());
-       
-            return p;
-            
-        }
-
-    }
+//    /**
+//     * Return a test suite using the {@link LocalTripleStore} and pipeline
+//     * joins.
+//     */
+//    public static class LTSWithPipelineJoins extends BigdataStoreTest {
+//
+////        public LTSWithPipelineJoins(String name) {
+////            
+////            super(name);
+////            
+////        }
+//        
+//        @Override
+//        protected Properties getProperties() {
+//            
+//            final Properties p = new Properties(super.getProperties());
+//       
+//            return p;
+//            
+//        }
+//
+//    }
     
     static File createTempFile() {
         
@@ -117,7 +122,7 @@ public class BigdataStoreTest extends RDFStoreTest {
      * Overridden to destroy the backend database and its files on the disk.
      */
     @Override
-    protected void tearDown()
+    public void tearDown()
         throws Exception
     {
         
@@ -131,10 +136,7 @@ public class BigdataStoreTest extends RDFStoreTest {
 
     }
     
-    public BigdataStoreTest(String name) {
-
-        super(name);
-        
+    public BigdataStoreTest() {
     }
     
     protected Properties getProperties() {
@@ -315,55 +317,46 @@ public class BigdataStoreTest extends RDFStoreTest {
 		return count;
 	}
 
-    /**
-     * Modified to test SPARQL instead of Serql.
-     */
 	@Override
-	protected void testValueRoundTrip(Resource subj, URI pred, Value obj)
-		throws Exception
-	{
-		con.addStatement(subj, pred, obj);
-		con.commit();
-	
-		CloseableIteration<? extends Statement, SailException> stIter = con.getStatements(null, null, null,
-				false);
-	
-		try {
-			assertTrue(stIter.hasNext());
-	
-			Statement st = stIter.next();
-			assertEquals(subj, st.getSubject());
-			assertEquals(pred, st.getPredicate());
-			assertEquals(obj, st.getObject());
-			assertTrue(!stIter.hasNext());
-		}
-		finally {
-			stIter.close();
-		}
-	
-//		ParsedTupleQuery tupleQuery = QueryParserUtil.parseTupleQuery(QueryLanguage.SERQL,
-//				"SELECT S, P, O FROM {S} P {O} WHERE P = <" + pred.stringValue() + ">", null);
-//
-//		CloseableIteration<? extends BindingSet, QueryEvaluationException> iter;
-//		iter = con.evaluate(tupleQuery.getTupleExpr(), null, EmptyBindingSet.getInstance(), false);
+    protected void testValueRoundTrip(Resource subj, URI pred, Value obj)
+            throws Exception {
+        con.begin();
+        con.addStatement(subj, pred, obj);
+        con.commit();
 
-		final String query = "SELECT ?S ?P ?O WHERE { ?S ?P ?O filter(?P = <" + pred.stringValue() + ">) }";
-		CloseableIteration<? extends BindingSet, QueryEvaluationException> iter;
-		iter = evaluate(query, con);
-	
-		try {
-			assertTrue(iter.hasNext());
-	
-			BindingSet bindings = iter.next();
-			assertEquals(subj, bindings.getValue("S"));
-			assertEquals(pred, bindings.getValue("P"));
-			assertEquals(obj, bindings.getValue("O"));
-			assertTrue(!iter.hasNext());
-		}
-		finally {
-			iter.close();
-		}
-	}
+        CloseableIteration<? extends Statement, SailException> stIter = con
+                .getStatements(null, null, null, false);
+
+        try {
+            assertTrue(stIter.hasNext());
+
+            Statement st = stIter.next();
+            assertEquals(subj, st.getSubject());
+            assertEquals(pred, st.getPredicate());
+            assertEquals(obj, st.getObject());
+            assertTrue(!stIter.hasNext());
+        } finally {
+            stIter.close();
+        }
+
+        final String query = "SELECT ?S ?P ?O WHERE { ?S ?P ?O filter(?P = <"
+                + pred.stringValue() + ">) }";
+
+        CloseableIteration<? extends BindingSet, QueryEvaluationException> iter;
+        iter = evaluate(query, con);
+
+        try {
+            assertTrue(iter.hasNext());
+
+            BindingSet bindings = iter.next();
+            assertEquals(subj, bindings.getValue("S"));
+            assertEquals(pred, bindings.getValue("P"));
+            assertEquals(obj, bindings.getValue("O"));
+            assertTrue(!iter.hasNext());
+        } finally {
+            iter.close();
+        }
+    }
 
     /**
      * Modified to test SPARQL instead of Serql.

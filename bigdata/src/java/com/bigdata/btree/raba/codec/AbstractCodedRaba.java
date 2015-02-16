@@ -39,7 +39,6 @@ import com.bigdata.btree.raba.AbstractRaba;
  * mutation operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractCodedRaba implements ICodedRaba {
 
@@ -50,28 +49,34 @@ abstract public class AbstractCodedRaba implements ICodedRaba {
     /**
      * Implementation is read-only.
      */
+    @Override
     final public boolean isReadOnly() {
 
         return true;
 
     }
 
+    @Override
     final public int add(byte[] a) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public int add(byte[] value, int off, int len) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public int add(DataInput in, int len) throws IOException {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public void set(int index, byte[] a) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public String toString() {
 
         return AbstractRaba.toString(this);
@@ -82,18 +87,21 @@ abstract public class AbstractCodedRaba implements ICodedRaba {
      * Basic implementation may be overridden if a faster implementation is
      * available.
      */
+    @Override
     public Iterator<byte[]> iterator() {
 
         return new Iterator<byte[]>() {
 
             int i = 0;
 
+            @Override
             public boolean hasNext() {
 
                 return i < size();
 
             }
 
+            @Override
             public byte[] next() {
 
                 if (!hasNext())
@@ -103,6 +111,7 @@ abstract public class AbstractCodedRaba implements ICodedRaba {
 
             }
 
+            @Override
             public void remove() {
 
                 throw new UnsupportedOperationException();
@@ -112,5 +121,5 @@ abstract public class AbstractCodedRaba implements ICodedRaba {
         };
 
     }
-    
+
 }

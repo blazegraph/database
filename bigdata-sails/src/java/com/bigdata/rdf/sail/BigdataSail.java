@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 /*
 Portions of this code are:
 
-Copyright Aduna (http://www.aduna-software.com/) � 2001-2007
+Copyright Aduna (http://www.aduna-software.com/) 2001-2007
 
 All rights reserved.
 
@@ -70,6 +70,7 @@ import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -87,13 +88,14 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
-import org.openrdf.query.algebra.UpdateExpr;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
 import org.openrdf.sail.SailConnectionListener;
 import org.openrdf.sail.SailException;
+import org.openrdf.sail.UnknownSailTransactionStateException;
+import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -137,6 +139,7 @@ import com.bigdata.rdf.store.BigdataStatementIteratorImpl;
 import com.bigdata.rdf.store.BigdataValueIterator;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
 import com.bigdata.rdf.store.EmptyStatementIterator;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
@@ -146,6 +149,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -385,15 +389,30 @@ public class BigdataSail extends SailBase implements Sail {
          * @see BigdataSail#BigdataSail()
          */
         public static final String DEFAULT_FILE = "bigdata" + JNL;
+        
+        /**
+         * This optional boolean property may be used to specify whether quads
+         * in triple mode are rejected (true) or loaded while silently stripping
+         * off the context (false). In the latter case, the fireSailChangedEvent
+         * will report back the original statements, i.e. including the context,
+         * although the latter was not stored internally. This property only
+         * effects data loaded through the {@link Sail}.
+         * 
+         * @see http://trac.bigdata.com/ticket/1086
+         */
+        public static final String REJECT_QUADS_IN_TRIPLE_MODE = BigdataSail.
+              class.getPackage().getName() + ".rejectQuadsInTripleMode"; 
+        
+        public static final String DEFAULT_REJECT_QUADS_IN_TRIPLE_MODE = "false";
 
     }
 
     /**
      * Logger.
      */
-    final protected static Logger log = Logger.getLogger(BigdataSail.class);
+    final private static Logger log = Logger.getLogger(BigdataSail.class);
 
-    final protected static boolean INFO = log.isInfoEnabled();
+//    final protected static boolean INFO = log.isInfoEnabled();
 
 //    final protected static boolean DEBUG = log.isDebugEnabled();
 
@@ -501,6 +520,15 @@ public class BigdataSail extends SailBase implements Sail {
      * @see {@link Options#ISOLATABLE_INDICES}
      */
     final private boolean isolatable;
+    
+    /**
+     *  Specifies whether quads in triple mode are rejected (true) or loaded 
+     *  while silently stripping off the context (false). In the latter case, 
+     *  the fireSailChangedEvent will report back the original statements,
+     *  i.e. including the context, although the latter was not stored
+     *  internally.
+     */
+    final private boolean rejectQuadsInTripleMode;
     
     /**
      * <code>true</code> iff the {@link BigdataSail} has been
@@ -697,22 +725,15 @@ public class BigdataSail extends SailBase implements Sail {
          * during the middle of a BigdataSailConnection level operation (or visa
          * versa).
          */
+        boolean acquiredConnection = false;
         try {
-            // acquire the unisolated connection permit.
-            journal.acquireUnisolatedConnection();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        try {
-            
-//            final boolean create;
-//            final long tx0 = txService.newTx(ITx.READ_COMMITTED);
-//            try {
-//                // verify kb does not exist (can not be located).
-//                create = journal.getResourceLocator().locate(namespace, tx0) == null;
-//            } finally {
-//                txService.abort(tx0);
-//            }
+            try {
+                // acquire the unisolated connection permit.
+                journal.acquireUnisolatedConnection();
+                acquiredConnection = true;
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             
             // Check for pre-existing instance.
             {
@@ -729,28 +750,49 @@ public class BigdataSail extends SailBase implements Sail {
             }
             
             // Create a new instance.
-//            if (create) 
             {
             
-                final LocalTripleStore lts = new LocalTripleStore(
-                        journal, namespace, ITx.UNISOLATED, properties);
-                
                 if (Boolean.parseBoolean(properties.getProperty(
                         BigdataSail.Options.ISOLATABLE_INDICES,
                         BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
                 
+                    /*
+                     * Isolatable indices: requires the use of a tx to create
+                     * the KB instance.
+                     */
+
                     final long txCreate = txService.newTx(ITx.UNISOLATED);
-        
-                    final AbstractTripleStore txCreateView = new LocalTripleStore(
-                            journal, namespace, Long.valueOf(txCreate), properties);
-        
-                    // create the kb instance within the tx.
-                    txCreateView.create();
-        
-                    // commit the tx.
-                    txService.commit(txCreate);
+
+                    boolean ok = false;
+                    try {
+                        
+                        final AbstractTripleStore txCreateView = new LocalTripleStore(
+                                journal, namespace, Long.valueOf(txCreate),
+                                properties);
+
+                        // create the kb instance within the tx.
+                        txCreateView.create();
+
+                        // commit the tx.
+                        txService.commit(txCreate);
+                        
+                        ok = true;
+
+                    } finally {
+                        
+                        if (!ok)
+                            txService.abort(txCreate);
+                        
+                    }
                     
                 } else {
+                    
+                    /*
+                     * Create KB without isolatable indices.
+                     */
+
+                    final LocalTripleStore lts = new LocalTripleStore(
+                            journal, namespace, ITx.UNISOLATED, properties);
                     
                     lts.create();
                     
@@ -789,7 +831,8 @@ public class BigdataSail extends SailBase implements Sail {
             
         } finally {
 
-            journal.releaseUnisolatedConnection();
+            if (acquiredConnection)
+                journal.releaseUnisolatedConnection();
 
         }
         
@@ -1034,6 +1077,22 @@ public class BigdataSail extends SailBase implements Sail {
                         + isolatable);
             
         }
+        
+        
+        // allowAutoCommit
+        {
+            
+            rejectQuadsInTripleMode = 
+                Boolean.parseBoolean(properties.getProperty(
+                    BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE,
+                    BigdataSail.Options.DEFAULT_REJECT_QUADS_IN_TRIPLE_MODE));
+
+            if (log.isInfoEnabled())
+                log.info(BigdataSail.Options.REJECT_QUADS_IN_TRIPLE_MODE + "="
+                        + rejectQuadsInTripleMode);
+            
+        }
+        
 
         namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
@@ -1253,10 +1312,35 @@ public class BigdataSail extends SailBase implements Sail {
      * returns the unisolated view of the database. Note that truth maintenance
      * requires only one connection at a time and is therefore not compatible
      * with full read/write transactions.
+     * <p>
+     * The correct pattern for obtaining an updatable connection, doing work
+     * with that connection, and committing or rolling back that update is as
+     * follows.
+     * 
+     * <pre>
+     * 
+     * BigdataSailConnection conn = null;
+     * boolean ok = false;
+     * try {
+     *     conn = sail.getConnection();
+     *     doWork(conn);
+     *     conn.commit();
+     *     ok = true;
+     * } finally {
+     *     if (conn != null) {
+     *         if (!ok) {
+     *             conn.rollback();
+     *         }
+     *         conn.close();
+     *     }
+     * }
+     * </pre>
+     * 
+     * This pattern can also be used with {@link #getUnisolatedConnection()}.
      */
     @Override
     public BigdataSailConnection getConnection() throws SailException {
-        
+      
         return (BigdataSailConnection) super.getConnection();
         
     }
@@ -1281,25 +1365,49 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
-	/**
-	 * Return an unisolated connection to the database. The unisolated
-	 * connection supports fast, scalable updates against the database. The
-	 * unisolated connection is ACID when used with a local {@link Journal} and
-	 * shard-wise ACID when used with an {@link IBigdataFederation}.
-	 * <p>
-	 * In order to guarantee that operations against the unisolated connection
-	 * are ACID, only one of unisolated connection is permitted at a time for a
-	 * {@link Journal} and this method will block until the connection is
-	 * available. If there is an open unisolated connection against a local
-	 * {@link Journal}, then the open connection must be closed before a new
-	 * connection can be returned by this method.
-	 * <p>
-	 * This constraint that there can be only one unisolated connection is not
-	 * enforced in scale-out since unisolated operations in scale-out are only
-	 * shard-wise ACID.
-	 * 
-	 * @return The unisolated connection to the database
-	 */
+	    /**
+     * Return an unisolated connection to the database. The unisolated
+     * connection supports fast, scalable updates against the database. The
+     * unisolated connection is ACID when used with a local {@link Journal} and
+     * shard-wise ACID when used with an {@link IBigdataFederation}.
+     * <p>
+     * In order to guarantee that operations against the unisolated connection
+     * are ACID, only one of unisolated connection is permitted at a time for a
+     * {@link Journal} and this method will block until the connection is
+     * available. If there is an open unisolated connection against a local
+     * {@link Journal}, then the open connection must be closed before a new
+     * connection can be returned by this method.
+     * <p>
+     * This constraint that there can be only one unisolated connection is not
+     * enforced in scale-out since unisolated operations in scale-out are only
+     * shard-wise ACID.
+     * <p>
+     * The correct pattern for obtaining an updatable connection, doing work
+     * with that connection, and committing or rolling back that update is as
+     * follows.
+     * 
+     * <pre>
+     * BigdataSailConnection conn = null;
+     * boolean ok = false;
+     * try {
+     *     conn = sail.getUnisolatedConnection();
+     *     doWork(conn);
+     *     conn.commit();
+     *     ok = true;
+     * } finally {
+     *     if (conn != null) {
+     *         if (!ok) {
+     *             conn.rollback();
+     *         }
+     *         conn.close();
+     *     }
+     * }
+     * </pre>
+     * 
+     * @return The unisolated connection to the database
+     * 
+     * @see #getConnection()
+     */
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
@@ -1313,21 +1421,39 @@ public class BigdataSail extends SailBase implements Sail {
                     "UNISOLATED connection is not reentrant.");
         }
 
-        if (getDatabase().getIndexManager() instanceof Journal) {
-            // acquire permit from Journal.
-            ((Journal) getDatabase().getIndexManager())
-                    .acquireUnisolatedConnection();
+        boolean acquiredConnection = false;
+        Lock writeLock = null;
+        BigdataSailConnection conn = null;
+        try {
+            if (getDatabase().getIndexManager() instanceof Journal) {
+                // acquire permit from Journal.
+                ((Journal) getDatabase().getIndexManager())
+                        .acquireUnisolatedConnection();
+                acquiredConnection = true;
+            }
+
+            // acquire the write lock.
+            writeLock = lock.writeLock();
+            writeLock.lock();
+
+            // new writable connection.
+            conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
+                    .startConn();
+        } finally {
+            if (conn == null) {
+                // Did not obtain connection.
+                if (writeLock != null) {
+                    // release write lock.
+                    writeLock.unlock();
+                }
+                if (acquiredConnection) {
+                    // release permit.
+                    ((Journal) getDatabase().getIndexManager())
+                            .releaseUnisolatedConnection();
+                }
+            }
         }
-
-		// acquire the write lock.
-		final Lock writeLock = lock.writeLock();
-		writeLock.lock();
-
-		// new writable connection.
-		final BigdataSailConnection conn = new BigdataSailConnection(database,
-				writeLock, true/* unisolated */).startConn();
-
-		return conn;
+        return conn;
 
     }
     
@@ -1569,6 +1695,13 @@ public class BigdataSail extends SailBase implements Sail {
 		 * those at a time).
 		 */
         private final boolean unisolated;
+        
+        /**
+         * Critical section support in case rollback is not completed cleanly, in which
+         * case calls to commit() will fail until a clean rollback() is made. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+
+         */
+        private final AtomicBoolean rollbackRequired = new AtomicBoolean(false);
 
         public String toString() {
         	
@@ -2379,6 +2512,15 @@ public class BigdataSail extends SailBase implements Sail {
             // flush any pending retractions first!
             flushStatementBuffers(false/* flushAssertBuffer */, true/* flushRetractBuffer */);
 
+            // in case quads shall be rejected in triples mode by configuration
+            // and we encounter such a quad, raise an error
+            if (rejectQuadsInTripleMode && !quads && c!=null) {
+               throw new SailException(
+                  "Quad in triples mode is not allowed by configuration "
+                  + "(set parameter rejectQuadsInTripleMode to false to "
+                  + "allow for quads data)");
+            }
+            
             /*
              * Buffer the assertion.
              * 
@@ -2786,6 +2928,123 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
+        /**
+         * Note: The CONTEXT is ignored when in statementIdentifier mode!
+         */
+        public synchronized int removeStatements(final ISPO[] stmts) throws SailException {
+            
+            assertWritableConn();
+
+            flushStatementBuffers(true/* flushAssertBuffer */, false/* flushRetractBuffer */);
+
+            if (m_listeners != null) {
+
+                /*
+                 * FIXME to support the SailConnectionListener we need to
+                 * pre-materialize the explicit statements that are to be
+                 * deleted and then notify the listener for each such explicit
+                 * statement. Since that is a lot of work, make sure that we do
+                 * not generate notices unless there are registered listeners!
+                 */
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            // #of explicit statements removed.
+            long n = 0;
+
+            if (getTruthMaintenance()) {
+
+                /*
+                 * Since we are doing truth maintenance we need to copy the
+                 * matching "explicit" statements into a temporary store rather
+                 * than deleting them directly. This uses the internal API to
+                 * copy the statements to the temporary store without
+                 * materializing them as Sesame Statement objects.
+                 */
+
+                /*
+                 * Obtain a chunked iterator using the triple pattern that
+                 * visits only the explicit statements.
+                 */
+                final IChunkedOrderedIterator<ISPO> itr = 
+                		new ChunkedArrayIterator<ISPO>(stmts);
+
+                // The tempStore absorbing retractions.
+                final AbstractTripleStore tempStore = getRetractionBuffer()
+                        .getStatementStore();
+
+                // Copy explicit statements to tempStore.
+                n = tempStore.addStatements(tempStore, true/* copyOnly */,
+                        itr, null/* filter */);
+
+                /*
+                 * Nothing more happens until the commit or incremental write
+                 * flushes the retraction buffer and runs TM.
+                 */
+                
+            } else {
+
+                /*
+                 * Since we are not doing truth maintenance, just remove the
+                 * statements from the database (synchronous, batch api, not
+                 * buffered).
+                 */
+                
+                if (changeLog == null) {
+                    
+                    n = database.removeStatements(stmts, stmts.length);
+                    
+                } else {
+                
+                    final IChunkedOrderedIterator<ISPO> itr = 
+                        database.computeClosureForStatementIdentifiers(
+                        		new ChunkedArrayIterator<ISPO>(stmts));
+                    
+                    // no need to compute closure for sids since we just did it
+                    n = StatementWriter.removeStatements(database, itr, 
+                            false/* computeClosureForStatementIdentifiers */,
+                            changeLog);
+                    
+//                    final IAccessPath<ISPO> ap = 
+//                        database.getAccessPath(s, p, o, c);
+//    
+//                    final IChunkedOrderedIterator<ISPO> itr = ap.iterator();
+//                    
+//                    if (itr.hasNext()) {
+//                        
+//                        final BigdataStatementIteratorImpl itr2 = 
+//                            new BigdataStatementIteratorImpl(database, bnodes2, itr)
+//                                .start(database.getExecutorService()); 
+//                        
+//                        final BigdataStatement[] stmts = 
+//                            new BigdataStatement[database.getChunkCapacity()];
+//                        
+//                        int i = 0;
+//                        while (i < stmts.length && itr2.hasNext()) {
+//                            stmts[i++] = itr2.next();
+//                            if (i == stmts.length) {
+//                                // process stmts[]
+//                                n += removeAndNotify(stmts, i);
+//                                i = 0;
+//                            }
+//                        }
+//                        if (i > 0) {
+//                            n += removeAndNotify(stmts, i);
+//                        }
+//                        
+//                    }
+                    
+                }
+
+            }
+
+            // avoid overflow.
+            return (int) Math.min(Integer.MAX_VALUE, n);
+            
+        }
+        
 //        private long removeAndNotify(final BigdataStatement[] stmts, final int numStmts) {
 //            
 //            final SPO[] tmp = new SPO[numStmts];
@@ -2849,6 +3108,7 @@ public class BigdataSail extends SailBase implements Sail {
 //            
 //        }
 
+        @Override
         public synchronized CloseableIteration<? extends Resource, SailException> getContextIDs()
                 throws SailException {
             
@@ -2883,6 +3143,7 @@ public class BigdataSail extends SailBase implements Sail {
                 private Resource next = null;
                 private boolean open = true;
 
+                @Override
                 public void close() throws SailException {
                     if (open) {
                         open = false;
@@ -2891,6 +3152,7 @@ public class BigdataSail extends SailBase implements Sail {
                     }
                 }
 
+                @Override
                 public boolean hasNext() throws SailException {
                     if(open && _hasNext())
                         return true;
@@ -2912,6 +3174,7 @@ public class BigdataSail extends SailBase implements Sail {
                     return false;
                 }
 
+                @Override
                 public Resource next() throws SailException {
                     if (next == null)
                         throw new SailException();
@@ -2920,6 +3183,7 @@ public class BigdataSail extends SailBase implements Sail {
                     return tmp;
                 }
 
+                @Override
                 public void remove() throws SailException {
                     /*
                      * Note: remove is not supported. The semantics would
@@ -2943,26 +3207,34 @@ public class BigdataSail extends SailBase implements Sail {
          * Note: The semantics depend on the {@link Options#STORE_CLASS}. See
          * {@link ITripleStore#abort()}.
          */
+        @Override
         public synchronized void rollback() throws SailException {
-
-            assertWritableConn();
-
-            if (txLog.isInfoEnabled())
-                txLog.info("SAIL-ROLLBACK-CONN: " + this);
-
-            // discard buffered assertions and/or retractions.
-            clearBuffers();
-
-            // discard the write set.
-            database.abort();
-            
-            if (changeLog != null) {
-                
-                changeLog.transactionAborted();
-                
-            }
-            
-            dirty = false;
+        	// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+        	boolean success = false;
+        	try {
+	            assertWritableConn();
+	
+	            if (txLog.isInfoEnabled())
+	                txLog.info("SAIL-ROLLBACK-CONN: " + this);
+	
+	            // discard buffered assertions and/or retractions.
+	            clearBuffers();
+	
+	            // discard the write set.
+	            database.abort();
+	            
+	            if (changeLog != null) {
+	                
+	                changeLog.transactionAborted();
+	                
+	            }
+	            
+	            dirty = false;
+	            
+	            success = true; // mark successful rollback
+        	} finally { // @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+        		rollbackRequired.set(!success);
+        	}
             
         }
 
@@ -2991,6 +3263,13 @@ public class BigdataSail extends SailBase implements Sail {
          *         was committed.
          */
         public synchronized long commit2() throws SailException {
+        	
+        	/**
+        	 * If a call to rollback does not complete cleanly, then rollbackRequired will be set and no updates will be allowed.
+        	 * @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+        	 */
+        	if (rollbackRequired.get())
+        		throw new IllegalStateException("Rollback required");
 
             assertWritableConn();
 
@@ -3034,12 +3313,14 @@ public class BigdataSail extends SailBase implements Sail {
          * Note: The semantics depend on the {@link Options#STORE_CLASS}.  See
          * {@link AbstractTripleStore#commit()}.
          */
+        @Override
         final public synchronized void commit() throws SailException {
             
             commit2();
             
         }
 
+        @Override
         final public boolean isOpen() throws SailException {
 
             return openConn;
@@ -3069,6 +3350,7 @@ public class BigdataSail extends SailBase implements Sail {
          * artifact arises because the {@link SailConnection} is using
          * unisolated writes on the database).
          */
+        @Override
         public synchronized void close() throws SailException {
 
 //            assertOpen();
@@ -3151,6 +3433,7 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Invoke close, which will be harmless if we are already closed. 
          */
+        @Override
         protected void finalize() throws Throwable {
             
         	/*
@@ -3288,6 +3571,7 @@ public class BigdataSail extends SailBase implements Sail {
          * from each context in a quad store, including anything in the
          * {@link BigdataSail#NULL_GRAPH}.
          */
+        @Override
         @SuppressWarnings("unchecked")
         public CloseableIteration<? extends Statement, SailException> getStatements(
                 final Resource s, final URI p, final Value o,
@@ -3541,27 +3825,27 @@ public class BigdataSail extends SailBase implements Sail {
          * Update
          */
         
-        /**
-         * Bigdata now uses an internal query model which differs significantly
-         * from the Sesame query model. Support is not provided for
-         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
-         * prepared and evaluated using a
-         * {@link BigdataSailRepositoryConnection}.
-         * 
-         * @throws SailException
-         *             <em>always</em>.
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
-         *      SPARQL 1.1 Update </a>
-         */
-        @Override
-        public void executeUpdate(final UpdateExpr updateExpr,
-                final Dataset dataset, final BindingSet bindingSet,
-                boolean includeInferred) throws SailException {
-
-            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
-            
-        }
+//        /**
+//         * Bigdata now uses an internal query model which differs significantly
+//         * from the Sesame query model. Support is not provided for
+//         * {@link UpdateExpr} evaluation. SPARQL UPDATE requests must be
+//         * prepared and evaluated using a
+//         * {@link BigdataSailRepositoryConnection}.
+//         * 
+//         * @throws SailException
+//         *             <em>always</em>.
+//         * 
+//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
+//         *      SPARQL 1.1 Update </a>
+//         */
+//        @Override
+//        public void executeUpdate(final UpdateExpr updateExpr,
+//                final Dataset dataset, final BindingSet bindingSet,
+//                boolean includeInferred) throws SailException {
+//
+//            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+//            
+//        }
         
         /*
          * High-level query.
@@ -3750,6 +4034,125 @@ public class BigdataSail extends SailBase implements Sail {
 
             }
 
+        }
+
+        /*
+		 * These methods are new with openrdf 2.7. Bigdata uses either
+		 * MVCC (full read-write tx) or simply a single writer on the live
+		 * indices (unisolated). The latter has more throughput.
+		 * 
+		 * TODO The MVCC semantics in bigdata do use a prepare()/commit()
+		 * pattern and have the notion of active and inactive transactions. This
+		 * transaction statement metadata could be exposed to the SailConnection
+		 * for the BigdataSailReadOnlyConnection and BigdataSailRWConnection,
+		 * but not for the BigdataSailConnection (unisolated connection).
+		 * 
+		 * BBT - 11/15/2015
+		 * 
+		 * (non-Javadoc)
+		 * 
+		 * @see org.openrdf.sail.SailConnection#begin()
+		 */
+        
+        /**
+         * NOP.
+         * <p>
+         * {@inheritDoc}
+         */
+        @Override
+        public void begin() throws SailException {
+            
+        }
+
+        /**
+		 * Always returns <code>true</code>.
+		 * <p>
+		 * Note: Bigdata does not expose its internal transaction state to the
+		 * sail (the concept of active and inactive transactions exists for full
+		 * read/write transactions and but those semantics are not exposed to
+		 * the sail).
+		 * <p>
+		 * {@inheritDoc}
+		 */
+        @Override
+        public boolean isActive() throws UnknownSailTransactionStateException {
+            
+        	return true;
+        	
+        }
+
+		/**
+		 * NOP - the internal transaction model is not exposed to the
+		 * {@link SailConnection}.
+		 * <p>
+		 * Note: Full read/write transactions do have a prepare()/commit() model
+		 * interallly based on MVCC, but unisolated connections do not.
+		 * <p>
+		 * {@inheritDoc}
+		 */
+        @Override
+        public void prepare() throws SailException {
+            
+        }
+
+        /*
+		 * This API is new with openrdf 2.7. It is not supported. Bigdata has a
+		 * different logical operator model from openrdf. The UpdateContext is
+		 * expressed in terms of the openrdf logical operator model
+		 * (UpdateExpr). Therefore it can not be used with bigdata.
+		 * 
+		 * (non-Javadoc)
+		 * 
+		 * @see org.openrdf.sail.SailConnection#startUpdate(org.openrdf.sail.
+		 * UpdateContext)
+		 */
+        
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void startUpdate(UpdateContext op)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void addStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void removeStatement(UpdateContext op, Resource subj, URI pred, Value obj, Resource... contexts)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+
+        }
+
+        /**
+         * Unsupported API.
+         */
+        @Override
+        public void endUpdate(UpdateContext op)
+            throws SailException
+        {
+            
+            throw new SailException(ERR_OPENRDF_QUERY_MODEL);
+            
         }
 
     } // class BigdataSailConnection

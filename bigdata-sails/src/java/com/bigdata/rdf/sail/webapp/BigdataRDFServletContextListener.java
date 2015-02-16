@@ -29,10 +29,14 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Date;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.servlet.ServletContext;
@@ -83,12 +87,46 @@ public class BigdataRDFServletContextListener implements
     private long readLockTx;
     private BigdataRDFContext rdfContext;
 //    private SparqlCache sparqlCache;
+    
+    /**
+     * The set of init parameters from the <code>web.xml</code> file after we
+     * have applied any overrides specified by the
+     * {@link BigdataRDFServletContextListener#INIT_PARAM_OVERRIDES} attributes.
+     */
+    private Map<String,String> effectiveInitParams;
 
     /**
      * <code>true</code> iff this class opened the {@link IIndexManager}, in
      * which case it will close it at the appropriate life cycle event.
      */
     private boolean closeIndexManager;
+
+    /**
+     * The name of the {@link ServletContext} attribute under which we store
+     * any overrides for the init parameters of the {@link ServletContext}. Note
+     * that it is NOT possible to actual modify the init parameters specified in
+     * the <code>web.xml</code> file. Therefore, we attach the overrides as an
+     * attribute and then consult them from within
+     * {@link BigdataRDFServletContextListener#contextInitialized(javax.servlet.ServletContextEvent)}
+     * .
+     */
+    public static final String INIT_PARAM_OVERRIDES = "INIT_PARAMS_OVERRIDES";
+
+    /**
+     * Return the effective value of the given init parameter, respecting any
+     * overrides that were specified to the {@link NanoSparqlServer} when it
+     * initialized the server.
+     * 
+     * @param key
+     *            The name of the desired init parameter.
+     * 
+     * @return The effective value of that init parameter.
+     */
+    protected String getInitParameter(final String key) {
+
+        return effectiveInitParams.get(key);
+
+    }
 
     public BigdataRDFServletContextListener() {
         super();
@@ -110,10 +148,50 @@ public class BigdataRDFServletContextListener implements
         
         final ServletContext context = e.getServletContext();
 
+        /*
+         * Figure out the effective init parameters that we want to use
+         * for this initialization procedure.
+         */
+        {
+        
+            effectiveInitParams = new LinkedHashMap<String, String>();
+
+            /*  
+             * Copy the init params from web.xml into a local map.
+             */
+            final Enumeration<String> names = context.getInitParameterNames();
+            while(names.hasMoreElements()) {
+                final String name = names.nextElement();
+                final String value = context.getInitParameter(name);
+                effectiveInitParams.put(name, value);
+            }
+
+            /*
+             * Look for init parameter overrides that have been attached to the
+             * WebAppContext by the NanoSparqlServer. If found, then apply them
+             * before doing anything else. This is how we apply overrides to the
+             * init parameters that were specified in "web.xml".
+             */
+            {
+
+                @SuppressWarnings("unchecked")
+                final Map<String, String> initParamOverrides = (Map<String, String>) context
+                        .getAttribute(BigdataRDFServletContextListener.INIT_PARAM_OVERRIDES);
+
+                if (initParamOverrides != null) {
+                
+                    effectiveInitParams.putAll(initParamOverrides);
+                    
+                }
+
+            }
+            
+        }
+
         final String namespace;
         {
          
-            String s = context.getInitParameter(ConfigParams.NAMESPACE);
+            String s = getInitParameter(ConfigParams.NAMESPACE);
 
             if (s == null)
                 s = ConfigParams.DEFAULT_NAMESPACE;
@@ -128,7 +206,7 @@ public class BigdataRDFServletContextListener implements
         final boolean create;
         {
 
-            final String s = context.getInitParameter(ConfigParams.CREATE);
+            final String s = getInitParameter(ConfigParams.CREATE);
 
             if (s != null)
                 create = Boolean.valueOf(s);
@@ -170,9 +248,9 @@ public class BigdataRDFServletContextListener implements
                     + ConfigParams.PROPERTY_FILE;
 
             // The default value is taken from the web.xml file.
-            final String defaultValue = context
-                    .getInitParameter(ConfigParams.PROPERTY_FILE);
-            
+            final String defaultValue = getInitParameter(
+                    ConfigParams.PROPERTY_FILE);
+
             // The effective location of the property file.
             final String propertyFile = System.getProperty(//
                     FQN_PROPERTY_FILE,//
@@ -213,7 +291,7 @@ public class BigdataRDFServletContextListener implements
         final long timestamp;
         {
         
-            final String s = context.getInitParameter(ConfigParams.READ_LOCK);
+            final String s = getInitParameter( ConfigParams.READ_LOCK);
             
             readLock = s == null ? null : Long.valueOf(s);
             
@@ -257,8 +335,7 @@ public class BigdataRDFServletContextListener implements
         final int queryThreadPoolSize;
         {
 
-            final String s = context
-                    .getInitParameter(ConfigParams.QUERY_THREAD_POOL_SIZE);
+            final String s = getInitParameter( ConfigParams.QUERY_THREAD_POOL_SIZE);
 
             queryThreadPoolSize = s == null ? ConfigParams.DEFAULT_QUERY_THREAD_POOL_SIZE
                     : Integer.valueOf(s);
@@ -279,8 +356,7 @@ public class BigdataRDFServletContextListener implements
         final boolean describeEachNamedGraph;
         {
 
-            final String s = context
-                    .getInitParameter(ConfigParams.DESCRIBE_EACH_NAMED_GRAPH);
+            final String s = getInitParameter( ConfigParams.DESCRIBE_EACH_NAMED_GRAPH);
 
             describeEachNamedGraph = s == null ? ConfigParams.DEFAULT_DESCRIBE_EACH_NAMED_GRAPH
                     : Boolean.valueOf(s);
@@ -294,7 +370,7 @@ public class BigdataRDFServletContextListener implements
         final boolean readOnly;
         {
 
-            final String s = context.getInitParameter(ConfigParams.READ_ONLY);
+            final String s = getInitParameter( ConfigParams.READ_ONLY);
 
             readOnly = s == null ? ConfigParams.DEFAULT_READ_ONLY : Boolean
                     .valueOf(s);
@@ -307,8 +383,7 @@ public class BigdataRDFServletContextListener implements
         final long queryTimeout;
         {
 
-            final String s = context
-                    .getInitParameter(ConfigParams.QUERY_TIMEOUT);
+            final String s = getInitParameter( ConfigParams.QUERY_TIMEOUT);
 
             queryTimeout = s == null ? ConfigParams.DEFAULT_QUERY_TIMEOUT
                     : Integer.valueOf(s);
@@ -343,21 +418,10 @@ public class BigdataRDFServletContextListener implements
 //        context.setAttribute(BigdataServlet.ATTRIBUTE_SPARQL_CACHE,
 //                new SparqlCache(new MemoryManager(DirectBufferPool.INSTANCE)));
 
-        if (log.isInfoEnabled()) {
-            /*
-             * Log some information about the default kb (#of statements, etc).
-             */
-            final long effectiveTimestamp = config.timestamp == ITx.READ_COMMITTED ? indexManager
-                    .getLastCommitTime() : config.timestamp;
-            log.info("\n"
-                    + rdfContext
-                            .getKBInfo(config.namespace, effectiveTimestamp));
-        }
-
         {
         
-            final boolean forceOverflow = Boolean.valueOf(context
-                    .getInitParameter(ConfigParams.FORCE_OVERFLOW));
+            final boolean forceOverflow = Boolean
+                    .valueOf(getInitParameter(ConfigParams.FORCE_OVERFLOW));
 
             if (forceOverflow && indexManager instanceof IBigdataFederation<?>) {
 
@@ -400,8 +464,8 @@ public class BigdataRDFServletContextListener implements
             rdfContext = null;
             
         }
-        
-        if (txs != null && readLock != null) {
+
+        if (txs != null && readLock != null && readLock != -1L) {
 
             try {
             
@@ -414,6 +478,10 @@ public class BigdataRDFServletContextListener implements
                                 + readLockTx, ex);
             
             }
+            
+            txs = null;
+            readLock = null;
+
         }
 
         if (jnl != null) {
@@ -442,6 +510,8 @@ public class BigdataRDFServletContextListener implements
 //            sparqlCache  = null;
 //
 //        }
+
+        effectiveInitParams = null;
         
         /*
          * Terminate various threads which should no longer be executing once we
@@ -469,14 +539,37 @@ public class BigdataRDFServletContextListener implements
      */
     private IIndexManager openIndexManager(final String propertyFile) {
 
-        final File file = new File(propertyFile);
+        // Locate the named .properties or .config file.
+        final URL propertyFileUrl;
+        if (new File(propertyFile).exists()) {
 
-        if (!file.exists()) {
+            // Check the file system.
+            try {
+                propertyFileUrl = new URL("file:" + propertyFile);
+            } catch (MalformedURLException ex) {
+                throw new RuntimeException(ex);
+            }
 
-            throw new RuntimeException("Could not find file: " + file);
+        } else {
 
+            // Check the classpath.
+            propertyFileUrl = BigdataRDFServletContextListener.class
+                    .getClassLoader().getResource(propertyFile);
+    
         }
 
+        if (log.isInfoEnabled())
+            log.info("bigdata configuration: propertyFile=" + propertyFile
+                    + ", propertyFileUrl=" + propertyFileUrl);
+
+        if (propertyFileUrl == null) {
+
+            throw new RuntimeException("Could not find file: file="
+                    + propertyFile + ", user.dir="
+                    + System.getProperty("user.dir"));
+
+        }
+        
         boolean isJini = false;
         if (propertyFile.endsWith(".config")) {
             // scale-out.
@@ -492,7 +585,7 @@ public class BigdataRDFServletContextListener implements
              */
             throw new RuntimeException(
                     "File must have '.config' or '.properties' extension: "
-                            + file);
+                            + propertyFile);
         }
 
         final IIndexManager indexManager;
@@ -502,6 +595,16 @@ public class BigdataRDFServletContextListener implements
 
                 /*
                  * A bigdata federation.
+                 * 
+                 * Note: The Apache River configuration mechanism will search
+                 * both the file system and the classpath, much as we have done
+                 * above.
+                 * 
+                 * TODO This will use the ClassLoader associated with the
+                 * JiniClient if that is different from the ClassLoader used
+                 * above, then it could be possible for one ClassLoader to find
+                 * the propertyFile resource and the other to not find that
+                 * resource.
                  */
 
                 jiniClient = new JiniClient(new String[] { propertyFile });
@@ -521,7 +624,7 @@ public class BigdataRDFServletContextListener implements
                 {
                     // Read the properties from the file.
                     final InputStream is = new BufferedInputStream(
-                            new FileInputStream(propertyFile));
+                            propertyFileUrl.openStream());
                     try {
                         properties.load(is);
                     } finally {

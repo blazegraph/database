@@ -28,32 +28,22 @@ import java.util.LinkedList;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.impl.BindingImpl;
-import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.spo.ISPO;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.BigdataStatementIterator;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.relation.accesspath.IAccessPath;
-
-import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
  * Test case for reverse lookup from SID to statement.
@@ -108,7 +98,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
 
             cxn.setAutoCommit(false);
     
-            cxn.add(getClass().getResourceAsStream("sids.rdf"), "", RDFFormat.RDFXML);
+            cxn.add(getClass().getResourceAsStream("sids.ttl"), "", ServiceProviderHook.TURTLE_RDR);
 
             /*
              * Note: The either flush() or commit() is required to flush the
@@ -128,13 +118,14 @@ public class TestSids extends ProxyBigdataSailTestCase {
 //            	final String s = "http://localhost/host1";
 //            	final String s = "http://localhost/switch1";
             	
-                String query = 
+                final String query = 
                     "PREFIX myns: <http://mynamespace.com#> " +
                     "SELECT distinct ?s ?p ?o " +
                     " { " +
-                    "   ?sid myns:creator <http://1.com> . " +
+                    " <<"+(s == null ? "?s" : "<"+s+">")+" ?p ?o>> myns:creator <http://1.com> . " +
+//                    "   ?sid myns:creator <http://1.com> . " +
 //                    "   graph ?sid { ?s ?p ?o } " +
-                    "   graph ?sid { "+(s == null ? "?s" : "<"+s+">")+" ?p ?o } " +
+//                    "   graph ?sid { "+(s == null ? "?s" : "<"+s+">")+" ?p ?o } " +
                     " }";
                 
                 final TupleQuery tupleQuery = 
@@ -147,7 +138,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
 	                	log.info("no bindings");
 	                } else {
 		                while (result.hasNext()) {
-		                    BindingSet bs = result.next();
+		                    final BindingSet bs = result.next();
 	//	                    log.info(bs.getBinding("s").getValue() + " " + bs.getBinding("p").getValue() + " " + bs.getBinding("o").getValue() + " .");
 		                    log.info((s == null ? bs.getBinding("s").getValue() : s) + " " + bs.getBinding("p").getValue() + " " + bs.getBinding("o").getValue() + " .");
 		                }
@@ -158,7 +149,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
                 
 	                final TupleQueryResult result = tupleQuery.evaluate();
 	            	
-	                Collection<BindingSet> solution = new LinkedList<BindingSet>();
+	                final Collection<BindingSet> solution = new LinkedList<BindingSet>();
 	                solution.add(createBindingSet(new Binding[] {
 	                        new BindingImpl("s", new URIImpl("http://localhost/host1")),
 	                        new BindingImpl("p", new URIImpl("http://mynamespace.com#connectedTo")),
@@ -206,7 +197,7 @@ public class TestSids extends ProxyBigdataSailTestCase {
 
             cxn.setAutoCommit(false);
 
-            final ValueFactory vf = sail.getValueFactory();
+            final BigdataValueFactory vf = (BigdataValueFactory) sail.getValueFactory();
         	
         	final URI host1 = vf.createURI("http://localhost/host1");
         	final URI host = vf.createURI("http://domainnamespace.com/host#Host");
@@ -239,27 +230,33 @@ public class TestSids extends ProxyBigdataSailTestCase {
 //        	cxn.add(swtch2, RDF.TYPE, swtch, sid5);
 //        	cxn.add(sid5, creator, src2);
         	
-        	final Statement s1 = vf.createStatement(host1, RDF.TYPE, host, vf.createBNode());
-        	final Statement s2 = vf.createStatement(host1, connectedTo, swtch1, vf.createBNode());
-        	final Statement s3 = vf.createStatement(host1, connectedTo, swtch2, vf.createBNode());
-        	final Statement s4 = vf.createStatement(swtch1, RDF.TYPE, swtch, vf.createBNode());
-        	final Statement s5 = vf.createStatement(swtch2, RDF.TYPE, swtch, vf.createBNode());
+        	final BigdataStatement s1 = vf.createStatement(host1, RDF.TYPE, host, vf.createBNode());
+        	final BigdataStatement s2 = vf.createStatement(host1, connectedTo, swtch1, vf.createBNode());
+        	final BigdataStatement s3 = vf.createStatement(host1, connectedTo, swtch2, vf.createBNode());
+        	final BigdataStatement s4 = vf.createStatement(swtch1, RDF.TYPE, swtch, vf.createBNode());
+        	final BigdataStatement s5 = vf.createStatement(swtch2, RDF.TYPE, swtch, vf.createBNode());
+        	
+        	final BigdataBNode sid1 = vf.createBNode(s1);
+        	final BigdataBNode sid2 = vf.createBNode(s2);
+        	final BigdataBNode sid3 = vf.createBNode(s3);
+        	final BigdataBNode sid4 = vf.createBNode(s4);
+        	final BigdataBNode sid5 = vf.createBNode(s5);
         	
         	cxn.add(s1);
-        	cxn.add(s1.getContext(), creator, src1);
-        	cxn.add(s1.getContext(), creator, src2);
+        	cxn.add(sid1, creator, src1);
+        	cxn.add(sid1, creator, src2);
         	
         	cxn.add(s2);
-        	cxn.add(s2.getContext(), creator, src1);
+        	cxn.add(sid2, creator, src1);
 
         	cxn.add(s3);
-        	cxn.add(s3.getContext(), creator, src2);
+        	cxn.add(sid3, creator, src2);
 
         	cxn.add(s4);
-        	cxn.add(s4.getContext(), creator, src1);
+        	cxn.add(sid4, creator, src1);
 
         	cxn.add(s5);
-        	cxn.add(s5.getContext(), creator, src2);
+        	cxn.add(sid5, creator, src2);
 
         	cxn.flush();//commit();
             
@@ -278,9 +275,10 @@ public class TestSids extends ProxyBigdataSailTestCase {
                     "PREFIX myns: <http://mynamespace.com#> " +
                     "SELECT distinct ?s ?p ?o " +
                     " { " +
-                    "   ?sid myns:creator <http://1.com> . " +
-//                    "   graph ?sid { ?s ?p ?o } " +
-                    "   graph ?sid { "+(s == null ? "?s" : "<"+s+">")+" ?p ?o } " +
+                    " <<"+(s == null ? "?s" : "<"+s+">")+" ?p ?o>> myns:creator <http://1.com> . " +
+//                    "   ?sid myns:creator <http://1.com> . " +
+////                    "   graph ?sid { ?s ?p ?o } " +
+//                    "   graph ?sid { "+(s == null ? "?s" : "<"+s+">")+" ?p ?o } " +
                     " }";
                 
                 final TupleQuery tupleQuery = 

@@ -36,7 +36,6 @@ import com.bigdata.io.DataOutputBuffer;
  * @see IRaba
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IRabaCoder extends Serializable {
 
@@ -54,6 +53,14 @@ public interface IRabaCoder extends Serializable {
      */
     boolean isValueCoder();
 
+    /**
+     * Return true iff this {@link IRabaCoder} supports duplicate keys.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/763" >
+     *      Stochastic Results With Analytic Query Mode </a>
+     */
+    boolean isDuplicateKeys();
+    
     /**
      * Encode the data, returning an {@link ICodedRaba}. Implementations of this
      * method should be optimized for the very common use case where the caller

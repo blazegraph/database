@@ -654,8 +654,11 @@ public class DataLoader {
      * Load from an input stream.
      * 
      * @param is
+     *            The input stream (required).
      * @param baseURL
+     *            The base URL (required).
      * @param rdfFormat
+     *            The format (required).
      * @return
      * @throws IOException
      */
@@ -671,11 +674,16 @@ public class DataLoader {
     }
 
     /**
-     * Load from a {@link URL}.
+     * Load from a {@link URL}. If in quads mode, the triples in the default
+     * graph will be inserted into the named graph associate with the specified
+     * <code>url</code>.
      * 
      * @param url
+     *            The URL (required).
      * @param baseURL
+     *            The base URL (required).
      * @param rdfFormat
+     *            The {@link RDFFormat} (required).
      * @return
      * @throws IOException
      */
@@ -898,7 +906,7 @@ public class DataLoader {
 
         if (fmt == null) // fallback
             fmt = rdfFormat;
-
+                
         InputStream is = null;
 
         try {
@@ -1007,7 +1015,8 @@ public class DataLoader {
 //        loader.setFlush(false);
         // add listener to log progress.
         loader.addRioLoaderListener( new RioLoaderListener() {
-            
+
+            @Override
             public void processingNotification( final RioLoaderEvent e ) {
 				/*
 				 * This reports as statements are parsed. Depending on how
@@ -1628,5 +1637,5 @@ public class DataLoader {
         ServiceProviderHook.forceLoad();
         
     }
-    
+
 }

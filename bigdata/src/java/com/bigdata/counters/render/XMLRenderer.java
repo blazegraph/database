@@ -41,24 +41,23 @@ import com.bigdata.counters.query.URLQueryModel;
  * client can apply XSLT as desired to style the XML.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class XMLRenderer implements IRenderer {
 
     /**
      * Describes the state of the controller.
      */
-    final URLQueryModel model;
+    private final URLQueryModel model;
 
     /**
      * Selects the counters to be rendered.
      */
-    final ICounterSelector counterSelector;
+    private final ICounterSelector counterSelector;
 
     /**
      * The selected character set encoding.
      */
-    final String charset;
+    private final String charset;
 
     /**
      * @param model
@@ -89,15 +88,37 @@ public class XMLRenderer implements IRenderer {
         
     }
 
+    @Override
     public void render(final Writer w) {
 
         final CounterSet counterSet = new CounterSet();
 
+        @SuppressWarnings("rawtypes")
         final ICounter[] counters = counterSelector.selectCounters(model.depth,
-                model.pattern, model.fromTime, model.toTime, model.period);
+                model.pattern, model.fromTime, model.toTime, model.period,
+                false/* historyRequired */);
 
-        for (ICounter counter : counters) {
+        /*
+         * Apply an optional constraint on the path prefix.
+         * 
+         * TODO push down into the ICounterSelector. This will be more
+         * efficient.
+         */
+        final String pathPrefix = model.path != null && model.path.length() > 0 ? model.path
+                : null;
 
+        for (ICounter<?> counter : counters) {
+
+            if (pathPrefix != null) {
+
+                if (!counter.getPath().startsWith(pathPrefix)) {
+
+                    continue;
+
+                }
+
+            }
+            
             counterSet.makePath(counter.getParent().getPath()).attach(counter);
 
         }

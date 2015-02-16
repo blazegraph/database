@@ -24,10 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.Iterator;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sail.SailException;
@@ -78,9 +80,12 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_addGetRemove() {
 
-        final URI serviceURI1 = new URIImpl("http://www.bigdata.com/myService");
+        final URI serviceURI1 = new URIImpl("http://www.bigdata.com/myService/"
+                + getName() + "/" + UUID.randomUUID());
 
-        final URI serviceURI2 = new URIImpl("http://www.bigdata.com/myService2");
+        final URI serviceURI2 = new URIImpl(
+                "http://www.bigdata.com/myService2/" + getName() + "/"
+                        + UUID.randomUUID());
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
@@ -122,9 +127,17 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_serviceAlias() {
 
-        final URI serviceURI1 = new URIImpl("http://www.bigdata.com/myService");
+        /*
+         * Note: Avoid possible side-effects from uncleared service registries
+         * using a UUID to make these URIs distinct from others that might be in
+         * the ServiceRegistry.
+         */
+        final URI serviceURI1 = new URIImpl("http://www.bigdata.com/myService/"
+                + getName() + "/" + UUID.randomUUID());
 
-        final URI serviceURI2 = new URIImpl("http://www.bigdata.com/myService2");
+        final URI serviceURI2 = new URIImpl(
+                "http://www.bigdata.com/myService2/" + getName() + "/"
+                        + UUID.randomUUID());
 
         final RemoteServiceOptions options = new RemoteServiceOptions();
 
@@ -232,10 +245,12 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
             final BigdataValueFactory f = store.getValueFactory();
 
             final BigdataURI serviceURI1 = f
-                    .createURI("http://www.bigdata.com/myService");
+                    .createURI("http://www.bigdata.com/myService/" + getName()
+                            + "/" + UUID.randomUUID());
 
             final BigdataURI serviceURI2 = f
-                    .createURI("http://www.bigdata.com/myService2");
+                    .createURI("http://www.bigdata.com/myService2/" + getName()
+                            + "/" + UUID.randomUUID());
 
             final BigdataValue[] values = new BigdataValue[] { //
                     serviceURI1,//
@@ -266,8 +281,9 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
                 final QueryEngine queryEngine = QueryEngineFactory
                         .getQueryController(store.getIndexManager());
 
-                final ClientConnectionManager cm = queryEngine
-                        .getClientConnectionManager();
+//                final ClientConnectionManager cm = queryEngine
+//                        .getClientConnectionManager();
+                final HttpClient cm = queryEngine.getClientConnectionManager();
 
                 final JoinGroupNode groupNode = new JoinGroupNode();
                 
@@ -320,7 +336,8 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_customService() throws SailException {
 
-        final URI serviceURI1 = new URIImpl("http://www.bigdata.com/myService");
+        final URI serviceURI1 = new URIImpl("http://www.bigdata.com/myService/"
+                + getName() + "/" + UUID.randomUUID());
 
         final MyCustomServiceFactory serviceFactory = new MyCustomServiceFactory(
                 new OpenrdfNativeServiceOptions());

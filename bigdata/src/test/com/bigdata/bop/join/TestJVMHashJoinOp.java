@@ -201,8 +201,8 @@ public class TestJVMHashJoinOp extends AbstractHashJoinOpTestCase {
                             new NV(PipelineOp.Annotations.MAX_PARALLEL, 2),//
                             namedSet,//
                     }));
-            fail("Expecting: " + UnsupportedOperationException.class);
-        } catch (UnsupportedOperationException ex) {
+            fail("Expecting: " + IllegalArgumentException.class);
+        } catch (IllegalArgumentException ex) {
             if (log.isInfoEnabled())
                 log.info("Ignoring expected exception: " + ex);
         }

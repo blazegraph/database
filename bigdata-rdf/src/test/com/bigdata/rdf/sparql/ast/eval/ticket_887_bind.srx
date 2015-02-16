@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<sparql
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+     xmlns="http://www.w3.org/2005/sparql-results#" >
+   <head>
+    <variable name="?hello"/>
+    <variable name="?helloWorld"/>
+    <variable name="?member"/>
+    <variable name="?class"/>
+    <variable name="?g"/>
+   </head>
+   <results>
+     <result>
+      <binding name="hello">
+         <literal>hello</literal>
+      </binding>
+      <binding name="helloWorld">
+         <literal>hello world</literal>
+      </binding>
+      <binding name="member">
+         <uri>http://www.bigdata.com/member</uri>
+      </binding>
+      <binding name="class">
+         <uri>http://www.bigdata.com/cls</uri>
+      </binding>
+      <binding name="g">
+         <uri>http://www.bigdata.com/</uri>
+      </binding>
+     </result>
+   </results>
+</sparql>

@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.hints;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 
@@ -45,6 +46,7 @@ final class OptimisticQueryHint extends AbstractDoubleQueryHint {
 
     @Override
     public void handle(final AST2BOpContext context,
+            final QueryRoot queryRoot,
             final QueryHintScope scope, final ASTBase op, final Double value) {
 
         if (op instanceof JoinGroupNode) {

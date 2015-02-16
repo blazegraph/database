@@ -46,7 +46,6 @@ import com.bigdata.rdf.sail.tck.BigdataStoreTest;
  * the pipeline join algorithm.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
@@ -136,16 +135,18 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
 
         suite.addTestSuite(com.bigdata.rdf.sail.TestNoExceptions.class);
 
+        suite.addTestSuite(com.bigdata.rdf.sail.TestInlineURIs.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 
             final TestSuite tckSuite = new TestSuite("Sesame 2.x TCK");
 
             // Sesame Sail test.
-            tckSuite.addTestSuite(BigdataStoreTest.LTSWithPipelineJoins.class);
+            tckSuite.addTestSuite(BigdataStoreTest.class);
 
             // Sesame SailConnection test.
-            tckSuite.addTestSuite(BigdataConnectionTest.LTSWithPipelineJoins.class);
+            tckSuite.addTestSuite(BigdataConnectionTest.class);
 
             try {
 
@@ -198,6 +199,7 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
     }
 
+    @Override
     public Properties getProperties() {
 
         final Properties properties = new Properties(super.getProperties());

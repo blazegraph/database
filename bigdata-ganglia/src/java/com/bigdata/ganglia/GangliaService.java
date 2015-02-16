@@ -204,7 +204,8 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 	 * The period after which a host which has not been updated will have its
 	 * metrics deleted from the {@link GangliaState}.
 	 */
-	private final int globalDMax;
+	@SuppressWarnings("unused")
+    private final int globalDMax;
 	
 	/**
 	 * Object which knows how to generate {@link IGangliaMetricMessage}s which
@@ -260,6 +261,18 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 			"gexec"//
 	};
 
+    /**
+     * Return a copy of the default metrics used to generate {@link IHostReport}
+     * s.
+     * 
+     * @see #getHostReport()
+     */
+    public String[] getDefaultHostReportOn() {
+
+        return Arrays.copyOf(defaultHostReportOn, defaultHostReportOn.length);
+        
+	}
+	
 	/** Place into descending order by load_one. */
 	private static final Comparator<IHostReport> defaultHostReportComparator = new HostReportComparator(
 			"load_one", false/* asc */);
@@ -1352,15 +1365,44 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 	 */
 	public IHostReport[] getHostReport(final String[] reportOn,
 			final Comparator<IHostReport> comparator) {
+	    
+        final String[] hosts = gangliaState.getKnownHosts();
+
+        return getHostReport(hosts, reportOn, comparator);
+        
+	}
+	
+    /**
+     * Return a host report based on the current state (similar to
+     * <code>gstat -a</code>).
+     * <p>
+     * Note: The report will not be accurate immediately as the
+     * {@link GangliaService} needs to build up a model of the current state of
+     * the monitored hosts.
+     * 
+     * @param hosts
+     *            The hosts for which host reports will be returned.
+     * @param reportOn
+     *            The metrics to be reported for each host. The
+     *            {@link IHostReport#getMetrics()} is an ordered map and will
+     *            reflect the metrics in the order in which they are requested
+     *            here.
+     * @param comparator
+     *            The comparator used to order the {@link IHostReport}s
+     *            (optional).
+     * 
+     * @return The {@link IHostReport}s for each specified host ordered by the
+     *         given {@link Comparator}.
+     */
+    public IHostReport[] getHostReport(final String[] hosts,
+            final String[] reportOn, final Comparator<IHostReport> comparator) {
 
 		if (reportOn == null || reportOn.length == 0)
 			throw new IllegalArgumentException();
 
-		if (comparator == null)
-			throw new IllegalArgumentException();
+//		if (comparator == null)
+//			throw new IllegalArgumentException();
 		
-		final String[] hosts = gangliaState.getKnownHosts();
-
 		final IHostReport[] a = new IHostReport[hosts.length];
 
 		for (int i = 0; i < a.length; i++) {
@@ -1406,33 +1448,60 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
 		}
 
 		// Sort
-		Arrays.sort(a, comparator);
+        if (comparator != null) {
+         
+            Arrays.sort(a, comparator);
+            
+        }
 
 		return a;
 
 	}
 
-	/**
-	 * The name for this host.
-	 */
-	public static final String getCanonicalHostName() {
-		String s;
-		try {
-			/*
-			 * Note: This should be the host *name* NOT an IP address of a
-			 * preferred Ethernet adaptor.
-			 */
-			s = InetAddress.getLocalHost().getCanonicalHostName();
-		} catch (Throwable t) {
-			log.warn("Could not resolve canonical name for host: " + t);
-		}
-		try {
-			s = InetAddress.getLocalHost().getHostName();
-		} catch (Throwable t) {
-			log.warn("Could not resolve name for host: " + t);
-			s = "localhost";
-		}
-		return s;
+    /**
+     * The name of an environment variable whose value will be used as the
+     * canoncial host name for the host running this JVM. This information is
+     * used by the {@link GangliaService}, which is responsible for obtaining
+     * and reporting the canonical hostname for host metrics reporting.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
+    public static final String HOSTNAME = "com.bigdata.hostname";
+
+    /**
+     * The name for this host.
+     * 
+     * @see #HOSTNAME
+     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     *      bad reverse DNS setups</a>
+     */
+    public static final String getCanonicalHostName() {
+        String s = System.getProperty(HOSTNAME);
+        if (s != null) {
+            // Trim whitespace.
+            s = s.trim();
+        }
+        if (s != null && s.length() != 0) {
+            log.warn("Hostname override: hostname=" + s);
+        } else {
+            try {
+                /*
+                 * Note: This should be the host *name* NOT an IP address of a
+                 * preferred Ethernet adaptor.
+                 */
+                s = InetAddress.getLocalHost().getCanonicalHostName();
+            } catch (Throwable t) {
+                log.warn("Could not resolve canonical name for host: " + t);
+            }
+            try {
+                s = InetAddress.getLocalHost().getHostName();
+            } catch (Throwable t) {
+                log.warn("Could not resolve name for host: " + t);
+                s = "localhost";
+            }
+        }
+        return s;
 	}
 
 	/**

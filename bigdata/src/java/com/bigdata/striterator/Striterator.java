@@ -92,14 +92,17 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
         
         this((I)new Iterator<E>() {
 
+            @Override
             public boolean hasNext() {
                 return srcEnum.hasMoreElements();
             }
 
+            @Override
             public E next() {
                 return srcEnum.nextElement();
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -151,7 +154,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
      *            
      * @return The filtered iterator.
      */
-    public IStriterator<I,E> exclude(Set<E> set) {
+    public IStriterator<I,E> exclude(final Set<E> set) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
     }
@@ -162,7 +165,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
         throw new UnsupportedOperationException();
     }
 
-    public IStriterator<I,E> map(Object client, Method method) {
+    public IStriterator<I,E> map(final Object client, final Method method) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException();
     }
@@ -225,6 +228,7 @@ public class Striterator<I extends Iterator<E>, E> implements IStriterator<I,E> 
      *             chunked striterator patterns and this method will always
      *             throw an {@link UnsupportedOperationException}.
      */
+    @Override
     public void remove() {
 
         throw new UnsupportedOperationException();

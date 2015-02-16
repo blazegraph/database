@@ -267,7 +267,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
 				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
-						op/* queryNode */, null/* bindingSets */);
+						op/* queryNode */, context.getBindings()/* bindingSets */);
 
 			}
 			
@@ -486,6 +486,19 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                                 new LinkedHashSet<IVariable<?>>()/* vars */,
                                 true/* recursive */);
 
+                for (IBindingSet bs : context.getBindings()) {
+                    
+                    @SuppressWarnings("rawtypes")
+                    final Iterator<IVariable> it = bs.vars();
+                    
+                    while (it.hasNext()) {
+                        
+                        projectedVars.add(it.next());
+                        
+                    }
+                    
+                }
+
                 final ProjectionNode projection = new ProjectionNode();
 
                 for (IVariable<?> var : projectedVars) {
@@ -493,7 +506,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     projection.addProjectionVar(new VarNode(var.getName()));
 
                 }
-
+                
                 queryRoot.setProjection(projection);
                 
             }
@@ -595,10 +608,18 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * associated with the SailConnection in case the view is
 				 * isolated by a transaction.
 				 */
+				
+				// If the query contains a nativeDistinctSPO query hint then
+				// the line below unfortunately isolates the query so that the hint does
+				// not impact any other execution, this is hacked by putting a property on the query root.
+				
 				final MutableTupleQueryResult result = new MutableTupleQueryResult(
 						ASTEvalHelper.evaluateTupleQuery(
 								context.conn.getTripleStore(), astContainer,
-								null/* bindingSets */));
+								context.getQueryBindingSet()/* bindingSets */));
+				
+				boolean nativeDistinct = astContainer.getOptimizedAST().getProperty(ConstructNode.Annotations.NATIVE_DISTINCT,
+						ConstructNode.Annotations.DEFAULT_NATIVE_DISTINCT);
 
                 try {
 
@@ -708,7 +729,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 										.evaluateTupleQuery2(
 												context.conn.getTripleStore(),
 												astContainer,
-												null/* bindingSets */, false/* materialize */);
+												context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
 
 								try {
 
@@ -743,6 +764,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							
 							final ConstructNode template = op.getDeleteClause()
 									.getQuadData().flatten(new ConstructNode(context));
+							
+							template.setDistinctQuads(true);
+							
+							if (nativeDistinct) {
+								template.setNativeDistinct(true);
+							}
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
                                     context.conn.getTripleStore(), template,
@@ -813,6 +840,12 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							final ConstructNode template = op.getInsertClause()
 									.getQuadData().flatten(new ConstructNode(context));
 
+							template.setDistinctQuads(true);
+							
+							if (nativeDistinct) {
+								template.setNativeDistinct(true);
+							}
+
                             final ASTConstructIterator itr = new ASTConstructIterator(
                                     context.conn.getTripleStore(), template,
                                     op.getWhereClause(), null/* bnodesMap */,
@@ -841,6 +874,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 
             } else {
 
+                
                 /*
                  * DELETE/INSERT.
                  * 
@@ -896,7 +930,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					 */
 					final ICloseableIterator<IBindingSet[]> result = ASTEvalHelper
 							.evaluateTupleQuery2(context.conn.getTripleStore(),
-									astContainer, null/* bindingSets */, false/* materialize */);
+									astContainer, context.getQueryBindingSet()/* bindingSets */, false/* materialize */);
 
                     try {
 
@@ -923,9 +957,11 @@ public class AST2BOpUpdate extends AST2BOpUtility {
                     final ConstructNode template = quadData
                             .flatten(new ConstructNode(context));
 
+					template.setDistinctQuads(true);
+
                     // Set the CONSTRUCT template (quads patterns).
                     queryRoot.setConstruct(template);
-
+                    
                     /*
 					 * Run as a CONSTRUCT query
 					 * 
@@ -941,8 +977,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 					 */
                     final GraphQueryResult result = ASTEvalHelper
 							.evaluateGraphQuery(context.conn.getTripleStore(),
-									astContainer, null/* bindingSets */);
-
+									astContainer, context.getQueryBindingSet()/* bindingSets */);
+                    
                     try {
 
                         while (result.hasNext()) {
@@ -1127,7 +1163,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         
         if (!silent) {
 
-            assertGraphNotEmpty(context, sourceGraph);
+//            assertGraphNotEmpty(context, sourceGraph);
 
         }
         
@@ -1335,7 +1371,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
         /*
          * Execute the update.
          */
-        executeUpdate(left, null/* bindingSets */, context);
+        executeUpdate(left, context.getBindings()/* bindingSets */, context);
 
         // Return null since pipeline was evaluated.
         return null;

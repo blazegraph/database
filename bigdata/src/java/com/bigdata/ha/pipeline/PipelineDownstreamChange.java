@@ -42,7 +42,7 @@ import com.bigdata.quorum.QuorumException;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class PipelineDownstreamChange extends QuorumException {
+public class PipelineDownstreamChange extends AbstractPipelineChangeException {
 
     /**
      * 

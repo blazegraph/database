@@ -209,4 +209,84 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         
     }    
+
+    /**
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/831">Union with FILTER
+     *      issue</a>
+     */
+    public void test_union_ticket_831() throws Exception {
+        
+        new TestHelper(
+                "ticket_831", // testURI,
+                "ticket_831.rq",// queryFileURL
+                "ticket_831.ttl",// dataFileURL
+                "ticket_831.srx"// resultFileURL
+                ).runTest();
+        
+    }    
+
+    /**
+     * The original query.
+     * @see <a href="http://trac.bigdata.com/ticket/874">FILTER not applied when
+     *      there is UNION in the same join group</a>
+     */
+    public void test_union_ticket_874() throws Exception {
+        
+        new TestHelper(
+                "ticket_874", // testURI,
+                "ticket_874.rq",// queryFileURL
+                "ticket_874.ttl",// dataFileURL
+                "ticket_874.srx"// resultFileURL
+                ).runTest();
+        
+    }    
+
+    /**
+     * A rewrite of the original query that works.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/874">FILTER not applied when
+     *      there is UNION in the same join group</a>
+     */
+    public void test_union_ticket_874b() throws Exception {
+        
+        new TestHelper(
+                "ticket_874b", // testURI,
+                "ticket_874b.rq",// queryFileURL
+                "ticket_874.ttl",// dataFileURL
+                "ticket_874.srx"// resultFileURL
+                ).runTest();
+        
+    }    
+
+    /**
+     * This is DAWG sparql11-subquery-05. It fails in scale-out.
+     * 
+     * <pre>
+     * SELECT * 
+     * WHERE { 
+     *     {
+     *       SELECT ?s 
+     *       WHERE {?s ?p ?o}
+     *       LIMIT 1 
+     *     }
+     *     {?s ?p ?o} 
+     *     UNION 
+     *     {} 
+     * }
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void test_union_ticket_944() throws Exception {
+        
+        new TestHelper(
+                "ticket_944", // testURI,
+                "ticket_944.rq",// queryFileURL
+                "ticket_944.trig",// dataFileURL
+                "ticket_944.srx"// resultFileURL
+                ).runTest();
+        
+    }
+    
 }

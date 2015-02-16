@@ -33,9 +33,6 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 
 /**
@@ -51,7 +48,7 @@ import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestSearch extends ProxyTestCase<IIndexManager> {
+public class TestSearch extends AbstractSearchTest {
 
     public TestSearch() {
         super();
@@ -105,7 +102,6 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         /** all documents are in English. */
         final String languageCode = "EN";
 
-        final String NAMESPACE = "test";
 
         final boolean prefixMatch = false;
         final double minCosine = .0;
@@ -117,64 +113,46 @@ public class TestSearch extends ProxyTestCase<IIndexManager> {
         final TimeUnit unit = TimeUnit.MILLISECONDS;
         final String regex = null;
 
-        final Properties properties = getProperties();
-        
-        final IIndexManager indexManager = getStore( properties );
-        
-        try {
+        init();
+        {
 
-            // setup and populate the index.
-            FullTextIndex<Long> ndx;
-            {
-                
-                ndx = new FullTextIndex<Long>(indexManager, NAMESPACE,
-                        ITx.UNISOLATED, properties );
+            /*
+             * Index the documents.
+             */
+            long docId = 1;
+            final int fieldId = 0;
+            final TokenBuffer<Long> buffer = new TokenBuffer<Long>(docs.length, getNdx());
+            for (String s : docs) {
 
-                ndx.create();
+                getNdx().index(buffer, Long.valueOf(docId++), fieldId,
+                        languageCode, new StringReader(s));
 
-                /*
-                 * Index the documents.
-                 */
-                long docId = 1;
-                final int fieldId = 0;
-                final TokenBuffer<Long> buffer = new TokenBuffer<Long>(docs.length, ndx);
-                for (String s : docs) {
-
-                    ndx.index(buffer, Long.valueOf(docId++), fieldId,
-                            languageCode, new StringReader(s));
-
-                }
-
-                // flush index writes to the database.
-                buffer.flush();
             }
 
-            // run query and verify results.
-            {
+            // flush index writes to the database.
+            buffer.flush();
+        }
 
-                final String query = "child proofing";
+        // run query and verify results.
+        {
 
-                final Hiterator<Hit<Long>> itr = ndx.search(new FullTextQuery(
-                		query,
-                        languageCode, prefixMatch, regex, 
-                        matchAllTerms, false/* matchExact*/, 
-                        minCosine, maxCosine,
-                        minRank, maxRank, timeout, unit));
+            final String query = "child proofing";
+
+            final Hiterator<Hit<Long>> itr = getNdx().search(new FullTextQuery(
+            		query,
+                    languageCode, prefixMatch, regex, 
+                    matchAllTerms, false/* matchExact*/, 
+                    minCosine, maxCosine,
+                    minRank, maxRank, timeout, unit));
 //                                query, languageCode, 0d/* minCosine */,
 //                                Integer.MAX_VALUE/* maxRank */);
-                
-                assertSameHits(new IHit[] { //
-                        new HT<Long>(5L, 0.44194173824159216d),//
-                        new HT<Long>(6L, 0.44194173824159216d),//
-                        new HT<Long>(2L, 0.35355339059327373d),//
-                        new HT<Long>(3L, 0.35355339059327373d),//
-                }, itr);
-            }
-
-        } finally {
-
-            indexManager.destroy();
-
+            
+            assertSameHits(new IHit[] { //
+                    new HT<Long>(5L, 0.44194173824159216d),//
+                    new HT<Long>(6L, 0.44194173824159216d),//
+                    new HT<Long>(2L, 0.35355339059327373d),//
+                    new HT<Long>(3L, 0.35355339059327373d),//
+            }, itr);
         }
 
     }

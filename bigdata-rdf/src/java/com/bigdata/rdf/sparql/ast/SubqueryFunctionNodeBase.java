@@ -32,6 +32,7 @@ import java.util.Map;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot.Annotations;
 
 /**
  * A special function node for modeling value expression nodes which are
@@ -40,7 +41,6 @@ import com.bigdata.bop.BOp;
  * subquery result.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
         IGraphPatternContainer {
@@ -52,6 +52,22 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
 
     interface Annotations extends FunctionNode.Annotations,
             IGraphPatternContainer.Annotations {
+        
+        /**
+         * Used to specify the query plan for FILTER (NOT) EXISTS. There are two
+         * basic plans: vectored sub-plan and subquery with LIMIT ONE. Each plan
+         * has its advantages.
+         * <p>
+         * Note: This annotation gets propagated to the {@link SubqueryRoot}
+         * when the FILTER (NOT) EXISTS is turned into an ASK subquery.
+         * 
+         * @see FilterExistsModeEnum
+         * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance
+         *      for FILTER EXISTS </a>
+         */
+        String FILTER_EXISTS = QueryHints.FILTER_EXISTS;
+        
+        FilterExistsModeEnum DEFAULT_FILTER_EXISTS = QueryHints.DEFAULT_FILTER_EXISTS;
 
     }
 
@@ -95,6 +111,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
 
@@ -102,6 +119,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
 
     }
 
+    @Override
     public void setGraphPattern(
             final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
@@ -118,5 +136,32 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
         setProperty(Annotations.GRAPH_PATTERN, graphPattern);
 
     }
+
+    /**
+     * 
+     * @see Annotations#FILTER_EXISTS
+     */
+    public void setFilterExistsMode(final FilterExistsModeEnum newVal) {
+
+        setProperty(Annotations.FILTER_EXISTS, newVal);
+        
+    }
+    
+    /**
+     * @see Annotations#FILTER_EXISTS
+     */
+    public FilterExistsModeEnum getFilterExistsMode() {
+
+        return getProperty(Annotations.FILTER_EXISTS,
+                Annotations.DEFAULT_FILTER_EXISTS);
+
+    }
+    
+    @Override
+	protected void annotationValueToString(final StringBuilder sb, final BOp val, int i) {
+
+        sb.append(val.toString(i));
+        
+	}
 
 }

@@ -200,6 +200,7 @@ public class TestQueryEngine_Slice extends TestCase2 {
                         new NV(SliceOp.Annotations.LIMIT, limit),//
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         final UUID queryId = UUID.randomUUID();

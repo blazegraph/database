@@ -955,35 +955,137 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
     }
     
+    /**
+     * Perform a range count on a full text query.
+     */
     public int count(final FullTextQuery query) {
     	
-		final Hit[] a = _search(query);
-		
-		return a.length;
+    	if (cache.containsKey(query)) {
+    		
+        	if (log.isInfoEnabled())
+        		log.info("found hits in cache");
+        	
+    		return cache.get(query).length;
+    		
+        } else {
+        	
+        	if (log.isInfoEnabled())
+        		log.info("did not find hits in cache");
+        	
+        }
+    	
+        // tokenize the query.
+        final TermFrequencyData<V> qdata = tokenize(query);
+        
+        // No terms after stopword extraction
+        if (qdata == null) {
+        	
+        	cache.put(query, new Hit[] {});
+        	
+        	return 0;
+        			
+        }
+        
+        /*
+         * We can run an optimized version of this (just a quick range count)
+         * but only if the caller does not care about exact match and has
+         * not specified a regex.
+         */
+        if (qdata.distinctTermCount() == 1 &&
+        		!query.isMatchExact() && query.getMatchRegex() == null) {
+        	
+        	final boolean prefixMatch = query.isPrefixMatch();
+        	
+        	final Map.Entry<String, ITermMetadata> e = qdata.getSingletonEntry();
+        	
+            final String termText = e.getKey();
+        	
+            final ITermMetadata md = e.getValue();
+
+            final CountIndexTask<V> task1 = new CountIndexTask<V>(termText, 0, 1, 
+            		prefixMatch, md.getLocalTermWeight(), this);
+            
+            return (int) task1.getRangeCount();
+        	
+        } else {
+	        
+			final Hit<V>[] a = _search(query);
+	    	
+			return a.length;
+			
+        }
 		
     }
     
-    public Hit<V>[] _search(final FullTextQuery q) {
+    protected TermFrequencyData<V> tokenize(final FullTextQuery query) {
     	
-		final String query = q.getQuery();
-		final String languageCode = q.getLanguageCode(); 
-		final boolean prefixMatch = q.isPrefixMatch();
-        final double minCosine = q.getMinCosine();
-        final double maxCosine = q.getMaxCosine();
-        final int minRank = q.getMinRank();
-        final int maxRank = q.getMaxRank(); 
-        final boolean matchAllTerms = q.isMatchAllTerms();
-        final boolean matchExact = q.isMatchExact();
-        final String regex = q.getMatchRegex();
-        long timeout = q.getTimeout();
-        final TimeUnit unit = q.getTimeUnit(); 
+		final String q = query.getQuery();
+		final String languageCode = query.getLanguageCode(); 
+		final boolean prefixMatch = query.isPrefixMatch();
+
+        // tokenize the query.
+        final TermFrequencyData<V> qdata;
+        {
+            
+    		final TokenBuffer<V> buffer = new TokenBuffer<V>(1, this);
+
+            /*
+             * If we are using prefix match ('*' operator) then we don't want to
+             * filter stopwords from the search query.
+             */
+            final boolean filterStopwords = !prefixMatch;
+
+            index(buffer, //
+                    null, // docId // was Long.MIN_VALUE
+                    Integer.MIN_VALUE, // fieldId
+                    languageCode,//
+                    new StringReader(q), //
+                    filterStopwords//
+            );
+
+            if (buffer.size() == 0) {
+
+                /*
+                 * There were no terms after stopword extration.
+                 */
+
+                log.warn("No terms after stopword extraction: query=" + query);
+
+                return null; 
+
+            }
+            
+            qdata = buffer.get(0);
+            
+            qdata.normalize();
+            
+        }
+        
+        return qdata;
+
+    }
+    
+    public Hit<V>[] _search(final FullTextQuery query) {
+    	
+		final String queryStr = query.getQuery();
+		final String languageCode = query.getLanguageCode(); 
+		final boolean prefixMatch = query.isPrefixMatch();
+        final double minCosine = query.getMinCosine();
+        final double maxCosine = query.getMaxCosine();
+        final int minRank = query.getMinRank();
+        final int maxRank = query.getMaxRank(); 
+        final boolean matchAllTerms = query.isMatchAllTerms();
+        final boolean matchExact = query.isMatchExact();
+        final String regex = query.getMatchRegex();
+        long timeout = query.getTimeout();
+        final TimeUnit unit = query.getTimeUnit(); 
 
         final long begin = System.currentTimeMillis();
         
 //        if (languageCode == null)
 //            throw new IllegalArgumentException();
 
-        if (query == null)
+        if (queryStr == null)
             throw new IllegalArgumentException();
         
         if (minCosine < 0d || minCosine > 1d)
@@ -1002,7 +1104,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             throw new IllegalArgumentException();
         
         if (log.isInfoEnabled())
-            log.info("languageCode=[" + languageCode + "], text=[" + query
+            log.info("languageCode=[" + languageCode + "], text=[" + queryStr
                     + "], minCosine=" + minCosine 
                     + ", maxCosine=" + maxCosine
                     + ", minRank=" + minRank
@@ -1018,7 +1120,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
             
         }
         
-        final FullTextQuery cacheKey = q;
+        final FullTextQuery cacheKey = query;
         
         Hit<V>[] a;
         
@@ -1034,137 +1136,24 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         	if (log.isInfoEnabled())
         		log.info("did not find hits in cache");
         	
-	        // tokenize the query.
-	        final TermFrequencyData<V> qdata;
-	        {
-	            
-	            final TokenBuffer<V> buffer = new TokenBuffer<V>(1, this);
-	
-	            /*
-	             * If we are using prefix match ('*' operator) then we don't want to
-	             * filter stopwords from the search query.
-	             */
-	            final boolean filterStopwords = !prefixMatch;
-	
-	            index(buffer, //
-	                    null, // docId // was Long.MIN_VALUE
-	                    Integer.MIN_VALUE, // fieldId
-	                    languageCode,//
-	                    new StringReader(query), //
-	                    filterStopwords//
-	            );
-	
-	            if (buffer.size() == 0) {
-	
-	                /*
-	                 * There were no terms after stopword extration.
-	                 */
-	
-	                log.warn("No terms after stopword extraction: query=" + query);
-	
-	                a = new Hit[] {};
-	                
-	                cache.put(cacheKey, a);
-	                
-	                return a; 
-	
-	            }
-	            
-	            qdata = buffer.get(0);
-	            
-	            qdata.normalize();
-	            
-	        }
-	
-	        final IHitCollector<V> hits;
-	        
-	        if (qdata.distinctTermCount() == 1) {
-	        	
-	        	final Map.Entry<String, ITermMetadata> e = qdata.getSingletonEntry();
-	        	
-                final String termText = e.getKey();
+            // tokenize the query.
+            final TermFrequencyData<V> qdata = tokenize(query);
+            
+            // No terms after stopword extraction
+            if (qdata == null) {
             	
-                final ITermMetadata md = e.getValue();
-
-                final CountIndexTask<V> task1 = new CountIndexTask<V>(termText, 0, 1, prefixMatch, md
-                        .getLocalTermWeight(), this);
-                
-                hits = new SingleTokenHitCollector<V>(task1);
-	        	
-	        } else {
-	        	
-	            final List<CountIndexTask<V>> tasks = new ArrayList<CountIndexTask<V>>(
-	                    qdata.distinctTermCount());
-	
-	            int i = 0;
-	            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
-	
-	                final String termText = e.getKey();
-	
-	                final ITermMetadata md = e.getValue();
-	
-	                tasks.add(new CountIndexTask<V>(termText, i++, qdata.terms.size(), prefixMatch, md
-	                        .getLocalTermWeight(), this));
-	
-	            }
-	            
-	            hits = new MultiTokenHitCollector<V>(tasks);
-	        	
-	        }
-	        
-	        // run the queries.
-	        {
-	
-	            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
-	                    qdata.distinctTermCount());
-	
-	            int i = 0;
-	            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
-	
-	                final String termText = e.getKey();
-	
-	                final ITermMetadata md = e.getValue();
-	
-	                tasks.add(new ReadIndexTask<V>(termText, i++, qdata.terms.size(),
-	                		prefixMatch, md.getLocalTermWeight(), this, hits));
-	
-	            }
-	
-	            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
-	                    getExecutorService(), timeout, unit);
-	
-	            try {
-	
-	    	        final long start = System.currentTimeMillis();
-	    	        
-	                executionHelper.submitTasks(tasks);
-	                
-	                if (log.isInfoEnabled()) {
-		                final long readTime = System.currentTimeMillis() - start;
-		                log.info("read time: " + readTime);
-	                }
-	                
-	            } catch (InterruptedException ex) {
-	
-	            	if (log.isInfoEnabled()) {
-		                // TODO Should we wrap and toss this interrupt instead?
-		                log.info("Interrupted - only partial results will be returned.");
-	            	}
-	                
-	            } catch (ExecutionException ex) {
-	
-	                throw new RuntimeException(ex);
-	                
-	            }
-	
-	        }
-	        
-	        a = hits.getHits();
-	        
+            	cache.put(cacheKey, a = new Hit[] {});
+            	
+            	return a;
+            			
+            }
+            
+            a = executeQuery(qdata, prefixMatch, timeout, unit);
+            
 	        if (a.length == 0) {
 	        	
 	            log.info("No hits: languageCode=[" + languageCode + "], query=["
-	                    + query + "]");
+	                    + queryStr + "]");
 	            
 	            cache.put(cacheKey, a);
 	            
@@ -1215,14 +1204,14 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	         */
 	        if (matchExact) {
 	        	
-	        	a = matchExact(a, query);
+	        	a = matchExact(a, queryStr);
 	        	
 	        }
 	        
 	        if (a.length == 0) {
 	        	
 	            log.warn("No hits after matchAllTerms pruning: languageCode=[" + languageCode + "], query=["
-	                    + query + "]");
+	                    + queryStr + "]");
 	            
 	            cache.put(cacheKey, a);
 	            
@@ -1252,7 +1241,7 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        if (a.length == 0) {
 	        	
 	            log.warn("No hits after regex pruning: languageCode=[" + languageCode + "], query=["
-	                    + query + "], regex=[" + regex + "]");
+	                    + queryStr + "], regex=[" + regex + "]");
 	            
 	            cache.put(cacheKey, a);
 	            
@@ -1290,6 +1279,27 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 	        cache.put(cacheKey, a);
         
         }
+        
+        /*
+         * Take a slice of the hits based on min/max cosine and min/max rank.
+         */
+        a = slice(query, a);
+        
+        final long elapsed = System.currentTimeMillis() - begin;
+        
+        if (log.isInfoEnabled())
+            log.info("Done: " + a.length + " hits in " + elapsed + "ms");
+
+        return a;
+        
+    }
+    
+    protected Hit<V>[] slice(final FullTextQuery query, Hit<V>[] a) {
+    	
+        final double minCosine = query.getMinCosine();
+        final double maxCosine = query.getMaxCosine();
+        final int minRank = query.getMinRank();
+        final int maxRank = query.getMaxRank();
         
 //        if (log.isDebugEnabled()) {
 //        	log.debug("before min/max cosine/rank pruning:");
@@ -1414,13 +1424,106 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         	
         }
 
-        final long elapsed = System.currentTimeMillis() - begin;
-        
-        if (log.isInfoEnabled())
-            log.info("Done: " + a.length + " hits in " + elapsed + "ms");
-
         return a;
         
+    }
+    
+    protected Hit<V>[] executeQuery(final TermFrequencyData<V> qdata,
+    		final boolean prefixMatch, final long timeout, final TimeUnit unit) {
+    	
+        final IHitCollector<V> hits;
+        
+        if (qdata.distinctTermCount() == 1) {
+        	
+        	final Map.Entry<String, ITermMetadata> e = qdata.getSingletonEntry();
+        	
+            final String termText = e.getKey();
+        	
+            final ITermMetadata md = e.getValue();
+
+            final CountIndexTask<V> task1 = new CountIndexTask<V>(termText, 0, 1,
+            		prefixMatch, md.getLocalTermWeight(), this);
+            
+            hits = new SingleTokenHitCollector<V>(task1);
+        	
+        } else {
+        	
+            final List<CountIndexTask<V>> tasks = new ArrayList<CountIndexTask<V>>(
+                    qdata.distinctTermCount());
+
+            int i = 0;
+            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
+
+                final String termText = e.getKey();
+
+                final ITermMetadata md = e.getValue();
+
+                tasks.add(new CountIndexTask<V>(termText, i++, qdata.terms.size(), 
+                		prefixMatch, md.getLocalTermWeight(), this));
+
+            }
+            
+            hits = new MultiTokenHitCollector<V>(tasks);
+        	
+        }
+        
+        // run the queries.
+        {
+
+            final List<Callable<Object>> tasks = new ArrayList<Callable<Object>>(
+                    qdata.distinctTermCount());
+
+            int i = 0;
+            for (Map.Entry<String, ITermMetadata> e : qdata.terms.entrySet()) {
+
+                final String termText = e.getKey();
+
+                final ITermMetadata md = e.getValue();
+
+                tasks.add(new ReadIndexTask<V>(termText, i++, qdata.terms.size(),
+                		prefixMatch, md.getLocalTermWeight(), this, hits));
+
+            }
+
+            final ExecutionHelper<Object> executionHelper = new ExecutionHelper<Object>(
+                    getExecutorService(), timeout, unit);
+
+            try {
+
+    	        final long start = System.currentTimeMillis();
+    	        
+                executionHelper.submitTasks(tasks);
+                
+                if (log.isInfoEnabled()) {
+	                final long readTime = System.currentTimeMillis() - start;
+	                log.info("read time: " + readTime);
+                }
+                
+            } catch (InterruptedException ex) {
+
+            	if (log.isInfoEnabled()) {
+	                // TODO Should we wrap and toss this interrupt instead?
+	                log.info("Interrupted - only partial results will be returned.");
+            	}
+                
+            	/*
+            	 * Yes, let's toss it.  We were getting into a situation
+            	 * where the ExecutionHelper above received an interrupt
+            	 * but we still went through the heavy-weight filtering
+            	 * operations below (matchExact or matchRegex).
+            	 */
+            	throw new RuntimeException(ex);
+
+            } catch (ExecutionException ex) {
+
+                throw new RuntimeException(ex);
+                
+            }
+
+        }
+        
+        return hits.getHits();
+
     }
     
     /**

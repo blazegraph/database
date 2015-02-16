@@ -30,6 +30,8 @@ import java.io.ObjectOutput;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -39,22 +41,28 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.ha.msg.HAWriteMessageBase;
-import com.bigdata.ha.msg.IHALogRequest;
+import com.bigdata.ha.msg.HAMessageWrapper;
+import com.bigdata.ha.msg.HASendState;
 import com.bigdata.ha.msg.IHAMessage;
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.pipeline.HAReceiveService;
 import com.bigdata.ha.pipeline.HAReceiveService.IHAReceiveCallback;
 import com.bigdata.ha.pipeline.HASendService;
+import com.bigdata.ha.pipeline.ImmediateDownstreamReplicationException;
+import com.bigdata.ha.pipeline.NestedPipelineException;
+import com.bigdata.ha.pipeline.PipelineImmediateDownstreamReplicationException;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.quorum.QCE;
@@ -65,7 +73,9 @@ import com.bigdata.quorum.QuorumStateChangeEvent;
 import com.bigdata.quorum.QuorumStateChangeEventEnum;
 import com.bigdata.quorum.QuorumStateChangeListener;
 import com.bigdata.quorum.QuorumStateChangeListenerBase;
+import com.bigdata.quorum.ServiceLookup;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**
  * {@link QuorumPipeline} implementation.
@@ -190,7 +200,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      * href="https://sourceforge.net/apps/trac/bigdata/ticket/724">HA wire
      * pulling and sudden kill testing</a>.
      */
-    private final int RETRY_SLEEP = 100; //200; // 50; // milliseconds.
+    private final int RETRY_SLEEP = 30; //200; // 50; // milliseconds.
     
     /**
      * Once this timeout is elapsed, retrySend() will fail.
@@ -207,18 +217,24 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     /**
      * The {@link QuorumMember}.
      */
-    protected final QuorumMember<S> member;
+    private final QuorumMember<S> member;
 
     /**
      * The service {@link UUID} for the {@link QuorumMember}.
      */
-    protected final UUID serviceId;
+    private final UUID serviceId;
     
     /**
      * Lock managing the various mutable aspects of the pipeline state.
      */
     private final ReentrantLock lock = new ReentrantLock();
 
+    /**
+     * Condition signalled when the write replication pipeline has been changed
+     * (either the upstream and/or downstream service was changed).
+     */
+    private final Condition pipelineChanged = lock.newCondition();
+    
     /** send service (iff this is the leader). */
     private HASendService sendService;
 
@@ -243,6 +259,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      */
     private final InnerEventHandler innerEventHandler = new InnerEventHandler();
 
+    /**
+     * One up message identifier.
+     */
+    private final AtomicLong messageId = new AtomicLong(0L);
+    
     /**
      * Core implementation of the handler for the various events. Always run
      * while holding the {@link #lock}.
@@ -580,9 +601,23 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             super.pipelineChange(oldDownStreamId, newDownStreamId);
             lock.lock();
             try {
+                if (oldDownStreamId == newDownStreamId) {
+                    // Nothing to do (both null or same UUID reference).
+                    return;
+                }
+                if (oldDownStreamId != null && newDownStreamId != null
+                        && oldDownStreamId.equals(newDownStreamId)) {
+                    /*
+                     * Nothing to do. The pipeline is already configured
+                     * correctly.
+                     */
+                    return;
+                }
                 // The address of the next service in the pipeline.
-                final InetSocketAddress addrNext = newDownStreamId == null ? null
-                        : getAddrNext(newDownStreamId);
+//                final InetSocketAddress addrNext = getAddrNext(newDownStreamId);
+                final PipelineState<S> nextState = getAddrNext(newDownStreamId);
+                final InetSocketAddress addrNext = nextState == null ? null
+                        : nextState.addr;
                 if (log.isInfoEnabled())
                     log.info("oldDownStreamId=" + oldDownStreamId
                             + ",newDownStreamId=" + newDownStreamId
@@ -613,7 +648,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                     receiveService.changeDownStream(addrNext);
                 }
                 // populate and/or clear the cache.
-                cachePipelineState(newDownStreamId);
+                pipelineStateRef.set(nextState);
+//                cachePipelineState(newDownStreamId);
+                // Signal pipeline change.
+                pipelineChanged.signalAll();
                 if (log.isDebugEnabled())
                     log.debug("pipelineChange - done.");
             } finally {
@@ -634,6 +672,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                     if (log.isInfoEnabled())
                         log.info("receiveService=" + receiveService);
                     receiveService.changeUpStream();
+                    // Signal pipeline change.
+                    pipelineChanged.signalAll();
                 }
             } finally {
                 lock.unlock();
@@ -665,7 +705,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
          *            
          * @return It's {@link InetSocketAddress}
          */
-        private InetSocketAddress getAddrNext(final UUID downStreamId) {
+        private PipelineState<S> getAddrNext(final UUID downStreamId) {
 
             if (downStreamId == null)
                 return null;
@@ -674,9 +714,10 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
             try {
 
-                final InetSocketAddress addrNext = service.getWritePipelineAddr();
+                final InetSocketAddress addrNext = service
+                        .getWritePipelineAddr();
 
-                return addrNext;
+                return new PipelineState<S>(service, addrNext);
                 
             } catch (IOException e) {
 
@@ -734,50 +775,52 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 }
                 // clear cache.
                 pipelineStateRef.set(null);
+                // Signal pipeline change.
+                pipelineChanged.signalAll();
             } finally {
                 lock.unlock();
             }
         }
 
-        /**
-         * Populate or clear the {@link #pipelineState} cache.
-         * <p>
-         * Note: The only times we need to populate the {@link #pipelineState} are
-         * in response to a {@link #pipelineChange(UUID, UUID)} event or in response
-         * to message a {@link #pipelineElectedLeader()} event.
-         * 
-         * @param downStreamId
-         *            The downstream service {@link UUID}.
-         */
-        private void cachePipelineState(final UUID downStreamId) {
-            
-            if (downStreamId == null) {
-            
-                pipelineStateRef.set(null);
-                
-                return;
-            
-            }
-
-            final S nextService = member.getService(downStreamId);
-            
-            final PipelineState<S> pipelineState = new PipelineState<S>();
-            
-            try {
-
-                pipelineState.addr = nextService.getWritePipelineAddr();
-                
-            } catch (IOException e) {
-                
-                throw new RuntimeException(e);
-                
-            }
-            
-            pipelineState.service = nextService;
-            
-            pipelineStateRef.set(pipelineState);
-            
-        }
+//        /**
+//         * Populate or clear the {@link #pipelineState} cache.
+//         * <p>
+//         * Note: The only times we need to populate the {@link #pipelineState} are
+//         * in response to a {@link #pipelineChange(UUID, UUID)} event or in response
+//         * to message a {@link #pipelineElectedLeader()} event.
+//         * 
+//         * @param downStreamId
+//         *            The downstream service {@link UUID}.
+//         */
+//        private void cachePipelineState(final UUID downStreamId) {
+//            
+//            if (downStreamId == null) {
+//            
+//                pipelineStateRef.set(null);
+//                
+//                return;
+//            
+//            }
+//
+//            final S nextService = member.getService(downStreamId);
+//            
+//            final PipelineState<S> pipelineState = new PipelineState<S>();
+//            
+//            try {
+//
+//                pipelineState.addr = nextService.getWritePipelineAddr();
+//                
+//            } catch (IOException e) {
+//                
+//                throw new RuntimeException(e);
+//                
+//            }
+//            
+//            pipelineState.service = nextService;
+//            
+//            pipelineStateRef.set(pipelineState);
+//            
+//        }
         
         /**
          * Setup the send service.
@@ -802,15 +845,20 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                  * handle downstreamId != null conditionally.
                  */
                 final UUID downstreamId = member.getDownstreamServiceId();
-                if (downstreamId != null) {
-                    // The address of the next service in the pipeline.
-                    final InetSocketAddress addrNext = member.getService(
-                            downstreamId).getWritePipelineAddr();
+                // The address of the next service in the pipeline.
+                final PipelineState<S> nextState = getAddrNext(downstreamId);
+                if (nextState != null) {
+//                    // The address of the next service in the pipeline.
+//                    final InetSocketAddress addrNext = member.getService(
+//                            downstreamId).getWritePipelineAddr();
                     // Start the send service.
-                    sendService.start(addrNext);
+                    sendService.start(nextState.addr);
                 }
                 // populate and/or clear the cache.
-                cachePipelineState(downstreamId);
+                pipelineStateRef.set(nextState);
+//              cachePipelineState(downstreamId);
+                // Signal pipeline change.
+                pipelineChanged.signalAll();
             } catch (Throwable t) {
                 try {
                     tearDown();
@@ -842,20 +890,40 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 final InetSocketAddress addrSelf = member.getService()
                         .getWritePipelineAddr();
                 // Address of the downstream service (if any).
-                final InetSocketAddress addrNext = downstreamId == null ? null
-                        : member.getService(downstreamId).getWritePipelineAddr();
+//                final InetSocketAddress addrNext = downstreamId == null ? null
+//                        : member.getService(downstreamId).getWritePipelineAddr();
+//                final InetSocketAddress addrNext = getAddrNext(downstreamId);
+                final PipelineState<S> nextServiceState = getAddrNext(downstreamId);
+                final InetSocketAddress addrNext = nextServiceState == null ? null
+                        : nextServiceState.addr;
                 // Setup the receive service.
-                receiveService = new HAReceiveService<HAMessageWrapper>(addrSelf,
-                        addrNext, new IHAReceiveCallback<HAMessageWrapper>() {
+                receiveService = new HAReceiveService<HAMessageWrapper>(
+                        addrSelf, addrNext,
+                        new IHAReceiveCallback<HAMessageWrapper>() {
+                            @Override
                             public void callback(final HAMessageWrapper msg,
                                     final ByteBuffer data) throws Exception {
                                 // delegate handling of write cache blocks.
-                                handleReplicatedWrite(msg.req, msg.msg, data);
+                                handleReplicatedWrite(msg.getHASyncRequest(),
+                                        (IHAWriteMessage) msg
+                                                .getHAWriteMessage(), data);
+                            }
+                            @Override
+                            public void incReceive(final HAMessageWrapper msg,
+                                    final int nreads, final int rdlen,
+                                    final int rem) throws Exception {
+                                // delegate handling of incremental receive notify.
+                                QuorumPipelineImpl.this.incReceive(//
+                                        msg.getHASyncRequest(),
+                                        (IHAWriteMessage) msg.getHAWriteMessage(), //
+                                        nreads, rdlen, rem);
                             }
                         });
                 // Start the receive service - will not return until service is
                 // running
                 receiveService.start();
+                // Signal pipeline change.
+                pipelineChanged.signalAll();
             } catch (Throwable t) {
                 /*
                  * Always tear down if there was a setup problem to avoid leaking
@@ -1161,38 +1229,154 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
     /*
      * End of QuorumStateChangeListener.
      */
-    
-    /**
-     * Glue class wraps the {@link IHAWriteMessage} and the
-     * {@link IHALogRequest} message and exposes the requires {@link IHAMessage}
-     * interface to the {@link HAReceiveService}. This class is never persisted.
-     * It just let's us handshake with the {@link HAReceiveService} and get back
-     * out the original {@link IHAWriteMessage} as well as the optional
-     * {@link IHALogRequest} message.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-     *         Thompson</a>
-     */
-    private static class HAMessageWrapper extends HAWriteMessageBase {
 
-        private static final long serialVersionUID = 1L;
+    private IHASendState newSendState() {
 
-        final IHASyncRequest req;
-        final IHAWriteMessage msg;
-        
-        public HAMessageWrapper(final IHASyncRequest req,
-                final IHAWriteMessage msg) {
+        final Quorum<?, ?> quorum = member.getQuorum();
 
-            // Use size and checksum from real IHAWriteMessage.
-            super(msg.getSize(),msg.getChk());
-            
-            this.req = req; // MAY be null;
-            this.msg = msg;
-            
-        }
+        final IHASendState snd = new HASendState(messageId.incrementAndGet(),
+                serviceId/* originalSenderId */, serviceId/* senderId */,
+                quorum.token(), quorum.replicationFactor());
+
+        return snd;
 
     }
     
+    @Override
+    public Future<IHAPipelineResetResponse> resetPipeline(
+            final IHAPipelineResetRequest req) throws IOException {
+
+        final FutureTask<IHAPipelineResetResponse> ft = new FutureTask<IHAPipelineResetResponse>(
+                new ResetPipelineTaskImpl(req));
+
+        member.getExecutor().submit(ft);
+
+        return ft;
+
+    }
+
+    /**
+     * Task resets the pipeline on this service.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+     */
+    private class ResetPipelineTaskImpl implements
+            Callable<IHAPipelineResetResponse> {
+
+        private final IHAPipelineResetRequest req;
+        
+        public ResetPipelineTaskImpl(final IHAPipelineResetRequest req) {
+         
+            this.req = req;
+            
+        }
+        
+        @Override
+        public IHAPipelineResetResponse call() throws Exception {
+
+            lock.lock();
+            try {
+                return doRunWithLock();
+            } finally {
+                lock.unlock();
+            }
+            
+        }
+
+        /**
+         * If there is an identified problem service and that service is either
+         * our upstream or downstream service, then we need to wait until we
+         * observe a pipeline change event such that it is no longer our
+         * upstream or downstream service. Otherwise we can go ahead and reset
+         * our pipeline.
+         * 
+         * TODO What if this service is the problem service?
+         */
+        private boolean isProblemServiceOurNeighbor() {
+
+            final UUID psid = req.getProblemServiceId();
+            
+            if (psid == null) {
+            
+                return false;
+                
+            }
+
+            final UUID[] priorAndNext = member.getQuorum()
+                    .getPipelinePriorAndNext(member.getServiceId());
+            
+            if (psid.equals(priorAndNext[0]))
+                return true;
+            
+            if (psid.equals(priorAndNext[1]))
+                return true;
+
+            return false;
+            
+        }
+        
+        private IHAPipelineResetResponse doRunWithLock() throws Exception {
+
+            log.warn("Will reset pipeline: req=" + req);
+
+            final long begin = System.nanoTime();
+            final long timeout = req.getTimeoutNanos();
+            long remaining = timeout;
+
+            if (isProblemServiceOurNeighbor()) {
+
+                log.warn("Problem service is our neighbor.");
+
+                do {
+
+                    pipelineChanged.await(remaining, TimeUnit.NANOSECONDS);
+
+                    // remaining = timeout - elapsed
+                    remaining = timeout - (begin - System.nanoTime());
+
+                } while (isProblemServiceOurNeighbor() && remaining > 0);
+
+                if (isProblemServiceOurNeighbor()) {
+
+                    /*
+                     * Timeout elapsed.
+                     * 
+                     * Note: This could be a false timeout, e.g., the problem
+                     * service left and re-entered and is still our neighbor.
+                     * However, the leader will just log and ignore the problem.
+                     * If the pipeline is working again, then all is good. If
+                     * not, then it will force out the problem service and reset
+                     * the pipeline again.
+                     */
+                    throw new TimeoutException();
+
+                }
+                
+            } else {
+
+                log.warn("Problem service is not our neighbor.");
+
+                // tear down send and/or receive services.
+                innerEventHandler.tearDown();
+
+                // The current pipeline order.
+                final UUID[] pipelineOrder = member.getQuorum().getPipeline();
+                // The index of this service in the pipeline order.
+                final int index = getIndex(serviceId, pipelineOrder);
+                if (index == 0) {
+                    innerEventHandler.setUpSendService();
+                } else if (index > 0) {
+                    innerEventHandler.setUpReceiveService();
+                }
+
+            }
+
+            return new HAPipelineResetResponse();
+
+        }
+
+    }
+
     /*
      * This is the leader, so send() the buffer.
      */
@@ -1205,7 +1389,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         lock();
         try {
 
-            ft = new FutureTask<Void>(new RobustReplicateTask(req, msg, b));
+            ft = new FutureTask<Void>(new RobustReplicateTask(req,
+                    newSendState(), msg, b));
 
         } finally {
 
@@ -1234,6 +1419,11 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final IHASyncRequest req;
         
         /**
+         * Metadata about the state of the sender for this message.
+         */
+        private final IHASendState snd;
+        
+        /**
          * The {@link IHAWriteMessage}.
          */
         private final IHAWriteMessage msg;
@@ -1256,9 +1446,13 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final long quorumToken;
 
         public RobustReplicateTask(final IHASyncRequest req,
-                final IHAWriteMessage msg, final ByteBuffer b) {
+                final IHASendState snd, final IHAWriteMessage msg,
+                final ByteBuffer b) {
             
             // Note: [req] MAY be null.
+
+            if (snd == null)
+                throw new IllegalArgumentException();
 
             if (msg == null)
                 throw new IllegalArgumentException();
@@ -1268,6 +1462,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
             this.req = req;
 
+            this.snd = snd;
+            
             this.msg = msg;
             
             this.b = b;
@@ -1458,6 +1654,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
          *     at com.bigdata.ha.pipeline.HAReceiveService.run(HAReceiveService.java:431)
          * </pre>
          */
+        @Override
         public Void call() throws Exception {
 
             final long beginNanos = System.nanoTime();
@@ -1540,8 +1737,9 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
 
                 final ByteBuffer b = this.b.duplicate();
 
-                new SendBufferTask<S>(member, quorumToken, req, msg, b,
-                        downstream, sendService, sendLock).call();
+                new SendBufferTask<S>(member, quorumToken, req, snd, msg, b,
+                        downstream, sendService, QuorumPipelineImpl.this,
+                        sendLock).call();
 
                 return;
 
@@ -1665,28 +1863,35 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final QuorumMember<S> member;
         private final long token; // member MUST remain leader for token.
         private final IHASyncRequest req;
+        private final IHASendState snd;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HASendService sendService;
-        private final Lock sendLock;
+        private final QuorumPipelineImpl<S> outerClass;
+        private final Semaphore sendLock;
 
         public SendBufferTask(final QuorumMember<S> member, final long token,
-                final IHASyncRequest req, final IHAWriteMessage msg,
-                final ByteBuffer b, final PipelineState<S> downstream,
-                final HASendService sendService, final Lock sendLock) {
+                final IHASyncRequest req, final IHASendState snd,
+                final IHAWriteMessage msg, final ByteBuffer b,
+                final PipelineState<S> downstream,
+                final HASendService sendService,
+                final QuorumPipelineImpl<S> outerClass, final Semaphore sendLock) {
 
             this.member = member;
             this.token = token; 
             this.req = req; // Note: MAY be null.
+            this.snd = snd;
             this.msg = msg;
             this.b = b;
             this.downstream = downstream;
             this.sendService = sendService;
+            this.outerClass = outerClass;
             this.sendLock = sendLock;
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             /*
@@ -1694,7 +1899,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
              * write pipeline at a time.
              */
 
-            sendLock.lock();
+            sendLock.acquire();
 
             try {
 
@@ -1704,7 +1909,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 
             } finally {
                 
-                sendLock.unlock();
+                sendLock.release();
                 
             }
 
@@ -1714,71 +1919,420 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                 ExecutionException, IOException {
 
             // Get Future for send() outcome on local service.
-            final Future<Void> futSnd = sendService.send(b);
-
+            final Future<Void> futLoc = sendService.send(b, snd.getMarker());
             try {
-
-                // Get Future for receive outcome on the remote service (RMI).
-                final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(req, msg);
-
                 try {
 
-                    /*
-                     * Await the Futures, but spend more time waiting on the
-                     * local Future and only check the remote Future every
-                     * second. Timeouts are ignored during this loop.
-                     */
-                    while (!futSnd.isDone() && !futRec.isDone()) {
+                    // Get Future for receive outcome on the remote service
+                    // (RMI).
+                    final Future<Void> futRmt;
+                    try {
+                        futRmt = downstream.service.receiveAndReplicate(req,
+                                snd, msg);
+                    } catch (IOException ex) { // RMI error.
+                        throw new ImmediateDownstreamReplicationException(ex);
+                    }
+
+                    try {
+
                         /*
-                         * Make sure leader's quorum token remains valid for ALL
-                         * writes.
+                         * Await the Futures, but spend more time waiting on the
+                         * local Future and only check the remote Future every
+                         * second. Timeouts are ignored during this loop - they
+                         * are used to let us wait longer on the local Future
+                         * than on the remote Future. ExecutionExceptions are
+                         * also ignored. We want to continue this loop until
+                         * both Futures are done. Interrupts are not trapped, so
+                         * an interrupt will still exit the loop.
+                         * 
+                         * It appears that it is possible for futSnd to be
+                         * blocked and not generate an error. If we do not exit
+                         * the loop and check the futRec future in this case
+                         * then we coul loop continuously. This does rather beg
+                         * the question of whether we should only be checking
+                         * futRec at this stage.
+                         * 
+                         * Note: [futRmt] is currently a ThickFuture to avoid
+                         * historical problems with DGC and is already done by
+                         * the time the RMI returns that ThickFuture to us.
+                         * Therefore the loop below can be commented out. All we
+                         * are really doing is waiting on futSnd and verifying
+                         * that the [token] remains valid.
                          */
-                        member.assertLeader(token);
-                        try {
-                            futSnd.get(1L, TimeUnit.SECONDS);
-                        } catch (TimeoutException ignore) {
+                        while ((!futLoc.isDone() || !futRmt.isDone())) {
+                            /*
+                             * Make sure leader's quorum token remains valid for
+                             * ALL writes.
+                             */
+                            member.assertLeader(token);
+                            try {
+                                futLoc.get(500L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            } catch (ExecutionException ignore) {
+                                /*
+                                 * Try the other Future with timeout and cancel
+                                 * if not done.
+                                 */
+                                try {
+                                    futRmt.get(500L, TimeUnit.MILLISECONDS);
+                                } catch(TimeoutException ex) { // Ignore.
+                                } catch(ExecutionException ex) { // Ignore.
+                                } finally {
+                                    futRmt.cancel(true/* mayInterruptIfRunning */);
+                                }
+                                /*
+                                 * Note: Both futures are DONE at this point.
+                                 */
+                            }
+                            try {
+                                futRmt.get(500L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            } catch (ExecutionException ignore) {
+                                /*
+                                 * Try the other Future with timeout and cancel
+                                 * if not done.
+                                 */
+                                try {
+                                    futLoc.get(500L, TimeUnit.MILLISECONDS);
+                                } catch(TimeoutException ex) { // Ignore.
+                                } catch(ExecutionException ex) { // Ignore.
+                                } finally {
+                                    futLoc.cancel(true/* mayInterruptIfRunning */);
+                                }
+                                /*
+                                 * Note: Both futures are DONE at this point.
+                                 */
+                            }
+                            /*
+                             * Note: Both futures are DONE at this point.
+                             */
                         }
-                        try {
-                            futRec.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
+                                                
+                        /*
+                         * Note: We want to check the remote Future for the
+                         * downstream service first in order to accurately
+                         * report the service that was the source of a pipeline
+                         * replication problem.
+                         */
+                        futRmt.get();
+                        futLoc.get();
+
+                    } finally {
+                        if (!futRmt.isDone()) {
+                            // cancel remote Future unless done.
+                            futRmt.cancel(true/* mayInterruptIfRunning */);
                         }
                     }
-                    futSnd.get();
-                    futRec.get();
 
                 } finally {
-                    if (!futRec.isDone()) {
-                        // cancel remote Future unless done.
-                        futRec.cancel(true/* mayInterruptIfRunning */);
-                    }
+                    // cancel the local Future.
+                    futLoc.cancel(true/* mayInterruptIfRunning */);
+                }
+            } catch (Throwable t) {
+                launderPipelineException(true/* isLeader */, token, member, outerClass, t);
+            }
+        }
+        
+    } // class SendBufferTask
+
+    /**
+     * Launder an exception thrown during pipeline replication.
+     * 
+     * @param isLeader
+     *            <code>true</code> iff this service is the quorum leader.
+     * @param token
+     *            The quorum token.
+     * @param member
+     *            The {@link QuorumMember} for this service.
+     * @param outerClass
+     *            The outer class - required for {@link #resetPipeline()}.
+     * @param t
+     *            The throwable.
+     */
+    static private <S extends HAPipelineGlue> void launderPipelineException(
+            final boolean isLeader, final long token,
+            final QuorumMember<S> member, final QuorumPipelineImpl<S> outerClass,
+            final Throwable t) {
+
+        log.warn("isLeader=" + isLeader + ", t=" + t, t);
+        
+        /*
+         * When non-null, some service downstream of this service had a problem
+         * replicating to a follower.
+         */
+        final PipelineImmediateDownstreamReplicationException remoteCause = (PipelineImmediateDownstreamReplicationException) InnerCause.getInnerCause(t,
+            PipelineImmediateDownstreamReplicationException.class);
+
+        /*
+         * When non-null, this service has a problem with replication to its
+         * immediate follower.
+         * 
+         * Note: if [remoteCause!=null], then we DO NOT look for a direct cause
+         * (since there will be one wrapped up in the exception trace for some
+         * remote service rather than for this service).
+         */
+        final ImmediateDownstreamReplicationException directCause = remoteCause == null ? (ImmediateDownstreamReplicationException) InnerCause
+                .getInnerCause(t,
+                        ImmediateDownstreamReplicationException.class)
+                : null;
+
+        final UUID thisService = member.getServiceId();
+
+        final UUID[] priorAndNext = member.getQuorum().getPipelinePriorAndNext(
+                member.getServiceId());
+
+        if (isLeader) {
+
+            // The problem service (iff identified).
+            UUID problemServiceId = null;
+            
+            try {
+
+                /*
+                 * If we can identify the problem service, then force it out of
+                 * the pipeline. It can re-enter the pipeline once it
+                 * transitions through its ERROR state.
+                 */
+
+                if (directCause != null) {
+
+                    problemServiceId = priorAndNext[1];
+                            
+                } else if (remoteCause != null) {
+
+                    problemServiceId = remoteCause.getProblemServiceId();
+
+                } else {
+                    
+                    // Do not remove anybody.
+                    
                 }
 
-            } finally {
-                // cancel the local Future.
-                futSnd.cancel(true/* mayInterruptIfRunning */);
+                if (problemServiceId != null) {
+
+                    // Force out the problem service.
+                    member.getActor().forceRemoveService(problemServiceId);
+
+                }
+                
+            } catch (Throwable e) {
+
+                // Log and continue.
+                log.error("Problem on force remove: problemServiceId="
+                        + problemServiceId, e);
+
+                if(InnerCause.isInnerCause(e, InterruptedException.class)) {
+                    // Propagate interrupt.
+                    Thread.currentThread().interrupt();
+                }
+                
+            }
+
+            /**
+             * Reset the pipeline on each service (including the leader). If
+             * replication fails, the socket connections both upstream and
+             * downstream of the point of failure can be left in an
+             * indeterminate state with partially buffered data. In order to
+             * bring the pipeline back into a known state (without forcing a
+             * quorum break) we message each service in the pipeline to reset
+             * its HAReceiveService (including the inner HASendService. The next
+             * message and payload relayed from the leader will cause new socket
+             * connections to be established.
+             * 
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/724"
+             *      > HA Wire Pulling and Sudden Kills </a>
+             */
+            try {
+
+                outerClass.resetPipeline(token, problemServiceId);
+
+            } catch (Throwable e) {
+
+                // Log and continue. Details are logged by resetPipeline().
+                log.warn("Problem(s) on reset pipeline: " + e);
+
+                if(InnerCause.isInnerCause(e, InterruptedException.class)) {
+                    // Propagate interrupt.
+                    Thread.currentThread().interrupt();
+                }
+                
             }
 
         }
-        
-    }
+
+        if (directCause != null) {
+
+            throw new PipelineImmediateDownstreamReplicationException(
+                    thisService, priorAndNext, t);
+            
+        } else if (remoteCause != null) {
+            
+            throw new NestedPipelineException(t);
+            
+        } else {
+            
+            throw new RuntimeException(t);
+            
+        }
     
+    }
+
+    /**
+     * Issue concurrent requests to each service in the pipeline to reset the
+     * pipeline on that service. The request to the leader is executed in the
+     * caller's thread so it will own whatever locks the caller already owns -
+     * this is done to avoid deadlock.
+     * 
+     * @param token
+     *            The quorum token on the leader.
+     * @param problemServiceId
+     *            The problem service in the write pipeline (if known).
+     */
+    private void resetPipeline(final long token, final UUID problemServiceId) {
+
+        log.error("Leader will reset pipeline: token=" + token+", problemServiceId=" + problemServiceId);
+
+        /*
+         * We will only message the services that are in the pipeline.
+         * 
+         * For services (other than the leader) in the quorum, submit the
+         * RunnableFutures to an Executor.
+         * 
+         * For the leader, we do this in the caller's thread (to avoid
+         * possible deadlocks).
+         */
+        final UUID[] pipelineIds = member.getQuorum().getPipeline();
+
+        member.assertLeader(token);
+        
+        // TODO Configure timeout on HAJournalServer.
+        final IHAPipelineResetRequest msg = new HAPipelineResetRequest(token,
+                problemServiceId, TimeUnit.MILLISECONDS.toNanos(5000));
+
+        /*
+         * To minimize latency, we first submit the futures for the other
+         * services and then do f.run() on the leader. 
+         */
+        final List<Future<IHAPipelineResetResponse>> localFutures = new LinkedList<Future<IHAPipelineResetResponse>>();
+
+        try {
+
+            for (int i = 1; i < pipelineIds.length; i++) {
+
+                final UUID serviceId = pipelineIds[i];
+
+                /*
+                 * Submit task on local executor. The task will do an RMI to the
+                 * remote service.
+                 */
+                final Future<IHAPipelineResetResponse> rf = member
+                        .getExecutor().submit(
+                                new PipelineResetMessageTask<S>(member,
+                                        serviceId, msg));
+
+                // add to list of futures we will check.
+                localFutures.add(rf);
+
+            }
+
+            {
+                /*
+                 * Run the operation on the leader using a local method call
+                 * (non-RMI) in the caller's thread to avoid deadlock.
+                 */
+                member.assertLeader(token);
+                final FutureTask<IHAPipelineResetResponse> ft = new FutureTask<IHAPipelineResetResponse>(
+                        new ResetPipelineTaskImpl(msg));
+                localFutures.add(ft);
+                ft.run();// run on the leader.
+            }
+            /*
+             * Check the futures for the other services in the quorum.
+             */
+            final List<Throwable> causes = new LinkedList<Throwable>();
+            for (Future<IHAPipelineResetResponse> ft : localFutures) {
+                try {
+                    ft.get(); // TODO Timeout?
+                } catch (InterruptedException ex) {
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } catch (ExecutionException ex) {
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } catch (RuntimeException ex) {
+                    /*
+                     * Note: ClientFuture.get() can throw a RuntimeException
+                     * if there is a problem with the RMI call. In this case
+                     * we do not know whether the Future is done.
+                     */
+                    log.error(ex, ex);
+                    causes.add(ex);
+                } finally {
+                    // Note: cancelling a *local* Future wrapping an RMI.
+                    ft.cancel(true/* mayInterruptIfRunning */);
+                }
+            }
+
+            /*
+             * If there were any errors, then throw an exception listing them.
+             */
+            if (!causes.isEmpty()) {
+                // Throw exception back to the leader.
+                if (causes.size() == 1)
+                    throw new RuntimeException(causes.get(0));
+                throw new RuntimeException("remote errors: nfailures="
+                        + causes.size(), new ExecutionExceptions(causes));
+            }
+
+        } finally {
+
+            // Ensure that all futures are cancelled.
+            QuorumServiceBase.cancelFutures(localFutures);
+
+        }
+
+    }
+
+    static private class PipelineResetMessageTask<S extends HAPipelineGlue>
+            extends
+            AbstractMessageTask<S, IHAPipelineResetResponse, IHAPipelineResetRequest> {
+
+        public PipelineResetMessageTask(final ServiceLookup<S> serviceLookup,
+                final UUID serviceId, final IHAPipelineResetRequest msg) {
+
+            super(serviceLookup, serviceId, msg);
+
+        }
+
+        @Override
+        protected Future<IHAPipelineResetResponse> doRMI(final S service)
+                throws IOException {
+
+            return service.resetPipeline(msg);
+        }
+
+    }
+
     /**
      * Lock used to ensure that at most one message is being sent along the
      * write pipeline at a time.
      */
-    private final Lock sendLock = new ReentrantLock();
+//    private final Lock sendLock = new ReentrantLock();
+    private final Semaphore sendLock = new Semaphore(1/*permits*/);
 
     @Override
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-            final IHAWriteMessage msg) throws IOException {
+            final IHASendState snd, final IHAWriteMessage msg)
+            throws IOException {
 
         /*
          * FIXME We should probably pass the quorum token through from the
-         * leader for ALL replicated writes. This uses the leader's quorum token
-         * when it is available (for a live write) and otherwise uses the
-         * current quorum token (for historical writes, since we are not
-         * providing the leader's token in this case).
+         * leader for ALL replicated writes [this is now done by the
+         * IHASendState but the code is not really using that data yet]. This
+         * uses the leader's quorum token when it is available (for a live
+         * write) and otherwise uses the current quorum token (for historical
+         * writes, since we are not providing the leader's token in this case).
          */
         final long token = req == null ? msg.getQuorumToken() : member
                 .getQuorum().token();
@@ -1828,7 +2382,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                  */
 
                 ft = new FutureTask<Void>(new ReceiveTask<S>(member, token,
-                        req, msg, b, receiveService));
+                        req, snd, msg, b, receiveService));
                 
 //                try {
 //
@@ -1853,7 +2407,8 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                  */
 
                 ft = new FutureTask<Void>(new ReceiveAndReplicateTask<S>(
-                        member, token, req, msg, b, downstream, receiveService));
+                        member, token, req, snd, msg, b, downstream,
+                        receiveService, QuorumPipelineImpl.this));
 
             }
 
@@ -1882,6 +2437,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final QuorumMember<S> member;
         private final long token;
         private final IHASyncRequest req;
+        private final IHASendState snd;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final HAReceiveService<HAMessageWrapper> receiveService;
@@ -1889,6 +2445,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         public ReceiveTask(final QuorumMember<S> member,
                 final long token, 
                 final IHASyncRequest req,
+                final IHASendState snd,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final HAReceiveService<HAMessageWrapper> receiveService
                 ) {
@@ -1896,19 +2453,21 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             this.member = member;
             this.token = token;
             this.req = req; // Note: MAY be null.
+            this.snd = snd;
             this.msg = msg;
             this.b = b;
             this.receiveService = receiveService;
         }
         
+        @Override
         public Void call() throws Exception {
 
-            // wrap the messages together.
+            // wrap the messages together. 
             final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
-                    req, msg);
+                    req, snd, msg);
 
-            // Get Future for send() outcome on local service.
-            final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
+            // Get Future for receive() outcome on local service.
+            final Future<Void> futRec = receiveService.receiveData(wrappedMsg,
                     b);
 
             try {
@@ -1919,7 +2478,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
                         // Verify token remains valid.
                         member.getQuorum().assertQuorum(token);
                         // Await the future.
-                        return futSnd.get(1000, TimeUnit.MILLISECONDS);
+                        return futRec.get(1000, TimeUnit.MILLISECONDS);
                     } catch (TimeoutException ex) {
                         // Timeout. Ignore and retry loop.
                         Thread.sleep(100/* ms */);
@@ -1930,7 +2489,7 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
             } finally {
 
                 // cancel the local Future.
-                futSnd.cancel(true/*mayInterruptIfRunning*/);
+                futRec.cancel(true/*mayInterruptIfRunning*/);
                 
             }
             
@@ -1948,85 +2507,151 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
         private final QuorumMember<S> member;
         private final long token;
         private final IHASyncRequest req;
+        private final IHASendState snd;
         private final IHAWriteMessage msg;
         private final ByteBuffer b;
         private final PipelineState<S> downstream;
         private final HAReceiveService<HAMessageWrapper> receiveService;
+        private final QuorumPipelineImpl<S> outerClass;
 
         public ReceiveAndReplicateTask(final QuorumMember<S> member,
                 final long token, final IHASyncRequest req,
+                final IHASendState snd,
                 final IHAWriteMessage msg, final ByteBuffer b,
                 final PipelineState<S> downstream,
-                final HAReceiveService<HAMessageWrapper> receiveService) {
+                final HAReceiveService<HAMessageWrapper> receiveService,
+                final QuorumPipelineImpl<S> outerClass) {
 
             this.member = member;
             this.token = token;
             this.req = req; // Note: MAY be null.
+            this.snd = snd;
             this.msg = msg;
             this.b = b;
             this.downstream = downstream;
             this.receiveService = receiveService;
+            this.outerClass = outerClass;
         }
 
+        @Override
         public Void call() throws Exception {
-
+        	
             // wrap the messages together.
             final HAMessageWrapper wrappedMsg = new HAMessageWrapper(
-                    req, msg);
+                    req, snd, msg);
 
-            // Get Future for send() outcome on local service.
-            final Future<Void> futSnd = receiveService.receiveData(wrappedMsg,
+            // Get Future for receive() outcome on local service.
+            final Future<Void> futLoc = receiveService.receiveData(wrappedMsg,
                     b);
 
             try {
-
-                // Get future for receive outcome on the remote
-                // service.
-                final Future<Void> futRec = downstream.service
-                        .receiveAndReplicate(req, msg);
-
                 try {
 
-                    /*
-                     * Await the Futures, but spend more time
-                     * waiting on the local Future and only check
-                     * the remote Future every second. Timeouts are
-                     * ignored during this loop.
-                     */
-                    while (!futSnd.isDone() && !futRec.isDone()) {
+                    // Get Future for receive outcome on the remote service
+                    // (RMI).
+                    final Future<Void> futRmt;
+                    try {
+                        futRmt = downstream.service.receiveAndReplicate(req,
+                                snd, msg);
+                    } catch (IOException ex) { // RMI error.
+                        throw new ImmediateDownstreamReplicationException(ex);
+                    }
+
+                    try {
+
                         /*
-                         * The token must remain valid, even if this service is
-                         * not joined with the met quorum. If fact, services
-                         * MUST replicate writes regardless of whether or not
-                         * they are joined with the met quorum, but only while
-                         * there is a met quorum.
+                         * Await the Futures, but spend more time waiting on the
+                         * local Future and only check the remote Future every
+                         * second. Timeouts are ignored during this loop - they
+                         * are used to let us wait longer on the local Future
+                         * than on the remote Future. ExecutionExceptions are
+                         * also ignored. We want to continue this loop until
+                         * both Futures are done. Interrupts are not trapped, so
+                         * an interrupt will still exit the loop.
+                         * 
+                         * Note: [futRmt] is currently a ThickFuture to avoid
+                         * historical problems with DGC and is already done by
+                         * the time the RMI returns that ThickFuture to us.
+                         * Therefore the loop below can be commented out. All we
+                         * are really doing is waiting on futSnd and verifying
+                         * that the [token] remains valid.
                          */
-                        member.getQuorum().assertQuorum(token);
-                        try {
-                            futSnd.get(1L, TimeUnit.SECONDS);
-                        } catch (TimeoutException ignore) {
+                        while ((!futLoc.isDone() || !futRmt.isDone())) {
+                            /*
+                             * The token must remain valid, even if this service
+                             * is not joined with the met quorum. If fact,
+                             * services MUST replicate writes regardless of
+                             * whether or not they are joined with the met
+                             * quorum, but only while there is a met quorum.
+                             */
+                            member.getQuorum().assertQuorum(token);
+                            try {
+                                futLoc.get(500L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            } catch (ExecutionException ignore) {
+                                /*
+                                 * Try the other Future with timeout and cancel
+                                 * if not done.
+                                 */
+                                try {
+                                	futRmt.get(500L, TimeUnit.MILLISECONDS);
+                                } catch(TimeoutException ex) { // Ignore.
+                                } catch(ExecutionException ex) { // Ignore.
+                                } finally {
+                                	futRmt.cancel(true/* mayInterruptIfRunning */);
+                                }
+                                /*
+                                 * Note: Both futures are DONE at this point.
+                                 */
+                            }
+                            try {
+                                futRmt.get(500L, TimeUnit.MILLISECONDS);
+                            } catch (TimeoutException ignore) {
+                            } catch (ExecutionException ignore) {
+                                /*
+                                 * Try the other Future with timeout and cancel
+                                 * if not done.
+                                 */
+                                try {
+                                	futLoc.get(500L, TimeUnit.MILLISECONDS);
+                                } catch(TimeoutException ex) { // Ignore.
+                                } catch(ExecutionException ex) { // Ignore.
+                                } finally {
+                                	futLoc.cancel(true/* mayInterruptIfRunning */);
+                                }
+                                /*
+                                 * Note: Both futures are DONE at this point.
+                                 */
+                            }
+                            /*
+                             * Note: Both futures are DONE at this point.
+                             */
                         }
-                        try {
-                            futRec.get(10L, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException ignore) {
+                        
+                        /*
+                         * Note: We want to check the remote Future for the
+                         * downstream service first in order to accurately
+                         * report the service that was the source of a pipeline
+                         * replication problem.
+                         */
+                        futLoc.get();
+                        futRmt.get();
+                        
+                    } finally {
+                        if (!futRmt.isDone()) {
+                            // cancel remote Future unless done.
+                            futRmt.cancel(true/* mayInterruptIfRunning */);
                         }
                     }
-                    futSnd.get();
-                    futRec.get();
 
                 } finally {
-                    if (!futRec.isDone()) {
-                        // cancel remote Future unless done.
-                        futRec
-                                .cancel(true/* mayInterruptIfRunning */);
-                    }
+                    // cancel the local Future.
+                    futLoc.cancel(true/* mayInterruptIfRunning */);
                 }
-
-            } finally {
-                // cancel the local Future.
-                futSnd.cancel(true/* mayInterruptIfRunning */);
+            } catch (Throwable t) {
+                launderPipelineException(false/* isLeader */, token, member,
+                        outerClass, t);
             }
-
             // done
             return null;
         }
@@ -2054,6 +2679,27 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
      */
     abstract protected void handleReplicatedWrite(final IHASyncRequest req,
             final IHAWriteMessage msg, final ByteBuffer data) throws Exception;
+
+    /**
+     * Notify that some payload bytes have been incrementally received for an
+     * {@link IHAMessage}.
+     * 
+     * @param msg
+     *            The message.
+     * @param nreads
+     *            The number of reads performed against the upstream socket for
+     *            this message.
+     * @param rdlen
+     *            The number of bytes read from the socket in this read.
+     * @param rem
+     *            The number of bytes remaining before the payload has been
+     *            fully read.
+     * 
+     * @throws Exception
+     */
+    abstract protected void incReceive(final IHASyncRequest req,
+            final IHAWriteMessage msg, final int nreads, final int rdlen,
+            final int rem) throws Exception;
 
     /**
      * A utility class that bundles together the Internet address and port at which
@@ -2088,8 +2734,15 @@ abstract public class QuorumPipelineImpl<S extends HAPipelineGlue> /*extends
          */
         public S service;
 
+        /** Deserialization constructor. */
+        @SuppressWarnings("unused")
         public PipelineState() {
 
+        }
+
+        public PipelineState(final S service, final InetSocketAddress addr) {
+            this.service = service;
+            this.addr = addr;
         }
 
         @SuppressWarnings("unchecked")

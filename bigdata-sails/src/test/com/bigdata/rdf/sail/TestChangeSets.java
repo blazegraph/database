@@ -32,7 +32,6 @@ import java.util.LinkedList;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.BNode;
 import org.openrdf.model.URI;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
@@ -45,6 +44,7 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.InMemChangeLog;
 import com.bigdata.rdf.changesets.InferenceChangeLogReporter;
+import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.ModifiedEnum;
@@ -445,17 +445,20 @@ public class TestChangeSets extends ProxyBigdataSailTestCase {
             final URI x = vf.createURI(ns+"X");
             final URI y = vf.createURI(ns+"Y");
             final URI z = vf.createURI(ns+"Z");
-            final BNode sid1 = vf.createBNode();
+//            final BNode sid1 = vf.createBNode();
 //            final BNode sid2 = vf.createBNode();
             
+            final BigdataStatement axb = vf.createStatement(a, x, b);
+            final BigdataBNode sid1 = vf.createBNode(axb);
+            
             final BigdataStatement[] add = new BigdataStatement[] {
-                vf.createStatement(a, x, b, sid1),
+                axb,
                 vf.createStatement(sid1, y, c),
                 vf.createStatement(d, z, sid1),
             };
 
             final BigdataStatement[] explicitRemove = new BigdataStatement[] {
-                vf.createStatement(a, x, b, sid1),
+                axb,
             };
 
             final BigdataStatement[] inferredRemove = new BigdataStatement[] {

@@ -36,6 +36,7 @@ import org.openrdf.query.algebra.evaluation.impl.QueryModelNormalizer;
 import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
@@ -98,9 +99,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * BY in which duplicate solutions are discarded after the sort by a filter
  * which compares the current solution with the prior solution.
  * 
- * TODO AST optimizer to turn SELECT DISTINCT ?p WHERE { ?s ?p ?o } into a
- * DistinctTermScan? (We are doing something very similar for GRAPH ?g {}).
- * 
  * TODO A query with a LIMIT of ZERO (0) should be failed as there will be no
  * solutions.
  * 
@@ -139,10 +137,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
+        this(true);
+    }
+
+    public DefaultOptimizerList(final boolean bottomUpEvaluation) {
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
-    	 * into an IN filter using the full text index to determine the IN
+    	 * into an7 full text index to determine the IN
     	 * set.
     	 * 
     	 * Convert:
@@ -212,7 +214,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * and for non-GRAPH groups:
          * 
          * <pre>
-         * { ... {} } =? { ... }
+         * { ... {} } => { ... }
          * </pre>
          * <p>
          * Note: as a policy decision in bigdata 1.1, we do not WANT to combine
@@ -236,6 +238,18 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * {@link ProjectionNode}.
          */
         add(new ASTWildcardProjectionOptimizer());
+        
+        /**
+         * 
+         */
+        
+        /**
+         * Makes implicit bindings in the query explicit, in order to make them
+         * amenable to subsequent optimization through the 
+         * {@link ASTBindingAssigner}. Implicit bindings are those
+         */
+        // currently outcommented, see ticket 
+//        add(new ASTSimpleBindingsOptimizer());
         
         /**
          * Propagates bindings from an input solution into the query, replacing
@@ -314,23 +328,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTGraphGroupOptimizer());
 
-        /**
-         * Rewrites the WHERE clause of each query by lifting out any
-         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
-         * of any named subquery such that there is no more than one
-         * {@link ServiceNode} in that subquery by lifting out additional
-         * {@link ServiceNode}s into new named subqueries.
-         * <p>
-         * Note: This rewrite step is necessary to preserve the "run-once"
-         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
-         * any position other than the head of a named subquery, it will be
-         * invoked once for each solution which flows through that part of
-         * the query plan.  This is wasteful since the SERVICE call does not
-         * run "as-bound" (source solutions are not propagated to the SERVICE
-         * when it is invoked).
-         */
-        add(new ASTServiceNodeOptimizer());
-        
         /**
          * Lift FILTERs which can be evaluated based solely on the bindings in
          * the parent group out of a child group. This helps because we will
@@ -419,7 +416,9 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
          */
-        add(new ASTBottomUpOptimizer());
+        if (bottomUpEvaluation) {
+            add(new ASTBottomUpOptimizer());
+        }
 
         /**
          * Lifts a simple optional out of the child group.
@@ -436,6 +435,28 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTFlattenJoinGroupsOptimizer());
 
+        /**
+         * Convert an ALP service call into an ArbitraryLengthPathNode
+         */
+        add(new ASTALPServiceOptimizer());
+
+        /**
+         * Rewrites the WHERE clause of each query by lifting out any
+         * {@link ServiceNode}s into a named subquery. Rewrites the WHERE clause
+         * of any named subquery such that there is no more than one
+         * {@link ServiceNode} in that subquery by lifting out additional
+         * {@link ServiceNode}s into new named subqueries.
+         * <p>
+         * Note: This rewrite step is necessary to preserve the "run-once"
+         * contract for a SERVICE call.  If a {@link ServiceNode} appears in
+         * any position other than the head of a named subquery, it will be
+         * invoked once for each solution which flows through that part of
+         * the query plan.  This is wasteful since the SERVICE call does not
+         * run "as-bound" (source solutions are not propagated to the SERVICE
+         * when it is invoked).
+         */
+        add(new ASTServiceNodeOptimizer());
+        
         /*
          * Join Order Optimization
          */
@@ -468,6 +489,56 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Add range counts to all statement patterns.
          */
         add(new ASTRangeCountOptimizer());
+        
+        /**
+         * Attach cardinality to join groups and unions.  Not fully implemented
+         * yet.
+         */
+        add(new ASTCardinalityOptimizer());
+        
+		/**
+		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
+		 * count mechanisms when that feature would produce exact results for
+		 * the KB instance.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
+		 *      </a>
+		 */
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			add(new ASTFastRangeCountOptimizer());
+
+		/**
+		 * Optimizes SELECT COUNT(*) ?z { triple-pattern } GROUP BY ?z using
+		 * the fast rang count pattern documented above, i.e. the COUNT is
+		 * rewritten to be performed via fast range count optimization where
+		 * possible. In addition, the computation of bindings for grouping
+		 * variable ?z is pushed inside a SELECT DISTINCT ?z { triple-pattern }
+		 * subquery, which may be amenable to optimization through the
+		 * {@link ASTDistinctTermScanOptimizer}, which is applied in the
+		 * subsequent step.
+		 */
+		if (QueryHints.DEFAULT_FAST_RANGE_COUNT_OPTIMIZER)
+			add(new ASTSimpleGroupByAndCountOptimizer());
+		
+        /**
+		 * Optimizes
+		 * <code>SELECT DISTINCT ?property WHERE { ?x ?property ?y . }</code>
+		 * and similar patterns using an O(N) algorithm, where N is the number
+		 * of distinct solutions.
+		 * <p>
+		 * Note: Either this must run after the {@link ASTRangeCountOptimizer}
+		 * in order to modify the estimated cardinality associated with using
+		 * the {@link DistinctTermAdvancer} (which does less work than a scan)
+		 * or the {@link ASTRangeCountOptimizer} must not overwrite the
+		 * cardinality estimates attached by this optimizer and this optimizer
+		 * could run first.
+		 * 
+		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
+		 *      PREDICATEs query is slow </a>
+		 */
+		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
+			add(new ASTDistinctTermScanOptimizer());
         
         /**
          * Run the static join order optimizer. This attaches the estimated

@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import org.apache.http.conn.ClientConnectionManager;
+import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -37,7 +37,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * {@link ServiceCall} instance.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ServiceCallCreateParams {
 
@@ -66,7 +65,7 @@ public interface ServiceCallCreateParams {
      * Return the {@link ClientConnectionManager} used to make remote SERVICE
      * call requests.
      */
-    ClientConnectionManager getClientConnectionManager();
+    HttpClient getClientConnectionManager();
 
     /**
      * The configuration options associated with the {@link ServiceFactory}.

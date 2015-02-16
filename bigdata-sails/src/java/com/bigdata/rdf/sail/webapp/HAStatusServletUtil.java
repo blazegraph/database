@@ -25,15 +25,20 @@ package com.bigdata.rdf.sail.webapp;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -41,6 +46,8 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
+import com.bigdata.Banner;
+import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.QuorumService;
@@ -64,6 +71,8 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.webapp.StatusServlet.DigestEnum;
 import com.bigdata.zookeeper.DumpZookeeper;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonGenerator;
 
 /**
  * Class supports the {@link StatusServlet} and isolates code that has a
@@ -91,6 +100,18 @@ public class HAStatusServletUtil {
      * branch.
      */
     static final String REBUILD = "rebuild";
+
+    /**
+     * Force this service into the error state. It will automatically attempt to
+     * recover from the error state. This basically "kicks" the service.
+     * 
+     * @see QuorumService#enterErrorState()
+     * 
+     *      TODO Move this declaration to {@link StatusServlet} once we are done
+     *      reconciling between the 1.2.x maintenance branch and the READ_CACHE
+     *      branch.
+     */
+    static final String ERROR = "error";
 
     final private IIndexManager indexManager;
 
@@ -124,7 +145,8 @@ public class HAStatusServletUtil {
 
         final HAJournal journal = (HAJournal) indexManager;
 
-        final ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>> quorum = (ZKQuorumImpl) journal
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+		final ZKQuorumImpl<HAGlue, ZKQuorumClient<HAGlue>> quorum = (ZKQuorumImpl) journal
                 .getQuorum();
 
         // The current token.
@@ -133,7 +155,7 @@ public class HAStatusServletUtil {
         // The last valid token.
         final long lastValidToken = quorum.lastValidToken();
 
-        // This token is a bit different. It is senstive to the journal role in
+        // This token is a bit different. It is sensitive to the journal role in
         // the quorum (joined or not).
         final long haReadyToken = journal.getHAReady();
         
@@ -155,7 +177,7 @@ public class HAStatusServletUtil {
         {
             QuorumService<HAGlue> t;
             try {
-                t = (QuorumService) quorum.getClient();
+                t = (QuorumService<HAGlue>) quorum.getClient();
             } catch (IllegalStateException ex) {
                 // Note: Not available (quorum.start() not called)./
                 t = null;
@@ -186,41 +208,84 @@ public class HAStatusServletUtil {
             // The quorum state
             if (quorumService == null) {
 
-                p.text("The local quorum service is not running.").node("br")
-                        .close();
+                p.text("The local quorum service is ")
+                   .node("span").attr("id", "quorum-state").text("not running")
+                   .close().text(".")
+                .node("br").close();
 
             } else {
                     
-                p.text("The quorum is " + (quorum.isQuorumMet() ? "" : "not")
-                        + " met.").node("br").close();
+                p.text("The quorum is ")
+                   .node("span").attr("id", "quorum-state")
+                   .text((quorum.isQuorumMet() ? "" : "not ") + "met")
+                   .close().text(".")
+                .node("br").close();
 
-                p.text("" + njoined + " out of " + quorum.replicationFactor()
-                        + " services are joined.").node("br").close();
+                p.node("span").attr("id", "njoined").text("" + njoined).close()
+                .text(" out of ")
+                   .node("span").attr("id", "replication-factor")
+                   .text("" + quorum.replicationFactor()).close()
+                .text(" services are joined.")
+                .node("br").close();
 
-                p.text("quorumToken=" + quorumToken + ", lastValidToken="
-                        + lastValidToken).node("br").close();
+                p.text("quorumToken=")
+                   .node("span").attr("id", "quorum-token")
+                   .text("" + quorumToken).close()
+                .text(", lastValidToken=")
+                   .node("span").attr("id", "last-valid-token")
+                   .text("" + lastValidToken).close()
+                .node("br").close();
 
-                p.text("logicalServiceZPath="
-                        + quorumService.getLogicalServiceZPath()).node("br")
-                        .close();
+                p.text("logicalServiceZPath=")
+                   .node("span").attr("id", "logical-service-z-path")
+                   .text(quorumService.getLogicalServiceZPath()).close()
+                .node("br").close();
+
+                p.text("PlatformStatsPlugIn=")
+                   .node("span").attr("id", "platform-stats-plugin")
+                   .text(journal.getPlatformStatisticsCollector() == null ?
+                   "N/A" : "Running").close()
+                .node("br").close();
+
+                p.text("GangliaPlugIn=")
+                   .node("span").attr("id", "ganglia-plugin")
+                   .text(journal.getGangliaService() == null ? "N/A" :
+                   "Running").close()
+                .node("br").close();
 
                 // Note: This is the *local* value of getHAStatus().
                 // Note: The HAReady token reflects whether or not the service
                 // is
                 // joined.
-                p.text("HAStatus: " + quorumService.getService().getHAStatus()
-                        + ", HAReadyToken=" + haReadyToken).node("br").close();
+                p.text("HAStatus: ")
+                   .node("span").attr("id", "ha-status")
+                   .text("" + quorumService.getService().getHAStatus()).close()
+                .text(", HAReadyToken=")
+                   .node("span").attr("id", "ha-ready-token")
+                   .text("" + haReadyToken).close()
+                .node("br").close();
 
                 /*
                  * Report on the Service.
                  */
                 {
-                    p.text("Service: serviceId=" + quorumService.getServiceId())
-                            .node("br").close();
-                    p.text("Service: pid=" + quorumService.getPID()).node("br")
-                            .close();
-                    p.text("Service: path=" + quorumService.getServiceDir())
-                            .node("br").close();
+                    p.text("Service: serviceId=")
+                       .node("span").attr("id", "service-id")
+                       .text("" + quorumService.getServiceId()).close()
+                    .node("br").close();
+                    p.text("Service: pid=")
+                       .node("span").attr("id", "service-pid")
+                       .text("" + quorumService.getPID()).close()
+                    .node("br").close();
+                    p.text("Service: path=")
+                       .node("span").attr("id", "service-path")
+                       .text("" + quorumService.getServiceDir()).close()
+                    .node("br").close();
+                    p.text("Service: proxy=")
+                       .node("span").attr("id", "service-proxy")
+                       .text("" + journal.getHAJournalServer().getProxy())
+                       .close()
+                    .node("br").close();
 
                 }
 
@@ -248,22 +313,57 @@ public class HAStatusServletUtil {
                     final boolean takeSnapshot = mgr
                             .isReadyToSnapshot(snapshotPolicy
                                     .newSnapshotRequest());
-                    p.text("Service"//
-                            + ": snapshotPolicy="
-                            + snapshotPolicy//
-                            + ", shouldSnapshot="
-                            + takeSnapshot//
+                    p.text("Service: snapshotPolicy=")
+                       .node("span").attr("id", "snapshot-policy")
+                       .text("" + snapshotPolicy).close()
+                    .text(", shouldSnapshot=")
+                       .node("span").attr("id", "take-snapshot")
+                       .text("" + takeSnapshot).close()
 //                            + ", lastSnapshotCommitCounter="
 //                            + sinceCommitCounter//
 //                            + ", HALogFileBytesOnDiskSinceLastSnapshot="
 //                            + haLogBytesOnDiskSinceLastSnapshot//
-                    ).node("br").close();
+                    .node("br").close();
                 }
                 // restore policy.
-                p.text("Service: restorePolicy="
-                        + journal.getSnapshotManager().getRestorePolicy())
-                        .node("br").close();
-                
+                p.text("Service: restorePolicy=")
+                   .node("span").attr("id", "restore-policy")
+                   .text("" + journal.getSnapshotManager().getRestorePolicy())
+                   .close()
+                .node("br").close();
+
+                // HA Load Balancer.
+                {
+                    /*
+                     * Note: MUST NOT HAVE A DIRECT REFERENCE TO THIS CLASS OR
+                     * IT WILL BREAK THE WAR ARTIFACT WHEN DEPLOYED TO A
+                     * NON-JETTY CONTAINER SINCE THE JETTY ProxyServlet WILL NOT
+                     * BE FOUND.
+                     */
+                    try {
+                        final Class<?> cls = Class
+                                .forName("com.bigdata.rdf.sail.webapp.HALoadBalancerServlet");
+                        final Method m = cls.getMethod("toString",
+                                new Class[] { ServletContext.class });
+                        final String rep = (String) m.invoke(null/* static */,
+                                new Object[] { req.getServletContext() });
+                        p.text("Service: LBSPolicy=").node("span")
+                                .attr("id", "lbs-policy").text(rep).close()
+                                .node("br").close();
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    } catch (NoSuchMethodException e) {
+                        throw new RuntimeException(e);
+                    } catch (SecurityException e) {
+                        throw new RuntimeException(e);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    } catch (IllegalArgumentException e) {
+                        throw new RuntimeException(e);
+                    } catch (InvocationTargetException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
 //                if(true) {
 //                    /*
 //                     * HABackup: disable this code block. It is for
@@ -310,17 +410,30 @@ public class HAStatusServletUtil {
 //                        // Ignore.
 //                    }
                     final long fileSize = file == null ? 0L : file.length();
-                    p.text("HAJournal: file=" + file //
-                            + ", commitCounter=" + commitCounter //
-                            + ", nbytes=" + fileSize//
-                            + (digestStr == null ? "" : ", md5=" + digestStr)//
+                    p.text("HAJournal: file=")
+                       .node("span").attr("id", "ha-journal-file")
+                       .text("" + file).close()
+                    .text(", commitCounter=")
+                       .node("span").attr("id", "ha-journal-commit-counter")
+                       .text("" + commitCounter).close()
+                    .text(", nbytes=")
+                       .node("span").attr("id", "ha-journal-nbytes")
+                       .text("" + fileSize).close();
+                    if(digestStr != null) {
+                       p.text(", md5=")
+                          .node("span").attr("id", "ha-journal-md5")
+                          .text(digestStr).close();
+                    }
 //                            + (releaseTime != -1L ? ", releaseTime="
 //                                    + RootBlockView.toString(releaseTime)//
 //                            : "")//
-                    ).node("br").close();
+                    p.node("br").close();
+
                     // Show the current root block.
-                    if(debug)
-                        current.node("pre", rb.toString());
+                    if(debug) {
+                       current.node("span").attr("id", "root-block")
+                          .text(rb.toString()).close();
+                    }
                 }
             }
 
@@ -360,20 +473,28 @@ public class HAStatusServletUtil {
                             .getProperty(
                                     com.bigdata.journal.Options.HALOG_COMPRESSOR,
                                     com.bigdata.journal.Options.DEFAULT_HALOG_COMPRESSOR);
-                    p.text("HALogDir: nfiles="
-                            + nfiles
-                            + ", nbytes="
-                            + nbytes
-                            + ", path="
-                            + nexus.getHALogDir()
-                            + ", compressorKey="
-                            + compressorKey
-                            + ", lastHALogClosed="
-                            + (r == null ? "N/A" : CommitCounterUtility
-                                    .getCommitCounterStr(r.getCommitCounter()))
-                            + ", liveLog="
-                            + (currentFile == null ? "N/A" : currentFile
-                                    .getName())).node("br").close();
+                    p.text("HALogDir: nfiles=")
+                       .node("span").attr("id", "ha-log-dir-nfiles")
+                       .text("" + nfiles).close()
+                    .text(", nbytes=")
+                       .node("span").attr("id", "ha-log-dir-nbytes")
+                       .text("" + nbytes).close()
+                    .text(", path=")
+                       .node("span").attr("id", "ha-log-dir-path")
+                       .text("" + nexus.getHALogDir()).close()
+                    .text(", compressorKey=")
+                       .node("span").attr("id", "ha-log-dir-compressor-key")
+                       .text(compressorKey).close()
+                    .text(", lastHALogClosed=")
+                       .node("span").attr("id", "ha-log-dir-last-ha-log-closed")
+                       .text((r == null ? "N/A" : CommitCounterUtility
+                             .getCommitCounterStr(r.getCommitCounter())))
+                             .close()
+                    .text(", liveLog=")
+                       .node("span").attr("id", "ha-log-dir-live-log")
+                       .text((currentFile == null ? "N/A" : 
+                          currentFile.getName())).close()
+                    .node("br").close();
                 }
                 if (digestEnum != null
                         && (digestEnum == DigestEnum.All || digestEnum == DigestEnum.HALogs)) {
@@ -410,14 +531,21 @@ public class HAStatusServletUtil {
                         } finally {
                             r.close();
                         }
-                        p.text("HALogFile: closingCommitCounter="
-                                + closingCommitCounter//
-                                + ", file="
-                                + file//
-                                + ", nbytes="
-                                + nbytes//
-                                + (digestStr == null ? "" : ", md5="
-                                        + digestStr)).node("br").close();
+                        p.text("HALogFile: closingCommitCounter=")
+                           .node("span").attr("id", "ha-log-file-closing-commit-counter")
+                           .text("" + closingCommitCounter).close()
+                        .text(", file=")
+                           .node("span").attr("id", "ha-log-file-file")
+                           .text("" + file).close()
+                        .text(", nbytes=")
+                           .node("span").attr("id", "ha-log-file-nbytes")
+                           .text("" + nbytes).close();
+                        if(digestStr != null) {
+                           p.text(", md5=")
+                              .node("span").attr("id", "ha-log-file-digest-str")
+                              .text(digestStr).close();
+                        }
+                        p.node("br").close();
                     }
                 }
             }
@@ -456,10 +584,16 @@ public class HAStatusServletUtil {
                         nbytes += sr.sizeOnDisk();
                         nfiles++;
                     }
-                    p.text("SnapshotDir: nfiles=" + nfiles + ", nbytes="
-                            + nbytes + ", path="
-                            + journal.getSnapshotManager().getSnapshotDir())
-                            .node("br").close();
+                    p.text("SnapshotDir: nfiles=")
+                       .node("span").attr("id", "snapshot-dir-nfiles")
+                       .text("" + nfiles).close()
+                    .text(", nbytes=")
+                       .node("span").attr("id", "snapshot-dir-nbytes")
+                       .text("" + nbytes).close()
+                    .text(", path=")
+                       .node("span").attr("id", "snapshot-dir-path")
+                       .text("" + journal.getSnapshotManager().getSnapshotDir()).close()
+                    .node("br").close();
                 }
                 if (true) {
 
@@ -493,14 +627,22 @@ public class HAStatusServletUtil {
                             }
                         }
 
-                        p.text("SnapshotFile: commitTime="
-                                + RootBlockView.toString(rb.getLastCommitTime())
-                                + ", commitCounter="
-                                + rb.getCommitCounter()
-                                + ", nbytes="
-                                + nbytes
-                                + (digestStr == null ? "" : ", md5="
-                                        + digestStr)).node("br").close();
+                        p.text("SnapshotFile: commitTime=")
+                           .node("span").attr("id", "snapshot-file-commit-time")
+                           .text(RootBlockView.toString(rb.getLastCommitTime()))
+                           .close()
+                        .text(", commitCounter=")
+                           .node("span").attr("id", "snapshot-file-commit-counter")
+                           .text("" + rb.getCommitCounter()).close()
+                        .text(", nbytes=")
+                           .node("span").attr("id", "snapshot-file-nbytes")
+                           .text("" + nbytes).close();
+                        if(digestStr != null) {
+                           p.text(", md5=")
+                              .node("span").attr("id", "snapshot-file-md5")
+                              .text(digestStr).close();
+                        }
+                        p.node("br").close();
 
                     }
                     
@@ -552,8 +694,10 @@ public class HAStatusServletUtil {
             
             p.close();
 
-            if(debug)
-                current.node("pre", quorum.toString());
+            if(debug) {
+               current.node("span").attr("id", "quorum").text(quorum.toString())
+                  .close();
+            }
 
         }
 
@@ -578,13 +722,30 @@ public class HAStatusServletUtil {
                 // Request RESTORE.
                 if (haGlue.rebuildFromLeader(new HARemoteRebuildRequest()) != null) {
 
-                    current.node("h2",
-                            "Running Disaster Recovery for this service (REBUILD).");
+                    current.node("h2").attr("id", "rebuild")
+                       .text("Running Disaster Recovery for this service (REBUILD).");
 
                 }
 
             }
 
+        }
+
+        if (quorumService != null) {
+
+            /*
+             * Force the service into the "ERROR" state. It will automatically
+             * attempt to recover.
+             */
+
+            final String val = req.getParameter(HAStatusServletUtil.ERROR);
+
+            if (val != null) {
+
+                quorumService.enterErrorState();
+
+            }
+    
         }
         
         /*
@@ -597,7 +758,8 @@ public class HAStatusServletUtil {
             
             {
                 
-                final XMLBuilder.Node p = current.node("p");
+                final XMLBuilder.Node ul = current.node("ul")
+                      .attr("id", "quorum-services");
 
                 final UUID[] joined = quorum.getJoined();
 
@@ -624,6 +786,8 @@ public class HAStatusServletUtil {
 
                     }
 
+                    final XMLBuilder.Node li = ul.node("li");
+                    
                     /*
                      * Do all RMIs to the remote service in a try/catch. This
                      * allows us to catch problems with communications to the
@@ -657,8 +821,10 @@ public class HAStatusServletUtil {
                          * Note error and continue with the next service.
                          */
 
-                        p.text("Unable to reach service: " + remoteService)
-                                .close();
+                        li.text("Unable to reach service: ")
+                           .node("span").attr("class", "unreachable")
+                           .text("" + remoteService).close()
+                        .close();
 
                         log.error(ex, ex);
 
@@ -676,27 +842,45 @@ public class HAStatusServletUtil {
 
                     final int pipelineIndex = indexOf(serviceId, pipeline);
 
-                    final String nssUrl = "http://" + hostname + ":" + nssPort;
+                    /*
+                     * TODO This assumes that the context path at the remote
+                     * service is the same as the context path for the local
+                     * service.
+                     */
+                    final String nssUrl = "http://" + hostname + ":" + nssPort
+                            + BigdataStatics.getContextPath();
 
                     // hyper link to NSS service.
-                    p.node("a").attr("href", nssUrl).text(nssUrl).close();
+                    li.node("a").attr("class", "nss-url").attr("href", nssUrl)
+                       .text(nssUrl).close();
 
                     // plus the other metadata.
-                    p.text(" : "//
-                            + (isLeader ? "leader" : (isFollower ? "follower"
-                                    : " is not joined"))//
-                            + ", pipelineOrder="
-                            + (pipelineIndex == -1 ? "N/A" : pipelineIndex)//
-                            + ", writePipelineAddr=" + writePipelineAddr//
-                            + ", service=" + (isSelf ? "self" : "other")//
-                            + ", extendedRunState=" + extendedRunState//
-                    ).node("br").close();
+                    li.text(" : ")
+                       .node("span").attr("class", "service-status")
+                       .text((isLeader ? "leader" : (isFollower ? "follower"
+                             : " is not joined"))).close()
+                    .text(", pipelineOrder=")
+                       .node("span").attr("class", "service-pipeline-order")
+                       .text("" + (pipelineIndex == -1 ? "N/A" : pipelineIndex))
+                       .close()
+                    .text(", writePipelineAddr=")
+                       .node("span").attr("class", "service-write-pipeline-addr")
+                       .text("" + writePipelineAddr).close()
+                    .text(", service=")
+                       .node("span").attr("class", "service-service")
+                       .text((isSelf ? "self" : "other")).close()
+                    .text(", extendedRunState=")
+                       .node("span").attr("class", "service-extended-run-state")
+                       .text(extendedRunState).close()
+                    .node("br").close();
+
+                    li.close();
                 }
 
-                p.close();
+                ul.close();
 
             }
-
+            
             // DumpZookeeper
             {
 
@@ -714,7 +898,8 @@ public class HAStatusServletUtil {
 
                     final XMLBuilder.Node p = current.node("p");
 
-                    p.text("ZooKeeper is not available.").close();
+                    p.text("ZooKeeper is not available.")
+                    .attr("id", "zookeeper-unavailable").close();
 
                 } else {
 
@@ -726,7 +911,7 @@ public class HAStatusServletUtil {
                     final PrintWriter out = new PrintWriter(
                             resp.getOutputStream(), true/* autoFlush */);
 
-                    out.print("<pre>\n");
+                    out.print("<span id=\"zookeeper\">\n");
 
                     try {
 
@@ -749,7 +934,7 @@ public class HAStatusServletUtil {
                     }
 
                     // close section.
-                    out.print("\n</pre>");
+                    out.print("\n</span>");
 
                     // flush PrintWriter before resuming writes on Writer.
                     out.flush();
@@ -826,11 +1011,100 @@ public class HAStatusServletUtil {
 
         BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
                 BigdataRDFServlet.MIME_TEXT_PLAIN, status.name());
+        
+        log.warn("Responding to HA status request");
 
         return;
 
     }
 
+   /**
+    * Basic server health info
+    * 
+    * @param req
+    * @param resp
+    * @throws TimeoutException
+    * @throws InterruptedException
+    * @throws AsynchronousQuorumCloseException
+    * @throws IOException
+    */
+   public void doHealthStatus(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      final StringWriter writer = new StringWriter();
+      final JsonFactory factory = new JsonFactory();
+      final JsonGenerator json = factory.createGenerator(writer);
+
+      json.writeStartObject();
+      json.writeStringField("version", Banner.getVersion());
+      json.writeNumberField("timestamp", new Date().getTime());
+
+      if (!(indexManager instanceof HAJournal)) {
+
+         // standalone
+         json.writeStringField("deployment", "standalone");
+
+      } else {
+
+         // HA
+         json.writeStringField("deployment", "HA");
+
+         final HAJournal journal = (HAJournal) indexManager;
+
+         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
+               .getQuorum();
+
+         if (quorum.isQuorumFullyMet(quorum.token())) {
+            json.writeStringField("status", "Good");
+            json.writeStringField("details",
+                  "All servers (" + quorum.replicationFactor() + ") joined");
+         } else {
+            // at least one server is not available
+            // status is either Warning or Bad
+            if (quorum.isQuorumMet()) {
+               json.writeStringField("status", "Warning");
+            } else {
+               json.writeStringField("status", "Bad");
+            }
+            json.writeStringField(
+                  "details",
+                  "Only " + quorum.getJoined().length + " of target "
+                        + quorum.replicationFactor() + " servers joined");
+         }
+
+         json.writeFieldName("services");
+         json.writeStartArray();
+
+         final UUID[] members = quorum.getMembers();
+         final UUID[] joined = quorum.getJoined();
+
+         for (UUID serviceId : members) {
+            final boolean isLeader = serviceId.equals(quorum.getLeaderId());
+            final boolean isFollower = indexOf(serviceId, joined) > 0;
+
+            json.writeStartObject();
+            json.writeStringField("id", serviceId.toString());
+            json.writeStringField("status", isLeader ? "leader"
+                  : (isFollower ? "follower" : "unready"));
+            json.writeEndObject();
+         }
+
+         json.writeEndArray();
+      }
+
+      json.writeEndObject();
+      json.close();
+
+      // TODO Alternatively "max-age=1" for max-age in seconds.
+      resp.addHeader("Cache-Control", "no-cache");
+
+      BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+            BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
+
+      return;
+
+   }
+    
 //    /**
 //     * Impose a lexical ordering on the file names. This is used for the HALog
 //     * and snapshot file names. The main component of those file names is the

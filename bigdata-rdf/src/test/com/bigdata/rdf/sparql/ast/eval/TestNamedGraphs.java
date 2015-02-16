@@ -35,7 +35,6 @@ import com.bigdata.rdf.internal.IV;
  * Test suite for named and default graph stuff.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestNamedGraphs extends AbstractDataDrivenSPARQLTestCase {
 
@@ -641,4 +640,45 @@ public class TestNamedGraphs extends AbstractDataDrivenSPARQLTestCase {
 
     }
 
+    /**
+     * Note: This is a duplicate of <a href="http://trac.bigdata.com/ticket/792>
+     * GRAPH ?g { FILTER NOT EXISTS { ?s ?p ?o } } not respecting ?g </a>
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/888> GRAPH ignored by FILTER
+     *      NOT EXISTS </a>
+     */
+    public void test_named_graphs_ticket_888() throws Exception {
+        
+        if(!store.isQuads())
+            return;
+
+        new TestHelper(
+                "named-graphs-ticket-888",// testURI
+                "named-graphs-ticket-888.rq", // queryURI
+                "named-graphs-ticket-888.trig", // dataURI
+                "named-graphs-ticket-888.srx" // resultURI
+                ).runTest();
+
+    }
+    
+    /**
+     * Unit test of a work around for {@link #test_named_graphs_ticket_888()}.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/888> GRAPH ignored by FILTER
+     *      NOT EXISTS </a>
+     */
+    public void test_named_graphs_ticket_888b() throws Exception {
+        
+        if(!store.isQuads())
+            return;
+
+        new TestHelper(
+                "named-graphs-ticket-888",// testURI
+                "named-graphs-ticket-888b.rq", // queryURI
+                "named-graphs-ticket-888.trig", // dataURI
+                "named-graphs-ticket-888.srx" // resultURI
+                ).runTest();
+
+    }
+    
 }

@@ -83,7 +83,6 @@ import com.bigdata.journal.TimestampUtility;
  *       partition), etc}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ResourceEvents {
 
@@ -94,7 +93,7 @@ public class ResourceEvents {
      *       discovered service in order to aggregate results from multiple
      *       hosts in a scale-out solution.
      */
-    protected static final Logger log = Logger.getLogger(ResourceEvents.class);
+    private static final Logger log = Logger.getLogger(ResourceEvents.class);
 
 //    /**
 //     * True iff the {@link #log} level is DEBUG or less.

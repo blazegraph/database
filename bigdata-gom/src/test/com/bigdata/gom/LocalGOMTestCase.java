@@ -29,7 +29,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URL;
-import java.util.Iterator;
 import java.util.Properties;
 
 import junit.extensions.proxy.ProxyTestSuite;
@@ -37,26 +36,20 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
-import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.gom.gpo.IGPO;
-import com.bigdata.gom.gpo.ILinkSet;
+import com.bigdata.BigdataStatics;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.ObjectManager;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rwstore.TestRWJournal;
 
 public class LocalGOMTestCase extends TestCase implements IGOMProxy {
 
@@ -67,7 +60,6 @@ public class LocalGOMTestCase extends TestCase implements IGOMProxy {
     protected ValueFactory m_vf;
     protected IObjectManager om;
     
-
     public LocalGOMTestCase() {
     }
 
@@ -130,8 +122,9 @@ public class LocalGOMTestCase extends TestCase implements IGOMProxy {
         m_repo.initialize();
         m_vf = m_sail.getValueFactory();
         // Note: This uses a mock endpoint URL.
-        om = new ObjectManager("http://localhost/sparql", m_repo);
-        
+        om = new ObjectManager("http://localhost"
+                + BigdataStatics.getContextPath() + "/sparql", m_repo);
+
     }
     
     protected void tearDown() throws Exception {

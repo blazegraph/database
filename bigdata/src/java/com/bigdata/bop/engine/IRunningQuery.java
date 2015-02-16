@@ -114,8 +114,8 @@ public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
     Map<Integer/* bopId */, BOpStats> getStats();
     
     /**
-     * Return the query deadline (the time at which it will terminate regardless
-     * of its run state).
+     * Return the query deadline in milliseconds (the time at which it will
+     * terminate regardless of its run state).
      * 
      * @return The query deadline (milliseconds since the epoch) and
      *         {@link Long#MAX_VALUE} if no explicit deadline was specified.

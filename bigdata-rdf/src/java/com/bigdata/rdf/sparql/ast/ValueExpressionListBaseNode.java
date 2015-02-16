@@ -79,6 +79,7 @@ abstract public class ValueExpressionListBaseNode<E extends IValueExpressionNode
 
     }
 
+    @Override
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public Iterator<E> iterator() {
 

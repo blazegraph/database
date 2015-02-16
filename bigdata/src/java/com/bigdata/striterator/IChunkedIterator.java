@@ -69,6 +69,7 @@ public interface IChunkedIterator<E> extends ICloseableIterator<E> {
      * @throws NoSuchElementException
      *             if the iterator is exhausted.
      */
+    @Override
     public E next();
     
     /**
@@ -93,6 +94,7 @@ public interface IChunkedIterator<E> extends ICloseableIterator<E> {
      * the source iterator to remove elements from the index as they are
      * visited.
      */
+    @Override
     public void remove();
     
 }

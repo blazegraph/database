@@ -64,7 +64,6 @@ import com.bigdata.io.ByteArrayBuffer;
  * support {@link #search(byte[])} and <code>null</code>s are allowed.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo consider discarding all of the {@link #add(byte[])} methods. It is
  *       typically easier and more convenient to directly manage the existing
@@ -78,7 +77,7 @@ public interface IRaba extends Iterable<byte[]> {
     /**
      * Return <code>true</code> if this implementation is read-only.
      */
-    public boolean isReadOnly();
+    boolean isReadOnly();
 
     /**
      * When <code>true</code> the {@link IRaba} supports search and elements are
@@ -96,6 +95,19 @@ public interface IRaba extends Iterable<byte[]> {
      */
     boolean isKeys();
 
+    /*
+     * TODO This could be added to differentiate between IRaba implementations
+     * that do / do not support duplicate keys.  The ones used with the HTree do.
+     * The rest do not.
+     */
+//    /**
+//     * When <code>true</code>, then {@link IRaba} supports duplicate keys.
+//     * 
+//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/763" >
+//     *      Stochastic Results With Analytic Query Mode </a>
+//     */
+//    boolean isDuplicateKeys();
+    
     /**
      * The capacity of the logical byte[][].
      * 
@@ -194,6 +206,7 @@ public interface IRaba extends Iterable<byte[]> {
      * <code>null</code>, then the iterator will report a <code>null</code> for
      * that element.
      */
+    @Override
     public Iterator<byte[]> iterator();
 
     /*

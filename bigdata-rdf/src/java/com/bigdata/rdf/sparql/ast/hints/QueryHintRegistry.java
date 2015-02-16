@@ -30,20 +30,17 @@ package com.bigdata.rdf.sparql.ast.hints;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry.Factory;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
  * A factory which is used to register and resolve query hints.
  * 
- * TODO Query hint actions should not be extendable once the system is up. E.g.,
- * something at least a little bit protected. This is because the query hints
- * have access to the {@link AST2BOpContext}.
- * 
- * TODO Query hints for includeInferred, timeout/deadline.
+ * TODO Query hints for includeInferred, timeout/deadline, the "noJoinVarsLimit"
+ * at which we break an unconstrained hash join (see the
+ * {@link IHashJoinUtility} implementation classes).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class QueryHintRegistry {
 
@@ -96,23 +93,32 @@ public class QueryHintRegistry {
 
         add(new QueryIdHint());
 
+        // Optimizer hints.
         add(new RunFirstHint());
         add(new RunLastHint());
         add(new RunOnceHint());
         add(new OptimizerQueryHint());
+        add(new RTOSampleTypeQueryHint());
+        add(new RTOLimitQueryHint());
+        add(new RTONEdgesQueryHint());
         add(new OptimisticQueryHint());
 
+        // Analytic query mode.
         add(new AnalyticQueryHint());
         add(new NativeDistinctQueryHint());
         add(new NativeDistinctSPOHint());
         add(new NativeDistinctSPOThresholdHint());
         add(new NativeHashJoinsHint());
+        
+        // JOIN hints.
         add(new MergeJoinHint());
         add(new HashJoinHint());
         add(new KeyOrderHint());
         add(new RemoteAPHint());
         add(new AccessPathSampleLimitHint());
         add(new AccessPathScanAndFilterHint());
+        
+        // DESCRIBE
         add(new DescribeModeHint());
         add(new DescribeIterationLimitHint());
         add(new DescribeStatementLimitHint());
@@ -120,10 +126,9 @@ public class QueryHintRegistry {
         /*
          * BufferAnnotations
          * 
-         * TODO The buffer annotations should probably be applied to any
-         * IJoinNode, but I have not reviewed the code paths for join group
-         * nodes, etc. to make sure that the annotations would be respected if
-         * we hang them off of anything other than a statement pattern.
+         * Note: The buffer annotations should be applied to any PipelineOp.
+         * They control the vectoring out of the pipeline operator, which sets
+         * up the vectoring for the downstream operator(s).
          */
         add(new BufferChunkOfChunksCapacityHint());
         add(new BufferChunkCapacityHint());
@@ -132,10 +137,8 @@ public class QueryHintRegistry {
         /*
          * PipelineOp annotations.
          * 
-         * TODO The pipeline annotations should probably be applied to any
-         * IJoinNode, but I have not reviewed the code paths for join group
-         * nodes, etc. to make sure that the annotations would be respected if
-         * we hang them off of anything other than a statement pattern.
+         * Note: The pipeline annotations should be applied to any PipelineOp.
+         * They control the vectoring and parallelism of pipeline operators.
          * 
          * TODO Support MAX_MEMORY, but it should only be applied if the
          * operator in question is running against the native heap.
@@ -159,6 +162,11 @@ public class QueryHintRegistry {
          */
         add(new CutoffLimitHint());
 
+        /**
+         * FILTER (NOT) EXISTS evaluation strategy hint.
+         */
+        add(new FilterExistsHint());
+        
     }
 
 }

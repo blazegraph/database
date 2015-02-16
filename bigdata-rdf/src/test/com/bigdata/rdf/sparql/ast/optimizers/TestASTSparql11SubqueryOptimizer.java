@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Collections;
+import java.util.LinkedList;
 
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -42,6 +43,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GroupByNode;
@@ -220,7 +222,9 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                         new ConstantNode(p), new VarNode("o"), null/* c */,
                         Scope.DEFAULT_CONTEXTS));
 
-                whereClause.addChild(new NamedSubqueryInclude(name));
+                final NamedSubqueryInclude nsi = new NamedSubqueryInclude(name);
+                nsi.setAttachedJoinFilters(new LinkedList<FilterNode>());
+                whereClause.addChild(nsi);
 
                 subqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,name);
                 final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
@@ -377,7 +381,9 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                         new ConstantNode(p), new VarNode("o"), null/* c */,
                         Scope.DEFAULT_CONTEXTS));
 
-                whereClause.addChild(new NamedSubqueryInclude(name));
+                final NamedSubqueryInclude nsi = new NamedSubqueryInclude(name);
+                nsi.setAttachedJoinFilters(new LinkedList<FilterNode>());
+                whereClause.addChild(nsi);
 
                 subqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,name);
                 final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();
@@ -657,7 +663,9 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                         new ConstantNode(p), new VarNode("o"), null/* c */,
                         Scope.DEFAULT_CONTEXTS));
 
-                whereClause.addChild(new NamedSubqueryInclude(name));
+                final NamedSubqueryInclude nsi = new NamedSubqueryInclude(name);
+                nsi.setAttachedJoinFilters(new LinkedList<FilterNode>());
+                whereClause.addChild(nsi);
 
                 subqueryRoot = new NamedSubqueryRoot(QueryType.SELECT,name);
                 final NamedSubqueriesNode namedSubqueries = new NamedSubqueriesNode();

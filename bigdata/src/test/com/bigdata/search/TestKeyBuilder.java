@@ -33,13 +33,9 @@ import java.util.Properties;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
-import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
-import com.bigdata.journal.ProxyTestCase;
 import com.bigdata.search.FullTextIndex.Options;
 
 /**
@@ -48,7 +44,7 @@ import com.bigdata.search.FullTextIndex.Options;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
+public class TestKeyBuilder extends AbstractSearchTest {
 
     /**
      * 
@@ -93,6 +89,10 @@ public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
         return keyBuilder;
         
     }
+
+	IndexMetadata getIndexMetadata() {
+		return getNdx().getIndex().getIndexMetadata();
+	}
     private IKeyBuilder keyBuilder;
     
     /**
@@ -103,9 +103,6 @@ public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
      */
     public void test_keyOrder() {
 
-        final String namespace = getName(); 
-        
-        final Properties properties = getProperties();
 
         // The default Strength should be Primary.
         assertEquals(
@@ -113,26 +110,14 @@ public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
                 StrengthEnum
                         .valueOf(FullTextIndex.Options.DEFAULT_INDEXER_COLLATOR_STRENGTH));
 
+        init(
         // Use the default Strength.
-        properties.setProperty(KeyBuilder.Options.STRENGTH,
-                FullTextIndex.Options.DEFAULT_INDEXER_COLLATOR_STRENGTH);
-        
+                KeyBuilder.Options.STRENGTH,
+                FullTextIndex.Options.DEFAULT_INDEXER_COLLATOR_STRENGTH,
         // Use English.
-        properties.setProperty(KeyBuilder.Options.USER_LANGUAGE, "en");
-
-        final IIndexManager store = getStore();
-        
-        try {
+                KeyBuilder.Options.USER_LANGUAGE, "en");
             
-            final FullTextIndex<Long> ndx = new FullTextIndex<Long>(store,
-                    namespace, ITx.UNISOLATED, properties);
-            
-            ndx.create();
-            
-            final IndexMetadata indexMetadata = ndx.getIndex()
-                    .getIndexMetadata();
-            
-            final FullTextIndexTupleSerializer<Long> tupleSer = (FullTextIndexTupleSerializer<Long>) indexMetadata
+            final FullTextIndexTupleSerializer<Long> tupleSer = (FullTextIndexTupleSerializer<Long>) getIndexMetadata()
                     .getTupleSerializer();
             
             if(log.isInfoEnabled())
@@ -146,17 +131,14 @@ public class TestKeyBuilder extends ProxyTestCase<IIndexManager> {
 //                    ((DefaultKeyBuilderFactory) tupleSer.getKeyBuilderFactory())
 //                            .getLocale().getLanguage());
             
-            doKeyOrderTest(ndx, -1L/* docId */, 0/* fieldId */, true/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 0L/* docId */,  0/* fieldId */, true/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 1L/* docId */, 12/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), -1L/* docId */, 0/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 0L/* docId */,  0/* fieldId */, true/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 1L/* docId */, 12/* fieldId */, true/* fieldsEnabled */);
 
-            doKeyOrderTest(ndx, -1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 0L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
-            doKeyOrderTest(ndx, 1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), -1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 0L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
+            doKeyOrderTest(getNdx(), 1L/* docId */, 0/* fieldId */, false/* fieldsEnabled */);
             
-        } finally {
-            store.destroy();
-        }
     }
 
     protected void doKeyOrderTest(final FullTextIndex<Long> ndx,

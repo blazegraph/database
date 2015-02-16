@@ -50,6 +50,7 @@ public abstract class EmptyRaba implements IRaba, Externalizable {
             
         }
         
+        @Override
         final public boolean isKeys() {
 
             return true;
@@ -78,6 +79,7 @@ public abstract class EmptyRaba implements IRaba, Externalizable {
             
         }
 
+        @Override
         final public boolean isKeys() {
 
             return false;
@@ -92,75 +94,92 @@ public abstract class EmptyRaba implements IRaba, Externalizable {
     public EmptyRaba() {
         
     }
-    
+
+    @Override
     final public int capacity() {
         return 0;
     }
 
+    @Override
     final public boolean isEmpty() {
         return true;
     }
 
+    @Override
     final public boolean isFull() {
         return true;
     }
 
+    @Override
     final public int size() {
         return 0;
     }
     
+    @Override
     final public boolean isReadOnly() {
         return true;
     }
 
+    @Override
     final public boolean isNull(int index) {
         throw new IndexOutOfBoundsException();
     }
 
+    @Override
     final public int length(int index) {
         throw new IndexOutOfBoundsException();
     }
 
+    @Override
     final public byte[] get(int index) {
         throw new IndexOutOfBoundsException();
     }
 
+    @Override
     final public int copy(int index, OutputStream os) {
         throw new IndexOutOfBoundsException();
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     final public Iterator<byte[]> iterator() {
         return EmptyIterator.DEFAULT;
     }
 
+    @Override
     final public int search(byte[] searchKey) {
         if (isKeys())
             return -1;
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public void set(int index, byte[] a) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public int add(byte[] a) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public int add(byte[] value, int off, int len) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     final public int add(DataInput in, int len) throws IOException {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public void readExternal(ObjectInput in) throws IOException,
             ClassNotFoundException {
         // NOP
     }
 
+    @Override
     public void writeExternal(ObjectOutput out) throws IOException {
         // NOP
     }

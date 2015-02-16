@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -70,11 +71,8 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.filter.PrefixFilter;
 import com.bigdata.btree.filter.TupleFilter;
-import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
-import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.cache.ConcurrentWeakValueCacheWithBatchedUpdates;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IResourceLock;
@@ -84,15 +82,19 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
+import com.bigdata.rdf.internal.IInlineURIFactory;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.NoExtensionFactory;
+import com.bigdata.rdf.internal.NoInlineURIFactory;
 import com.bigdata.rdf.internal.NoSuchVocabularyItem;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataLiteral;
@@ -269,6 +271,47 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         }
 
         return (Class<IExtensionFactory>) cls;
+
+    }
+
+    @SuppressWarnings("unchecked")
+    protected Class<IInlineURIFactory> determineInlineURIFactoryClass() {
+
+        final String defaultClassName;
+        if (vocab == null || vocab.get(XSD.IPV4) == null) {
+            /*
+             * If there is no vocabulary then you can not use an inline URI
+             * factory because the namespaces must be in the vocabulary. If the
+             * XSD.IPV4 uri is not present in the vocabulary then either you are
+             * using NoVocabulary.class or an older version of the vocabulary
+             * that does not have that URI in it. Newer journals should be using
+             * DefaultBigdataVocabulary.
+             */
+            defaultClassName = NoInlineURIFactory.class.getName();
+        } else {
+            defaultClassName = AbstractTripleStore.Options.DEFAULT_INLINE_URI_FACTORY_CLASS;
+        }
+
+        final String className = getProperty(
+                AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS,
+                defaultClassName);
+        
+        final Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Bad option: "
+                    + AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, e);
+        }
+
+        if (!IInlineURIFactory.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(
+                    AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS
+                            + ": Must implement: "
+                            + IInlineURIFactory.class.getName());
+        }
+
+        return (Class<IInlineURIFactory>) cls;
 
     }
 
@@ -552,6 +595,26 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                         AbstractTripleStore.Options.EXTENSION_FACTORY_CLASS, e);
             }
 
+            final IInlineURIFactory uriFactory;
+            try {
+                
+                /*
+                 * Setup the inline URI factory.
+                 */
+                final Class<IInlineURIFactory> urifc = 
+                    determineInlineURIFactoryClass();
+
+                uriFactory = urifc.newInstance();
+                uriFactory.init(vocab);
+
+            } catch (InstantiationException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, e);
+            } catch (IllegalAccessException e) {
+                throw new IllegalArgumentException(
+                        AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS, e);
+            }
+
             /*
              * Setup the lexicon configuration.
              */
@@ -561,7 +624,8 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     inlineLiterals, inlineTextLiterals,
                     maxInlineTextLength, inlineBNodes, inlineDateTimes,
                     inlineDateTimesTimeZone,
-                    rejectInvalidXSDValues, xFactory, vocab, valueFactory);
+                    rejectInvalidXSDValues, xFactory, vocab, valueFactory,
+                    uriFactory);
 
         }
         
@@ -1418,26 +1482,31 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
-        /*
+        /**
          * The KeyBuilder used to form the prefix keys.
          * 
-         * Note: The prefix keys are formed with IDENTICAL strength. This is
+         * Note: The prefix keys are formed with PRIMARY strength. This is
          * necessary in order to match all keys in the index since it causes the
          * secondary characteristics to NOT be included in the prefix key even
          * if they are present in the keys in the index.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/974" >
+         *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
          */
-        final LexiconKeyBuilder keyBuilder;
-        {
-
-            final Properties properties = new Properties();
-
-            properties.setProperty(KeyBuilder.Options.STRENGTH,
-                    StrengthEnum.Primary.toString());
-
-            keyBuilder = new Term2IdTupleSerializer(
-                    new DefaultKeyBuilderFactory(properties)).getLexiconKeyBuilder();
-
-        }
+        final LexiconKeyBuilder keyBuilder = ((Term2IdTupleSerializer) getTerm2IdIndex()
+                .getIndexMetadata().getTupleSerializer())
+                .getLexiconPrimaryKeyBuilder();
+//        {
+//
+//            final Properties properties = new Properties();
+//
+//            properties.setProperty(KeyBuilder.Options.STRENGTH,
+//                    StrengthEnum.Primary.toString());
+//
+//            keyBuilder = new Term2IdTupleSerializer(
+//                    new DefaultKeyBuilderFactory(properties)).getLexiconKeyBuilder();
+//
+//        }
 
         /*
          * Formulate the keys[].
@@ -2470,6 +2539,31 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         // BlobIVs which must be resolved against an index.
         final Collection<BlobIV<?>> blobIVs = new LinkedList<BlobIV<?>>();
         
+        final Set<IV<?, ?>> unrequestedSidTerms = new LinkedHashSet<IV<?, ?>>();
+        
+        /*
+         * We need to materialize terms inside of SIDs so that the SIDs
+         * can be materialized properly.
+         */
+        for (IV<?,?> iv : ivs) {
+            
+            if (iv instanceof SidIV) {
+
+            	handleSid((SidIV) iv, ivs, unrequestedSidTerms);
+            	
+            }
+            
+        }
+        
+        /*
+         * Add the SID terms to the IVs to materialize.
+         */
+        for (IV<?, ?> iv : unrequestedSidTerms) {
+        	
+        	ivs.add(iv);
+        	
+        }
+
         /*
          * Filter out the inline values first and those that have already
          * been materialized and cached.
@@ -2490,6 +2584,11 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
                 // already materialized
                 ret.put(iv, iv.getValue());
+
+            } else if (iv instanceof SidIV) {
+
+                // defer until the end
+                continue;
 
             } else if (iv.isInline()) {
 
@@ -2532,61 +2631,95 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         }
 
-        if (numNotFound == 0) {
+//        if (numNotFound == 0) {
+//
+//            // Done.
+//            return ret;
+//
+//        }
 
-            // Done.
-            return ret;
+        if (numNotFound > 0) {
+
+        	// go to the indices
+        	
+	        /*
+	         * Setup and run task(s) to resolve IV(s).
+	         */
+	
+	        final ExecutorService service = getExecutorService();
+	        
+	        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+	
+	        if (!termIVs.isEmpty()) {
+	
+	            tasks.add(new BatchResolveTermIVsTask(service, getId2TermIndex(),
+	                    termIVs, ret, termCache, valueFactory, termsChunksSize));
+	
+	        }
+	
+	        if (!blobIVs.isEmpty()) {
+	
+	            tasks.add(new BatchResolveBlobIVsTask(service, getBlobsIndex(),
+	                    blobIVs, ret, termCache, valueFactory, blobsChunkSize));
+	
+	        }
+	
+	        if (log.isInfoEnabled())
+	            log.info("nterms=" + n + ", numNotFound=" + numNotFound
+	                    + ", cacheSize=" + termCache.size());
+	
+	        try {
+	
+	            if (tasks.size() == 1) {
+	             
+	                tasks.get(0).call();
+	                
+	            } else {
+	
+	                // Co-thread tasks.
+	                final List<Future<Void>> futures = getExecutorService()
+	                        .invokeAll(tasks);
+	
+	                // Verify no errors.
+	                for (Future<Void> f : futures)
+	                    f.get();
+	            
+	            }
+	
+	        } catch (Exception ex) {
+	
+	            throw new RuntimeException(ex);
+	
+	        }
 
         }
-   
-        /*
-         * Setup and run task(s) to resolve IV(s).
-         */
-
-        final ExecutorService service = getExecutorService();
         
-        final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
-
-        if (!termIVs.isEmpty()) {
-
-            tasks.add(new BatchResolveTermIVsTask(service, getId2TermIndex(),
-                    termIVs, ret, termCache, valueFactory, termsChunksSize));
-
-        }
-
-        if (!blobIVs.isEmpty()) {
-
-            tasks.add(new BatchResolveBlobIVsTask(service, getBlobsIndex(),
-                    blobIVs, ret, termCache, valueFactory, blobsChunkSize));
-
-        }
-
-        if (log.isInfoEnabled())
-            log.info("nterms=" + n + ", numNotFound=" + numNotFound
-                    + ", cacheSize=" + termCache.size());
-
-        try {
-
-            if (tasks.size() == 1) {
-             
-                tasks.get(0).call();
-                
-            } else {
-
-                // Co-thread tasks.
-                final List<Future<Void>> futures = getExecutorService()
-                        .invokeAll(tasks);
-
-                // Verify no errors.
-                for (Future<Void> f : futures)
-                    f.get();
+        /*
+         * SidIVs require special handling.
+         */
+        for (IV<?,?> iv : ivs) {
             
+            if (iv instanceof SidIV) {
+
+            	cacheTerms((SidIV<?>) iv, ret);
+            	
+                // translate it into a value directly
+                ret.put(iv, iv.asValue(this));
+                
             }
+            
+        }
 
-        } catch (Exception ex) {
+        /*
+         * Remove any IVs that were not explicitly requested in the method 
+         * call but that got pulled into materialization because of a SID.
+         */
+        for (IV<?,?> iv : unrequestedSidTerms) {
 
-            throw new RuntimeException(ex);
-
+        	ivs.remove(iv);
+        	
+        	ret.remove(iv);
+            
         }
 
         final long elapsed = System.currentTimeMillis() - begin;
@@ -2598,6 +2731,104 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         return ret;
 
+    }
+    
+    /**
+     * Add the terms inside a SID to the collection of IVs to materialize if
+     * they are not already there.
+     */
+	@SuppressWarnings("rawtypes")
+	final private void handleSid(final SidIV sid, 
+			final Collection<IV<?, ?>> ivs, 
+			final Set<IV<?, ?>> unrequested) {
+    	
+    	final ISPO spo = sid.getInlineValue();
+
+    	handleTerm(spo.s(), ivs, unrequested);
+		
+    	handleTerm(spo.p(), ivs, unrequested);
+		
+    	handleTerm(spo.o(), ivs, unrequested);
+		
+    	if (spo.c() != null) {
+    	
+    		handleTerm(spo.c(), ivs, unrequested);
+    		
+    	}
+		
+    }
+    
+    /**
+     * Add the terms inside a SID to the collection of IVs to materialize if
+     * they are not already there.
+     */
+	@SuppressWarnings("rawtypes")
+	final private void handleTerm(final IV<?, ?> iv, 
+			final Collection<IV<?, ?>> ivs, 
+			final Set<IV<?, ?>> unrequested) {
+
+		if (iv instanceof SidIV) {
+			
+			handleSid((SidIV) iv, ivs, unrequested);
+			
+		} else {
+			
+			if (!ivs.contains(iv)) {
+				
+//				ivs.add(iv);
+				
+				unrequested.add(iv);
+				
+			}
+			
+		}
+		
+    }
+    
+    /**
+     * We need to cache the BigdataValues on the IV components within the
+     * SidIV so that the SidIV can materialize itself into a BigdataBNode
+     * properly.
+     */
+    @SuppressWarnings("rawtypes")
+	final private void cacheTerms(final SidIV sid, 
+    		final Map<IV<?, ?>, BigdataValue> terms) {
+    	
+    	final ISPO spo = sid.getInlineValue();
+    	
+    	cacheTerm(spo.s(), terms);
+    	
+    	cacheTerm(spo.p(), terms);
+    	
+    	cacheTerm(spo.o(), terms);
+    	
+    	if (spo.c() != null) {
+    		
+    		cacheTerm(spo.c(), terms);
+    		
+    	}
+    	
+    }
+    
+    /**
+     * We need to cache the BigdataValues on the IV components within the
+     * SidIV so that the SidIV can materialize itself into a BigdataBNode
+     * properly.
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	final private void cacheTerm(final IV iv, 
+			final Map<IV<?, ?>, BigdataValue> terms) {
+    	
+    	if (iv instanceof SidIV) {
+    		
+    		cacheTerms((SidIV<?>) iv, terms);
+    		
+    	} else {
+    		
+    		iv.setValue(terms.get(iv));
+    		
+    	}
+    	
     }
     
     /**

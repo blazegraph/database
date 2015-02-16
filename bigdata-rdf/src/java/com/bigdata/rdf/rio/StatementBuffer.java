@@ -29,7 +29,6 @@ package com.bigdata.rdf.rio;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,11 +38,11 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataResource;
@@ -151,6 +150,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * the canonicalizing {@link #bnodes} mapping.
      */
     private Set<BigdataStatement> deferredStmts;
+    
+    /**
+     * RDR statements.  Map to a bnode used in other statements.  Need to defer
+     * both the reified statement (since it comes in piecemeal) and the 
+     * statements about it (since we need to make sure the ground version is 
+     * present).
+     */
+    private Map<BigdataBNodeImpl, ReifiedStmt> reifiedStmts;
 
     /**
      * <code>true</code> if statement identifiers are enabled.
@@ -175,6 +182,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * The optional store into which statements will be inserted when non-
      * <code>null</code>.
      */
+    @Override
     public final AbstractTripleStore getStatementStore() {
 
         return statementStore;
@@ -198,6 +206,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * {@link #getStatementStore()} is <code>null</code>, statements will be
      * written into this store as well.
      */
+    @Override
     public final AbstractTripleStore getDatabase() {
         
         return database;
@@ -205,6 +214,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     }
 
     protected final BigdataValueFactory valueFactory;
+
+    /**
+     * Reification vocabulary.
+     */
+    private final BigdataURI RDF_SUBJECT;
+    private final BigdataURI RDF_PREDICATE;
+    private final BigdataURI RDF_OBJECT;
+    private final BigdataURI RDF_STATEMENT;
+    private final BigdataURI RDF_TYPE;
     
     /**
      * The maximum #of Statements, URIs, Literals, or BNodes that the buffer can
@@ -213,22 +231,42 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected final int capacity;
 
-    /**
-     * When true only distinct terms are stored in the buffer (this is always
-     * true since this condition always outperforms the alternative).
-     */
-    protected final boolean distinct = true;
+//    /**
+//     * When true only distinct terms are stored in the buffer (this is always
+//     * true since this condition always outperforms the alternative).
+//     */
+//    protected final boolean distinct = true;
     
+    @Override
     public boolean isEmpty() {
         
         return numStmts == 0;
         
     }
     
+    @Override
     public int size() {
         
         return numStmts;
         
+    }
+    
+    @Override
+    public String toString() {
+    	
+    	return "numURIs=" + numURIs
+    			+ ", numLiterals=" + numLiterals
+    			+ ", numBNodes=" + numBNodes
+    			+ ", numStmts=" + numStmts
+    			+ ", numValues=" + numValues
+    			+ ", numSids=" + numSIDs
+    			+ ", values.length=" + (values != null ? String.valueOf(values.length) : "null")
+    			+ ", stmts.length=" + (stmts != null ? String.valueOf(stmts.length) : "null")
+    			+ ", bnodes.size()=" + (bnodes != null ? String.valueOf(bnodes.size()) : "null")
+    			+ ", distinctTermMap.size()=" + (distinctTermMap != null ? String.valueOf(distinctTermMap.size()) : "null")
+    			+ ", reifiedStmts.size()=" + (reifiedStmts != null ? String.valueOf(reifiedStmts.size()) : "null")
+    			+ ", deferredStmts.size()=" + (deferredStmts != null ? String.valueOf(deferredStmts.size()) : "null");
+    	
     }
 
     /**
@@ -283,7 +321,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     public StatementBuffer(final AbstractTripleStore database,
             final int capacity) {
-
         this(null/* statementStore */, database, capacity);
 
     }
@@ -328,39 +365,46 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         this.capacity = capacity;
         
-        values = new BigdataValue[capacity * arity];
+        values = new BigdataValue[capacity * arity + 5];
         
         stmts = new BigdataStatement[capacity];
 
-        if (distinct) {
-
-            /*
-             * initialize capacity to N times the #of statements allowed. this
-             * is the maximum #of distinct terms and would only be realized if
-             * each statement used distinct values. in practice the #of distinct
-             * terms will be much lower. however, also note that the map will be
-             * resized at .75 of the capacity so we want to over-estimate the
-             * maximum likely capacity by at least 25% to avoid re-building the
-             * hash map.
-             */
-            
-            distinctTermMap = new HashMap<Value, BigdataValue>(capacity * arity);
-            
-        } else {
-            
-            distinctTermMap = null;
-            
-        }
+        /*
+         * initialize capacity to N times the #of statements allowed. this
+         * is the maximum #of distinct terms and would only be realized if
+         * each statement used distinct values. in practice the #of distinct
+         * terms will be much lower. however, also note that the map will be
+         * resized at .75 of the capacity so we want to over-estimate the
+         * maximum likely capacity by at least 25% to avoid re-building the
+         * hash map.
+         */
         
+        distinctTermMap = new HashMap<Value, BigdataValue>(capacity * arity);
+            
         this.statementIdentifiers = database.getStatementIdentifiers();
         
         if(log.isInfoEnabled()) {
             
             log.info("capacity=" + capacity + ", sids=" + statementIdentifiers
                     + ", statementStore=" + statementStore + ", database="
-                    + database);
+                    + database + ", arity=" + arity);
             
         }
+        
+        this.RDF_SUBJECT = valueFactory.asValue(RDF.SUBJECT);
+        this.RDF_PREDICATE = valueFactory.asValue(RDF.PREDICATE);
+        this.RDF_OBJECT = valueFactory.asValue(RDF.OBJECT);
+        this.RDF_STATEMENT = valueFactory.asValue(RDF.STATEMENT);
+        this.RDF_TYPE = valueFactory.asValue(RDF.TYPE);
+        
+    	/*
+    	 * Get the reification vocabulary into the distinct term map.
+    	 */
+    	getDistinctTerm(RDF_SUBJECT, true);
+    	getDistinctTerm(RDF_PREDICATE, true);
+    	getDistinctTerm(RDF_OBJECT, true);
+    	getDistinctTerm(RDF_STATEMENT, true);
+    	getDistinctTerm(RDF_TYPE, true);
         
     }
 
@@ -375,14 +419,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * 
      * @todo this implementation always returns ZERO (0).
      */
+    @Override
     public long flush() {
        
-        log.info("");
-
         /*
          * Process deferred statements (NOP unless using statement identifiers).
          */
-        processDeferredStatements();
+//        processDeferredStatements();
 
         // flush anything left in the buffer.
         incrementalWrite();
@@ -394,210 +437,279 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
     }
     
-    /**
-     * Processes the {@link #deferredStmts deferred statements}.
-     * <p>
-     * When statement identifiers are enabled the processing of statements using
-     * blank nodes in their subject or object position must be deferred until we
-     * know whether or not the blank node is being used as a statement
-     * identifier (blank nodes are not allowed in the predicate position by the
-     * RDF data model). If the blank node is being used as a statement
-     * identifier then its {@link IV}  will be assigned based on
-     * the {s,p,o} triple. If it is being used as a blank node, then the
-     * {@link IV} is assigned using the blank node ID.
-     * <p>
-     * Deferred statements are processed as follows:
-     * <ol>
-     * 
-     * <li>Collect all deferred statements whose blank node bindings never show
-     * up in the context position of a statement (
-     * {@link BigdataBNode#getStatementIdentifier()} is <code>false</code>).
-     * Those blank nodes are NOT statement identifiers so we insert them into
-     * the lexicon and the insert the collected statements as well.</li>
-     * 
-     * <li>The remaining deferred statements are processed in "cliques". Each
-     * clique consists of all remaining deferred statements whose {s,p,o} have
-     * become fully defined by virtue of a blank node becoming bound as a
-     * statement identifier. A clique is collected by a full pass over the
-     * remaining deferred statements. This process repeats until no statements
-     * are identified (an empty clique or fixed point).</li>
-     * 
-     * </ol>
-     * If there are remaining deferred statements then they contain cycles. This
-     * is an error and an exception is thrown.
-     * 
-     * @todo on each {@link #flush()}, scan the deferred statements for those
-     *       which are fully determined (bnodes are flagged as statement
-     *       identifiers) to minimize the build up for long documents?
-     */
-    protected void processDeferredStatements() {
-
-        if (!statementIdentifiers || deferredStmts == null
-                || deferredStmts.isEmpty()) {
-
-            // NOP.
-            
-            return;
-            
-        }
-
-        if (log.isInfoEnabled())
-            log.info("processing " + deferredStmts.size()
-                    + " deferred statements");
-
+//    /**
+//     * Processes the {@link #deferredStmts deferred statements}.
+//     * <p>
+//     * When statement identifiers are enabled the processing of statements using
+//     * blank nodes in their subject or object position must be deferred until we
+//     * know whether or not the blank node is being used as a statement
+//     * identifier (blank nodes are not allowed in the predicate position by the
+//     * RDF data model). If the blank node is being used as a statement
+//     * identifier then its {@link IV}  will be assigned based on
+//     * the {s,p,o} triple. If it is being used as a blank node, then the
+//     * {@link IV} is assigned using the blank node ID.
+//     * <p>
+//     * Deferred statements are processed as follows:
+//     * <ol>
+//     * 
+//     * <li>Collect all deferred statements whose blank node bindings never show
+//     * up in the context position of a statement (
+//     * {@link BigdataBNode#getStatementIdentifier()} is <code>false</code>).
+//     * Those blank nodes are NOT statement identifiers so we insert them into
+//     * the lexicon and the insert the collected statements as well.</li>
+//     * 
+//     * <li>The remaining deferred statements are processed in "cliques". Each
+//     * clique consists of all remaining deferred statements whose {s,p,o} have
+//     * become fully defined by virtue of a blank node becoming bound as a
+//     * statement identifier. A clique is collected by a full pass over the
+//     * remaining deferred statements. This process repeats until no statements
+//     * are identified (an empty clique or fixed point).</li>
+//     * 
+//     * </ol>
+//     * If there are remaining deferred statements then they contain cycles. This
+//     * is an error and an exception is thrown.
+//     * 
+//     * @todo on each {@link #flush()}, scan the deferred statements for those
+//     *       which are fully determined (bnodes are flagged as statement
+//     *       identifiers) to minimize the build up for long documents?
+//     */
+//    protected void processDeferredStatements() {
+//
+//        if (!statementIdentifiers || deferredStmts == null
+//                || deferredStmts.isEmpty()) {
+//
+//            // NOP.
+//            
+//            return;
+//            
+//        }
+//
+//        if (log.isInfoEnabled())
+//            log.info("processing " + deferredStmts.size()
+//                    + " deferred statements");
+//
+//        /*
+//         * Need to flush the terms out to the dictionary or the reification 
+//         * process will not work correctly.
+//         */
 //        incrementalWrite();
-        
-        try {
-            
-            // Note: temporary override - clear by finally{}.
-            statementIdentifiers = false;
-            
-            // stage 1.
-            {
-                
-                final int nbefore = deferredStmts.size();
-                
-                int n = 0;
-                
-                final Iterator<BigdataStatement> itr = deferredStmts.iterator();
-                
-                while(itr.hasNext()) {
-                    
-                    final BigdataStatement stmt = itr.next();
-                    
-                    if (stmt.getSubject() instanceof BNode
-                            && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier())
-                        continue;
-
-                    if (stmt.getObject() instanceof BNode
-                            && ((BigdataBNode) stmt.getObject()).isStatementIdentifier())
-                        continue;
-
-                    if(log.isDebugEnabled()) {
-                        log.debug("grounded: "+stmt);
-                    }
-
-                    // fully grounded so add to the buffer.
-                    add(stmt);
-                    
-                    // the statement has been handled.
-                    itr.remove();
-                    
-                    n++;
-                    
-                }
-                
-                if (log.isInfoEnabled())
-                    log.info(""+ n
-                                + " out of "
-                                + nbefore
-                                + " deferred statements used only blank nodes (vs statement identifiers).");
-                
-                /*
-                 * Flush everything in the buffer so that the blank nodes that
-                 * are really blank nodes will have their term identifiers
-                 * assigned.
-                 */
-                
-                incrementalWrite();
-                
-            }
-            
-            // stage 2.
-            if(!deferredStmts.isEmpty()) {
-                
-                int nrounds = 0;
-                
-                while(true) {
-
-                    nrounds++;
-                    
-                    final int nbefore = deferredStmts.size();
-                    
-                    final Iterator<BigdataStatement> itr = deferredStmts.iterator();
-                    
-                    while(itr.hasNext()) {
-                        
-                        final BigdataStatement stmt = itr.next();
-
-                        if (stmt.getSubject() instanceof BNode
-                                && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier()
-                                && stmt.s() == null)
-                            continue;
-
-                        if (stmt.getObject() instanceof BNode
-                                && ((BigdataBNode) stmt.getObject()).isStatementIdentifier()
-                                && stmt.o() == null)
-                            continue;
-
-                        if (log.isDebugEnabled()) {
-                            log.debug("round="+nrounds+", grounded: "+stmt);
-                        }
-                        
-                        // fully grounded so add to the buffer.
-                        add(stmt);
-                        
-                        // deferred statement has been handled.
-                        itr.remove();
-                        
-                    }
-                    
-                    final int nafter = deferredStmts.size();
-
-                    if (log.isInfoEnabled())
-                        log.info("round=" + nrounds+" : #before="+nbefore+", #after="+nafter);
-                    
-                    if(nafter == nbefore) {
-                    
-                        if (log.isInfoEnabled())
-                            log.info("fixed point after " + nrounds
-                                    + " rounds with " + nafter
-                                    + " ungrounded statements");
-                        
-                        break;
-                        
-                    }
-                    
-                    /*
-                     * Flush the buffer so that we can obtain the statement
-                     * identifiers for all statements in this clique.
-                     */
-                    
-                    incrementalWrite();
-                    
-                } // next clique.
-                
-                final int nremaining = deferredStmts.size();
-
-                if (nremaining > 0) {
-
-                    throw new StatementCyclesException(
-                            "" + nremaining
-                            + " statements can not be grounded");
-                    
-                }
-                
-                
-            } // stage 2.
-
-        } finally {
-
-            // Note: restore flag!
-            statementIdentifiers = true;
-
-            deferredStmts = null;
-            
-        }
-        
-    }
+//        
+//        try {
+//            
+//            // Note: temporary override - clear by finally{}.
+//            statementIdentifiers = false;
+//            
+//            // stage 0
+//            if (reifiedStmts != null) {
+//            	
+//            	for (Map.Entry<BigdataBNodeImpl, ReifiedStmt> e : reifiedStmts.entrySet()) {
+//            	
+//            		final BigdataBNodeImpl sid = e.getKey();
+//            		
+//            		final ReifiedStmt reifiedStmt = e.getValue();
+//            		
+//            		if (!reifiedStmt.isFullyBound(arity)) {
+//            			
+//            			log.warn("unfinished reified stmt: " + reifiedStmt);
+//            			
+//            			continue;
+//            			
+//            		}
+//
+//            		final BigdataStatement stmt = valueFactory.createStatement(
+//            				reifiedStmt.getSubject(), 
+//            				reifiedStmt.getPredicate(), 
+//            				reifiedStmt.getObject(), 
+//            				reifiedStmt.getContext(), 
+//							StatementEnum.Explicit);
+//            		
+//            		sid.setStatement(stmt);
+//            		
+//            		sid.setIV(new SidIV(new SPO(stmt)));
+//            		
+//            		if (log.isInfoEnabled()) {
+//            			log.info("reified sid conversion: sid=" + sid + ", stmt=" + stmt);
+//            		}
+//            		
+//            	}
+//            	
+//            	if (log.isInfoEnabled()) {
+//            	
+//            		for (BigdataBNodeImpl sid : reifiedStmts.keySet()) {
+//            	
+//            			log.info("sid: " + sid + ", iv=" + sid.getIV());
+//            			
+//            		}
+//            		
+//            	}
+//            	
+//            }
+//            
+//            // stage 1.
+//            {
+//                
+//                final int nbefore = deferredStmts.size();
+//                
+//                int n = 0;
+//                
+//                final Iterator<BigdataStatement> itr = deferredStmts.iterator();
+//                
+//                while(itr.hasNext()) {
+//                    
+//                    final BigdataStatement stmt = itr.next();
+//
+//                    if (stmt.getSubject() instanceof BNode
+//                            && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier())
+//                        continue;
+//
+//                    if (stmt.getObject() instanceof BNode
+//                            && ((BigdataBNode) stmt.getObject()).isStatementIdentifier())
+//                        continue;
+//
+//                    if(log.isDebugEnabled()) {
+//                        log.debug("grounded: "+stmt);
+//                    }
+//
+//                    if (stmt.getSubject() instanceof BNode)
+//                    	addTerm(stmt.getSubject());
+//                    
+//                    if (stmt.getObject() instanceof BNode)
+//                    	addTerm(stmt.getObject());
+//                    
+//                    // fully grounded so add to the buffer.
+//                    add(stmt);
+//                    
+//                    // the statement has been handled.
+//                    itr.remove();
+//                    
+//                    n++;
+//                    
+//                }
+//                
+//                if (log.isInfoEnabled())
+//                    log.info(""+ n
+//                                + " out of "
+//                                + nbefore
+//                                + " deferred statements used only blank nodes (vs statement identifiers).");
+//                
+//                /*
+//                 * Flush everything in the buffer so that the blank nodes that
+//                 * are really blank nodes will have their term identifiers
+//                 * assigned.
+//                 */
+//                
+//                incrementalWrite();
+//                
+//            }
+//            
+//            // stage 2.
+//            if(!deferredStmts.isEmpty()) {
+//                
+//                int nrounds = 0;
+//                
+//                while(true) {
+//
+//                    nrounds++;
+//                    
+//                    final int nbefore = deferredStmts.size();
+//                    
+//                    final Iterator<BigdataStatement> itr = deferredStmts.iterator();
+//                    
+//                    while(itr.hasNext()) {
+//                        
+//                        final BigdataStatement stmt = itr.next();
+//
+//                        if (log.isDebugEnabled()) {
+//                        	log.debug(stmt.getSubject() + ", iv=" + stmt.s());
+//                        }
+//                        
+//                        if (stmt.getSubject() instanceof BNode
+//                                && ((BigdataBNode) stmt.getSubject()).isStatementIdentifier()
+//                                && stmt.s() == null)
+//                            continue;
+//
+//                        if (stmt.getObject() instanceof BNode
+//                                && ((BigdataBNode) stmt.getObject()).isStatementIdentifier()
+//                                && stmt.o() == null)
+//                            continue;
+//
+//                        if (log.isDebugEnabled()) {
+//                            log.debug("round="+nrounds+", grounded: "+stmt);
+//                        }
+//                        
+//                        // fully grounded so add to the buffer.
+//                        add(stmt);
+//                        
+//                        // deferred statement has been handled.
+//                        itr.remove();
+//                        
+//                    }
+//                    
+//                    final int nafter = deferredStmts.size();
+//
+//                    if (log.isInfoEnabled())
+//                        log.info("round=" + nrounds+" : #before="+nbefore+", #after="+nafter);
+//                    
+//                    if(nafter == nbefore) {
+//                    
+//                        if (log.isInfoEnabled())
+//                            log.info("fixed point after " + nrounds
+//                                    + " rounds with " + nafter
+//                                    + " ungrounded statements");
+//                        
+//                        break;
+//                        
+//                    }
+//                    
+//                    /*
+//                     * Flush the buffer so that we can obtain the statement
+//                     * identifiers for all statements in this clique.
+//                     */
+//                    
+//                    incrementalWrite();
+//                    
+//                } // next clique.
+//                
+//                final int nremaining = deferredStmts.size();
+//
+//                if (nremaining > 0) {
+//
+//                	if (log.isDebugEnabled()) {
+//                		
+//                		for (BigdataStatement s : deferredStmts) {
+//                			log.debug("could not ground: " + s);
+//                		}
+//                		
+//                	}
+//                	
+//                    throw new StatementCyclesException(
+//                            "" + nremaining
+//                            + " statements can not be grounded");
+//                    
+//                }
+//                
+//                
+//            } // stage 2.
+//
+//        } finally {
+//
+//            // Note: restore flag!
+//            statementIdentifiers = true;
+//
+//            deferredStmts = null;
+//            
+//            reifiedStmts = null;
+//            
+//        }
+//        
+//    }
     
     /**
      * Clears all buffered data, including the canonicalizing mapping for blank
      * nodes and deferred provenance statements.
      */
+    @Override
     public void reset() {
-        
-        log.info("");
         
         _clear();
         
@@ -611,11 +723,14 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         
         deferredStmts = null;
         
+        reifiedStmts = null;
+        
     }
     
     /**
      * @todo could be replaced with {@link BigdataValueFactory
      */
+    @Override
     public void setBNodeMap(final Map<String, BigdataBNode> bnodes) {
     
         if (bnodes == null)
@@ -655,6 +770,15 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (distinctTermMap != null) {
             
             distinctTermMap.clear();
+         
+        	/*
+        	 * Get the reification vocabulary into the distinct term map.
+        	 */
+        	getDistinctTerm(RDF_SUBJECT, true);
+        	getDistinctTerm(RDF_PREDICATE, true);
+        	getDistinctTerm(RDF_OBJECT, true);
+        	getDistinctTerm(RDF_STATEMENT, true);
+        	getDistinctTerm(RDF_TYPE, true);
             
         }
 
@@ -667,6 +791,30 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      */
     protected void incrementalWrite() {
 
+    	/*
+    	 * Look for non-sid bnodes and add them to the values to be written
+    	 * to the database (if they haven't already been written).
+    	 */
+    	if (bnodes != null) {
+    		
+	    	for (BigdataBNode bnode : bnodes.values()) {
+	    		
+	    		// sid, skip
+	    		if (bnode.isStatementIdentifier())
+	    			continue;
+	    		
+	    		// already written, skip
+	    		if (bnode.getIV() != null)
+	    			continue;
+	    		
+	    		values[numValues++] = bnode;
+	    		
+	    		numBNodes++;
+	    		
+	    	}
+	    	
+    	}
+    	
         final long begin = System.currentTimeMillis();
 
         if (log.isInfoEnabled()) {
@@ -742,6 +890,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         if (log.isInfoEnabled()) {
 
             log.info("writing " + numTerms);
+            
+            for (int i = 0; i < numTerms; i++) {
+            	log.info("term: " + terms[i]);
+            }
 
         }
         
@@ -757,6 +909,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param p
      * @param o
      */
+    @Override
     public void add(final Resource s, final URI p, final Value o) {
         
         add(s, p, o, null, StatementEnum.Explicit);
@@ -771,6 +924,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param o
      * @param c
      */
+    @Override
     public void add(final Resource s, final URI p, final Value o, final Resource c) {
         
         add(s, p, o, c, StatementEnum.Explicit);
@@ -785,6 +939,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @param o
      * @param type
      */
+    @Override
     public void add(final Resource s, final URI p, final Value o,
             final Resource c, final StatementEnum type) {
         
@@ -812,6 +967,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
     }
     
+    @Override
     public void add(final Statement e) {
 
         add(e.getSubject(), e.getPredicate(), e.getObject(), e.getContext(),
@@ -848,12 +1004,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
             final BigdataStatement stmt = stmts[i];
             
-            /*
-             * Note: context position is not passed when statement identifiers
-             * are in use since the statement identifier is assigned based on
-             * the {s,p,o} triple.
-             */
-
             final SPO spo = new SPO(stmt);
 
             if (log.isDebugEnabled()) 
@@ -870,15 +1020,6 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
         }
         
         /*
-         * When true, we will be handling statement identifiers.
-         * 
-         * Note: this is based on the flag on the database rather than the flag
-         * on the StatementBuffer since the latter is temporarily overridden when
-         * processing deferred statements.
-         */
-        final boolean sids = database.getStatementIdentifiers();
-
-        /*
          * Note: When handling statement identifiers, we clone tmp[] to avoid a
          * side-effect on its order so that we can unify the assigned statement
          * identifiers below.
@@ -890,76 +1031,76 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 //        final long nwritten = writeSPOs(sids ? tmp.clone() : tmp, numStmts);
         final long nwritten = writeSPOs(tmp.clone(), numStmts);
 
-        if (sids) {
-
-            /*
-             * Unify each assigned statement identifier with the context
-             * position on the corresponding statement.
-             */
-
-            for (int i = 0; i < numStmts; i++) {
-                
-                final SPO spo = tmp[i];
-                
-                final BigdataStatement stmt = stmts[i];
-
-                // verify that the BigdataStatement and SPO are the same triple.
-                assert stmt.s() == spo.s;
-                assert stmt.p() == spo.p;
-                assert stmt.o() == spo.o;
-                
-                final BigdataResource c = stmt.getContext();
-                
-                if (c == null)
-                    continue;
-
-                if (c instanceof URI) {
-
-                    throw new UnificationException(
-                            "URI not permitted in context position when statement identifiers are enabled: "
-                                    + stmt);
-                    
-                }
-                
-                if( c instanceof BNode) {
-
-                    final IV sid = spo.getStatementIdentifier();
-                    
-                    if(c.getIV() != null) {
-                        
-                        if (!sid.equals(c.getIV())) {
-
-                            throw new UnificationException(
-                                    "Can not unify blankNode "
-                                            + c
-                                            + "("
-                                            + c.getIV()
-                                            + ")"
-                                            + " in context position with statement identifier="
-                                            + sid + ": " + stmt + " (" + spo
-                                            + ")");
-                            
-                        }
-                        
-                    } else {
-                        
-                        // assign the statement identifier.
-                        c.setIV(sid);
-                        
-                        if (log.isDebugEnabled()) {
-                            
-                            log.debug("Assigned statement identifier: " + c
-                                    + "=" + sid);
-                            
-                        }
-
-                    }
-                    
-                }
-                
-            }
-                
-        }
+//        if (sids) {
+//
+//            /*
+//             * Unify each assigned statement identifier with the context
+//             * position on the corresponding statement.
+//             */
+//
+//            for (int i = 0; i < numStmts; i++) {
+//                
+//                final SPO spo = tmp[i];
+//                
+//                final BigdataStatement stmt = stmts[i];
+//
+//                // verify that the BigdataStatement and SPO are the same triple.
+//                assert stmt.s() == spo.s;
+//                assert stmt.p() == spo.p;
+//                assert stmt.o() == spo.o;
+//                
+//                final BigdataResource c = stmt.getContext();
+//                
+//                if (c == null)
+//                    continue;
+//
+////                if (c instanceof URI) {
+////
+////                    throw new UnificationException(
+////                            "URI not permitted in context position when statement identifiers are enabled: "
+////                                    + stmt);
+////                    
+////                }
+//                
+//                if( c instanceof BNode) {
+//
+//                    final IV sid = spo.getStatementIdentifier();
+//                    
+//                    if(c.getIV() != null) {
+//                        
+//                        if (!sid.equals(c.getIV())) {
+//
+//                            throw new UnificationException(
+//                                    "Can not unify blankNode "
+//                                            + c
+//                                            + "("
+//                                            + c.getIV()
+//                                            + ")"
+//                                            + " in context position with statement identifier="
+//                                            + sid + ": " + stmt + " (" + spo
+//                                            + ")");
+//                            
+//                        }
+//                        
+//                    } else {
+//                        
+//                        // assign the statement identifier.
+//                        c.setIV(sid);
+//                        
+//                        if (log.isDebugEnabled()) {
+//                            
+//                            log.debug("Assigned statement identifier: " + c
+//                                    + "=" + sid);
+//                            
+//                        }
+//
+//                    }
+//                    
+//                }
+//                
+//            }
+//                
+//        }
 
         // Copy the state of the isModified() flag
         for (int i = 0; i < numStmts; i++) {
@@ -1016,6 +1157,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
 
             log.info("writing " + numStmts + " on "
                     + (statementStore != null ? "statementStore" : "database"));
+            
+            for (int i = 0; i < numStmts; i++) {
+            	log.info("spo: " + stmts[i]);
+            }
 
         }
 
@@ -1061,9 +1206,10 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * @return Either the term or the pre-existing term in the buffer with the
      *         same data.
      */
-    protected BigdataValue getDistinctTerm(final BigdataValue term) {
+    protected BigdataValue getDistinctTerm(final BigdataValue term, final boolean addIfAbsent) {
 
-        assert distinct == true;
+        if (term == null)
+        	return null;
         
         if (term instanceof BNode) {
 
@@ -1077,70 +1223,155 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             
             final BigdataBNode bnode = (BigdataBNode)term;
             
-            // the BNode's ID.
-            final String id = bnode.getID();
-
-            if (bnodes == null) {
-
-                // allocating canonicalizing map for blank nodes.
-                bnodes = new HashMap<String, BigdataBNode>(capacity);
-
-                // insert this blank node into the map.
-                bnodes.put(id, bnode);
-
+        	final BigdataStatement stmt = bnode.getStatement();
+        	
+            if (stmt != null) {
+            	
+            	bnode.setStatement(valueFactory.createStatement(
+            			(BigdataResource) getDistinctTerm(stmt.getSubject(), true),
+            			(BigdataURI) getDistinctTerm(stmt.getPredicate(), true),
+            			(BigdataValue) getDistinctTerm(stmt.getObject(), true)
+            			));
+            	
+            	/*
+            	 * Do not "add if absent".  This is not a real term, just a
+            	 * composition of other terms.
+            	 */
+            	return bnode;
+            	
             } else {
-
-                // test canonicalizing map for blank nodes.
-                final BigdataBNode existingBNode = bnodes.get(id);
-
-                if (existingBNode != null) {
-
-                    // return existing blank node with same ID.
-                    return existingBNode;
-
-                }
-
-                // insert this blank node into the map.
-                bnodes.put(id, bnode);
-                
+            
+	            // the BNode's ID.
+	            final String id = bnode.getID();
+	
+	            if (bnodes == null) {
+	
+	                // allocating canonicalizing map for blank nodes.
+	                bnodes = new HashMap<String, BigdataBNode>(capacity);
+	
+	                // insert this blank node into the map.
+	                bnodes.put(id, bnode);
+	
+	            } else {
+	
+	                // test canonicalizing map for blank nodes.
+	                final BigdataBNode existingBNode = bnodes.get(id);
+	
+	                if (existingBNode != null) {
+	
+	                    /*
+	                     * Return existing blank node with same ID, do not
+	                     * add since not absent.
+	                     */
+	                    return existingBNode;
+	
+	                }
+	
+	                // insert this blank node into the map.
+	                bnodes.put(id, bnode);
+	                
+	            }
+	            
             }
             
-            return term;
+//            return term;
             
-        }
+        } else {
         
-        /*
-         * Other kinds of terms use a map whose scope is limited to the terms
-         * that are currently in the buffer. This keeps down the heap demand
-         * when reading very large documents.
-         */
-        
-        final BigdataValue existingTerm = distinctTermMap.get(term);
-        
-        if(existingTerm != null) {
-            
-            // return the pre-existing term.
-            
+	        /*
+	         * Other kinds of terms use a map whose scope is limited to the terms
+	         * that are currently in the buffer. This keeps down the heap demand
+	         * when reading very large documents.
+	         */
+	        
+	        final BigdataValue existingTerm = distinctTermMap.get(term);
+	        
+	        if (existingTerm != null) {
+	            
+	            // return the pre-existing term.
+	            
+	            if(log.isDebugEnabled()) {
+	                
+	                log.debug("duplicate: "+term);
+	                
+	            }
+	            
+	            if (equals(existingTerm, RDF_SUBJECT, RDF_PREDICATE, RDF_OBJECT, RDF_TYPE, RDF_STATEMENT)) {
+	            	
+	                if (addIfAbsent) {
+	                	
+	                	addTerm(term);
+	                	
+	                }
+	                
+	            }
+	            
+	            /*
+	             * Term already exists, do not add.
+	             */
+	            return existingTerm;
+	            
+	        }
+	
             if(log.isDebugEnabled()) {
                 
-                log.debug("duplicate: "+term);
+                log.debug("new term: "+term);
                 
             }
             
-            return existingTerm;
-            
+	        // put the new term in the map.
+	        if (distinctTermMap.put(term, term) != null) {
+	            
+	            throw new AssertionError();
+	            
+	        }
+	        
         }
-
-        // put the new term in the map.
-        if (distinctTermMap.put(term, term) != null) {
-            
-            throw new AssertionError();
-            
+        
+        if (addIfAbsent) {
+        	
+        	addTerm(term);
+        	
         }
         
         // return the new term.
         return term;
         
+    }
+    
+    protected void addTerm(final BigdataValue term) {
+    	
+    	if (term == null)
+    		return;
+    	
+        if (term instanceof URI) {
+
+            numURIs++;
+
+            values[numValues++] = term;
+
+        } else if (term instanceof BNode) {
+
+        	/*
+        	 * Handle bnodes separately, in incrementalWrite().
+        	 */
+        	
+//            if (!statementIdentifiers) {
+//
+//                numBNodes++;
+//
+//                values[numValues++] = term;
+//
+//            }
+
+        } else {
+
+            numLiterals++;
+
+            values[numValues++] = term;
+
+        }
+
     }
     
     /**
@@ -1162,202 +1393,261 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
      * 
      * @see #nearCapacity()
      */
-    protected void handleStatement(Resource s, URI p, Value o, Resource c,
+    protected void handleStatement(Resource _s, URI _p, Value _o, Resource _c,
             StatementEnum type) {
         
-        s = (Resource) valueFactory.asValue(s);
-        p = (URI)      valueFactory.asValue(p);
-        o =            valueFactory.asValue(o);
-        c = (Resource) valueFactory.asValue(c);
+    	// silently strip context in quads mode. See #1086.
+    	_c = database.isQuads() ? _c : null;
+       
+    	if (log.isDebugEnabled()) {
+    		
+    		log.debug("handle stmt: " + _s + ", " + _p + ", " + _o + ", " + _c);
+    		
+    	}
+    	
+//    	if (arity == 3) c = null;
+    	
+        final BigdataResource s = (BigdataResource) 
+        		getDistinctTerm(valueFactory.asValue(_s), true);
+        final BigdataURI p = (BigdataURI) 
+        		getDistinctTerm(valueFactory.asValue(_p), true);
+        final BigdataValue o = 
+        		getDistinctTerm(valueFactory.asValue(_o), true);
+        final BigdataResource c = (BigdataResource) 
+        		getDistinctTerm(valueFactory.asValue(_c), true);
         
-        boolean duplicateS = false;
-        boolean duplicateP = false;
-        boolean duplicateO = false;
-        boolean duplicateC = false;
-        
-        if (distinct) {
-            {
-                final BigdataValue tmp = getDistinctTerm((BigdataValue) s);
-                if (tmp != s) {
-                    duplicateS = true;
-                }
-                s = (Resource) tmp;
-            }
-            {
-                final BigdataValue tmp = getDistinctTerm((BigdataValue) p);
-                if (tmp != p) {
-                    duplicateP = true;
-                }
-                p = (URI) tmp;
-            }
-            {
-                final BigdataValue tmp = getDistinctTerm((BigdataValue) o);
-                if (tmp != o) {
-                    duplicateO = true;
-                }
-                o = (Value) tmp;
-            }
-            if (c != null) {
-                final BigdataValue tmp = getDistinctTerm((BigdataValue) c);
-                if (tmp != c) {
-                    duplicateC = true;
-                }
-                c = (Resource) tmp;
-            }
-        }
-
         /*
          * Form the BigdataStatement object now that we have the bindings.
          */
 
-        final BigdataStatement stmt;
-        {
-          
-            stmt = valueFactory
-                    .createStatement((BigdataResource) s, (BigdataURI) p,
-                            (BigdataValue) o, (BigdataResource) c, type);
-
-            if (statementIdentifiers
-                    && (s instanceof BNode || o instanceof BNode)) {
-
-                /*
-                 * When statement identifiers are enabled a statement with a
-                 * blank node in the subject or object position must be deferred
-                 * until the end of the source so that we determine whether it
-                 * is being used as a statement identifier or a blank node (if
-                 * the blank node occurs in the context position, then we know
-                 * that it is being used as a statement identifier).
-                 */
-                
-                if (deferredStmts == null) {
-
-                    deferredStmts = new HashSet<BigdataStatement>(stmts.length);
-
-                }
-
-                deferredStmts.add(stmt);
-
-                if (log.isDebugEnabled()) 
-                    log.debug("deferred: "+stmt);
-                
-            } else {
-
-                // add to the buffer.
-                stmts[numStmts++] = stmt;
-
-            }
-            
-        }
+        final BigdataStatement stmt = valueFactory.createStatement(s, p, o, c, type);
 
         /*
-         * Update counters.
+         * Specifically looking for reification syntax:
+         * _:sid rdf:type Statement .
+         * _:sid rdf:subject <S> .
+         * _:sid rdf:predicate <P> .
+         * _:sid rdf:object <O> .
          */
+        if (statementIdentifiers && s instanceof BNode) {
+        	
+        	if (equals(p, RDF_SUBJECT, RDF_PREDICATE, RDF_OBJECT)) {
+        		
+	    		final BigdataBNodeImpl sid = (BigdataBNodeImpl) s;
+	    		
+	        	if (sid.getStatement() != null) {
+
+	        		checkSid(sid, p, o);
+	        		
+	        		log.warn("seeing a duplicate value for " + sid + ": " + p +"=" + o);
+	        		
+	        		return;
+	        		
+	        	}
+	
+	    		if (reifiedStmts == null) {
+	    			
+	    			reifiedStmts = new HashMap<BigdataBNodeImpl, ReifiedStmt>();
+	    			
+	    		}
+	    		
+	    		final ReifiedStmt reifiedStmt;
+	    		if (reifiedStmts.containsKey(sid)) {
+	    			
+	    			reifiedStmt = reifiedStmts.get(sid);
+	    			
+	    		} else {
+	    			
+	    			reifiedStmt = new ReifiedStmt();
+	    			
+	    			reifiedStmts.put(sid, reifiedStmt);
+	    			
+	    		}
+	    				
+	    		reifiedStmt.set(p, o);	
+	    		
+	            if (log.isDebugEnabled()) 
+	                log.debug("reified piece: "+stmt);
+	            
+	            if (reifiedStmt.isFullyBound(arity)) {
+	            	
+	            	sid.setStatement(reifiedStmt.toStatement(valueFactory));
+	            	
+	            	reifiedStmts.remove(sid);
+	            	
+	            }
+	            
+	            return;
+	            
+        	} else if (equals(o, RDF_STATEMENT) && equals(p, RDF_TYPE)) {
+        		
+        		/*
+        		 * Ignore these statements.
+        		 * 
+        		 * _:sid rdf:type rdf:Statement .
+        		 */
+        		return;
+        		
+        	}
+
+        }
         
-        if (!duplicateS) {// && ((_Value) s).termId == 0L) {
+        // add to the buffer.
+        stmts[numStmts++] = stmt;
 
-            if (s instanceof URI) {
+//        if (c != null && statementIdentifiers && c instanceof BNode) {
+//        	
+//        	((BigdataBNodeImpl) c).setStatement(stmt);
+//        	
+//        }
 
-                numURIs++;
+    }
+    
+    private void checkSid(final BigdataBNode sid, final URI p, final Value o) {
+    	
+    	final BigdataStatement stmt = sid.getStatement();
+    	
+    	if ((p == RDF_SUBJECT && stmt.getSubject() != o) ||
+    			(p == RDF_PREDICATE && stmt.getPredicate() != o) ||
+    				(p == RDF_OBJECT && stmt.getObject() != o)) {
+    		
+			throw new UnificationException("sid cannot refer to multiple statements");
+    		
+    	}
+    	
+    }
+    
+    private boolean equals(final BigdataValue v1, final BigdataValue... v2) {
+    	
+		if (v2.length == 1) {
+			
+			return _equals(v1, v2[0]);
+			
+		} else {
+			
+			for (BigdataValue v : v2) {
+				
+				if (_equals(v1, v))
+					return true;
+				
+			}
+			
+			return false;
+			
+		}
 
-                values[numValues++] = (BigdataValue) s;
+    }
+    
+    private boolean _equals(final BigdataValue v1, final BigdataValue v2) {
+		
+		return v1 == v2;
+		
+//    	if (distinct) {
+//
+//    		return v1 == v2;
+//
+//    	} else {
+//    		
+//    		return v1.equals(v2);
+//    		
+//    	}
+    	
+    }
+    
+    private static class ReifiedStmt implements Statement {
 
-            } else {
+    	/**
+		 * 
+		 */
+		private static final long serialVersionUID = -7706421769807306702L;
+		
+		private BigdataResource s;
+    	private BigdataURI p;
+    	private BigdataValue o;
+    	private BigdataResource c;
+    	
+    	public ReifiedStmt() {
+    	}
+    	
+    	public boolean isFullyBound(final int arity) {
+    		return s != null && p != null && o != null && (arity > 3 ? c != null : true);
+    	}
+    	
+		@Override
+		public BigdataResource getContext() {
+			return c;
+		}
 
-                if (!statementIdentifiers) {
+		@Override
+		public BigdataValue getObject() {
+			return o;
+		}
 
-                    numBNodes++;
+		@Override
+		public BigdataURI getPredicate() {
+			return p;
+		}
 
-                    values[numValues++] = (BigdataValue) s;
+		@Override
+		public BigdataResource getSubject() {
+			return s;
+		}
 
-                }
-                
-            }
-            
-        }
+		public void set(final URI p, final BigdataValue o) {
+			
+			if (p.toString().equals(RDF.SUBJECT.toString())) {
+				
+				setSubject((BigdataResource) o);
+			
+			} else if (p.toString().equals(RDF.PREDICATE.toString())) {
+				
+				setPredicate((BigdataURI) o);
+			
+			} else if (p.toString().equals(RDF.OBJECT.toString())) {
+				
+				setObject(o);
+			
+//			} else if (p.equals(RDF.CONTEXT)) {
+//				
+//				setPredicate((URI) c);
+//			
+			} else {
 
-        if (!duplicateP) {//&& ((_Value) s).termId == 0L) {
-            
-            values[numValues++] = (BigdataValue)p;
+				throw new IllegalArgumentException();
+				
+			}
+			
+		}
+		
+		public void setSubject(final BigdataResource s) {
+			this.s = s;
+		}
 
-            numURIs++;
+		public void setPredicate(final BigdataURI p) {
+			this.p = p;
+		}
 
-        }
+		public void setObject(final BigdataValue o) {
+			this.o = o;
+		}
 
-        if (!duplicateO) {// && ((_Value) s).termId == 0L) {
+		public void setContext(final BigdataResource c) {
+			this.c = c;
+		}
+		
+	    @Override
+	    public String toString() {
+	        
+	        return "<" + s + ", " + p + ", " + o + ", " + c + ">";
 
-            if (o instanceof URI) {
-
-                numURIs++;
-
-                values[numValues++] = (BigdataValue) o;
-
-            } else if (o instanceof BNode) {
-
-                if (!statementIdentifiers) {
-
-                    numBNodes++;
-
-                    values[numValues++] = (BigdataValue) o;
-
-                }
-
-            } else {
-
-                numLiterals++;
-
-                values[numValues++] = (BigdataValue) o;
-
-            }
-            
-        }
-
-        if (c != null && !duplicateC && ((BigdataValue) c).getIV() == null) {
-
-            if (c instanceof URI) {
-
-                numURIs++;
-
-                values[numValues++] = (BigdataValue) c;
-
-            } else {
-
-                if (!database.getStatementIdentifiers()) {
-
-                    /*
-                     * We only let the context node into the buffer when
-                     * statement identifiers are disabled for the database.
-                     * 
-                     * Note: This does NOT test [statementIdentifiers] as that
-                     * flag is temporarily overriden when processing deferred
-                     * statements.
-                     */
-                    
-                    values[numValues++] = (BigdataValue) c;
-
-                    numBNodes++;
-
-                } else {
-
-                    /*
-                     * Flag the blank node as a statement identifier since it
-                     * appears in the context position.
-                     * 
-                     * Note: the blank node is not inserted into values[] since
-                     * it is a statement identifier and will be assigned when we
-                     * insert the statement rather than based on the blank
-                     * node's ID.
-                     */
-
-                	// Note: done automatically by setStatement();
-//                    ((BigdataBNode) c).setStatementIdentifier( true);
-					((BigdataBNodeImpl) c).setStatement(stmt);
-
-                }
-
-            }
-            
-        }
-
+	    }
+	    
+	    public BigdataStatement toStatement(final BigdataValueFactory vf) {
+	    	
+	    	return vf.createStatement(s, p, o, c);
+	    	
+	    }
+    	
     }
 
 }

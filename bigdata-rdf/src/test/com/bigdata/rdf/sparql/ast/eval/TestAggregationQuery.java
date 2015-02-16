@@ -138,5 +138,49 @@ public class TestAggregationQuery extends AbstractDataDrivenSPARQLTestCase {
                 ).runTest();
         
     }
+    
+    /**
+     * Query correctly returns one row having a value of ZERO (0) for the count
+     * since there are no solutions in the data that match the query.
+     * 
+     * <pre>
+     * select (count(?s) as ?count) {
+     *                 ?s ?p "abcedefg" .
+     * }
+     * </pre>
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT)
+     *      returns no rows rather than ZERO. </a>
+     */
+    public void test_count_emptyResult() throws Exception {
+        
+        new TestHelper("count_emptyResult", // testURI,
+                "count_emptyResult.rq",// queryFileURL
+                "count_emptyResult.trig",// dataFileURL
+                "count_emptyResult.srx"// resultFileURL
+                ).runTest();
+    }
+
+    /**
+     * Variation of the query above using COUNT(DISTINCT) should also return one
+     * solution having a binding of ZERO (0) for the count.
+     * 
+     * <pre>
+     * select (count(distinct ?snippet) as ?count) {
+     *                 ?snippet ?p "abcedefg" .
+     * }
+     * </pre>
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT)
+     *      returns no rows rather than ZERO. </a>
+     */
+    public void test_count_distinct_emptyResult()throws Exception {
+        
+        new TestHelper("count_distinct_emptyResult", // testURI,
+                "count_distinct_emptyResult.rq",// queryFileURL
+                "count_distinct_emptyResult.trig",// dataFileURL
+                "count_distinct_emptyResult.srx"// resultFileURL
+                ).runTest();
+    }
 
 }

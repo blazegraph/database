@@ -27,10 +27,14 @@
 
 package com.bigdata.rdf.model;
 
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.openrdf.model.BNode;
@@ -43,6 +47,7 @@ import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
@@ -63,12 +68,12 @@ import com.bigdata.util.CanonicalFactory;
  * @todo Consider a {@link WeakValueCache} to shortcut recently used statements?
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
 	private final String namespace;
 	
+	@Override
 	public String getNamespace() {
 		
 		return namespace;
@@ -80,10 +85,20 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      */
     private BigdataValueFactoryImpl(final String namespace) {
 
-    	this.namespace = namespace;
-    	
-    	xsdMap = getXSDMap();
+        this.namespace = namespace;
+
+        xsdMap = getXSDMap();
         
+        // @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert data with boolean object causes IllegalArgumentException </a>
+        // @see <a href="http://trac.bigdata.com/ticket/980"> Object position query hint is not a Literal </a>
+//        /**
+//         * Cache the IV on the BigdataValue for these boolean constants.
+//         * 
+//         * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert
+//         *      data with boolean object causes IllegalArgumentException </a>
+//         */
+//        TRUE.setIV(XSDBooleanIV.TRUE);
+//        FALSE.setIV(XSDBooleanIV.FALSE);
     }
     
 	/**
@@ -181,6 +196,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      */
 //    * @param namespace
 //    *            The namespace of the {@link LexiconRelation}.
+    @Override
     public void remove(/*final String namespace*/) {
         
 //        if (namespace == null)
@@ -196,6 +212,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     	
     }
 
+    @Override
     public BNodeContextFactory newBNodeContext() {
 
         return new BNodeContextFactory(this);
@@ -214,6 +231,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
      * 
      * @see #newBNodeContext()
      */
+    @Override
     public BigdataBNodeImpl createBNode() {
         
         return createBNode(nextID());
@@ -229,12 +247,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
     
+    @Override
     public BigdataBNodeImpl createBNode(final String id) {
 
         return new BigdataBNodeImpl(this, id);
 
     }
 
+    @Override
+    public BigdataBNodeImpl createBNode(final BigdataStatement stmt) {
+
+        return new BigdataBNodeImpl(this, nextID(), stmt);
+
+    }
+
+    @Override
     public BigdataLiteralImpl createLiteral(final String label) {
 
         return new BigdataLiteralImpl(this, label, null, null);
@@ -290,11 +317,11 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final BigdataURIImpl xsd_boolean = new BigdataURIImpl(this, xsd
             + "boolean");
 
-    private final BigdataLiteralImpl TRUE = new BigdataLiteralImpl(this, "true", null,
-            xsd_boolean);
-
-    private final BigdataLiteralImpl FALSE = new BigdataLiteralImpl(this, "false", null,
-            xsd_boolean);
+//    private final BigdataLiteralImpl TRUE = new BigdataLiteralImpl(this, "true", null,
+//            xsd_boolean);
+//
+//    private final BigdataLiteralImpl FALSE = new BigdataLiteralImpl(this, "false", null,
+//            xsd_boolean);
 
 	/**
 	 * Map for fast resolution of XSD URIs. The keys are the string values of
@@ -324,72 +351,107 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
     
-    public BigdataLiteralImpl createLiteral(boolean arg0) {
+    /**
+     * {@inheritDoc}
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert data
+     *      with boolean object causes IllegalArgumentException </a>
+     * @see <a href="http://trac.bigdata.com/ticket/980"> Object position of
+     *      query hint is not a Literal </a>
+     */
+    @Override
+    public BigdataLiteralImpl createLiteral(final boolean arg0) {
 
-        return (arg0 ? TRUE : FALSE);
+        return (arg0 //
+                ? new BigdataLiteralImpl(this, "true", null, xsd_boolean)
+                : new BigdataLiteralImpl(this, "false", null, xsd_boolean)
+                );
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(byte arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_byte);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(byte arg0, final boolean unsigned) {
 
         return new BigdataLiteralImpl(this, "" + (unsigned ? XSDUnsignedByteIV.promote(arg0) : arg0), null, unsigned ? xsd_ubyte : xsd_byte);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(short arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_short);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(short arg0, final boolean unsigned) {
 
         return new BigdataLiteralImpl(this, "" + (unsigned ? XSDUnsignedShortIV.promote(arg0) : arg0), null, unsigned ? xsd_ushort :xsd_short);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(int arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_int);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(int arg0, final boolean unsigned) {
 
         return new BigdataLiteralImpl(this, "" +  (unsigned ? XSDUnsignedIntIV.promote(arg0) : arg0), null, unsigned ? xsd_uint :xsd_int);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(long arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_long);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(long arg0, final boolean unsigned) {
 
         return new BigdataLiteralImpl(this, "" + (unsigned ? XSDUnsignedLongIV.promote(arg0) : arg0), null, unsigned ? xsd_ulong : xsd_long);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(float arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_float);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(double arg0) {
 
         return new BigdataLiteralImpl(this, "" + arg0, null, xsd_double);
 
     }
+    
+    public BigdataLiteralImpl createLiteral(final Date date) {
+        GregorianCalendar c = new GregorianCalendar();
+        c.setTime(date);
+        try {
+            XMLGregorianCalendar xmlGregCalendar = DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
+            return createLiteral(xmlGregCalendar);
+        }
+        catch (DatatypeConfigurationException e) {
+            throw new RuntimeException("Could not instantiate javax.xml.datatype.DatatypeFactory", e);
+        }
+    }
 
+    @Override
     public BigdataLiteralImpl createLiteral(final XMLGregorianCalendar arg0) {
 
 		/*
@@ -404,12 +466,14 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
         
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(final String label, final String language) {
 
         return new BigdataLiteralImpl(this, label, language, null/* datatype */);
 
     }
 
+    @Override
     public BigdataLiteralImpl createLiteral(final String label, URI datatype) {
 
         /*
@@ -428,6 +492,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
+    @Override
     public BigdataURIImpl createURI(final String uriString) {
 
 		final String str = uriString;
@@ -449,18 +514,21 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
+    @Override
     public BigdataURIImpl createURI(final String namespace, final String localName) {
 
         return new BigdataURIImpl(this, namespace + localName);
 
     }
 
+    @Override
     public BigdataStatementImpl createStatement(Resource s, URI p, Value o) {
 
         return createStatement(s, p, o, null/* c */, null/* type */);
 
     }
 
+    @Override
     public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
             Resource c) {
 
@@ -468,6 +536,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
+    @Override
     public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type) {
         
@@ -475,6 +544,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
         
     }
 
+    @Override
     public BigdataStatementImpl createStatement(Resource s, URI p, Value o,
             Resource c, StatementEnum type, final boolean userFlag) {
         
@@ -489,6 +559,7 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
     }
 
+    @Override
     final public BigdataValue asValue(final Value v) {
 
         if (v == null)
@@ -559,30 +630,35 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     private final transient BigdataValueSerializer<BigdataValue> valueSer = new BigdataValueSerializer<BigdataValue>(
             this);
 
+    @Override
     public BigdataValueSerializer<BigdataValue> getValueSerializer() {
 
         return valueSer;
 
     }
 
+    @Override
     public BigdataResource asValue(Resource v) {
 
         return (BigdataResource) asValue((Value) v);
         
     }
 
+    @Override
     public BigdataURI asValue(URI v) {
         
         return (BigdataURI)asValue((Value)v);
         
     }
 
+    @Override
     public BigdataLiteral asValue(Literal v) {
         
         return (BigdataLiteral)asValue((Value)v);
         
     }
 
+    @Override
     public BigdataBNode asValue(BNode v) {
 
         return (BigdataBNode)asValue((Value)v);

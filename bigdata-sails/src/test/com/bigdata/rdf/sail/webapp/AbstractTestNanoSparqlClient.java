@@ -37,10 +37,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.http.client.HttpClient;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -71,16 +74,16 @@ import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.SailException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.client.DefaultClientConnectionManagerFactory;
+import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
@@ -121,18 +124,35 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      * the {@link RemoteRepository}. This is used when we tear down the
      * {@link RemoteRepository}.
      */
-	private ClientConnectionManager m_cm;
+	// private ClientConnectionManager m_cm;
 	
+    /**
+     * The http client.
+     */
+    protected HttpClient m_client;
+
     /**
      * The client-API wrapper to the NSS.
      */
     protected RemoteRepositoryManager m_repo;
 
     /**
-	 * The effective {@link NanoSparqlServer} http end point.
-	 */
+     * The effective {@link NanoSparqlServer} http end point (including the
+     * ContextPath).
+     */
 	protected String m_serviceURL;
 
+    /**
+     * The URL of the root of the web application server. This does NOT include
+     * the ContextPath for the webapp.
+     * 
+     * <pre>
+     * http://localhost:8080 -- root URL
+     * http://localhost:8080/bigdata -- webapp URL (includes "/bigdata" context path.
+     * </pre>
+     */
+	protected String m_rootURL;
+	
 //	/**
 //	 * The request path for the REST API under test.
 //	 */
@@ -214,7 +234,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 			if (log.isInfoEnabled())
 				log.info("Destroying: " + namespace);
 
-			tripleStore.destroy();
+            if (!BigdataStatics.NSS_GROUP_COMMIT) {
+                /*
+                 * FIXME GROUP COMMIT: We need to submit a task that does this
+                 * in order to stay inside of the same concurrency control
+                 * mechanism as the database.
+                 */
+                tripleStore.destroy();
+            }
 			
 		}
 
@@ -222,23 +249,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	
 	TestMode testMode = null;
 	
-	@Override
-	public void setUp() throws Exception {
-	    
-		super.setUp();
-
-		log.warn("Setting up test:" + getName());
+	protected Server newFixture(final String lnamespace) throws Exception {
+		final IIndexManager indexManager = getIndexManager();
 		
 		final Properties properties = getProperties();
 
-		// guaranteed distinct namespace for the KB instance.
-		namespace = getName() + UUID.randomUUID();
-
-		final IIndexManager m_indexManager = getIndexManager();
-		
 		// Create the triple store instance.
-        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
-                namespace, properties);
+        final AbstractTripleStore tripleStore = createTripleStore(indexManager,
+        		lnamespace, properties);
         
         if (tripleStore.isStatementIdentifiers()) {
             testMode = TestMode.sids;
@@ -251,18 +269,64 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
         {
 
-            initParams.put(ConfigParams.NAMESPACE, namespace);
+            initParams.put(ConfigParams.NAMESPACE, lnamespace);
 
             initParams.put(ConfigParams.CREATE, "false");
             
         }
         // Start server for that kb instance.
-        m_fixture = NanoSparqlServer.newInstance(0/* port */,
-                m_indexManager, initParams);
+        final Server fixture = NanoSparqlServer.newInstance(0/* port */,
+                indexManager, initParams);
 
-        m_fixture.start();
+        fixture.start();
+		
+        return fixture;
+	}
+	
+	@Override
+	public void setUp() throws Exception {
+	    
+		super.setUp();
 
-		final int port = m_fixture.getConnectors()[0].getLocalPort();
+		if (log.isTraceEnabled())
+			log.trace("Setting up test:" + getName());
+		
+//		final Properties properties = getProperties();
+
+		// guaranteed distinct namespace for the KB instance.
+		namespace = getName() + UUID.randomUUID();
+		
+		m_fixture = newFixture(namespace);
+
+//		final IIndexManager m_indexManager = getIndexManager();
+//		
+//		// Create the triple store instance.
+//        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
+//                namespace, properties);
+//        
+//        if (tripleStore.isStatementIdentifiers()) {
+//            testMode = TestMode.sids;
+//        } else if (tripleStore.isQuads()) {
+//            testMode = TestMode.quads;
+//        } else {
+//            testMode = TestMode.triples;
+//        }
+//		
+//        final Map<String, String> initParams = new LinkedHashMap<String, String>();
+//        {
+//
+//            initParams.put(ConfigParams.NAMESPACE, namespace);
+//
+//            initParams.put(ConfigParams.CREATE, "false");
+//            
+//        }
+//        // Start server for that kb instance.
+//        m_fixture = NanoSparqlServer.newInstance(0/* port */,
+//                m_indexManager, initParams);
+//
+//        m_fixture.start();
+
+		final int port = NanoSparqlServer.getLocalPort(m_fixture);
 
 		// log.info("Getting host address");
 
@@ -275,33 +339,40 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         }
 
-        m_serviceURL = new URL("http", hostAddr, port, //
-                "" // file
-//              "/sparql/"// file
+        m_rootURL = new URL("http", hostAddr, port, ""/* contextPath */
         ).toExternalForm();
 
+        m_serviceURL = new URL("http", hostAddr, port,
+                BigdataStatics.getContextPath()).toExternalForm();
+
         if (log.isInfoEnabled())
-            log.info("Setup done: name=" + getName() + ", namespace="
-                    + namespace + ", serviceURL=" + m_serviceURL);
+            log.info("Setup done: \nname=" + getName() + "\nnamespace="
+                    + namespace + "\nrootURL=" + m_rootURL + "\nserviceURL="
+                    + m_serviceURL);
 
-//        final HttpClient httpClient = new DefaultHttpClient();
+        /*
+         * Ensure that the client follows redirects using a standard policy.
+         * 
+         * Note: This is necessary for tests of the webapp structure since the
+         * container may respond with a redirect (302) to the location of the
+         * webapp when the client requests the root URL.
+         */
 
-//        m_cm = httpClient.getConnectionManager();
+       	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        m_cm = DefaultClientConnectionManagerFactory.getInstance()
-                .newInstance();
+        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client,
+                getIndexManager().getExecutorService());
 
-        m_repo = new RemoteRepositoryManager(m_serviceURL,
-                new DefaultHttpClient(m_cm),
-                m_indexManager.getExecutorService());
-
-    }
+		if (log.isInfoEnabled())
+			log.info("Setup Active Threads: " + Thread.activeCount());
+	
+	}
 
     @Override
 	public void tearDown() throws Exception {
 
-//		if (log.isInfoEnabled())
-			log.warn("tearing down test: " + getName());
+		if (log.isTraceEnabled())
+			log.trace("tearing down test: " + getName());
 
 		if (m_fixture != null) {
 
@@ -322,23 +393,35 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //		m_indexManager = null;
 
 		namespace = null;
-		
+        
+        m_rootURL = null;
 		m_serviceURL = null;
-
-        if (m_cm != null) {
-
-            m_cm.shutdown();
-
-            m_cm = null;
-
-		}
 		
-		m_repo = null;
+//        if (m_cm != null) {
+//            m_cm.shutdown();
+//            m_cm = null;
+//        }
 		
-		log.info("tear down done");
+		log.info("Connection Shutdown Check");
 		
-		super.tearDown();
+        m_repo.close();
+        m_client.stop();
+        
+        m_repo = null;
+        m_client = null;
+        
+        log.info("tear down done");
 
+        super.tearDown();
+        
+        final int nthreads = Thread.activeCount();
+
+		if (log.isInfoEnabled())
+			log.info("Teardown Active Threads: " + nthreads);
+        
+        if (nthreads > 300) {
+        	log.error("High residual thread count: " + nthreads);
+        }
 	}
 
     /**
@@ -389,6 +472,35 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 *             If anything goes wrong.
 	 */
 	protected long countResults(final TupleQueryResult result) throws Exception {
+
+    	long count = 0;
+    	
+    	while(result.hasNext()) {
+    		
+    		result.next();
+    		
+    		count++;
+    		
+    	}
+    	
+    	result.close();
+    	
+    	return count;
+    	
+	}
+
+	/**
+	 * Counts the #of results in a SPARQL result set.
+	 * 
+	 * @param result
+	 *            The connection from which to read the results.
+	 * 
+	 * @return The #of results.
+	 * 
+	 * @throws Exception
+	 *             If anything goes wrong.
+	 */
+	protected long countResults(final GraphQueryResult result) throws Exception {
 
     	long count = 0;
     	
@@ -725,59 +837,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 */
     protected void doInsertWithBodyTest(final String method, final int ntriples,
             /*final String servlet,*/ final RDFFormat format) throws Exception {
-
-//		HttpURLConnection conn = null;
-//		try {
-//
-//			final URL url = new URL(m_serviceURL + servlet);
-//			conn = (HttpURLConnection) url.openConnection();
-//			conn.setRequestMethod(method);
-//			conn.setDoOutput(true);
-//			conn.setDoInput(true);
-//			conn.setUseCaches(false);
-//			conn.setReadTimeout(0);
-//			
-//            conn.setRequestProperty("Content-Type", format
-//                            .getDefaultMIMEType());
-//
-//            final byte[] data = genNTRIPLES(ntriples, format);
-//
-//            conn.setRequestProperty("Content-Length", Integer.toString(data
-//                    .length));
-//
-//			final OutputStream os = conn.getOutputStream();
-//			try {
-//			    os.write(data);
-//				os.flush();
-//			} finally {
-//				os.close();
-//			}
-//			// conn.connect();
-//
-//			final int rc = conn.getResponseCode();
-//
-//            if (log.isInfoEnabled()) {
-//                log.info("*** RESPONSE: " + rc + " for " + method);
-////                log.info("*** RESPONSE: " + getResponseBody(conn));
-//            }
-//
-//			if (rc < 200 || rc >= 300) {
-//
-//			    throw new IOException(conn.getResponseMessage());
-//			    
-//			}
-//
-//		} catch (Throwable t) {
-//			// clean up the connection resources
-//			if (conn != null)
-//				conn.disconnect();
-//			throw new RuntimeException(t);
-//		}
-//
-//        // Verify the mutation count.
-//        assertEquals(ntriples, getMutationResult(conn).mutationCount);
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         
         final byte[] data = genNTRIPLES(ntriples, format);
 //        final File file = File.createTempFile("bigdata-testnssclient", ".data");
@@ -1459,4 +1518,130 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
     }
 
+    protected void doStressDescribeTest(final String method, final RDFFormat format, final int tasks, final int threads, final int statements)
+            throws Exception {
+        
+        final URI person = new URIImpl(BD.NAMESPACE + "Person");
+        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
+        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
+        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
+
+        final BigdataSail sail = getSail();
+        sail.initialize();
+        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+        
+        try {
+
+            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
+                    .getConnection();
+            try {
+
+                cxn.setAutoCommit(false);
+                
+                // create a large number of mikes and bryans
+                for (int n = 0; n < statements; n++) {
+                    final URI miken = new URIImpl(BD.NAMESPACE + "Mike#" + n);
+                    final URI bryann = new URIImpl(BD.NAMESPACE + "Bryan#" + n);
+                    final Literal nameMiken = new LiteralImpl("Mike#" + n);
+                    final Literal nameBryann = new LiteralImpl("Bryan#" + n);
+	                cxn.add(miken, RDF.TYPE, person);
+	                cxn.add(miken, likes, rdf);
+	                cxn.add(miken, RDFS.LABEL, nameMiken);
+	                cxn.add(bryann, RDF.TYPE, person);
+	                cxn.add(bryann, likes, rdfs);
+	                cxn.add(bryann, RDFS.LABEL, nameBryann);
+                }
+
+                /*
+                 * Note: The either flush() or commit() is required to flush the
+                 * statement buffers to the database before executing any
+                 * operations that go around the sail.
+                 */
+                cxn.commit();
+            } finally {
+                cxn.close();
+            }
+             
+        } finally {
+            sail.shutDown();
+        }
+
+        // The expected results.
+        // Run the query and verify the results.
+        {
+            
+//            final QueryOptions opts = new QueryOptions();
+//            opts.serviceURL = m_serviceURL;
+//            opts.method = method;
+//            opts.acceptHeader = format.getDefaultMIMEType();
+//            opts.queryStr =//
+//                "prefix bd: <"+BD.NAMESPACE+"> " +//
+//                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
+//                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
+//                "DESCRIBE ?x " +//
+//                "WHERE { " +//
+//                "  ?x rdf:type bd:Person . " +//
+//                "  ?x bd:likes bd:RDF " +//
+//                "}";
+//
+//            final Graph actual = buildGraph(doSparqlQuery(opts, requestPath));
+            
+        	final String queryStr =
+                "prefix bd: <"+BD.NAMESPACE+"> " +//
+                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
+                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
+                "DESCRIBE ?x " +//
+                "WHERE { " +//
+                "  ?x rdf:type bd:Person . " +//
+                "  ?x bd:likes bd:RDF " +//
+                "}";
+
+        	final AtomicInteger errorCount = new AtomicInteger();
+        	final Callable<Void> task = new Callable<Void>() {
+
+				@Override
+				public Void call() throws Exception {
+					try {
+			            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
+			            final Graph actual = asGraph(query.evaluate());
+			
+			            assertTrue(!actual.isEmpty());
+			            
+						return null;
+					} catch (Exception e) {
+						log.warn("Call failure", e);
+						
+						errorCount.incrementAndGet();
+						
+						throw e;
+					}
+				}
+        		
+        	};
+        	
+        	final int threadCount = Thread.activeCount();
+        	
+        	final ExecutorService exec = Executors.newFixedThreadPool(threads);
+        	for (int r = 0; r < tasks; r++) {
+        		exec.submit(task);
+        	}
+        	exec.shutdown();
+        	exec.awaitTermination(2000, TimeUnit.SECONDS);
+        	// force shutdown
+        	exec.shutdownNow();
+        	
+        	int loops = 20;
+        	while (Thread.activeCount() > threadCount && --loops > 0) {
+        		Thread.sleep(500);
+            	if (log.isTraceEnabled())
+            		log.trace("Extra threads: " + (Thread.activeCount() - threadCount));
+        	}
+            
+        	if (log.isInfoEnabled())
+        		log.info("Return with extra threads: " + (Thread.activeCount() - threadCount));
+    		
+        	assertTrue(errorCount.get() == 0);
+        }
+
+    }
 }

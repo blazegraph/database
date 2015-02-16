@@ -65,34 +65,42 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     final private boolean lastInvocation;
     
+    @Override
     public IQueryClient getQueryController() {
         return queryController;
     }
 
+    @Override
     public UUID getQueryControllerId() {
         return queryControllerId;
     }
     
+    @Override
     public UUID getQueryId() {
         return queryId;
     }
 
+    @Override
     public int getBOpId() {
         return bopId;
     }
 
+    @Override
     public int getPartitionId() {
         return partitionId;
     }
     
+    @Override
     public boolean isLastInvocation() {
         return true; // Always.
     }
     
+    @Override
     public boolean isMaterialized() {
         return true;
     }
 
+    @Override
     public int getSolutionCount() {
         return 0;
     }
@@ -101,6 +109,7 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
         return 0;
     }
 
+    @Override
     public String toString() {
 
         return getClass().getName() + "{queryId=" + queryId + ",bopId=" + bopId
@@ -143,14 +152,17 @@ public class EmptyChunkMessage<E> implements IChunkMessage<E>, Serializable {
 
     }
 
+    @Override
     public void materialize(FederatedRunningQuery runningQuery) {
         // NOP
     }
 
+    @Override
     public void release() {
         // NOP
     }
 
+    @Override
     public IChunkAccessor<E> getChunkAccessor() {
 
         return new IChunkAccessor<E>() {

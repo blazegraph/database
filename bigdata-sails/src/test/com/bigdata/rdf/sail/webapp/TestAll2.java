@@ -30,12 +30,16 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-
 /**
- * Test suite.
+ * A version of the test suite that is intended for local debugging and is NOT
+ * run in CI. This is intended just to make it easier to run specific proxied
+ * test suites.
+ * <p>
+ * TO USE: Comment in/out those tests suites that you want to run in
+ * {@link #suite()} and also in
+ * {@link TestNanoSparqlServerWithProxyIndexManager2}.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestAll.java 4908 2011-07-13 19:42:43Z thompsonbry $
+ * @see TestAll
  */
 public class TestAll2 extends TestCase {
 
@@ -55,7 +59,7 @@ public class TestAll2 extends TestCase {
 
     public static Test suite() {
 
-        final TestSuite suite = new TestSuite("WebApp");
+        final TestSuite suite = new TestSuite("WebApp (local debugging)");
 
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager2.suite(TestMode.triples));
         

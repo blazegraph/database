@@ -23,59 +23,28 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal;
 
-import java.util.Iterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.IIndex;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.IResourceLocator;
 import com.bigdata.sparse.GlobalRowStoreSchema;
 import com.bigdata.sparse.SparseRowStore;
 
 /**
- * Interface accessing named indices.
+ * Collection of methods that are shared by both local and distributed stores.
+ * <p>
+ * Note: Historically, this was class was named for the ability to manage index
+ * objects in both local and distributed contexts. However, the introduction of
+ * GIST support has necessitated a refactoring of the interfaces and the name of
+ * this interface no longer reflects its function.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IIndexStore {
-
-    /**
-     * Return a view of the named index as of the specified timestamp.
-     * 
-     * @param name
-     *            The index name.
-     * @param timestamp
-     *            A timestamp which represents either a possible commit time on
-     *            the store or a read-only transaction identifier.
-     * 
-     * @return The index or <code>null</code> iff there is no index registered
-     *         with that name for that timestamp.
-     */
-    public IIndex getIndex(String name, long timestamp);
-
-    /**
-     * Iterator visits the names of all indices spanned by the given prefix.
-     * 
-     * @param prefix
-     *            The prefix (optional). When given, this MUST include a
-     *            <code>.</code> if you want to restrict the scan to only those
-     *            indices in a given namespace. Otherwise you can find indices
-     *            in <code>kb2</code> if you provide the prefix <code>kb</code>
-     *            where both kb and kb2 are namespaces since the indices spanned
-     *            by <code>kb</code> would include both <code>kb.xyz</code> and
-     *            <code>kb2.xyx</code>.
-     * @param timestamp
-     *            A timestamp which represents either a possible commit time on
-     *            the store or a read-only transaction identifier.
-     * 
-     * @return An iterator visiting those index names.
-     */
-    public Iterator<String> indexNameScan(String prefix, long timestamp);
 
     /**
      * Return an unisolated view of the global {@link SparseRowStore} used to
@@ -83,7 +52,7 @@ public interface IIndexStore {
      * 
      * @see GlobalRowStoreSchema
      */
-    public SparseRowStore getGlobalRowStore();
+    SparseRowStore getGlobalRowStore();
 
     /**
      * Return a view of the global {@link SparseRowStore} used to store named
@@ -102,7 +71,7 @@ public interface IIndexStore {
      * @return The global row store view -or- <code>null</code> if no view
      *         exists as of that timestamp.
      */
-    public SparseRowStore getGlobalRowStore(long timestamp);
+    SparseRowStore getGlobalRowStore(long timestamp);
     
     /**
      * Return the global file system used to store block-structured files and
@@ -110,7 +79,7 @@ public interface IIndexStore {
      * 
      * @see BigdataFileSystem
      */
-    public BigdataFileSystem getGlobalFileSystem();
+    BigdataFileSystem getGlobalFileSystem();
     
     /**
      * A factory for {@link TemporaryStore}s. {@link TemporaryStore}s are
@@ -135,13 +104,13 @@ public interface IIndexStore {
      * 
      * @return A {@link TemporaryStore}.
      */
-    public TemporaryStore getTempStore();
+    TemporaryStore getTempStore();
     
     /**
      * Return the default locator for resources that are logical index
      * containers (relations and relation containers).
      */
-    public IResourceLocator getResourceLocator();
+    IResourceLocator getResourceLocator();
 
     /**
      * A {@link ExecutorService} that may be used to parallelize operations.
@@ -149,7 +118,7 @@ public interface IIndexStore {
      * While the service does not impose concurrency controls, tasks run on this
      * service may submit operations to a {@link ConcurrencyManager}.
      */
-    public ExecutorService getExecutorService();
+    ExecutorService getExecutorService();
 
 	/**
 	 * Adds a task which will run until canceled, until it throws an exception,
@@ -166,19 +135,19 @@ public interface IIndexStore {
 	 * 
 	 * @return The {@link ScheduledFuture} for that task.
 	 */
-	public ScheduledFuture<?> addScheduledTask(final Runnable task,
+	ScheduledFuture<?> addScheduledTask(final Runnable task,
 			final long initialDelay, final long delay, final TimeUnit unit);
 
     /**
      * <code>true</code> iff performance counters will be collected for the
      * platform on which the client is running.
      */
-    public boolean getCollectPlatformStatistics();
+    boolean getCollectPlatformStatistics();
 
     /**
      * <code>true</code> iff statistics will be collected for work queues.
      */
-    public boolean getCollectQueueStatistics();
+    boolean getCollectQueueStatistics();
 
     /**
      * The port on which the optional httpd service will be run. The httpd
@@ -186,13 +155,13 @@ public interface IIndexStore {
      * platform on which it is running, etc. If this is ZERO (0), then the
      * port will be chosen randomly.
      */
-    public int getHttpdPort();
+    int getHttpdPort();
     
 	/**
 	 * The service that may be used to acquire synchronous distributed locks
 	 * <strong>without deadlock detection</strong>.
 	 */
-    public IResourceLockService getResourceLockService();
+    IResourceLockService getResourceLockService();
 
     /**
      * The database wide timestamp of the most recent commit on the store or 0L
@@ -210,11 +179,11 @@ public interface IIndexStore {
      * 
      * @see IRootBlockView#getLastCommitTime()
      */
-    public long getLastCommitTime();
+    long getLastCommitTime();
     
     /**
      * Destroy the {@link IIndexStore}.
      */
-    public void destroy();
+    void destroy();
     
 }

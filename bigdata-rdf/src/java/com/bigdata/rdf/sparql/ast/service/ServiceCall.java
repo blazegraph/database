@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast.service;
 import org.openrdf.query.BindingSet;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.relation.accesspath.IBindingSetAccessPath;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -43,7 +44,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *            common ancestor other than {@link Object}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ServiceCall<E> {
 
@@ -59,14 +59,22 @@ public interface ServiceCall<E> {
     IServiceOptions getServiceOptions();
     
     /**
-     * Invoke an service.
+     * Invoke an service. The caller will join the results from the service with
+     * the solutions in the context in which the service was invoked (using a
+     * solution set hash join pattern).
      * 
      * @param bindingSets
      *            The binding sets flowing into the service.
      * 
      * @return An iterator from which the solutions can be drained. If the
      *         iterator is closed, the service invocation must be cancelled.
-     * @throws Exception 
+     * 
+     * @throws Exception
+     * 
+     *             TODO RECHUNKING: This should probably return an
+     *             ICloseableIterator<IBindingSet[]> for consistent chunking
+     *             across our access path abstractions. And maybe it could
+     *             implement {@link IBindingSetAccessPath}.
      */
     ICloseableIterator<E> call(E[] bindingSets) throws Exception;
 

@@ -548,6 +548,7 @@ public abstract class GASRunnerBase<VS, ES, ST> implements
 
                         gasState.setFrontier(gasContext, startingVertex);
 
+                        // Run analytic.
                         final IGASStats stats = (IGASStats) gasContext.call();
 
                         if (stats.getFrontierSize() == 1) {

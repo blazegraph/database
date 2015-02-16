@@ -148,6 +148,7 @@ public class CompiledSolutionSetStats implements ISolutionSetStats,
 
 	}
 
+	@Override
 	public String toString() {
 
 		final StringBuilder sb = new StringBuilder();

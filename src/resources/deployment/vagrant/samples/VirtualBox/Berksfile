@@ -1,0 +1,16 @@
+site :opscode
+
+cookbook "apt"
+cookbook 'java', '~> 1.22.0' 
+cookbook 'ant'
+cookbook 'tomcat'
+cookbook 'subversion'
+#
+# The lvm cookbook breaks a virtualbox launch, so commented out here:
+#
+# cookbook 'lvm'
+cookbook "hadoop"
+cookbook "emacs"
+cookbook "sysstat"
+
+metadata

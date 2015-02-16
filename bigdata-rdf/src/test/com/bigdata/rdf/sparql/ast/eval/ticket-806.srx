@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='id'/>
+        <variable name='fullName'/>
+        <variable name='legalName'/>
+    </head>
+    <results>
+        <result>
+            <binding name='id'>
+                <literal>123</literal>
+            </binding>
+            <binding name='fullName'>
+                <literal>Bryan Thompson</literal>
+            </binding>
+            <binding name='legalName'>
+                <literal>Bryan Thompson 123</literal>
+            </binding>
+        </result>
+    </results>
+</sparql>

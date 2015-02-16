@@ -24,11 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.internal.constraints;
 
-
-
 /**
  * Some {@link IVValueExpression} evaluate to one of their
- * arguments, and if a INeedsEvaluation is in the expressions
+ * arguments, and if a {@link INeedsMaterialization} is in the expressions
  * parent path, the parent needs to materialize the expression's arguments.
  */
 public interface IPassesMaterialization {

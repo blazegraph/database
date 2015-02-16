@@ -31,10 +31,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.counters.Instrument;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.rwstore.RWStore;
 
 /**
  * The BufferedWrite merges/elides sorted scattered writes to minimize IO
@@ -88,12 +90,7 @@ public class BufferedWrite {
 	 */
 	private long m_endAddr = 0;
 	
-	/*
-	 * Counters.
-	 */
-	private final CAT m_dataBytes = new CAT();
-	private final CAT m_dataWrites = new CAT();
-	private final CAT m_fileWrites = new CAT();
+	private final RWStore.StoreCounters<?> m_storeCounters;
 	
 	public BufferedWrite(final IBufferedWriter store) throws InterruptedException {
 		
@@ -101,6 +98,8 @@ public class BufferedWrite {
 			throw new IllegalArgumentException();
 		
 		m_store = store;
+		
+		m_storeCounters = m_store.getStoreCounters();
 		
 		m_data.set( DirectBufferPool.INSTANCE.acquire() );
 		
@@ -137,6 +136,13 @@ public class BufferedWrite {
 		
 	}
 
+    /**
+     * Used to zero pad slots in buffered writes.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/721#comment:10"> HA1 </a>
+     */
+	static private final byte[] s_zeros = new byte[256];
+	
 	/**
 	 * Buffer a write.
 	 * 
@@ -155,7 +161,7 @@ public class BufferedWrite {
 	public int write(final long offset, final ByteBuffer data,
 			final IReopenChannel<FileChannel> opener) throws IOException {
 		
-		m_dataWrites.increment();
+		m_storeCounters.bufferDataWrites++;
 		
 		final int data_len = data.remaining();
 		final int slot_len = m_store.getSlotSize(data_len);
@@ -188,6 +194,19 @@ public class BufferedWrite {
 		}
 		// copy the caller's record into the buffer.
 		m_data.put(data);
+		
+		// if data_len < slot_len then clear remainder of buffer
+		int padding = slot_len - data_len;
+		while (padding > 0) {
+			if (padding > s_zeros.length) {
+				m_data.put(s_zeros);
+				padding -= s_zeros.length;
+			} else {
+				m_data.put(s_zeros, 0, padding);
+				break;
+			}
+		}
+		
 		// update the file offset by the size of the allocation slot
 		m_endAddr += slot_len;
 		// update the buffer position by the size of the allocation slot.
@@ -219,12 +238,12 @@ public class BufferedWrite {
 		}
 		
 		// increment by the amount of data currently in the buffer.
-		m_dataBytes.add( m_data.position() );
+		m_storeCounters.bufferDataBytes += m_data.position();
 		
 		// write out the data in the buffer onto the backing channel.
 		m_data.flip();
 		final int nwrites = FileChannelUtility.writeAll(opener, m_data, m_startAddr);
-		m_fileWrites.add(nwrites);
+		m_storeCounters.bufferFileWrites += nwrites;
 		
 		reset();
 		
@@ -250,8 +269,9 @@ public class BufferedWrite {
         final ByteBuffer m_data = tmp.buffer();
 
 		// reset the buffer state.
-		m_data.position(0);
-		m_data.limit(m_data.capacity());
+		//m_data.position(0);
+		//m_data.limit(m_data.capacity());
+		m_data.clear();
 		
 		m_startAddr = -1;
 		m_endAddr = 0;
@@ -259,19 +279,19 @@ public class BufferedWrite {
 	
 	public String getStats(final StringBuffer buf, final boolean reset) {
 
-		final String ret = "BufferedWrites, data: " + m_dataWrites + ", file: " + m_fileWrites + ", bytes: " + m_dataBytes;
+		final String ret = "BufferedWrites, data: " + m_storeCounters.bufferDataWrites + ", file: " + m_storeCounters.bufferFileWrites + ", bytes: " + m_storeCounters.bufferDataBytes;
 		
 		if (buf != null) {
 			buf.append(ret + "\n");
 		}
 		
 		if (reset) {
-			m_dataBytes.set(0L);
-			m_fileWrites.set(0L);
-			m_dataWrites.set(0L);
+			m_storeCounters.bufferFileWrites = 0;
+			m_storeCounters.bufferDataWrites = 0;
+			m_storeCounters.bufferDataBytes = 0;
 		}
 		
 		return ret;
-	}
+	}	
 
 }

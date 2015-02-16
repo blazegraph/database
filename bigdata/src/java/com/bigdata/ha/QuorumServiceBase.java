@@ -29,6 +29,7 @@ package com.bigdata.ha;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -36,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.ha.msg.IHASendState;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.journal.AbstractJournal;
@@ -43,6 +45,8 @@ import com.bigdata.journal.IResourceManager;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.AbstractQuorumMember;
+import com.bigdata.service.proxy.ThickFuture;
+import com.bigdata.util.InnerCause;
 
 /**
  * Abstract implementation provides the logic for distributing messages for the
@@ -105,6 +109,15 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
                     throws Exception {
 
                 QuorumServiceBase.this.handleReplicatedWrite(req, msg, data);
+
+            }
+            
+            @Override
+            protected void incReceive(final IHASyncRequest req,
+                    final IHAWriteMessage msg, final int nreads,
+                    final int rdlen, final int rem) throws Exception {
+
+                QuorumServiceBase.this.incReceive(req, msg, nreads, rdlen, rem);
 
             }
             
@@ -224,9 +237,10 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
     @Override
     public Future<Void> receiveAndReplicate(final IHASyncRequest req,
-            final IHAWriteMessage msg) throws IOException {
-        
-        return pipelineImpl.receiveAndReplicate(req, msg);
+            final IHASendState snd, final IHAWriteMessage msg)
+            throws IOException {
+
+        return pipelineImpl.receiveAndReplicate(req, snd, msg);
         
     }
 
@@ -235,6 +249,14 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
             final IHAWriteMessage msg, final ByteBuffer b) throws IOException {
 
         return pipelineImpl.replicate(req, msg, b);
+
+    }
+
+    @Override
+    public Future<IHAPipelineResetResponse> resetPipeline(
+            IHAPipelineResetRequest req) throws IOException {
+
+        return pipelineImpl.resetPipeline(req);
 
     }
 
@@ -262,8 +284,31 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
      */
     abstract protected void handleReplicatedWrite(IHASyncRequest req,
             IHAWriteMessage msg, ByteBuffer data) throws Exception;
- 
+
     /**
+     * Core implementation of callback for monitoring progress of replicated
+     * writes.
+     * 
+     * @param req
+     *            The synchronization request (optional). When non-
+     *            <code>null</code> the message and payload are historical data.
+     *            When <code>null</code> they are live data.
+     * @param msg
+     *            Metadata about a buffer containing data replicated to this
+     *            node.
+     * @param rdlen
+     *            The number of bytes read from the socket in this read.
+     * @param rem
+     *            The number of bytes remaining before the payload has been
+     *            fully read.
+     *            
+     * @throws Exception
+     */
+    abstract protected void incReceive(final IHASyncRequest req,
+            final IHAWriteMessage msg, final int nreads, final int rdlen,
+            final int rem) throws Exception;
+
+        /**
      * {@inheritDoc}
      * <p>
      * Note: The default implementation is a NOP.
@@ -394,6 +439,56 @@ abstract public class QuorumServiceBase<S extends HAGlue, L extends AbstractJour
 
         pipelineImpl.processEvents();
         
+    }
+
+    /**
+     * Cancel the requests on the remote services (RMI). This is a best effort
+     * implementation. Any RMI related errors are trapped and ignored in order
+     * to be robust to failures in RMI when we try to cancel the futures.
+     * <p>
+     * NOte: This is not being done in parallel. However, due to a DGC thread
+     * leak issue, we now use {@link ThickFuture}s. Thus, the tasks that are
+     * being cancelled are all local tasks running on the
+     * {@link #executorService}. If that local task is doing an RMI, then
+     * cancelling it will cause an interrupt in the NIO request.
+     */
+    public static <F extends Future<T>, T> void cancelFutures(
+            final List<F> futures) {
+
+        if (log.isInfoEnabled())
+            log.info("");
+
+        for (F f : futures) {
+
+            if (f == null) {
+
+                continue;
+
+            }
+
+            try {
+
+                if (!f.isDone()) {
+
+                    f.cancel(true/* mayInterruptIfRunning */);
+
+                }
+
+            } catch (Throwable t) {
+
+                if (InnerCause.isInnerCause(t, InterruptedException.class)) {
+
+                    // Propagate interrupt.
+                    Thread.currentThread().interrupt();
+
+                }
+
+                // ignored (to be robust).
+
+            }
+
+        }
+
     }
 
 }

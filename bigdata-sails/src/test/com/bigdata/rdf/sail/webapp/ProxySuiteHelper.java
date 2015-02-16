@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.util.Enumeration;
 import java.util.regex.Pattern;
 
+import junit.extensions.TestSetup;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -64,14 +65,28 @@ public class ProxySuiteHelper {
 
 	private static class MultiModeTestSuite extends TestSuite  {
 		private final ProxyTestSuite subs[];
-
+		
 		public MultiModeTestSuite(String name, TestMode ...modes ) {
 			super(name);
 			subs = new ProxyTestSuite[modes.length];
 			int i = 0;
 			for (final TestMode mode: modes) {
 				final ProxyTestSuite suite2 = TestNanoSparqlServerWithProxyIndexManager.createProxyTestSuite(TestNanoSparqlServerWithProxyIndexManager.getTemporaryJournal(),mode);
-				super.addTest(suite2);
+				super.addTest(new TestSetup(suite2) {
+		    		protected void setUp() throws Exception {
+		    		}
+		    		protected void tearDown() throws Exception {
+		    			((TestNanoSparqlServerWithProxyIndexManager)suite2.getDelegate()).tearDownAfterSuite();
+                        /*
+                         * Note: Do not clear. Will not leak unless the
+                         * QueryEngine objects are pinned. They will not be
+                         * pinned if you shutdown the Journal correctly for each
+                         * test; the call to tearDownAfterSuite above calls the destroy() method
+                         * on temporary journals, which appears to do the necessary thing.
+                         */
+    //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
+		    		}
+		    	});
 				suite2.setName(mode.name());
 				subs[i++] = suite2;
 			}
@@ -180,11 +195,11 @@ public class ProxySuiteHelper {
 		try {
 			@SuppressWarnings("unchecked")
 			final
-			Constructor<? extends TestCase> cons = TestSuite.getTestConstructor(clazz);
+			Constructor<?> cons = TestSuite.getTestConstructor(clazz);
 			if (cons.getParameterTypes().length == 1) {
-				return cons.newInstance(name);
+				return (Test) cons.newInstance(name);
 			} else {
-				final TestCase test = cons.newInstance();
+				final TestCase test = (TestCase) cons.newInstance();
 				test.setName(name);
 				return test;
 			}

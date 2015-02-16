@@ -104,6 +104,9 @@ public class TestAll extends TestCase {
         // Test suite for AST evaluation (SPARQL query).
         suite.addTest(com.bigdata.rdf.sparql.ast.eval.TestAll.suite());
 
+        // Stored Query SERVICE.
+        suite.addTest(com.bigdata.rdf.sparql.ast.service.storedquery.TestAll.suite());
+
         return suite;
         
     }

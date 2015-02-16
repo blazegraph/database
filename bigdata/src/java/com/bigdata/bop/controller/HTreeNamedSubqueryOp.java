@@ -40,6 +40,7 @@ import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
+import com.bigdata.bop.ISingleThreadedOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
@@ -73,7 +74,8 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class HTreeNamedSubqueryOp extends PipelineOp {
+public class HTreeNamedSubqueryOp extends PipelineOp implements
+        INamedSubqueryOp, ISingleThreadedOp {
 
     static private final transient Logger log = Logger
             .getLogger(HTreeNamedSubqueryOp.class);
@@ -123,11 +125,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
                             + getEvaluationContext());
         }
 
-        if (getMaxParallel() != 1) {
-            throw new IllegalArgumentException(
-                    PipelineOp.Annotations.MAX_PARALLEL + "="
-                            + getMaxParallel());
-        }
+        assertMaxParallelOne();
 
         if (!isAtOnceEvaluation())
             throw new IllegalArgumentException();
@@ -151,7 +149,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
     }
 
-    public HTreeNamedSubqueryOp(final BOp[] args, NV... annotations) {
+    public HTreeNamedSubqueryOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -164,6 +162,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
     }
     
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ControllerTask(this, context));
@@ -266,6 +265,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
         /**
          * Evaluate.
          */
+        @Override
         public Void call() throws Exception {
             
             try {
@@ -356,6 +356,7 @@ public class HTreeNamedSubqueryOp extends PipelineOp {
 
             }
 
+            @Override
             public Void call() throws Exception {
 
             	// The subquery

@@ -1,0 +1,146 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+#
+# Vagraant.ha3 - Install the Bigdata High Availability Server with 3 Nodes with an VirtualBox Provider
+#
+# The launch synopsis for this Vagrantfile:
+#
+#   % vagrant up
+#   % vagrant halt
+#   % vagrant up
+#
+#  The "halt" and following "up" forces a restart of the services post-installation.
+#  This is a temporary requirement until recipes are upated.
+
+Vagrant.require_plugin "vagrant-berkshelf"
+
+Vagrant.configure("2") do |config|
+
+config.vm.provider :virtualbox do |vb|
+	vb.customize ["modifyvm", :id, "--memory", "2048"]
+end
+
+script = <<SCRIPT
+	apt-get update
+	apt-get install -y curl
+	curl -L https://www.opscode.com/chef/install.sh | bash
+	mkdir -p /var/lib/zookeeper
+	echo "33.33.33.10  bigdataA" >> /etc/hosts
+	echo "33.33.33.11  bigdataB" >> /etc/hosts
+	echo "33.33.33.12  bigdataC" >> /etc/hosts
+SCRIPT
+
+$scriptA = "#{script}\n\techo 1 > /var/lib/zookeeper/myid\n"
+config.vm.define :bigdataA do |bigdataA|
+
+  bigdataA.vm.hostname = "bigdataA"
+  bigdataA.vm.box = "precise64"
+
+  bigdataA.berkshelf.enabled = true
+
+  bigdataA.vm.box_url = "http://files.vagrantup.com/precise64.box"
+
+  bigdataA.vm.network :private_network, ip: "33.33.33.10"
+
+  bigdataA.vm.provision :chef_solo do |chef|
+    chef.json = {
+	:bigdata => {
+		:install_flavor => "ha"
+	},
+	:java => {
+		:install_flavor => "oracle",
+		:jdk_version => "7",
+		:oracle => { 'accept_oracle_download_terms' => true }
+	},
+	:zookeeper =>	{
+		:zoocfg => { :clientPort=> '2081' }
+	}
+    }
+
+    bigdataA.vm.provision :shell, inline: $scriptA
+
+    chef.run_list = [
+        "recipe[bigdata::high_availability]"
+    ]
+
+  end
+
+end # bigdataA
+
+
+$scriptB = "#{script}\n\techo 2 > /var/lib/zookeeper/myid\n"
+config.vm.define :bigdataB do |bigdataB|
+
+  bigdataB.vm.hostname = "bigdataB"
+  bigdataB.vm.box = "precise64"
+
+  bigdataB.berkshelf.enabled = true
+
+  bigdataB.vm.box_url = "http://files.vagrantup.com/precise64.box"
+
+  bigdataB.vm.network :private_network, ip: "33.33.33.11"
+
+  bigdataB.vm.provision :chef_solo do |chef|
+    chef.json = {
+	:bigdata => {
+		:install_flavor => "ha"
+	},
+	:java => {
+		:install_flavor => "oracle",
+		:jdk_version => "7",
+		:oracle => { 'accept_oracle_download_terms' => true }
+	},
+	:zookeeper =>	{
+		:zoocfg => { :clientPort=> '2081' }
+	}
+    }
+
+    bigdataB.vm.provision :shell, inline: $scriptB
+
+    chef.run_list = [
+        "recipe[bigdata::high_availability]"
+    ]
+
+  end
+
+end # bigdataB
+
+
+$scriptC = "#{script}\n\techo 3 > /var/lib/zookeeper/myid\n"
+config.vm.define :bigdataC do |bigdataC|
+
+  bigdataC.vm.hostname = "bigdataC"
+  bigdataC.vm.box = "precise64"
+
+  bigdataC.berkshelf.enabled = true
+
+  bigdataC.vm.box_url = "http://files.vagrantup.com/precise64.box"
+
+  bigdataC.vm.network :private_network, ip: "33.33.33.12"
+
+  bigdataC.vm.provision :chef_solo do |chef|
+    chef.json = {
+	:bigdata => {
+		:install_flavor => "ha"
+	},
+	:java => {
+		:install_flavor => "oracle",
+		:jdk_version => "7",
+		:oracle => { 'accept_oracle_download_terms' => true }
+	},
+	:zookeeper =>	{
+		:zoocfg => { :clientPort=> '2081' }
+	}
+    }
+
+    bigdataC.vm.provision :shell, inline: $scriptC
+
+    chef.run_list = [
+        "recipe[bigdata::high_availability]"
+    ]
+
+  end
+
+end # bigdataC
+
+end

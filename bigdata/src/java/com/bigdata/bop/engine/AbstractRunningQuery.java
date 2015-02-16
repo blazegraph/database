@@ -29,9 +29,12 @@ package com.bigdata.bop.engine;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -96,7 +99,6 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * first result when compared with pipelined evaluation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractRunningQuery implements IRunningQuery {
 
@@ -143,13 +145,13 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
     /** The unique identifier for this query. */
     final private UUID queryId;
 
-    /**
-     * The query deadline. The value is the system clock time in milliseconds
-     * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
-     * In order to have a guarantee of a consistent clock, the deadline is
-     * interpreted by the query controller.
-     */
-    final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
+//    /**
+//     * The query deadline. The value is the system clock time in milliseconds
+//     * when the query is due and {@link Long#MAX_VALUE} if there is no deadline.
+//     * In order to have a guarantee of a consistent clock, the deadline is
+//     * interpreted by the query controller.
+//     */
+//    final private AtomicLong deadline = new AtomicLong(Long.MAX_VALUE);
 
     /**
      * The timestamp (ms) when the query begins to execute.
@@ -493,6 +495,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         
     }
     
+    @Override
     final public Map<Integer, BOp> getBOpIndex() {
 
         return bopIndex;
@@ -680,25 +683,25 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 		statsMap.put(bopId, stats);
 //		log.warn("bopId=" + bopId + ", stats=" + stats);
 
-        if (!op.getProperty(BOp.Annotations.CONTROLLER,
-                BOp.Annotations.DEFAULT_CONTROLLER)) {
-            /*
-             * Visit children, but not if this is a CONTROLLER operator since
-             * its children belong to a subquery.
-             */
-            final Iterator<BOp> itr = op.argIterator();
+        /*
+         * Visit children.
+         * 
+         * Note: The CONTROLLER concept has its subquery expressed through an
+         * annotation, not through its arguments. We always want to visit the
+         * child arguments of a pipeline operator. We just do not want to visit
+         * the operators in its sub-query plan.
+         */
+        final Iterator<BOp> itr = op.argIterator();
 
-            while(itr.hasNext()) {
-            
-                final BOp t = itr.next();
-            
-                // visit children (recursion)
-                populateStatsMap(t);
-                
-            }
-            
+        while (itr.hasNext()) {
+
+            final BOp t = itr.next();
+
+            // visit children (recursion)
+            populateStatsMap(t);
+
         }
-
+            
     }
 
     /**
@@ -824,18 +827,38 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
                 log.trace(msg.toString());
 
             // update per-operator statistics.
-            final BOpStats tmp = statsMap.putIfAbsent(msg.getBOpId(), msg.getStats());
+            {
+                // Data race on insert into CHM.
+                BOpStats tmp = statsMap.putIfAbsent(msg.getBOpId(),
+                        msg.getStats());
 
-			/*
-			 * Combine stats, but do not combine a stats object with itself.
-			 * 
-			 * @see https://sourceforge.net/apps/trac/bigdata/ticket/464 (Query
-			 * Statistics do not update correctly on cluster)
-			 */
-            if (tmp != null && tmp != msg.getStats()) {
-                tmp.add(msg.getStats());
+                /**
+                 * Combine stats, but do not combine a stats object with itself.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/464">
+                 *      Query Statistics do not update correctly on cluster</a>
+                 */
+                if (tmp == null) {
+                    // won the data race.
+                    tmp = msg.getStats();
+                } else {
+                    // lost the data race.
+                    if (tmp != msg.getStats()) {
+                        tmp.add(msg.getStats());
+                    }
+                }
+                /**
+                 * Post-increment now that we know who one the data race.
+                 * 
+                 * @see <a
+                 *      href="https://sourceforge.net/apps/trac/bigdata/ticket/793">
+                 *      Explain reports incorrect value for opCount</a>
+                 */
+                tmp.opCount.increment();
+                // log.warn("bop=" + getBOp(msg.getBOpId()).toShortString()
+                // + " : stats=" + tmp);
             }
-//			log.warn(msg.toString() + " : stats=" + tmp);
 
             switch (runState.haltOp(msg)) {
             case Running:
@@ -886,7 +909,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     /**
      * Method handles the case where there are downstream operators awaiting
-     * last pass evaluation is not re-triggered by the last
+     * last pass evaluation or at-once evaluation is not re-triggered by the last
      * {@link IChunkMessage} output from an upstream operator. If this situation
      * arises the query will just sit there waiting for a trigger to kick of
      * last pass evaluation. This method works around that by sending an empty
@@ -894,9 +917,38 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * triggered.
      * 
      * @param msg
+     *
+     * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
      */
     private void triggerOperatorsAwaitingLastPass() {
 
+        /*
+         * Examine all downstream operators. Find any at-once operators that
+         * can no longer be triggered and which have not yet executed. Then
+         * trigger them with an empty chunk message so they will run once
+         * and only once.
+         */
+
+        // Consider the operators which require at-once evaluation.
+        for (Integer bopId : runState.getAtOnceRequired()) {
+
+            if (runState.getOperatorRunState(bopId) == RunStateEnum.StartLastPass) {
+
+                if (log.isInfoEnabled())
+                    log.info("Triggering at-once (no solutions in): " + bopId);
+
+                /*
+                 * Since evaluation is purely local, we specify -1 as the shardId.
+                 */
+                final IChunkMessage<IBindingSet> emptyMessage = new EmptyChunkMessage<IBindingSet>(
+                        getQueryController(), queryId, bopId, -1/* shardId */, true/* lastInvocation */);
+
+                acceptChunk(emptyMessage);
+
+            }
+
+        }
+    	
         if (runState.getTotalLastPassRemainingCount() == 0) {
 
             return;
@@ -1621,7 +1673,8 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     /**
      * Report a snapshot of the known (declared) child {@link IRunningQuery}s
-     * for this {@link IRunningQuery}.
+     * for this {@link IRunningQuery} and (recursively) for any children of this
+     * {@link IRunningQuery}.
      * 
      * @return An array providing a snapshot of the known child
      *         {@link IRunningQuery}s and never <code>null</code>.
@@ -1630,13 +1683,35 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
         synchronized (children) {
 
-            return children.values()
-                    .toArray(new IRunningQuery[children.size()]);
+            if (children.isEmpty()) {
+
+                // Fast path if no children.
+                return EMPTY_ARRAY;
+
+            }
+
+            // Add in all direct child queries.
+            final List<IRunningQuery> tmp = new LinkedList<IRunningQuery>(
+                    children.values());
+
+            // Note: Do not iterator over [tmp] to avoid concurrent modification.
+            for (IRunningQuery c : children.values()) {
+
+                // Recursive for each child.
+                tmp.addAll(Arrays.asList(((AbstractRunningQuery) c)
+                        .getChildren()));
+
+            }
+
+            // Convert to array.
+            return tmp.toArray(new IRunningQuery[tmp.size()]);
 
         }
-        
+
     }
-    
+
+    private static final IRunningQuery[] EMPTY_ARRAY = new IRunningQuery[0];
+
     /**
      * Attach a child query.
      * <p>
@@ -1697,7 +1772,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         lock.lock();
         try {
             sb.append(",elapsed=" + getElapsed());
-            sb.append(",deadline=" + deadline.get());
+            sb.append(",deadline=" + runState.getDeadline());
             sb.append(",isDone=" + isDone());
             sb.append(",isCancelled=" + isCancelled());
             sb.append(",runState=" + runState);

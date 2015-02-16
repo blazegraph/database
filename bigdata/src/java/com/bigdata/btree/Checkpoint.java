@@ -49,7 +49,6 @@ import com.bigdata.stream.Stream.StreamIndexMetadata;
  * you can start using the index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Checkpoint implements ICheckpoint, Externalizable {
     
@@ -782,13 +781,14 @@ public class Checkpoint implements ICheckpoint, Externalizable {
     }
 
     /**
-     * Create a persistence capable data structure.
+     * Generic method to create a persistence capable data structure (GIST
+     * compatible, core implementation).
      * 
      * @param store
      *            The backing store.
      * @param metadata
      *            The metadata that describes the data structure to be created.
-     *            
+     * 
      * @return The persistence capable data structure.
      */
     public static ICheckpointProtocol create(final IRawStore store,

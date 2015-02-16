@@ -68,6 +68,8 @@ public abstract class ProxyBigdataSailTestCase
     implements IProxyTest
 {
 
+//	protected final transient static Logger log = Logger.getLogger(ProxyBigdataSailTestCase.class);
+	
     public ProxyBigdataSailTestCase() {}
     public ProxyBigdataSailTestCase(String name){super(name);}
     
@@ -154,18 +156,77 @@ public abstract class ProxyBigdataSailTestCase
      * proxy is created for each test, while one instance of the delegate serves
      * an entire suite of tests.)
      */
+
+    private int startupActiveThreads = 0;
     
+    @Override
     protected void setUp() throws Exception {
-        getOurDelegate().setUp(this);
+        
+        startupActiveThreads = Thread.currentThread().getThreadGroup().activeCount();
+
+        getOurDelegate().setUp(this);        
+        
     }
 
+    private static boolean s_checkThreads = true;
+
+    @Override
     protected void tearDown() throws Exception {
+
         getOurDelegate().tearDown(this);
+        
+        if (s_checkThreads) {
+
+            final ThreadGroup grp = Thread.currentThread().getThreadGroup();
+            final int tearDownActiveThreads = grp.activeCount();
+            if (startupActiveThreads != tearDownActiveThreads) {
+                final Thread[] threads = new Thread[tearDownActiveThreads];
+                grp.enumerate(threads);
+                final StringBuilder info = new StringBuilder();
+                boolean first = true;
+                for (Thread t : threads) {
+                    if (t == null)
+                        continue;
+                    if (!first)
+                        info.append(',');
+                    info.append("[" + t.getName() + "]");
+                    first = false;
+                }
+
+                final String failMessage = "Threads left active after task"
+                        + ": test="
+                        + getName()//
+                        + ", delegate=" + getOurDelegate().getClass().getName()
+                        + ", startupCount=" + startupActiveThreads
+                        + ", teardownCount=" + tearDownActiveThreads
+                        + ", thisThread=" + Thread.currentThread().getName()
+                        + ", threads: " + info;
+
+                if (grp.activeCount() != startupActiveThreads)
+                    log.error(failMessage);
+
+                /*
+                 * Wait up to 2 seconds for threads to die off so the next test
+                 * will run more cleanly.
+                 */
+                for (int i = 0; i < 20; i++) {
+                    Thread.sleep(100);
+                    if (grp.activeCount() != startupActiveThreads)
+                        break;
+                }
+
+            }
+
+        }
+        
+        super.tearDown();
+                
     }
 
     /**
      * The properties as configured by the delegate.
      */
+    @Override
     public Properties getProperties() {
         return getOurDelegate().getProperties();
     }

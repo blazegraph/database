@@ -28,11 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.osx;
 
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import com.bigdata.counters.AbstractProcessCollector;
@@ -48,14 +48,13 @@ import com.bigdata.counters.ProcessReaderHelper;
 import com.bigdata.rawstore.Bytes;
 
 /**
- * Collects some counters using <code>iostat</code>. Unfortunately,
+ * Collects some counters using <code>iostat</code> under OSX. Unfortunately,
  * <code>iostat</code> does not break down the reads and writes and does not
  * report IO Wait. This information is obviously available from OSX as it is
  * provided by the ActivityMonitor, but we can not get it from
  * <code>iostat</code>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: VMStatCollector.java 4289 2011-03-10 21:22:30Z thompsonbry $
  */
 public class IOStatCollector extends AbstractProcessCollector implements
         ICounterHierarchy, IRequiredHostCounters, IHostCounters{
@@ -77,7 +76,7 @@ public class IOStatCollector extends AbstractProcessCollector implements
             
         }
         
-        public I(String path) {
+        public I(final String path) {
             
             assert path != null;
             
@@ -85,9 +84,10 @@ public class IOStatCollector extends AbstractProcessCollector implements
             
         }
 
+        @Override
         public long lastModified() {
 
-            return lastModified;
+            return lastModified.get();
             
         }
 
@@ -95,7 +95,8 @@ public class IOStatCollector extends AbstractProcessCollector implements
          * @throws UnsupportedOperationException
          *             always.
          */
-        public void setValue(T value, long timestamp) {
+        @Override
+        public void setValue(final T value, final long timestamp) {
            
             throw new UnsupportedOperationException();
             
@@ -114,7 +115,7 @@ public class IOStatCollector extends AbstractProcessCollector implements
 
         DI(final String path) {
         	
-        	this(path,1d);
+            this(path, 1d);
 
         }
 
@@ -126,7 +127,7 @@ public class IOStatCollector extends AbstractProcessCollector implements
             
         }
         
-        
+        @Override
         public Double getValue() {
          
             final Double value = (Double) vals.get(path);
@@ -146,14 +147,14 @@ public class IOStatCollector extends AbstractProcessCollector implements
     /**
      * Map containing the current values for the configured counters. The keys
      * are paths into the {@link CounterSet}. The values are the data most
-     * recently read from <code>vmstat</code>.
+     * recently read from <code>iostat</code>.
      */
-    final private Map<String, Object> vals = new HashMap<String, Object>();
+    final private Map<String, Object> vals = new ConcurrentHashMap<String, Object>();
     
 	/**
 	 * The timestamp associated with the most recently collected values.
 	 */
-	private long lastModified = System.currentTimeMillis();
+	private final AtomicLong lastModified = new AtomicLong(System.currentTimeMillis());
 
 	/**
 	 * The {@link Pattern} used to split apart the rows read from
@@ -178,7 +179,8 @@ public class IOStatCollector extends AbstractProcessCollector implements
         this.cpuStats = cpuStats;
         
     }
-    
+
+    @Override   
     public List<String> getCommand() {
 
 		final List<String> command = new LinkedList<String>();
@@ -203,14 +205,13 @@ public class IOStatCollector extends AbstractProcessCollector implements
         
     }
 
-    /**
-     * Declares the counters that we will collect
-     */
+    @Override
     public CounterSet getCounters() {
         
 		final CounterSet root = new CounterSet();
 
-		inst = new LinkedList<I>();
+		@SuppressWarnings("rawtypes")
+        final List<I> inst = new LinkedList<I>();
 
 		/*
 		 * Note: Counters are all declared as Double to facilitate aggregation.
@@ -249,24 +250,22 @@ public class IOStatCollector extends AbstractProcessCollector implements
             inst.add(new DI(IHostCounters.CPU_PercentUserTime, .01d));
             // Note: column sy
             inst.add(new DI(IHostCounters.CPU_PercentSystemTime, .01d));
-//            // Note: IO Wait is NOT reported by vmstat.
+//            // Note: IO Wait is NOT reported by iostat.
 //            inst.add(new DI(IHostCounters.CPU_PercentIOWait, .01d));
             
         }
 
-        for (Iterator<I> itr = inst.iterator(); itr.hasNext();) {
+        for (@SuppressWarnings("rawtypes") I i : inst) {
 
-			final I i = itr.next();
+            root.addCounter(i.getPath(), i);
 
-			root.addCounter(i.getPath(), i);
-
-		}
+        }
 
 		return root;
         
     }
-    private List<I> inst = null;
 
+    @Override
     public AbstractProcessReader getProcessReader() {
         
         return new IOStatReader();
@@ -300,6 +299,7 @@ public class IOStatCollector extends AbstractProcessCollector implements
 	 */
     private class IOStatReader extends ProcessReaderHelper {
         
+        @Override
         protected ActiveProcess getActiveProcess() {
             
             if (activeProcess == null)
@@ -427,7 +427,7 @@ public class IOStatCollector extends AbstractProcessCollector implements
                 try {
 
                     // timestamp
-                    lastModified = System.currentTimeMillis();
+                    lastModified.set(System.currentTimeMillis());
 
 					final String[] fields = pattern
 							.split(data.trim(), 0/* limit */);

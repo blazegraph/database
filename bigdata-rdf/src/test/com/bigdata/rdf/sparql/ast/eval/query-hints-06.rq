@@ -10,7 +10,13 @@ WHERE {
   
   # Disable analytic query for the test.
   hint:Query hint:analytic "false".
-  
+
+  # Set the global chunkSize.  This will apply to the SELECT, sub-SELECT
+  # (including the hash index and hash join operators used to realize the
+  # sub-select), the SliceOp, etc.  This gets overridden for both SPs in 
+  # the query.
+  hint:Query hint:chunkSize "5" .
+
   ?x rdfs:label ?o .
   # Override the vector size for the previous join.
   hint:Prior hint:com.bigdata.relation.accesspath.IBuffer.chunkCapacity 1001 .
@@ -20,7 +26,7 @@ WHERE {
           ?x rdf:type foaf:Person .
      	  # Override the vector size for previous join.
   		  hint:Prior hint:chunkSize 251 .
-    	 }
+    	 } limit 10
   }
-
-}
+  
+} limit 20

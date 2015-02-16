@@ -1,5 +1,5 @@
 prefix : <http://example.com/>
-SELECT ?a {
+SELECT ?a ?e {
     BIND( <<?a :b :c>> AS ?sid ) .
     ?sid :d ?e .
 }

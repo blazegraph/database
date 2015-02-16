@@ -7,12 +7,15 @@
 @prefix :          <http://example.com/> . 
 @prefix rdf:       <http://www.w3.org/1999/02/22-rdf-syntax-ns#> . 
 
-_:s1 rdf:subject   :a1 .
+:a1  :b  :c .
+:a2  :b  :c .
+
+_:s1 rdf:subject   :a2 .
 _:s1 rdf:predicate :b .
 _:s1 rdf:object    :c .
 _:s1 rdf:type      rdf:Statement .
 
-_:s2 rdf:subject   :a2 .
+_:s2 rdf:subject   :a3 .
 _:s2 rdf:predicate :b .
 _:s2 rdf:object    :c .
 _:s2 rdf:type      rdf:Statement .

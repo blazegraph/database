@@ -94,7 +94,10 @@ import com.bigdata.rdf.internal.DefaultExtensionFactory;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
 import com.bigdata.rdf.internal.IExtensionFactory;
+import com.bigdata.rdf.internal.IInlineURIFactory;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.InlineURIFactory;
+import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.BlobIV;
@@ -122,6 +125,7 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
 import com.bigdata.rdf.spo.ExplicitSPOFilter;
@@ -136,7 +140,7 @@ import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.bigdata.rdf.vocab.RDFSVocabulary;
+import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
 import com.bigdata.relation.AbstractResource;
@@ -165,6 +169,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreUtil;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedConvertingIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.DelegateChunkedIterator;
 import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
@@ -264,6 +269,7 @@ abstract public class AbstractTripleStore extends
      * 
      * @see Options#QUADS
      */
+    @Override
     final public boolean isQuads() {
         
         return quads;
@@ -312,6 +318,11 @@ abstract public class AbstractTripleStore extends
      * @see Options#CONSTRAIN_XXXC_SHARDS
      */
     final private boolean constrainXXXCShards;
+    
+    /**
+     * @see Options#BOTTOM_UP_EVALUATION
+     */
+    final private boolean bottomUpEvaluation;
     
     /**
      * Return an instance of the class that is used to compute the closure of
@@ -389,6 +400,15 @@ abstract public class AbstractTripleStore extends
     final public boolean isConstrainXXXCShards() {
         
         return constrainXXXCShards;
+        
+    }
+    
+    /**
+     * @see Options#CONSTRAIN_XXXC_SHARDS
+     */
+    final public boolean isBottomUpEvaluation() {
+        
+        return bottomUpEvaluation;
         
     }
     
@@ -619,7 +639,7 @@ abstract public class AbstractTripleStore extends
          * which it provides for {@link AbstractTripleStore}s created using that
          * class.
          */
-        String DEFAULT_VOCABULARY_CLASS = RDFSVocabulary.class.getName();
+        String DEFAULT_VOCABULARY_CLASS = DefaultBigdataVocabulary.class.getName();
         
         /**
          * The {@link Axioms} model that will be used (default
@@ -1180,6 +1200,27 @@ abstract public class AbstractTripleStore extends
 
         public static String DEFAULT_HISTORY_SERVICE_MIN_RELEASE_AGE = Long
                 .toString(Long.MAX_VALUE);
+        
+        /**
+         * If this option is set to false, turn off the ASTBottomUpOptimizer.
+         * 
+         * @see {@link ASTBottomUpOptimizer}
+         */
+        public static String BOTTOM_UP_EVALUATION = AbstractTripleStore.class
+                .getName() + ".bottomUpEvaluation";
+
+        public static String DEFAULT_BOTTOM_UP_EVALUATION = "true";
+
+        /**
+         * The name of the {@link IInlineURIFactory} class.
+         * 
+         * @see #DEFAULT_EXTENSION_FACTORY_CLASS
+         */
+        String INLINE_URI_FACTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".inlineURIFactory";
+
+        String DEFAULT_INLINE_URI_FACTORY_CLASS = InlineURIFactory.class
+                .getName();
 
     }
 
@@ -1402,6 +1443,10 @@ abstract public class AbstractTripleStore extends
         this.constrainXXXCShards = Boolean.valueOf(getProperty(
                 Options.CONSTRAIN_XXXC_SHARDS,
                 Options.DEFAULT_CONSTRAIN_XXXC_SHARDS)); 
+        
+        this.bottomUpEvaluation = Boolean.valueOf(getProperty(
+                Options.BOTTOM_UP_EVALUATION,
+                Options.DEFAULT_BOTTOM_UP_EVALUATION)); 
         
         /*
          * Setup namespace mapping for serialization utility methods.
@@ -1728,7 +1773,8 @@ abstract public class AbstractTripleStore extends
 
     }
 
-    public void destroy() {
+    @Override
+    final public void destroy() {
 
         assertWritable();
 
@@ -2140,6 +2186,7 @@ abstract public class AbstractTripleStore extends
      * @throws IllegalStateException
      *             if the view is read only.
      */
+    @Override
     public long commit() {
         
         if (isReadOnly())
@@ -2161,6 +2208,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getTermCount() {
 
         long rangeCount = 0L;
@@ -2173,6 +2221,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getURICount() {
 
         long rangeCount = 0L;
@@ -2704,6 +2753,34 @@ abstract public class AbstractTripleStore extends
             final URI p, final Value o, final Resource c) {
 
         return asStatementIterator(getAccessPath(s, p, o, c).iterator());
+
+    }
+    
+    /**
+     * Efficient batched, streaming resolution of triple patterns to statements
+     * spanned by those triple patterns that are present in the data.
+     * <p>
+     * Note: If the input contains triple patterns that have a high cardinality
+     * in the data, then a large number of statements may be returned.
+     * 
+     * @param triplePatterns
+     *            A collection of triple patterns or fully bound statements. If
+     *            this collection contains triple patterns that have a high
+     *            cardinality in the data, then a large number of statements may
+     *            be returned.
+     * 
+     * @return An iterator from which the materialized statements spanned by
+     *         those triple patterns may be read.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/866" > Efficient batch
+     *      remove of a collection of triple patterns </a>
+     */
+    public BigdataStatementIterator getStatements(
+            final IChunkedOrderedIterator<BigdataTriplePattern> triplePatterns) {
+
+        return asStatementIterator(new ChunkedWrappedIterator<ISPO>(
+                new BigdataTriplePatternMaterializer(this, triplePatterns)
+                        .start(getExecutorService())));
 
     }
 
@@ -3246,12 +3323,18 @@ abstract public class AbstractTripleStore extends
 //        
 //        }
 
-        final BigdataValue v = getTerm(iv);
-
-        if (v == null)
-            return "<NOT_FOUND#" + iv + ">";
-
-        final String s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+        String s = "";
+        
+        try {
+	        
+        	final BigdataValue v = getTerm(iv);
+	
+	        if (v == null)
+	            return "<NOT_FOUND#" + iv + ">";
+	
+	        s = (v instanceof URI ? abbrev((URI) v) : v.toString());
+	        
+        } catch (NotMaterializedException ex) { }
 
         return s + ("(" + iv + ")");
 
@@ -3904,19 +3987,19 @@ abstract public class AbstractTripleStore extends
 //                     */
 //                    lexiconRelation.addStatementIdentifiers(a, numStmts);
 
-                    /*
-                     * No more statement identifiers in the lexicon - they are
-                     * now inlined directly into the statement indices using
-                     * the SidIV class.
-                     * 
-                     * Mark explicit statements as "sidable". The actual sid
-                     * will be produced on-demand to reduce heap pressure.
-                     */
-                    for (ISPO spo : a) {
-                    	if (spo.isExplicit()) {
-                    		spo.setStatementIdentifier(true);
-                    	}
-                    }
+//                    /*
+//                     * No more statement identifiers in the lexicon - they are
+//                     * now inlined directly into the statement indices using
+//                     * the SidIV class.
+//                     * 
+//                     * Mark explicit statements as "sidable". The actual sid
+//                     * will be produced on-demand to reduce heap pressure.
+//                     */
+//                    for (ISPO spo : a) {
+//                    	if (spo.isExplicit()) {
+//                    		spo.setStatementIdentifier(true);
+//                    	}
+//                    }
 
                     statementIdentifierTime = System.currentTimeMillis()
                             - begin;
@@ -3963,13 +4046,13 @@ abstract public class AbstractTripleStore extends
     public long removeStatements(final ISPO[] stmts, final int numStmts) {
 
         return removeStatements(new ChunkedArrayIterator<ISPO>(numStmts, stmts,
-                null/* keyOrder */), true);
+                null/* keyOrder */), true/*computeClosureForStatementIdentifiers*/);
 
     }
 
     public long removeStatements(final IChunkedOrderedIterator<ISPO> itr) {
 
-        return removeStatements(itr, true);
+        return removeStatements(itr, true/*computeClosureForStatementIdentifiers*/);
         
     }
     

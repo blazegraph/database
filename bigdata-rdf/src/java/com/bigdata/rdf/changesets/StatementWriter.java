@@ -130,7 +130,7 @@ public class StatementWriter {
 //            
 //            final BigdataStatement[] stmts = 
 //                new BigdataStatement[database.getChunkCapacity()];
-            final SPO[] stmts = new SPO[database.getChunkCapacity()];
+            final ISPO[] stmts = new ISPO[database.getChunkCapacity()];
             
             int i = 0;
             while ((i = nextChunk(itr, stmts)) > 0) {
@@ -144,7 +144,7 @@ public class StatementWriter {
         
     }
     
-    private static long removeStatements(final AbstractTripleStore database,
+    public static long removeStatements(final AbstractTripleStore database,
             final ISPO[] stmts, 
             final int numStmts,
             final boolean computeClosureForStatementIdentifiers,

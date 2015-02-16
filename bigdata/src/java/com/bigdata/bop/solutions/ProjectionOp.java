@@ -68,7 +68,7 @@ public class ProjectionOp extends PipelineOp {
     /**
      * @param op
      */
-    public ProjectionOp(ProjectionOp op) {
+    public ProjectionOp(final ProjectionOp op) {
         super(op);
     }
 
@@ -76,11 +76,11 @@ public class ProjectionOp extends PipelineOp {
      * @param args
      * @param annotations
      */
-    public ProjectionOp(BOp[] args, Map<String, Object> annotations) {
+    public ProjectionOp(final BOp[] args, final Map<String, Object> annotations) {
         super(args, annotations);
     }
 
-    public ProjectionOp(final BOp[] args, NV... annotations) {
+    public ProjectionOp(final BOp[] args, final NV... annotations) {
 
         this(args, NV.asMap(annotations));
         
@@ -95,6 +95,7 @@ public class ProjectionOp extends PipelineOp {
         
     }
 
+    @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
         return new FutureTask<Void>(new ChunkTask(this, context));
@@ -122,11 +123,13 @@ public class ProjectionOp extends PipelineOp {
             if (vars == null)
                 throw new IllegalArgumentException();
 
-            if (vars.length == 0)
-                throw new IllegalArgumentException();
+            // @see #946 (Empty PROJECTION causes IllegalArgumentException)
+//            if (vars.length == 0)
+//                throw new IllegalArgumentException();
 
         }
 
+        @Override
         public Void call() throws Exception {
 
             final BOpStats stats = context.getStats();

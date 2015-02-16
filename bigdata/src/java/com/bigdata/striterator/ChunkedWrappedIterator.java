@@ -151,6 +151,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
 
                     private static final long serialVersionUID = 1L;
 
+                    @Override
                     public boolean isValid(final Object arg0) {
                         
                         return filter.isValid((E) arg0);
@@ -167,6 +168,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
         
     }
     
+    @Override
     public void close() {
 
         if (open) {
@@ -189,6 +191,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     /**
      * Return <code>true</code> if there are elements in the source iterator.
      */
+    @Override
     public boolean hasNext() {
 
         if(open && src.hasNext())
@@ -209,6 +212,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     /**
      * The next element from the source iterator.
      */
+    @Override
     public E next() {
 
         if (!hasNext()) {
@@ -229,6 +233,7 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
      * The next chunk of elements in whatever order the were visited by
      * {@link #next()}.
      */
+    @Override
     @SuppressWarnings("unchecked")
     public E[] nextChunk() {
 
@@ -292,18 +297,21 @@ public class ChunkedWrappedIterator<E> implements IChunkedOrderedIterator<E> {
     /**
      * Delegated to the source iterator.
      */
+    @Override
     public void remove() {
         
         src.remove();
         
     }
 
+    @Override
     public IKeyOrder<E> getKeyOrder() {
 
         return keyOrder;
         
     }
 
+    @Override
     public E[] nextChunk(final IKeyOrder<E> keyOrder) {
 
         if (keyOrder == null)

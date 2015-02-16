@@ -40,7 +40,7 @@ public class ChunkedOrderedStriterator<I extends IChunkedOrderedIterator<E>, E>
         extends ChunkedStriterator<I, E> implements
         IChunkedOrderedStriterator<I, E> {
 
-    public ChunkedOrderedStriterator(I src) {
+    public ChunkedOrderedStriterator(final I src) {
 
         super(src);
         
@@ -55,32 +55,38 @@ public class ChunkedOrderedStriterator<I extends IChunkedOrderedIterator<E>, E>
      *            The source iterator.
      */
     @SuppressWarnings("unchecked")
-    public ChunkedOrderedStriterator(int chunkSize,Iterator<E> src) {
-     
+    public ChunkedOrderedStriterator(final int chunkSize, final Iterator<E> src) {
+
         this((I) new ChunkedWrappedIterator<E>(src, chunkSize,
                 null/* keyOrder */, null/*filter*/));
         
     }
-
+    
+    @Override
     final public IKeyOrder<E> getKeyOrder() {
 
         return src.getKeyOrder();
         
     }
 
-    final public E[] nextChunk(IKeyOrder<E> keyOrder) {
+    @Override
+    final public E[] nextChunk(final IKeyOrder<E> keyOrder) {
         
         return src.nextChunk(keyOrder);
         
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * Strengthened return type.
      */
-    public IChunkedOrderedStriterator<I, E> addFilter(IFilter<I, ?, E> filter) {
-        
+    @Override
+    public IChunkedOrderedStriterator<I, E> addFilter(
+            final IFilter<I, ?, E> filter) {
+
         return (IChunkedOrderedStriterator<I, E>) super.addFilter(filter);
-        
+
     }
 
 }

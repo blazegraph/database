@@ -21,8 +21,10 @@ import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.striterator.AbstractChunkedResolverator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -218,10 +220,13 @@ public class BigdataBindingSetResolverator
 	                    
 	                }
 	                
-	                if (iv.hasValue())
-	                	continue;
 	                
-	                ids.add(iv);
+	                handleIV(iv, ids);
+	                
+//	                if (iv.hasValue())
+//	                	continue;
+//	                
+//	                ids.add(iv);
 	
 	            }
 	            
@@ -244,11 +249,13 @@ public class BigdataBindingSetResolverator
 	                    
 	                }
 	                
-	                if (iv.hasValue())
-	                	continue;
-	                
-	                ids.add(iv);
-	                
+//	                if (iv.hasValue())
+//	                	continue;
+//	                
+//	                ids.add(iv);
+
+	                handleIV(iv, ids);
+
             	}
             	
             }
@@ -302,6 +309,49 @@ public class BigdataBindingSetResolverator
         }
         
     }
+    
+    /**
+     * Add the IV to the list of terms to materialize, and also
+     * delegate to {@link #handleSid(SidIV, Collection, boolean)} if it's a
+     * SidIV.
+     */
+    static private void handleIV(final IV<?, ?> iv, 
+    		final Collection<IV<?, ?>> ids) {
+    	
+    	if (iv instanceof SidIV) {
+    		
+    		handleSid((SidIV<?>) iv, ids);
+    		
+    	}
+    		
+		ids.add(iv);
+    	
+    }
+    
+    /**
+     * Sids need to be handled specially because their individual ISPO
+     * components might need materialization as well.
+     */
+    static private void handleSid(final SidIV<?> sid,
+    		final Collection<IV<?, ?>> ids) {
+    	
+    	final ISPO spo = sid.getInlineValue();
+    	
+    	handleIV(spo.s(), ids);
+    	
+    	handleIV(spo.p(), ids);
+    	
+    	handleIV(spo.o(), ids);
+    	
+    	if (spo.c() != null) {
+    		
+        	handleIV(spo.c(), ids);
+    		
+    	}
+
+    }
+
+
 
     /**
      * Resolve the term identifiers in the {@link IBindingSet} using the map

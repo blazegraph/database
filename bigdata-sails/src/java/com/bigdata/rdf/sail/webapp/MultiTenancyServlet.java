@@ -45,7 +45,6 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
@@ -64,6 +63,16 @@ import com.bigdata.util.PropertyUtil;
  *      NanoSparqlServer Admin API for Multi-tenant deployments</a>
  * 
  * @author thompsonbry
+ * 
+ *         FIXME GROUP COMMIT: The CREATE and DESTROY operations require special
+ *         attention. Define DropKBTask and CreateKBTask for use by the
+ *         multi-tenancy API and fix up the callers of CreateKBTask and
+ *         tripleStore.destroy() to use these tasks. This means that the base
+ *         implementations of those tasks must not require the servlet
+ *         parameters.
+ * 
+ *         FIXME GROUP COMMIT: The other operations in this class also should
+ *         use the new REST API pattern, but are not intrinsically sensitive.
  */
 public class MultiTenancyServlet extends BigdataRDFServlet {
 
@@ -74,6 +83,18 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     
     static private final transient Logger log = Logger.getLogger(MultiTenancyServlet.class); 
 
+    /**
+     * URL query parameter used to override the servlet init parameter
+     * {@link ConfigParams#DESCRIBE_EACH_NAMED_GRAPH}.
+     */
+    protected static final String DESCRIBE_EACH_NAMED_GRAPH = "describe-each-named-graph";
+    
+    /**
+     * URL query parameter used to specify that only the default namespace
+     * should be described.
+     */
+    protected static final String DESCRIBE_DEFAULT_NAMESPACE = "describe-default-namespace";
+    
     /**
      * Delegate for the sparql end point expressed by
      * <code>.../namespace/NAMESPACE/sparql</code>.
@@ -106,20 +127,20 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
-            // Service must be writable.
-            return;
-        }
-
         if (req.getRequestURI().endsWith("/namespace")) {
-        
+
+            // CREATE NAMESPACE.
             doCreateNamespace(req, resp);
 
             return;
             
         }
 
-        // Pass through to the SPARQL end point REST API.
+        /*
+         * Pass through to the SPARQL end point REST API.
+         * 
+         * Note: This also handles CANCEL QUERY, which is a POST.
+         */
         m_restServlet.doPost(req, resp);
 
     }
@@ -134,7 +155,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doDelete(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -160,7 +181,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     protected void doPut(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        if (!isWritable(req, resp)) {
+        if (!isWritable(getServletContext(), req, resp)) {
             // Service must be writable.
             return;
         }
@@ -220,6 +241,11 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doCreateNamespace(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
         
+        if (!isWritable(getServletContext(), req, resp)) {
+            // Service must be writable.
+            return;
+        }
+
         final BigdataRDFContext context = getBigdataRDFContext();
 
         final IIndexManager indexManager = context.getIndexManager();
@@ -329,19 +355,26 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                 BigdataSail.Options.NAMESPACE,
                 BigdataSail.Options.DEFAULT_NAMESPACE);
 
-        final long timestamp = ITx.UNISOLATED;
+        {
 
-        // resolve the namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, timestamp);
+            final long timestamp = ITx.UNISOLATED;
+            
+            // resolve the namespace.
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+                    .getResourceLocator().locate(namespace, timestamp);
 
-        if (tripleStore != null) {
-            /*
-             * Already exists.
-             */
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "EXISTS: "
-                    + namespace);
-            return;
+            if (tripleStore != null) {
+                /*
+                 * The namespace already exists.
+                 * 
+                 * Note: The response code is defined as 409 (Conflict) since
+                 * 1.3.2.
+                 */
+                buildResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
+                        "EXISTS: " + namespace);
+                return;
+            }
+            
         }
 
         try {
@@ -375,14 +408,15 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             }
 
-            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "CREATED: "
-                    + namespace);
+            /*
+             * Note: The response code is defined as 201 (Created) since 1.3.2.
+             */
+            buildResponse(resp, HttpServletResponse.SC_CREATED,
+                    MIME_TEXT_PLAIN, "CREATED: " + namespace);
 
         } catch (Throwable e) {
 
-            log.error(e, e);
-
-            throw launderThrowable(e, resp, "");
+            launderThrowable(e, resp, "namespace=" + namespace);
 
         }
         
@@ -402,54 +436,105 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final long timestamp = ITx.UNISOLATED;
 
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
-
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
-
+        boolean acquiredConnection = false;
         try {
-
-            final BigdataSail sail = new BigdataSail(tripleStore);
-
-            BigdataSailConnection con = null;
-
-            try {
-
-                sail.initialize();
-                // This basically puts a lock on the KB instance.
-                con = sail.getUnisolatedConnection();
-                // Destroy the KB instance.
-                tripleStore.destroy();
-                // Commit.
-                con.commit();
-
-            } finally {
-
-                if (con != null)
-                    con.close();
-
-                sail.shutDown();
-                
+            
+            if (getIndexManager() instanceof Journal) {
+                // acquire permit from Journal.
+                ((Journal) getIndexManager()).acquireUnisolatedConnection();
+                acquiredConnection = true;
             }
 
+            final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                    .getTripleStore(namespace, timestamp); 
+
+            if (tripleStore == null) {
+                /*
+                 * There is no such triple/quad store instance.
+                 */
+                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+                return;
+            }
+
+            // Destroy the KB instance.
+            tripleStore.destroy();
+            
+            tripleStore.commit();
+            
             buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
                     + namespace);
 
         } catch (Throwable e) {
 
-            log.error(e, e);
+            launderThrowable(e, resp, "");
+
+        } finally {
+
+            if (acquiredConnection) {
             
-            throw launderThrowable(e, resp, "");
+                ((Journal) getIndexManager()).releaseUnisolatedConnection();
+                
+            }
             
         }
 
     }
+    
+//    private void doDeleteNamespace(final HttpServletRequest req,
+//            final HttpServletResponse resp) throws IOException {
+//
+//        final String namespace = getNamespace(req);
+//
+//        final long timestamp = ITx.UNISOLATED;
+//
+//        final AbstractTripleStore tripleStore = getBigdataRDFContext()
+//                .getTripleStore(namespace, timestamp);
+//
+//        if (tripleStore == null) {
+//            /*
+//             * There is no such triple/quad store instance.
+//             */
+//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+//            return;
+//        }
+//
+//        try {
+//
+//            final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//            BigdataSailConnection con = null;
+//
+//            try {
+//
+//                sail.initialize();
+//                // This basically puts a lock on the KB instance.
+//                con = sail.getUnisolatedConnection();
+//                // Destroy the KB instance.
+//                tripleStore.destroy();
+//                // Commit.
+//                con.commit();
+//
+//            } finally {
+//
+//                if (con != null)
+//                    con.close();
+//
+//                sail.shutDown();
+//                
+//            }
+//
+//            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
+//                    + namespace);
+//
+//        } catch (Throwable e) {
+//
+//            log.error(e, e);
+//            
+//            throw launderThrowable(e, resp, "");
+//            
+//        }
+//
+//    }
 
     /**
      * Send the configuration properties for the addressed KB instance.
@@ -459,29 +544,43 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
      * @throws IOException
      */
     private void doShowProperties(final HttpServletRequest req,
-            final HttpServletResponse resp) throws IOException {
+			final HttpServletResponse resp) throws IOException {
 
-        final String namespace = getNamespace(req);
+		final String namespace = getNamespace(req);
 
-        final long timestamp = getTimestamp(req);
+		final long timestamp = getTimestamp(req);
 
-        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                .getTripleStore(namespace, timestamp);
+		final long tx = getBigdataRDFContext().newTx(timestamp);
+		
+		try {
+		    
+			final AbstractTripleStore tripleStore = getBigdataRDFContext()
+					.getTripleStore(namespace, tx);
 
-        if (tripleStore == null) {
-            /*
-             * There is no such triple/quad store instance.
-             */
-            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-            return;
-        }
+			if (tripleStore == null) {
+				/*
+				 * There is no such triple/quad store instance.
+				 */
+				buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+				return;
+			}
 
-        final Properties properties = PropertyUtil.flatCopy(tripleStore
-                .getProperties());
+			final Properties properties = PropertyUtil.flatCopy(tripleStore
+					.getProperties());
 
-        sendProperties(req, resp, properties);
-        
-    }
+			sendProperties(req, resp, properties);
+
+		} catch(Throwable t) {
+			
+			launderThrowable(t, resp, "namespace=" + namespace);
+			
+		} finally {
+
+		    getBigdataRDFContext().abortTx(tx);
+		    
+		}
+
+	}
 
     /**
      * Generate a VoID Description for the known namespaces.
@@ -489,60 +588,108 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
     private void doDescribeNamespaces(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        long timestamp = getTimestamp(req);
-
-        if (timestamp == ITx.READ_COMMITTED) {
+        final long timestamp = getTimestamp(req);
         
-            // Use the last commit point.
-            timestamp = getIndexManager().getLastCommitTime();
-            
+        final boolean describeEachNamedGraph;
+        {
+            final String s = req.getParameter(DESCRIBE_EACH_NAMED_GRAPH);
+        
+            describeEachNamedGraph = s != null ?
+                Boolean.valueOf(s) : 
+                    getBigdataRDFContext().getConfig().describeEachNamedGraph;
         }
-        
-        /*
-         * The set of registered namespaces for KBs.
+
+        final boolean describeDefaultNamespace;
+        {
+            final String s = req.getParameter(DESCRIBE_DEFAULT_NAMESPACE);
+
+            describeDefaultNamespace = s != null ? Boolean.valueOf(s) : false;
+        }
+
+        /**
+         * Protect the entire operation with a transaction, including the
+         * describe of each namespace that we discover.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         *      problem with list namespaces and create namespace </a>
          */
-        final List<String> namespaces = getBigdataRDFContext()
-                .getNamespaces(timestamp);
+        final long tx = getBigdataRDFContext().newTx(timestamp);
 
-        final Graph g = new GraphImpl();
-
-        for(String namespace : namespaces) {
+        try {
             
-            // Get a view onto that KB instance for that timestamp.
-            final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                    .getTripleStore(namespace, timestamp);
+            final Graph g = new GraphImpl();
 
-            if (tripleStore == null) {
+            if (describeDefaultNamespace) {
+
+                final String namespace = getBigdataRDFContext().getConfig().namespace;
+
+                describeNamespaceTx(req, g, namespace, describeEachNamedGraph,
+                        tx);
+
+            } else {
 
                 /*
-                 * There is no such triple/quad store instance (could be a
-                 * concurrent delete of the namespace).
+                 * The set of registered namespaces for KBs.
                  */
-                
-                continue;
-                
+                final List<String> namespaces = getBigdataRDFContext()
+                        .getNamespacesTx(tx);
+
+                for (String namespace : namespaces) {
+
+                    describeNamespaceTx(req, g, namespace,
+                            describeEachNamedGraph, tx);
+
+                }
+
             }
 
-            final BNode aDataSet = g.getValueFactory().createBNode();
-            
-            /*
-             * Figure out the service end point.
-             * 
-             * Note: This is just the requestURL as reported. This makes is
-             * possible to support virtual hosting and similar http proxy
-             * patterns since the SPARQL end point is just the URL at which the
-             * service is responding.
-             */
-            final String serviceURI = req.getRequestURL().toString();
-            
-            final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+            sendGraph(req, resp, g);
 
-            v.describeDataSet(false/* describeStatistics */,
-                    getBigdataRDFContext().getConfig().describeEachNamedGraph);
+		} catch (Throwable t) {
 
+			launderThrowable(t, resp, "describeEachNamedGraph="
+					+ describeEachNamedGraph + ", describeDefaultNamespace="
+					+ describeDefaultNamespace);
+
+        } finally {
+
+            getBigdataRDFContext().abortTx(tx);
+            
         }
 
-        sendGraph(req, resp, g);
+    }
+    
+    /**
+     * Describe a namespace into the supplied Graph object.
+     */
+    private void describeNamespaceTx(final HttpServletRequest req,
+            final Graph g, final String namespace,
+            final boolean describeEachNamedGraph, final long tx) 
+                    throws IOException {
+        
+        // Get a view onto that KB instance for that timestamp.
+        final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                .getTripleStore(namespace, tx);
+
+        if (tripleStore == null) {
+
+            /*
+             * There is no such triple/quad store instance (could be a
+             * concurrent delete of the namespace).
+             */
+            
+            return;
+            
+        }
+
+        final BNode aDataSet = g.getValueFactory().createBNode();
+        
+        // Figure out the service end point(s).
+        final String[] serviceURI = getServiceURIs(getServletContext(), req);
+
+        final VoID v = new VoID(g, tripleStore, serviceURI, aDataSet);
+
+        v.describeDataSet(false/* describeStatistics */, describeEachNamedGraph);
         
     }
 

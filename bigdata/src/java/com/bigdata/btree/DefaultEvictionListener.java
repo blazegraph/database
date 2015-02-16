@@ -33,11 +33,11 @@ import com.bigdata.cache.IHardReferenceQueue;
  * persistence store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DefaultEvictionListener implements
         IEvictionListener {
 
+    @Override
     public void evicted(final IHardReferenceQueue<PO> cache, final PO ref) {
 
         final AbstractNode<?> node = (AbstractNode<?>) ref;
@@ -60,87 +60,131 @@ public class DefaultEvictionListener implements
         }
 
         final AbstractBTree btree = node.btree;
-
-        // Note: This assert can be violated for a read-only B+Tree since there
-        // is less synchronization.
-        assert btree.isReadOnly() || btree.ndistinctOnWriteRetentionQueue > 0;
-
-        btree.ndistinctOnWriteRetentionQueue--;
         
-        if (node.deleted) {
-
-            /*
-             * Deleted nodes are ignored as they are evicted from the queue.
+        if (btree.error != null) {
+            /**
+             * This occurs if an error was detected against a mutable view of
+             * the index (the unisolated index view) and the caller has not
+             * discarded the index and caused it to be reloaded from the most
+             * recent checkpoint.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate
+             *      BTree objects if error occurs during eviction </a>
              */
-
-            return;
-
+            throw new IllegalStateException(AbstractBTree.ERROR_ERROR_STATE,
+                    btree.error);
         }
+        
+		try {
 
-        // this does not permit transient nodes to be coded.
-        if (node.dirty && btree.store != null) {
-//            // this causes transient nodes to be coded on eviction.
-//            if (node.dirty) {
-            
-            if (node.isLeaf()) {
+		    // Note: This assert can be violated for a read-only B+Tree since
+			// there is less synchronization.
+			assert btree.isReadOnly() || btree.ndistinctOnWriteRetentionQueue > 0;
 
-                /*
-                 * A leaf is written out directly.
+			btree.ndistinctOnWriteRetentionQueue--;
+
+			if (node.deleted) {
+
+				/*
+				 * Deleted nodes are ignored as they are evicted from the queue.
+				 */
+
+				return;
+
+			}
+
+			// this does not permit transient nodes to be coded.
+			if (node.dirty && btree.store != null) {
+				// // this causes transient nodes to be coded on eviction.
+				// if (node.dirty) {
+
+				if (node.isLeaf()) {
+
+					/*
+					 * A leaf is written out directly.
+					 */
+
+					btree.writeNodeOrLeaf(node);
+
+				} else {
+
+					/*
+					 * A non-leaf node must be written out using a post-order
+					 * traversal so that all dirty children are written through
+					 * before the dirty parent. This is required in order to
+					 * assign persistent identifiers to the dirty children.
+					 */
+
+					btree.writeNodeRecursive(node);
+
+				}
+
+				// is a coded data record.
+				assert node.isCoded();
+
+				// no longer dirty.
+				assert !node.dirty;
+
+				if (btree.store != null) {
+
+					// object is persistent (has assigned addr).
+					assert ref.identity != PO.NULL;
+
+				}
+
+			} // isDirty
+			
+	        // This does not insert into the cache.  That is handled by writeNodeOrLeaf.
+//	        if (btree.globalLRU != null) {
+//
+//	            /*
+//	             * Add the INodeData or ILeafData object to the global LRU, NOT the
+//	             * Node or Leaf.
+//	             * 
+//	             * Note: The global LRU touch only occurs on eviction from the write
+//	             * retention queue. This is nice because it limits the touches on
+//	             * the global LRU, which could otherwise be a hot spot. We do a
+//	             * touch whether or not the node was persisted since we are likely
+//	             * to return to the node in either case.
+//	             */
+//
+//	            final IAbstractNodeData delegate = node.getDelegate();
+//
+//	            assert delegate != null : node.toString();
+//
+//	            assert delegate.isCoded() : node.toString();
+//
+//	            btree.globalLRU.add(delegate);
+//
+//	        }
+
+		} catch (Throwable e) {
+		
+            if (!btree.readOnly) {
+
+                /**
+                 * If the btree is mutable and an eviction fails, then the index
+                 * MUST be discarded.
+                 * 
+                 * @see <a href="http://trac.bigdata.com/ticket/1005">
+                 *      Invalidate BTree objects if error occurs during eviction
+                 *      </a>
                  */
                 
-                btree.writeNodeOrLeaf(node);
+                btree.error = e;
 
-            } else {
-
-                /*
-                 * A non-leaf node must be written out using a post-order
-                 * traversal so that all dirty children are written through
-                 * before the dirty parent. This is required in order to
-                 * assign persistent identifiers to the dirty children.
-                 */
-
-                btree.writeNodeRecursive(node);
+                // Throw as Error.
+                throw new EvictionError(e);
 
             }
 
-            // is a coded data record.
-            assert node.isCoded();
-            
-            // no longer dirty.
-            assert !node.dirty;
-            
-            if (btree.store != null) {
-             
-                // object is persistent (has assigned addr).
-                assert ref.identity != PO.NULL;
-                
-            }
-            
-        } // isDirty
+            // Launder the throwable.
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
 
-        // This does not insert into the cache.  That is handled by writeNodeOrLeaf.
-//        if (btree.globalLRU != null) {
-//
-//            /*
-//             * Add the INodeData or ILeafData object to the global LRU, NOT the
-//             * Node or Leaf.
-//             * 
-//             * Note: The global LRU touch only occurs on eviction from the write
-//             * retention queue. This is nice because it limits the touches on
-//             * the global LRU, which could otherwise be a hot spot. We do a
-//             * touch whether or not the node was persisted since we are likely
-//             * to return to the node in either case.
-//             */
-//
-//            final IAbstractNodeData delegate = node.getDelegate();
-//
-//            assert delegate != null : node.toString();
-//
-//            assert delegate.isCoded() : node.toString();
-//
-//            btree.globalLRU.add(delegate);
-//
-//        }
+            throw new RuntimeException(e);
+
+		}
 
     }
 

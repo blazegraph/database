@@ -2848,7 +2848,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
     
     /**
      * Note: This task is interrupted by {@link OverflowManager#shutdownNow()}.
-     * Therefore is tests {@link Thread#isInterrupted()} and returns immediately
+     * Therefore it tests {@link Thread#isInterrupted()} and returns immediately
      * if it has been interrupted.
      * 
      * @return The return value is always null.
@@ -3374,7 +3374,10 @@ public class AsynchronousOverflowTask implements Callable<Object> {
     static protected boolean isNormalShutdown(
             final ResourceManager resourceManager, final Throwable t) {
 
-        if(Thread.currentThread().isInterrupted()) return true;
+        if (Thread.interrupted()) {
+            // Note: interrupt status of thread was cleared.
+            return true;
+        }
         
         if (!resourceManager.isRunning()
                 || !resourceManager.getConcurrencyManager()

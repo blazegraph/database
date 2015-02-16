@@ -42,6 +42,7 @@ import org.openrdf.model.vocabulary.FN;
 
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
+import com.bigdata.rdf.internal.constraints.IriBOp;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.sparql.ast.ASTAbs;
 import com.bigdata.rdf.sail.sparql.ast.ASTAggregate;
@@ -95,6 +96,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTSHA224;
 import com.bigdata.rdf.sail.sparql.ast.ASTSHA256;
 import com.bigdata.rdf.sail.sparql.ast.ASTSHA384;
 import com.bigdata.rdf.sail.sparql.ast.ASTSHA512;
+import com.bigdata.rdf.sail.sparql.ast.ASTSTRUUID;
 import com.bigdata.rdf.sail.sparql.ast.ASTSameTerm;
 import com.bigdata.rdf.sail.sparql.ast.ASTSample;
 import com.bigdata.rdf.sail.sparql.ast.ASTSeconds;
@@ -110,6 +112,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTSubstr;
 import com.bigdata.rdf.sail.sparql.ast.ASTSum;
 import com.bigdata.rdf.sail.sparql.ast.ASTTimezone;
 import com.bigdata.rdf.sail.sparql.ast.ASTTz;
+import com.bigdata.rdf.sail.sparql.ast.ASTUUID;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpperCase;
 import com.bigdata.rdf.sail.sparql.ast.ASTYear;
 import com.bigdata.rdf.sail.sparql.ast.Node;
@@ -596,12 +599,12 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
     @Override
     final public FunctionNode visit(ASTTimezone node, Object data)
             throws VisitorException {
-        return unary(node, FN.TIMEZONE_FROM_DATETIME);
+        return unary(node, FunctionRegistry.TIMEZONE);
     }
 
     @Override
     final public FunctionNode visit(ASTTz node, Object data) throws VisitorException {
-        return unary(node, FunctionRegistry.TIMEZONE);
+        return unary(node, FunctionRegistry.TZ);
     }
 
     @Override
@@ -639,11 +642,31 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
             throws VisitorException {
         return unary(node, FunctionRegistry.SHA512);
     }
+    
+    @Override
+    public FunctionNode visit(ASTUUID node, Object data)
+        throws VisitorException {
+        return noneary(node, FunctionRegistry.UUID);
+    }
+
+    @Override
+    public FunctionNode visit(ASTSTRUUID node, Object data)
+        throws VisitorException {
+        return noneary(node, FunctionRegistry.STRUUID);
+    }
+
 
     @Override
     final public FunctionNode visit(ASTIRIFunc node, Object data)
             throws VisitorException {
-        return unary(node, FunctionRegistry.IRI);
+        
+
+        return new FunctionNode(FunctionRegistry.IRI,
+//                null/* scalarValues */,
+                Collections.singletonMap(IriBOp.Annotations.BASE_URI, (Object) node.getBaseURI()),
+                new ValueExpressionNode[] { left(node) });
+
+//        return unary(node, FunctionRegistry.IRI);
         /*
          * FIXME baseURI resolution needs to be handled for IRI functions, most
          * likely in unary(), binary(), nary(), and aggregate().  Write AST 
@@ -749,7 +772,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         final GroupGraphPattern parentGP = graphPattern;
 
-        graphPattern = new GroupGraphPattern();
+        graphPattern = scopedGroupGraphPattern(node);
 
         @SuppressWarnings("unchecked")
         final GraphPatternGroup<IGroupMemberNode> innerGraphPattern = (GraphPatternGroup<IGroupMemberNode>) node
@@ -781,8 +804,8 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
          */
 
         final GroupGraphPattern parentGP = graphPattern;
-
-        graphPattern = new GroupGraphPattern();
+        
+        graphPattern = scopedGroupGraphPattern(node);
 
         @SuppressWarnings("unchecked")
         final GraphPatternGroup<IGroupMemberNode> innerGraphPattern = (GraphPatternGroup<IGroupMemberNode>) node

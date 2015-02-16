@@ -63,15 +63,15 @@ public class HAWriteMessageBase implements Externalizable, IHAWriteMessageBase {
      *            The Alder32 checksum of the bytes to be transfered.
      */
     public HAWriteMessageBase(final int sze, final int chk) {
-
+    	
         if (sze <= 0)
             throw new IllegalArgumentException();
 		
         this.sze = sze;
 		
         this.chk = chk;
-        
-	}
+
+    }
 	
     /**
      * Deserialization constructor.
@@ -97,7 +97,8 @@ public class HAWriteMessageBase implements Externalizable, IHAWriteMessageBase {
 	    return chk;
 	    
 	}
-	
+
+	@Override
     public String toString() {
 
         return super.toString() + "{size=" + sze + ",chksum=" + chk + "}";
@@ -131,6 +132,7 @@ public class HAWriteMessageBase implements Externalizable, IHAWriteMessageBase {
     
     private static final transient short currentVersion = VERSION0;
     
+    @Override
     public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -145,6 +147,7 @@ public class HAWriteMessageBase implements Externalizable, IHAWriteMessageBase {
         
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
         
         out.writeShort(currentVersion);
@@ -152,7 +155,7 @@ public class HAWriteMessageBase implements Externalizable, IHAWriteMessageBase {
         out.writeInt(sze);
         
         out.writeInt(chk);
-        
+
     }
 
 }

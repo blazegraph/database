@@ -30,7 +30,7 @@ package com.bigdata.rdf.sail.webapp.client;
 import org.openrdf.query.TupleQueryResult;
 
 /**
- * A prepared tuple query against a {@link RemoteRepository}.
+ * A prepared tuple query against a {@link JettyeRemoteRepository}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -45,5 +45,17 @@ public interface IPreparedTupleQuery extends IPreparedQuery {
      * @throws Exception
      */
     public TupleQueryResult evaluate() throws Exception;
+    
+    /**
+     * Evaluate the tuple query, notify the specified listener when complete.
+     * 
+     * @param  listener
+     *              The query listener.
+     * @return The result.
+     * 
+     * @throws Exception
+     */
+    public TupleQueryResult evaluate(IPreparedQueryListener listener) 
+            throws Exception;
     
 }

@@ -17,6 +17,7 @@ package com.bigdata.rdf.graph.impl.ram;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.rio.RDFHandlerException;
 
 import com.bigdata.rdf.graph.impl.ram.RAMGASEngine.RAMGraph;
@@ -60,6 +61,11 @@ public class RAMGraphLoader extends GraphLoader {
 
         }
 
+    }
+
+    @Override
+    protected ValueFactory getValueFactory() {
+        return g.getValueFactory();
     }
     
 }

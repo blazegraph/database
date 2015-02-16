@@ -1,3 +1,27 @@
+/*
+
+Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+*/
 package com.bigdata.bop.fed;
 
 import java.util.Iterator;
@@ -35,8 +59,6 @@ import com.bigdata.sparse.SparseRowStore;
  * how to create the index partition view.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: JoinTaskFactoryTask.java 3448 2010-08-18 20:55:58Z thompsonbry
- *          $
  * 
  * @todo While this class solves our problem I do not know whether or not this
  *       class should this class have more visibility? The downside is that it
@@ -64,7 +86,10 @@ class DelegateIndexManager implements IIndexManager {
 
     /**
      * Delegates to the {@link IndexManager}.
+     * <p>
+     * {@inheritDoc}
      */
+    @Override
     public IIndex getIndex(final String name, final long timestamp) {
 
         return dataService.getResourceManager().getIndex(name, timestamp);
@@ -73,7 +98,10 @@ class DelegateIndexManager implements IIndexManager {
 
     /**
      * Not allowed.
+     * <p>
+     * {@inheritDoc}
      */
+    @Override
     public void dropIndex(final String name) {
 
         throw new UnsupportedOperationException();
@@ -83,79 +111,93 @@ class DelegateIndexManager implements IIndexManager {
     /**
      * Not allowed.
      */
+    @Override
     public void registerIndex(IndexMetadata indexMetadata) {
 
         throw new UnsupportedOperationException();
 
     }
 
+    @Override
     public void destroy() {
 
         throw new UnsupportedOperationException();
 
     }
 
+    @Override
     public ExecutorService getExecutorService() {
 
         return dataService.getFederation().getExecutorService();
 
     }
 
+    @Override
     public BigdataFileSystem getGlobalFileSystem() {
 
         return dataService.getFederation().getGlobalFileSystem();
 
     }
 
+    @Override
     public SparseRowStore getGlobalRowStore() {
 
         return dataService.getFederation().getGlobalRowStore();
 
     }
 
+    @Override
     public SparseRowStore getGlobalRowStore(final long timestamp) {
 
         return dataService.getFederation().getGlobalRowStore(timestamp);
 
     }
 
+    @Override
     public long getLastCommitTime() {
 
         return dataService.getFederation().getLastCommitTime();
 
     }
 
+    @Override
     public IResourceLocator getResourceLocator() {
 
         return dataService.getFederation().getResourceLocator();
 
     }
-
+    
+    @Override
     public IResourceLockService getResourceLockService() {
 
         return dataService.getFederation().getResourceLockService();
 
     }
 
+    @Override
     public TemporaryStore getTempStore() {
 
         return dataService.getFederation().getTempStore();
 
     }
 
+    @Override
 	public ScheduledFuture<?> addScheduledTask(Runnable task,
 			long initialDelay, long delay, TimeUnit unit) {
 		return dataService.getFederation().addScheduledTask(task, initialDelay, delay, unit);
 	}
 
+    @Override
 	public boolean getCollectPlatformStatistics() {
 		return dataService.getFederation().getCollectPlatformStatistics();
 	}
 
+    @Override
 	public boolean getCollectQueueStatistics() {
 		return dataService.getFederation().getCollectQueueStatistics();
 	}
 
+    @Override
 	public int getHttpdPort() {
 		return dataService.getFederation().getHttpdPort();
 	}
@@ -171,6 +213,7 @@ class DelegateIndexManager implements IIndexManager {
         return dataService.getFederation().getCounters();
     }
     
+    @Override
 	public String toString() {
 
         return super.toString() + "{dataServiceUUID="

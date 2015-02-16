@@ -32,11 +32,17 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
+import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.Update;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.Repository;
@@ -46,9 +52,11 @@ import org.openrdf.rio.RDFParseException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.BigdataSailUpdate;
 
 /**
  * Integration with the openrdf SPARQL 1.1 update test suite.
@@ -207,7 +215,7 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
             logger.debug("loading dataset...");
             InputStream dataset = SPARQLUpdateTest.class.getResourceAsStream(datasetFile);
             try {
-                con.setAutoCommit(false);
+//                con.setAutoCommit(false);
                 con.add(dataset, "", RDFFormat.forFileName(datasetFile));//RDFFormat.TRIG);
                 con.commit();
             }
@@ -285,7 +293,8 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
 //				+ "} LIMIT 10";//
 
 		// run update once.
-		con.prepareUpdate(QueryLanguage.SPARQL, s).execute();
+        final BigdataSailUpdate update = (BigdataSailUpdate) con.prepareUpdate(QueryLanguage.SPARQL, s);
+        update.execute();
 
 		// Both graphs should now have some data.
         assertTrue(con.hasStatement(null,null,null, true, (Resource)gin));
@@ -298,4 +307,369 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
 
 	}
 
+    /**
+     * Unit test for
+     * 
+     * <pre>
+     * DROP ALL;
+     * INSERT DATA {
+     * GRAPH <http://example.org/one> {
+     * <a> <b> <c> .
+     * <d> <e> <f> .
+     * }};
+     * ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;
+     * DROP SILENT GRAPH <http://example.org/one>  ;
+     * </pre>
+     * 
+     * The IV cache was not not being propagated correctly with the result that
+     * we were seeing mock IVs for "one" and "two". The UPDATE would work
+     * correctly the 2nd time since the URIs had been entered into the
+     * dictionary by then.
+     * 
+     * @throws RepositoryException 
+     * @throws MalformedQueryException 
+     * @throws UpdateExecutionException 
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/567" >
+     *      Failure to set cached value on IV results in incorrect behavior for
+     *      complex UPDATE operation </a>
+     */
+    public void testTicket567() throws RepositoryException, MalformedQueryException, UpdateExecutionException {
+
+        // replace the standard dataset with one specific to this case.
+        con.clear();
+        con.commit();
+
+        final StringBuilder update = new StringBuilder();
+        update.append("DROP ALL;\n");
+        update.append("INSERT DATA {\n");
+        update.append(" GRAPH <http://example.org/one> {\n");
+        update.append("   <http://example.org/a> <http://example.org/b> <http://example.org/c> .\n");
+        update.append("   <http://example.org/d> <http://example.org/e> <http://example.org/f> .\n");
+        update.append("}};\n");
+        update.append("ADD SILENT GRAPH <http://example.org/one> TO GRAPH <http://example.org/two> ;\n");
+        update.append("DROP SILENT GRAPH <http://example.org/one>  ;\n");
+        
+        final Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update.toString());
+
+        operation.execute();
+
+        final URI one = f.createURI("http://example.org/one");
+        final URI two = f.createURI("http://example.org/two");
+
+        String msg = "Nothing in graph <one>";
+        assertFalse(msg, con.hasStatement(null, null, null, true, one));
+
+        msg = "statements are in graph <two>";
+        assertTrue(msg, con.hasStatement(null, null, null, true, two));
+        
+    }
+    
+    /**
+     * In the ticket, the source file contains the following triples. In this
+     * test, those are triples are written into the graph using INSERT DATA
+     * rather than LOAD so this test can be self-contained.
+     * 
+     * <pre>
+     * _:bnode <http://example/p> 2 .
+     * _:bnode a <http://example/Foo> .
+     * <http://example/s> <http://example/p> 2 .
+     * </pre>
+     * 
+     * Load into graphA:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * DROP SILENT GRAPH tempGraph: ;
+     * DROP SILENT GRAPH graphA: ;
+     * INSERT DATA {
+     * GRAPH graphA: {
+     *   _:bnode <http://example/p> 2 . 
+     *   _:bnode a <http://example/Foo> . 
+     *   <http://example/s> <http://example/p> 2 . 
+     * }}
+     * </pre>
+     * 
+     * Verify that all three triples are in graphA:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+     * </pre>
+     * 
+     * Now delete some triples from graphA while inserting the deleted triples
+     * into tempGraph:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * DROP SILENT GRAPH tempGraph: ;
+     * DELETE { GRAPH graphA:    { ?s ?p ?v . } }
+     * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+     * WHERE { GRAPH graphA: { 
+     *     ?s a <http://example/Foo> .
+     *     ?s ?p ?v . } }
+     * </pre>
+     * 
+     * The result should be that the combination of tempGraph and graphA should
+     * have the exact same number of triples that we started with. But now
+     * notice that graphA has 0 triples:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * SELECT * WHERE { GRAPH graphA: { ?s ?p ?v . } }
+     * </pre>
+     * 
+     * However, tempGraph has only 2 triples:
+     * 
+     * <pre>
+     * PREFIX graphA:  <http://example/graphA>
+     * PREFIX tempGraph:  <http://example/temp>
+     * SELECT * WHERE { GRAPH tempGraph: { ?s ?p ?v . } }
+     * </pre>
+     * 
+     * so one triple is missing:
+     * 
+     * <pre>
+     * <http://example/s> <http://example/p> 2 .
+     * </pre>
+     * 
+     * @throws QueryEvaluationException
+     */
+    public void testTicket571() throws RepositoryException,
+            MalformedQueryException, UpdateExecutionException,
+            QueryEvaluationException {
+
+        final URI graphA = f.createURI("http://example.org/graphA");
+        final URI tempGraph = f.createURI("http://example.org/tmp");
+        final URI s = f.createURI("http://example/s>");
+        final URI p = f.createURI("http://example/p>");
+        final URI x = f.createURI("http://example/x>");
+        final URI foo = f.createURI("http://example/Foo>");
+        final URI rdfType = f.createURI(RDF.TYPE.stringValue());
+        final Literal two = f.createLiteral("2", XSD.INTEGER);
+
+        // replace the standard dataset with one specific to this case.
+        con.prepareUpdate(QueryLanguage.SPARQL, "DROP ALL").execute();
+
+        /**
+         * Load into graphA (note: file is "file:///tmp/junk.ttl" in the
+         * ticket).
+         * 
+         * <pre>
+         * PREFIX graphA:  <http://example/graphA>
+//         * PREFIX tempGraph:  <http://example/temp>
+//         * DROP SILENT GRAPH tempGraph: ;
+//         * DROP SILENT GRAPH graphA: ;
+         * LOAD <file:///tmp/junk.ttl> INTO GRAPH graphA: ;
+         * </pre>
+         */
+        con.prepareUpdate(//
+                QueryLanguage.SPARQL,//
+                "PREFIX graphA:  <http://example/graphA> \n" + //
+//                "PREFIX tempGraph:  <http://example/temp> \n"+//
+//                "DROP SILENT GRAPH tempGraph: ;\n"+//
+//                "DROP SILENT GRAPH graphA: ;\n"+//
+                "INSERT DATA { \n"+//
+                " GRAPH graphA: { \n" +//
+                "   _:bnode <http://example/p> 2 . \n"+//
+                "   _:bnode a <http://example/Foo> . \n"+//
+                "   <http://example/s> <http://example/p> 2 . \n"+//
+                "}}\n"//
+//                "LOAD <file:bigdata-sails/src/test/org/openrdf/query/parser/sparql/ticket571.ttl> INTO GRAPH graphA: ;\n"//
+        ).execute();
+        
+        /**
+         * Verify that all three triples are in graphA:
+         * 
+         * <pre>
+         * SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }
+         * </pre>
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }";
+
+            assertEquals("graphA", 3L, countSolutions(query));
+            
+        }
+        
+        /**
+         * Now delete some triples from graphA while inserting the deleted
+         * triples into tempGraph:
+         * 
+         * <pre>
+         * PREFIX graphA:  <http://example/graphA>
+         * PREFIX tempGraph:  <http://example/temp>
+         * DROP SILENT GRAPH tempGraph: ;  ### Note: redundant
+         * DELETE { GRAPH graphA:    { ?s ?p ?v . } } 
+         * INSERT { GRAPH tempGraph: { ?s ?p ?v . } }
+         * WHERE { GRAPH graphA: { 
+         *     ?s a <http://example/Foo> .
+         *     ?s ?p ?v . } }
+         * </pre>
+         */
+        con.prepareUpdate(//
+                QueryLanguage.SPARQL, //
+                "PREFIX graphA:  <http://example/graphA> \n" + //
+                "PREFIX tempGraph:  <http://example/temp> \n" +//
+//                "DROP SILENT GRAPH tempGraph: ;\n"+//
+                "DELETE { GRAPH graphA:    { ?s ?p ?v . } } \n"+//
+                "INSERT { GRAPH tempGraph: { ?s ?p ?v . } } \n"+//
+                "WHERE { GRAPH graphA: { \n"+//
+                "    ?s a <http://example/Foo> . \n"+//
+                "    ?s ?p ?v . } }\n"//
+        ).execute();
+
+        /**
+         * graphA should have one triple remaining:
+         * 
+         * <pre>
+         * <http://example/s> <http://example/p> 2 .
+         * </pre>
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/graphA> { ?s ?p ?v . } }";
+
+            assertEquals("graphA", 1L, countSolutions(query));
+            
+        }
+
+        /**
+         * The other 2 triples should have been moved into tempGraph.
+         */
+        {
+
+            final String query = "SELECT * WHERE { GRAPH <http://example/temp> { ?s ?p ?v . } }";
+
+            assertEquals("tempGraph", 2L, countSolutions(query));
+            
+        }
+
+    }
+    
+    /**
+     * This test is based on a forum post. This post provided an example of an
+     * issue with Unicode case-folding in the REGEX operator and a means to
+     * encode the Unicode characters to avoid doubt about which characters were
+     * transmitted and receieved.
+     * 
+     * @throws Exception 
+     * 
+     * @see <a href=
+     *      "https://sourceforge.net/projects/bigdata/forums/forum/676946/topic/7073971"
+     *      >Forum post on the REGEX Unicode case-folding issue</a>
+     *      
+     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/655">
+     *      SPARQL REGEX operator does not perform case-folding correctly for
+     *      Unicode data</a>
+     */
+    public void testUnicodeCleanAndRegex() throws Exception {
+
+        /*
+         * If I work around this problem by switching the unencoded Unicode
+         * characters into SPARQL escape sequences like this:
+         */
+
+        // Insert statement:
+        final String updateStr = "PREFIX ns: <http://example.org/ns#>\n"
+                + "INSERT DATA { GRAPH ns:graph { ns:auml ns:label \"\u00C4\", \"\u00E4\" } }\n";
+
+        final BigdataSailUpdate update = (BigdataSailUpdate)
+                con.prepareUpdate(QueryLanguage.SPARQL, updateStr);
+        update.execute();
+
+        // Test query:
+        final String queryStr = "PREFIX ns: <http://example.org/ns#>\n"
+                + "SELECT * { GRAPH ns:graph { ?s ?p ?o FILTER(regex(?o, \"\u00E4\", \"i\")) } }";
+
+        assertEquals(2L, countSolutions(queryStr));
+
+        /*
+         * Then I still get only one result for the query, the triple with ''
+         * which is \u00E4. But if I now add the 'u' flag to the regex, I get
+         * both triples as result, so this seems to be a viable workaround.
+         * Always setting the UNICODE_CASE flag sounds like a good idea, and in
+         * fact, Jena ARQ seems to do that when given the 'i' flag:
+         */
+        
+    }
+
+    /**
+     * Verify ability to load data from a gzip resource.
+     */
+    public void testLoadGZip()
+            throws Exception
+        {
+        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.gz>";
+        
+        final String ns = "http://bigdata.com/test/data#";
+        
+        con.prepareUpdate(QueryLanguage.SPARQL, update).execute();
+
+        assertTrue(con.hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
+                f.createLiteral("Michael Personick"), true));
+
+    }
+    
+    /**
+     * Count solutions for a TupleQuery.
+     * 
+     * @param query
+     *            The SPARQL query.
+     * @return The #of solutions.
+     * @throws QueryEvaluationException
+     * @throws RepositoryException
+     * @throws MalformedQueryException
+     */
+    protected long countSolutions(final String query)
+            throws QueryEvaluationException, RepositoryException,
+            MalformedQueryException {
+        TupleQueryResult result = con.prepareTupleQuery(QueryLanguage.SPARQL,
+                query).evaluate();
+        try {
+            long n = 0;
+            while (result.hasNext()) {
+                final BindingSet bset = result.next();
+                n++;
+                if (logger.isInfoEnabled())
+                    logger.info(bset.toString());
+            }
+            return n;
+        } finally {
+            result.close();
+        }
+    }
+
+    
+    /**
+     * SPARQL update test for literals with language tags, cf. ticket #1073.
+     */
+    public void testUpdateLiteralsWithLanguageTags() throws Exception {
+
+        final String queryStr = "SELECT * WHERE { ?s ?p ?o }";
+    	long nrTriplesBeforeUpdate = countSolutions(queryStr);
+    	
+        // Insert statement:
+    	StringBuilder updateStrBuf = new StringBuilder();
+    	updateStrBuf.append("INSERT DATA { ");
+    	updateStrBuf.append("<http://rm-lod.org/object/2176/production/date> ");
+    	updateStrBuf.append("<http://www.w3.org/2000/01/rdf-schema#label> ");
+    	updateStrBuf.append("\"1906\"@ru . }");
+
+    	String updateStr = updateStrBuf.toString();
+    	
+        final BigdataSailUpdate update = (BigdataSailUpdate)
+                con.prepareUpdate(QueryLanguage.SPARQL, updateStr);
+        update.execute();
+
+        // Test query:
+    	long nrTriplesAfterUpdate = countSolutions(queryStr);
+
+        assertEquals(nrTriplesBeforeUpdate + 1, nrTriplesAfterUpdate);
+    }
 }

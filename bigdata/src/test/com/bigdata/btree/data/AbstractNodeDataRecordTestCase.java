@@ -79,6 +79,9 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final long minimumVersionTimestamp = 0L;
         final long maximumVersionTimestamp = 0L;
 
+        // Must not be 0L.  See #855.
+        childAddr[0] = 12L;
+
         final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
                 keys), spannedTupleCount, childAddr, childEntryCount,
                 hasVersionTimestamps, minimumVersionTimestamp,
@@ -104,6 +107,9 @@ abstract public class AbstractNodeDataRecordTestCase extends
         final long minimumVersionTimestamp = System.currentTimeMillis();
         final long maximumVersionTimestamp = System.currentTimeMillis() + 20;
 
+        // Must not be 0L.  See #855.
+        childAddr[0] = 12L;
+        
         final INodeData expected = new MockNodeData(new ReadOnlyKeysRaba(nkeys,
                 keys), spannedTupleCount, childAddr, childEntryCount,
                 hasVersionTimestamps, minimumVersionTimestamp,

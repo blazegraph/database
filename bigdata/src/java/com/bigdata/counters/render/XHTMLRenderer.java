@@ -48,11 +48,10 @@ import com.bigdata.util.HTMLUtility;
  *       name.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class XHTMLRenderer implements IRenderer {
     
-    final static protected Logger log = Logger.getLogger(XHTMLRenderer.class);
+    final static private Logger log = Logger.getLogger(XHTMLRenderer.class);
     
     final public static String ps = ICounterSet.pathSeparator;
 
@@ -68,12 +67,12 @@ public class XHTMLRenderer implements IRenderer {
     /**
      * Describes the state of the controller.
      */
-    public final URLQueryModel model;
+    private final URLQueryModel model;
 
     /**
      * Selects the counters to be rendered.
      */
-    public final ICounterSelector counterSelector;
+    private final ICounterSelector counterSelector;
 
     /**
      * @param model
@@ -101,6 +100,7 @@ public class XHTMLRenderer implements IRenderer {
      * @param w
      * @throws IOException
      */
+    @Override
     public void render(final Writer w) throws IOException {
 
         writeXmlDecl(w);
@@ -117,7 +117,7 @@ public class XHTMLRenderer implements IRenderer {
         
     }
     
-    protected void writeXmlDecl(Writer w) throws IOException {
+    protected void writeXmlDecl(final Writer w) throws IOException {
         
         w.write("<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>\n");
         
@@ -128,7 +128,7 @@ public class XHTMLRenderer implements IRenderer {
      * @param w
      * @throws IOException
      */
-    protected void writeDocType(Writer w) throws IOException {
+    protected void writeDocType(final Writer w) throws IOException {
         
 //        if(true) return;
         
@@ -143,7 +143,7 @@ public class XHTMLRenderer implements IRenderer {
     }
 
     /** The start <code>html</code> tag. */
-    protected void writeHtml(Writer w) throws IOException {
+    protected void writeHtml(final Writer w) throws IOException {
         
         w.write("<html ");
         
@@ -159,7 +159,7 @@ public class XHTMLRenderer implements IRenderer {
         
     }
     
-    protected void writeHead(Writer w) throws IOException {
+    protected void writeHead(final Writer w) throws IOException {
 
         w.write("<head\n>");
         
@@ -170,13 +170,13 @@ public class XHTMLRenderer implements IRenderer {
         w.write("</head\n>");
     }
     
-    protected void writeTitle(Writer w)  throws IOException {
+    protected void writeTitle(final Writer w)  throws IOException {
         
         w.write("<title>bigdata(tm) telemetry : "+cdata(model.path)+"</title\n>");
         
     }
 
-    protected void writeScripts(Writer w)  throws IOException {
+    protected void writeScripts(final Writer w)  throws IOException {
         
         if (model.flot) {
 
@@ -195,7 +195,8 @@ public class XHTMLRenderer implements IRenderer {
     protected void writeBody(final Writer w) throws IOException  {
         
         w.write("<body\n>");
-
+        
+        // Navigate to the node selected by the path.
         final ICounterNode node = ((CounterSetSelector) counterSelector)
                 .getRoot().getPath(model.path);
         
@@ -221,7 +222,7 @@ public class XHTMLRenderer implements IRenderer {
         
         if(node instanceof ICounter) {
 
-            writeCounter(w, (ICounter) node);
+            writeCounter(w, (ICounter<?>) node);
 
         } else {
 
@@ -241,17 +242,17 @@ public class XHTMLRenderer implements IRenderer {
                 
                 writeHistoryTable(w, counterSelector.selectCounters(
                         model.depth, model.pattern, model.fromTime,
-                        model.toTime, model.period), model.period,
-                        model.timestampFormat);
+                        model.toTime, model.period, true/* historyRequired */),
+                        model.period, model.timestampFormat);
                 
                 break;
                 
             case pivot:
                 
-                writePivotTable(w, counterSelector.selectCounters(
-                        model.depth, model.pattern, model.fromTime,
-                        model.toTime, model.period));
-                
+                writePivotTable(w, counterSelector.selectCounters(model.depth,
+                        model.pattern, model.fromTime, model.toTime,
+                        model.period, true/* historyRequired */));
+
                 break;
                 
             case events:
@@ -280,7 +281,7 @@ public class XHTMLRenderer implements IRenderer {
      * 
      * @deprecated by refactor inside of a rendering object.
      */
-    protected void writeFullPath(Writer w, String path)
+    protected void writeFullPath(final Writer w, final String path)
             throws IOException {
 
         writePath(w, path, 0/* root */);
@@ -296,8 +297,8 @@ public class XHTMLRenderer implements IRenderer {
      * 
      * @deprecated by refactor inside of a rendering object.
      */
-    protected void writePath(Writer w, String path, int rootDepth)
-            throws IOException {
+    protected void writePath(final Writer w, final String path,
+            final int rootDepth) throws IOException {
 
         final String[] a = path.split(ps);
 
@@ -393,7 +394,7 @@ public class XHTMLRenderer implements IRenderer {
      * {@link CounterSet} in a single table (this is the navigational view of
      * the counter set hierarchy).
      */
-    protected void writeCounterSet(Writer w, final CounterSet counterSet,
+    protected void writeCounterSet(final Writer w, final CounterSet counterSet,
             final int depth) throws IOException {
         
         // depth of the hierarchy at the point where we are starting.
@@ -480,7 +481,7 @@ public class XHTMLRenderer implements IRenderer {
                 
             } else {
                 
-                final ICounter counter = (ICounter) node;
+                final ICounter<?> counter = (ICounter<?>) node;
 
                 /*
                  * write out values for the counter.
@@ -502,7 +503,7 @@ public class XHTMLRenderer implements IRenderer {
                      * LBS.
                      */
 
-                    HistoryInstrument inst = (HistoryInstrument) counter
+                    final HistoryInstrument<?> inst = (HistoryInstrument<?>) counter
                             .getInstrument();
 
                     w.write("  <td>" + value(counter,inst.minutes.getAverage())
@@ -553,7 +554,8 @@ public class XHTMLRenderer implements IRenderer {
      * 
      * @throws IOException
      */
-    protected void writeCounter(final Writer w, final ICounter counter)
+    protected void writeCounter(final Writer w,
+            @SuppressWarnings("rawtypes") final ICounter counter)
             throws IOException {
 
         if (counter.getInstrument() instanceof HistoryInstrument) {
@@ -746,17 +748,16 @@ public class XHTMLRenderer implements IRenderer {
     /**
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public class HTMLValueFormatter extends ValueFormatter {
 
-        protected final URLQueryModel model;
+        private final URLQueryModel model;
         
         /**
          * 
          * @param model
          */
-        public HTMLValueFormatter(URLQueryModel model) {
+        public HTMLValueFormatter(final URLQueryModel model) {
             
             super(model);
             
@@ -769,16 +770,19 @@ public class XHTMLRenderer implements IRenderer {
          * for inclusion in a CDATA section (we do both operations together so that
          * we can format {@link IServiceCounters#LOCAL_HTTPD} as a link anchor.
          */
-        public String value(final ICounter counter, final Object val) {
+        public String value(
+                @SuppressWarnings("rawtypes") final ICounter counter,
+                final Object val) {
 
-            return XHTMLRenderer.this.value(counter,val);
+            return XHTMLRenderer.this.value(counter, val);
             
         }
 
         /**
          * A clickable trail of the path from the root.
          */
-        public void writeFullPath(Writer w, String path)
+        @Override
+        public void writeFullPath(final Writer w, final String path)
                 throws IOException {
 
             writePath(w, path, 0/* root */);
@@ -792,8 +796,9 @@ public class XHTMLRenderer implements IRenderer {
          *            The path components will be shown beginning at this depth -
          *            ZERO (0) is the root.
          */
-        public void writePath(Writer w, String path, int rootDepth)
-                throws IOException {
+        @Override
+        public void writePath(final Writer w, final String path,
+                final int rootDepth) throws IOException {
 
             final String[] a = path.split(ps);
 
@@ -838,7 +843,8 @@ public class XHTMLRenderer implements IRenderer {
                     if(rootDepth!=0 && n==rootDepth) {
                         
                         w.write("<a href=\""
-                                + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, prefix) }) + "\">");
+                                + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(
+                                        URLQueryModel.PATH, prefix) }) + "\">");
 
                         w.write("...");
 
@@ -851,8 +857,9 @@ public class XHTMLRenderer implements IRenderer {
                     w.write("&nbsp;");
 
                     w.write("<a href=\""
-                            + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(URLQueryModel.PATH, sb
-                                    .toString()) }) + "\">");
+                            + model.getRequestURL(new URLQueryParam[] { new URLQueryParam(
+                                    URLQueryModel.PATH, sb.toString()) })
+                            + "\">");
 
                     // current path component.
                     w.write(cdata(name));
@@ -889,9 +896,11 @@ public class XHTMLRenderer implements IRenderer {
      *             if any element of <i>a</i> does not use a
      *             {@link HistoryInstrument}.
      * 
-     * @todo review use of basePeriod - this is {@link URLQueryModel#period}, right?
+     * @todo review use of basePeriod - this is {@link URLQueryModel#period},
+     *       right?
      */
-    protected void writeHistoryTable(final Writer w, final ICounter[] a,
+    protected void writeHistoryTable(final Writer w,
+            @SuppressWarnings("rawtypes") final ICounter[] a,
             final PeriodEnum basePeriod,
             final TimestampFormatEnum timestampFormat) throws IOException {
 
@@ -953,12 +962,11 @@ public class XHTMLRenderer implements IRenderer {
     /**
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class HTMLPivotTableRenderer extends PivotTableRenderer {
 
-        public HTMLPivotTableRenderer(PivotTable pt,
-                ValueFormatter formatter) {
+        public HTMLPivotTableRenderer(final PivotTable pt,
+                final ValueFormatter formatter) {
 
             super(pt, formatter);
             
@@ -967,6 +975,7 @@ public class XHTMLRenderer implements IRenderer {
         /**
          * Generate the table.
          */
+        @Override
         public void render(final Writer w) throws IOException {
 
             final HistoryTable t = pt.src;
@@ -1068,7 +1077,7 @@ public class XHTMLRenderer implements IRenderer {
                         double val = 0d;
 
                         // consider each counter in the cset for this output row.
-                        for (ICounter c : cset.counters) {
+                        for (ICounter<?> c : cset.counters) {
 
                             if (!c.getName().equals(vcol)) {
 
@@ -1084,7 +1093,7 @@ public class XHTMLRenderer implements IRenderer {
                                     continue;
 
                                 // get the sample from the data table.
-                                final IHistoryEntry e = t.data[row][col];
+                                final IHistoryEntry<?> e = t.data[row][col];
 
                                 if (e == null) {
 
@@ -1189,7 +1198,8 @@ public class XHTMLRenderer implements IRenderer {
      * 
      * @todo review use of basePeriod. is this {@link URLQueryModel#period}?
      */
-    protected void writePivotTable(final Writer w, final ICounter[] a,
+    protected void writePivotTable(final Writer w,
+            @SuppressWarnings("rawtypes") final ICounter[] a,
             final PeriodEnum basePeriod,
             final TimestampFormatEnum timestampFormat) throws IOException {
 
@@ -1255,18 +1265,19 @@ public class XHTMLRenderer implements IRenderer {
      * The pivot table data are selected in the same manner as the correlated
      * view and are used to generate a {@link HistoryTable}. There will be one
      * data row per row in the history table. There will be one category column
-     * for each capturing group in the {@link URLQueryModel#pattern}, one column for
-     * the timestamp associated with the row, and one for the value of each
+     * for each capturing group in the {@link URLQueryModel#pattern}, one column
+     * for the timestamp associated with the row, and one for the value of each
      * performance counter selected by the {@link URLQueryModel#pattern}.
      * <p>
      * Since the pivot table and the correlated view are both based on the
      * {@link HistoryTable} you can switch between these views simply by
-     * changing the {@link URLQueryModel#reportType} using the {@value URLQueryModel#REPORT} URL
-     * query parameter.
+     * changing the {@link URLQueryModel#reportType} using the
+     * {@value URLQueryModel#REPORT} URL query parameter.
      * 
      * @see ReportEnum#pivot
      */
-    protected void writePivotTable(final Writer w, final ICounter[] a)
+    protected void writePivotTable(final Writer w,
+            @SuppressWarnings("rawtypes") final ICounter[] a)
             throws IOException {
         
         if (model.period == null) {
@@ -1919,7 +1930,7 @@ public class XHTMLRenderer implements IRenderer {
      * 
      * @deprecated Move into formatter objects.
      */
-    protected String value(final ICounter counter, final Object val) {
+    protected String value(final ICounter<?> counter, final Object val) {
         
         if (counter == null)
             throw new IllegalArgumentException();

@@ -55,7 +55,6 @@ import com.bigdata.service.IBigdataFederation;
  * pipeline join algorithm.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestBigdataSailEmbeddedFederationWithQuads extends
         AbstractBigdataSailTestCase {
@@ -115,6 +114,8 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
         suite.addTestSuite(com.bigdata.rdf.sail.TestLexJoinOps.class);
         suite.addTestSuite(com.bigdata.rdf.sail.TestMaterialization.class);
  
+        suite.addTestSuite(com.bigdata.rdf.sail.TestInlineURIs.class);
+        
         // The Sesame TCK, including the SPARQL test suite.
         {
 
@@ -151,7 +152,8 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
         return suite;
         
     }
-    
+
+    @Override
     public Properties getProperties() {
 
         final Properties properties = new Properties(super.getProperties());

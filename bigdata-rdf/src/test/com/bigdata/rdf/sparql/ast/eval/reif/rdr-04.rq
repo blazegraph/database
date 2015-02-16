@@ -1,0 +1,5 @@
+prefix :       <http://example.com/> 
+
+select ?s ?p ?o ?p1 ?o1  where {
+  <<?s ?p ?o>> ?p1 ?o1 .
+}

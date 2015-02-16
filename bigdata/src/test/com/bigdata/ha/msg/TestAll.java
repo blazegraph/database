@@ -62,7 +62,9 @@ public class TestAll extends TestCase {
         final TestSuite suite = new TestSuite("HA messages");
 
         suite.addTestSuite(TestHAWriteMessage.class);
-        
+
+        suite.addTestSuite(TestHASendState.class);
+
         return suite;
 
     }

@@ -426,21 +426,23 @@ public class BigdataFileSystem extends
      * {@link IBigdataFederation}, {@link ITx#UNISOLATED} operations will take
      * care of this for you. Otherwise you must do this yourself.
      */
+    @Override
     public void create() {
 
         assertWritable();
 
         final IResourceLock resourceLock = acquireExclusiveLock();
         
-        final Properties tmp = getProperties();
-        
-//        final int branchingFactor = Integer.parseInt(tmp.getProperty(
-//                Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
-
-        // set property that will let the contained relations locate their container.
-        tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
-        
         try {
+
+            final Properties tmp = getProperties();
+            
+//          final int branchingFactor = Integer.parseInt(tmp.getProperty(
+//                  Options.BRANCHING_FACTOR, Options.DEFAULT_BRANCHING_FACTOR));
+
+			// set property that will let the contained relations locate their
+			// container.
+			tmp.setProperty(RelationSchema.CONTAINER, getNamespace());
 
             super.create();
             
@@ -505,6 +507,7 @@ public class BigdataFileSystem extends
         
     }
 
+    @Override
     public void destroy() {
 
         assertWritable();
@@ -564,8 +567,9 @@ public class BigdataFileSystem extends
         return version;
         
     }
-    
-    public int create(Document doc) {
+
+    @Override
+    public int create(final Document doc) {
         
         if (doc == null)
             throw new IllegalArgumentException();

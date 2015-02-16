@@ -30,12 +30,12 @@ package com.bigdata.rdf.sail.sparql;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern;
 import org.openrdf.query.algebra.StatementPattern.Scope;
-import org.openrdf.query.parser.sparql.FOAF;
 
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
@@ -104,7 +104,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -120,6 +120,71 @@ public class TestSubqueryPatterns extends
 //                whereClause.addChild(subSelect);
 
                 final JoinGroupNode wrapperGroup = new JoinGroupNode();
+                whereClause.addChild(wrapperGroup);
+                wrapperGroup.addChild(subSelect);
+            }
+            {
+
+                final ProjectionNode projection2 = new ProjectionNode();
+                projection2.addProjectionVar(new VarNode("s"));
+                subSelect.setProjection(projection2);
+
+                final JoinGroupNode whereClause2 = new JoinGroupNode();
+                subSelect.setWhereClause(whereClause2);
+
+                whereClause2.addChild(new StatementPatternNode(
+                        new VarNode("s"), new VarNode("p"), new VarNode("o"),
+                        null/* c */, Scope.DEFAULT_CONTEXTS));
+
+            }
+        }
+
+        final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+   
+    /**
+     * Unit test for simple optional subquery without anything else in the outer
+     * join group.
+     * 
+     * <pre>
+     * SELECT ?s where { OPTIONAL {SELECT ?s where {?s ?p ?o}}}
+     * </pre>
+     * 
+     * Note: This requires recursion back in through the
+     * {@link BigdataExprBuilder}.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/806>
+     *      Incorrect AST generated for OPTIONAL { SELECT }</a>
+     */
+    public void test_optional_subSelect() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+        final String sparql = "select ?s where { optional {select ?s where { ?s ?p ?o  } } }";
+
+        final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+        final SubqueryRoot subSelect;
+        {
+
+            {
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+                expected.setPrefixDecls(prefixDecls);
+            }
+
+            {
+                final ProjectionNode projection = new ProjectionNode();
+                projection.addProjectionVar(new VarNode("s"));
+                expected.setProjection(projection);
+
+                final JoinGroupNode whereClause = new JoinGroupNode();
+                expected.setWhereClause(whereClause);
+
+                subSelect = new SubqueryRoot(QueryType.SELECT);
+//                whereClause.addChild(subSelect);
+
+                final JoinGroupNode wrapperGroup = new JoinGroupNode(true/* optional */);
                 whereClause.addChild(wrapperGroup);
                 wrapperGroup.addChild(subSelect);
             }
@@ -170,7 +235,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -236,7 +301,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -306,7 +371,7 @@ public class TestSubqueryPatterns extends
         {
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -389,7 +454,7 @@ public class TestSubqueryPatterns extends
                     makeIV(valueFactory.createLiteral("12", XSD.INTEGER)));
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 expected.setPrefixDecls(prefixDecls);
             }
 
@@ -501,7 +566,7 @@ public class TestSubqueryPatterns extends
             final VarNode anonvar = mockAnonVar("-exists-1");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("rdf", RDF.NAMESPACE);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
@@ -578,7 +643,7 @@ public class TestSubqueryPatterns extends
             final VarNode anonvar = mockAnonVar("-exists-1");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("rdf", RDF.NAMESPACE);
                 prefixDecls.put("foaf", FOAFVocabularyDecl.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
@@ -667,7 +732,7 @@ public class TestSubqueryPatterns extends
                             .stringValue())));
             
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
                 prefixDecls.put("rdfs", RDFS.NAMESPACE);
                 expected.setPrefixDecls(prefixDecls);
             }
@@ -774,7 +839,7 @@ public class TestSubqueryPatterns extends
 //                            .stringValue())));
 //            
 //            {
-//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 //                prefixDecls.put("rdfs", RDFS.NAMESPACE);
 //                expected.setPrefixDecls(prefixDecls);
 //            }
@@ -882,7 +947,7 @@ public class TestSubqueryPatterns extends
 //                            .stringValue())));
 //            
 //            {
-//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
 //                prefixDecls.put("rdfs", RDFS.NAMESPACE);
 //                expected.setPrefixDecls(prefixDecls);
 //            }

@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.apache.http.conn.ClientConnectionManager;
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
@@ -59,8 +59,9 @@ import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.Chunkerator;
-import com.bigdata.striterator.CloseableIteratorWrapper;
+import com.bigdata.striterator.CloseableChunkedIteratorWrapperConverter;
 import com.bigdata.striterator.IChunkedIterator;
+import com.bigdata.striterator.IChunkedStriterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -676,7 +677,7 @@ public class BOpContext<E> extends BOpContextBase {
      * Return the {@link ClientConnectionManager} used to make remote SERVICE
      * call requests.
      */
-    public ClientConnectionManager getClientConnectionManager() {
+    public HttpClient getClientConnectionManager() {
         
         return getRunningQuery().getQueryEngine().getClientConnectionManager();
         
@@ -706,7 +707,7 @@ public class BOpContext<E> extends BOpContextBase {
      * 
      * @throws NullPointerException
      *             if an argument is <code>null</code>.
-     */
+     */ @Deprecated// with PipelineJoin.JoinTask.AccessPathTask.handleJoin()
     final static public boolean bind(final IPredicate<?> pred,
             final IConstraint[] constraints, final Object e,
             final IBindingSet bindings) {
@@ -1078,8 +1079,8 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
-     * Convert an {@link IAccessPath#iterator()} into a stream of
-     * {@link IBindingSet}s.
+     * Convert an {@link IAccessPath#iterator()} into a stream of chunks of
+     * {@link IBindingSet}.
      * 
      * @param src
      *            The iterator draining the {@link IAccessPath}. This will visit
@@ -1090,7 +1091,7 @@ public class BOpContext<E> extends BOpContextBase {
      *            Statistics to be updated as elements and chunks are consumed
      *            (optional).
      * 
-     * @return The dechunked iterator visiting the solutions. The order of the
+     * @return An iterator visiting chunks of solutions. The order of the
      *         original {@link IElement}s is preserved.
      * 
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (AccessPath
@@ -1105,14 +1106,15 @@ public class BOpContext<E> extends BOpContextBase {
 //    *            The array of distinct variables (no duplicates) to be
 //    *            extracted from the visited {@link IElement}s.
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static public ICloseableIterator<IBindingSet> solutions(
+    static public ICloseableIterator<IBindingSet[]> solutions(
             final IChunkedIterator<?> src, //
             final IPredicate<?> pred,//
 //            final IVariable<?>[] varsx, 
             final BaseJoinStats stats//
             ) {
 
-        return new CloseableIteratorWrapper(
+        //return new CloseableIteratorWrapper(
+        final IChunkedStriterator itr1 =
                 new com.bigdata.striterator.ChunkedStriterator(src).addFilter(
 //                        new ChunkedFilter() {
                         new ChunkedFilter<IChunkedIterator<Object>, Object, Object>() {
@@ -1160,17 +1162,27 @@ public class BOpContext<E> extends BOpContextBase {
 
                     }
 
-                })) {
+                });
+        //) {
+//
+//            /**
+//             * Close the real source if the caller closes the returned iterator.
+//             */
+//            @Override
+//            public void close() {
+//                super.close();
+//                src.close();
+//            }
+//        };
 
-            /**
-             * Close the real source if the caller closes the returned iterator.
-             */
-            @Override
-            public void close() {
-                super.close();
-                src.close();
-            }
-        };
+        /*
+         * Convert from IChunkedIterator<IBindingSet> to
+         * ICloseableIterator<IBindingSet[]>. This is a fly weight conversion.
+         */
+        final ICloseableIterator<IBindingSet[]> itr2 = new CloseableChunkedIteratorWrapperConverter<IBindingSet>(
+                itr1);
+
+        return itr2;
 
     }
 

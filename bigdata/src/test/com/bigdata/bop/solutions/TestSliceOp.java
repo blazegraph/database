@@ -177,6 +177,7 @@ public class TestSliceOp extends TestCase2 {
                     new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                    new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
         
         assertEquals("offset", offset, query.getOffset());
@@ -288,6 +289,7 @@ public class TestSliceOp extends TestCase2 {
                     new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                    new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
         
         assertEquals("offset", offset, query.getOffset());
@@ -367,6 +369,7 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         assertEquals("offset", offset, query.getOffset());
@@ -442,6 +445,7 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         assertEquals("offset", offset, query.getOffset());
@@ -530,6 +534,7 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         assertEquals("offset", 0L, query.getOffset());
@@ -591,6 +596,7 @@ public class TestSliceOp extends TestCase2 {
                         new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                                 BOpEvaluationContext.CONTROLLER),//
                         new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                        new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         assertEquals("offset", -1L, query.getOffset());
@@ -632,6 +638,7 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         assertEquals("offset", 1L, query.getOffset());
@@ -709,6 +716,7 @@ public class TestSliceOp extends TestCase2 {
                 new NV(SliceOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),//
+                new NV(PipelineOp.Annotations.REORDER_SOLUTIONS,false),//
                 }));
 
         final SliceStats stats = query.newStats();

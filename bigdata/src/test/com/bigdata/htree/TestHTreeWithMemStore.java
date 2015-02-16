@@ -44,7 +44,7 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
+import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.htree.AbstractHTree.HTreePageStateException;
 import com.bigdata.io.DirectBufferPool;
@@ -324,8 +324,7 @@ public class TestHTreeWithMemStore extends TestCase {
 
         final ITupleSerializer<?,?> tupleSer = new DefaultTupleSerializer(
                 new ASCIIKeyBuilderFactory(Bytes.SIZEOF_INT),
-                DefaultFrontCodedRabaCoder.INSTANCE,// Note: reports true for isKeys()!
-                // new SimpleRabaCoder(),// keys
+                FrontCodedRabaCoderDupKeys.INSTANCE,// keys
                 new SimpleRabaCoder() // vals
                 );
         

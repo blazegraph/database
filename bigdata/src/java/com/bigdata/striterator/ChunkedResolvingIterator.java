@@ -33,7 +33,7 @@ import java.util.Arrays;
 import cutthecrap.utils.striterators.ICloseableIterator;
 
 /**
- * Converts the type of the source iterator using #resolve().
+ * Converts the type of the source iterator using {@link #resolve(Object)}.
  * <p>
  * Note: This class correctly passes {@link ICloseableIterator#close()} through
  * to the source iterator.
@@ -59,7 +59,7 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
      * @param src
      *            The source iterator.
      */
-    public ChunkedResolvingIterator(IChunkedOrderedIterator<S> src) {
+    public ChunkedResolvingIterator(final IChunkedOrderedIterator<S> src) {
 
         this(src, null/* keyOrder */);
         
@@ -76,7 +76,8 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
      * @param keyOrder
      *            The sort order for the resolved elements.
      */
-    public ChunkedResolvingIterator(IChunkedOrderedIterator<S> src, IKeyOrder<E> keyOrder) {
+    public ChunkedResolvingIterator(final IChunkedOrderedIterator<S> src,
+            final IKeyOrder<E> keyOrder) {
 
         if (src == null)
             throw new IllegalArgumentException();
@@ -87,24 +88,28 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
         
     }
     
+    @Override
     public IKeyOrder<E> getKeyOrder() {
 
         return keyOrder;
         
     }
 
+    @Override
     public boolean hasNext() {
 
         return src.hasNext();
         
     }
 
+    @Override
     public E next() {
         
         return resolve( src.next() );
         
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public E[] nextChunk() {
 
@@ -136,7 +141,8 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
         
     }
 
-    public E[] nextChunk(IKeyOrder<E> keyOrder) {
+    @Override
+    public E[] nextChunk(final IKeyOrder<E> keyOrder) {
 
         if (keyOrder == null)
             throw new IllegalArgumentException();
@@ -155,12 +161,14 @@ abstract public class ChunkedResolvingIterator<E,S> implements IChunkedOrderedIt
         
     }
 
+    @Override
     public void remove() {
 
         src.remove();
         
     }
 
+    @Override
     public void close() {
 
         src.close();

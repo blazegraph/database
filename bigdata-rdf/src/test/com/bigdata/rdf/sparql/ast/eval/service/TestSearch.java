@@ -154,10 +154,59 @@ public class TestSearch extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * Unit test for a prefix match ("mi*").
+     * 
+     * <pre>
+     * # Search query.
+     * PREFIX bds: <http://www.bigdata.com/rdf/search#>
+     * 
+     * SELECT ?subj ?label 
+     * WHERE {
+     *       ?lit bds:search "mi*" .
+     *       ?lit bds:relevance ?cosine .
+     *       ?subj ?p ?label .
+     * }
+     * </pre>
      */
     public void test_search_prefix_match() throws Exception {
         
-        new TestHelper("search-prefix-match").runTest();
+        new TestHelper(
+                "search-prefix-match",// testURI
+                "search-prefix-match.rq",// query
+                "search-prefix-match.trig",//data
+                "search-prefix-match.srx" // expected results
+                ).runTest();
+
+    }
+
+    /**
+     * Unit test for a prefix match ("mi*").
+     * 
+     * <pre>
+     * # Search query.
+     * PREFIX bds: <http://www.bigdata.com/rdf/search#>
+     * 
+     * SELECT ?subj ?label 
+     *   WITH {
+     *    SELECT ?subj ( ?lit as ?label )
+     *     WHERE {
+     *       ?lit bds:search "mi*" .
+     *       ?lit bds:relevance ?cosine .
+     *       ?subj ?p ?lit .
+     *       }
+     *   } as %searchSet1
+     * WHERE {
+     *    include %searchSet1
+     * }
+     * </pre>
+     */
+    public void test_search_prefix_match2() throws Exception {
+        
+        new TestHelper(
+                "search-prefix-match2",// testURI
+                "search-prefix-match2.rq",// query
+                "search-prefix-match.trig",//data
+                "search-prefix-match.srx" // expected results
+                ).runTest();
         
     }
 
