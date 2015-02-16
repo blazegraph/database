@@ -56,6 +56,8 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
 
+import junit.framework.Test;
+
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -83,7 +85,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  * Note: Also see {@link SPARQLUpdateTest}. These two test suites SHOULD be kept
  * synchronized. {@link SPARQLUpdateTest} runs against a local kb instance while
  * this class runs against the NSS. The two test suites are not exactly the same
- * because one uses the {@link RemoteRepository} to commuicate with the NSS
+ * because one uses the {@link RemoteRepository} to communicate with the NSS
  * while the other uses the local API.
  * 
  * @param <S>
@@ -103,16 +105,23 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 	}
 
-    protected static final String EX_NS = "http://example.org/";
+	static public Test suite() {
+		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
+				"test.*", TestMode.triples
+//				"test.*", TestMode.quads, TestMode.sids, TestMode.triples
+				);
+	}
 
-    protected ValueFactory f = new ValueFactoryImpl();
-    protected URI bob, alice, graph1, graph2;
+	private static final String EX_NS = "http://example.org/";
+
+    private ValueFactory f = new ValueFactoryImpl();
+    private URI bob, alice, graph1, graph2;
 //    protected RemoteRepository m_repo;
 
 	@Override
 	public void setUp() throws Exception {
-	    
-	    super.setUp();
+
+		super.setUp();
 	    
 //        m_repo = new RemoteRepository(m_serviceURL);
         
@@ -132,6 +141,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         graph2 = f.createURI(EX_NS, "graph2");
 	}
 	
+	@Override
 	public void tearDown() throws Exception {
 	    
 	    bob = alice = graph1 = graph2 = null;
@@ -151,7 +161,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
      *            The file format.
      * @throws Exception
      */
-    protected void loadFile(final String file, RDFFormat format)
+    protected void loadFile(final String file, final RDFFormat format)
             throws Exception {
 
         final AddOp add = new AddOp(new File(file), format);
