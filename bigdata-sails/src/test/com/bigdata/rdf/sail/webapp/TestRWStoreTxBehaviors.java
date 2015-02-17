@@ -1,5 +1,7 @@
 package com.bigdata.rdf.sail.webapp;
 
+import java.util.Collections;
+
 import junit.framework.Test;
 
 import com.bigdata.journal.AbstractJournal;
@@ -30,8 +32,7 @@ public class TestRWStoreTxBehaviors<S extends IIndexManager> extends
 
 	static public Test suite() {
 		return ProxySuiteHelper.suiteWhenStandalone(TestRWStoreTxBehaviors.class,
-				"test.*", BufferMode.DiskRW, TestMode.triples
-//				"test.*", TestMode.quads, TestMode.sids, TestMode.triples
+				"test.*", Collections.singleton(BufferMode.DiskRW), TestMode.triples
 				);
 	}
 
