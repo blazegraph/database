@@ -1568,6 +1568,18 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // Always sending an OK with a response entity.
                 resp.setStatus(BigdataServlet.HTTP_OK);
 
+				/**
+				 * Note: Content Type header is required. See <a href=
+				 * "http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1"
+				 * >RFC2616</a>
+				 * 
+				 * Note: This needs to be written before we write on the stream
+				 * and after we decide on the status code. Since this code path
+				 * handles the "monitor" mode, we are writing it out immediately
+				 * and the response will be an XHTML document.
+				 */
+				resp.setContentType("text/html; charset=" + charset.name());
+
                 // This will write the response entity.
                 listener = new SparqlUpdateResponseWriter(resp, os, charset,
                         true /* reportLoadProgress */, true/* flushEachEvent */,
@@ -1593,6 +1605,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // buffer the response here.
                 baos = new ByteArrayOutputStream();
 
+				/*
+				 * Note: Do NOT set the ContentType yet. This action needs to be
+				 * deferred until we decide that a normal response (vs an
+				 * exception) will be delivered.
+				 */
+                
                 listener = new SparqlUpdateResponseWriter(resp, baos, charset,
                         false/* reportLoadProgress */, false/* flushEachEvent */,
                         mutationCount);
@@ -1627,7 +1645,20 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // Send an OK with a response entity.
                 resp.setStatus(BigdataServlet.HTTP_OK);
 
-                // Copy the document into the response.
+				/**
+				 * Note: Content Type header is required. See <a href=
+				 * "http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1"
+				 * >RFC2616</a>
+				 * 
+				 * Note: This needs to be written before we write on the stream
+				 * and after we decide on the status code. Since this code path
+				 * defers the status code until we know whether or not the
+				 * SPARQL UPDATE was atomically committed, we write it out now
+				 * and then serialize the response document.
+				 */
+				resp.setContentType("text/html; charset=" + charset.name());
+
+				// Copy the document into the response.
                 baos.flush();
                 os.write(baos.toByteArray());
 
@@ -1703,10 +1734,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             this.resp = resp;
             
-            /** Content Type header is required:
-            http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1
-            */
-            resp.setContentType("text/html; charset="+charset.name());
+//            /** Content Type header is required: Note: This should be handled when we make the decision to incrementally evict vs wait until the UPDATE completes and then write the status code (monitor vs non-monitor).
+//            http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1
+//            */
+//            resp.setContentType("text/html; charset="+charset.name());
             
             this.os = os;
             
