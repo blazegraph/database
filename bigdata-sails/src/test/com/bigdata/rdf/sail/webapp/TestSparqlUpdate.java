@@ -74,6 +74,7 @@ import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -107,8 +108,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 	static public Test suite() {
 		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
-				"test.*", TestMode.triples
-//				"test.*", TestMode.quads, TestMode.sids, TestMode.triples
+				"test.*", BufferMode.Transient, TestMode.quads
 				);
 	}
 
