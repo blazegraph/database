@@ -43,6 +43,13 @@ public class ApiTaskForJournal<T> extends AbstractTask<T> {
 
     private final AbstractApiTask<T> delegate;
 
+    @Override
+    public String toString() {
+    	
+		return super.toString() + "::{delegate=" + delegate + "}";
+    	
+    }
+    
     public ApiTaskForJournal(final IConcurrencyManager concurrencyManager,
             final long timestamp, final String[] resource,
             final AbstractApiTask<T> delegate) {

@@ -71,14 +71,22 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     abstract public boolean isReadOnly();
     
     @Override
-    public String getNamespace() {
+    final public String getNamespace() {
         return namespace;
     }
 
     @Override
-    public long getTimestamp() {
+    final public long getTimestamp() {
         return timestamp;
     }
+    
+	@Override
+	public String toString() {
+
+		return getClass().getName() + "{namespace=" + getNamespace()
+				+ ",timestamp=" + getTimestamp() + "}";
+
+	}
     
     /**
      * @param namespace

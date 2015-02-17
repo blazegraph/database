@@ -483,6 +483,15 @@ public class QueryServlet extends BigdataRDFServlet {
             }
 
         }
+        
+    	@Override
+    	public String toString() {
+
+			return getClass().getName() + "{namespace=" + getNamespace()
+					+ ",timestamp=" + getTimestamp() + ", updateStr=["
+					+ updateStr + "]}";
+
+    	}
 
 	}
 
