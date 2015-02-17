@@ -35,6 +35,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.journal.BufferMode;
+
 /**
  * This class provides static methods to help creating
  * test classes and suites of tests that use the proxy test
@@ -66,15 +68,18 @@ public class ProxySuiteHelper {
 	private static class MultiModeTestSuite extends TestSuite  {
 		private final ProxyTestSuite subs[];
 		
-		public MultiModeTestSuite(String name, TestMode ...modes ) {
+		public MultiModeTestSuite(final String name, final BufferMode bufferMode, final TestMode ...modes ) {
 			super(name);
 			subs = new ProxyTestSuite[modes.length];
 			int i = 0;
 			for (final TestMode mode: modes) {
-				final ProxyTestSuite suite2 = TestNanoSparqlServerWithProxyIndexManager.createProxyTestSuite(TestNanoSparqlServerWithProxyIndexManager.getTemporaryJournal(),mode);
+				final ProxyTestSuite suite2 = TestNanoSparqlServerWithProxyIndexManager.createProxyTestSuite(TestNanoSparqlServerWithProxyIndexManager.getTemporaryJournal(bufferMode),mode);
 				super.addTest(new TestSetup(suite2) {
+					@Override
 		    		protected void setUp() throws Exception {
 		    		}
+					@SuppressWarnings("rawtypes")
+					@Override
 		    		protected void tearDown() throws Exception {
 		    			((TestNanoSparqlServerWithProxyIndexManager)suite2.getDelegate()).tearDownAfterSuite();
                         /*
@@ -123,11 +128,9 @@ public class ProxySuiteHelper {
 		return createTest(test.getClass(),test.getName());
 	}
 
-	private static Test cloneSuite(Test delegate, TestSuite suite) {
+	private static Test cloneSuite(final Test delegate, final TestSuite suite) {
 		final TestSuite rslt =  new CloningTestSuite(delegate,suite.getName());
-		@SuppressWarnings("unchecked")
-		final
-		Enumeration<Test> enumerate = suite.tests();
+		final Enumeration<Test> enumerate = suite.tests();
 		while( enumerate.hasMoreElements() ) {
 			rslt.addTest(enumerate.nextElement());
 		}
@@ -151,19 +154,24 @@ public class ProxySuiteHelper {
 	 * 
 	 * @param clazz  The clazz to be tested, i.e. the calling class
 	 * @param regex  Matched against the test names to decide which tests to run. Should usually start in "test.*"
-	 * @param modes  One or more TestModes.
+	 * @param bufferMode The {@link BufferMode} - this is used to control the backing store implementation. 
+	 * @param testModes  One or more TestModes.
 	 * @return
 	 */
-	public static Test suiteWhenStandalone(Class<? extends TestCase> clazz, String regex, TestMode ... modes) {
+	public static Test suiteWhenStandalone(final Class<? extends TestCase> clazz, final String regex, final BufferMode bufferMode, final TestMode ... testModes) {
 		if (!proxyIndexManagerTestingHasStarted) {
 			final Pattern pat = Pattern.compile(regex);
 			proxyIndexManagerTestingHasStarted = true;
-			final TestSuite suite = new MultiModeTestSuite(clazz.getName(),modes);
+			final TestSuite suite = new MultiModeTestSuite(clazz.getName(),bufferMode, testModes);
 			addMatchingTestsFromClass(suite, clazz, pat);
 			return suite;
 		} else {
 			return new TestSuite(clazz);
 		}
+	}
+
+	public static Test suiteWhenStandalone(final Class<? extends TestCase> clazz, final String regex, final TestMode ... testModes) {
+		return suiteWhenStandalone(clazz, regex, BufferMode.Transient, testModes);
 	}
 
 	/**
@@ -174,13 +182,16 @@ public class ProxySuiteHelper {
 	 * @param modes  One or more TestModes.
 	 * @return
 	 */
-	public static TestSuite suiteWithOptionalProxy(String name, TestMode ... mode) {
+	public static TestSuite suiteWithOptionalProxy(final String name, final BufferMode bufferMode, final TestMode ... testMode) {
 		if (!proxyIndexManagerTestingHasStarted) {
 			proxyIndexManagerTestingHasStarted = true;
-			return new MultiModeTestSuite(name,mode);
+			return new MultiModeTestSuite(name,bufferMode,testMode);
 		} else {
 			return new TestSuite(name);
 		}
+	}
+	public static TestSuite suiteWithOptionalProxy(final String name, final TestMode ... testMode) {
+		return suiteWithOptionalProxy(name,BufferMode.Transient,testMode);
 	}
 
 	private static void addMatchingTestsFromClass(TestSuite suite3, Class<? extends TestCase> clazz, Pattern pat) {
@@ -191,11 +202,9 @@ public class ProxySuiteHelper {
 		}
 	}
 
-	private static Test createTest(Class<? extends TestCase> clazz, String name) {
+	private static Test createTest(final Class<? extends TestCase> clazz, final String name) {
 		try {
-			@SuppressWarnings("unchecked")
-			final
-			Constructor<?> cons = TestSuite.getTestConstructor(clazz);
+			final Constructor<?> cons = TestSuite.getTestConstructor(clazz);
 			if (cons.getParameterTypes().length == 1) {
 				return (Test) cons.newInstance(name);
 			} else {

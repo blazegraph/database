@@ -1,6 +1,9 @@
 package com.bigdata.rdf.sail.webapp;
 
+import junit.framework.Test;
+
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.rwstore.RWStore;
@@ -23,6 +26,13 @@ public class TestRWStoreTxBehaviors<S extends IIndexManager> extends
 
 		super(name);
 
+	}
+
+	static public Test suite() {
+		return ProxySuiteHelper.suiteWhenStandalone(TestRWStoreTxBehaviors.class,
+				"test.*", BufferMode.DiskRW, TestMode.triples
+//				"test.*", TestMode.quads, TestMode.sids, TestMode.triples
+				);
 	}
 
 	/**
