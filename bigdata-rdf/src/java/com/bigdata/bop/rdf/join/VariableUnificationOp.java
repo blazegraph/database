@@ -176,7 +176,7 @@ public class VariableUnificationOp extends PipelineOp {
 
          this.targetVar = op.getTargetVar();
          
-         this.tmpVar = op.getTargetVar();
+         this.tmpVar = op.getTmpVar();
       }
 
       @Override
