@@ -10,4 +10,5 @@
     :s :int "10"^^xsd:int .
     :s :integer "10"^^xsd:integer .
     :s :double "10.0"^^xsd:double .
+    :s :boolean "true"^^xsd:boolean .
 }

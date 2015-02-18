@@ -96,6 +96,7 @@ import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.constraints.UUIDBOp;
+import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -2964,7 +2965,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 continue;
             } else if (child instanceof AssignmentNode) {
                
-               if (assignmentNodeNeedsToBeResolved()) {
+               if (assignmentNodeNeedsToBeResolved((AssignmentNode)child)) {
                   
                   left = addResolvedAssignment(left, (AssignmentNode) child, 
                         doneSet, joinGroup.getQueryHints(), ctx);                      
@@ -3008,9 +3009,65 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
     }
 
-    private static boolean assignmentNodeNeedsToBeResolved() {
+    /**
+     * Makes a static (pessimistic) best effort decision whether or not the
+     * assignment node needs to be resolved (i.e., its possibly mocked IV is to
+     * be joined against the dictionary) or not.
+     * 
+     * @param ass
+     * @return
+     */
+    private static boolean assignmentNodeNeedsToBeResolved(AssignmentNode ass) {
 
-       // TODO: implement (with true we're on the save side for now, though)
+       /*
+        *  In case the assignment node is either a constant (has been joined
+        *  against the dictionary already!) or a boolean expression (which
+        *  will resolve to true/false anyways), we do not need to resolve
+        *  the constructed value. 
+        *  
+        *  Note: There might be other edge cases for which we're on the safe
+        *  side and can return false, but this seems to cover most cases.
+        */
+       final IValueExpression<?> vexp = ass.getValueExpression();
+       if (vexp instanceof IConstant || 
+           vexp instanceof XSDBooleanIVValueExpression) {
+          return false;
+       }
+       
+       /*
+        * In case of more complex assignment expressions, we may still not
+        * require to resolve the IV in case the bound variable is not used
+        * anywhere else in the query. To do so, we count the number of 
+        * occurrences of the variable in the root query; if it occurs more
+        * than once (i.e., more often than the binding in the assignment node,
+        * it is (in the general case) not safe to suppress the resolving.
+        * 
+        * Note: this again is overly broad. However, there are only rare cases
+        * where the same variable is used twice independently (e.g. in
+        * unconnected unions), which we ignore here.
+        */
+
+       // get query root
+       IGroupNode queryRoot = ass.getParent();
+       while (queryRoot.getParent()!=null) {
+          queryRoot=queryRoot.getParent();
+       }
+
+       // get assignment variable
+       final IVariable<IV> var = ass.getVar();
+
+       // get number of occurrences
+       final int nrOccurrences = BOpUtility.countOccurrencesOf(queryRoot, var);
+       if (nrOccurrences<=1) {
+          return false;
+       }
+          
+       // TODO: test case for 2*?s etc.
+
+       
+       /*
+        * None of the two cases applies
+        */
        return true;
    }
 
