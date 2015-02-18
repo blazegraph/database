@@ -1824,5 +1824,37 @@ public class BOpUtility {
                 .toArray(new IConstraint[list.size()]);
 
     }
+    
+    
+    /**
+     * Counts the number of occurrences of inner in op.
+     * 
+     * @param op the BOp to scan for occurrences
+     * @param inner the nested BOp we're looking for
+     * 
+     * @result the number of occurrences
+     */
+    @SuppressWarnings("unchecked")
+    public static int countOccurrencesOf(final BOp op, final BOp inner) {
+
+        Iterator<BOp> it = new Striterator(preOrderIteratorWithAnnotations(op))
+                .addFilter(new Filter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public boolean isValid(Object arg0) {
+                       return inner.equals(arg0);
+                    }
+                });
+        
+        int i=0;
+        while (it.hasNext()) {
+           it.next();
+           i++;
+        }
+        
+        return i;
+
+    }
 
 }

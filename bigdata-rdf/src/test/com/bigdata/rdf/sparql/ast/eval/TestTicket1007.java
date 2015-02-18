@@ -52,7 +52,8 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
 
    /**
     * Original query as defined in bug report, reusing a URI constructed in a
-    * BIND clause in a join: <code>
+    * BIND clause in a join: 
+        <code>
          PREFIX : <http://www.interition.net/ref/>
 
          SELECT * WHERE
@@ -69,6 +70,7 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
          }
        </code>
     * 
+    * Note: originally this query failed.
     * @throws Exception
     */
    public void test_ticket_1007() throws Exception {
@@ -129,6 +131,7 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
           :s :int "10"^^xsd:int .
           :s :integer "10"^^xsd:integer .
           :s :double "10.0"^^xsd:double .
+          :s :boolean "true"^^xsd:boolean .
       }
       </code>
     * 
@@ -215,6 +218,8 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
         BIND (xsd:integer("10") AS ?o)
       }
    </code>
+   *
+   * Note: originally this query failed.
    */
    public void test_ticket_1007_number5() throws Exception {
       new TestHelper("ticket-1007-number5",// testURI,
@@ -253,6 +258,8 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
         BIND (CONCAT("untyped","String") AS ?o)
       }
    </code>
+   *
+   * Note: originally this query failed.   
    */
    public void test_ticket_1007_string2() throws Exception {
       new TestHelper("ticket-1007-string2",// testURI,
@@ -272,6 +279,8 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
         BIND (STRAFTER("XuntypedString","X") AS ?o)
       }
    </code>
+   *
+   * Note: originally this query failed.   
    */
    public void test_ticket_1007_string3() throws Exception {
       new TestHelper("ticket-1007-string3",// testURI,
@@ -339,6 +348,44 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
             "ticket-1007-freshUri.srx",// resultFileURL
             false // checkOrder (because only one solution)
       ).runTest();
-   }   
-   
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      WHERE 
+      { 
+        ?s <http://www.bigdata.com/boolean> ?o
+        BIND (?s=?s AS ?o)
+      }
+   </code>
+   */
+  public void test_ticket_1007_boolean1() throws Exception {
+     new TestHelper("ticket-1007-boolean1",// testURI,
+           "ticket-1007-boolean1.rq",// queryFileURL
+           "ticket-1007-custom.trig",// dataFileURL
+           "ticket-1007-boolean.srx",// resultFileURL
+           false // checkOrder (because only one solution)
+     ).runTest();
+  }   
+  
+  /**
+  <code>
+      SELECT ?o
+      WHERE 
+      { 
+         ?s <http://www.bigdata.com/boolean> ?o
+         BIND (?s=<http://www.bigdata.com/s> AS ?o)
+      }
+  </code>
+  */
+  public void test_ticket_1007_boolean2() throws Exception {
+     new TestHelper("ticket-1007-boolean2",// testURI,
+           "ticket-1007-boolean2.rq",// queryFileURL
+           "ticket-1007-custom.trig",// dataFileURL
+           "ticket-1007-boolean.srx",// resultFileURL
+           false // checkOrder (because only one solution)
+     ).runTest();
+  }   
+
 }
