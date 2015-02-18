@@ -437,11 +437,8 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      *             if the task can not be accepted for execution.
      * @throws IOException
      *             if there is an RMI problem.
-     * 
-     * @todo change API to <T> Future<T> submit(tx,name,IIndexProcedure<T>).
-     *       Existing code will need to be recompiled after this API change.
      */
-    public Future submit(long tx, String name, IIndexProcedure proc)
+    public <T> Future<T> submit(long tx, String name, IIndexProcedure<T> proc)
             throws IOException;
 
     /**
@@ -455,6 +452,7 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      * 
      * @see IDataServiceCallable
      */
+    @Override
     public Future<? extends Object> submit(Callable<? extends Object> proc)
             throws RemoteException;
 
@@ -480,7 +478,7 @@ public interface IDataService extends ITxCommitProtocol, IService, IRemoteExecut
      *             if the record identified by addr can not be read from the
      *             resource.
      * 
-     * @todo This is a first try at adding support for reading low-level records
+     * @deprecated This was a first try at adding support for reading low-level records
      *       from a journal or index segment in support of the
      *       {@link BigdataFileSystem}.
      *       <p>

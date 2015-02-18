@@ -95,9 +95,6 @@ import com.bigdata.sparse.SparseRowStore;
  * with the JINI codebase mechanism (<code>java.rmi.server.codebase</code>).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * 
- * @todo add generic type for {@link #apply(IIndex)} 's return value (much like
- *       {@link Callable}).
  */
 public interface IIndexProcedure<T> extends IReadOnly, Serializable {
 
