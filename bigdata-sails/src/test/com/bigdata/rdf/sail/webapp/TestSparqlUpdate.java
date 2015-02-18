@@ -121,8 +121,8 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 	static public Test suite() {
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
-//				"test.*",
-				"testInsertWhere",
+				"testStressInsertWhereGraph",
+//				"testInsertWhere",
 				new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[]{
 //				BufferMode.Transient, 
 //				BufferMode.DiskWORM, 
@@ -145,21 +145,30 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 		super.setUp();
 	    
 //        m_repo = new RemoteRepository(m_serviceURL);
-        
-        /*
-         * Only for testing. Clients should use AddOp(File, RDFFormat).
-         * 
-         * TODO Do this using LOAD or just write tests for LOAD?
-         */
-        loadFile(
-                "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig",
-                RDFFormat.TRIG);
+
+		// Load the test data set.
+		doLoadFile();
 
         bob = f.createURI(EX_NS, "bob");
         alice = f.createURI(EX_NS, "alice");
 
         graph1 = f.createURI(EX_NS, "graph1");
         graph2 = f.createURI(EX_NS, "graph2");
+	}
+	
+	/**
+	 * Load the test data set.
+	 * 
+	 * @throws Exception
+	 */
+	private void doLoadFile() throws Exception {
+        /*
+		 * Only for testing. Clients should use AddOp(File, RDFFormat) or SPARQL
+		 * UPDATE "LOAD".
+		 */
+        loadFile(
+                "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig",
+                RDFFormat.TRIG);
 	}
 	
 	@Override
@@ -215,8 +224,11 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
         try {
 
-            return m_repo.getStatements(subj, pred, obj, includeInferred,
-                    contexts).hasNext();
+            return m_repo.hasStatement(subj, pred, obj, includeInferred,
+                    contexts);
+            // Note: Does not close() the result!
+//            return m_repo.getStatements(subj, pred, obj, includeInferred,
+//                    contexts).hasNext();
             
         } catch (Exception e) {
             
@@ -1900,5 +1912,41 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     	return new LiteralImpl(sb.toString());
     	
     }
+
+    /**
+     * Used for reporting of the last operation issued.
+     */
+    private enum StressTestOpEnum {
+		Update,
+		DropAll,
+		LoadFile
+	};
+	/**
+	 * A stress test written to look for stochastic behaviors in SPARQL UPDATE
+	 * for GROUP COMMIT.
+	 */
+    public void testStressInsertWhereGraph() throws Exception {
+
+		final int LIMIT = 10;
+		int i = 0;
+		StressTestOpEnum lastOp = null;
+		try {
+			for (i = 0; i < LIMIT; i++) {
+
+				lastOp = StressTestOpEnum.Update;
+				testInsertWhereGraph();
+				
+				lastOp = StressTestOpEnum.DropAll;
+				testDropAll();
+				
+				lastOp = StressTestOpEnum.LoadFile;
+				doLoadFile();
+			}
+		} catch (Throwable t) {
+			throw new RuntimeException("Iteration " + (i + 1) + " of " + LIMIT
+					+ ", lastOp=" + lastOp, t);
+		}
+
+	}
 
 }
