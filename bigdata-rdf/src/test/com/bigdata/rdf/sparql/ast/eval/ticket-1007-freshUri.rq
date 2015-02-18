@@ -1,0 +1,6 @@
+SELECT DISTINCT ?z
+WHERE 
+{
+  ?s ?p ?o
+  BIND (URI("http://untypedUri") AS ?z)
+}

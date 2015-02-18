@@ -1,0 +1,5 @@
+SELECT ?o
+{ 
+  ?s <http://www.bigdata.com/double> ?o
+  BIND ("10.00"^^<http://www.w3.org/2001/XMLSchema#double> AS ?o)
+}

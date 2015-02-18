@@ -397,13 +397,17 @@ public class MockTermResolverOp extends PipelineOp {
    private static void collectIfValueMocked(final IV<?, ?> iv,
          final Map<IV<?, ?>, BigdataValue> ivMap) {
       
-      final Object ivVal = iv.getValue();
-      if (ivVal instanceof BigdataValue) {
-         final BigdataValue bdVal = (BigdataValue)ivVal;
-         if (!bdVal.isRealIV()) {
-            ivMap.put(iv, bdVal);
+      if (iv.isNullIV() && iv.hasValue() && !iv.isInline()) {
+         
+         final Object ivVal = iv.getValue();
+         if (ivVal instanceof BigdataValue) {
+            final BigdataValue bdVal = (BigdataValue)ivVal;
+            if (!bdVal.isRealIV()) {
+               ivMap.put(iv, bdVal);
+            }
          }
-      }      
+         
+      }
    }
 
    /**
@@ -463,10 +467,10 @@ public class MockTermResolverOp extends PipelineOp {
              * instead we need to construct a fresh constant with the resolved
              * value.
              */
-            if (value!=null) {
+            if (value!=null && value.getIV()!=null) {
                bindingSet.set(var, 
                   new Constant<IV<BigdataValue, ?>>(value.getIV()));
-            } // otherwise: nothing to be done (TODO: check)
+            } // otherwise: nothing to be done
          }
 
       } else {

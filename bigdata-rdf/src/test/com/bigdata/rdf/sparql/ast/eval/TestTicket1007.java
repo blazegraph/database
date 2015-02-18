@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.eval;
 
-import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase.TestHelper;
 
 /**
  * Various tests covering different constellations where values are constructed
@@ -46,6 +45,10 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
    public TestTicket1007(String name) {
       super(name);
    }
+
+   /**************************************************************************
+    *********************** ORIGINAL TICKET TESTS ****************************
+    **************************************************************************/
 
    /**
     * Original query as defined in bug report, reusing a URI constructed in a
@@ -105,5 +108,237 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
             false // checkOrder (because only one solution)
       ).runTest();
    }
+   
+   /**************************************************************************
+    ***************************** CUSTOM TESTS *******************************
+    **************************************************************************/
+   
+   /*
+    *  Dataset (trig) used in the tests defined in this section:
+    * 
+      <code>
+      @prefix : <http://www.bigdata.com/> .
+      @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+      @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+      @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+      @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+      : {
+          :s :untypedString "untypedString" .
+          :s :typedString "typedString"^^xsd:unsignedByte .
+          :s :int "10"^^xsd:int .
+          :s :integer "10"^^xsd:integer .
+          :s :double "10.0"^^xsd:double .
+      }
+      </code>
+    * 
+    */
+
+   /**
+    <code>
+      SELECT ?o
+      WHERE 
+      { 
+         ?s ?p ?o
+         BIND (10 AS ?o)
+      }
+    </code>
+    */
+   public void test_ticket_1007_number1() throws Exception {
+      new TestHelper("ticket-1007-number1",// testURI,
+            "ticket-1007-number1.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-number-integer.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      { 
+        ?s <http://www.bigdata.com/double> ?o
+        BIND ("10.00"^^<http://www.w3.org/2001/XMLSchema#double> AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_number2() throws Exception {
+      new TestHelper("ticket-1007-number2",// testURI,
+            "ticket-1007-number2.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-number-double.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      { 
+        ?s <http://www.bigdata.com/integer> ?o
+        BIND (10 AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_number3() throws Exception {
+      new TestHelper("ticket-1007-number3",// testURI,
+            "ticket-1007-number3.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-number-integer.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      { 
+        ?s <http://www.bigdata.com/integer> ?o
+        BIND (2*5 AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_number4() throws Exception {
+      new TestHelper("ticket-1007-number4",// testURI,
+            "ticket-1007-number4.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-number-integer.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      { 
+        ?s <http://www.bigdata.com/integer> ?o
+        BIND (xsd:integer("10") AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_number5() throws Exception {
+      new TestHelper("ticket-1007-number5",// testURI,
+            "ticket-1007-number5.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-number-integer.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      WHERE 
+      { 
+        ?s ?p ?o
+        BIND ("untypedString" AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_string1() throws Exception {
+      new TestHelper("ticket-1007-string1",// testURI,
+            "ticket-1007-string1.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-string.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      WHERE 
+      { 
+        ?s ?p ?o
+        BIND (CONCAT("untyped","String") AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_string2() throws Exception {
+      new TestHelper("ticket-1007-string2",// testURI,
+            "ticket-1007-string2.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-string.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   /**
+   <code>
+      SELECT ?o
+      WHERE 
+      { 
+        ?s ?p ?o
+        BIND (STRAFTER("XuntypedString","X") AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_string3() throws Exception {
+      new TestHelper("ticket-1007-string3",// testURI,
+            "ticket-1007-string3.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-string.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   
+   /**
+   <code>
+      SELECT ?o
+      WHERE 
+      { 
+        ?s ?p ?o
+        BIND (URI("http://untypedString") AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_empty1() throws Exception {
+      new TestHelper("ticket-1007-empty1",// testURI,
+            "ticket-1007-empty1.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-empty.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+   
+   /**
+   <code>
+      SELECT ?o
+      WHERE 
+      {
+        ?s ?p ?o
+        BIND ("10" AS ?o)
+      }
+   </code>
+   */
+   public void test_ticket_1007_empty2() throws Exception {
+      new TestHelper("ticket-1007-empty2",// testURI,
+            "ticket-1007-empty2.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-empty.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
+
+   
+   /**
+   <code>
+      SELECT DISTINCT ?z
+      WHERE 
+      {
+        ?s ?p ?o
+        BIND (URI("http://untypedUri") AS ?z)
+      }
+   </code>
+   */
+   public void test_ticket_1007_freshUri() throws Exception {
+      new TestHelper("ticket-1007-freshUri",// testURI,
+            "ticket-1007-freshUri.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-freshUri.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }   
+   
 }
