@@ -275,6 +275,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         case quads:
             // QUADS mode UPDATE test suite. 
             suite.addTestSuite(TestSparqlUpdate.class);
+            suite.addTestSuite(TestConcurrentRestApiRequests.class);
             suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
             suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
             break;
@@ -312,6 +313,12 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
     
     @Override
 	public Properties getProperties() {
+    
+    	return getProperties(testMode);
+    	
+    }
+    
+	static public Properties getProperties(final TestMode testMode) {
 
 //    	System.err.println("testMode="+testMode);
     	

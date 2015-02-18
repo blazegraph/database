@@ -234,7 +234,7 @@ public class RemoteRepository {
      * options, but the client API must not include a dependency on the Sail so
      * it is given by value again here in a package local scope.
      */
-    static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
+    public static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
 
     /**
      * Return the maximum requestURL length before the request is converted into

@@ -813,7 +813,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public void test_POST_INSERT_triples_with_BODY_and_defaultContext()
 			throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		final String resource = packagePath
@@ -847,7 +847,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public void test_POST_INSERT_triples_with_URI_and_defaultContext()
 			throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
@@ -901,7 +901,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_POST_INSERT_NQuads_by_URL() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
@@ -1188,7 +1188,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_ESTCARD_quads_01() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_estcard.trig");
@@ -1204,7 +1204,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 	public void test_ESTCARD_quads_02() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_estcard.trig");
@@ -1221,7 +1221,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 	public void test_ESTCARD_quads_03() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_estcard.trig");
@@ -1238,7 +1238,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 	public void test_ESTCARD_quads_04() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_estcard.trig");
@@ -1259,7 +1259,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_CONTEXTS() throws Exception {
 
-		if (testMode != TestMode.quads)
+		if (getTestMode() != TestMode.quads)
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_estcard.trig");
@@ -1442,7 +1442,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_DELETE_accessPath_delete_c() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_delete_by_access_path.trig");
@@ -1515,7 +1515,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_DELETE_accessPath_delete_c1() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_delete_by_access_path.trig");
@@ -1538,7 +1538,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_DELETE_accessPath_delete_multiple_contexts() throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_delete_by_access_path.trig");
@@ -1614,7 +1614,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public void test_DELETE_accessPath_delete_c_nothingMatched()
 			throws Exception {
 
-		if (TestMode.quads != testMode)
+		if (TestMode.quads != getTestMode())
 			return;
 
 		doInsertbyURL("POST", packagePath + "test_delete_by_access_path.trig");
