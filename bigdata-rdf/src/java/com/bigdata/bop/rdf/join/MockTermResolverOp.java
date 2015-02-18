@@ -29,8 +29,8 @@ package com.bigdata.bop.rdf.join;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -48,7 +48,6 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVCache;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -251,7 +250,7 @@ public class MockTermResolverOp extends PipelineOp {
     * @param chunk
     *           The chunk of solutions whose variables will be materialized.
     */
-   static void handleChunk(final IVariable<?>[] required,
+   private static void handleChunk(final IVariable<?>[] required,
          final LexiconRelation lex,//
          final IBindingSet[] chunk//
    ) {
@@ -271,7 +270,7 @@ public class MockTermResolverOp extends PipelineOp {
        * to the associated BigdataValue.
        */
       final Map<IV<?, ?>, BigdataValue> ivMap = 
-         new HashMap<IV<?, ?>, BigdataValue>(initialCapacity);
+         new LinkedHashMap<IV<?, ?>, BigdataValue>(initialCapacity);
       
       for (IBindingSet solution : chunk) {
 
@@ -395,8 +394,8 @@ public class MockTermResolverOp extends PipelineOp {
     * @param ivVals array to store {@link BigdataValue}s of ivs satisfying the
     *          condition
     */
-   protected static void collectIfValueMocked(IV<?, ?> iv,
-         Map<IV<?, ?>, BigdataValue> ivMap) {
+   private static void collectIfValueMocked(final IV<?, ?> iv,
+         final Map<IV<?, ?>, BigdataValue> ivMap) {
       
       final Object ivVal = iv.getValue();
       if (ivVal instanceof BigdataValue) {
@@ -464,9 +463,10 @@ public class MockTermResolverOp extends PipelineOp {
              * instead we need to construct a fresh constant with the resolved
              * value.
              */
-            bindingSet.set(var, 
-               new Constant<IV<BigdataValue, ?>>(value.getIV()));
-
+            if (value!=null) {
+               bindingSet.set(var, 
+                  new Constant<IV<BigdataValue, ?>>(value.getIV()));
+            } // otherwise: nothing to be done (TODO: check)
          }
 
       } else {
