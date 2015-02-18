@@ -68,9 +68,8 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *       operations, from the {@link DataService}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class TestConcurrentJournal extends ProxyTestCase {
+public class TestConcurrentJournal extends ProxyTestCase<Journal> {
 
     public TestConcurrentJournal() {
         super();
@@ -136,14 +135,15 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<String> future = journal.submit(new AbstractTask<String>(journal,
                     ITx.READ_COMMITTED, resource) {
 
                 /**
                  * The task just sets a boolean value and returns the name of
                  * the sole resource. It does not actually read anything.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected String doTask() throws Exception {
 
                     ran.compareAndSet(false, true);
 
@@ -195,7 +195,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<String> future = journal.submit(new AbstractTask<String>(journal,
                     ITx.UNISOLATED, resource) {
 
                 /**
@@ -203,7 +203,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
                  * the sole resource. It does not actually read or write on
                  * anything.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected String doTask() throws Exception {
 
                     ran.compareAndSet(false, true);
 
@@ -265,7 +266,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             assertNotSame(ITx.UNISOLATED, tx);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<String> future = journal.submit(new AbstractTask<String>(journal,
                     tx, resource) {
 
                 /**
@@ -273,7 +274,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
                  * the sole resource. It does not actually read or write on
                  * anything.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected String doTask() throws Exception {
 
                     ran.compareAndSet(false, true);
 
@@ -334,7 +336,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             // final long tx = journal.newTx(IsolationEnum.ReadCommitted);
             // assertNotSame(ITx.UNISOLATED, tx);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<String> future = journal.submit(new AbstractTask<String>(journal,
                     tx, resource) {
 
                 /**
@@ -342,7 +344,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
                  * the sole resource. It does not actually read or write on
                  * anything.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected String doTask() throws Exception {
 
                     ran.compareAndSet(false, true);
 
@@ -409,7 +412,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             assertNotSame(ITx.UNISOLATED, tx);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<String> future = journal.submit(new AbstractTask<String>(journal,
                     tx, resource) {
 
                 /**
@@ -417,7 +420,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
                  * the sole resource. It does not actually read or write on
                  * anything.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected String doTask() throws Exception {
 
                     ran.compareAndSet(false, true);
 
@@ -482,13 +486,14 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<Void> future = journal.submit(new AbstractTask<Void>(journal,
                     ITx.UNISOLATED, resource) {
 
                 /**
                  * The task just sets a boolean value and then sleeps.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected Void doTask() throws Exception {
 
                     ran.compareAndSet(false, true);
 
@@ -610,14 +615,15 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
             final AtomicBoolean ran = new AtomicBoolean(false);
 
-            final Future<? extends Object> future = journal.submit(new AbstractTask(journal,
+            final Future<Void> future = journal.submit(new AbstractTask<Void>(journal,
                     ITx.UNISOLATED, resource) {
 
                 /**
                  * The task just sets a boolean value and then runs an infinite
                  * loop, <strong>ignoring interrupts</strong>.
                  */
-                protected Object doTask() throws Exception {
+            	@Override
+                protected Void doTask() throws Exception {
 
                     t.set(Thread.currentThread());
 
@@ -923,10 +929,11 @@ public class TestConcurrentJournal extends ProxyTestCase {
             /*
              * Note: this task is stateless
              */
-            final AbstractTask task = new AbstractTask(journal, ITx.UNISOLATED,
+            final AbstractTask<Void> task = new AbstractTask<Void>(journal, ITx.UNISOLATED,
                     resource) {
 
-                protected Object doTask() throws Exception {
+            	@Override
+                protected Void doTask() throws Exception {
 
                     return null;
 
@@ -1187,8 +1194,10 @@ public class TestConcurrentJournal extends ProxyTestCase {
             }
 
             // Submit task that writes on the index and wait for the commit.
-            journal.submit(new AbstractTask(journal,ITx.UNISOLATED,name){
-                protected Object doTask() throws Exception {
+            journal.submit(new AbstractTask<Void>(journal,ITx.UNISOLATED,name){
+
+            	@Override
+                protected Void doTask() throws Exception {
                     
                     final BTree ndx = (BTree)getIndex(name);
                     
@@ -1200,6 +1209,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                     
                     return null;
                 }
+            	
             }).get(); // wait for the commit.
             
             // verify checkpoint was updated.
@@ -1477,9 +1487,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * A class used to force aborts on tasks and then recognize the abort by the
      * {@link ForcedAbortException} from the uni
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
-    private class ForcedAbortException extends RuntimeException {
+    @SuppressWarnings("unused")
+	private class ForcedAbortException extends RuntimeException {
 
         private static final long serialVersionUID = 1L;
         
@@ -1642,7 +1652,6 @@ public class TestConcurrentJournal extends ProxyTestCase {
      * strategy is still open).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public void test_concurrentReadersAreOk() throws Throwable {
 
@@ -1673,12 +1682,14 @@ public class TestConcurrentJournal extends ProxyTestCase {
             final int NWRITES = 10000;
             final String[] resource = new String[NRESOURCES];
             {
-                KeyBuilder keyBuilder = new KeyBuilder(4);
+            	final KeyBuilder keyBuilder = new KeyBuilder(4);
                 for (int i = 0; i < resource.length; i++) {
                     resource[i] = "index#" + i;
-                    final IIndex ndx = journal.registerIndex(resource[i], new IndexMetadata(resource[i],UUID.randomUUID()));
+					final IIndex ndx = (IIndex) journal.register(
+							resource[i], new IndexMetadata(resource[i],
+									UUID.randomUUID()));
                     for (int j = 0; j < NWRITES; j++) {
-                        byte[] val = (resource[i] + "#" + j).getBytes();
+                    	final byte[] val = (resource[i] + "#" + j).getBytes();
                         ndx.insert(keyBuilder.reset().append(j).getKey(), val);
                     }
                 }
@@ -1702,9 +1713,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
              * 
              * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
              *         Thompson</a>
-             * @version $Id$
              */
-            class ReadTask extends AbstractTask {
+            class ReadTask extends AbstractTask<Void> {
 
                 protected ReadTask(IConcurrencyManager concurrencyManager,
                         String resource) {
@@ -1713,7 +1723,8 @@ public class TestConcurrentJournal extends ProxyTestCase {
 
                 }
 
-                protected Object doTask() throws Exception {
+                @Override
+                protected Void doTask() throws Exception {
 
                     final IIndex ndx = getIndex(getOnlyResource());
 
@@ -1726,7 +1737,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
                     }
 //                    assertTrue(ndx instanceof ReadOnlyIndex);
                     
-                    final ITupleIterator itr = ndx.rangeIterator(null, null);
+                    final ITupleIterator<?> itr = ndx.rangeIterator(null, null);
 
                     int n = 0;
 
@@ -1763,6 +1774,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
             for (int i = 0; i < 10; i++) {
                 final String theResource = resource[i % resource.length];
                 writerService.submit(new Callable<Object>() {
+                	@Override
                     public Object call() throws Exception {
                         journal.submit(new InterruptMyselfTask(journal,
                                 ITx.UNISOLATED, theResource));
@@ -1779,7 +1791,7 @@ public class TestConcurrentJournal extends ProxyTestCase {
              * while.
              */
             {
-                Collection<AbstractTask> tasks = new LinkedList<AbstractTask>();
+            	final Collection<AbstractTask<Void>> tasks = new LinkedList<AbstractTask<Void>>();
                 for (int i = 0; i < NRESOURCES * 10; i++) {
                     
                     tasks.add(new ReadTask(journal, resource[i
@@ -1788,9 +1800,9 @@ public class TestConcurrentJournal extends ProxyTestCase {
                 }
                 
                 // await futures.
-                final List<Future> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
+                final List<Future<Void>> futures = journal.invokeAll(tasks, 10, TimeUnit.SECONDS);
                 
-                for(Future f : futures) {
+                for(Future<Void> f : futures) {
                 
                     if(f.isDone()&&!f.isCancelled()) {
                         // all tasks that complete should have done so without error.
