@@ -232,7 +232,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
     public void test_INSERT_triples_with_BODY_and_defaultContext()
             throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
 
         final String resource = packagePath
@@ -255,7 +255,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
     
     public void test_INSERT_triples_with_URI_and_defaultContext() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
         
         // Load the resource into the KB.
@@ -281,7 +281,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
     public void test_INSERT_NQuads_by_URL()
             throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
 
         // Verify nothing in the KB.
@@ -385,7 +385,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_CONTEXTS() throws Exception {
 
-    	if (testMode != TestMode.quads)
+    	if (getTestMode() != TestMode.quads)
     		return;
 
         doInsertbyURL("POST", packagePath
@@ -560,7 +560,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_DELETE_accessPath_delete_c() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
         
         doInsertbyURL("POST", packagePath
@@ -583,7 +583,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_DELETE_accessPath_delete_c1() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
         
         doInsertbyURL("POST", packagePath
@@ -606,7 +606,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_DELETE_accessPath_delete_c_nothingMatched() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
 
         doInsertbyURL("POST", packagePath
@@ -781,7 +781,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_GET_accessPath_delete_c() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
         
         doInsertbyURL("POST", packagePath
@@ -804,7 +804,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_GET_accessPath_delete_c1() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
         
         doInsertbyURL("POST", packagePath
@@ -827,7 +827,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_GET_accessPath_delete_c_nothingMatched() throws Exception {
 
-        if(TestMode.quads != testMode)
+        if(TestMode.quads != getTestMode())
             return;
 
         doInsertbyURL("POST", packagePath

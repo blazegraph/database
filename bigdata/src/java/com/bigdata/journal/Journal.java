@@ -3385,11 +3385,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
 
     @Override
-    @SuppressWarnings("rawtypes")
-    public List<Future> invokeAll(
-            Collection<? extends AbstractTask> tasks, long timeout,
-            TimeUnit unit) throws InterruptedException {
-        
+	public <T> List<Future<T>> invokeAll(
+			final Collection<? extends AbstractTask<T>> tasks,
+			final long timeout, final TimeUnit unit)
+			throws InterruptedException {
+
         return concurrencyManager.invokeAll(tasks, timeout, unit);
         
     }

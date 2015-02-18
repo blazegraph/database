@@ -247,8 +247,18 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 	}
 	
-	TestMode testMode = null;
+	/**
+	 * The {@link TestMode} that is in effect.
+	 */
+	private TestMode testMode = null;
 	
+	/**
+	 * The {@link TestMode} that is in effect.
+	 */
+	protected TestMode getTestMode() {
+		return testMode;
+	}
+
 	protected Server newFixture(final String lnamespace) throws Exception {
 		final IIndexManager indexManager = getIndexManager();
 		
@@ -259,7 +269,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         		lnamespace, properties);
         
         if (tripleStore.isStatementIdentifiers()) {
-            testMode = TestMode.sids;
+			testMode = TestMode.sids;
         } else if (tripleStore.isQuads()) {
             testMode = TestMode.quads;
         } else {
@@ -1648,4 +1658,5 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         }
 
     }
+
 }
