@@ -350,14 +350,17 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
              * isolation logic).
              */
 
-            // Obtain the necessary locks for R/w access to KB indices.
+            // Obtain the names of the necessary locks for R/W access to indices.
             final String[] locks = getLocksForKB((Journal) indexManager,
                     namespace);
 
             final IConcurrencyManager cc = ((Journal) indexManager)
                     .getConcurrencyManager();
             
-            // Submit task to ConcurrencyManager. Will acquire locks and run.
+            // Submit task to ConcurrencyManager. 
+            // Task will (eventually) acquire locks and run.
+            // Note: The Future of that task is returned to the caller.
+            // TODO Could pass through timeout for submitted task here.
             return cc.submit(new ApiTaskForJournal(cc, task.getTimestamp(),
                     locks, task));
 

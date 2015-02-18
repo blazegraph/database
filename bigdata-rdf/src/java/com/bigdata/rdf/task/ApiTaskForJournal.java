@@ -63,14 +63,17 @@ public class ApiTaskForJournal<T> extends AbstractTask<T> {
     @Override
     protected T doTask() throws Exception {
 
+    	// Set reference to Journal on the delegate.
         delegate.setIndexManager(getJournal());
 
         try {
 
+        	// Run the delegate task.
             return delegate.call();
 
         } finally {
 
+        	// Clear reference to the Journal from the delegate.
             delegate.clearIndexManager();
 
         }
