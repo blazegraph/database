@@ -59,7 +59,6 @@ import com.bigdata.util.NV;
  * indices.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class StressTestConcurrentUnisolatedIndices extends
         ProxyTestCase<Journal> implements IComparisonTest {
@@ -255,7 +254,7 @@ public class StressTestConcurrentUnisolatedIndices extends
          * Setup the tasks that we will submit.
          */
 
-        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>();
+        final Collection<AbstractTask<Void>> tasks = new HashSet<AbstractTask<Void>>();
 
         final ConcurrentHashMap<String, Thread> btrees = new ConcurrentHashMap<String, Thread>();
 
@@ -291,14 +290,14 @@ public class StressTestConcurrentUnisolatedIndices extends
 
         final long begin = System.currentTimeMillis();
 
-        final List<Future> results = journal.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+        final List<Future<Void>> results = journal.invokeAll(tasks, timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
 
         /*
          * Examine the futures to see how things went.
          */
-        final Iterator<Future> itr = results.iterator();
+        final Iterator<Future<Void>> itr = results.iterator();
         
         int nfailed = 0; // #of tasks that failed.
 //        int nretry = 0; // #of tasks that threw RetryException
@@ -400,7 +399,7 @@ public class StressTestConcurrentUnisolatedIndices extends
     /**
      * A task that writes on named unisolated index(s).
      */
-    public static class WriteTask extends AbstractTask {
+    public static class WriteTask extends AbstractTask<Void> {
 
         private final int trial;
         private final int keyLen;
@@ -440,7 +439,7 @@ public class StressTestConcurrentUnisolatedIndices extends
          * @return null
          */
         @Override
-        public Object doTask() throws Exception {
+        public Void doTask() throws Exception {
 
             // the index names on which the writer holds a lock.
             final String[] resource = getResource();
@@ -549,7 +548,6 @@ public class StressTestConcurrentUnisolatedIndices extends
      * {@link TestOptions#FAILURE_RATE}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     private static class SpuriousException extends RuntimeException {
 
@@ -703,7 +701,7 @@ public class StressTestConcurrentUnisolatedIndices extends
      *            each property has a defined value.
      */
     @Override
-    public Result doComparisonTest(Properties properties) throws Exception {
+    public Result doComparisonTest(final Properties properties) throws Exception {
 
         final long timeout = Long.parseLong(properties.getProperty(TestOptions.TIMEOUT));
 
@@ -732,7 +730,6 @@ public class StressTestConcurrentUnisolatedIndices extends
      * Experiment generation utility class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class GenerateExperiment extends ExperimentDriver {
         
