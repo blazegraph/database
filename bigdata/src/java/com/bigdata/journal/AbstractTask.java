@@ -1579,6 +1579,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Returns a copy of the array of resources declared to the constructor.
      */
+    @Override
     public String[] getResource() {
 
         // clone so that people can not mess with the resource names.
@@ -1594,6 +1595,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @exception IllegalStateException
      *                if more than one resource was declared.
      */
+    @Override
     public String getOnlyResource() {
         
         if (resource.length > 1)
@@ -1739,6 +1741,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Returns Task{taskName,timestamp,elapsed,resource[]}
      */
+    @Override
     public String toString() {
         
         return "Task{" + getTaskName() + ",timestamp="
@@ -1859,6 +1862,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *             executor service running the task to be shutdown and thereby
      *             interrupt all running tasks).
      */
+    @Override
     final public T call() throws Exception {
         
         try {

@@ -83,9 +83,8 @@ import com.bigdata.util.NV;
  *       minimum effort that a task can do to write on the store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class StressTestGroupCommit extends ProxyTestCase implements IComparisonTest {
+public class StressTestGroupCommit extends ProxyTestCase<Journal> implements IComparisonTest {
 
     /**
      * 
@@ -346,7 +345,6 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * Options understood by this stress test.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface TestOptions extends Options {
         
@@ -388,7 +386,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         /*
          * Create the tasks.
          */
-        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
+        final Collection<AbstractTask<Void>> tasks = new HashSet<AbstractTask<Void>>(ntasks);
 
         // updated by each task that runs.
         final AtomicLong nrun = new AtomicLong(0);
@@ -406,9 +404,10 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
 //                    new RegisterIndexTask(journal, resource, 
 //                            new IndexMetadata(resource, indexUUID)),
 
-                    new AbstractTask(journal, ITx.UNISOLATED, resource) {
+                    new AbstractTask<Void>(journal, ITx.UNISOLATED, resource) {
                         
-                        protected Object doTask() throws Exception {
+                    	@Override
+                        protected Void doTask() throws Exception {
 
                             getJournal().registerIndex(resource, new IndexMetadata(resource, indexUUID));
                             
@@ -609,7 +608,6 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * Experiment generation utility class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class GenerateExperiment extends ExperimentDriver {
         

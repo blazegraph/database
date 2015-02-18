@@ -2936,9 +2936,10 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             } else {
 
                 // choose the tasks to be run.
-                final List<AbstractTask> tasks = chooseTasks(forceCompactingMerges);
+				final List<AbstractTask> tasks = chooseTasks(forceCompactingMerges);
 
-                runTasks(tasks);
+				// Note: Must discard element type to make compiler happy.
+				runTasks((List) tasks);
                 
             }
 
@@ -3107,7 +3108,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * 
      * @throws InterruptedException
      */
-    protected void runTasks(final List<AbstractTask> tasks)
+    protected <T> void runTasks(final List<AbstractTask<T>> tasks)
             throws InterruptedException {
 
         if (log.isInfoEnabled())
@@ -3133,7 +3134,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * overflow again, when we run out of time, or when there are no more tasks
      * to be executed.
      */
-    protected void runTasksInSingleThread(final List<AbstractTask> tasks)
+    protected <T> void runTasksInSingleThread(final List<AbstractTask<T>> tasks)
         throws InterruptedException {
         
         final ExecutorService executorService = Executors
@@ -3150,7 +3151,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
             
             long remaining = nanos;
             
-            final Iterator<AbstractTask> titr = tasks.iterator();
+            final Iterator<AbstractTask<T>> titr = tasks.iterator();
 
             int ndone = 0;
             
@@ -3179,7 +3180,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
                     
                 }
 
-                final AbstractTask task = titr.next();
+                final AbstractTask<T> task = titr.next();
                 
                 final Future<? extends Object> f = resourceManager
                         .getConcurrencyManager().submit(task);
@@ -3218,7 +3219,7 @@ public class AsynchronousOverflowTask implements Callable<Object> {
      * 
      * @see {@link OverflowManager#overflowTasksConcurrent}
      */
-    protected void runTasksConcurrent(final List<AbstractTask> tasks)
+    protected <T> void runTasksConcurrent(final List<AbstractTask<T>> tasks)
         throws InterruptedException {
 
         assert resourceManager.overflowTasksConcurrent >= 0;
@@ -3254,19 +3255,19 @@ public class AsynchronousOverflowTask implements Callable<Object> {
              * that class is not a good citizen of the Executor and
              * ExecutorService patterns.
              */
-            final List<Future> futures = resourceManager
+            final List<Future<T>> futures = resourceManager
                     .getConcurrencyManager().invokeAll(tasks,
                             resourceManager.overflowTimeout,
                             TimeUnit.MILLISECONDS);
 
             // Note: list is 1:1 correlated with [futures].
-            final Iterator<AbstractTask> titr = tasks.iterator();
+            final Iterator<AbstractTask<T>> titr = tasks.iterator();
 
             // verify that all tasks completed successfully.
             for (Future<? extends Object> f : futures) {
 
                 // the task for that future.
-                final AbstractTask task = titr.next();
+                final AbstractTask<T> task = titr.next();
 
                 /*
                  * Non-blocking: all tasks have already either completed or been
