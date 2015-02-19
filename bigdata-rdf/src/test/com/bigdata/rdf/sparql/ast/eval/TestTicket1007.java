@@ -132,6 +132,7 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
           :s :integer "10"^^xsd:integer .
           :s :double "10.0"^^xsd:double .
           :s :boolean "true"^^xsd:boolean .
+          :c :p5 "5"^^xsd:integer .          
       }
       </code>
     * 
@@ -229,6 +230,26 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
             false // checkOrder (because only one solution)
       ).runTest();
    }
+   
+   // TODO: finish this test case
+   /**
+   <code>
+      SELECT ?o
+      { 
+        ?s <http://www.bigdata.com/integer> ?o .
+        <http://www.bigdata.com/c> <http://www.bigdata.com/p5> ?v .
+        BIND (?v*2 AS ?o)
+      }
+   </code>
+   */   
+   public void test_ticket_1007_number6() throws Exception {
+      new TestHelper("ticket-1007-number6",// testURI,
+            "ticket-1007-number6.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-number-integer.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }
 
    /**
    <code>
@@ -291,6 +312,52 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
       ).runTest();
    }
 
+   /**
+   <code>
+       SELECT ?o
+       WHERE 
+       { 
+          ?s ?p ?o
+          {
+             SELECT ?o
+             WHERE
+             {
+                BIND (CONCAT("untyped","String") AS ?o)
+             }
+          }
+       }
+   </code>
+   *
+   * Note: originally this query failed.
+   */
+   public void test_ticket_1007_string4() throws Exception {
+      new TestHelper("ticket-1007-string4",// testURI,
+            "ticket-1007-string4.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-string.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }   
+   
+   /**
+   <code>
+       SELECT ?o
+       WHERE 
+       { 
+          BIND (CONCAT("untyped","String") AS ?o)
+       }
+   </code>
+   *
+   * Note: originally this query failed.
+   */
+   public void test_ticket_1007_string5() throws Exception {
+      new TestHelper("ticket-1007-string5",// testURI,
+            "ticket-1007-string5.rq",// queryFileURL
+            "ticket-1007-custom.trig",// dataFileURL
+            "ticket-1007-string.srx",// resultFileURL
+            false // checkOrder (because only one solution)
+      ).runTest();
+   }   
    
    /**
    <code>
