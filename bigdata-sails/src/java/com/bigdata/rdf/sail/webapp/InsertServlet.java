@@ -358,6 +358,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
             final long elapsed = System.currentTimeMillis() - begin;
             
+            // Nothing to do.
             reportModifiedCount(resp, 0L/* nmodified */, elapsed);
 
         	return;
