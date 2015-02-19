@@ -2129,7 +2129,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             if (!ran) {
 
-                // Do not re-invoke it afterTask failed above.
+                // Note: Do not re-invoke afterTask() if it failed above.
 
                 if (log.isInfoEnabled())
                     log.info("Task failed: class=" + this + " : " + t2);
