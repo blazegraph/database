@@ -92,11 +92,14 @@ import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.constraints.UUIDBOp;
 import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -112,6 +115,7 @@ import com.bigdata.rdf.sparql.ast.FilterExistsModeEnum;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -2965,10 +2969,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 continue;
             } else if (child instanceof AssignmentNode) {
                
-               if (assignmentNodeNeedsToBeResolved((AssignmentNode)child)) {
+               if (mustBeResolvedInContext((AssignmentNode)child,ctx)) {
                   
                   left = addResolvedAssignment(left, (AssignmentNode) child, 
-                        doneSet, joinGroup.getQueryHints(), ctx);                      
+                        doneSet, joinGroup.getQueryHints(), ctx);
                   
                } else {
                   
@@ -3010,68 +3014,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
 
     /**
-     * Makes a static (pessimistic) best effort decision whether or not the
-     * assignment node needs to be resolved (i.e., its possibly mocked IV is to
-     * be joined against the dictionary) or not.
-     * 
-     * @param ass
-     * @return
-     */
-    private static boolean assignmentNodeNeedsToBeResolved(AssignmentNode ass) {
-
-       /*
-        *  In case the assignment node is either a constant (has been joined
-        *  against the dictionary already!) or a boolean expression (which
-        *  will resolve to true/false anyways), we do not need to resolve
-        *  the constructed value. 
-        *  
-        *  Note: There might be other edge cases for which we're on the safe
-        *  side and can return false, but this seems to cover most cases.
-        */
-       final IValueExpression<?> vexp = ass.getValueExpression();
-       if (vexp instanceof IConstant || 
-           vexp instanceof XSDBooleanIVValueExpression) {
-          return false;
-       }
-       
-       /*
-        * In case of more complex assignment expressions, we may still not
-        * require to resolve the IV in case the bound variable is not used
-        * anywhere else in the query. To do so, we count the number of 
-        * occurrences of the variable in the root query; if it occurs more
-        * than once (i.e., more often than the binding in the assignment node,
-        * it is (in the general case) not safe to suppress the resolving.
-        * 
-        * Note: this again is overly broad. However, there are only rare cases
-        * where the same variable is used twice independently (e.g. in
-        * unconnected unions), which we ignore here.
-        */
-
-       // get query root
-       IGroupNode queryRoot = ass.getParent();
-       while (queryRoot.getParent()!=null) {
-          queryRoot=queryRoot.getParent();
-       }
-
-       // get assignment variable
-       final IVariable<IV> var = ass.getVar();
-
-       // get number of occurrences
-       final int nrOccurrences = BOpUtility.countOccurrencesOf(queryRoot, var);
-       if (nrOccurrences<=1) {
-          return false;
-       }
-          
-       // TODO: test case for 2*?s etc.
-
-       
-       /*
-        * None of the two cases applies
-        */
-       return true;
-   }
-
-   /**
      * Attempt to translate the join group using a merge join.
      * <P>
      * We recognize a merge join when there an INCLUDE followed by either a
@@ -5217,7 +5159,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * 
      * @see MockTermResolverOp
      */
-    protected static PipelineOp addMockTermResolverOp(//
+    private static PipelineOp addMockTermResolverOp(//
             PipelineOp left,//
             final Set<IVariable<IV>> vars,//
             final boolean materializeInlineIvs,//
@@ -5264,7 +5206,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * 
      * @see VariableUnificationOp
      */
-    protected static PipelineOp addVariableUnificationOp(//
+    private static PipelineOp addVariableUnificationOp(//
           PipelineOp left,//
           final IVariable<IV> targetVar,
           final IVariable<IV> tmpVar,
@@ -5275,5 +5217,79 @@ public class AST2BOpUtility extends AST2BOpRTO {
                       new IVariable[] { targetVar, tmpVar }),
              new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
     }
+
+   /**
+     * Makes a static (pessimistic) best effort decision whether or not the
+     * assignment node needs to be resolved (i.e., its possibly mocked IV must
+     * be resolved against the dictionary). 
+     * 
+     * @param ass the assignment node to investigate
+     * @param ctx the query evaluation context
+     * 
+     * @return false if it can be guaranteed that the IVs are not mocked or
+     *               do not need to be resolved, true otherwise
+     */
+    private static boolean mustBeResolvedInContext(
+       final AssignmentNode ass, final AST2BOpContext ctx) {
+
+       final IValueExpression<?> vexp = ass.getValueExpression();
+       
+       /* APPROACH: SCAN FOR SAFE CASES, RETURN true IF NOT ENCOUNTERED */
+       
+       /*
+        * We're always fine with numerical and boolean expressions.
+        */
+       if (vexp instanceof MathBOp ||
+           vexp instanceof XSDBooleanIVValueExpression) {
+          return false;
+            
+       }
+       
+       /*
+        * Handle cases where the assignment node is a constant with 
+        * known bound value.
+        */
+       if (vexp instanceof IConstant) {
+          final IConstant<?> vexpAsConst = (IConstant<?>)vexp;
+          final Object val = vexpAsConst.get();
+          
+          if (val instanceof TermId) {    
+             
+             // whenever IV is not mocked, we're fine
+             final TermId<?> valAsTermId = (TermId<?>)val;
+             if (!valAsTermId.isNullIV()) {
+                return false;
+             }
+   
+          } else if (val instanceof NumericIV) {
+
+             // also, numerics don't pose problems
+             return false;
+          }
+       }
+          
+       
+       /*
+        * In case of more complex assignment expressions, we may still not
+        * require to resolve the IV in case the bound variable is not used
+        * anywhere else in the query. To do so, we count the number of 
+        * occurrences of the variable in the root query; if it occurs more
+        * than once (i.e., more often than the binding in the assignment node,
+        * it is (in the general case) not safe to suppress the resolving.
+        * 
+        * Note: this again is overly broad. However, there are only rare cases
+        * where the same variable is used twice independently (e.g. in
+        * unconnected unions), which we ignore here.
+        */
+       if (BOpUtility.countOccurrencesOf(
+             ctx.sa.getQueryRoot().getWhereClause(), ass.getVar()) <= 1) {
+          return false;
+       }
+          
+       /*
+        * Fallback: we can't be sure that resolval is not required
+        */
+       return true;
+   }
     
 }
