@@ -59,6 +59,7 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -215,6 +216,12 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				 */
 				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause
+               .isInnerCause(t, QuadsOperationInTriplesModeException.class)) {
+			
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            resp.setContentType(MIME_TEXT_PLAIN);		
+			   
 			} else {
 				// Internal server error.
 				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

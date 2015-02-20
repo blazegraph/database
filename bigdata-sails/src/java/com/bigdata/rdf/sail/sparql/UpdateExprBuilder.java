@@ -95,6 +95,7 @@ import com.bigdata.rdf.sparql.ast.LoadGraph;
 import com.bigdata.rdf.sparql.ast.MoveGraph;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -633,8 +634,14 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             
             if (withNode != null) {
                 
-                with = (ConstantNode) withNode.jjtAccept(this, data);
+                if (!context.tripleStore.isQuads()) {
+                    throw new QuadsOperationInTriplesModeException(
+                         "Using named graph referenced through WITH clause " +
+                         "is not supported in triples mode.");
+                }
                 
+                with = (ConstantNode) withNode.jjtAccept(this, data);
+
                 /*
                  * Set the default context for the WHERE clause, DELETE clause,
                  * and/or INSERT clauser.
@@ -766,6 +773,19 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         }
         catch (IOException e) {
             throw new VisitorException(e);
+        }
+        
+        /**
+         * Reject real quads in triple mode
+         */
+        if (!context.tripleStore.isQuads()) {
+           for (Statement stmt : stmts) {
+              if (stmt!=null && stmt.getContext()!=null) {
+                 throw new QuadsOperationInTriplesModeException(
+                    "Quads in SPARQL update data block are not supported " +
+                    "in triples mode.");
+              }
+           }
         }
         
         final BigdataStatement[] a = stmts.toArray(
