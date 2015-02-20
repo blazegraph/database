@@ -52,7 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.4.0-SNAPSHOT</version>
+   <version>1.5.0-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>bigdata(R)</name>
     <description>Bigdata(R) Maven Build</description>
@@ -319,11 +319,11 @@ dependencies.
 mvn deploy:deploy-file \
    -DgroupId=it.unimi \
    -DartifactId=fastutil \
-   -Dversion=5.1.5 \
+   -Dversion=6.5.16 \
    -Dpackaging=jar \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/unimi/fastutil-5.1.5.jar
+   -Dfile=bigdata/lib/unimi/fastutil-6.5.16.jar
                -->
            <groupId>it.unimi</groupId>
            <artifactId>fastutil</artifactId>
