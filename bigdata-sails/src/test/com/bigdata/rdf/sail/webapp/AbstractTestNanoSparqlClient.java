@@ -1501,11 +1501,15 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected long countResults(final RepositoryResult<Statement> result)
             throws Exception {
 
-        long i;
-        for (i = 0; result.hasNext(); i++) {
-            result.next();
-        }
-        return i;
+		try {
+			long i;
+			for (i = 0; result.hasNext(); i++) {
+				result.next();
+			}
+			return i;
+		} finally {
+			result.close();
+		}
 
     }
 

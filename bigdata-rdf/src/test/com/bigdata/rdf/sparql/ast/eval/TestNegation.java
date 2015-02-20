@@ -575,6 +575,9 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                             "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.originalIndex",
                             SPOKeyOrder.POCS);
 
+                    whereClause2.setProperty(
+                            "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.estimatedCardinality",
+                            1L);
                 }
                 
                 notExistsSubquery2.setAskVar(askVar2.getValueExpression());
@@ -665,6 +668,9 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                                 "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.originalIndex",
                                 SPOKeyOrder.POCS);
 
+                        whereClause1.setProperty(
+                                "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.estimatedCardinality",
+                                2L);
                     }
                     
                     notExistsSubquery1.setAskVar(askVar1.getValueExpression());
