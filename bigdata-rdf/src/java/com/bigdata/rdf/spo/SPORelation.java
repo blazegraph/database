@@ -1209,7 +1209,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
                  * The 4th position should never become bound for a triple store
                  * without statement identifiers.
                  */
-                throw new UnsupportedOperationException();
+                      
+                throw new UnsupportedOperationException(
+                    "Cannot execute quad operation (such as named graph access "
+                    + "or update) over the database, which has been initialized "
+                    + "in triples mode. Please do either re-initialize your DB "
+                    + "in quads mode or use operations over triples only.");
             }
             break;
         case 4:
