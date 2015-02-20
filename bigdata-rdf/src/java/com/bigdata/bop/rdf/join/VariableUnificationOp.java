@@ -115,6 +115,12 @@ public class VariableUnificationOp extends PipelineOp {
       this(args, NV.asMap(annotations));
 
    }
+   
+   public VariableUnificationOp(final VariableUnificationOp op) {
+
+      super(op);
+      
+  }
 
    /**
     * @return the target variable for unification, which will remain bound

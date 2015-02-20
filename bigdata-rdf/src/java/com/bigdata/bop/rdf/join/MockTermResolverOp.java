@@ -355,7 +355,7 @@ public class MockTermResolverOp extends PipelineOp {
          ivVals.toArray(new BigdataValue[ivVals.size()]);
 
       for (BigdataValue ivVal : ivValsArr) {
-         if (ivVal.getIV().isNullIV()) {
+         if (ivVal.getIV()!=null && ivVal.getIV().isNullIV()) {
             ivVal.clearInternalValue();
          }
       }
