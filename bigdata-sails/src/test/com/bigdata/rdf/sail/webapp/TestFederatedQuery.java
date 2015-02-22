@@ -495,14 +495,12 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     
 //  @Test
     public void test6() throws Exception {      
-    	fail("Failing test that takes too long."); // FIXME Remove this line. The problem is presumably on the remote service.
         prepareTest(null, Arrays.asList(PREFIX+"data06endpoint1.ttl"));
         execute(PREFIX+"service06.rq", PREFIX+"service06.srx", false);          
     }
     
 //  @Test
     public void test7() throws Exception {      
-    	fail("Failing test that takes too long."); // FIXME Remove this line. The problem is presumably on the remote service.
         // clears the repository and adds new data + execute
         prepareTest(PREFIX+"data07.ttl", Collections.<String>emptyList());
         execute(PREFIX+"service07.rq", PREFIX+"service07.srx", false);          
