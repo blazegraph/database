@@ -22,18 +22,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.webapp;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Future;
 
 import javax.servlet.ServletContext;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -42,10 +39,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.rdf.task.IApiTask;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -196,29 +195,123 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     }
 
     /**
-     * Submit a task and return a {@link Future} for that task. The task will be
-     * run on the appropriate executor service depending on the nature of the
-     * backing database and the view required by the task.
-     * 
-     * @param task
-     *            The task.
-     * 
-     * @return The {@link Future} for that task.
-     * 
-     * @throws DatasetNotFoundException
-     * 
-     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
-     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
-     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
-     *      Concurrent unisolated operations against multiple KBs </a>
-     */
+	 * Submit a task and return a {@link Future} for that task. The task will be
+	 * run on the appropriate executor service depending on the nature of the
+	 * backing database and the view required by the task.
+	 * <p>
+	 * <strong>The servlet API MUST NOT close the output stream from within the
+	 * a submitted mutation task. Closing the output stream within the mutation
+	 * task permits the client to conclude that the operation was finished
+	 * before the group commit actually occurs which breaks the visibility
+	 * guarantee of an ACID commit (the change is not yet visible).</strong>
+	 * <p>
+	 * This arises because the {@link AbstractApiTask} implementation has
+	 * invoked conn.commit() and hence believes that it was successful, but the
+	 * {@link AbstractTask} itself has not yet been through a checkpoint and the
+	 * write set for the commit group has not yet been melded into a stable
+	 * commit point. Instead, the caller MUST allow the servlet container to
+	 * close the output stream once the submitted task has completed
+	 * successfully (at which point the group commit will be stable). This
+	 * provides the necessary and correct visibility barrier for the updates.
+	 * 
+	 * @param task
+	 *            The task.
+	 * 
+	 * @return The {@link Future} for that task.
+	 * 
+	 * @throws DatasetNotFoundException
+	 * 
+	 * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+	 *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+	 * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+	 *      Concurrent unisolated operations against multiple KBs </a>
+	 */
     protected <T> Future<T> submitApiTask(final AbstractRestApiTask<T> task)
             throws DatasetNotFoundException {
 
         final IIndexManager indexManager = getIndexManager();
 
-        return AbstractApiTask.submitApiTask(indexManager, task);
-        
+		/*
+		 * CAUTION: DO NOT SUBMIT MUTATION TASKS THAT CLOSE THE HTTP OUTPUT
+		 * STREAM !!!
+		 */
+
+		return AbstractApiTask.submitApiTask(indexManager, new WrapperTask<T>(
+				task));
+
+    }
+
+    /**
+	 * Class ensures flush() and close() of the {@link ServletOutputStream} or
+	 * {@link PrintWriter} associated with the {@link HttpServletResponse}.
+	 * 
+	 * @author bryan
+	 * 
+	 * @param <T>
+	 */
+	private static class WrapperTask<T> implements IApiTask<T> {
+
+		private final AbstractRestApiTask<T> delegate;
+
+		WrapperTask(final AbstractRestApiTask<T> delegate) {
+
+			if (delegate == null)
+				throw new IllegalArgumentException();
+    		
+    		this.delegate = delegate;
+    		
+    	}
+    	
+		/**
+		 * Hook method is invoked after this task is executed. This may be used by
+		 * mutation tasks that need to coordinate some action with the successful
+		 * completion of the task.
+		 * 
+		 * @throws IOException 
+		 */
+	    protected void afterCall() throws Exception {
+	       
+	    	// Flush and close the output stream / writer.
+	    	delegate.flushAndClose();
+
+	    }
+
+	    @Override
+		public T call() throws Exception {
+
+	    	final T ret = delegate.call();
+			try {
+				afterCall();
+			} catch (Throwable t) {
+				// Log an ignore.
+				log.warn(t, t);
+			}
+			
+			return ret;
+		}
+
+		@Override
+		public String getNamespace() {
+			return delegate.getNamespace();
+		}
+
+		@Override
+		public long getTimestamp() {
+			return delegate.getTimestamp();
+		}
+
+		@Override
+		public void setIndexManager(IIndexManager indexManager) {
+
+			delegate.setIndexManager(indexManager);
+			
+		}
+
+		@Override
+		public void clearIndexManager() {
+			delegate.clearIndexManager();
+		}
+    	
     }
     
 //    /**
@@ -277,7 +370,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         
         if (getConfig(servletContext).readOnly) {
             
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     "Not writable.");
 
             // Not writable.  Response has been committed.
@@ -294,7 +387,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             return true;
         default:
             log.warn(haStatus.name());
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     haStatus.name());
             // Not writable.  Response has been committed.
             return false;
@@ -329,7 +422,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         default:
             // Not ready.
             log.warn(haStatus.name());
-            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
                     haStatus.name());
             // Response has been committed.
             return false;
@@ -491,115 +584,50 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
         
     }
 
-    static public void buildResponse(final HttpServletResponse resp,
-            final int status, final String mimeType) throws IOException {
+   /**
+    * Generate and commit a response having the indicated http status code, mime
+    * type, and content.
+    * 
+    * @param resp
+    * @param status
+    *           The http status code.
+    * @param mimeType
+    *           The MIME type of the response.
+    * @param content
+    *           The content
+    * @throws IOException
+    * 
+    *            FIXME GROUP_COMMIT: This flushes the response to the client
+    *            immediately. Therefore this method MUST NOT be invoked before
+    *            the group commit point! All code paths in the REST API that
+    *            have actually performed a mutation (vs simply reporting a
+    *            client or server error before entering into their mutation code
+    *            path) MUST handle that flush from within the
+    *            {@link AbstractRestApiTask}.
+    */
+   static public void buildAndCommitResponse(final HttpServletResponse resp,
+         final int status, final String mimeType, final String content)
+         throws IOException {
 
-        resp.setStatus(status);
+      resp.setStatus(status);
 
-        resp.setContentType(mimeType);
+      resp.setContentType(mimeType);
 
-    }
+      final Writer w = resp.getWriter();
 
-    static public void buildResponse(final HttpServletResponse resp, final int status,
-            final String mimeType, final String content) throws IOException {
+      if (content != null)
+         w.write(content);
 
-        buildResponse(resp, status, mimeType);
+      /*
+       * Note: This commits the response! This method MUST NOT be used within an
+       * AbstractRestApiTask that results in a mutation as that would permit the
+       * client to believe that the mutation was committed when in fact it is
+       * NOT committed until the AbstractTask running that AbstractRestApiTask
+       * is melded into a group commit, which occurs *after* the user code for
+       * task is done executing.
+       */
+      w.flush();
 
-        final Writer w = resp.getWriter();
-
-        w.write(content);
-
-        w.flush();
-
-    }
-
-    static protected void buildResponse(final HttpServletResponse resp,
-            final int status, final String mimeType, final InputStream content)
-            throws IOException {
-
-        buildResponse(resp, status, mimeType);
-
-        final OutputStream os = resp.getOutputStream();
-
-        copyStream(content, os);
-
-        os.flush();
-
-    }
-
-    /**
-     * Copy the input stream to the output stream.
-     * 
-     * @param content
-     *            The input stream.
-     * @param outstr
-     *            The output stream.
-     *            
-     * @throws IOException
-     */
-    static protected void copyStream(final InputStream content,
-            final OutputStream outstr) throws IOException {
-
-        final byte[] buf = new byte[1024];
-
-        while (true) {
-        
-            final int rdlen = content.read(buf);
-            
-            if (rdlen <= 0) {
-            
-                break;
-                
-            }
-            
-            outstr.write(buf, 0, rdlen);
-            
-        }
-
-    }
-
-    /**
-     * Conditionally wrap the input stream, causing the data to be logged as
-     * characters at DEBUG. Whether or not the input stream is wrapped depends
-     * on the current {@link #log} level.
-     * 
-     * @param instr
-     *            The input stream.
-     * 
-     * @return The wrapped input stream.
-     * 
-     * @throws IOException
-     */
-    protected InputStream debugStream(final InputStream instr)
-            throws IOException {
-
-        if (!log.isDebugEnabled()) {
-
-            return instr;
-
-        }
-
-        final ByteArrayOutputStream outstr = new ByteArrayOutputStream();
-
-        final byte[] buf = new byte[1024];
-        int rdlen = 0;
-        while (rdlen >= 0) {
-            rdlen = instr.read(buf);
-            if (rdlen > 0) {
-                outstr.write(buf, 0, rdlen);
-            }
-        }
-
-        final InputStreamReader rdr = new InputStreamReader(
-                new ByteArrayInputStream(outstr.toByteArray()));
-        final char[] chars = new char[outstr.size()];
-        rdr.read(chars);
-        log.debug("debugStream, START");
-        log.debug(chars);
-        log.debug("debugStream, END");
-
-        return new ByteArrayInputStream(outstr.toByteArray());
-        
-    }
+   }
 
 }

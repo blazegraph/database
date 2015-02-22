@@ -26,6 +26,8 @@ package com.bigdata.rdf.task;
 
 import java.util.concurrent.Callable;
 
+import com.bigdata.journal.IIndexManager;
+
 /**
  * A task that can be run either with direct index access or using the
  * concurrency manager (compatible with group commit).
@@ -41,5 +43,20 @@ public interface IApiTask<T> extends Callable<T> {
 
     /** The timestamp of the view of that KB instance. */
     long getTimestamp();
+
+	/**
+	 * Protocol used to inform the task of the index manager before it is
+	 * executed.
+	 * 
+	 * @throws IllegalStateException
+	 *             if the index manager has already been set.
+	 */
+	void setIndexManager(IIndexManager indexManager);
+
+	/**
+	 * Protocol used to clear the index manager from the task after it is
+	 * executed.
+	 */
+	void clearIndexManager();
     
 }

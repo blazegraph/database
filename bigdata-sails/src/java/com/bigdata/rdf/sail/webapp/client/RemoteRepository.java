@@ -666,7 +666,38 @@ public class RemoteRepository {
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
         
-        return (rangeCount(subj, pred, obj, contexts) > 0);
+       if(false) {
+          /*
+          * FIXME This is only correct when the remote repository does not use
+          * full read/write transactions. Otherwise it may overestimate since it
+          * will also count deleted tuples. In order to fix this, we really need
+          * to make hasStatements() a top-level REST API method since the client
+          * can not correctly decide whether or not the server supports delete
+          * markers and therefore can not correctly choose between
+          * hasStatements() based on getStatements() LIMIT 1 and hasStatements()
+          * based on rangeCount. Note that the server side API in
+          * AbstractTripleStore considers this information and always uses the
+          * correct backend strategy. See #1109.
+          * 
+          * In fact, the situation appears to be worse than that since
+          * TestSparqlUpdate fails several tests when we use the rangeCount
+          * which pass if we use getStatements() !!!
+          */
+         return (rangeCount(subj, pred, obj, contexts) > 0);
+      } else {
+         /*
+          * FIXME This should be pushed down to a server-side operation for
+          * improved performance.  We need to lift hasStatements() into the
+          * REST API for that.  See #1109.
+          */
+         final GraphQueryResult ret = getStatements(subj, pred, obj,
+               includeInferred, contexts);
+         try {
+            return ret.hasNext();
+         } finally {
+            ret.close();
+         }
+      }
         
     }
     

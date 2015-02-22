@@ -100,13 +100,15 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
         this.timestamp = timestamp;
     }
 
-    protected void clearIndexManager() {
+    @Override
+    public void clearIndexManager() {
 
         indexManagerRef.set(null);
 
     }
 
-    protected void setIndexManager(final IIndexManager indexManager) {
+    @Override
+    public void setIndexManager(final IIndexManager indexManager) {
 
         if (!indexManagerRef
                 .compareAndSet(null/* expect */, indexManager/* update */)) {
@@ -285,7 +287,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
     static public <T> Future<T> submitApiTask(
-            final IIndexManager indexManager, final AbstractApiTask<T> task)
+            final IIndexManager indexManager, final IApiTask<T> task)
             throws DatasetNotFoundException {
 
         final String namespace = task.getNamespace();

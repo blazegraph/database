@@ -98,8 +98,10 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public static Test suite() {
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
-                "test_SELECT_ALL", TestMode.quads, TestMode.sids,
-                TestMode.triples);
+                "test_PUT_UPDATE_WITH_CONSTRUCT_TEMPLATE_ONLY", TestMode.quads
+//                , TestMode.sids
+//                , TestMode.triples
+                );
        
 	}
 
@@ -1758,7 +1760,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_PUT_UPDATE_WITH_QUERY() throws Exception {
 
-		setupDataOnServer();
+	   setupDataOnServer();
 
 		// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 
@@ -1950,7 +1952,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_PUT_UPDATE_WITH_CONSTRUCT_TEMPLATE_ONLY() throws Exception {
 
-		setupDataOnServer();
+	   setupDataOnServer();
 
 		// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 

@@ -274,7 +274,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             if (format == null) {
 
-                buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                         "Content-Type not recognized as Properties: "
                                 + contentType);
 
@@ -290,7 +290,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             if (parserFactory == null) {
 
-                buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                         "Parser factory not found: Content-Type="
                                 + contentType + ", format=" + format);
                 
@@ -370,7 +370,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                  * Note: The response code is defined as 409 (Conflict) since
                  * 1.3.2.
                  */
-                buildResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
+                buildAndCommitResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
                         "EXISTS: " + namespace);
                 return;
             }
@@ -411,7 +411,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             /*
              * Note: The response code is defined as 201 (Created) since 1.3.2.
              */
-            buildResponse(resp, HttpServletResponse.SC_CREATED,
+            buildAndCommitResponse(resp, HttpServletResponse.SC_CREATED,
                     MIME_TEXT_PLAIN, "CREATED: " + namespace);
 
         } catch (Throwable e) {
@@ -452,8 +452,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                 /*
                  * There is no such triple/quad store instance.
                  */
-                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-                return;
+               buildAndCommitNamespaceNotFoundResponse(req, resp);
+               return;
             }
 
             // Destroy the KB instance.
@@ -461,7 +461,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             
             tripleStore.commit();
             
-            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
+            buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
                     + namespace);
 
         } catch (Throwable e) {
@@ -561,7 +561,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 				/*
 				 * There is no such triple/quad store instance.
 				 */
-				buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+				buildAndCommitNamespaceNotFoundResponse(req, resp);
 				return;
 			}
 
