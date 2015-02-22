@@ -295,14 +295,18 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		final TestNanoSparqlServerWithProxyIndexManager<?> delegate = new TestNanoSparqlServerWithProxyIndexManager(
 				null/* name */, indexManager, testMode); // !!!! THIS CLASS !!!!
 
-        /*
-         * Use a proxy test suite and specify the delegate.
-         */
+      /*
+       * Use a proxy test suite and specify the delegate.
+       */
 
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "NanoSparqlServer Proxied Test Suite");
-		return suite;
-	}
+      final ProxyTestSuite suite = new ProxyTestSuite(delegate,
+            "NanoSparqlServer Proxied Test Suite: indexManager="
+                  + indexManager.getClass().getSimpleName() + ", testMode="
+                  + testMode);
+
+      return suite;
+      
+   }
 
 	@SuppressWarnings("unchecked")
     public S getIndexManager() {

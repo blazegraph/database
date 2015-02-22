@@ -41,43 +41,45 @@ import com.bigdata.journal.Journal;
  */
 public class ApiTaskForJournal<T> extends AbstractTask<T> {
 
-    private final AbstractApiTask<T> delegate;
+   private final IApiTask<T> delegate;
 
-    @Override
-    public String toString() {
-    	
-		return super.toString() + "::{delegate=" + delegate + "}";
-    	
-    }
-    
-    public ApiTaskForJournal(final IConcurrencyManager concurrencyManager,
-            final long timestamp, final String[] resource,
-            final AbstractApiTask<T> delegate) {
+   @Override
+   public String toString() {
 
-        super(concurrencyManager, timestamp, resource);
+      return super.toString() + "::{delegate=" + delegate + "}";
 
-        this.delegate = delegate;
+   }
 
-    }
+   public ApiTaskForJournal(final IConcurrencyManager concurrencyManager,
+         final long timestamp, final String[] resource,
+         final IApiTask<T> delegate) {
 
-    @Override
-    protected T doTask() throws Exception {
+      super(concurrencyManager, timestamp, resource);
 
-    	// Set reference to Journal on the delegate.
-        delegate.setIndexManager(getJournal());
+      this.delegate = delegate;
 
-        try {
+   }
 
-        	// Run the delegate task.
-            return delegate.call();
+   @Override
+   protected T doTask() throws Exception {
 
-        } finally {
+      // Set reference to Journal on the delegate.
+      delegate.setIndexManager(getJournal());
 
-        	// Clear reference to the Journal from the delegate.
-            delegate.clearIndexManager();
+      try {
 
-        }
+         // Run the delegate task.
+         final T ret = delegate.call();
 
-    }
+         return ret;
+
+      } finally {
+
+         // Clear reference to the Journal from the delegate.
+         delegate.clearIndexManager();
+
+      }
+
+   }
 
 }

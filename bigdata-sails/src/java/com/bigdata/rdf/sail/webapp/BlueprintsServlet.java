@@ -86,7 +86,7 @@ public class BlueprintsServlet extends BigdataRDFServlet {
 
         if (!mimeTypes.contains(mimeType)) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as graph data: " + contentType);
 
             return;

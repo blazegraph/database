@@ -72,6 +72,7 @@ import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
+import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
@@ -121,8 +122,9 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 	static public Test suite() {
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
-				"testStressInsertWhereGraph",
-//				"testInsertWhere",
+		      "test.*",
+//				"testStressInsertWhereGraph",
+//				"testInsertWhereGraph",
 				new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[]{
 //				BufferMode.Transient, 
 //				BufferMode.DiskWORM, 
@@ -222,19 +224,15 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws RepositoryException {
 
-        try {
+      try {
 
-            return m_repo.hasStatement(subj, pred, obj, includeInferred,
-                    contexts);
-            // Note: Does not close() the result!
-//            return m_repo.getStatements(subj, pred, obj, includeInferred,
-//                    contexts).hasNext();
-            
-        } catch (Exception e) {
-            
-            throw new RepositoryException(e);
-            
-        }
+         return m_repo.hasStatement(subj, pred, obj, includeInferred, contexts);
+
+      } catch (Exception e) {
+
+         throw new RepositoryException(e);
+
+      }
 
     }
     

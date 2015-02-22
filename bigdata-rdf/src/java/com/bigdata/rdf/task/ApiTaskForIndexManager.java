@@ -46,32 +46,35 @@ import com.bigdata.service.IBigdataFederation;
  */
 public class ApiTaskForIndexManager<T> implements Callable<T> {
 
-    private final IIndexManager indexManager;
-    private final AbstractApiTask<T> delegate;
+   private final IIndexManager indexManager;
+   private final IApiTask<T> delegate;
 
-    public ApiTaskForIndexManager(final IIndexManager indexManager,
-            final AbstractApiTask<T> delegate) {
+   public ApiTaskForIndexManager(final IIndexManager indexManager,
+         final IApiTask<T> delegate) {
 
-        this.indexManager = indexManager;
-        this.delegate = delegate;
+      this.indexManager = indexManager;
+      this.delegate = delegate;
 
-    }
+   }
 
-    @Override
-    public T call() throws Exception {
+   @Override
+   public T call() throws Exception {
 
-        delegate.setIndexManager(indexManager);
+      delegate.setIndexManager(indexManager);
 
-        try {
+      try {
 
-            return delegate.call();
+         // Run the delegate task.
+         final T ret = delegate.call();
 
-        } finally {
+         return ret;
 
-            delegate.clearIndexManager();
+      } finally {
 
-        }
+         delegate.clearIndexManager();
 
-    }
+      }
+
+   }
 
 }

@@ -378,31 +378,50 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 	}
 
-    /**
-     * Report a mutation count and elapsed time back to the user agent.
-     * 
-     * @param resp
-     *            The response.
-     * @param nmodified
-     *            The mutation count.
-     * @param elapsed
-     *            The elapsed time (milliseconds).
-     * 
-     * @throws IOException
-     */
-    static protected void reportModifiedCount(final HttpServletResponse resp,
-            final long nmodified, final long elapsed) throws IOException {
+//    /**
+//	 * Report a mutation count and elapsed time back to the user agent.
+//	 * <p>
+//	 * Note: See caution at
+//	 * {@link AbstractRestApiTask#reportModifiedCount(long, long)} concerning
+//	 * group commit semantics.
+//	 * 
+//	 * @param resp
+//	 *            The response.
+//	 * @param nmodified
+//	 *            The mutation count.
+//	 * @param elapsed
+//	 *            The elapsed time (milliseconds).
+//	 * 
+//	 * @throws IOException
+//	 */
+//    static protected void reportModifiedCount(final HttpServletResponse resp,
+//            final long nmodified, final long elapsed) throws IOException {
+//
+//        final StringWriter w = new StringWriter();
+//    	
+//        final XMLBuilder t = new XMLBuilder(w);
+//
+//        t.root("data").attr("modified", nmodified)
+//                .attr("milliseconds", elapsed).close();
+//
+//        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+//
+//    }
 
-        final StringWriter w = new StringWriter();
-    	
-        final XMLBuilder t = new XMLBuilder(w);
+   /**
+    * Report that a namespace is not found. The namespace is extracted from the
+    * {@link HttpServletRequest}.
+    */
+   protected void buildAndCommitNamespaceNotFoundResponse(
+         final HttpServletRequest req, final HttpServletResponse resp)
+         throws IOException {
 
-        t.root("data").attr("modified", nmodified)
-                .attr("milliseconds", elapsed).close();
+      buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+            MIME_TEXT_PLAIN, "Not found: namespace=" + getNamespace(req)
+      // +", timestamp="+getTimestamp(req)
+      );
 
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-
-    }
+   }
 
     /**
      * Report an access path range count and elapsed time back to the user agent.
@@ -426,7 +445,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         t.root("data").attr("rangeCount", rangeCount)
                 .attr("milliseconds", elapsed).close();
 
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+        buildAndCommitResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
         

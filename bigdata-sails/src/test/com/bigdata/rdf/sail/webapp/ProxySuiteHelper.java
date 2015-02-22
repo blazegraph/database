@@ -74,7 +74,7 @@ public class ProxySuiteHelper {
 			super(name);
 			if (bufferModes.isEmpty())
 				throw new IllegalArgumentException();
-			final int ntests = testModes.length * bufferModes.size();
+         final int ntests = testModes.length * bufferModes.size();
 			subs = new ProxyTestSuite[ntests];
 			int i = 0;
 			for( final BufferMode bufferMode : bufferModes) {
@@ -98,7 +98,8 @@ public class ProxySuiteHelper {
 	    //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
 			    		}
 			    	});
-					suite2.setName(bufferMode.name() + "." + testMode.name());
+               suite2.setName(name + ", bufferMode=" + bufferMode.name()
+                     + ", testMode=" + testMode.name());
 					subs[i++] = suite2;
 				}
 			}
