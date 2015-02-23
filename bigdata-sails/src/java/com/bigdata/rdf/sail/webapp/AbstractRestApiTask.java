@@ -194,11 +194,57 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
        writer.write(stringWriter.toString());
 
       /*
-       * Note: GROUP COMMIT: This flushes the response to the client. This MUST
-       * NOT be invoked before the group commit point!  See flushAndClose().
+       * Note: GROUP COMMIT: This would flush the response to the client. This
+       * MUST NOT be invoked before the group commit point! See flushAndClose().
        */
 //       w.flush(); 
 
     }
     
+    /**
+    * Generate a response having the indicated http status code, mime type, and
+    * content.
+    * 
+    * @param status
+    *           The http status code.
+    * @param mimeType
+    *           The MIME type of the response.
+    * @param content
+    *           The content
+    * @throws IOException
+    */
+   protected void buildResponse(final int status, final String mimeType,
+         final String content) throws IOException {
+
+       resp.setStatus(status);
+
+       resp.setContentType(mimeType);
+
+       final Writer w = resp.getWriter();
+
+       if (content != null)
+          w.write(content);
+
+       /*
+        * Note: GROUP COMMIT: This would flush the response to the client. This
+        * MUST NOT be invoked before the group commit point! See flushAndClose().
+        */
+//        w.flush(); 
+
+    }
+
+   /**
+    * Report that a namespace is not found. The namespace is extracted from the
+    * {@link HttpServletRequest}.
+    */
+   protected void buildNamespaceNotFoundResponse()
+         throws IOException {
+
+      buildResponse(HttpServletResponse.SC_NOT_FOUND,
+            BigdataServlet.MIME_TEXT_PLAIN, "Not found: namespace=" + namespace
+      // +", timestamp="+getTimestamp(req)
+      );
+
+   }
+
 }

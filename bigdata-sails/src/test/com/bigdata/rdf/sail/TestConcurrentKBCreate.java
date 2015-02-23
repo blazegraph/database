@@ -42,6 +42,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 
 /**
  * Test suite for the concurrent create and discovery of a KB instance.
@@ -129,7 +130,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
             assertNull(getQueryConnection(jnl, namespace, ITx.READ_COMMITTED));
 
             // Create the KB instance.
-            new CreateKBTask(jnl, namespace).call();
+            AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties)).get();
 
             // Attempt to discover the KB instance.
             BigdataSailRepositoryConnection conn = null;
@@ -267,11 +268,15 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
         
         tasks.add(new Callable<Void>() {
 
+           @Override
             public Void call() throws Exception {
 
                 try {
 
-                    new CreateKBTask(indexManager, namespace).call();
+                  AbstractApiTask.submitApiTask(
+                        indexManager,
+                        new CreateKBTask(namespace, ((Journal) indexManager)
+                              .getProperties())).get();
 
                     created.set(true);
 

@@ -77,10 +77,11 @@ import org.openrdf.sail.SailException;
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
@@ -89,8 +90,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -175,47 +175,64 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
 
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			fail("exists: " + namespace);
-			
-		}
-
-		/*
-		 * Create the KB instance.
-		 */
-
-		if (log.isInfoEnabled()) {
-			log.info("Creating KB instance: namespace="+namespace);
-			log.info("Properties=" + properties.toString());
-		}
-
-		if (indexManager instanceof Journal) {
-
-	        // Create the kb instance.
-			tripleStore = new LocalTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-
-		} else {
-
-			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-		}
-
-        // create the triple store.
-        tripleStore.create();
+      AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
+            properties));
+		
+//		// Locate the resource declaration (aka "open"). This tells us if it
+//		// exists already.
+//		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//		if (tripleStore != null) {
+//
+//			fail("exists: " + namespace);
+//			
+//		}
+//
+//		/*
+//		 * Create the KB instance.
+//		 */
+//
+//		if (log.isInfoEnabled()) {
+//			log.info("Creating KB instance: namespace="+namespace);
+//			log.info("Properties=" + properties.toString());
+//		}
+//
+//		if (indexManager instanceof Journal) {
+//
+//	        // Create the kb instance.
+//			tripleStore = new LocalTripleStore(indexManager, namespace,
+//					ITx.UNISOLATED, properties);
+//
+//		} else {
+//
+//			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
+//					ITx.UNISOLATED, properties);
+//		}
+//
+//        // create the triple store.
+//        tripleStore.create();
 
         if(log.isInfoEnabled())
         	log.info("Created tripleStore: " + namespace);
 
-        // New KB instance was created.
-        return tripleStore;
+//        // New KB instance was created.
+//        return tripleStore;
 
+        /**
+         * Return a view of the new KB to the caller.
+         * 
+         * Note: The caller MUST NOT attempt to modify this KB view outside of
+         * the group commit mechanisms. Therefore I am now returning a read-only
+         * view.
+         */
+      final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+            .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
+
+      assert tripleStore != null;
+
+      return tripleStore;
+      
     }
 
 	protected void dropTripleStore(final IIndexManager indexManager,
@@ -224,26 +241,29 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
 
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			if (log.isInfoEnabled())
-				log.info("Destroying: " + namespace);
-
-            if (!BigdataStatics.NSS_GROUP_COMMIT) {
-                /*
-                 * FIXME GROUP COMMIT: We need to submit a task that does this
-                 * in order to stay inside of the same concurrency control
-                 * mechanism as the database.
-                 */
-                tripleStore.destroy();
-            }
-			
-		}
+//		// Locate the resource declaration (aka "open"). This tells us if it
+//		// exists already.
+//		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//		if (tripleStore != null) {
+//
+//			if (log.isInfoEnabled())
+//				log.info("Destroying: " + namespace);
+//
+//            if (!BigdataStatics.NSS_GROUP_COMMIT) {
+//                /*
+//                 * GROUP COMMIT: We need to submit a task that does this
+//                 * in order to stay inside of the same concurrency control
+//                 * mechanism as the database.
+//                 */
+//                tripleStore.destroy();
+//            }
+//			
+//		}
+		
+      AbstractApiTask.submitApiTask(indexManager, new DestroyKBTask(namespace,
+            ITx.UNISOLATED));
 
 	}
 	

@@ -31,7 +31,6 @@ package com.bigdata.counters;
  * Interface for self-reporting performance counters.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ICounterSetAccess {
 
