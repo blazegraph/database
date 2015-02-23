@@ -231,7 +231,6 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
       ).runTest();
    }
    
-   // TODO: finish this test case
    /**
    <code>
       SELECT ?o
