@@ -31,6 +31,7 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
@@ -50,7 +51,6 @@ import com.bigdata.relation.locator.DefaultResourceLocator;
  * high-level query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class LocalTripleStore extends AbstractLocalTripleStore {
 
@@ -78,7 +78,22 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
 
         super.commit();
         
-        final long commitTime= getIndexManager().commit();
+		if (BigdataStatics.NSS_GROUP_COMMIT) {
+			/*
+			 * Note: GROUP_COMMIT (#566) requires that the WriteExecutorService
+			 * controls when commit points are melded. If group commit is
+			 * enabled and the index manager is directs the Journal to commit()
+			 * then any partially executed tasks that have checkpointed indices
+			 * will be immediately flushed to the backing store, breaking the
+			 * ACID semantics of the commit.
+			 * 
+			 * Note: The checkpoint of the indices for an unisolated
+			 * AbstractTask occurs when the task is done with its work but is
+			 * still holding any resource locks.
+			 */
+			return 0L;
+		}
+		final long commitTime = getIndexManager().commit();
         
         final long elapsed = System.currentTimeMillis() - begin;
 
@@ -141,7 +156,6 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
      * Options understood by the {@link LocalTripleStore}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface Options extends AbstractTripleStore.Options {
        

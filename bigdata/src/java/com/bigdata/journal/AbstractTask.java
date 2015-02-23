@@ -47,6 +47,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
@@ -65,8 +66,12 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.htree.AbstractHTree;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -2800,9 +2805,21 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getExecutorService();
             
         }
+
+        @Override
+        public Quorum<HAGlue,QuorumService<HAGlue>> getQuorum() {
+           return delegate.getQuorum();
+        }
+        
+        @Override
+        final public long awaitHAReady(final long timeout, final TimeUnit units)
+                throws InterruptedException, TimeoutException,
+                AsynchronousQuorumCloseException {
+           return delegate.awaitHAReady(timeout, units);
+        }
         
         /*
-         * Disallowed methods (commit protocol and shutdown protocol).
+         *  Disallowed methods (commit protocol and shutdown protocol).
          */
         
         /**
@@ -3458,6 +3475,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         @Override
         public void destroy() {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Quorum<HAGlue,QuorumService<HAGlue>> getQuorum() {
+           throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        final public long awaitHAReady(final long timeout, final TimeUnit units)
+                throws InterruptedException, TimeoutException,
+                AsynchronousQuorumCloseException {
+           return delegate.awaitHAReady(timeout, units);
         }
 
         @Override

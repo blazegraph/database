@@ -143,6 +143,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -692,6 +693,13 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
+     * <strong>CAUTION: With the introduction of group commit support the 
+     * correct way to create a new KB instance is using {@link AbstractApiTask}
+     * to submit a {@link CreateKBTask}. This code path will correctly make use
+     * of the group commit mechanisms. A failure to use this approach could 
+     * result in a non-ACID commit!
+     * </strong>
+     * <p>
      * If the {@link LocalTripleStore} with the appropriate namespace exists,
      * then return it. Otherwise, create the {@link LocalTripleStore}. When the
      * properties indicate that full transactional isolation should be
@@ -703,6 +711,10 @@ public class BigdataSail extends SailBase implements Sail {
      *            The properties.
      *            
      * @return The {@link LocalTripleStore}.
+     * 
+     * @see CreateKBTask
+     * 
+     * @deprecated by {@link CreateKBTask}
      */
     public static LocalTripleStore createLTS(final Journal journal,
             final Properties properties) {
@@ -838,7 +850,14 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
 
-    private static void checkProperties(final Properties properties) 
+    /**
+    * Check properties to make sure that they are consistent.
+    * 
+    * @param properties
+    *           The properties.
+    * @throws UnsupportedOperationException
+    */
+    public static void checkProperties(final Properties properties) 
             throws UnsupportedOperationException {
     
         final boolean quads = Boolean.parseBoolean(properties.getProperty(

@@ -45,9 +45,11 @@ import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.PropertyUtil;
@@ -63,13 +65,6 @@ import com.bigdata.util.PropertyUtil;
  *      NanoSparqlServer Admin API for Multi-tenant deployments</a>
  * 
  * @author thompsonbry
- * 
- *         FIXME GROUP COMMIT: The CREATE and DESTROY operations require special
- *         attention. Define DropKBTask and CreateKBTask for use by the
- *         multi-tenancy API and fix up the callers of CreateKBTask and
- *         tripleStore.destroy() to use these tasks. This means that the base
- *         implementations of those tasks must not require the servlet
- *         parameters.
  * 
  *         FIXME GROUP COMMIT: The other operations in this class also should
  *         use the new REST API pattern, but are not intrinsically sensitive.
@@ -379,40 +374,38 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         try {
 
-            if (indexManager instanceof Journal) {
-
-                /*
-                 * Create a local triple store.
-                 * 
-                 * Note: This hands over the logic to some custom code located
-                 * on the BigdataSail.
-                 */
-
-                final Journal jnl = (Journal) indexManager;
-
-                // create the appropriate as configured triple/quad store.
-                BigdataSail.createLTS(jnl, effective);
-
-            } else {
-
-                /*
-                 * Register triple store for scale-out.
-                 * 
-                 * TODO Review guidance for creation of KBs on a cluster.
-                 */
-
-                final ScaleOutTripleStore ts = new ScaleOutTripleStore(
-                        indexManager, namespace, ITx.UNISOLATED, effective);
-
-                ts.create();
-
-            }
-
-            /*
-             * Note: The response code is defined as 201 (Created) since 1.3.2.
-             */
-            buildAndCommitResponse(resp, HttpServletResponse.SC_CREATED,
-                    MIME_TEXT_PLAIN, "CREATED: " + namespace);
+         AbstractApiTask
+               .submitApiTask(
+                     indexManager,
+                     new RestApiCreateKBTask(req, resp, namespace, effective/* effectiveProperties */))
+               .get();
+           
+//            if (indexManager instanceof Journal) {
+//
+//                /*
+//                 * Create a local triple store.
+//                 * 
+//                 * Note: This hands over the logic to some custom code located
+//                 * on the BigdataSail.
+//                 */
+//
+//                final Journal jnl = (Journal) indexManager;
+//
+//                // create the appropriate as configured triple/quad store.
+//                BigdataSail.createLTS(jnl, effective);
+//
+//            } else {
+//
+//                /*
+//                 * Register triple store for scale-out.
+//                 */
+//
+//                final ScaleOutTripleStore ts = new ScaleOutTripleStore(
+//                        indexManager, namespace, ITx.UNISOLATED, effective);
+//
+//                ts.create();
+//
+//            }
 
         } catch (Throwable e) {
 
@@ -420,6 +413,42 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         }
         
+    }
+    
+    /**
+     * Extended to report the correct HTTP response to the client.
+     */
+    private static class RestApiCreateKBTask extends AbstractDelegateRestApiTask<Void> {
+
+      public RestApiCreateKBTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final Properties properties) {
+
+         super(req, resp, namespace, ITx.UNISOLATED, new CreateKBTask(namespace, properties));
+
+      }
+
+      @Override
+      public Void call() throws Exception {
+         
+         super.call();
+         
+         /*
+          * Note: The response code is defined as 201 (Created) since 1.3.2.
+          */
+         
+         buildResponse(HttpServletResponse.SC_CREATED, MIME_TEXT_PLAIN,
+               "CREATED: " + namespace);
+
+         return null;
+         
+      }
+
+      @Override
+      final public boolean isReadOnly() {
+         return false;
+      }
+    
     }
 
     /**
@@ -434,51 +463,97 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final String namespace = getNamespace(req);
 
-        final long timestamp = ITx.UNISOLATED;
+      try {
 
-        boolean acquiredConnection = false;
-        try {
-            
-            if (getIndexManager() instanceof Journal) {
-                // acquire permit from Journal.
-                ((Journal) getIndexManager()).acquireUnisolatedConnection();
-                acquiredConnection = true;
-            }
-
-            final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                    .getTripleStore(namespace, timestamp); 
-
-            if (tripleStore == null) {
-                /*
-                 * There is no such triple/quad store instance.
-                 */
-               buildAndCommitNamespaceNotFoundResponse(req, resp);
-               return;
-            }
-
-            // Destroy the KB instance.
-            tripleStore.destroy();
-            
-            tripleStore.commit();
-            
-            buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
-                    + namespace);
+         AbstractApiTask.submitApiTask(getIndexManager(),
+               new RestApiDestroyKBTask(req, resp, namespace)).get();
 
         } catch (Throwable e) {
 
-            launderThrowable(e, resp, "");
-
-        } finally {
-
-            if (acquiredConnection) {
-            
-                ((Journal) getIndexManager()).releaseUnisolatedConnection();
-                
-            }
+            launderThrowable(e, resp, "DELETE NAMESPACE: namespace="+namespace);
             
         }
 
+   }
+
+   private static class RestApiDestroyKBTask extends AbstractDelegateRestApiTask<Void> {
+
+      public RestApiDestroyKBTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace) {
+
+         super(req, resp, namespace, ITx.UNISOLATED, new DestroyKBTask(
+               namespace, ITx.UNISOLATED));
+
+      }
+
+      @Override
+      public boolean isReadOnly() {
+         return false;
+      }
+
+      @Override
+      public Void call() throws Exception {
+
+         super.call();
+
+         buildResponse(HTTP_OK, MIME_TEXT_PLAIN, "DELETED: " + namespace);
+
+         return null;
+
+      }
+
     }
+    
+//    private void doDeleteNamespace(final HttpServletRequest req,
+//          final HttpServletResponse resp) throws IOException {
+//
+//      final String namespace = getNamespace(req);
+//
+//      final long timestamp = ITx.UNISOLATED;
+//
+//      boolean acquiredConnection = false;
+//      try {
+//          
+//          if (getIndexManager() instanceof Journal) {
+//              // acquire permit from Journal.
+//              ((Journal) getIndexManager()).acquireUnisolatedConnection();
+//              acquiredConnection = true;
+//          }
+//
+//          final AbstractTripleStore tripleStore = getBigdataRDFContext()
+//                  .getTripleStore(namespace, timestamp); 
+//
+//          if (tripleStore == null) {
+//              /*
+//               * There is no such triple/quad store instance.
+//               */
+//             buildAndCommitNamespaceNotFoundResponse(req, resp);
+//             return;
+//          }
+//
+//          // Destroy the KB instance.
+//          tripleStore.destroy();
+//          
+//          tripleStore.commit();
+//          
+//          buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
+//                  + namespace);
+//
+//      } catch (Throwable e) {
+//
+//          launderThrowable(e, resp, "");
+//
+//      } finally {
+//
+//          if (acquiredConnection) {
+//          
+//              ((Journal) getIndexManager()).releaseUnisolatedConnection();
+//              
+//          }
+//          
+//      }
+//
+//  }
     
 //    private void doDeleteNamespace(final HttpServletRequest req,
 //            final HttpServletResponse resp) throws IOException {
@@ -550,25 +625,42 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
 		final long timestamp = getTimestamp(req);
 
+		// TODO Why is it necessary to protect this operation with a transaction?
 		final long tx = getBigdataRDFContext().newTx(timestamp);
 		
 		try {
-		    
-			final AbstractTripleStore tripleStore = getBigdataRDFContext()
-					.getTripleStore(namespace, tx);
+		   
+         AbstractApiTask.submitApiTask(getIndexManager(),
+               new AbstractRestApiTask<Void>(req, resp, namespace, timestamp) {
 
-			if (tripleStore == null) {
-				/*
-				 * There is no such triple/quad store instance.
-				 */
-				buildAndCommitNamespaceNotFoundResponse(req, resp);
-				return;
-			}
+                  @Override
+                  public boolean isReadOnly() {
+                     return true;
+                  }
 
-			final Properties properties = PropertyUtil.flatCopy(tripleStore
-					.getProperties());
+                  @Override
+                  public Void call() throws Exception {
+                     final AbstractTripleStore tripleStore = getBigdataRDFContext()
+                           .getTripleStore(namespace, tx);
 
-			sendProperties(req, resp, properties);
+                     if (tripleStore == null) {
+                        /*
+                         * There is no such triple/quad store instance.
+                         */
+                        buildNamespaceNotFoundResponse();
+                        return null;
+                     }
+
+                     final Properties properties = PropertyUtil
+                           .flatCopy(tripleStore.getProperties());
+
+                     sendProperties(req, resp, properties);
+
+                     return null;
+
+                  }
+
+               }).get();
 
 		} catch(Throwable t) {
 			

@@ -131,6 +131,19 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
 
     /**
+    * Return a view of the {@link AbstractTripleStore} for the namespace and
+    * timestamp associated with this task.
+    * 
+    * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
+    *         found for that namespace and timestamp.
+    */
+   protected AbstractTripleStore getTripleStore() {
+   
+      return getTripleStore(namespace, timestamp);
+      
+   }
+    
+    /**
      * Return a view of the {@link AbstractTripleStore} for the given namespace
      * that will read on the commit point associated with the given timestamp.
      * 
@@ -143,7 +156,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
      *         found for that namespace and timestamp.
      */
-    protected AbstractTripleStore getTripleStore(final String namespace,
+    private AbstractTripleStore getTripleStore(final String namespace,
             final long timestamp) {
 
         // resolve the default namespace.
@@ -166,6 +179,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * request.
      * 
      * @throws RepositoryException
+     * @throws DatasetNotFoundException
      */
     protected BigdataSailRepositoryConnection getQueryConnection()
             throws RepositoryException {
@@ -182,11 +196,12 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
     /**
      * This version uses the namespace and timestamp provided by the caller.
-
+     *
      * @param namespace
      * @param timestamp
      * @return
      * @throws RepositoryException
+     * @throws DatasetNotFoundException
      */
 	protected BigdataSailRepositoryConnection getQueryConnection(
 			final String namespace, final long timestamp)
@@ -278,17 +293,14 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * 
      * @return The {@link Future} for that task.
      * 
-     * @throws DatasetNotFoundException
-     * 
      * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
      *      should interrupt NSS requests and AbstractTasks </a>
      * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
      *      operations against multiple KBs </a>
      */
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    static public <T> Future<T> submitApiTask(
-            final IIndexManager indexManager, final IApiTask<T> task)
-            throws DatasetNotFoundException {
+   static public <T> Future<T> submitApiTask(final IIndexManager indexManager,
+         final IApiTask<T> task) {
 
         final String namespace = task.getNamespace();
         
@@ -380,43 +392,18 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      *            The namespace of the KB instance.
      * 
      * @return The locks for the named indices associated with that KB instance.
-     * 
-     * @throws DatasetNotFoundException
      */
     private static String[] getLocksForKB(final Journal indexManager,
-            final String namespace) throws DatasetNotFoundException {
+            final String namespace) {
 
-        /*
-         * Note: There are two possible approaches here. One is to explicitly
-         * enumerate the index names for the triple store. The other is to
-         * specify the namespace of the triple store and use hierarchical
-         * locking.
-         * 
-         * This is now using hierarchical locking, so it just returns the
-         * namespace.
-         */
-        return new String[]{namespace};
-        
-//        final long timestamp = indexManager.getLastCommitTime();
-//
-//        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-//                .getResourceLocator().locate(namespace, timestamp);
-//
-//        if (tripleStore == null)
-//            throw new DatasetNotFoundException("Not found: namespace="
-//                    + namespace + ", timestamp="
-//                    + TimestampUtility.toString(timestamp));
-//
-//        final Set<String> lockSet = new HashSet<String>();
-//
-//        lockSet.addAll(tripleStore.getSPORelation().getIndexNames());
-//
-//        lockSet.addAll(tripleStore.getLexiconRelation().getIndexNames());
-//
-//        final String[] locks = lockSet.toArray(new String[lockSet.size()]);
-//
-//        return locks;
+      /*
+       * This uses hierarchical locking, so it just returns the namespace. This
+       * is implicitly used to contend with any other unisolated operations on
+       * the same namespace. Thus we do not need to enumerate the indices under
+       * that namespace.
+       */
+      return new String[] { namespace };
 
-    }
-    
+   }
+
 }

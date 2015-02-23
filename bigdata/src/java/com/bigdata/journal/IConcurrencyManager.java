@@ -35,7 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.service.IServiceShutdown;
 
 /**
@@ -45,9 +45,8 @@ import com.bigdata.service.IServiceShutdown;
  *      control.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IConcurrencyManager extends IServiceShutdown {
+public interface IConcurrencyManager extends IServiceShutdown, ICounterSetAccess {
 
     /**
      * The client side of the transaction manager.
@@ -70,6 +69,7 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * 
      * @see #shutdownNow()
      */
+    @Override
     public void shutdown();
 
     /**
@@ -78,13 +78,9 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * 
      * @see #shutdown()
      */
+    @Override
     public void shutdownNow();
 
-    /**
-     * Return declared counters.
-     */
-    public ICounterSet getCounters();
-    
     /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
      * appropriate thread pool with as much concurrency as possible.
