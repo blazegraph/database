@@ -31,7 +31,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.sparql;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Collection;
@@ -184,7 +183,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         
         final GroupGraphPattern parentGP = graphPattern;
         
-        graphPattern = new GroupGraphPattern();
+        graphPattern = scopedGroupGraphPattern(node);
 
         final TermNode contextNode = (TermNode) node.jjtGetChild(0).jjtAccept(
                 this, data);

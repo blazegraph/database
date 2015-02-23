@@ -772,7 +772,7 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
 
         final GroupGraphPattern parentGP = graphPattern;
 
-        graphPattern = new GroupGraphPattern();
+        graphPattern = scopedGroupGraphPattern(node);
 
         @SuppressWarnings("unchecked")
         final GraphPatternGroup<IGroupMemberNode> innerGraphPattern = (GraphPatternGroup<IGroupMemberNode>) node
@@ -804,8 +804,8 @@ public class ValueExprBuilder extends BigdataASTVisitorBase {
          */
 
         final GroupGraphPattern parentGP = graphPattern;
-
-        graphPattern = new GroupGraphPattern();
+        
+        graphPattern = scopedGroupGraphPattern(node);
 
         @SuppressWarnings("unchecked")
         final GraphPatternGroup<IGroupMemberNode> innerGraphPattern = (GraphPatternGroup<IGroupMemberNode>) node

@@ -105,7 +105,6 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.ITPS;
@@ -1176,135 +1175,139 @@ public class BigdataRDFContext extends BigdataBaseContext {
         abstract protected void doQuery(BigdataSailRepositoryConnection cxn,
                 OutputStream os) throws Exception;
 
-        /**
-         * Task for executing a SPARQL QUERY or SPARQL UPDATE.
-         * <p>
-         * See {@link AbstractQueryTask#update} to decide whether this task is a
-         * QUERY or an UPDATE.
-         * 
-         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-         *         Thompson</a>
-         */
-        private class SparqlRestApiTask extends AbstractRestApiTask<Void> {
-
-            public SparqlRestApiTask(final HttpServletRequest req,
-                    final HttpServletResponse resp, final String namespace,
-                    final long timestamp) {
-
-                super(req, resp, namespace, timestamp);
-                
-            }
-
-            @Override
-            public boolean isReadOnly() {
-             
-                // Read-only unless SPARQL UPDATE.
-                return !AbstractQueryTask.this.update;
-                
-            }
-
-            @Override
-            public Void call() throws Exception {
-//                BigdataSailRepositoryConnection cxn = null;
-//                boolean success = false;
-                try {
-                    // Note: Will be UPDATE connection if UPDATE request!!!
-//                    cxn = getQueryConnection();//namespace, timestamp);
-                    if(log.isTraceEnabled())
-                        log.trace("Query running...");
-                    beginNanos = System.nanoTime();
-                    if (explain && !update) {
-                        /*
-                         * The data goes to a bit bucket and we send an
-                         * "explanation" of the query evaluation back to the caller.
-                         * 
-                         * Note: The trick is how to get hold of the IRunningQuery
-                         * object. It is created deep within the Sail when we
-                         * finally submit a query plan to the query engine. We have
-                         * the queryId (on queryId2), so we can look up the
-                         * IRunningQuery in [m_queries] while it is running, but
-                         * once it is terminated the IRunningQuery will have been
-                         * cleared from the internal map maintained by the
-                         * QueryEngine, at which point we can not longer find it.
-                         * 
-                         * Note: We can't do this for UPDATE since it would have a
-                         * side-effect anyway. The way to "EXPLAIN" an UPDATE is to
-                         * break it down into the component QUERY bits and execute
-                         * those.
-                         */
-                        doQuery(cxn, new NullOutputStream());
-//                        success = true;
-                    } else {
-                        doQuery(cxn, os);
-//                        success = true;
-                        os.flush();
-                        os.close();
-                    }
-                    if (log.isTraceEnabled())
-                        log.trace("Query done.");
-                    return null;
-                } finally {
-                    endNanos = System.nanoTime();
-                    m_queries.remove(queryId);
-                    if (queryId2 != null) m_queries2.remove(queryId2);
-//                    if (os != null) {
-//                        try {
-//                            os.close();
-//                        } catch (Throwable t) {
-//                            log.error(t, t);
-//                        }
+//        /**
+//         * Task for executing a SPARQL QUERY or SPARQL UPDATE.
+//         * <p>
+//         * See {@link AbstractQueryTask#update} to decide whether this task is a
+//         * QUERY or an UPDATE.
+//         * 
+//         * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+//         *         Thompson</a>
+//         */
+//        private class SparqlRestApiTask implements Callable<Void> {//extends AbstractRestApiTask<Void> {
+//
+////            public SparqlRestApiTask(final HttpServletRequest req,
+////                    final HttpServletResponse resp, final String namespace,
+////                    final long timestamp) {
+////
+////                super(req, resp, namespace, timestamp);
+////                
+////            }
+//
+////            @Override
+////            public boolean isReadOnly() {
+////             
+////                // Read-only unless SPARQL UPDATE.
+////                return !AbstractQueryTask.this.update;
+////                
+////            }
+//
+//            @Override
+//            public Void call() throws Exception {
+////                BigdataSailRepositoryConnection cxn = null;
+////                boolean success = false;
+//                try {
+//                    // Note: Will be UPDATE connection if UPDATE request!!!
+////                    cxn = getQueryConnection();//namespace, timestamp);
+//                    if(log.isTraceEnabled())
+//                        log.trace("Query running...");
+//                    beginNanos = System.nanoTime();
+//                    if (explain && !update) {
+//                        /*
+//                         * The data goes to a bit bucket and we send an
+//                         * "explanation" of the query evaluation back to the caller.
+//                         * 
+//                         * Note: The trick is how to get hold of the IRunningQuery
+//                         * object. It is created deep within the Sail when we
+//                         * finally submit a query plan to the query engine. We have
+//                         * the queryId (on queryId2), so we can look up the
+//                         * IRunningQuery in [m_queries] while it is running, but
+//                         * once it is terminated the IRunningQuery will have been
+//                         * cleared from the internal map maintained by the
+//                         * QueryEngine, at which point we can not longer find it.
+//                         * 
+//                         * Note: We can't do this for UPDATE since it would have a
+//                         * side-effect anyway. The way to "EXPLAIN" an UPDATE is to
+//                         * break it down into the component QUERY bits and execute
+//                         * those.
+//                         */
+//                        doQuery(cxn, new NullOutputStream());
+////                        success = true;
+//                    } else {
+//                        doQuery(cxn, os);
+////                        success = true;
+//                        os.flush();
+//                        os.close();
 //                    }
-//                    if (cxn != null) {
-//                        if (!success && !cxn.isReadOnly()) {
-//                            /*
-//                             * Force rollback of the connection.
-//                             * 
-//                             * Note: It is possible that the commit has already been
-//                             * processed, in which case this rollback() will be a
-//                             * NOP. This can happen when there is an IO error when
-//                             * communicating with the client, but the database has
-//                             * already gone through a commit.
-//                             */
-//                            try {
-//                                // Force rollback of the connection.
-//                                cxn.rollback();
-//                            } catch (Throwable t) {
-//                                log.error(t, t);
-//                            }
-//                        }
-//                        try {
-//                            // Force close of the connection.
-//                            cxn.close();
-//                        } catch (Throwable t) {
-//                            log.error(t, t);
-//                        }
-//                    }
-                }
-            }
-            
-        } // class SparqlRestApiTask
+//                    if (log.isTraceEnabled())
+//                        log.trace("Query done.");
+//                    return null;
+//                } finally {
+//                    endNanos = System.nanoTime();
+//                    m_queries.remove(queryId);
+//                    if (queryId2 != null) m_queries2.remove(queryId2);
+//                }
+//            }
+//            
+//        } // class SparqlRestApiTask
         
         @Override
         final public Void call() throws Exception {
-            
-//            final String queryOrUpdateStr = astContainer.getQueryString();
-            
-//            try {
-                
-                return AbstractApiTask.submitApiTask(getIndexManager(),
-                        new SparqlRestApiTask(req, resp, namespace, timestamp))
-                        .get();
 
-//            } catch (Throwable t) {
-//
-//                // FIXME GROUP_COMMIT: check calling stack for existing launderThrowable.
-//                throw BigdataRDFServlet.launderThrowable(t, resp,
-//                        queryOrUpdateStr);
-//
-//            }
+			/*
+			 * Note: We are already inside of an AbstractApiTask.submitApiTask()
+			 * invocation made by doSparqlQuery() or doSparqlUpdate(). 
+			 */
+        	return innerCall();
 
         } // call()
 
+        private Void innerCall() throws Exception {
+//                BigdataSailRepositoryConnection cxn = null;
+//                boolean success = false;
+            try {
+                // Note: Will be UPDATE connection if UPDATE request!!!
+//                    cxn = getQueryConnection();//namespace, timestamp);
+                if(log.isTraceEnabled())
+                    log.trace("Query running...");
+                beginNanos = System.nanoTime();
+                if (explain && !update) {
+                    /*
+                     * The data goes to a bit bucket and we send an
+                     * "explanation" of the query evaluation back to the caller.
+                     * 
+                     * Note: The trick is how to get hold of the IRunningQuery
+                     * object. It is created deep within the Sail when we
+                     * finally submit a query plan to the query engine. We have
+                     * the queryId (on queryId2), so we can look up the
+                     * IRunningQuery in [m_queries] while it is running, but
+                     * once it is terminated the IRunningQuery will have been
+                     * cleared from the internal map maintained by the
+                     * QueryEngine, at which point we can not longer find it.
+                     * 
+                     * Note: We can't do this for UPDATE since it would have a
+                     * side-effect anyway. The way to "EXPLAIN" an UPDATE is to
+                     * break it down into the component QUERY bits and execute
+                     * those.
+                     */
+                    doQuery(cxn, new NullOutputStream());
+//                        success = true;
+                } else {
+                    doQuery(cxn, os);
+//                        success = true;
+                    os.flush();
+                    os.close();
+                }
+                if (log.isTraceEnabled())
+                    log.trace("Query done.");
+                return null;
+            } finally {
+                endNanos = System.nanoTime();
+                m_queries.remove(queryId);
+                if (queryId2 != null) m_queries2.remove(queryId2);
+            }
+        } // innerCall()
+        
     } // class AbstractQueryTask
 
     /**
@@ -1365,6 +1368,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 		}
 
+        @Override
 		protected void doQuery(final BigdataSailRepositoryConnection cxn,
 				final OutputStream os) throws Exception {
 
@@ -2046,7 +2050,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-            acceptStr = req.getHeader("Accept");
+            acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
         }
 
         // Do conneg.

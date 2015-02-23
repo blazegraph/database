@@ -89,18 +89,23 @@ class GroupGraphPattern {
      */
     public GroupGraphPattern() {
     }
-
+    
     /**
      * Creates a new graph pattern that inherits the context and scope from a
      * parent graph pattern.
      */
     public GroupGraphPattern(final GroupGraphPattern parent) {
-
-        context = parent.context;
-        
-        spScope = parent.spScope;
-        
+        this(parent.context, parent.spScope);
     }
+    
+    /**
+     * Creates a new graph pattern in the given context and scope.
+     */
+    public GroupGraphPattern(TermNode context, Scope spScope) {
+       this.context = context;
+       this.spScope = spScope;
+    }
+
 
     public void setContextVar(final TermNode context) {
 
