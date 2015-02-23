@@ -193,7 +193,11 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 
        writer.write(stringWriter.toString());
 
-//       w.flush(); // FIXME GROUP COMMIT: This flushes the response to the client. This MUST NOT be invoked before the group commit point!
+      /*
+       * Note: GROUP COMMIT: This flushes the response to the client. This MUST
+       * NOT be invoked before the group commit point!  See flushAndClose().
+       */
+//       w.flush(); 
 
     }
     
