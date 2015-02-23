@@ -35,6 +35,8 @@ import org.apache.log4j.Logger;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
@@ -46,6 +48,7 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * Test suite for the proposed standardization of "reification done right".
@@ -81,6 +84,30 @@ public class TestReificationDoneRightParser extends
         super(name);
     }
 
+     /**
+      * Overriden: test must be executed in triples mode (test_customService)
+      */
+     @Override
+     protected Properties getProperties() {
+
+        final Properties properties = new Properties();
+
+        // override the default vocabulary.
+        properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+                 NoVocabulary.class.getName());
+
+        // turn off axioms.
+        properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
+                 NoAxioms.class.getName());
+
+        // Note: No persistence.
+        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+                 BufferMode.Transient.toString());
+       
+        return properties;
+
+    }        
+    
     /**
 	 * Unit test for a triple reference pattern using an explicit BIND().
 	 * 

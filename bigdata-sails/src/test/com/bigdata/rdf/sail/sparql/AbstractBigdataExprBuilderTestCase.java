@@ -199,8 +199,12 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         final Properties properties = new Properties();
 
-//        // turn on quads.
-//        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
+        /*
+         * Note: we execute the parser tests in quads mode, since some of them
+         * use constructs such as GRAPH keywords for which exceptions are
+         * thrown at parse time in triples mode. 
+         */
+        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
 
         // override the default vocabulary.
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
