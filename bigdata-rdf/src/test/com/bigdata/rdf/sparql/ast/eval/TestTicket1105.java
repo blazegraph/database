@@ -67,8 +67,7 @@ public class TestTicket1105 extends AbstractDataDrivenSPARQLTestCase {
    /**
     * Triples mode test suite.
     */
-   public static class TestTriplesModeAPs extends
-         TestSimpleGroupByAndCountOptimizer {
+   public static class TestTriplesModeAPs extends TestTicket1105 {
 
       @Override
       public Properties getProperties() {
@@ -392,8 +391,7 @@ public class TestTicket1105 extends AbstractDataDrivenSPARQLTestCase {
    /**
     * Quads mode test suite.
     */
-   public static class TestQuadsModeAPs extends
-         TestSimpleGroupByAndCountOptimizer {
+   public static class TestQuadsModeAPs extends TestTicket1105 {
       
       /**
        * Query: 
