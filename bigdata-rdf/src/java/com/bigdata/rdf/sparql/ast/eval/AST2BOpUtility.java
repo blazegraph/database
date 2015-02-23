@@ -3613,12 +3613,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
         * resolved against the dictionary. This join will be built on top in
         * a later step, see comment below.
         */
-       Var freshVar = Var.var();
+       final Var freshVar = Var.var();
        final ConditionalBind b = new ConditionalBind(
              freshVar,
              assignmentNode.getValueExpression(), false);
 
-       IConstraint c = new ProjectedConstraint(b);
+       final IConstraint c = new ProjectedConstraint(b);
 
        /*
         * We might have already materialized everything we need for this
