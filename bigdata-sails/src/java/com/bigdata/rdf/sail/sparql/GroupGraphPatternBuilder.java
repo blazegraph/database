@@ -126,10 +126,6 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
         
     }
 
-    //
-    //
-    //
-
     /**
      * <code>( SelectQuery | GraphPattern )</code> - this is the common path for
      * SubSelect and graph patterns.
@@ -237,17 +233,21 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
                 final JoinGroupNode joinGroup = new JoinGroupNode();
 
-                if (node.jjtGetParent() instanceof ASTGraphGraphPattern) {
-
-                    /*
-                     * TODO Should we reach up to the first GRAPH graph pattern
-                     * in case it is more than one level above us and pull in
-                     * its context? Or should that be handled by an AST
-                     * Optimizer?
-                     */
-
-                    joinGroup.setContext(parentGP.getContext());
-
+                /*
+                 * We look up to the first ASTGraphGraphPattern ancestor,
+                 * which defines the context for the given node
+                 */
+                ASTGraphGraphPattern scopePattern = 
+                   firstASTGraphGraphAncestor(node.jjtGetParent());
+                if (scopePattern!=null) {
+                   Node child = scopePattern.jjtGetChild(0);
+                   if (child!=null) {
+                      final TermNode s = 
+                         (TermNode) scopePattern.jjtGetChild(0).jjtAccept(this, data);
+                      
+                      if (s!=null) 
+                         joinGroup.setContext(s);
+                   }
                 }
 
                 @SuppressWarnings("rawtypes")

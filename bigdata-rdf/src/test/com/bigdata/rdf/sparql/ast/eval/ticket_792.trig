@@ -1,0 +1,10 @@
+@prefix : <http://example.com/> .
+
+:graph1 {
+   :I a :Person .
+}
+
+:graph2 {
+   :I a :Person .
+   :I :name "Michael"
+}

@@ -106,6 +106,16 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	public static final String MIME_SPARQL_QUERY = "application/sparql-query";
 
 	public static final String MIME_SPARQL_UPDATE = "application/sparql-update";
+	
+	public static final String OUTPUT_FORMAT_QUERY_PARAMETER = "format";
+	
+	public static final String OUTPUT_FORMAT_JSON = "sparql-results+json";
+	
+	public static final String OUTPUT_FORMAT_XML = "sparql-results+xml";
+	
+	public static final String OUTPUT_FORMAT_JSON_SHORT = "json";
+	
+	public static final String OUTPUT_FORMAT_XML_SHORT = "xml";
 
     /**
      * 
@@ -438,8 +448,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        final String acceptStr = req.getHeader("Accept");
-
+		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
+				req.getHeader("Accept")); 
+		
         final ConnegUtil util = new ConnegUtil(acceptStr);
 
         // The best RDFFormat for that Accept header.
@@ -507,8 +519,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        final String acceptStr = req.getHeader("Accept");
-
+    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
+				req.getHeader("Accept")); 
+        
         final ConnegUtil util = new ConnegUtil(acceptStr);
 
         // The best format for that Accept header.
