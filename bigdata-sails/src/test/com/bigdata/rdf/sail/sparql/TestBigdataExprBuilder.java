@@ -955,10 +955,6 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_from_and_from_named() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
-        if (!context.tripleStore.isQuads()) {
-           return;
-        };
         
         final String sparql = "" + //
                 "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n" + //
@@ -1053,10 +1049,6 @@ public class TestBigdataExprBuilder extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_from_and_from_named_with_unknown_graph()
             throws MalformedQueryException, TokenMgrError, ParseException {
-
-       if (!context.tripleStore.isQuads()) {
-          return;
-       };
 
         final String sparql = "" + //
                 "PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n" + //

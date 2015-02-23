@@ -24,10 +24,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval.service;
 
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
@@ -36,6 +36,8 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -55,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * Test suite for the {@link ServiceRegistry}.
@@ -75,6 +78,30 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
         super(name);
     }
 
+    /**
+     * Overriden: test must be executed in triples mode (test_customService)
+     */
+    @Override
+    protected Properties getProperties() {
+
+       final Properties properties = new Properties();
+
+       // override the default vocabulary.
+       properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+               NoVocabulary.class.getName());
+
+       // turn off axioms.
+       properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
+               NoAxioms.class.getName());
+
+       // Note: No persistence.
+       properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+               BufferMode.Transient.toString());
+       
+       return properties;
+
+   }    
+    
     /**
      * Unit test for adding, resolving, and removing a {@link ServiceFactory}.
      */

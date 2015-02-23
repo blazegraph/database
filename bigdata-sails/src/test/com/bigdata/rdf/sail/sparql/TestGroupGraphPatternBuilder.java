@@ -135,10 +135,6 @@ public class TestGroupGraphPatternBuilder extends
     public void test_named_graph_pattern() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
-        if (!context.tripleStore.isQuads()) {
-            return;
-        };
-
         final String sparql = "select ?s where {GRAPH ?src {?s ?p ?o}}";
 
         final QueryRoot expected = new QueryRoot(QueryType.SELECT);
@@ -178,11 +174,7 @@ public class TestGroupGraphPatternBuilder extends
      */
     public void test_named_graph_pattern_graphConstant() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
-        if (!context.tripleStore.isQuads()) {
-            return;
-        };
-
+       
         final String sparql = "select ?s where {GRAPH <http://www.bigdata.com> {?s ?p ?o}}";
 
         final IV<BigdataValue, ?> graphConst = makeIV(valueFactory
@@ -278,10 +270,6 @@ public class TestGroupGraphPatternBuilder extends
      */
     public void test_triple_pattern_with_named_graph_group()
             throws MalformedQueryException, TokenMgrError, ParseException {
-
-        if (!context.tripleStore.isQuads()) {
-            return;
-        };
 
         final String sparql = "select ?s where {?s ?p ?o . GRAPH ?src { ?o ?p2 ?s } }";
 

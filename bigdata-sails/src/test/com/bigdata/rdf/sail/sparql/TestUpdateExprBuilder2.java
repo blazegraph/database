@@ -97,11 +97,6 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert__insertInto_01() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
-        if (!context.tripleStore.isQuads()) {
-            return;
-        };
-
        
         final String sparql = //
                   "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
@@ -199,11 +194,6 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert__deleteFrom_01() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
-        if (!context.tripleStore.isQuads()) {
-            return;
-        };
-
        
         final String sparql = //
                   "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
