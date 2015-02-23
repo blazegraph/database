@@ -1,0 +1,6 @@
+SELECT ?o
+WHERE 
+{ 
+  ?s <http://www.bigdata.com/boolean> ?o
+  BIND (?s=?s AS ?o)
+}
