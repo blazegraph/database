@@ -46,8 +46,7 @@ public class BigdataSailNSSWrapper {
     private final BigdataSail sail;
     
     /**
-     * A jetty {@link Server} running a {@link NanoSparqlServer} instance which
-     * is running against that {@link #m_indexManager}.
+     * A jetty {@link Server} running a {@link NanoSparqlServer} instance.
      */
     protected Server m_fixture;
 
