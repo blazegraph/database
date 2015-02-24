@@ -31,7 +31,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.openrdf.query.parser.serql.ast.ASTBooleanConstant;
+import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
@@ -70,7 +70,6 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
-import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
@@ -83,6 +82,8 @@ import com.bigdata.service.IBigdataFederation;
  */
 public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
+   private static final Logger log = Logger.getLogger(AST2BOpContext.class);
+   
     /**
      * The {@link ASTContainer} and never <code>null</code>.
      */
@@ -414,26 +415,8 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         this.db = db;
 
-        this.optimizers = new DefaultOptimizerList();
-        if(!db.isBottomUpEvaluation()) {
-         /**
-          * Conditionally remove the bottom-up evaluation optimizer.
-          * 
-          * Note: This allows the constructor to be stateless.  We might want
-          * to evolve this over time.
-          * 
-          * @see <a href="http://trac.bigdata.com/ticket/1113"> Hook to
-          *      configure the ASTOptimizerList </a>
-          */
-           final Iterator<IASTOptimizer> itr = optimizers.iterator();
-           while(itr.hasNext()) {
-              final IASTOptimizer opt = itr.next();
-              if(opt instanceof ASTBottomUpOptimizer) {
-                 itr.remove();
-                 break;
-              }
-           }
-        }
+        // Factory for ASTOptimizerList. See #1113
+        this.optimizers = newOptimizerList(db);
 
         this.idFactory = idFactory;
         
@@ -520,7 +503,45 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
     }
 
-    @Override
+   /**
+    * Initialize the optimizer list.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1113"> Hook to configure the
+    *      ASTOptimizerList </a>
+    */
+   private static ASTOptimizerList newOptimizerList(final AbstractTripleStore db) {
+
+      final ASTOptimizerList optimizers;
+      try {
+         final Class<?> cls = Class
+               .forName(QueryHints.DEFAULT_AST_OPTIMIZER_CLASS);
+         if (!ASTOptimizerList.class.isAssignableFrom(cls)) {
+            throw new RuntimeException(cls.getCanonicalName()
+                  + " does not extend "
+                  + ASTOptimizerList.class.getCanonicalName());
+         }
+         optimizers = (ASTOptimizerList) cls.newInstance();
+      } catch (ClassNotFoundException | InstantiationException
+            | IllegalAccessException e) {
+         throw new RuntimeException(e);
+      }
+      if (!db.isBottomUpEvaluation()) {
+         /*
+          * Conditionally remove the bottom-up evaluation optimizer.
+          */
+         final Iterator<IASTOptimizer> itr = optimizers.iterator();
+         while (itr.hasNext()) {
+            final IASTOptimizer opt = itr.next();
+            if (opt instanceof ASTBottomUpOptimizer) {
+               itr.remove();
+               break;
+            }
+         }
+      }
+      return optimizers;
+   }
+
+   @Override
     public long getTimestamp() {
 
         return db.getTimestamp();
