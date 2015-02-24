@@ -148,7 +148,11 @@ public class TestAll extends TestCase {
 
         // additional bottom-up evaluation tests.
         suite.addTestSuite(TestTicket1087.class);
-        
+
+        // test static analysis for quads constructs in triples mode, raising
+        // an early exception when accessing named graphs in triples mode
+        suite.addTest(TestTicket1105.suite());
+
 		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*

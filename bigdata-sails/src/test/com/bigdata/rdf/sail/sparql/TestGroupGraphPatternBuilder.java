@@ -174,7 +174,7 @@ public class TestGroupGraphPatternBuilder extends
      */
     public void test_named_graph_pattern_graphConstant() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "select ?s where {GRAPH <http://www.bigdata.com> {?s ?p ?o}}";
 
         final IV<BigdataValue, ?> graphConst = makeIV(valueFactory
