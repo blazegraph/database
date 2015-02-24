@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -107,8 +108,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected static final String packagePath = "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/";
 
 	/**
-	 * A jetty {@link Server} running a {@link NanoSparqlServer} instance which
-	 * is running against that {@link #m_indexManager}.
+	 * A jetty {@link Server} running a {@link NanoSparqlServer} instance.
 	 */
 	protected Server m_fixture;
 
@@ -168,15 +168,16 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 	}
 
-	protected AbstractTripleStore createTripleStore(
-			final IIndexManager indexManager, final String namespace,
-			final Properties properties) {
-        
+   protected AbstractTripleStore createTripleStore(
+         final IIndexManager indexManager, final String namespace,
+         final Properties properties) throws InterruptedException,
+         ExecutionException {
+
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
 
       AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
-            properties));
+            properties)).get();
 		
 //		// Locate the resource declaration (aka "open"). This tells us if it
 //		// exists already.
@@ -236,7 +237,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     }
 
 	protected void dropTripleStore(final IIndexManager indexManager,
-			final String namespace) {
+			final String namespace) throws InterruptedException, ExecutionException {
 
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
@@ -263,7 +264,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //		}
 		
       AbstractApiTask.submitApiTask(indexManager, new DestroyKBTask(namespace,
-            ITx.UNISOLATED));
+            ITx.UNISOLATED)).get();
 
 	}
 	

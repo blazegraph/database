@@ -282,22 +282,26 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
     
     /**
-     * Submit a task and return a {@link Future} for that task. The task will be
-     * run on the appropriate executor service depending on the nature of the
-     * backing database and the view required by the task.
-     * 
-     * @param indexManager
-     *            The {@link IndexManager}.
-     * @param task
-     *            The task.
-     * 
-     * @return The {@link Future} for that task.
-     * 
-     * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
-     *      should interrupt NSS requests and AbstractTasks </a>
-     * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
-     *      operations against multiple KBs </a>
-     */
+    * Submit a task and return a {@link Future} for that task. The task will be
+    * run on the appropriate executor service depending on the nature of the
+    * backing database and the view required by the task.
+    * <p>
+    * <strong> This method returns a {@link Future}. Remember to do
+    * {@link Future#get()} on the returned {@link Future} to await the group
+    * commit.</strong>
+    * 
+    * @param indexManager
+    *           The {@link IndexManager}.
+    * @param task
+    *           The task.
+    * 
+    * @return The {@link Future} for that task.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
+    *      should interrupt NSS requests and AbstractTasks </a>
+    * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
+    *      operations against multiple KBs </a>
+    */
     @SuppressWarnings({ "unchecked", "rawtypes" })
    static public <T> Future<T> submitApiTask(final IIndexManager indexManager,
          final IApiTask<T> task) {
