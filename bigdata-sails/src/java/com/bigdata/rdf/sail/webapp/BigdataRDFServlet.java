@@ -183,61 +183,70 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	 *      should never throw an exception </a>
 	 */
     protected static void launderThrowable(final Throwable t,
-            final HttpServletResponse resp, final String queryStr) {
-        final boolean isQuery = queryStr != null && queryStr.length() > 0;
-        try {
-            // log an error for the service.
-            log.error("cause=" + t + (isQuery ? ", query=" + queryStr : ""), t);
-        } finally {
-            // ignore any problems here.
-        }
-		if (resp == null) {
-			// Nothing can be done.
-			return;
-		}
-		if (!resp.isCommitted()) {
-			/*
-			 * Set appropriate status code.
-			 * 
-			 * Note: A committed response has already had its status code and
-			 * headers written.
-			 */
-			if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
-				/*
-				 * The addressed KB does not exist.
-				 */
-				resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-				resp.setContentType(MIME_TEXT_PLAIN);
-			} else if (InnerCause.isInnerCause(t,
-					ConstraintViolationException.class)) {
-				/*
-				 * A constraint violation is a bad request (the data violates
-				 * the rules) not a server error.
-				 */
-				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-				resp.setContentType(MIME_TEXT_PLAIN);
-			} else if (InnerCause
-					.isInnerCause(t, MalformedQueryException.class)) {
-				/*
-				 * Send back a BAD REQUEST (400) along with the text of the
-				 * syntax error message.
-				 * 
-				 * TODO Write unit test for 400 response for bad client request.
-				 */
-				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-				resp.setContentType(MIME_TEXT_PLAIN);
-			} else if (InnerCause
-               .isInnerCause(t, QuadsOperationInTriplesModeException.class)) {
-			
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            resp.setContentType(MIME_TEXT_PLAIN);		
-			   
-			} else {
-				// Internal server error.
-				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-				resp.setContentType(MIME_TEXT_PLAIN);
-			}
-		}
+          final HttpServletResponse resp, final String queryStr) {
+       final boolean isQuery = queryStr != null && queryStr.length() > 0;
+       try {
+           // log an error for the service.
+           log.error("cause=" + t + (isQuery ? ", query=" + queryStr : ""), t);
+       } finally {
+           // ignore any problems here.
+       }
+       if (resp == null) {
+           // Nothing can be done.
+           return;
+       }
+		
+       if (!resp.isCommitted()) {
+
+           /*
+            * Set appropriate status code.
+            * 
+            * Note: A committed response has already had its status code and
+            * headers written.
+            */
+           if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+           
+               /*
+                * The addressed KB does not exist.
+                */
+               resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+               resp.setContentType(MIME_TEXT_PLAIN);
+
+           } else if (InnerCause.isInnerCause(t,
+                  ConstraintViolationException.class)) {
+              
+               /*
+                * A constraint violation is a bad request (the data violates the
+                * rules) not a server error.
+                */
+               resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+               resp.setContentType(MIME_TEXT_PLAIN);
+               
+           } else if (InnerCause.isInnerCause(t, MalformedQueryException.class)) {
+              
+               /*
+                * Send back a BAD REQUEST (400) along with the text of the syntax
+                * error message.
+                * 
+                * TODO Write unit test for 400 response for bad client request.
+                */
+               resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+               resp.setContentType(MIME_TEXT_PLAIN);
+
+           } else if (InnerCause.isInnerCause(t,
+                  QuadsOperationInTriplesModeException.class)) {
+
+               resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+               resp.setContentType(MIME_TEXT_PLAIN);
+
+         } else {
+            
+               // Internal server error.
+               resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+               resp.setContentType(MIME_TEXT_PLAIN);
+               
+         }
+      }
 		/*
 		 * Attempt to write the stack trace on the response.
 		 * 
