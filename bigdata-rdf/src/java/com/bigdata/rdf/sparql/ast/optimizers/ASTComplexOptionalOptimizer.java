@@ -473,6 +473,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
         }
 
         // Step 2 (for each direct child complex optional group).
+        boolean isFirst = true;
         for (JoinGroupNode childGroup : complexGroups) {
 
 //            log.error("Convert: " + childGroup);
@@ -498,9 +499,18 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             final NamedSubqueryInclude anInclude = new NamedSubqueryInclude(
                     solutionSetName);
             
-            if (group.replaceWith(childGroup, anInclude) != 1)
+            // ORIGINAL CODE
+//          if (group.replaceWith(childGroup, anInclude) != 1)
+//          throw new AssertionError();
+            
+            // NEW CODE
+            final JoinGroupNode jgn = new JoinGroupNode();
+            jgn.addArg(anInclude);
+            jgn.setOptional(!isFirst);
+               
+            if (group.replaceWith(childGroup, jgn) != 1)
                 throw new AssertionError();
-
+             
             whereClause.addChild(childGroup);
 
             /*
@@ -524,8 +534,9 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
             }
 
+            isFirst = false;
         }
-        
+
     }
 
     private void liftSparql11Subquery(final AST2BOpContext context,
