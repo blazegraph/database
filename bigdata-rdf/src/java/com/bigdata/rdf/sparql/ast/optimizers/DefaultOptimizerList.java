@@ -126,8 +126,6 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * the items from OFFSET through LIMIT-1.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: DefaultOptimizerList.java 5115 2011-09-01 15:24:57Z
- *          thompsonbry$
  */
 public class DefaultOptimizerList extends ASTOptimizerList {
 
@@ -137,10 +135,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
-        this(true);
-    }
-
-    public DefaultOptimizerList(final boolean bottomUpEvaluation) {
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
@@ -415,10 +409,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         /**
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/1113"> Hook to configure
+         * the ASTOptimizerList </a>
          */
-        if (bottomUpEvaluation) {
-            add(new ASTBottomUpOptimizer());
-        }
+        add(new ASTBottomUpOptimizer());
 
         /**
          * Lifts a simple optional out of the child group.
