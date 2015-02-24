@@ -92,6 +92,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -262,9 +263,16 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //            }
 //			
 //		}
-		
-      AbstractApiTask.submitApiTask(indexManager, new DestroyKBTask(namespace,
-            ITx.UNISOLATED)).get();
+
+      try {
+         AbstractApiTask.submitApiTask(indexManager,
+               new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+      } catch (Exception ex) {
+         if (InnerCause.isInnerCause(ex, DatasetNotFoundException.class)) {
+            if (log.isInfoEnabled())
+               log.info("namespace does not exist: " + namespace);
+         }
+		}
 
 	}
 	
