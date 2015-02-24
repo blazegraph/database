@@ -448,7 +448,7 @@ public class DumpLogDigests {
 		public int compareTo(HALogInfo other) {
 			
 			// should not be same commit counter!
-			assert commitCounter != other.commitCounter;
+			assert commitCounter != other.commitCounter : "self="+this+", other="+other;
 			
 			return commitCounter < other.commitCounter ? -1 : 1;
 		}
@@ -456,6 +456,14 @@ public class DumpLogDigests {
 		public boolean exists() {
 			return digest != null;
 		}
+		
+		@Override
+		public String toString() {
+         return getClass().getName() + "{commitCounter=" + commitCounter
+               + ", isOpen=" + isOpen + ", digest="
+               + BytesUtil.toHexString(digest) + "}";
+		}
+
     }
     
     /**
