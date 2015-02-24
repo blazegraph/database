@@ -21,6 +21,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperationContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -117,7 +118,13 @@ public class DatasetDeclProcessor {
         if (!datasetClauses.isEmpty()) {
 
 //          dataset = new DatasetImpl();
-
+            
+            if (!context.tripleStore.isQuads()) {
+                throw new QuadsOperationInTriplesModeException(
+                    "NAMED clauses in queries are not supported in"
+                    + " triples mode.");
+            }
+           
             for (ASTDatasetClause dc : datasetClauses) {
             
                 final ASTIRI astIri = dc.jjtGetChild(ASTIRI.class);
