@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -472,9 +474,21 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             
         }
 
+        /**
+         * Extract maybe produced variables from the complex join groups
+         */
+        final List<Set<IVariable<?>>> complexGroupsVars = 
+             new ArrayList<Set<IVariable<?>>>(complexGroups.size());
+        for (int i=0; i<complexGroups.size(); i++) {
+           
+           final Set<IVariable<?>> cur = new HashSet<IVariable<?>>();
+           sa.getMaybeProducedBindings(complexGroups.get(i), cur, true);
+           complexGroupsVars.add(i,cur);
+        }
+        
         // Step 2 (for each direct child complex optional group).
-        boolean isFirst = true;
-        for (JoinGroupNode childGroup : complexGroups) {
+        for (int i=0; i<complexGroups.size(); i++) {
+            final JoinGroupNode childGroup = complexGroups.get(i);
 
 //            log.error("Convert: " + childGroup);
 
@@ -499,18 +513,13 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             final NamedSubqueryInclude anInclude = new NamedSubqueryInclude(
                     solutionSetName);
             
-            // ORIGINAL CODE
-//          if (group.replaceWith(childGroup, anInclude) != 1)
-//          throw new AssertionError();
-            
-            // NEW CODE
             final JoinGroupNode jgn = new JoinGroupNode();
             jgn.addArg(anInclude);
-            jgn.setOptional(!isFirst);
+            jgn.setOptional(true);
                
             if (group.replaceWith(childGroup, jgn) != 1)
                 throw new AssertionError();
-             
+
             whereClause.addChild(childGroup);
 
             /*
@@ -521,6 +530,26 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 final Set<IVariable<?>> projectedVars = sa.getProjectedVars(
                         anInclude, whereClause, query, exogenousVars,
                         new LinkedHashSet<IVariable<?>>());
+                
+                /**
+                 * In addition to the variables collected by getProjectedVars,
+                 * we need to retain variables appearing in subsequent complex
+                 * join groups. This is necessary to avoid a blowup (duplicates)
+                 * in the number of results, see ticket #801.
+                 */
+                final Set<IVariable<?>> childGroupVars = 
+                        complexGroupsVars.get(i);
+                
+                final Set<IVariable<?>> subsequentGroupVars = 
+                        new HashSet<IVariable<?>>();
+                
+                for (int j=i+1; j<complexGroupsVars.size(); j++) {
+                   subsequentGroupVars.addAll(complexGroupsVars.get(j));
+                }
+                
+                childGroupVars.retainAll(subsequentGroupVars);
+
+                projectedVars.addAll(childGroupVars);
 
                 final ProjectionNode projection = new ProjectionNode();
 
@@ -529,12 +558,11 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                     projection.addProjectionVar(new VarNode(v.getName()));
 
                 }
+                
 
                 nsr.setProjection(projection);
 
             }
-
-            isFirst = false;
         }
 
     }
