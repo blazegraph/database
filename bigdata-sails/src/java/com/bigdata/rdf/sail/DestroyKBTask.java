@@ -38,8 +38,10 @@ import com.bigdata.rdf.task.AbstractApiTask;
  * use of this class is as follows:
  * 
  * <pre>
- * AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace, properties))
+ * AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace, properties)).get()
  * </pre>
+ * 
+ * @see CreateKBTask
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
