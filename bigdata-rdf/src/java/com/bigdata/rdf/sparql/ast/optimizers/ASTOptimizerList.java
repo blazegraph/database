@@ -43,7 +43,6 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * An executable list of query optimizers.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
         IASTOptimizer {
