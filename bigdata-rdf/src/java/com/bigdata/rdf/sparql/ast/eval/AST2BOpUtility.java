@@ -1981,8 +1981,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-                new NV(ProjectionOp.Annotations.SELECT, projectedVars))//
-                , subqueryRoot, ctx);
+                new NV(ProjectionOp.Annotations.SELECT, projectedVars)//
+                ), subqueryRoot, ctx);
         
         // Append the subquery plan.
         left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
