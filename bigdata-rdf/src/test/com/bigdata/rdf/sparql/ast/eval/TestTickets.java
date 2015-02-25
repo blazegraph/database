@@ -476,5 +476,18 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_835.srx"// resultFileURL
        ).runTest();    
     }
+    
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * Query solutions are duplicated and increase by adding graph patterns</a>.
+     * Related test case using a complex join group instead of subquery.
+     */
+    public void test_ticket_835d() throws Exception {
+       new TestHelper("ticket_835d",// testURI,
+             "ticket_835d.rq",// queryFileURL
+             "ticket_835.trig",// dataFileURL
+             "ticket_835.srx"// resultFileURL
+       ).runTest();    
+    }
 
 }
