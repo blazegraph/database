@@ -1,0 +1,7 @@
+SELECT *
+WHERE
+{ 
+  BIND(1 as ?A)
+  { BIND(2 as ?B) } UNION { BIND(2 as ?B) }
+  OPTIONAL { BIND( 'unbound' as ?D ) OPTIONAL { ?A <http://doesn.not> <http://exists> } }
+} 
