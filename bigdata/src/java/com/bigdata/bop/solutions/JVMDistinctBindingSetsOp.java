@@ -106,7 +106,7 @@ public class JVMDistinctBindingSetsOp extends PipelineOp {
 
 		final IVariable<?>[] vars = (IVariable[]) getProperty(Annotations.VARIABLES);
 
-		if (vars == null || vars.length == 0)
+		if (vars == null)
 			throw new IllegalArgumentException();
 
     }
