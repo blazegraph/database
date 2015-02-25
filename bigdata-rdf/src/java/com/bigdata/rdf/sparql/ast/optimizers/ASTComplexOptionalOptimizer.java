@@ -475,15 +475,17 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
         }
 
         /**
-         * Extract maybe produced variables from the complex join groups
+         * Extract maybe produced variables from the complex join groups,
+         * making the accessible in an easy way for reuse in the subsequent
+         * iteration
          */
-        final List<Set<IVariable<?>>> complexGroupsVars = 
+        final List<Set<IVariable<?>>> complexGroupsMaybeVars = 
              new ArrayList<Set<IVariable<?>>>(complexGroups.size());
         for (int i=0; i<complexGroups.size(); i++) {
            
            final Set<IVariable<?>> cur = new HashSet<IVariable<?>>();
            sa.getMaybeProducedBindings(complexGroups.get(i), cur, true);
-           complexGroupsVars.add(i,cur);
+           complexGroupsMaybeVars.add(i,cur);
         }
         
         // Step 2 (for each direct child complex optional group).
@@ -515,7 +517,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             
             final JoinGroupNode jgn = new JoinGroupNode();
             jgn.addArg(anInclude);
-            jgn.setOptional(true);
+            jgn.setOptional(i>0); // optional required for second and following
                
             if (group.replaceWith(childGroup, jgn) != 1)
                 throw new AssertionError();
@@ -527,30 +529,43 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
              */
             {
 
+                /*
+                 * sa.getProjectedVars computes required variables according
+                 * to the ancestor axis
+                 */
                 final Set<IVariable<?>> projectedVars = sa.getProjectedVars(
                         anInclude, whereClause, query, exogenousVars,
                         new LinkedHashSet<IVariable<?>>());
                 
-                /**
-                 * In addition to the variables collected by getProjectedVars,
+                /*
+                 * In addition to the vars collected by sa.getProjectedVars,
                  * we need to retain variables appearing in subsequent complex
                  * join groups. This is necessary to avoid a blowup (duplicates)
-                 * in the number of results, see ticket #801.
+                 * in the number of results, see ticket #801, i.e. we need to
+                 * make sure that joins with subsequent join groups are
+                 * executed over *all* joint variables.
+                 * 
+                 * To do so, we start up with the maybe vars of the group itself
+                 * and retain all maybe vars occurring in one of the following
+                 * join groups, and add them to the list of projected vars.
                  */
-                final Set<IVariable<?>> childGroupVars = 
-                        complexGroupsVars.get(i);
+                final Set<IVariable<?>> joinVarCandidates = 
+                        complexGroupsMaybeVars.get(i);
                 
-                final Set<IVariable<?>> subsequentGroupVars = 
+                final Set<IVariable<?>> subsequentGroupMaybeVars = 
                         new HashSet<IVariable<?>>();
-                
-                for (int j=i+1; j<complexGroupsVars.size(); j++) {
-                   subsequentGroupVars.addAll(complexGroupsVars.get(j));
+                for (int j=i+1; j<complexGroupsMaybeVars.size(); j++) {
+                   subsequentGroupMaybeVars.addAll(complexGroupsMaybeVars.get(j));
                 }
                 
-                childGroupVars.retainAll(subsequentGroupVars);
+                joinVarCandidates.retainAll(subsequentGroupMaybeVars);
 
-                projectedVars.addAll(childGroupVars);
+                projectedVars.addAll(joinVarCandidates);
 
+                /*
+                 * Having computed the projection vars, we're now ready to 
+                 * build the projection clause for the current named subquery. 
+                 */
                 final ProjectionNode projection = new ProjectionNode();
 
                 for (IVariable<?> v : projectedVars) {
