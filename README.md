@@ -4,4 +4,4 @@ Please see the release notes in [bigdata/src/releases](bigdata/src/releases) for
 
 Please also visit us at [blazegraph.com](http://www.blazegraph.com).
 
-![image](http://www.blazegraph.com/static/images/logo.png)
+![image](http://www.blazegraph.com/static/images/blazegraph.png)
