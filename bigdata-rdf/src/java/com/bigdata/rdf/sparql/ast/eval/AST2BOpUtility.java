@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -3778,6 +3779,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
+        final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
+        
         final PipelineOp op;
         if(ctx.nativeHashJoins) {
             op = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
@@ -3790,7 +3793,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, subgroup.getProjectInVars()),//
+                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), subgroup, ctx);
@@ -3804,7 +3807,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, subgroup.getProjectInVars()),//
+                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
                 new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), subgroup, ctx);
@@ -3832,7 +3835,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         anns.add(new NV(
                 JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
         anns.add(new NV(
-                JVMDistinctBindingSetsOp.Annotations.VARIABLES, joinVars));
+                JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectInVars));
         anns.add(new NV(
                 JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
                 BOpEvaluationContext.CONTROLLER));
@@ -3848,10 +3851,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-                new NV(ProjectionOp.Annotations.SELECT, joinVars))//
+                new NV(ProjectionOp.Annotations.SELECT, projectInVars))//
                 , subgroup, ctx);        
-        
-                
 
         final PipelineOp subqueryPlan = convertJoinGroupOrUnion(left,
                 subgroup, doneSet, ctx);
