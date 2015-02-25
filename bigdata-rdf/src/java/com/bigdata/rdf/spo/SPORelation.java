@@ -490,6 +490,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @todo force drop of all indices rather than throwing an exception if an
      * index does not exist?
      */
+    @Override
     public void destroy() {
 
         final IResourceLock resourceLock = acquireExclusiveLock();
