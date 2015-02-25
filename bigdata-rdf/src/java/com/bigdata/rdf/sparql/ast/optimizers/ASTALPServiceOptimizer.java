@@ -1,3 +1,29 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     4501 Tower Road
+     Greensboro, NC 27410
+     licenses@bigdata.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Aug 23, 2011
+ */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.Properties;
@@ -5,10 +31,8 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -24,13 +48,47 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
 
+/**
+ * This ALP SERVICE {@link IASTOptimizer} provides a rewrite of a SERVICE
+ * expression that makes it possible to specify limits (minimum, maximum path
+ * length), directionality of traversal, etc.
+ * <p>
+ * A sample query is:
+ * 
+ * <pre>
+ * #e.g. "Go three hops out in either direction from vertex <id:v0> where the edge is of type <test:foo> and the edge has <some:prop>=someVal."
+ * 
+ * SELECT * WHERE {
+ * SERVICE bd:alp { " +
+ * <id:v0> ?edge ?to . " +
+ * hint:Prior hint:alp.pathExpr true .
+ * ?edge rdf:type <test:foo> .
+ * ?edge <some:prop> "someVal" .
+ * hint:Group hint:alp.lowerBound 1 .
+ * hint:Group hint:alp.upperBound 3 .
+ * hint:Group hint:alp.bidirectional true .
+ * }
+ * }
+ * </pre>
+ * 
+ * @see <a href="http://trac.bigdata.com/ticket/1072"> Configurable ALP Service </a>
+ * @see <a href="http://trac.bigdata.com/ticket/1117"> Document the ALP Service </a>
+ * 
+ * @author bryan
+ */
 public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
         implements IASTOptimizer {
 
     private static final transient Logger log = Logger.getLogger(ASTALPServiceOptimizer.class);
 
-    public static final URI ALP = new URIImpl(BD.NAMESPACE + "alp");
-    
+    /**
+     * The well-known URI of the ALP SERVICE extension {@value #ALP}.
+     */
+    public static final URI ALP = BD.ALP_SERVICE;
+
+    /**
+     * 
+     */
     public static final String PATH_EXPR = "alp.pathExpr";
     
     public static final String LOWER_BOUND = "alp.lowerBound";
