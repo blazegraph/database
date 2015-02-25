@@ -1606,7 +1606,8 @@ public class Name2Addr extends BTree {
      *      AbstractTripleStore.destroy() does not filter for correct prefix
      *      </a>
      */
-    public static final Iterator<String> indexNameScan(final String prefix,
+    @SuppressWarnings("unchecked")
+   public static final Iterator<String> indexNameScan(final String prefix,
             final IIndex n2a) {
 
         final byte[] fromKey;
@@ -1658,19 +1659,15 @@ public class Name2Addr extends BTree {
 
         }
 
-        @SuppressWarnings("unchecked")
         final ITupleIterator<Entry> itr = n2a.rangeIterator(fromKey, toKey);
 
         /*
          * Add resolver from the tuple to the name of the index.
          */
-        IStriterator sitr = new Striterator(itr);
-
-        sitr = sitr.addFilter(new Resolver() {
+        final IStriterator sitr = new Striterator(itr).addFilter(new Resolver() {
 
             private static final long serialVersionUID = 1L;
 
-            @SuppressWarnings("unchecked")
             @Override
             protected Object resolve(Object obj) {
 
