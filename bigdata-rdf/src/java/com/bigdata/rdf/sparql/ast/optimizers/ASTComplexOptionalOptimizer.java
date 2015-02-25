@@ -518,17 +518,17 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             final JoinGroupNode jgn = new JoinGroupNode();
             jgn.addArg(anInclude);
             jgn.setOptional(i>0); // optional required for second and following
-               
+
             if (group.replaceWith(childGroup, jgn) != 1)
                 throw new AssertionError();
 
             whereClause.addChild(childGroup);
 
             /*
-             * Create the projection for the named subquery.
+             * Create the projection for the named subquery and replace the
+             * query with the named subquery ID.
              */
             {
-
                 /*
                  * sa.getProjectedVars computes required variables according
                  * to the ancestor axis
@@ -573,11 +573,21 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                     projection.addProjectionVar(new VarNode(v.getName()));
 
                 }
-                
 
                 nsr.setProjection(projection);
-
+                
+                
+                /*
+                 *  also propagate the projected vars to the JoinGroupNode
+                 */
+                final IVariable<?>[] projectedVarsAsArr = 
+                    projectedVars.toArray(new IVariable<?>[projectedVars.size()]);
+                jgn.setProjectInVars(projectedVarsAsArr);
+        
             }
+            
+            
+
         }
 
     }
