@@ -125,9 +125,6 @@ public class JVMDistinctFilter implements IDistinctFilter {
         if (vars == null)
             throw new IllegalArgumentException();
 
-        if (vars.length == 0)
-            throw new IllegalArgumentException();
-
         this.vars = vars;
 
         this.map = new ConcurrentHashMap<Solution, Solution>(initialCapacity,
