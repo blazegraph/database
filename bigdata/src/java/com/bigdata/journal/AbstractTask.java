@@ -88,6 +88,7 @@ import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.TaskCounters;
 
+import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -3092,9 +3093,29 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 final long timestampIsIgnored) {
 
             return new Striterator(n2a.values().iterator())
-                    .addFilter(new Resolver() {
+                    .addFilter(new Filter(){
+                     private static final long serialVersionUID = 1L;
+                     
+                  /*
+                   * Impose prefix restriction on the Name2Addr scan.
+                   * 
+                   * TODO This forces us to scan all indices that were isolated
+                   * by the task. When using hierarchical locking that is
+                   * typically on the order of ~10 indices. If also using
+                   * durable named solution sets, then this could be quite a bit
+                   * more and it might be worthwhile to make [n2a] on
+                   * AbstractTask a TreeMap (using the same comparator
+                   * semantics) such that the prefix scan could be turned into a
+                   * range restricted scan.
+                   */
+                     @Override
+                     public boolean isValid(Object obj) {
+                        return ((Entry)obj).name.startsWith(prefix);
+                     }}).addFilter(new Resolver() {
                         private static final long serialVersionUID = 1L;
-
+                        /*
+                         * Resolve Entry to the name of the index.
+                         */
                         @Override
                         protected Object resolve(final Object obj) {
                             return ((Entry)obj).name;
