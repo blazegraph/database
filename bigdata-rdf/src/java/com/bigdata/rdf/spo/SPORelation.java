@@ -86,6 +86,7 @@ import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.service.history.HistoryIndexTupleSerializer;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -1209,7 +1210,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
                  * The 4th position should never become bound for a triple store
                  * without statement identifiers.
                  */
-                throw new UnsupportedOperationException();
+                      
+                throw new RuntimeException(
+                   new QuadsOperationInTriplesModeException(
+                    "Predicate lookup with bound context, but DB is initialized"
+                    + " in triples mode. Please do either re-init your database"
+                    + " in quads mode or use operations over triples only."));
             }
             break;
         case 4:

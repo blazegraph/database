@@ -1,0 +1,3 @@
+SELECT ?s ?p ?o
+FROM NAMED <http://example/c>
+WHERE { ?s ?p ?o }

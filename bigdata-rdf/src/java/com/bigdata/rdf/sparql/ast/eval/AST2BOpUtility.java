@@ -66,6 +66,8 @@ import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.bop.paths.ZeroLengthPathOp;
 import com.bigdata.bop.rdf.join.ChunkedMaterializationOp;
 import com.bigdata.bop.rdf.join.DataSetJoin;
+import com.bigdata.bop.rdf.join.MockTermResolverOp;
+import com.bigdata.bop.rdf.join.VariableUnificationOp;
 import com.bigdata.bop.solutions.DropOp;
 import com.bigdata.bop.solutions.GroupByOp;
 import com.bigdata.bop.solutions.GroupByRewriter;
@@ -91,10 +93,14 @@ import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
+import com.bigdata.rdf.internal.constraints.MathBOp;
 import com.bigdata.rdf.internal.constraints.ProjectedConstraint;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.constraints.TryBeforeMaterializationConstraint;
 import com.bigdata.rdf.internal.constraints.UUIDBOp;
+import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
@@ -110,6 +116,7 @@ import com.bigdata.rdf.sparql.ast.FilterExistsModeEnum;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
+import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -2962,10 +2969,21 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 left = addConditional(left, joinGroup, filter, doneSet, ctx);
                 continue;
             } else if (child instanceof AssignmentNode) {
-                // LET / BIND
-                left = addAssignment(left, (AssignmentNode) child, doneSet,
+               
+               if (mustBeResolvedInContext((AssignmentNode)child,ctx)) {
+                  
+                  left = addResolvedAssignment(left, (AssignmentNode) child, 
+                        doneSet, joinGroup.getQueryHints(), ctx);
+                  
+               } else {
+                  
+                  left = addAssignment(left, (AssignmentNode) child, doneSet,
                         joinGroup.getQueryHints(), ctx, false/* projection */);
-                continue;
+                  
+               }
+
+               continue;
+               
             } else if (child instanceof BindingsClause) {
 //                // LET / BIND
 //                left = addAssignment(left, (AssignmentNode) child, doneSet,
@@ -3449,7 +3467,15 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
 
     /**
-     * Add an assignment to the query plan.
+     * Add an assignment to the query plan. Note that this method does not
+     * resolve the IV of the bound variable (which might be bound to a mocked
+     * IV) against the dictionary. Actually, this can be considered a simple,
+     * performance optimized version to translate assignment nodes that can
+     * be used whenever resolving of the IV is not necessary (e.g., because
+     * the IV is filtered away or directly passed to the result).
+     * 
+     * See addAndResolveAssignment method for an alternative that also resolves
+     * constructed (mocked) IVs against the dictionary.
      * 
      * @param left
      * @param assignmentNode
@@ -3532,6 +3558,143 @@ public class AST2BOpUtility extends AST2BOpRTO {
     }
 
     /**
+     * Add an assignment to the query plan and resolve the IV of the bound
+     * variable (which might be bound to a mocked IV) against the dictionary. 
+     * Using this method for translating assignments. This might come with a
+     * performance overhead, since a dictionary join is involved. However,
+     * using this method is always safe in the sense that the variable that
+     * is bound may be used in subsequent joins.
+     * 
+     * See addAssignment for a performance optimized method that does not
+     * resolve constructed (mocked) IVs against the dictionary.
+     * 
+     * @param left
+     * @param assignmentNode
+     *            The {@link AssignmentNode} (LET() or BIND()).
+     * @param doneSet variable set containing 
+     * @param queryHints
+     *            The query hints from the AST node that dominates the
+     *            assignment and from which we will take any query hints. E.g.,
+     *            a PROJECTION or a JOIN GROUP.
+     * @param ctx The evaluation context.
+     * 
+     * @return the resulting PipelineOp
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })    
+    private static PipelineOp addResolvedAssignment(PipelineOp left,
+        final AssignmentNode assignmentNode,//
+        final Set<IVariable<?>> doneSet, //
+        final Properties queryHints,//
+        final AST2BOpContext ctx) {
+       
+       final IValueExpression ve = assignmentNode.getValueExpression();
+
+       final Set<IVariable<IV>> vars = new LinkedHashSet<IVariable<IV>>();
+
+       /*
+        * Get the vars this filter needs materialized.
+        */
+       final ComputedMaterializationRequirement req = assignmentNode
+               .getMaterializationRequirement();
+
+       vars.addAll(req.getVarsToMaterialize());
+
+       /*
+        * Remove the ones we've already done.
+        */
+       vars.removeAll(doneSet);
+
+       final int bopId = ctx.nextId();
+
+       /*
+        * Construct an IConstraint operating over a fresh variable, to avoid
+        * conflicts with existing (already bounb variables): this is necessary,
+        * because the values constructed in the assignment node might be mocked
+        * values, which cannot be joined to existing values prior to being
+        * resolved against the dictionary. This join will be built on top in
+        * a later step, see comment below.
+        */
+       final Var freshVar = Var.var();
+       final ConditionalBind b = new ConditionalBind(
+             freshVar,
+             assignmentNode.getValueExpression(), false);
+
+       final IConstraint c = new ProjectedConstraint(b);
+
+       /*
+        * We might have already materialized everything we need for this
+        * filter.
+        */
+       if (vars.size() > 0) {
+
+           left = addMaterializationSteps1(left, bopId, ve, vars,
+                   queryHints, ctx);
+
+           if(req.getRequirement()==Requirement.ALWAYS) {
+
+               /*
+                * Add all the newly materialized variables to the set we've
+                * already done.
+                */
+
+               doneSet.addAll(vars);
+               
+           }
+
+       }
+
+       /**
+        * The pipeline we construct in the following works as follows, from
+        * bottom to top:
+        * 
+        * A. Innermost is a conditional routing op that processes the condition
+        *   and computes the bound values. We feed in the ConditionalBind
+        *   expression c, which operates over freshVar and thus does not
+        *   conflict with any mappings in the mapping set.
+        *   
+        * B. On top, we place a MockTermResolverOp, which batch joins the
+        *    values for freshVar against the dictionary.
+        *   
+        * C. The resolved values for freshVar now coexist with potential
+        *    prior mappings for the assignment node variable, so we use the
+        *    VariableUnificationOp to calculate kind of an implicit join over
+        *    the mapping sets (thereby collating freshVar with the assignment
+        *    node variable again).
+        */
+       
+       // operator A.
+       left = applyQueryHints(//
+               new ConditionalRoutingOp(leftOrEmpty(left), //
+               new NV(BOp.Annotations.BOP_ID, bopId), //
+               new NV(ConditionalRoutingOp.Annotations.CONDITION, c)//
+           ), queryHints, ctx);
+
+       // operator B.
+       final Set<IVariable<IV>> iVars = new LinkedHashSet<IVariable<IV>>();
+       iVars.add(freshVar);
+       left = addMockTermResolverOp(
+             left,//
+             iVars,//
+             ChunkedMaterializationOp.Annotations.DEFAULT_MATERIALIZE_INLINE_IVS,
+             null,//
+             assignmentNode.getQueryHints(),//
+             ctx//
+             ); 
+       
+       // operator C.
+       left = addVariableUnificationOp(
+                left, assignmentNode.getVar(), freshVar, ctx);
+       
+       /**
+        * The assignment node var is definitely resolved now
+        */
+       doneSet.add(assignmentNode.getVar());
+       
+       return left;       
+
+   }
+
+   /**
      * Add a FILTER which will not be attached to a required join to the
      * pipeline.
      * 
@@ -5018,4 +5181,159 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
     }
 
+    
+    
+    /**
+     * Use a pipeline operator which resolves mocked terms in the binding set
+     * against the dictionary.
+     * 
+     * @param left
+     *            The left (upstream) operator that immediately proceeds the
+     *            materialization steps.
+     * @param vars
+     *            The variables pointing to mocked IVs to be resolved.
+     * @param queryHints
+     *            The query hints from the dominating AST node.
+     * @param ctx
+     *            The evaluation context.
+     * 
+     * @return The final bop added to the pipeline by this method. If there are
+     *         no variables that require resolving, then this just returns
+     *         <i>left</i>.
+     * 
+     * @see MockTermResolverOp
+     */
+    private static PipelineOp addMockTermResolverOp(//
+            PipelineOp left,//
+            final Set<IVariable<IV>> vars,//
+            final boolean materializeInlineIvs,//
+            final Long cutoffLimit,//
+            final Properties queryHints,//
+            final AST2BOpContext ctx//
+            ) {
+
+        final int nvars = vars.size();
+
+        if (nvars == 0)
+            return left;
+
+        final long timestamp = ctx.getLexiconReadTimestamp();
+
+        final String ns = ctx.getLexiconNamespace();
+
+        return (PipelineOp) applyQueryHints(new MockTermResolverOp(leftOrEmpty(left),
+            new NV(MockTermResolverOp.Annotations.VARS, vars.toArray(new IVariable[nvars])),//
+            new NV(MockTermResolverOp.Annotations.RELATION_NAME, new String[] { ns }), //
+            new NV(MockTermResolverOp.Annotations.TIMESTAMP, timestamp), //
+            new NV(PipelineOp.Annotations.SHARED_STATE, !ctx.isCluster()),// live stats, but not on the cluster.
+            new NV(BOp.Annotations.BOP_ID, ctx.nextId())//
+            ), queryHints, ctx);
+    }
+    
+    /**
+     * Constructs an operator that unifies variables in a mapping set, thereby
+     * filtering mappings out for which the variables cannot be unified, see
+     * {@link VariableUnificationOp} for detailed documentation.
+     * 
+     * @param left
+     *            The left (upstream) operator that immediately proceeds the
+     *            materialization steps.
+     * @param targetVar
+     *            the target variable for unification, which will remain bound
+     *            in mappings passing the unification process
+     * @param tmpVar
+     *            the variable for unification that will be removed/renamed in
+     *            mappings passing the unification process
+     * @param ctx The evaluation context.
+     * 
+     * @return The final bop added to the pipeline by this method.
+     * 
+     * @see VariableUnificationOp
+     */
+    private static PipelineOp addVariableUnificationOp(//
+          PipelineOp left,//
+          final IVariable<IV> targetVar,
+          final IVariable<IV> tmpVar,
+          final AST2BOpContext ctx) {
+       
+       return new VariableUnificationOp(leftOrEmpty(left),
+             new NV(VariableUnificationOp.Annotations.VARS, 
+                      new IVariable[] { targetVar, tmpVar }),
+             new NV(BOp.Annotations.BOP_ID, ctx.nextId()));
+    }
+
+   /**
+     * Makes a static (pessimistic) best effort decision whether or not the
+     * assignment node needs to be resolved (i.e., its possibly mocked IV must
+     * be resolved against the dictionary). 
+     * 
+     * @param ass the assignment node to investigate
+     * @param ctx the query evaluation context
+     * 
+     * @return false if it can be guaranteed that the IVs are not mocked or
+     *               do not need to be resolved, true otherwise
+     */
+    private static boolean mustBeResolvedInContext(
+       final AssignmentNode ass, final AST2BOpContext ctx) {
+
+       final IValueExpression<?> vexp = ass.getValueExpression();
+       
+       /* APPROACH: SCAN FOR SAFE CASES, RETURN true IF NOT ENCOUNTERED */
+       
+       /*
+        * We're always fine with numerical and boolean expressions.
+        */
+       if (vexp instanceof MathBOp ||
+           vexp instanceof XSDBooleanIVValueExpression) {
+          return false;
+            
+       }
+       
+       /*
+        * Handle cases where the assignment node is a constant with 
+        * known bound value.
+        */
+       if (vexp instanceof IConstant) {
+          final IConstant<?> vexpAsConst = (IConstant<?>)vexp;
+          final Object val = vexpAsConst.get();
+          
+          if (val instanceof TermId) {    
+             
+             // whenever IV is not mocked, we're fine
+             final TermId<?> valAsTermId = (TermId<?>)val;
+             if (!valAsTermId.isNullIV()) {
+                return false;
+             }
+   
+          } else if (val instanceof NumericIV) {
+
+             // also, numerics don't pose problems
+             return false;
+          }
+       }
+          
+       
+       /*
+        * In case of more complex assignment expressions, we may still not
+        * require to resolve the IV in case the bound variable is not used
+        * anywhere else in the query. To do so, we count the number of 
+        * occurrences of the variable in the root query; if it occurs more
+        * than once (i.e., more often than the binding in the assignment node,
+        * it is (in the general case) not safe to suppress the resolving.
+        * 
+        * Note: this again is overly broad. However, there are only rare cases
+        * where the same variable is used twice independently (e.g. in
+        * unconnected unions), which we ignore here.
+        */
+       if (BOpUtility.countOccurrencesOf(
+             ctx.sa.getQueryRoot().getWhereClause(), ass.getVar()) <= 1) {
+          return false;
+       }
+          
+       /*
+        * Fallback: we can't be sure that resolval is not required
+        */
+       return true;
+   }
+    
 }
