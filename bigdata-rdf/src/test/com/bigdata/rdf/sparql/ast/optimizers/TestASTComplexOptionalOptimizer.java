@@ -374,8 +374,16 @@ public class TestASTComplexOptionalOptimizer extends
             {
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
-                whereClause.addChild(new NamedSubqueryInclude(set2));
-                whereClause.addChild(new NamedSubqueryInclude(set3));
+                
+                JoinGroupNode jgnSet2 = new JoinGroupNode();
+                jgnSet2.addArg(new NamedSubqueryInclude(set2));
+                jgnSet2.setOptional(false);
+                whereClause.addChild(jgnSet2);
+                
+                JoinGroupNode jgnSet3 = new JoinGroupNode();
+                jgnSet3.addArg(new NamedSubqueryInclude(set3));
+                jgnSet3.setOptional(true);
+                whereClause.addChild(jgnSet3);
             }
 
         }

@@ -1,0 +1,2 @@
+SELECT ?s ?p ?o
+WHERE { GRAPH <http://www.example/c> { ?s ?p ?o } }

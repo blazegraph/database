@@ -1,2 +1,2 @@
 SELECT  (COUNT(*) as ?count) ?z 
-WHERE {  GRAPH ?g { ?x rdf:type ?z } } GROUP BY ?z
+WHERE { ?x rdf:type ?z } GROUP BY ?z
