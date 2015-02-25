@@ -64,35 +64,35 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.17.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/jackson-core-2.2.3.jar"/>
-	<classpathentry kind="lib" path="bigdata-blueprints/lib/jettison-1.3.3.jar"/>
-	<classpathentry kind="lib" path="bigdata-blueprints/lib/rexster-core-2.5.0.jar"/>
-	<classpathentry kind="lib" path="bigdata-blueprints/lib/blueprints-core-2.5.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/jettison-1.3.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/rexster-core-2.5.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/blueprints-core-2.5.0.jar"/>
 	<classpathentry kind="lib" path="bigdata-blueprints/lib/blueprints-test-2.5.0.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-client-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-continuation-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-http-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-io-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-proxy-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-rewrite-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-security-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-server-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-servlet-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-util-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-webapp-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/jetty/jetty-xml-9.2.3.v20140905.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/junit-4.11.jar"/>
-	<classpathentry kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar" sourcepath="/Users/bryan/cuda-workspace/openrdf-sesame-2.7.13"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-client-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-continuation-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-http-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-io-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-proxy-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-rewrite-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-security-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-server-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-servlet-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-util-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-webapp-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-xml-9.2.3.v20140905.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-4.11.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar" sourcepath="/Users/bryan/cuda-workspace/openrdf-sesame-2.7.13"/>
 	<classpathentry kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.7.13.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.7.13.jar"/>
 	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.7.13.jar"/>
-	<classpathentry kind="lib" path="bigdata/lib/hamcrest-core-1.3.jar"/>
-	<classpathentry kind="lib" path="bigdata-blueprints/lib/commons-configuration-1.10.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/commons-io-2.1.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpcore-4.1.4.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpmime-4.1.3.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/httpclient-4.1.3.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/commons-fileupload-1.3.1.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/httpcomponents/commons-logging-1.1.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/hamcrest-core-1.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/commons-configuration-1.10.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-io-2.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/httpcore-4.1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/httpmime-4.1.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/httpclient-4.1.3.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-fileupload-1.3.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-logging-1.1.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -1,0 +1,5 @@
+SELECT ?o
+{ 
+  ?s <http://www.bigdata.com/integer> ?o
+  BIND (10 AS ?o)
+}
