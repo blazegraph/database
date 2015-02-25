@@ -139,9 +139,20 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTCK.class);
 
+        /* test suite for complex BIND operations creating values that are
+         * reused in other parts of the query, targeted at covering problems
+         * with dictionary resolving these constructed values correctly (in
+         * order to resolve mocked IDs)
+         */
+        suite.addTestSuite(TestTicket1007.class);
+
         // additional bottom-up evaluation tests.
         suite.addTestSuite(TestTicket1087.class);
-        
+
+        // test static analysis for quads constructs in triples mode, raising
+        // an early exception when accessing named graphs in triples mode
+        suite.addTest(TestTicket1105.suite());
+
 		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*

@@ -1627,7 +1627,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 
     public void test_insert_data_triples_then_quads2() throws MalformedQueryException,
         TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX dc: <http://purl.org/dc/elements/1.1/>\n"
                 + "PREFIX ns: <http://example.org/ns#>\n"
                 + "INSERT DATA\n"
@@ -1728,7 +1728,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 //    @SuppressWarnings("rawtypes")
     public void test_insert_data_triples_quads_triples() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX dc: <http://purl.org/dc/elements/1.1/>\n"
                 + "PREFIX ns: <http://example.org/ns#>\n"
                 + "INSERT DATA\n"
@@ -1895,7 +1895,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert_00() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
                 + "DELETE { ?person foaf:givenName 'Bill' }\n"//
                 + "INSERT { ?person foaf:givenName 'William' }\n"//
@@ -2224,7 +2224,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert_03() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
                 + "DELETE { ?person foaf:givenName 'Bill' }\n"//
                 + "INSERT { ?person foaf:givenName 'William' }\n"//
@@ -2470,7 +2470,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert_10() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
                 + "DELETE {\n"//
                 + "  GRAPH <http://example/addresses> { ?person foaf:givenName 'Bill' } .\n" //
@@ -2599,7 +2599,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert_11() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
                 +"WITH <http://example/addresses>\n"
                 + "DELETE {\n"//
@@ -2974,7 +2974,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_delete_insert_blankNodes01() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
                 + "DELETE { [] foaf:givenName 'Bill' }\n"//
                 + "INSERT { ?person foaf:givenName 'William' }\n"//
@@ -3270,7 +3270,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert_31() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+        
         final String sparql = "PREFIX foaf:  <http://xmlns.com/foaf/0.1/>\n"
                 + "DELETE { ?person foaf:givenName 'Bill' }\n"//
                 + "USING NAMED <http://example/addresses>\n"//
@@ -3427,7 +3427,7 @@ public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
      */
     public void test_ticket_562() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = "INSERT {\n" + //
                 "  GRAPH <http://example/out> { ?s ?p ?v . }\n" + //
                 "}\n" + //
