@@ -325,6 +325,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             	IGroupMemberNode t = members[i];
             	optimizationApplicable |= 
             		t instanceof IBindingProducerNode && 
+            		!(t instanceof AssignmentNode) && // assignments run last
             		!(t instanceof JoinGroupNode && ((JoinGroupNode) t).isOptional());
             }
     	

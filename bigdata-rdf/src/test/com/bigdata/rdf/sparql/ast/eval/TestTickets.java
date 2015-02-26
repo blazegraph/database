@@ -553,7 +553,20 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();
     }     
     
-
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071i() throws Exception {
+       new TestHelper("ticket_1071i",// testURI,
+             "ticket_1071i.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071i.srx"// resultFileURL
+       ).runTest();
+    }     
+    
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
      * Query solutions are duplicated and increase by adding graph patterns</a>
