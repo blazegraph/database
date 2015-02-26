@@ -40,6 +40,19 @@ import com.bigdata.btree.keys.IKeyBuilder;
 abstract public class AbstractIndexProcedure<T> implements IIndexProcedure<T> {
 
     /**
+    * Note: Serialization is not used for durable data, just RMI. However,
+    * declaring this field MAY break serialization of {@link IIndexProcedure}
+    * instances. Those instances are only used in the scale-out architecture. If
+    * there is a problem, you can upgrade the server instances as well as the
+    * clients. Note that the failure to specify a specific serialVersionUID
+    * means that the actual value was being computed at runtime and that
+    * round-trip serialization depended on the JVMs computing the same value for
+    * this field, so there is not any well known historical value that can be
+    * used reliably.
+    */
+   private static final long serialVersionUID = 1L;
+
+   /**
      * Return the thread-local key builder configured for the {@link IIndex}
      * 
      * @param ndx
