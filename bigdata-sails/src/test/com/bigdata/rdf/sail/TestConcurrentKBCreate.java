@@ -35,14 +35,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
+import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.rdf.vocab.BSBMVocabulary;
+import com.bigdata.rdf.vocab.RDFSVocabulary;
+import com.bigdata.util.InnerCause;
 
 /**
  * Test suite for the concurrent create and discovery of a KB instance.
@@ -115,7 +118,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
      */
     public void test_KBCreateAndDiscovery() throws Exception {
      
-        final String namespace = "kb";
+       final String namespace = getName();
 
         // Inherit the properties from the delegate.
         final Properties properties = getProperties();
@@ -127,23 +130,13 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
             jnl = new Journal(properties);
             
             // KB does not exist.
-            assertNull(getQueryConnection(jnl, namespace, ITx.READ_COMMITTED));
+            assertKBNotFound(jnl, namespace);
 
             // Create the KB instance.
             AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties)).get();
 
             // Attempt to discover the KB instance.
-            BigdataSailRepositoryConnection conn = null;
-            try {
-                // Request query connection.
-                conn = getQueryConnection(jnl, namespace, ITx.READ_COMMITTED);
-                // Verify KB exists.
-                assertNotNull(conn);
-            } finally {
-                // Ensure connection is closed.
-                if (conn != null)
-                    conn.close();
-            }
+            assertKBExists(jnl, namespace);
 
         } finally {
 
@@ -155,11 +148,304 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     }
     
     /**
+     * A non-concurrent version testing both create and destroy.
+     */
+    public void test_KBCreateAndDestroy() throws Exception {
+     
+       final String namespace = getName();
+
+        // Inherit the properties from the delegate.
+        final Properties properties = getProperties();
+        
+        Journal jnl = null;
+        try {
+
+            // New Journal instance.
+            jnl = new Journal(properties);
+            
+            // KB does not exist.
+            assertKBNotFound(jnl, namespace);
+
+            // Create the KB instance.
+            AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties)).get();
+
+            // Attempt to discover the KB instance.
+            assertKBExists(jnl, namespace);
+
+            // Destroy the KB instance.
+            AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+
+            // Verify gone.
+            assertKBNotFound(jnl, namespace);
+
+        } finally {
+
+            if (jnl != null)
+                jnl.destroy();
+
+        }
+        
+    }
+
+   /**
+    * Verify that the named kb exists.
+    */
+   private void assertKBExists(final Journal jnl, final String namespace)
+         throws RepositoryException {
+      // Attempt to discover the KB instance.
+      BigdataSailRepositoryConnection conn = null;
+      try {
+         // Request query connection.
+         conn = getQueryConnection(jnl, namespace, ITx.READ_COMMITTED);
+         // Verify KB exists.
+         assertNotNull(namespace, conn);
+      } finally {
+         // Ensure connection is closed.
+         if (conn != null)
+            conn.close();
+      }
+   }
+
+   /**
+    * Verify that the named kb does not exist.
+    */
+   private void assertKBNotFound(final Journal jnl, final String namespace)
+         throws RepositoryException {
+      // Attempt to discover the KB instance.
+      BigdataSailRepositoryConnection conn = null;
+      try {
+         // Request query connection.
+         conn = getQueryConnection(jnl, namespace, ITx.READ_COMMITTED);
+         // Verify KB does not exist.
+         assertNull(namespace, conn);
+      } finally {
+         // Ensure connection is closed.
+         if (conn != null)
+            conn.close();
+      }
+   }
+
+    /**
+     * A non-concurrent version with two KBs.
+     */
+   public void test_2KBCreateAndDiscovery() throws Exception {
+
+      final String namespace = getName();
+      final String namespace2 = getName()+"2";
+
+      // Inherit the properties from the delegate.
+      final Properties properties = getProperties();
+
+      Journal jnl = null;
+      try {
+
+         // New Journal instance.
+         jnl = new Journal(properties);
+
+         // KB does not exist.
+         assertKBNotFound(jnl, namespace);
+
+         // Create the KB instance.
+         AbstractApiTask.submitApiTask(jnl,
+               new CreateKBTask(namespace, properties)).get();
+
+         assertKBExists(jnl, namespace);
+         
+         // Create the KB instance.
+         AbstractApiTask.submitApiTask(jnl,
+               new CreateKBTask(namespace2, properties)).get();
+
+         assertKBExists(jnl, namespace2);
+
+      } finally {
+
+         if (jnl != null)
+            jnl.destroy();
+
+      }
+       
+   }
+   
+   /**
+    * A non-concurrent version testing both create, destroy, and then re-create
+    * where the KB properties have NOT been changed.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
+    *      followed by Create with different Vocablary causes runtime exception
+    *      </a>
+    */
+   public void test_CreateDestroy_ticket_948_00() throws Exception {
+    
+       final String namespace = getName();
+
+       // Inherit the properties from the delegate.
+      final Properties properties1 = new Properties(getProperties());
+      properties1.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+            BSBMVocabulary.class.getName());
+
+       Journal jnl = null;
+       try {
+
+           // New Journal instance.
+           jnl = new Journal(getProperties());
+           
+           // KB does not exist.
+           assertKBNotFound(jnl, namespace);
+
+           // Create the KB instance.
+           AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties1)).get();
+
+           // Attempt to discover the KB instance.
+           assertKBExists(jnl, namespace);
+
+           // Destroy the KB instance.
+           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+
+           // Verify gone.
+           assertKBNotFound(jnl, namespace);
+
+           // Re-create the KB instance with the same properties.
+           AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties1)).get();
+
+           // Verify gone.
+           assertKBExists(jnl, namespace);
+
+       } finally {
+
+           if (jnl != null)
+               jnl.destroy();
+
+       }
+       
+   }
+   /**
+    * A non-concurrent version testing both create, destroy, and then re-create
+    * where the KB properties have been changed (especially the Vocabulary class).
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
+    *      followed by Create with different Vocablary causes runtime exception
+    *      </a>
+    */
+   public void test_CreateDestroy_ticket_948_01() throws Exception {
+    
+      final String namespace = getName();
+
+       // Inherit the properties from the delegate.
+      final Properties properties1 = new Properties(getProperties());
+      properties1.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+            BSBMVocabulary.class.getName());
+
+      final Properties properties2 = new Properties(getProperties());
+      properties2.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+            RDFSVocabulary.class.getName());
+
+       Journal jnl = null;
+       try {
+
+           // New Journal instance.
+           jnl = new Journal(getProperties());
+           
+           // KB does not exist.
+           assertKBNotFound(jnl, namespace);
+
+           // Create the KB instance.
+           AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties1)).get();
+
+           // Attempt to discover the KB instance.
+           assertKBExists(jnl, namespace);
+
+           // Destroy the KB instance.
+           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+
+           // Verify gone.
+           assertKBNotFound(jnl, namespace);
+
+           // Re-create the KB instance with a different Vocabulary class.
+           AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties2)).get();
+
+           // Verify gone.
+           assertKBExists(jnl, namespace);
+
+       } finally {
+
+           if (jnl != null)
+               jnl.destroy();
+
+       }
+       
+   }
+   
+   /**
+    * A non-concurrent version testing both create, destroy, and then re-create
+    * where the KB properties have been changed (especially the Vocabulary class).
+    * <p>
+    * In this variant, we shutdown the Journal and then re-open it.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
+    *      followed by Create with different Vocablary causes runtime exception
+    *      </a>
+    */
+   public void test_CreateDestroy_ticket_948_02() throws Exception {
+    
+      final String namespace = getName();
+
+       // Inherit the properties from the delegate.
+      final Properties properties1 = new Properties(getProperties());
+      properties1.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+            BSBMVocabulary.class.getName());
+
+      final Properties properties2 = new Properties(getProperties());
+      properties2.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+            RDFSVocabulary.class.getName());
+
+       Journal jnl = null;
+       try {
+
+           // New Journal instance.
+           jnl = new Journal(getProperties());
+           
+           // KB does not exist.
+           assertKBNotFound(jnl, namespace);
+
+           // Create the KB instance.
+           AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties1)).get();
+
+           // Attempt to discover the KB instance.
+           assertKBExists(jnl, namespace);
+
+           // Destroy the KB instance.
+           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+
+           // Verify gone.
+           assertKBNotFound(jnl, namespace);
+           
+           // Shutdown and reopen the journal.
+           jnl.shutdown();
+           
+           jnl = new Journal(getProperties());
+           
+
+           // Re-create the KB instance with a different Vocabulary class.
+           AbstractApiTask.submitApiTask(jnl, new CreateKBTask(namespace, properties2)).get();
+
+           // Verify gone.
+           assertKBExists(jnl, namespace);
+
+       } finally {
+
+           if (jnl != null)
+               jnl.destroy();
+
+       }
+       
+   }
+   
+   /**
      * Basic test of the concurrent create and discovery of a KB.
      */
     public void test_concurrentKBCreateAndDiscovery() throws Exception {
 
-        final String namespace = "kb";
+       final String namespace = getName();
 
         // Inherit the properties from the delegate.
         final Properties properties = getProperties();
@@ -201,7 +487,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
 
             for (int i = 0; i < 100; i++) {
 
-                final String namespace = "kb" + i;
+                final String namespace = getName() + "-" + i;
 
                 doConcurrentCreateAndDiscoveryTest(jnl, namespace);
 
@@ -424,30 +710,39 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
 
             return null;
 
-        }
-        
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
+      }
 
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+      try {
 
-        repo.initialize();
+         // Wrap with SAIL.
+         final BigdataSail sail = new BigdataSail(tripleStore);
 
-        if (TimestampUtility.isReadOnly(timestamp)) {
+         final BigdataSailRepository repo = new BigdataSailRepository(sail);
+
+         repo.initialize();
+
+         if (TimestampUtility.isReadOnly(timestamp)) {
 
             return (BigdataSailRepositoryConnection) repo
-                    .getReadOnlyConnection(timestamp);
+                  .getReadOnlyConnection(timestamp);
 
-        }
-        
-        // Read-write connection.
-        final BigdataSailRepositoryConnection conn = repo.getConnection();
-        
-        conn.setAutoCommit(false);
-        
-        return conn;
+         }
 
-    }
+         // Read-write connection.
+         final BigdataSailRepositoryConnection conn = repo.getConnection();
+
+         conn.setAutoCommit(false);
+
+         return conn;
+      } catch (Throwable t) {
+         if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+            // Not found.
+            return null;
+         }
+         throw new RuntimeException(t);
+      }
+
+   }
 
     /**
      * Return a read-only view of the {@link AbstractTripleStore} for the given
@@ -474,46 +769,46 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
         
     }
 
-    /**
-     * Return an UNISOLATED connection.
-     * 
-     * @param namespace
-     *            The namespace.
-     * 
-     * @return The UNISOLATED connection.
-     * 
-     * @throws SailException
-     * 
-     * @throws RepositoryException
-     */
-    private BigdataSailRepositoryConnection getUnisolatedConnection(
-            final IIndexManager indexManager, final String namespace)
-            throws SailException, RepositoryException {
-
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-        if (tripleStore == null) {
-
-            throw new RuntimeException("Not found: namespace=" + namespace);
-
-        }
-
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        repo.initialize();
-
-        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
-                .getUnisolatedConnection();
-
-        conn.setAutoCommit(false);
-
-        return conn;
-
-    }
+//    /**
+//     * Return an UNISOLATED connection.
+//     * 
+//     * @param namespace
+//     *            The namespace.
+//     * 
+//     * @return The UNISOLATED connection.
+//     * 
+//     * @throws SailException
+//     * 
+//     * @throws RepositoryException
+//     */
+//    private BigdataSailRepositoryConnection getUnisolatedConnection(
+//            final IIndexManager indexManager, final String namespace)
+//            throws SailException, RepositoryException {
+//
+//        // resolve the default namespace.
+//        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//        if (tripleStore == null) {
+//
+//            throw new RuntimeException("Not found: namespace=" + namespace);
+//
+//        }
+//
+//        // Wrap with SAIL.
+//        final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//
+//        repo.initialize();
+//
+//        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
+//                .getUnisolatedConnection();
+//
+//        conn.setAutoCommit(false);
+//
+//        return conn;
+//
+//    }
 
 }
