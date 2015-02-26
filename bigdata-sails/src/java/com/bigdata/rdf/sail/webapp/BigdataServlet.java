@@ -275,6 +275,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 	    	delegate.flushAndClose();
 
 	    }
+	    
+	    @Override
+      public String toString() {
+         return super.toString() + "{delegate=" + delegate + "}";
+      }
 
 	    @Override
 		public T call() throws Exception {
