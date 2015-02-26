@@ -236,7 +236,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 		 * STREAM !!!
 		 */
 
-		return AbstractApiTask.submitApiTask(indexManager, new WrapperTask<T>(
+		return AbstractApiTask.submitApiTask(indexManager, new FlushAndCloseWrapperTask<T>(
 				task));
 
     }
@@ -249,11 +249,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 	 * 
 	 * @param <T>
 	 */
-	private static class WrapperTask<T> implements IApiTask<T> {
+	private static class FlushAndCloseWrapperTask<T> implements IApiTask<T> {
 
 		private final AbstractRestApiTask<T> delegate;
 
-		WrapperTask(final AbstractRestApiTask<T> delegate) {
+		FlushAndCloseWrapperTask(final AbstractRestApiTask<T> delegate) {
 
 			if (delegate == null)
 				throw new IllegalArgumentException();
@@ -312,6 +312,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 			delegate.clearIndexManager();
 		}
     	
+		@Override
+		public boolean isGRSRequired() {
+		   return delegate.isGRSRequired();
+		}
+		
     }
     
 //    /**

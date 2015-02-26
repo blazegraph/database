@@ -73,4 +73,9 @@ abstract public class AbstractDelegateRestApiTask<T> extends
       delegate.clearIndexManager();
    }
 
+   @Override
+   public boolean isGRSRequired() {
+      return super.isGRSRequired() || delegate.isGRSRequired();
+   }
+   
 }

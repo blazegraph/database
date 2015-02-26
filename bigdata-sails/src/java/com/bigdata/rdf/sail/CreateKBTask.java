@@ -79,7 +79,7 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
    public CreateKBTask(final String namespace, final Properties properties) {
 
-      super(namespace, ITx.UNISOLATED);
+      super(namespace, ITx.UNISOLATED, true/* isGRSRequired */);
 
       if (properties == null)
          throw new IllegalArgumentException();

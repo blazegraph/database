@@ -45,6 +45,7 @@ import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.sparse.GlobalRowStoreHelper;
 
 /**
  * Base class is non-specific. Directly derived classes are suitable for
@@ -66,6 +67,12 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     
     /** The timestamp of the view of that KB instance. */
     protected final long timestamp;
+    
+   /**
+    * The GRS is required for create/destroy of a relation (triple/quad store,
+    * etc).
+    */
+   private final boolean isGRSRequired;
 
     @Override
     abstract public boolean isReadOnly();
@@ -78,6 +85,11 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     @Override
     final public long getTimestamp() {
         return timestamp;
+    }
+    
+    @Override
+    public boolean isGRSRequired() {
+       return isGRSRequired;
     }
     
 	@Override
@@ -94,11 +106,29 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * @param timestamp
      *            The timestamp of the view of that KB instance.
      */
+   protected AbstractApiTask(final String namespace, final long timestamp) {
+
+      this(namespace, timestamp, false/* requiresGRS */);
+      
+   }
+
+    /**
+    * 
+    * @param namespace
+    *           The namespace of the target KB instance.
+    * @param timestamp
+    *           The timestamp of the view of that KB instance.
+    * @param isGRSRequired
+    *           True iff a lock must be obtain on the Global Row Store (GRS).
+    *           For example, the GRS is required for create/destroy of a
+    *           relation (triple/quad store, etc).
+    */
     protected AbstractApiTask(final String namespace,
-            final long timestamp) {
-        this.namespace = namespace;
-        this.timestamp = timestamp;
-    }
+          final long timestamp, final boolean isGRSRequired) {
+      this.namespace = namespace;
+      this.timestamp = timestamp;
+      this.isGRSRequired = isGRSRequired;
+  }
 
     @Override
     public void clearIndexManager() {
@@ -370,7 +400,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
             // Obtain the names of the necessary locks for R/W access to indices.
             final String[] locks = getLocksForKB((Journal) indexManager,
-                    namespace);
+                    namespace, task.isGRSRequired());
 
             final IConcurrencyManager cc = ((Journal) indexManager)
                     .getConcurrencyManager();
@@ -387,18 +417,21 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
     
     /**
-     * Return the set of locks that the task must acquire in order to operate on
-     * the specified namespace.
-     * 
-     * @param indexManager
-     *            The {@link Journal}.
-     * @param namespace
-     *            The namespace of the KB instance.
-     * 
-     * @return The locks for the named indices associated with that KB instance.
-     */
+    * Return the set of locks that the task must acquire in order to operate on
+    * the specified namespace.
+    * 
+    * @param indexManager
+    *           The {@link Journal}.
+    * @param namespace
+    *           The namespace of the KB instance.
+    * @param requiresGRS
+    *           GRS is required for create/destroy of a relation (triple/quad
+    *           store, etc).
+    * 
+    * @return The locks for the named indices associated with that KB instance.
+    */
     private static String[] getLocksForKB(final Journal indexManager,
-            final String namespace) {
+            final String namespace, final boolean requiresGRS) {
 
       /*
        * This uses hierarchical locking, so it just returns the namespace. This
@@ -406,7 +439,15 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
        * the same namespace. Thus we do not need to enumerate the indices under
        * that namespace.
        */
-      return new String[] { namespace };
+      if (requiresGRS) {
+         /*
+          * The GRS is required for create/destroy of a relation (triple/quad store, etc).
+          */
+         return new String[] { GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX,
+               namespace };
+      } else {
+         return new String[] { namespace };
+      }
 
    }
 

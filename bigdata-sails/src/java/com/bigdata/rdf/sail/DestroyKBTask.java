@@ -51,7 +51,7 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
          .getLogger(DestroyKBTask.class);
 
    public DestroyKBTask(final String namespace, final long timestamp) {
-      super(namespace, timestamp);
+      super(namespace, timestamp, true/* isGRSRequired */);
    }
 
    @Override
