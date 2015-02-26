@@ -489,6 +489,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
         }
         
         // Step 2 (for each direct child complex optional group).
+        String precedingSolutionName = mainSolutionSetName;
         for (int i=0; i<complexGroups.size(); i++) {
             final JoinGroupNode childGroup = complexGroups.get(i);
 
@@ -505,7 +506,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             nsr.setWhereClause(whereClause);
 
             final NamedSubqueryInclude mainInclude = new NamedSubqueryInclude(
-                    mainSolutionSetName);
+                  precedingSolutionName);
 
             whereClause.addChild(mainInclude);
 
@@ -552,13 +553,13 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 final Set<IVariable<?>> joinVarCandidates = 
                         complexGroupsDefiniteVars.get(i);
                 
-                final Set<IVariable<?>> subsequentGroupMaybeVars = 
+                final Set<IVariable<?>> subsequentGroupDefiniteVars = 
                         new HashSet<IVariable<?>>();
                 for (int j=i+1; j<complexGroupsDefiniteVars.size(); j++) {
-                   subsequentGroupMaybeVars.addAll(complexGroupsDefiniteVars.get(j));
+                   subsequentGroupDefiniteVars.addAll(complexGroupsDefiniteVars.get(j));
                 }
                 
-                joinVarCandidates.retainAll(subsequentGroupMaybeVars);
+                joinVarCandidates.retainAll(subsequentGroupDefiniteVars);
 
                 projectedVars.addAll(joinVarCandidates);
 
@@ -587,7 +588,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             }
             
             
-
+            precedingSolutionName = solutionSetName;
         }
 
     }
