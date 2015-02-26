@@ -389,14 +389,6 @@ public class TestSubQuery extends AbstractDataDrivenSPARQLTestCase {
      */
     public void test_ticket_801b_complex_optionals() throws Exception {
         
-        if (!BigdataStatics.runKnownBadTests) {
-            /*
-             * FIXME Add this test to CI once we make some more progress
-             * against the underlying issue.  
-             */
-            return;
-        }
-
         final TestHelper h = new TestHelper(
                 "test_ticket_801b_complex_optionals", // testURI,
                 "test_ticket_801b_complex_optionals.rq",// queryFileURL

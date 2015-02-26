@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -472,8 +474,23 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             
         }
 
+        /**
+         * Extract maybe produced variables from the complex join groups,
+         * making the accessible in an easy way for reuse in the subsequent
+         * iteration
+         */
+        final List<Set<IVariable<?>>> complexGroupsMaybeVars = 
+             new ArrayList<Set<IVariable<?>>>(complexGroups.size());
+        for (int i=0; i<complexGroups.size(); i++) {
+           
+           final Set<IVariable<?>> cur = new HashSet<IVariable<?>>();
+           sa.getMaybeProducedBindings(complexGroups.get(i), cur, true);
+           complexGroupsMaybeVars.add(i,cur);
+        }
+        
         // Step 2 (for each direct child complex optional group).
-        for (JoinGroupNode childGroup : complexGroups) {
+        for (int i=0; i<complexGroups.size(); i++) {
+            final JoinGroupNode childGroup = complexGroups.get(i);
 
 //            log.error("Convert: " + childGroup);
 
@@ -498,7 +515,11 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             final NamedSubqueryInclude anInclude = new NamedSubqueryInclude(
                     solutionSetName);
             
-            if (group.replaceWith(childGroup, anInclude) != 1)
+            final JoinGroupNode jgn = new JoinGroupNode();
+            jgn.addArg(anInclude);
+            jgn.setOptional(i>0); // optional required for second and following
+               
+            if (group.replaceWith(childGroup, jgn) != 1)
                 throw new AssertionError();
 
             whereClause.addChild(childGroup);
@@ -508,10 +529,43 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
              */
             {
 
+                /*
+                 * sa.getProjectedVars computes required variables according
+                 * to the ancestor axis
+                 */
                 final Set<IVariable<?>> projectedVars = sa.getProjectedVars(
                         anInclude, whereClause, query, exogenousVars,
                         new LinkedHashSet<IVariable<?>>());
+                
+                /*
+                 * In addition to the vars collected by sa.getProjectedVars,
+                 * we need to retain variables appearing in subsequent complex
+                 * join groups. This is necessary to avoid a blowup (duplicates)
+                 * in the number of results, see ticket #801, i.e. we need to
+                 * make sure that joins with subsequent join groups are
+                 * executed over *all* joint variables.
+                 * 
+                 * To do so, we start up with the maybe vars of the group itself
+                 * and retain all maybe vars occurring in one of the following
+                 * join groups, and add them to the list of projected vars.
+                 */
+                final Set<IVariable<?>> joinVarCandidates = 
+                        complexGroupsMaybeVars.get(i);
+                
+                final Set<IVariable<?>> subsequentGroupMaybeVars = 
+                        new HashSet<IVariable<?>>();
+                for (int j=i+1; j<complexGroupsMaybeVars.size(); j++) {
+                   subsequentGroupMaybeVars.addAll(complexGroupsMaybeVars.get(j));
+                }
+                
+                joinVarCandidates.retainAll(subsequentGroupMaybeVars);
 
+                projectedVars.addAll(joinVarCandidates);
+
+                /*
+                 * Having computed the projection vars, we're now ready to 
+                 * build the projection clause for the current named subquery. 
+                 */
                 final ProjectionNode projection = new ProjectionNode();
 
                 for (IVariable<?> v : projectedVars) {
@@ -519,13 +573,13 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                     projection.addProjectionVar(new VarNode(v.getName()));
 
                 }
+                
 
                 nsr.setProjection(projection);
 
             }
-
         }
-        
+
     }
 
     private void liftSparql11Subquery(final AST2BOpContext context,
