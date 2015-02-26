@@ -497,4 +497,48 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();
     } 
     
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071e() throws Exception {
+       new TestHelper("ticket_1071e",// testURI,
+             "ticket_1071e.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071e.srx"// resultFileURL
+       ).runTest();
+    } 
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071f() throws Exception {
+       new TestHelper("ticket_1071f",// testURI,
+             "ticket_1071f.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071f.srx"// resultFileURL
+       ).runTest();
+    } 
+        
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071g() throws Exception {
+       new TestHelper("ticket_1071g",// testURI,
+             "ticket_1071g.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071g.srx"// resultFileURL
+       ).runTest();
+    } 
+    
+    
+    
 }
