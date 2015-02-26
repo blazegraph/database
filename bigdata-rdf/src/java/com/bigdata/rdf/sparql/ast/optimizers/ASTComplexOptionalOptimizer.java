@@ -509,21 +509,24 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                   precedingSolutionName);
 
             whereClause.addChild(mainInclude);
-
-            // Replace the complex optional group with an INCLUDE of the
-            // generated solution set back into the main query.
+            whereClause.addChild(childGroup);
+            
 
             final NamedSubqueryInclude anInclude = new NamedSubqueryInclude(
                     solutionSetName);
-            
-            final JoinGroupNode jgn = new JoinGroupNode();
-            jgn.addArg(anInclude);
-            jgn.setOptional(i>0); // optional required for second and following
 
-            if (group.replaceWith(childGroup, jgn) != 1)
+            /*
+             * We substitute the current include into the main query.
+             * 
+             * TODO: Note that it may be removed again at the end of the for 
+             * loop: actually, we only keep the final subquery, all others are
+             * dropped again. We just need to add them temporarily,
+             * to be able to reuse the static analysis (call 
+             * sa.getProjectedVars) below. We might try to change this to make
+             * the code more readable.
+             */
+            if (group.replaceWith(childGroup, anInclude) != 1)
                 throw new AssertionError();
-
-            whereClause.addChild(childGroup);
 
             /*
              * Create the projection for the named subquery and replace the
@@ -576,17 +579,27 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 }
 
                 nsr.setProjection(projection);
-                
+               
+                // remove group again
+                if (i!=complexGroups.size()-1) {
+                    if (!group.removeArg(anInclude))
+                        throw new AssertionError();
+                }
+
                 
                 /*
                  *  also propagate the projected vars to the JoinGroupNode
                  */
-                final IVariable<?>[] projectedVarsAsArr = 
-                    projectedVars.toArray(new IVariable<?>[projectedVars.size()]);
-                jgn.setProjectInVars(projectedVarsAsArr);
+//                final IVariable<?>[] projectedVarsAsArr = 
+//                    projectedVars.toArray(new IVariable<?>[projectedVars.size()]);
+//                jgn.setProjectInVars(projectedVarsAsArr);
         
             }
             
+            // Replace the complex optional group with an INCLUDE of the
+            // generated solution set back into the main query.
+
+
             
             precedingSolutionName = solutionSetName;
         }
