@@ -2334,50 +2334,47 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
     }
 
-    /**
-     * Return an UNISOLATED connection.
-     * 
-     * @param namespace
-     *            The namespace.
-     * 
-     * @return The UNISOLATED connection.
-     * 
-     * @throws SailException
-     * 
-     * @throws RepositoryException
-     * 
-     *             FIXME GROUP COMMIT: This is deprecated by the support for
-     *             {@link RestApiMutationTask}s
-     */
-    @Deprecated // deprecated by the 
-    BigdataSailRepositoryConnection getUnisolatedConnection(
-            final String namespace) throws SailException, RepositoryException {
-
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-        if (tripleStore == null) {
-
-            throw new RuntimeException("Not found: namespace=" + namespace);
-
-        }
-
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        repo.initialize();
-
-        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
-                .getUnisolatedConnection();
-
-        conn.setAutoCommit(false);
-
-        return conn;
-
-    }
+//    /**
+//     * Return an UNISOLATED connection.
+//     * 
+//     * @param namespace
+//     *            The namespace.
+//     * 
+//     * @return The UNISOLATED connection.
+//     * 
+//     * @throws SailException
+//     * 
+//     * @throws RepositoryException
+//     */
+//    @Deprecated // deprecated by the by the support for group commit. 
+//    BigdataSailRepositoryConnection getUnisolatedConnection(
+//            final String namespace) throws SailException, RepositoryException {
+//
+//        // resolve the default namespace.
+//        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+//                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//        if (tripleStore == null) {
+//
+//            throw new RuntimeException("Not found: namespace=" + namespace);
+//
+//        }
+//
+//        // Wrap with SAIL.
+//        final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//
+//        repo.initialize();
+//
+//        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
+//                .getUnisolatedConnection();
+//
+//        conn.setAutoCommit(false);
+//
+//        return conn;
+//
+//    }
 
     /**
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
