@@ -39,7 +39,6 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -83,22 +82,22 @@ import com.bigdata.service.Split;
 // * 
 // *    &lt;R, H extends IResultHandler&lt;R, A&gt;, A&gt;
 // * </pre>
-abstract public class AbstractKeyArrayIndexProcedure extends
-        AbstractIndexProcedure implements IKeyArrayIndexProcedure,
+abstract public class AbstractKeyArrayIndexProcedure<T> extends
+        AbstractIndexProcedure<T> implements IKeyArrayIndexProcedure<T>,
         Externalizable {
 
-    protected static final Logger log = Logger.getLogger(AbstractKeyArrayIndexProcedure.class);
-    
+//    private static final Logger log = Logger.getLogger(AbstractKeyArrayIndexProcedure.class);
+//    
 //    /**
 //     * True iff the {@link #log} level is INFO or less.
 //     */
 //    final protected boolean INFO = log.getEffectiveLevel().toInt() <= Level.INFO
 //            .toInt();
 //
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final protected boolean DEBUG = log.isDebugEnabled();
+//    /**
+//     * True iff the {@link #log} level is DEBUG or less.
+//     */
+//    final protected boolean DEBUG = log.isDebugEnabled();
 
     /**
      * The object used to (de-)code the keys when they are sent to the remote
@@ -166,30 +165,35 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 //        
 //    }
     
+    @Override
     final public IRaba getKeys() {
         
         return keys;
         
     }
     
+    @Override
     final public IRaba getValues() {
         
         return vals;
         
     }
     
+    @Override
     final public int getKeyCount() {
 
         return keys.size();
 
     }
 
+    @Override
     final public byte[] getKey(final int i) {
 
         return keys.get(i);
 
     }
 
+    @Override
     final public byte[] getValue(final int i) {
 
         if (vals == null)
@@ -286,6 +290,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 //        
 //    }
     
+    @Override
     final public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
 
@@ -343,6 +348,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         
     }
 
+    @Override
     final public void writeExternal(final ObjectOutput out) throws IOException {
 
         writeMetadata(out);
@@ -445,7 +451,6 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      * procedure call (those readily expressed as a <code>byte[][]</code>).
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class ResultBuffer implements Externalizable {
         
@@ -514,6 +519,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         }
 
+        @Override
         public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
@@ -548,6 +554,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             
         }
 
+        @Override
         public void writeExternal(final ObjectOutput out) throws IOException {
 
             out.writeByte(VERSION0);
@@ -585,7 +592,6 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     public static class ResultBitBuffer implements Externalizable {
 
@@ -675,6 +681,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             
         }
 
+        @Override
         public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
@@ -688,6 +695,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
                         + version);
             }
 
+            @SuppressWarnings("resource")
             final InputBitStream ibs = new InputBitStream((InputStream) in,
                     0/* unbuffered */, false/* reflectionTest */);
 
@@ -708,10 +716,12 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             
         }
 
+        @Override
         public void writeExternal(final ObjectOutput out) throws IOException {
 
             out.writeByte(VERSION);
             
+            @SuppressWarnings("resource")
             final OutputBitStream obs = new OutputBitStream((OutputStream) out,
                     0/* unbuffered! */, false/*reflectionTest*/);
 
@@ -745,7 +755,6 @@ abstract public class AbstractKeyArrayIndexProcedure extends
      * Knows how to aggregate {@link ResultBuffer} objects.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class ResultBufferHandler implements
             IResultHandler<ResultBuffer, ResultBuffer> {
@@ -761,6 +770,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
             
         }
 
+        @Override
         public void aggregate(final ResultBuffer result, final Split split) {
 
             final IRaba src = result.getValues();
@@ -781,6 +791,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
          * associated with each split. We would need to return an appropriate
          * {@link IRaba} implementation here instead.
          */
+        @Override
         public ResultBuffer getResult() {
 
             return new ResultBuffer(results.length, results, valsCoder);
@@ -819,6 +830,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         }
 
+        @Override
         public void aggregate(final ResultBitBuffer result, final Split split) {
 
             System.arraycopy(result.getResult(), 0, results, 
@@ -832,6 +844,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
         /**
          * The aggregated results.
          */
+        @Override
         public ResultBitBuffer getResult() {
 
             return new ResultBitBuffer(results.length, results, onCount.get());
@@ -852,6 +865,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
 
         }
 
+        @Override
         public void aggregate(final ResultBitBuffer result, final Split split) {
 
             int delta = 0;
@@ -871,6 +885,7 @@ abstract public class AbstractKeyArrayIndexProcedure extends
          * The #of <code>true</code> values observed in the aggregated
          * {@link ResultBitBuffer}s.
          */
+        @Override
         public Long getResult() {
 
             return ntrue.get();
