@@ -98,8 +98,8 @@ public class ProxySuiteHelper {
 	    //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
 			    		}
 			    	});
-               suite2.setName(name + ", bufferMode=" + bufferMode.name()
-                     + ", testMode=" + testMode.name());
+//               suite2.setName(name + ", bufferMode=" + bufferMode.name()
+//                     + ", testMode=" + testMode.name());
 					subs[i++] = suite2;
 				}
 			}
@@ -107,21 +107,21 @@ public class ProxySuiteHelper {
 
 		@SuppressWarnings("rawtypes")
 		@Override
-		public void addTestSuite(Class clazz) {
+		public void addTestSuite(final Class clazz) {
 			for (final ProxyTestSuite s:subs) {
 				s.addTestSuite(clazz);
 			}
 		}
 
 		@Override
-		public void addTest(Test test) {
+		public void addTest(final Test test) {
 			for (final ProxyTestSuite s:subs) {
 				s.addTest(cloneTest(s.getDelegate(),test));
 			}
 		}
 	}
 
-	private static Test cloneTest(Test delegate, Test test) {
+	private static Test cloneTest(final Test delegate, final Test test) {
 		if (test instanceof TestSuite) {
 			return cloneSuite(delegate, (TestSuite)test);
 		}
@@ -132,7 +132,7 @@ public class ProxySuiteHelper {
 	}
 
 
-	private static Test cloneTestCase(TestCase test) {
+	private static Test cloneTestCase(final TestCase test) {
 		return createTest(test.getClass(),test.getName());
 	}
 
