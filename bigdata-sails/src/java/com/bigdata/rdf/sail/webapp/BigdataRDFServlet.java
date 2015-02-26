@@ -34,6 +34,7 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.net.URLDecoder;
 import java.util.Iterator;
 import java.util.Properties;
@@ -225,6 +226,29 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				 */
 				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t, HttpOperationException.class)) {
+            /*
+             * An AbstractRestApiTask failed and throw out a typed exception to
+             * avoid joining a commit group.
+             * 
+             * TODO The queryStr is ignored on this code path. Review the places
+             * where the HttpOperationException is thrown and standardize the
+             * information contained in its [content] as we have already done
+             * for the [queryStr].
+             */
+            final HttpOperationException ex = (HttpOperationException) InnerCause
+                  .getInnerCause(t, HttpOperationException.class);
+            resp.setStatus(ex.status);
+            resp.setContentType(ex.mimeType);
+            try {
+               final Writer w = resp.getWriter();
+               if (ex.content != null)
+                  w.write(ex.content); // write content iff given.
+               w.flush(); // Commit the response.
+            } catch (IOException ex2) {
+               // ignore any problems here.
+            }
+            return;
 			} else {
 				// Internal server error.
 				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -378,37 +402,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 	}
 
-//    /**
-//	 * Report a mutation count and elapsed time back to the user agent.
-//	 * <p>
-//	 * Note: See caution at
-//	 * {@link AbstractRestApiTask#reportModifiedCount(long, long)} concerning
-//	 * group commit semantics.
-//	 * 
-//	 * @param resp
-//	 *            The response.
-//	 * @param nmodified
-//	 *            The mutation count.
-//	 * @param elapsed
-//	 *            The elapsed time (milliseconds).
-//	 * 
-//	 * @throws IOException
-//	 */
-//    static protected void reportModifiedCount(final HttpServletResponse resp,
-//            final long nmodified, final long elapsed) throws IOException {
-//
-//        final StringWriter w = new StringWriter();
-//    	
-//        final XMLBuilder t = new XMLBuilder(w);
-//
-//        t.root("data").attr("modified", nmodified)
-//                .attr("milliseconds", elapsed).close();
-//
-//        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-//
-//    }
-
-   /**
+	/**
     * Report that a namespace is not found. The namespace is extracted from the
     * {@link HttpServletRequest}.
     */
@@ -435,8 +429,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    static protected void reportRangeCount(final HttpServletResponse resp,
-            final long rangeCount, final long elapsed) throws IOException {
+   static protected void buildAndCommitRangeCountResponse(
+         final HttpServletResponse resp, final long rangeCount,
+         final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
         

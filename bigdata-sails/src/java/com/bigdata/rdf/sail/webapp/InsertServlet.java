@@ -505,20 +505,6 @@ public class InsertServlet extends BigdataRDFServlet {
                             /*
                              * Try to get the RDFFormat from the URL's file
                              * path.
-                             * 
-                             * FIXME GROUP COMMIT: There is a potential issue
-                             * where the existing code commits the response and
-                             * returns, e.g., from the InsertServlet. Any task
-                             * that does not fail (thrown exception) will
-                             * commit. This means that mutations operations that
-                             * fail will still attempt to join a commit point.
-                             * This is inappropriate and could cause resource
-                             * leaks (e.g., if the operation failed after
-                             * writing on the Journal). We really should throw
-                             * out a typed exception, but in launderThrowable()
-                             * ignore that typed exception if the response has
-                             * already been committed. That way the task will
-                             * not join a commit point.
                              */
 
                             format = RDFFormat.forFileName(url.getFile());
@@ -527,12 +513,10 @@ public class InsertServlet extends BigdataRDFServlet {
 
                         if (format == null) {
 
-                            buildAndCommitResponse(resp, HTTP_BADREQUEST,
+                            throw new HttpOperationException(HTTP_BADREQUEST,
                                     MIME_TEXT_PLAIN,
                                     "Content-Type not recognized as RDF: "
                                             + contentType);
-
-                            return null;
 
                         }
 
@@ -540,12 +524,12 @@ public class InsertServlet extends BigdataRDFServlet {
                                 .getInstance().get(format);
 
                         if (rdfParserFactory == null) {
-                            buildAndCommitResponse(resp, HTTP_INTERNALERROR,
+                        
+                           throw new HttpOperationException(HTTP_INTERNALERROR,
                                     MIME_TEXT_PLAIN,
                                     "Parser not found: Content-Type="
                                             + contentType);
 
-                            return null;
                         }
 
                         final RDFParser rdfParser = rdfParserFactory

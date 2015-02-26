@@ -48,7 +48,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
-import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -69,7 +68,6 @@ import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
-import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -1221,7 +1219,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 final long elapsed = System.currentTimeMillis() - begin;
 
-                reportRangeCount(resp, rangeCount, elapsed);
+                buildAndCommitRangeCountResponse(resp, rangeCount, elapsed);
 
                 return null;
 
@@ -1253,7 +1251,7 @@ public class QueryServlet extends BigdataRDFServlet {
         try {
             
             submitApiTask(
-                    new GetContextsTask(req, resp, getNamespace(req),
+                    new RestApiGetContextsTask(req, resp, getNamespace(req),
                             getTimestamp(req))).get();
 
         } catch (Throwable t) {
@@ -1264,76 +1262,6 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
 
-    /**
-     * Task to report the contexts used by a QUADS mode KB instance.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     */
-    private static class GetContextsTask extends AbstractRestApiTask<Void> {
-
-        public GetContextsTask(final HttpServletRequest req,
-                final HttpServletResponse resp, final String namespace,
-                final long timestamp) {
- 
-            super(req, resp, namespace, timestamp);
-            
-        }
-
-        @Override
-        public boolean isReadOnly() {
-            return true;
-        }
-
-        @Override
-        public Void call() throws Exception {
-
-            BigdataSailRepositoryConnection conn = null;
-            try {
-
-                conn = getQueryConnection();
-
-                final StringWriter w = new StringWriter();
-
-                final RepositoryResult<Resource> it = conn.getContextIDs();
-
-                try {
-
-                    final XMLBuilder t = new XMLBuilder(w);
-
-                    final Node root = t.root("contexts");
-
-                    while (it.hasNext()) {
-
-                        root.node("context").attr("uri", it.next()).close();
-
-                    }
-
-                    root.close();
-
-                } finally {
-
-                    it.close();
-
-                }
-
-                buildAndCommitResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-                
-                return null;
-
-            } finally {
-
-                if (conn != null) {
-
-                    conn.close();
-                    
-                }
-
-            }
-
-        }
-        
-    }
-    
     /**
      * Private API reports the shards against which the access path would
      * read.

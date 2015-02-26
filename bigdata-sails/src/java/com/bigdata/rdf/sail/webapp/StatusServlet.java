@@ -248,9 +248,6 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
      *      Cancellation </a>
-     *      
-     *             FIXME GROUP COMMIT: Review cancellation and leader fail
-     *             scenarios.
      */
     static void doCancelQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final IIndexManager indexManager,
