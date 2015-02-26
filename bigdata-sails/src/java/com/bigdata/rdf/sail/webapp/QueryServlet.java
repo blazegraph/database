@@ -341,34 +341,32 @@ public class QueryServlet extends BigdataRDFServlet {
 
             return;
 
-        }
+      }
 
-		try {
+      try {
 
-	        final String namespace = getNamespace(req);
+         final String namespace = getNamespace(req);
 
-	        final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
+         final long timestamp = ITx.UNISOLATED;// getTimestamp(req);
 
-	        submitApiTask(
-	    			/*
-					 * Note: When GROUP_COMMIT (#566) is enabled the http output
-					 * stream MUST NOT be closed from within the submitted task.
-					 * Doing so would permit the client to conclude that the
-					 * operation was finished before the group commit actually
-					 * occurs. Instead, we leave it to the servlet container to
-					 * close the http output stream only once the execution
-					 * thread leaves this context. This provides the appropriate
-					 * visibility guarantees.
-					 */
-					new SparqlUpdateTask(req, resp, namespace, timestamp,
-							updateStr, getBigdataRDFContext() //
-					)).get();
-	        
-		} catch (Throwable t) {
+         /*
+          * Note: When GROUP_COMMIT (#566) is enabled the http output stream
+          * MUST NOT be closed from within the submitted task. Doing so would
+          * permit the client to conclude that the operation was finished before
+          * the group commit actually occurs. Instead, we leave it to the
+          * servlet container to close the http output stream only once the
+          * execution thread leaves this context. This provides the appropriate
+          * visibility guarantees.
+          */
+         submitApiTask(
+               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr,
+                     getBigdataRDFContext())).get();
 
-			launderThrowable(t, resp, "SPARQL-UPDATE: updateStr=" + updateStr);
+      } catch (Throwable t) {
 
-		}
+         launderThrowable(t, resp, "SPARQL-UPDATE: updateStr=" + updateStr);
+
+      }
 
     }
 
@@ -527,16 +525,15 @@ public class QueryServlet extends BigdataRDFServlet {
 
         }
 
-		try {
+      try {
 
-	        final String namespace = getNamespace(req);
+         final String namespace = getNamespace(req);
 
-	        final long timestamp = getTimestamp(req);
+         final long timestamp = getTimestamp(req);
 
-			submitApiTask(
-					new SparqlQueryTask(req, resp, namespace, timestamp,
-							queryStr, getBigdataRDFContext() //
-					)).get();
+         submitApiTask(
+               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr,
+                     getBigdataRDFContext())).get();
 
 		} catch (Throwable t) {
 			// if (!InnerCause.isInnerCause(t, DatasetNotFoundException.class))

@@ -206,13 +206,13 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      *            the index of the repository, starting with 1
      * @return
      */
-    protected String getRepositoryUrl(final int i) {
+    private String getRepositoryUrl(final int i) {
 
         return getRepositoryUrlBase() + i + "/sparql";
 
     }
     
-    protected String getRepositoryUrlBase() {
+    private String getRepositoryUrlBase() {
         
         return m_serviceURL + "/namespace/" + namespace + "_";
 
@@ -231,7 +231,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      * @throws SailException 
      * @throws RepositoryException 
      */
-    public BigdataSailRepository getRepository(final int i)
+    private BigdataSailRepository getRepository(final int i)
             throws SailException, RepositoryException {
 
         final String ns = getNamespace(i);
@@ -257,7 +257,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      * The <code>local</code> repository.
      * @return
      */
-    public BigdataSailRepository getRepository() {
+    private BigdataSailRepository getRepository() {
         
         return localRepository;
         

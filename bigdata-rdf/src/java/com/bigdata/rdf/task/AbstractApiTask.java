@@ -332,89 +332,101 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
     *      operations against multiple KBs </a>
     */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+   @SuppressWarnings({ "unchecked", "rawtypes" })
    static public <T> Future<T> submitApiTask(final IIndexManager indexManager,
          final IApiTask<T> task) {
 
-        final String namespace = task.getNamespace();
-        
-        final long timestamp = task.getTimestamp();
-        
-        if (!BigdataStatics.NSS_GROUP_COMMIT || indexManager instanceof IBigdataFederation
-                || TimestampUtility.isReadOnly(timestamp)
-                ) {
+      final String namespace = task.getNamespace();
+
+      final long timestamp = task.getTimestamp();
+
+      if (!BigdataStatics.NSS_GROUP_COMMIT
+            || indexManager instanceof IBigdataFederation
+            || TimestampUtility.isReadOnly(timestamp)) {
+
+         /*
+          * Execute the REST API task.
+          * 
+          * Note: For scale-out, the operation will be applied using client-side
+          * global views of the indices. This means that there will not be any
+          * globally consistent views of the indices and that updates will be
+          * shard-wise local.
+          * 
+          * Note: This can be used for operations on read-only views (even on a
+          * Journal). This is helpful since we can avoid some overhead
+          * associated the AbstractTask lock declarations.
+          */
+         // Wrap Callable.
+         final FutureTask<T> ft = new FutureTask<T>(new ApiTaskForIndexManager(
+               indexManager, task));
+
+         if (true) {
 
             /*
-             * Execute the REST API task.
+             * Caller runs (synchronous execution)
              * 
-             * Note: For scale-out, the operation will be applied using
-             * client-side global views of the indices. This means that
-             * there will not be any globally consistent views of the
-             * indices and that updates will be shard-wise local.
-             * 
-             * Note: This can be used for operations on read-only views (even on
-             * a Journal). This is helpful since we can avoid some overhead
-             * associated the AbstractTask lock declarations.
+             * Note: By having the caller run the task here we avoid consuming
+             * another thread.
              */
-            // Wrap Callable.
-            final FutureTask<T> ft = new FutureTask<T>(
-                    new ApiTaskForIndexManager(indexManager, task));
+            ft.run();
 
-            if (true) {
+         } else {
 
-                /*
-                 * Caller runs (synchronous execution)
-                 * 
-                 * Note: By having the caller run the task here we avoid
-                 * consuming another thread.
-                 */
-                ft.run();
-                
-            } else {
-                
-                /*
-                 * Run on a normal executor service.
-                 */
-                indexManager.getExecutorService().submit(ft);
-                
-            }
-
-            return ft;
-
-        } else {
-
-            /**
-             * Run on the ConcurrencyManager of the Journal.
-             * 
-             * Mutation operations will be scheduled based on the pre-declared
-             * locks and will have exclusive access to the resources guarded by
-             * those locks when they run.
-             * 
-             * FIXME GROUP COMMIT: The hierarchical locking mechanisms will fail
-             * on durable named solution sets because they use either HTree or
-             * Stream and AbstractTask does not yet support those durable data
-             * structures (it is still being refactored to support the
-             * ICheckpointProtocol rather than the BTree in its Name2Addr
-             * isolation logic).
+            /*
+             * Run on a normal executor service.
              */
+            indexManager.getExecutorService().submit(ft);
 
-            // Obtain the names of the necessary locks for R/W access to indices.
-            final String[] locks = getLocksForKB((Journal) indexManager,
-                    namespace, task.isGRSRequired());
+         }
 
-            final IConcurrencyManager cc = ((Journal) indexManager)
-                    .getConcurrencyManager();
-            
-            // Submit task to ConcurrencyManager. 
-            // Task will (eventually) acquire locks and run.
-            // Note: The Future of that task is returned to the caller.
-            // TODO Could pass through timeout for submitted task here.
-            return cc.submit(new ApiTaskForJournal(cc, task.getTimestamp(),
-                    locks, task));
+         return ft;
 
-        }
+      } else {
 
-    }
+         /**
+          * Run on the ConcurrencyManager of the Journal.
+          * 
+          * Mutation operations will be scheduled based on the pre-declared
+          * locks and will have exclusive access to the resources guarded by
+          * those locks when they run.
+          * 
+          * FIXME GROUP COMMIT: The hierarchical locking mechanisms will fail on
+          * durable named solution sets because they use either HTree or Stream
+          * and AbstractTask does not yet support those durable data structures
+          * (it is still being refactored to support the ICheckpointProtocol
+          * rather than the BTree in its Name2Addr isolation logic).
+          */
+
+         // Obtain the names of the necessary locks for R/W access to indices.
+         final String[] locks = getLocksForKB((Journal) indexManager,
+               namespace, task.isGRSRequired());
+
+         final IConcurrencyManager cc = ((Journal) indexManager)
+               .getConcurrencyManager();
+
+         /*
+          * Submit task to ConcurrencyManager.
+          * 
+          * Task will (eventually) acquire locks and run.
+          * 
+          * Note: The Future of that task is returned to the caller.
+          * 
+          * Note: ConcurrencyManager.submit() requires an AbstractTask. This
+          * makes it quite difficult for us to return a FutureTask here. Making
+          * the change there touches the lock manager and write executor service
+          * but maybe it should be done since it is otherwise difficult to
+          * convert a Future into a FutureTask or RunnableFuture.
+          * 
+          * TODO Could pass through timeout for submitted task here.
+          */
+         final Future<T> f = cc.submit(new ApiTaskForJournal(cc, task
+               .getTimestamp(), locks, task));
+
+         return f;
+
+      }
+
+   }
     
     /**
     * Return the set of locks that the task must acquire in order to operate on

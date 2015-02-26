@@ -1778,6 +1778,9 @@ abstract public class AbstractTripleStore extends
 
         assertWritable();
 
+        // Conditionally destroyed below. See #948.
+        final BigdataValueFactory tmp = valueFactory;
+        
         // FIXME unit tests fail here during tear down if the federation has
         // already been disconnected/destroyed since they can not reach the
         // lock service.  The code should handle this better.
@@ -1826,6 +1829,21 @@ abstract public class AbstractTripleStore extends
             
             super.destroy();
             
+            /**
+             * Discard the value factory for the lexicon's namespace.
+             * 
+             * Note: The LexiconRelation already does this. However, the
+             * AtomicDelete operation on the GRS winds up de-serializing the
+             * Vocabulary class as part of the delete of the declaration of
+             * the KB instance. This causes the Vocabulary object to be re-created
+             * within the BigdataValueFactoryImpl cache.  So we need to wipe it out
+             * again here.
+             * 
+             * @see #948
+             */
+            if(lexicon && tmp != null)
+               tmp.remove();
+
         } finally {
 
             unlock(resourceLock);

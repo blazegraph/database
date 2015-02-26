@@ -1702,8 +1702,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 baos.flush();
                 os.write(baos.toByteArray());
 
-                // Flush the response.
-                os.flush();
+                /*
+                 * DO NOT FLUSH THE RESPONSE HERE.  IT WILL COMMIT THE RESPONSE
+                 * TO THE CLIENT BEFORE THE GROUP COMMMIT !!!
+                 * 
+                 * @see #566
+                 */
+//                // Flush the response.
+//                os.flush();
 
             }
 
