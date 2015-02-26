@@ -38,22 +38,23 @@ import com.bigdata.mdi.ISeparatorKeys;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-abstract public class AbstractKeyRangeIndexProcedure extends
-        AbstractIndexProcedure implements IKeyRangeIndexProcedure,
+abstract public class AbstractKeyRangeIndexProcedure<T> extends
+        AbstractIndexProcedure<T> implements IKeyRangeIndexProcedure<T>,
         Externalizable {
 
     protected byte[] fromKey;
 
     protected byte[] toKey;
 
+    @Override
     public byte[] getFromKey() {
         
         return fromKey;
         
     }
     
+    @Override
     public byte[] getToKey() {
         
         return toKey;
@@ -76,13 +77,15 @@ abstract public class AbstractKeyRangeIndexProcedure extends
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
 
         readKeys(in);
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         writeKeys(out);
         
@@ -90,7 +93,7 @@ abstract public class AbstractKeyRangeIndexProcedure extends
 
     private static final short VERSION0 = 0x0;
 
-    protected void readKeys(ObjectInput in) throws IOException, ClassNotFoundException {
+    protected void readKeys(final ObjectInput in) throws IOException, ClassNotFoundException {
         
         final short version = in.readShort();
 
@@ -132,7 +135,7 @@ abstract public class AbstractKeyRangeIndexProcedure extends
 
     }
     
-    protected void writeKeys(ObjectOutput out) throws IOException {
+    protected void writeKeys(final ObjectOutput out) throws IOException {
         
         out.writeShort(VERSION0);
 
