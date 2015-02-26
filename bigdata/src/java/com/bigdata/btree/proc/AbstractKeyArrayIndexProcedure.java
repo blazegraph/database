@@ -42,8 +42,6 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.log4j.Logger;
-
 import com.bigdata.btree.Errors;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.raba.IRaba;
@@ -62,7 +60,6 @@ import com.bigdata.service.Split;
  * index).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 // * <pre>
 // * @param R
