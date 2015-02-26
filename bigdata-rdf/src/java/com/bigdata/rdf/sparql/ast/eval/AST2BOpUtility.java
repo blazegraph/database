@@ -1951,7 +1951,31 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * However, those variables are already present in the hash index so
          * they can be reunited with the solutions for the subquery in the
          * solution set hash join at the end of the subquery plan.
+         * 
+         * Note that, when projecting variables inside the subquery, we need
+         * to remove duplicates in the outer solution, to avoid a blowup in
+         * the result size (the inner result is joined with the complete
+         * outer result retained though the previous HashIndexOp at a later
+         * point anyway, what we're doing here just serves the purpose to avoid
+         * the computation of unneeded bindings inside the subclause, in the
+         * sense that we pass in every possible binding once), cf. ticket #835.
          */
+        // setup the distinct projection first
+        final List<NV> anns = new LinkedList<NV>();
+        anns.add(new NV(
+                JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
+        anns.add(new NV(
+                JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectedVars));
+        anns.add(new NV(
+                JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
+                BOpEvaluationContext.CONTROLLER));
+        anns.add(new NV(
+                JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
+
+        left = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
+                anns.toArray(new NV[anns.size()]));
+        
+        // and put the projection on top
         left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
