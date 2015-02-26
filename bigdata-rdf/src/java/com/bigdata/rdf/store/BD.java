@@ -36,6 +36,7 @@ import org.openrdf.model.vocabulary.SESAME;
 
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTALPServiceOptimizer;
 
 
 /**
@@ -194,4 +195,15 @@ public interface BD {
      */
     URI SERVICE_PARAM = new URIImpl(NAMESPACE + "serviceParam");
     
+    /**
+    * The well-known URI of the ALP SERVICE extension.
+    * 
+    * @see ASTALPServiceOptimizer
+    * @see <a href="http://trac.bigdata.com/ticket/1072"> Configurable ALP
+    *      Service </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1117"> Document the ALP
+    *      Service </a>
+    */
+    URI ALP_SERVICE = new URIImpl(NAMESPACE + "alp");
+
 }
