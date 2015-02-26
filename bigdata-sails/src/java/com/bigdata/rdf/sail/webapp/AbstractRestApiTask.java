@@ -259,11 +259,22 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
     *           The MIME type of the response.
     * @param content
     *           The content
+    * 
     * @throws IOException
+    * 
+    * @throws AssertionError
+    *            if the caller attempts to use this method for a non-success
+    *            (2xx) outcome. The correct pattern is to throw an
+    *            {@link HttpOperationException} instead once you are inside of
+    *            an {@link AbstractRestApiTask}.
     */
    protected void buildResponse(final int status, final String mimeType,
          final String content) throws IOException {
 
+      if (status < 200 || status >= 300)
+         throw new AssertionError(
+               "This method must not be used for non-success outcomes");
+      
       if (log.isInfoEnabled())
          log.info("task=" + this + ", status=" + status + ", mimeType="
                + mimeType + ", content=[" + content + "]");
@@ -284,22 +295,5 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 //        w.flush(); 
 
     }
-
-   /**
-    * Report that a namespace is not found. The namespace is extracted from the
-    * {@link HttpServletRequest}.
-    */
-   protected void buildNamespaceNotFoundResponse()
-         throws IOException {
-
-      if (log.isInfoEnabled())
-         log.info("task=" + this);
-
-      buildResponse(HttpServletResponse.SC_NOT_FOUND,
-            BigdataServlet.MIME_TEXT_PLAIN, "Not found: namespace=" + namespace
-      // +", timestamp="+getTimestamp(req)
-      );
-
-   }
-
+   
 }

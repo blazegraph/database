@@ -212,6 +212,15 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * close the output stream once the submitted task has completed successfully
     * (at which point the group commit will be stable). This provides the
     * necessary and correct visibility barrier for the updates.
+    * <p>
+    * <strong>CAUTION: Non-success outcomes MUST throw exceptions!</strong> Once
+    * the flow of control enters an {@link AbstractRestApiTask} the task MUST
+    * throw out a typed exception that conveys the necessary information to the
+    * launderThrowable() code which can then turn it into an appropriate HTTP
+    * response. If the task does not throw an exception then it is presumed to
+    * be successful and it will join the next group commit. Failure to follow
+    * this caution can cause partial write sets to be made durable, thus
+    * breaking the ACID semantics of the API.
     * 
     * @param task
     *           The task.
@@ -472,6 +481,14 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * REST API that have actually performed a mutation (vs simply reporting a
     * client or server error before entering into their mutation code path) MUST
     * use {@link #submitApiTask(AbstractRestApiTask)}.
+    * <p>
+    * Note: It is NOT safe to invoke this method once you are inside an
+    * {@link AbstractRestApiTask} EVEN if the purpose is to report a client or
+    * server error. The task MUST throw out a typed exception that conveys the
+    * necessary information to the launderThrowable() code which can then turn
+    * it into an appropriate HTTP response. If the task does not throw an
+    * exception then it is presumed to be successful and it will join the next
+    * group commit!
     * 
     * @param resp
     * @param status

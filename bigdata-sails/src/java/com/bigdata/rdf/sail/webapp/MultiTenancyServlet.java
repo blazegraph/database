@@ -38,15 +38,12 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.impl.GraphImpl;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.CreateKBTask;
-import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
@@ -257,7 +254,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
          * 3. Add the given properties to the flattened defaults to obtain the
          * effective properties.
          */
-        final Properties given, defaults, effective;
+        final Properties given, defaults, effectiveProperties;
         {        
 
             final String contentType = req.getContentType();
@@ -324,7 +321,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
              */
             {
                 
-                effective = PropertyUtil.flatCopy(defaults);
+                effectiveProperties = PropertyUtil.flatCopy(defaults);
 
                 for (Map.Entry<Object, Object> e : given.entrySet()) {
 
@@ -335,7 +332,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                     if (val != null) {
 
                         // Note: Hashtable does not allow nulls.
-                        effective.put(name, val);
+                        effectiveProperties.put(name, val);
 
                     }
 
@@ -346,111 +343,25 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
         }
 
         // The effective namespace for the new KB.
-        final String namespace = effective.getProperty(
+        final String namespace = effectiveProperties.getProperty(
                 BigdataSail.Options.NAMESPACE,
                 BigdataSail.Options.DEFAULT_NAMESPACE);
 
-        {
+      try {
 
-            final long timestamp = ITx.UNISOLATED;
-            
-            // resolve the namespace.
-            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                    .getResourceLocator().locate(namespace, timestamp);
+         AbstractApiTask.submitApiTask(
+               indexManager,
+               new RestApiCreateKBTask(req, resp, namespace,
+                     effectiveProperties)).get();
 
-            if (tripleStore != null) {
-                /*
-                 * The namespace already exists.
-                 * 
-                 * Note: The response code is defined as 409 (Conflict) since
-                 * 1.3.2.
-                 */
-                buildAndCommitResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
-                        "EXISTS: " + namespace);
-                return;
-            }
-            
-        }
+      } catch (Throwable e) {
 
-        try {
+         launderThrowable(e, resp, "namespace=" + namespace);
 
-         AbstractApiTask
-               .submitApiTask(
-                     indexManager,
-                     new RestApiCreateKBTask(req, resp, namespace, effective/* effectiveProperties */))
-               .get();
-           
-//            if (indexManager instanceof Journal) {
-//
-//                /*
-//                 * Create a local triple store.
-//                 * 
-//                 * Note: This hands over the logic to some custom code located
-//                 * on the BigdataSail.
-//                 */
-//
-//                final Journal jnl = (Journal) indexManager;
-//
-//                // create the appropriate as configured triple/quad store.
-//                BigdataSail.createLTS(jnl, effective);
-//
-//            } else {
-//
-//                /*
-//                 * Register triple store for scale-out.
-//                 */
-//
-//                final ScaleOutTripleStore ts = new ScaleOutTripleStore(
-//                        indexManager, namespace, ITx.UNISOLATED, effective);
-//
-//                ts.create();
-//
-//            }
+      }
 
-        } catch (Throwable e) {
-
-            launderThrowable(e, resp, "namespace=" + namespace);
-
-        }
-        
-    }
+   }
     
-    /**
-     * Extended to report the correct HTTP response to the client.
-     */
-    private static class RestApiCreateKBTask extends AbstractDelegateRestApiTask<Void> {
-
-      public RestApiCreateKBTask(final HttpServletRequest req,
-            final HttpServletResponse resp, final String namespace,
-            final Properties properties) {
-
-         super(req, resp, namespace, ITx.UNISOLATED, new CreateKBTask(namespace, properties));
-
-      }
-
-      @Override
-      public Void call() throws Exception {
-         
-         super.call();
-         
-         /*
-          * Note: The response code is defined as 201 (Created) since 1.3.2.
-          */
-         
-         buildResponse(HttpServletResponse.SC_CREATED, MIME_TEXT_PLAIN,
-               "CREATED: " + namespace);
-
-         return null;
-         
-      }
-
-      @Override
-      final public boolean isReadOnly() {
-         return false;
-      }
-    
-    }
-
     /**
      * Delete an existing namespace.
      * 
@@ -476,142 +387,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
    }
 
-   private static class RestApiDestroyKBTask extends AbstractDelegateRestApiTask<Void> {
-
-      public RestApiDestroyKBTask(final HttpServletRequest req,
-            final HttpServletResponse resp, final String namespace) {
-
-         super(req, resp, namespace, ITx.UNISOLATED, new DestroyKBTask(
-               namespace, ITx.UNISOLATED));
-
-      }
-
-      @Override
-      public boolean isReadOnly() {
-         return false;
-      }
-
-      @Override
-      public Void call() throws Exception {
-
-         super.call();
-
-         buildResponse(HTTP_OK, MIME_TEXT_PLAIN, "DELETED: " + namespace);
-
-         return null;
-
-      }
-
-    }
-    
-//    private void doDeleteNamespace(final HttpServletRequest req,
-//          final HttpServletResponse resp) throws IOException {
-//
-//      final String namespace = getNamespace(req);
-//
-//      final long timestamp = ITx.UNISOLATED;
-//
-//      boolean acquiredConnection = false;
-//      try {
-//          
-//          if (getIndexManager() instanceof Journal) {
-//              // acquire permit from Journal.
-//              ((Journal) getIndexManager()).acquireUnisolatedConnection();
-//              acquiredConnection = true;
-//          }
-//
-//          final AbstractTripleStore tripleStore = getBigdataRDFContext()
-//                  .getTripleStore(namespace, timestamp); 
-//
-//          if (tripleStore == null) {
-//              /*
-//               * There is no such triple/quad store instance.
-//               */
-//             buildAndCommitNamespaceNotFoundResponse(req, resp);
-//             return;
-//          }
-//
-//          // Destroy the KB instance.
-//          tripleStore.destroy();
-//          
-//          tripleStore.commit();
-//          
-//          buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
-//                  + namespace);
-//
-//      } catch (Throwable e) {
-//
-//          launderThrowable(e, resp, "");
-//
-//      } finally {
-//
-//          if (acquiredConnection) {
-//          
-//              ((Journal) getIndexManager()).releaseUnisolatedConnection();
-//              
-//          }
-//          
-//      }
-//
-//  }
-    
-//    private void doDeleteNamespace(final HttpServletRequest req,
-//            final HttpServletResponse resp) throws IOException {
-//
-//        final String namespace = getNamespace(req);
-//
-//        final long timestamp = ITx.UNISOLATED;
-//
-//        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-//                .getTripleStore(namespace, timestamp);
-//
-//        if (tripleStore == null) {
-//            /*
-//             * There is no such triple/quad store instance.
-//             */
-//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-//            return;
-//        }
-//
-//        try {
-//
-//            final BigdataSail sail = new BigdataSail(tripleStore);
-//
-//            BigdataSailConnection con = null;
-//
-//            try {
-//
-//                sail.initialize();
-//                // This basically puts a lock on the KB instance.
-//                con = sail.getUnisolatedConnection();
-//                // Destroy the KB instance.
-//                tripleStore.destroy();
-//                // Commit.
-//                con.commit();
-//
-//            } finally {
-//
-//                if (con != null)
-//                    con.close();
-//
-//                sail.shutDown();
-//                
-//            }
-//
-//            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
-//                    + namespace);
-//
-//        } catch (Throwable e) {
-//
-//            log.error(e, e);
-//            
-//            throw launderThrowable(e, resp, "");
-//            
-//        }
-//
-//    }
-
-    /**
+   /**
      * Send the configuration properties for the addressed KB instance.
      * 
      * @param req
@@ -640,15 +416,18 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
                   @Override
                   public Void call() throws Exception {
-                     final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                           .getTripleStore(namespace, tx);
+
+                     final AbstractTripleStore tripleStore = getTripleStore(
+                           namespace, tx);
 
                      if (tripleStore == null) {
                         /*
                          * There is no such triple/quad store instance.
                          */
-                        buildNamespaceNotFoundResponse();
-                        return null;
+                        throw new HttpOperationException(
+                              HttpServletResponse.SC_NOT_FOUND,
+                              BigdataServlet.MIME_TEXT_PLAIN,
+                              "Not found: namespace=" + namespace);
                      }
 
                      final Properties properties = PropertyUtil

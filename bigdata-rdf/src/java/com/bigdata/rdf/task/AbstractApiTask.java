@@ -48,10 +48,14 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.sparse.GlobalRowStoreHelper;
 
 /**
- * Base class is non-specific. Directly derived classes are suitable for
- * internal tasks (stored queries, stored procedures, etc) while REST API tasks
- * are based on a specialized subclass that also provides for access to the HTTP
- * request and response.
+ * Base class for task-oriented concurrency. Directly derived classes are
+ * suitable for internal tasks (stored queries, stored procedures, etc) while
+ * REST API tasks are based on a specialized subclass that also provides for
+ * access to the HTTP request and response.
+ * 
+ * <strong>CAUTION: Instances of this class that perform mutations MUST throw an
+ * exception if they do not want to join a commit group. Failure to follow this
+ * guideline can break the ACID contract.</strong>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
@@ -186,7 +190,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
      * @return The {@link AbstractTripleStore} -or- <code>null</code> if none is
      *         found for that namespace and timestamp.
      */
-    private AbstractTripleStore getTripleStore(final String namespace,
+    protected AbstractTripleStore getTripleStore(final String namespace,
             final long timestamp) {
 
         // resolve the default namespace.
@@ -390,11 +394,12 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
           * locks and will have exclusive access to the resources guarded by
           * those locks when they run.
           * 
-          * FIXME GROUP COMMIT: The hierarchical locking mechanisms will fail on
-          * durable named solution sets because they use either HTree or Stream
-          * and AbstractTask does not yet support those durable data structures
-          * (it is still being refactored to support the ICheckpointProtocol
-          * rather than the BTree in its Name2Addr isolation logic).
+          * FIXME GROUP_COMMIT/GIST: The hierarchical locking mechanisms will
+          * fail on durable named solution sets because they use either HTree or
+          * Stream and AbstractTask does not yet support those durable data
+          * structures (it is still being refactored to support the
+          * ICheckpointProtocol rather than the BTree in its Name2Addr isolation
+          * logic).
           */
 
          // Obtain the names of the necessary locks for R/W access to indices.

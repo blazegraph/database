@@ -108,16 +108,16 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 	}
 
-	/*
-	 * FIXME GROUP_COMMIT: We need to be running this test suite for each of the
-	 * BufferModes that we want to support. This is because there are subtle
-	 * interactions between the BufferMode, the AbstractTask, and the execution
-	 * of mutation operations.  One approach might be to pass in a collection
-	 * of BufferMode values rather than a singleton and then generate the test
-	 * suite for each BufferMode value in that collection [I've tried this, but
-	 * I am missing something in the proxy test pattern with the outcome that
-	 * the tests are not properly distinct.]
-	 */
+   /**
+    * We need to be running this test suite for each of the BufferModes that we
+    * want to support. This is because there are subtle interactions between the
+    * BufferMode, the AbstractTask, and the execution of mutation operations.
+    * One approach might be to pass in a collection of BufferMode values rather
+    * than a singleton and then generate the test suite for each BufferMode
+    * value in that collection [I've tried this, but I am missing something in
+    * the proxy test pattern with the outcome that the tests are not properly
+    * distinct.]
+    */
 	static public Test suite() {
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
