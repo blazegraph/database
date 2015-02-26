@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -129,30 +128,32 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
             group.setJoinVars(joinVars);
             
             /*
-             * The variables used by the group and its children, including 
-             * filters.
+             * The variables that will definitely be bound inside the subquery.
              */
-            final Set<IVariable<?>> usedByGroup = sa
-            		.getSpannedVariables(group, 
-            				true /*filters*/, new LinkedHashSet<IVariable<?>>());
+            final Set<IVariable<?>> definitelyBoundInGroup =
+                sa.getDefinitelyProducedBindings(
+                    group, new LinkedHashSet<IVariable<?>>(), true);
+            
+            
 
             /*
              * Find the set of variables which have appeared in the query and
              * may be bound by the time the group is evaluated.
              */
             final Set<IVariable<?>> maybeIncomingBindings = sa
-                    .getMaybeIncomingBindings(
-                            (GraphPatternGroup<?>) group,
-                            new LinkedHashSet<IVariable<?>>());
+                .getMaybeIncomingBindings(
+                    (GraphPatternGroup<?>) group, 
+                    new LinkedHashSet<IVariable<?>>());
 
             /*
-             * Retain the variables used by the group that have already
+             * Retain the defintely bound variables that have already
              * appeared previously in the query up to this point. 
              */
-            usedByGroup.retainAll(maybeIncomingBindings);
+            definitelyBoundInGroup.retainAll(maybeIncomingBindings);
             
             @SuppressWarnings("rawtypes")
-            final IVariable[] projectInVars = usedByGroup.toArray(new IVariable[0]);
+            final IVariable[] projectInVars = 
+                definitelyBoundInGroup.toArray(new IVariable[0]);
 
             group.setProjectInVars(projectInVars);
             

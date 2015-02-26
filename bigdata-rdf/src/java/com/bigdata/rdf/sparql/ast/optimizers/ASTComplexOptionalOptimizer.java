@@ -479,13 +479,13 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
          * making the accessible in an easy way for reuse in the subsequent
          * iteration
          */
-        final List<Set<IVariable<?>>> complexGroupsMaybeVars = 
+        final List<Set<IVariable<?>>> complexGroupsDefiniteVars = 
              new ArrayList<Set<IVariable<?>>>(complexGroups.size());
         for (int i=0; i<complexGroups.size(); i++) {
            
            final Set<IVariable<?>> cur = new HashSet<IVariable<?>>();
-           sa.getMaybeProducedBindings(complexGroups.get(i), cur, true);
-           complexGroupsMaybeVars.add(i,cur);
+           sa.getDefinitelyProducedBindings(complexGroups.get(i), cur, true);
+           complexGroupsDefiniteVars.add(i,cur);
         }
         
         // Step 2 (for each direct child complex optional group).
@@ -550,12 +550,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                  * join groups, and add them to the list of projected vars.
                  */
                 final Set<IVariable<?>> joinVarCandidates = 
-                        complexGroupsMaybeVars.get(i);
+                        complexGroupsDefiniteVars.get(i);
                 
                 final Set<IVariable<?>> subsequentGroupMaybeVars = 
                         new HashSet<IVariable<?>>();
-                for (int j=i+1; j<complexGroupsMaybeVars.size(); j++) {
-                   subsequentGroupMaybeVars.addAll(complexGroupsMaybeVars.get(j));
+                for (int j=i+1; j<complexGroupsDefiniteVars.size(); j++) {
+                   subsequentGroupMaybeVars.addAll(complexGroupsDefiniteVars.get(j));
                 }
                 
                 joinVarCandidates.retainAll(subsequentGroupMaybeVars);
