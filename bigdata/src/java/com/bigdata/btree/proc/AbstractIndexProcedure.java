@@ -36,9 +36,8 @@ import com.bigdata.btree.keys.IKeyBuilder;
  * Base class has some utility methods.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-abstract public class AbstractIndexProcedure implements IIndexProcedure {
+abstract public class AbstractIndexProcedure<T> implements IIndexProcedure<T> {
 
     /**
      * Return the thread-local key builder configured for the {@link IIndex}

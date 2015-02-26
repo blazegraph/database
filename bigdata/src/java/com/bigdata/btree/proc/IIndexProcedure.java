@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.proc;
 
 import java.io.Serializable;
-import java.util.concurrent.Callable;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
@@ -97,17 +96,6 @@ import com.bigdata.sparse.SparseRowStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public interface IIndexProcedure<T> extends IReadOnly, Serializable {
-
-//    /**
-//     * Return <code>true</code> iff the procedure asserts that it will not
-//     * write on the index. When <code>true</code>, the procedure may be run
-//     * against a view of the index that is read-only or which allows concurrent
-//     * processes to read on the same index object. When <code>false</code> the
-//     * procedure will be run against a mutable view of the index (assuming that
-//     * the procedure is executed in a context that has access to a mutable index
-//     * view).
-//     */
-//    public boolean isReadOnly();
     
     /**
      * Run the procedure.
