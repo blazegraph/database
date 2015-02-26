@@ -120,6 +120,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -1455,9 +1456,22 @@ public class BigdataSail extends SailBase implements Sail {
             writeLock = lock.writeLock();
             writeLock.lock();
 
+            // Note: The database is a final field for this path. For read-only
+            // and read/write connections we actually do discovery and can find
+            // out that the database no longer exists, in which case we throw a
+            // DataSetNotFoundException
+            assert database != null;
+            
             // new writable connection.
             conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
                     .startConn();
+        } catch(DatasetNotFoundException ex) {
+            /*
+             * This exception should not be thrown for the UNISOLATED connection
+             * since we know that the database reference is non-null on entry to
+             * the BigdataSailConnection constructor.
+             */
+           throw new RuntimeException(ex);
         } finally {
             if (conn == null) {
                 // Did not obtain connection.
@@ -1509,7 +1523,7 @@ public class BigdataSail extends SailBase implements Sail {
 			
     	    return _getReadOnlyConnection(timestamp);
     	    
-		} catch (IOException e) {
+		} catch (IOException | DatasetNotFoundException e) {
 			
 		    throw new RuntimeException(e);
 		    
@@ -1527,10 +1541,11 @@ public class BigdataSail extends SailBase implements Sail {
      * @return The transaction.
      * 
      * @throws IOException
+    * @throws DatasetNotFoundException 
      * @see ITransactionService#newTx(long)
      */
     private BigdataSailConnection _getReadOnlyConnection(final long timestamp)
-            throws IOException {
+            throws IOException, DatasetNotFoundException {
 
         return new BigdataSailReadOnlyConnection(timestamp).startConn();
 
@@ -1891,9 +1906,10 @@ public class BigdataSail extends SailBase implements Sail {
          *            <code>true</code> iff this is an unisolated connection.
          * @param readOnly
          *            <code>true</code> iff this is a read-only connection.
+       * @throws DatasetNotFoundException 
          */
         protected BigdataSailConnection(final AbstractTripleStore database,
-                final Lock lock, final boolean unisolated) {
+                final Lock lock, final boolean unisolated) throws DatasetNotFoundException {
 
             this(lock, unisolated, database.isReadOnly());
 
@@ -2074,14 +2090,20 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
         /**
-         * Attach to a new database view.  Useful for transactions.
-         * 
-         * @param database
-         */
-        protected synchronized void attach(final AbstractTripleStore database) {
+       * Attach to a new database view. Useful for transactions.
+       * 
+       * @param database
+       * @throws DatasetNotFoundException
+       *            if the argument is <code>null</code> (in the context of the
+       *            callers (except for the unisolated connection) a
+       *            <code>null</code> value means that the namespace could not
+       *            be discovered using the locator).
+       */
+      protected synchronized void attach(final AbstractTripleStore database)
+            throws DatasetNotFoundException {
 
             if (database == null)
-                throw new IllegalArgumentException();
+                throw new DatasetNotFoundException();
             
             BigdataSail.this.assertOpenSail();
             
@@ -4431,8 +4453,9 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * Constructor starts a new transaction.
+       * @throws DatasetNotFoundException 
          */
-        BigdataSailReadOnlyConnection(final long timestamp) throws IOException {
+        BigdataSailReadOnlyConnection(final long timestamp) throws IOException, DatasetNotFoundException {
 
             super(null/* lock */, false/* unisolated */, true/* readOnly */);
 
@@ -4449,8 +4472,9 @@ public class BigdataSail extends SailBase implements Sail {
          * Obtain a new read-only transaction from the journal's transaction
          * service, and attach this SAIL connection to the new view of the
          * database.
+       * @throws DatasetNotFoundException 
          */
-        protected void newTx(final long timestamp) throws IOException {
+        protected void newTx(final long timestamp) throws IOException, DatasetNotFoundException {
             
             // The view of the database *outside* of this connection.
             final AbstractTripleStore database = BigdataSail.this.database;
