@@ -6325,6 +6325,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             activateTx();
         }
         
+        @Override
         public void close() {
             if (m_open.compareAndSet(true/*expect*/, false/*update*/)) {
                 deactivateTx();
@@ -6332,6 +6333,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
     }
     
+    @Override
     public IRawTx newTx() {
         return new RawTx();
     }
@@ -6390,7 +6392,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     /**
      * Returns the slot size associated with this address
      */
-    public int getAssociatedSlotSize(int addr) {
+    @Override
+    public int getAssociatedSlotSize(final int addr) {
         return getBlock(addr).getBlockSize();
     }
 
@@ -6400,13 +6403,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * 
      * @param addr - address to be locked
      */
-    public void lockAddress(int addr) {
+    public void lockAddress(final int addr) {
         if (m_lockAddresses.putIfAbsent(addr, System.currentTimeMillis()) != null) {
             throw new IllegalStateException("address already locked, logical: " + addr + ", physical: " + physicalAddress(addr, true));
         }
     }
 
-    public void showWriteCacheDebug(long paddr) {
+    public void showWriteCacheDebug(final long paddr) {
         log.warn("WriteCacheDebug: " + paddr + " - " + m_writeCacheService.addrDebugInfo(paddr));
     }
 
@@ -6420,6 +6423,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //   * 
 //   * @return time of last release
 //   */
+    @Override
     public long getLastReleaseTime() {
         return m_lastDeferredReleaseTime;
     }
@@ -6427,6 +6431,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;
     private int m_cachedDatasize = 0;
 
+    @Override
     public void registerExternalCache(
             final ConcurrentWeakValueCache<Long, ICommitter> externalCache,
             final int dataSize) {
@@ -6479,10 +6484,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
 
+    @Override
     public InputStream getInputStream(long addr) {
         return new PSInputStream(this, addr);
     }
 
+    @Override
     public IPSOutputStream getOutputStream() {
         return getOutputStream(null);
     }  
