@@ -134,7 +134,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 					"" + (Bytes.megabyte32 * 1));
 		}
 
-		return new Journal(properties);
+      final Journal jnl = new Journal(properties);
+      
+		return jnl;
 
 	}
 
@@ -301,8 +303,12 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
       final ProxyTestSuite suite = new ProxyTestSuite(delegate,
             "NanoSparqlServer Proxied Test Suite: indexManager="
-                  + indexManager.getClass().getSimpleName() + ", testMode="
-                  + testMode);
+                  + indexManager.getClass().getSimpleName()
+                  + ", testMode="
+                  + testMode
+                  + ", bufferMode="
+                  + (indexManager instanceof Journal ? ((Journal) indexManager)
+                        .getBufferStrategy().getBufferMode() : ""));
 
       return suite;
       
