@@ -1,8 +1,34 @@
+/*
+
+ Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+
+ Contact:
+ SYSTAP, LLC
+ 4501 Tower Road
+ Greensboro, NC 27410
+ licenses@bigdata.com
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+ */
 package com.bigdata.search;
 
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
@@ -15,17 +41,18 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * Writes on the text index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
-        implements IParallelizableIndexProcedure,
-        IMutableRelationIndexWriteProcedure {
+public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure<Long>
+        implements IParallelizableIndexProcedure<Long>,
+        IMutableRelationIndexWriteProcedure<Long> {
 
     /**
      * 
      */
     private static final long serialVersionUID = 9013449121306914750L;
 
+    private static transient final Logger log = Logger.getLogger(TextIndexWriteProc.class);
+    
     public static class IndexWriteProcConstructor extends
             AbstractKeyArrayIndexProcedureConstructor<TextIndexWriteProc> {
 
@@ -51,6 +78,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
         /**
          * Values are required.
          */
+        @Override
         public final boolean sendValues() {
         
             return true;
@@ -67,6 +95,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
             
         }
         
+        @Override
         public TextIndexWriteProc newInstance(final IRabaCoder keySer,
                 final IRabaCoder valSer, final int fromIndex,
                 final int toIndex, final byte[][] keys, final byte[][] vals) {
@@ -97,6 +126,7 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
         
     }
 
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -107,9 +137,10 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
      * @return The #of pre-existing tuples that were updated as an
      *         {@link Integer}.
      */
-    public Object apply(final IIndex ndx) {
+    @Override
+    public Long apply(final IIndex ndx) {
 
-        int updateCount = 0;
+        long updateCount = 0;
 
         final int n = getKeyCount();
 
@@ -154,7 +185,8 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
         
     }
     
-    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
+    @Override
+    protected void readMetadata(final ObjectInput in) throws IOException, ClassNotFoundException {
         
         super.readMetadata(in);
         
@@ -165,7 +197,8 @@ public class TextIndexWriteProc extends AbstractKeyArrayIndexProcedure
     /**
      * Extended to write the {@link #overwrite} flag.
      */
-    protected void writeMetadata(ObjectOutput out) throws IOException {
+    @Override
+    protected void writeMetadata(final ObjectOutput out) throws IOException {
 
         super.writeMetadata(out);
         
