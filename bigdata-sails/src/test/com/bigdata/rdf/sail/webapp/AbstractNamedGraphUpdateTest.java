@@ -30,10 +30,12 @@ import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 
 
 /**
- * This class is concernign the issues raised in trac 804
- * https://sourceforge.net/apps/trac/bigdata/ticket/804
+ * This class is concerning the issues raised in trac 804
+ * 
+ * @see <a href="http://trac.bigdata.com/ticket/804" >update bug deleting
+ *      quads</a>
  * @author jeremycarroll
- *
+ * 
  */
 public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 	
@@ -41,8 +43,6 @@ public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 	private static String distinctHintTrue = "    hint:Query hint:nativeDistinctSPO true . \n";
 	private final boolean nativeDistinct;
 	
-
-
 	public AbstractNamedGraphUpdateTest(boolean nativeDistinct, String name)  {
 		super(name);
 		this.nativeDistinct = nativeDistinct;

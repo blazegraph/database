@@ -455,7 +455,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    protected void sendGraph(final HttpServletRequest req,
+    static protected void sendGraph(final HttpServletRequest req,
             final HttpServletResponse resp, final Graph g) throws IOException {
         /*
          * CONNEG for the MIME type.
@@ -525,7 +525,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    protected void sendProperties(final HttpServletRequest req,
+    static protected void sendProperties(final HttpServletRequest req,
             final HttpServletResponse resp, final Properties properties)
             throws IOException {
         /*
@@ -585,7 +585,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * Convert an array of URI strings to an array of URIs.
      */
-    protected Resource[] toURIs(final String[] s) {
+    static protected Resource[] toURIs(final String[] s) {
     	
     	if (s == null)
     		return null;

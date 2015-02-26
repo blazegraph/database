@@ -23,14 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.servlet.ServletContext;
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -44,7 +43,6 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.task.AbstractApiTask;
-import com.bigdata.rdf.task.IApiTask;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -195,159 +193,83 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     }
 
     /**
-	 * Submit a task and return a {@link Future} for that task. The task will be
-	 * run on the appropriate executor service depending on the nature of the
-	 * backing database and the view required by the task.
-	 * <p>
-	 * <strong>The servlet API MUST NOT close the output stream from within the
-	 * a submitted mutation task. Closing the output stream within the mutation
-	 * task permits the client to conclude that the operation was finished
-	 * before the group commit actually occurs which breaks the visibility
-	 * guarantee of an ACID commit (the change is not yet visible).</strong>
-	 * <p>
-	 * This arises because the {@link AbstractApiTask} implementation has
-	 * invoked conn.commit() and hence believes that it was successful, but the
-	 * {@link AbstractTask} itself has not yet been through a checkpoint and the
-	 * write set for the commit group has not yet been melded into a stable
-	 * commit point. Instead, the caller MUST allow the servlet container to
-	 * close the output stream once the submitted task has completed
-	 * successfully (at which point the group commit will be stable). This
-	 * provides the necessary and correct visibility barrier for the updates.
-	 * 
-	 * @param task
-	 *            The task.
-	 * 
-	 * @return The {@link Future} for that task.
-	 * 
-	 * @throws DatasetNotFoundException
-	 * 
-	 * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
-	 *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
-	 * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
-	 *      Concurrent unisolated operations against multiple KBs </a>
-	 */
-    protected <T> Future<T> submitApiTask(final AbstractRestApiTask<T> task)
-            throws DatasetNotFoundException {
+    * Submit a task, await its {@link Future}, flush and commit the servlet
+    * resdponse, and then a <strong>completed</strong> {@link Future} for that
+    * task. The task will be run on the appropriate executor service depending
+    * on the nature of the backing database and the view required by the task.
+    * <p>
+    * <strong>The servlet API MUST NOT close the output stream from within the a
+    * submitted mutation task. Closing the output stream within the mutation
+    * task permits the client to conclude that the operation was finished before
+    * the group commit actually occurs which breaks the visibility guarantee of
+    * an ACID commit (the change is not yet visible).</strong>
+    * <p>
+    * This arises because the {@link AbstractApiTask} implementation has invoked
+    * conn.commit() and hence believes that it was successful, but the
+    * {@link AbstractTask} itself has not yet been through a checkpoint and the
+    * write set for the commit group has not yet been melded into a stable
+    * commit point. Instead, the caller MUST allow the servlet container to
+    * close the output stream once the submitted task has completed successfully
+    * (at which point the group commit will be stable). This provides the
+    * necessary and correct visibility barrier for the updates.
+    * 
+    * @param task
+    *           The task.
+    * 
+    * @return The {@link Future} for that task.
+    * 
+    * @throws DatasetNotFoundException
+    * @throws ExecutionException
+    * @throws InterruptedException
+    * @throws IOException
+    * 
+    * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
+    *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
+    * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
+    *      Concurrent unisolated operations against multiple KBs </a>
+    */
+   protected <T> Future<T> submitApiTask(final AbstractRestApiTask<T> task)
+         throws DatasetNotFoundException, InterruptedException,
+         ExecutionException, IOException {
 
-        final IIndexManager indexManager = getIndexManager();
+      final IIndexManager indexManager = getIndexManager();
 
-		/*
-		 * CAUTION: DO NOT SUBMIT MUTATION TASKS THAT CLOSE THE HTTP OUTPUT
-		 * STREAM !!!
-		 */
+      /*
+       * ::CAUTION::
+       * 
+       * MUTATION TASKS MUST NOT FLUSH OR CLOSE THE HTTP OUTPUT STREAM !!!
+       * 
+       * THIS MUST BE DONE *AFTER* THE GROUP COMMIT POINT.
+       * 
+       * THE GROUP COMMIT POINT OCCURS *AFTER* THE TASK IS DONE.
+       */
 
-		return AbstractApiTask.submitApiTask(indexManager, new FlushAndCloseWrapperTask<T>(
-				task));
+      // Submit task. Will run.
+      final Future<T> f = AbstractApiTask.submitApiTask(indexManager, task);
+
+      // Await Future.
+      f.get();
+
+      /*
+       * IFF successful, flush and close the response.
+       * 
+       * Note: This *commits* the http response to the client. The client will
+       * see this as the commit point on the database and will expect to have
+       * any mutation visible in subsequent reads.
+       */
+      task.flushAndClose();
+
+      // TODO Modify to return T rather than Future<T> if we are always doing the get() here?
+      return f;
 
     }
-
-    /**
-	 * Class ensures flush() and close() of the {@link ServletOutputStream} or
-	 * {@link PrintWriter} associated with the {@link HttpServletResponse}.
-	 * 
-	 * @author bryan
-	 * 
-	 * @param <T>
-	 */
-	private static class FlushAndCloseWrapperTask<T> implements IApiTask<T> {
-
-		private final AbstractRestApiTask<T> delegate;
-
-		FlushAndCloseWrapperTask(final AbstractRestApiTask<T> delegate) {
-
-			if (delegate == null)
-				throw new IllegalArgumentException();
-    		
-    		this.delegate = delegate;
-    		
-    	}
-    	
-		/**
-		 * Hook method is invoked after this task is executed. This may be used by
-		 * mutation tasks that need to coordinate some action with the successful
-		 * completion of the task.
-		 * 
-		 * @throws IOException 
-		 */
-	    protected void afterCall() throws Exception {
-	       
-	    	// Flush and close the output stream / writer.
-	    	delegate.flushAndClose();
-
-	    }
-	    
-	    @Override
-      public String toString() {
-         return super.toString() + "{delegate=" + delegate + "}";
-      }
-
-	    @Override
-		public T call() throws Exception {
-
-	    	final T ret = delegate.call();
-			try {
-				afterCall();
-			} catch (Throwable t) {
-				// Log an ignore.
-				log.warn(t, t);
-			}
-			
-			return ret;
-		}
-
-		@Override
-		public String getNamespace() {
-			return delegate.getNamespace();
-		}
-
-		@Override
-		public long getTimestamp() {
-			return delegate.getTimestamp();
-		}
-
-		@Override
-		public void setIndexManager(IIndexManager indexManager) {
-
-			delegate.setIndexManager(indexManager);
-			
-		}
-
-		@Override
-		public void clearIndexManager() {
-			delegate.clearIndexManager();
-		}
-    	
-		@Override
-		public boolean isGRSRequired() {
-		   return delegate.isGRSRequired();
-		}
-		
-    }
-    
-//    /**
-//     * Return the {@link Quorum} -or- <code>null</code> if the
-//     * {@link IIndexManager} is not participating in an HA {@link Quorum}.
-//     */
-//    protected Quorum<HAGlue, QuorumService<HAGlue>> getQuorum() {
-//
-//        final IIndexManager indexManager = getIndexManager();
-//
-//        if (indexManager instanceof Journal) {
-//
-//            return ((Journal) indexManager).getQuorum();
-//
-//        }
-//
-//        return null;
-//	    
-//	}
 
     /**
      * Return the {@link HAStatusEnum} -or- <code>null</code> if the
      * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA
      * enabled.
      */
-    static public HAStatusEnum getHAStatus(final IIndexManager indexManager) {
+    static HAStatusEnum getHAStatus(final IIndexManager indexManager) {
 
         if (indexManager == null)
             throw new IllegalArgumentException();
@@ -437,59 +359,6 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
             // Response has been committed.
             return false;
         }
-
-//        final long quorumToken = quorum.token();
-//
-//        if (!quorum.isQuorumMet()) {
-//
-//            /*
-//             * The quorum is not met.
-//             */
-//
-//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-//                    "Quorum is not met.");
-//
-//            return false;
-//
-//        } else if (!quorum.getClient().isJoinedMember(quorumToken)) {
-//
-//            /*
-//             * The quorum is met, but this service is not joined with the met
-//             * quorum.
-//             */
-//
-//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-//                    "Service is not joined with met quorum.");
-//
-//            return false;
-//
-//        } else if (getIndexManager() instanceof AbstractJournal
-//                && ((AbstractJournal) getIndexManager()).getHAReady() == Quorum.NO_QUORUM) {
-//
-//            /*
-//             * The service is not "HA Ready".
-//             * 
-//             * Note: There is a lag between when a service joins with a met
-//             * quorum and when it has completed some internal asynchronous
-//             * processing to become "HA Ready". This handles that gap for the
-//             * HAJournalServer.
-//             */
-//            
-//            buildResponse(resp, HTTP_METHOD_NOT_ALLOWED, MIME_TEXT_PLAIN,
-//                    "Service is not HA Ready.");
-//
-//            return false;
-//
-//        } else {
-//            
-//            /*
-//             * There is a quorum. The quorum is met. This service is part of the
-//             * met quorum.
-//             */
-//
-//            return true;
-//
-//        }
 
     }
     
@@ -597,6 +466,12 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
    /**
     * Generate and commit a response having the indicated http status code, mime
     * type, and content.
+    * <p>
+    * This flushes the response to the client immediately. Therefore this method
+    * MUST NOT be invoked before the group commit point! All code paths in the
+    * REST API that have actually performed a mutation (vs simply reporting a
+    * client or server error before entering into their mutation code path) MUST
+    * use {@link #submitApiTask(AbstractRestApiTask)}.
     * 
     * @param resp
     * @param status
@@ -606,16 +481,8 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @param content
     *           The content
     * @throws IOException
-    * 
-    *            FIXME GROUP_COMMIT: This flushes the response to the client
-    *            immediately. Therefore this method MUST NOT be invoked before
-    *            the group commit point! All code paths in the REST API that
-    *            have actually performed a mutation (vs simply reporting a
-    *            client or server error before entering into their mutation code
-    *            path) MUST handle that flush from within the
-    *            {@link AbstractRestApiTask}.
     */
-   static public void buildAndCommitResponse(final HttpServletResponse resp,
+   static protected void buildAndCommitResponse(final HttpServletResponse resp,
          final int status, final String mimeType, final String content)
          throws IOException {
 

@@ -98,7 +98,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public static Test suite() {
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
-                "test_PUT_UPDATE_WITH_CONSTRUCT_TEMPLATE_ONLY", TestMode.quads
+                "test.*", TestMode.quads
 //                , TestMode.sids
 //                , TestMode.triples
                 );
@@ -1008,14 +1008,14 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 			// final RemoteRepository repo = new RemoteRepository(m_serviceURL);
 			final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
-                        final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-			g2 = asGraph(query.evaluate());
+			final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
+			g2 = asGraph(query);
 
 		}
 
 		assertEquals(1, g2.size());
 
-		assertTrue(g2.match(s, p, o).hasNext());
+      assertTrue(g2.match(s, p, o).hasNext());
 
 	}
 
@@ -1276,13 +1276,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 * Select everything in the kb using a POST.
 	 */
 	public void test_DELETE_withQuery() throws Exception {
-
-		// final String queryStr = "select * where {?s ?p ?o}";
-
-		// final QueryOptions opts = new QueryOptions();
-		// opts.serviceURL = m_serviceURL;
-		// opts.queryStr = queryStr;
-		// opts.method = "POST";
 
 		doInsertWithBodyTest("POST", 23, RDFFormat.NTRIPLES);
 
@@ -1801,19 +1794,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 				expected.add(new StatementImpl(bryan, likes, rdfs));
 			}
 
-			// final QueryOptions opts = new QueryOptions();
-			// opts.serviceURL = m_serviceURL;
-			// opts.queryStr = deleteQueryStr;
-			// opts.method = "GET";
-			// opts.acceptHeader = TupleQueryResultFormat.SPARQL
-			// .getDefaultMIMEType();
-			//
-			// assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
-			// requestPath)));
-
-			final IPreparedGraphQuery query = m_repo
-					.prepareGraphQuery(deleteQueryStr);
-			assertSameGraph(expected, asGraph(query.evaluate()));
+         assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr));
 
 		}
 
@@ -1866,20 +1847,9 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 			{
 
 				// The expected results.
-				final Graph expected = new GraphImpl();
+            final Graph expected = new GraphImpl();
 
-				// final QueryOptions opts = new QueryOptions();
-				// opts.serviceURL = m_serviceURL;
-				// opts.queryStr = deleteQueryStr;
-				// opts.method = "GET";
-				// opts.acceptHeader = TupleQueryResultFormat.SPARQL
-				// .getDefaultMIMEType();
-				//
-				// assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
-				// requestPath)));
-
-				assertSameGraph(expected,
-						m_repo.prepareGraphQuery(deleteQueryStr).evaluate());
+            assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr));
 
 			}
 
@@ -1915,8 +1885,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 				// assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 				// requestPath)));
 
-				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2)
-						.evaluate());
+				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2));
 
 			}
 
@@ -2001,8 +1970,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 			// assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
 			// requestPath)));
 
-			assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr)
-					.evaluate());
+         assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr));
 
 		}
 
@@ -2067,18 +2035,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 				// The expected results.
 				final Graph expected = new GraphImpl();
 
-				// final QueryOptions opts = new QueryOptions();
-				// opts.serviceURL = m_serviceURL;
-				// opts.queryStr = queryStr2;
-				// opts.method = "GET";
-				// opts.acceptHeader = TupleQueryResultFormat.SPARQL
-				// .getDefaultMIMEType();
-				//
-				// assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
-				// requestPath)));
-
-				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2)
-						.evaluate());
+				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2));
 
 			}
 
@@ -2104,18 +2061,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 				expected.add(new StatementImpl(mike, likes, rdf));
 				expected.add(new StatementImpl(bryan, likes, rdf));
 
-				// final QueryOptions opts = new QueryOptions();
-				// opts.serviceURL = m_serviceURL;
-				// opts.queryStr = queryStr2;
-				// opts.method = "GET";
-				// opts.acceptHeader = TupleQueryResultFormat.SPARQL
-				// .getDefaultMIMEType();
-				//
-				// assertSameGraph(expected, buildGraph(doSparqlQuery(opts,
-				// requestPath)));
-
-				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2)
-						.evaluate());
+				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2));
 
 			}
 

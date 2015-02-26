@@ -24,14 +24,20 @@
  */
 package com.bigdata.rdf.sail.webapp;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rdf.task.AbstractApiTask;
@@ -49,8 +55,11 @@ import com.bigdata.rdf.task.AbstractApiTask;
  */
 abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 
+   private static final Logger log = Logger.getLogger(AbstractRestApiTask.class);
+   
     /** The {@link HttpServletRequest}. */
     protected final HttpServletRequest req;
+    
     /** The {@link HttpServletResponse}. */
     protected final HttpServletResponse resp;
     
@@ -64,6 +73,12 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
      */
     private PrintWriter writer;
 
+   /**
+    * Used to coordinate access to the {@link ServletOutputStream} versus the
+    * {@link PrintWriter} (visibility).
+    */
+    private final Lock lock = new ReentrantLock();
+    
 	/**
 	 * Return the {@link ServletOutputStream} associated with the request (and
 	 * stash a copy).
@@ -72,12 +87,24 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 	 * @throws IllegalStateException
 	 *             per the servlet API if the writer has been requested already.
 	 */
-    public ServletOutputStream getOutputStream() throws IOException {
+    public OutputStream getOutputStream() throws IOException {
 
-		synchronized (this) {
+      lock.lock();
+      try {
 
-			return this.os = resp.getOutputStream();
-			
+         return new FilterOutputStream(this.os = resp.getOutputStream()) {
+            @Override
+            public void flush() {
+               throw new UnsupportedOperationException();
+            }
+            @Override
+            public void close() {
+               throw new UnsupportedOperationException();
+            }
+         };
+
+      } finally {
+         lock.unlock();
 		}
     	
     }
@@ -93,11 +120,23 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 	 */
 	public PrintWriter getWriter() throws IOException {
 
-		synchronized (this) {
+      lock.lock();
+      try {
 
-			return this.writer = resp.getWriter();
+         return new PrintWriter(this.writer = resp.getWriter()) {
+            @Override
+            public void flush() {
+               throw new UnsupportedOperationException();
+            }
+            @Override
+            public void close() {
+               throw new UnsupportedOperationException();
+            }
+         };
 
-		}
+      } finally {
+         lock.unlock();
+      }
 
 	}
 
@@ -109,16 +148,22 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 	 */
 	public void flushAndClose() throws IOException {
 
-		synchronized (this) {
-
+		lock.lock();
+		try {
+		   if(log.isInfoEnabled())
+            log.info("FLUSH-AND-CLOSE: " + toString());
 			if (os != null) {
-				os.flush();
-				os.close();
+			   final ServletOutputStream tmp = resp.getOutputStream();
+				tmp.flush();
+				tmp.close();
 			} else if (writer != null) {
-				writer.flush();
-				writer.close();
+			   final PrintWriter tmp = resp.getWriter();
+				tmp.flush();
+				tmp.close();
 			}
 
+		} finally {
+		   lock.unlock();
 		}
 
 	}
@@ -176,6 +221,9 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
     protected void reportModifiedCount(final long nmodified, final long elapsed)
             throws IOException {
 
+      if (log.isInfoEnabled())
+         log.info("task=" + this + ", nmodified=" + nmodified);
+
        final StringWriter stringWriter = new StringWriter();
        
        final XMLBuilder t = new XMLBuilder(stringWriter);
@@ -216,6 +264,10 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
    protected void buildResponse(final int status, final String mimeType,
          final String content) throws IOException {
 
+      if (log.isInfoEnabled())
+         log.info("task=" + this + ", status=" + status + ", mimeType="
+               + mimeType + ", content=[" + content + "]");
+
        resp.setStatus(status);
 
        resp.setContentType(mimeType);
@@ -239,6 +291,9 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
     */
    protected void buildNamespaceNotFoundResponse()
          throws IOException {
+
+      if (log.isInfoEnabled())
+         log.info("task=" + this);
 
       buildResponse(HttpServletResponse.SC_NOT_FOUND,
             BigdataServlet.MIME_TEXT_PLAIN, "Not found: namespace=" + namespace

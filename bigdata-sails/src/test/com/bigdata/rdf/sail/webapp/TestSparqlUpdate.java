@@ -125,9 +125,9 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //				"testStressInsertWhereGraph",
 //				"testInsertWhereGraph",
 				new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[]{
-//				BufferMode.Transient, 
-//				BufferMode.DiskWORM, 
-//				BufferMode.MemStore,
+				BufferMode.Transient, 
+				BufferMode.DiskWORM, 
+				BufferMode.MemStore,
 				BufferMode.DiskRW, 
 				})),
 				TestMode.quads
@@ -1386,7 +1386,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     {
 //        log.debug("executing testClearDefault");
 
-        String update = "CLEAR DEFAULT";
+       String update = "CLEAR DEFAULT";
 
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
 
