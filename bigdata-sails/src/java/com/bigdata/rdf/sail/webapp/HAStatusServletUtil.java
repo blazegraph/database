@@ -1009,7 +1009,7 @@ public class HAStatusServletUtil {
         // TODO Alternatively "max-age=1" for max-age in seconds.
         resp.addHeader("Cache-Control", "no-cache");
 
-        BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+        BigdataRDFServlet.buildAndCommitResponse(resp, BigdataRDFServlet.HTTP_OK,
                 BigdataRDFServlet.MIME_TEXT_PLAIN, status.name());
         
         log.warn("Responding to HA status request");
@@ -1098,7 +1098,7 @@ public class HAStatusServletUtil {
       // TODO Alternatively "max-age=1" for max-age in seconds.
       resp.addHeader("Cache-Control", "no-cache");
 
-      BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+      BigdataRDFServlet.buildAndCommitResponse(resp, BigdataRDFServlet.HTTP_OK,
             BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
 
       return;

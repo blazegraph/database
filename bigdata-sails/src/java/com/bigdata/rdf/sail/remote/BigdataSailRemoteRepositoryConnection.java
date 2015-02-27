@@ -108,7 +108,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
         this.repo = repo;
 
     }
-	
+
+   /**
+    * Report the fast range count (aka ESTCARD) associated with the specified
+    * access path.
+    */
 	public long count(final Resource s, final URI p, final Value o, 
 			final Resource... c) 
 			throws RepositoryException {

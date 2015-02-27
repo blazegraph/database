@@ -35,7 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import com.bigdata.counters.ICounterSet;
+import com.bigdata.counters.ICounterSetAccess;
 import com.bigdata.service.IServiceShutdown;
 
 /**
@@ -45,9 +45,8 @@ import com.bigdata.service.IServiceShutdown;
  *      control.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IConcurrencyManager extends IServiceShutdown {
+public interface IConcurrencyManager extends IServiceShutdown, ICounterSetAccess {
 
     /**
      * The client side of the transaction manager.
@@ -70,6 +69,7 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * 
      * @see #shutdownNow()
      */
+    @Override
     public void shutdown();
 
     /**
@@ -78,13 +78,9 @@ public interface IConcurrencyManager extends IServiceShutdown {
      * 
      * @see #shutdown()
      */
+    @Override
     public void shutdownNow();
 
-    /**
-     * Return declared counters.
-     */
-    public ICounterSet getCounters();
-    
     /**
      * Submit a task (asynchronous). Tasks will execute asynchronously in the
      * appropriate thread pool with as much concurrency as possible.
@@ -195,17 +191,10 @@ public interface IConcurrencyManager extends IServiceShutdown {
      *                if tasks or any of its elements are null
      * @exception RejectedExecutionException
      *                if any task cannot be scheduled for execution
-     * 
-     * FIXME Figure out why a generic for the future type causes errors under
-     * some java 1.6.0_07 and 1.6.0_10 compilers.  It does not seem to be a
-     * problem in the variant w/o the timeout, which is very, very strange.
      */
-    public List<Future> invokeAll(
-            Collection<? extends AbstractTask> tasks, long timeout,
+    public <T> List<Future<T>> invokeAll(
+            Collection<? extends AbstractTask<T>> tasks, long timeout,
             TimeUnit unit) throws InterruptedException;
-//    public <T> List<Future<T>> invokeAll(
-//            Collection<? extends AbstractTask<T>> tasks, long timeout,
-//            TimeUnit unit) throws InterruptedException;
 
     /**
      * The service on which read-write tasks are executed.
