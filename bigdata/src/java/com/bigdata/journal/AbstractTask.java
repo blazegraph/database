@@ -3129,6 +3129,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.isDirty();
         }
 
+        @Override
+        public boolean isGroupCommit() {
+           return delegate.isGroupCommit();
+        }
+
     } // class IsolatatedActionJournal
 
     /**
@@ -3707,6 +3712,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public boolean isDirty() {
             return false; // it's readOnly - cannot be dirty
         }
+
+        @Override
+        public boolean isGroupCommit() {
+           return delegate.isGroupCommit();
+        }
+      
     } // class ReadOnlyJournal
 
     /**
@@ -3812,7 +3823,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public CounterSet getCounters() {
             return delegate.getCounters();
         }
+
+      @Override
+      public boolean isGroupCommit() {
+         return delegate.isGroupCommit();
+      }
         
-    }
+    }// DelegateIndexClass
     
 }

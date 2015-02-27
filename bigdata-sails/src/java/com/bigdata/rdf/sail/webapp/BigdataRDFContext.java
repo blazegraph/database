@@ -382,7 +382,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * Immediate shutdown interrupts any running queries.
      * 
      * FIXME GROUP COMMIT: Shutdown should abort open transactions (including
-     * queries and updates). This hould be addressed when we handle group commit
+     * queries and updates). This should be addressed when we handle group commit
      * since that provides us with a means to recognize and interrupt each
      * running {@link AbstractRestApiTask}.
      */

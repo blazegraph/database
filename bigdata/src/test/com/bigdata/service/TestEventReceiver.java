@@ -528,7 +528,6 @@ public class TestEventReceiver extends TestCase2 {
      * Mock federation to support the unit tests in the outer class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static class MockFederation implements IBigdataFederation<IEventReceivingService> {
 
@@ -541,19 +540,22 @@ public class TestEventReceiver extends TestCase2 {
             
         }
         
+        @Override
         public IEventReceivingService getService() {
             
             return eventReceiver;
             
         }
         
-        public Class getServiceIface() {
+        @Override
+        public Class<?> getServiceIface() {
         
             return IEventReceivingService.class;
 //            return TestEventReceiver.class;
             
         }
 
+        @Override
         public String getServiceName() {
   
             return IEventReceivingService.class.getName();
@@ -562,6 +564,7 @@ public class TestEventReceiver extends TestCase2 {
             
         }
 
+        @Override
         public UUID getServiceUUID() {
             
             return serviceUUID;
@@ -572,181 +575,227 @@ public class TestEventReceiver extends TestCase2 {
          * unused methods.
          */
         
+        @Override
         public void destroy() {
             
         }
 
+        @Override
         public void dropIndex(String name) {
             
         }
 
+        @Override
         public IDataService getAnyDataService() {
             return null;
         }
 
+        @Override
         public IBigdataClient getClient() {
             return null;
         }
 
+        @Override
         public CounterSet getCounters() {
             return null;
         }
 
+        @Override
         public IDataService getDataService(UUID serviceUUID) {
             return null;
         }
 
+        @Override
         public IDataService getDataServiceByName(String name) {
             return null;
         }
 
+        @Override
         public UUID[] getDataServiceUUIDs(int maxCount) {
             return null;
         }
 
+        @Override
         public IDataService[] getDataServices(UUID[] uuid) {
             return null;
         }
 
+        @Override
         public ExecutorService getExecutorService() {
             return null;
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore() {
             return null;
         }
         
+        @Override
         public SparseRowStore getGlobalRowStore(final long timstamp) {
             return null;
         }
 
+        @Override
         public String getHttpdURL() {
             return null;
         }
 
+        @Override
         public IClientIndex getIndex(String name, long timestamp) {
             return null;
         }
 
+        @Override
         public long getLastCommitTime() {
             return 0;
         }
 
+        @Override
         public ILoadBalancerService getLoadBalancerService() {
             return null;
         }
 
+        @Override
         public IMetadataIndex getMetadataIndex(String name, long timestamp) {
             return null;
         }
 
+        @Override
         public IMetadataService getMetadataService() {
             return null;
         }
 
+        @Override
         public String getServiceCounterPathPrefix() {
             return null;
         }
 
+        @Override
         public CounterSet getServiceCounterSet() {
             return null;
         }
 
+        @Override
         public ITransactionService getTransactionService() {
             return null;
         }
 
+        @Override
         public boolean isDistributed() {
             return false;
         }
 
+        @Override
         public boolean isScaleOut() {
             return false;
         }
 
+        @Override
         public boolean isStable() {
             return false;
         }
 
+        @Override
         public void registerIndex(IndexMetadata metadata) {
               
         }
 
+        @Override
         public UUID registerIndex(IndexMetadata metadata, UUID dataServiceUUID) {
             return null;
         }
 
+        @Override
         public UUID registerIndex(IndexMetadata metadata, byte[][] separatorKeys, UUID[] dataServiceUUIDs) {
             return null;
         }
 
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
             return null;
         }
 
-        public IResourceLocator getResourceLocator() {
+        @Override
+        public IResourceLocator<?> getResourceLocator() {
             return null;
         }
 
+        @Override
         public IResourceLockService getResourceLockService() {
             return null;
         }
 
+        @Override
         public TemporaryStore getTempStore() {
             return null;
         }
 
+        @Override
         public void didStart() {
               
         }
 
+        @Override
         public boolean isServiceReady() {
             return false;
         }
 
+        @Override
         public AbstractHTTPD newHttpd(int httpdPort, ICounterSetAccess access) throws IOException {
             return null;
         }
 
+        @Override
         public void reattachDynamicCounters() {
             
         }
 
+        @Override
         public void serviceJoin(IService service, UUID serviceUUID) {
             
         }
 
+        @Override
         public void serviceLeave(UUID serviceUUID) {
             
         }
 
+        @Override
         public CounterSet getHostCounterSet() {
             return null;
         }
 
-		public ScheduledFuture<?> addScheduledTask(Runnable task,
+        @Override
+        public ScheduledFuture<?> addScheduledTask(Runnable task,
 				long initialDelay, long delay, TimeUnit unit) {
 			return null;
 		}
-
+		
+      @Override
 		public boolean getCollectPlatformStatistics() {
 			return false;
 		}
 
+      @Override
 		public boolean getCollectQueueStatistics() {
 			return false;
 		}
 
+      @Override
 		public int getHttpdPort() {
 			return 0;
 		}
 
         @Override
         public Iterator<String> indexNameScan(String prefix, long timestamp) {
-            // TODO Auto-generated method stub
             return null;
         }
         
+        @Override
+        public boolean isGroupCommit() {
+           return false;
+        }
+
     }
     
 }

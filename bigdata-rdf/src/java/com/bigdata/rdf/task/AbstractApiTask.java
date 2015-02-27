@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IReadOnly;
@@ -344,7 +343,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 
       final long timestamp = task.getTimestamp();
 
-      if (!BigdataStatics.NSS_GROUP_COMMIT
+      if (!indexManager.isGroupCommit()
             || indexManager instanceof IBigdataFederation
             || TimestampUtility.isReadOnly(timestamp)) {
 
@@ -354,34 +353,26 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
           * Note: For scale-out, the operation will be applied using client-side
           * global views of the indices. This means that there will not be any
           * globally consistent views of the indices and that updates will be
-          * shard-wise local.
+          * shard-wise local (even through scale-out uses group commit, we do
+          * not submit tasks on the client via the group commit API).
           * 
           * Note: This can be used for operations on read-only views (even on a
           * Journal). This is helpful since we can avoid some overhead
-          * associated the AbstractTask lock declarations.
+          * associated the AbstractTask lock declarations and the overhead
+          * associated with an isolated TemporaryStore per read-only or
+          * read-write tx AbstractTask instance.
           */
          // Wrap Callable.
          final FutureTask<T> ft = new FutureTask<T>(new ApiTaskForIndexManager(
                indexManager, task));
 
-         if (true) {
-
-            /*
-             * Caller runs (synchronous execution)
-             * 
-             * Note: By having the caller run the task here we avoid consuming
-             * another thread.
-             */
-            ft.run();
-
-         } else {
-
-            /*
-             * Run on a normal executor service.
-             */
-            indexManager.getExecutorService().submit(ft);
-
-         }
+         /*
+          * Caller runs (synchronous execution)
+          * 
+          * Note: By having the caller run the task here we avoid consuming
+          * another thread.
+          */
+         ft.run();
 
          return ft;
 
@@ -394,12 +385,11 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
           * locks and will have exclusive access to the resources guarded by
           * those locks when they run.
           * 
-          * FIXME GROUP_COMMIT/GIST: The hierarchical locking mechanisms will
-          * fail on durable named solution sets because they use either HTree or
-          * Stream and AbstractTask does not yet support those durable data
-          * structures (it is still being refactored to support the
-          * ICheckpointProtocol rather than the BTree in its Name2Addr isolation
-          * logic).
+          * FIXME GIST: The hierarchical locking mechanisms will fail on durable
+          * named solution sets because they use either HTree or Stream and
+          * AbstractTask does not yet support those durable data structures (it
+          * is still being refactored to support the ICheckpointProtocol rather
+          * than the BTree in its Name2Addr isolation logic).
           */
 
          // Obtain the names of the necessary locks for R/W access to indices.

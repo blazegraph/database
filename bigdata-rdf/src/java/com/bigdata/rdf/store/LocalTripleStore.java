@@ -74,33 +74,37 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     @Override
     synchronized public long commit() {
      
-        final long begin = System.currentTimeMillis();
+      final long begin = System.currentTimeMillis();
 
-        super.commit();
-        
-		if (BigdataStatics.NSS_GROUP_COMMIT) {
-			/*
-			 * Note: GROUP_COMMIT (#566) requires that the WriteExecutorService
-			 * controls when commit points are melded. If group commit is
-			 * enabled and the index manager is directs the Journal to commit()
-			 * then any partially executed tasks that have checkpointed indices
-			 * will be immediately flushed to the backing store, breaking the
-			 * ACID semantics of the commit.
-			 * 
-			 * Note: The checkpoint of the indices for an unisolated
-			 * AbstractTask occurs when the task is done with its work but is
-			 * still holding any resource locks.
-			 */
-			return 0L;
-		}
-		final long commitTime = getIndexManager().commit();
-        
-        final long elapsed = System.currentTimeMillis() - begin;
+      super.commit();
 
-        if (log.isInfoEnabled())
-            log.info("commit: commit latency=" + elapsed + "ms");
-        
-        return commitTime;
+      final IIndexManager indexManager = getIndexManager();
+
+      if (indexManager.isGroupCommit()) {
+         /*
+          * Note: GROUP_COMMIT (#566) requires that the WriteExecutorService
+          * controls when commit points are melded. If group commit is enabled
+          * and the index manager is directs the Journal to commit() then any
+          * partially executed tasks that have checkpointed indices will be
+          * immediately flushed to the backing store, breaking the ACID
+          * semantics of the commit.
+          * 
+          * Note: The checkpoint of the indices for an unisolated AbstractTask
+          * occurs when the task is done with its work but is still holding any
+          * resource locks.
+          */
+         return 0L;
+      }
+
+      final long commitTime = getIndexManager().commit();
+
+      final long elapsed = System.currentTimeMillis() - begin;
+
+      if (log.isInfoEnabled())
+         log.info("commit: commit latency=" + elapsed + "ms");
+
+      return commitTime;
+
     }
 
     @Override
@@ -164,7 +168,7 @@ public class LocalTripleStore extends AbstractLocalTripleStore {
     /**
      * Ctor specified by {@link DefaultResourceLocator}.
      * 
-     * @param indexManager
+     * @param indexManager (must be an {@link IJournal}).
      * @param namespace
      * @param timestamp
      * @param properties

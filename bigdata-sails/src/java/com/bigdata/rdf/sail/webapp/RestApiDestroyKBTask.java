@@ -28,13 +28,17 @@ import javax.servlet.http.HttpServletResponse;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.DestroyKBTask;
 
+/**
+ * Destroy a namespace (REST API).
+ * 
+ * @author bryan
+ */
 class RestApiDestroyKBTask extends AbstractDelegateRestApiTask<Void> {
 
    public RestApiDestroyKBTask(final HttpServletRequest req,
          final HttpServletResponse resp, final String namespace) {
 
-      super(req, resp, namespace, ITx.UNISOLATED, new DestroyKBTask(namespace,
-            ITx.UNISOLATED));
+      super(req, resp, namespace, ITx.UNISOLATED, new DestroyKBTask(namespace));
 
    }
 

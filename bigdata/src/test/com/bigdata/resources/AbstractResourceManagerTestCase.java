@@ -537,6 +537,11 @@ public class AbstractResourceManagerTestCase extends
             return false;
         }
 
+        @Override
+        public boolean isGroupCommit() {
+           return false;
+        }
+        
         public long getLastCommitTime() {
 
             return 0;

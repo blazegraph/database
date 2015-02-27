@@ -521,7 +521,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
             return;
 
-        }
+      }
 
       try {
 
@@ -533,12 +533,13 @@ public class QueryServlet extends BigdataRDFServlet {
                new SparqlQueryTask(req, resp, namespace, timestamp, queryStr,
                      getBigdataRDFContext())).get();
 
-		} catch (Throwable t) {
-			// if (!InnerCause.isInnerCause(t, DatasetNotFoundException.class))
-			launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
-		}
-	
-	}
+      } catch (Throwable t) {
+
+         launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
+
+      }
+
+   }
 
     /**
      * Helper task for the SPARQL QUERY.

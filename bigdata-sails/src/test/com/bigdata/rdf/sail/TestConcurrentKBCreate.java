@@ -173,7 +173,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
             assertKBExists(jnl, namespace);
 
             // Destroy the KB instance.
-            AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+            AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace)).get();
 
             // Verify gone.
             assertKBNotFound(jnl, namespace);
@@ -299,7 +299,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
            assertKBExists(jnl, namespace);
 
            // Destroy the KB instance.
-           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace)).get();
 
            // Verify gone.
            assertKBNotFound(jnl, namespace);
@@ -355,7 +355,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
            assertKBExists(jnl, namespace);
 
            // Destroy the KB instance.
-           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace)).get();
 
            // Verify gone.
            assertKBNotFound(jnl, namespace);
@@ -414,7 +414,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
            assertKBExists(jnl, namespace);
 
            // Destroy the KB instance.
-           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+           AbstractApiTask.submitApiTask(jnl, new DestroyKBTask(namespace)).get();
 
            // Verify gone.
            assertKBNotFound(jnl, namespace);

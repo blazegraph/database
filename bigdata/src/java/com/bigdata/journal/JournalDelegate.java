@@ -337,10 +337,15 @@ public class JournalDelegate implements IJournal {
 		return delegate.getInputStream(addr);
 	}
 
-	@Override
-	public boolean isDirty() {
-		return delegate.isDirty();
-	}
+   @Override
+   public boolean isDirty() {
+      return delegate.isDirty();
+   }
+
+   @Override
+   public boolean isGroupCommit() {
+      return delegate.isGroupCommit();
+   }
 
     @Override
     public ICheckpointProtocol register(String name, IndexMetadata metadata) {
