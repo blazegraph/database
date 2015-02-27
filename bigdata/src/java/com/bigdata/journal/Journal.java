@@ -191,7 +191,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
        * Third, writes on independent indices may be independent (this behavior
        * has been around for a long time).
        * <p>
-       * There are a few “gotchas” with the group commit support. This is
+       * There are a few "gotchas" with the group commit support. This is
        * because commits are decided by {@link IApiTask} or {@link AbstractTask}
        * completion and tasks are scheduled by the concurrency manager, lock
        * manager, and write executor service.
