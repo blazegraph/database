@@ -108,7 +108,7 @@ public class TestASTComplexOptionalOptimizer extends
      *         }
      * } as %_set1
      * WITH {
-     *         SELECT ?_var1 ?_var4
+     *         SELECT ?_var1 ?_var6 ?_var4
      *         WHERE {
      *            INCLUDE %_set1
      *            OPTIONAL {
@@ -118,7 +118,7 @@ public class TestASTComplexOptionalOptimizer extends
      *         }
      * } as %_set2
      * WITH {
-     *      SELECT ?_var1 ?_var10
+     *      SELECT ?_var1 ?_var6 ?_var4 ?_var10
      *      WHERE {
      *         INCLUDE %_set1
      *         OPTIONAL {
@@ -128,8 +128,7 @@ public class TestASTComplexOptionalOptimizer extends
      *     }
      * } as %_set3
      *  WHERE {
-     *         INCLUDE %_set2 .
-     *         INCLUDE %_set3 JOIN ON (?_var1) .
+     *         INCLUDE %_set3 .
      * }
      * </pre>
      * 
@@ -345,9 +344,10 @@ public class TestASTComplexOptionalOptimizer extends
                 nsr.setProjection(projection);
                 projection.addProjectionVar(new VarNode("var1"));
                 projection.addProjectionVar(new VarNode("var6"));
+                projection.addProjectionVar(new VarNode("var4"));
                 projection.addProjectionVar(new VarNode("var10"));
                 
-                whereClause.addChild(new NamedSubqueryInclude(set1));
+                whereClause.addChild(new NamedSubqueryInclude(set2));
 
                 {
 
@@ -374,16 +374,7 @@ public class TestASTComplexOptionalOptimizer extends
             {
                 final JoinGroupNode whereClause = new JoinGroupNode();
                 expected.setWhereClause(whereClause);
-                
-                JoinGroupNode jgnSet2 = new JoinGroupNode();
-                jgnSet2.addArg(new NamedSubqueryInclude(set2));
-                jgnSet2.setOptional(false);
-                whereClause.addChild(jgnSet2);
-                
-                JoinGroupNode jgnSet3 = new JoinGroupNode();
-                jgnSet3.addArg(new NamedSubqueryInclude(set3));
-                jgnSet3.setOptional(true);
-                whereClause.addChild(jgnSet3);
+                whereClause.addChild(new NamedSubqueryInclude(set3));
             }
 
         }
@@ -396,6 +387,12 @@ public class TestASTComplexOptionalOptimizer extends
         final IQueryNode actual = rewriter.optimize(context,
                 given/* queryNode */, bsets);
 
+        System.out.println("EXPECTED:");
+        System.out.println(expected);
+
+        System.out.println();
+        System.out.println("ACTUAL:");
+        System.out.println(actual);
         assertSameAST(expected, actual);
 
     }
