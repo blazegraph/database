@@ -39,7 +39,6 @@ import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
 import com.bigdata.btree.proc.IParallelizableIndexProcedure;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
@@ -63,16 +62,15 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * handle the overflow flag and the optional statement identifier correctly.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
+public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> implements
+        IParallelizableIndexProcedure<Object>, IMutableRelationIndexWriteProcedure<Object> {
 
-    protected transient static final Logger log = Logger
+    private transient static final Logger log = Logger
             .getLogger(SPOIndexWriteProc.class);
 
-    final transient protected boolean INFO = log.isInfoEnabled();
-    final transient protected boolean DEBUG = log.isDebugEnabled();
+    final transient private boolean INFO = log.isInfoEnabled();
+    final transient private boolean DEBUG = log.isDebugEnabled();
 
     /**
      * 
@@ -81,6 +79,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     private transient boolean reportMutation;
     
+    @Override
     public final boolean isReadOnly() {
 
         return false;
@@ -144,12 +143,14 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         /**
          * Values are required.
          */
+        @Override
         public final boolean sendValues() {
         
             return true;
             
         }
-        
+
+        @Override
         public SPOIndexWriteProc newInstance(final IRabaCoder keySer,
                 final IRabaCoder valSer, final int fromIndex,
                 final int toIndex, final byte[][] keys, final byte[][] vals) {
@@ -167,6 +168,7 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
      *         {@link Long} -or- a {@link ResultBitBuffer} IFF
      *         <code>reportMutations := true</code>.
      */
+    @Override
     public Object apply(final IIndex ndx) {
 
         // #of statements actually written on the index partition.
@@ -352,11 +354,11 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure implements
         
     }
 
-    /**
-     * Used by {@link #decodeStatementIdentifier(StatementEnum, byte[])}
-     */
-    private transient final DataInputBuffer vbuf = new DataInputBuffer(
-            new byte[] {});
+//    /**
+//     * Used by {@link #decodeStatementIdentifier(StatementEnum, byte[])}
+//     */
+//    private transient final DataInputBuffer vbuf = new DataInputBuffer(
+//            new byte[] {});
 
     @Override
     protected void writeMetadata(final ObjectOutput out) throws IOException {

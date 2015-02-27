@@ -7,7 +7,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.KV;
-import com.bigdata.btree.proc.IntegerAggregator;
+import com.bigdata.btree.proc.LongAggregator;
 
 /**
  * A buffer holding tokens extracted from one or more documents / fields.
@@ -408,7 +408,7 @@ public class TokenBuffer<V extends Comparable<V>> {
     protected long writeOnIndex(final int n, final byte[][] keys,
             final byte[][] vals) {
 
-        final IntegerAggregator resultHandler = new IntegerAggregator();
+        final LongAggregator resultHandler = new LongAggregator();
         
         textIndexer.getIndex().submit(0, //fromIndex
                 n, // toIndex

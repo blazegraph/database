@@ -67,15 +67,6 @@ public class BlueprintsServlet extends BigdataRDFServlet {
     @Override
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
-//        if (getBigdataRDFContext().getTripleStore(getNamespace(req),
-//                getTimestamp(req)) == null) {
-//            /*
-//             * There is no such triple/quad store instance.
-//             */
-//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-//            return;
-//        }
         
         final String contentType = req.getContentType();
 
@@ -86,7 +77,7 @@ public class BlueprintsServlet extends BigdataRDFServlet {
 
         if (!mimeTypes.contains(mimeType)) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as graph data: " + contentType);
 
             return;

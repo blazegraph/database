@@ -59,7 +59,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -154,8 +153,6 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.io.writecache.WriteCache;
-import com.bigdata.io.writecache.WriteCache.FileChannelScatteredWriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.Name2Addr.Entry;
 import com.bigdata.mdi.IResourceMetadata;
@@ -2756,11 +2753,12 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 */// TODO Could merge with doLocalAbort().
 	private void _abort() {
 
+		// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+		boolean success = false;
+		
 		final WriteLock lock = _fieldReadWriteLock.writeLock();
 
 		lock.lock();
-		// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
-		boolean success = false;
 
 		try {
 
@@ -3072,10 +3070,6 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
     @Override
 	public long commit() {
     	
-    	// Critical Section Check. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
-    	if (abortRequired.get()) // FIXME Move this into commitNow() after tagging hot fix.
-    		throw new IllegalStateException("Commit cannot be called, a call to abort must be made before further updates");
-
 		// The timestamp to be assigned to this commit point.
 		final long commitTime = nextCommitTimestamp();
 
@@ -4033,6 +4027,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
             if (log.isInfoEnabled())
                 log.info("commitTime=" + commitTime);
+
+        	// Critical Section Check. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
+        	if (abortRequired.get()) 
+        		throw new IllegalStateException("Commit cannot be called, a call to abort must be made before further updates");
 
             final CommitState cs = new CommitState(this, commitTime);
 
@@ -6406,25 +6404,26 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 //        }
 //    }
 
-    /**
-     * Await the service being ready to partitipate in an HA quorum. The
-     * preconditions include:
-     * <ol>
-     * <li>receiving notice of the quorum token via
-     * {@link #setQuorumToken(long)}</li>
-     * <li>The service is joined with the met quorum for that token</li>
-     * <li>If the service is a follower and it's local root blocks were at
-     * <code>commitCounter:=0</code>, then the root blocks from the leader have
-     * been installed on the follower.</li>
-     * <ol>
-     * 
-     * @param timeout
-     *            The timeout to await this condition.
-     * @param units
-     *            The units for that timeout.
-     *            
-     * @return the quorum token for which the service became HA ready.
-     */
+//    /**
+//     * Await the service being ready to partitipate in an HA quorum. The
+//     * preconditions include:
+//     * <ol>
+//     * <li>receiving notice of the quorum token via
+//     * {@link #setQuorumToken(long)}</li>
+//     * <li>The service is joined with the met quorum for that token</li>
+//     * <li>If the service is a follower and it's local root blocks were at
+//     * <code>commitCounter:=0</code>, then the root blocks from the leader have
+//     * been installed on the follower.</li>
+//     * <ol>
+//     * 
+//     * @param timeout
+//     *            The timeout to await this condition.
+//     * @param units
+//     *            The units for that timeout.
+//     *            
+//     * @return the quorum token for which the service became HA ready.
+//     */
+    @Override
     final public long awaitHAReady(final long timeout, final TimeUnit units)
             throws InterruptedException, TimeoutException,
             AsynchronousQuorumCloseException {
@@ -6815,10 +6814,11 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
      */
     private final AtomicReference<Future<IHANotifyReleaseTimeResponse>> gatherFuture = new AtomicReference<Future<IHANotifyReleaseTimeResponse>>();
     
-    /**
-     * The {@link Quorum} for this service -or- <code>null</code> if the service
-     * is not running with a quorum.
-     */
+//    /**
+//     * The {@link Quorum} for this service -or- <code>null</code> if the service
+//     * is not running with a quorum.
+//     */
+    @Override
 	public Quorum<HAGlue,QuorumService<HAGlue>> getQuorum() {
 
 		return quorum;

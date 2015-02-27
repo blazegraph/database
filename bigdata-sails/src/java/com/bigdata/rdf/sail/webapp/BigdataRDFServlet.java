@@ -34,6 +34,7 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.net.URLDecoder;
 import java.util.Iterator;
 import java.util.Properties;
@@ -183,70 +184,85 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	 *      should never throw an exception </a>
 	 */
     protected static void launderThrowable(final Throwable t,
-          final HttpServletResponse resp, final String queryStr) {
-       final boolean isQuery = queryStr != null && queryStr.length() > 0;
-       try {
-           // log an error for the service.
-           log.error("cause=" + t + (isQuery ? ", query=" + queryStr : ""), t);
-       } finally {
-           // ignore any problems here.
-       }
-       if (resp == null) {
-           // Nothing can be done.
-           return;
-       }
-		
-       if (!resp.isCommitted()) {
+            final HttpServletResponse resp, final String queryStr) {
+        final boolean isQuery = queryStr != null && queryStr.length() > 0;
+        try {
+            // log an error for the service.
+            log.error("cause=" + t + (isQuery ? ", query=" + queryStr : ""), t);
+        } finally {
+            // ignore any problems here.
+        }
+		if (resp == null) {
+			// Nothing can be done.
+			return;
+		}
+		if (!resp.isCommitted()) {
+			/*
+			 * Set appropriate status code.
+			 * 
+			 * Note: A committed response has already had its status code and
+			 * headers written.
+			 */
+			if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
+				/*
+				 * The addressed KB does not exist.
+				 */
+				resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t,
+					ConstraintViolationException.class)) {
+				/*
+				 * A constraint violation is a bad request (the data violates
+				 * the rules) not a server error.
+				 */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause
+					.isInnerCause(t, MalformedQueryException.class)) {
+				/*
+				 * Send back a BAD REQUEST (400) along with the text of the
+				 * syntax error message.
+				 * 
+				 * TODO Write unit test for 400 response for bad client request.
+				 */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t,
+					QuadsOperationInTriplesModeException.class)) {
 
-           /*
-            * Set appropriate status code.
-            * 
-            * Note: A committed response has already had its status code and
-            * headers written.
-            */
-           if (InnerCause.isInnerCause(t, DatasetNotFoundException.class)) {
-           
-               /*
-                * The addressed KB does not exist.
-                */
-               resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-               resp.setContentType(MIME_TEXT_PLAIN);
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
 
-           } else if (InnerCause.isInnerCause(t,
-                  ConstraintViolationException.class)) {
-              
-               /*
-                * A constraint violation is a bad request (the data violates the
-                * rules) not a server error.
-                */
-               resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-               resp.setContentType(MIME_TEXT_PLAIN);
-               
-           } else if (InnerCause.isInnerCause(t, MalformedQueryException.class)) {
-              
-               /*
-                * Send back a BAD REQUEST (400) along with the text of the syntax
-                * error message.
-                * 
-                * TODO Write unit test for 400 response for bad client request.
-                */
-               resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-               resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t, HttpOperationException.class)) {
+            /*
+             * An AbstractRestApiTask failed and throw out a typed exception to
+             * avoid joining a commit group.
+             * 
+             * TODO The queryStr is ignored on this code path. Review the places
+             * where the HttpOperationException is thrown and standardize the
+             * information contained in its [content] as we have already done
+             * for the [queryStr].
+             */
+            final HttpOperationException ex = (HttpOperationException) InnerCause
+                  .getInnerCause(t, HttpOperationException.class);
+            resp.setStatus(ex.status);
+            resp.setContentType(ex.mimeType);
+            try {
+               final Writer w = resp.getWriter();
+               if (ex.content != null)
+                  w.write(ex.content); // write content iff given.
+               w.flush(); // Commit the response.
+            } catch (IOException ex2) {
+               // ignore any problems here.
+            }
+            return;
+			} else {
+				// Internal server error.
+				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			}
+		}
 
-           } else if (InnerCause.isInnerCause(t,
-                  QuadsOperationInTriplesModeException.class)) {
-
-               resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-               resp.setContentType(MIME_TEXT_PLAIN);
-
-         } else {
-            
-               // Internal server error.
-               resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-               resp.setContentType(MIME_TEXT_PLAIN);
-               
-         }
-      }
 		/*
 		 * Attempt to write the stack trace on the response.
 		 * 
@@ -394,31 +410,20 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 	}
 
-    /**
-     * Report a mutation count and elapsed time back to the user agent.
-     * 
-     * @param resp
-     *            The response.
-     * @param nmodified
-     *            The mutation count.
-     * @param elapsed
-     *            The elapsed time (milliseconds).
-     * 
-     * @throws IOException
-     */
-    static protected void reportModifiedCount(final HttpServletResponse resp,
-            final long nmodified, final long elapsed) throws IOException {
+	/**
+    * Report that a namespace is not found. The namespace is extracted from the
+    * {@link HttpServletRequest}.
+    */
+   protected void buildAndCommitNamespaceNotFoundResponse(
+         final HttpServletRequest req, final HttpServletResponse resp)
+         throws IOException {
 
-        final StringWriter w = new StringWriter();
-    	
-        final XMLBuilder t = new XMLBuilder(w);
+      buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+            MIME_TEXT_PLAIN, "Not found: namespace=" + getNamespace(req)
+      // +", timestamp="+getTimestamp(req)
+      );
 
-        t.root("data").attr("modified", nmodified)
-                .attr("milliseconds", elapsed).close();
-
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-
-    }
+   }
 
     /**
      * Report an access path range count and elapsed time back to the user agent.
@@ -432,8 +437,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    static protected void reportRangeCount(final HttpServletResponse resp,
-            final long rangeCount, final long elapsed) throws IOException {
+   static protected void buildAndCommitRangeCountResponse(
+         final HttpServletResponse resp, final long rangeCount,
+         final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
         
@@ -442,7 +448,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         t.root("data").attr("rangeCount", rangeCount)
                 .attr("milliseconds", elapsed).close();
 
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+        buildAndCommitResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
         
@@ -452,7 +458,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    protected void sendGraph(final HttpServletRequest req,
+    static protected void sendGraph(final HttpServletRequest req,
             final HttpServletResponse resp, final Graph g) throws IOException {
         /*
          * CONNEG for the MIME type.
@@ -522,7 +528,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    protected void sendProperties(final HttpServletRequest req,
+    static protected void sendProperties(final HttpServletRequest req,
             final HttpServletResponse resp, final Properties properties)
             throws IOException {
         /*
@@ -582,7 +588,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * Convert an array of URI strings to an array of URIs.
      */
-    protected Resource[] toURIs(final String[] s) {
+    static protected Resource[] toURIs(final String[] s) {
     	
     	if (s == null)
     		return null;

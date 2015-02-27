@@ -30,6 +30,8 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.journal.BufferMode;
+
 /**
  * Test suite.
  * 
@@ -89,7 +91,7 @@ public class TestAll extends TestCase {
 		// RWStore specific unit tests.
 		suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(
 				TestNanoSparqlServerWithProxyIndexManager
-						.getTemporaryJournal(true/* RWStore */),
+						.getTemporaryJournal(BufferMode.DiskRW),
 				TestMode.triples));
 
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));

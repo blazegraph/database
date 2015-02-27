@@ -81,7 +81,6 @@ import com.bigdata.rwstore.sector.MemStore;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface Options {
 

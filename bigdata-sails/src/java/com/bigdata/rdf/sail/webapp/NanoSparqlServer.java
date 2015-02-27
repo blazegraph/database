@@ -822,8 +822,9 @@ public class NanoSparqlServer {
             final URL resourceBaseURL;
             if (file.exists()) {
 
-                // Check the file system.
-                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
+                // Check the file system. See #1108
+//                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
+                resourceBaseURL = file.toURI().toURL();
                 isFile = true;
 
             } else {
