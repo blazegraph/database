@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.io.Reader;
@@ -165,7 +164,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 	}
 
-   protected AbstractTripleStore createTripleStore(
+   private AbstractTripleStore createTripleStore(
          final IIndexManager indexManager, final String namespace,
          final Properties properties) throws InterruptedException,
          ExecutionException {
@@ -176,46 +175,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
       AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
             properties)).get();
 		
-//		// Locate the resource declaration (aka "open"). This tells us if it
-//		// exists already.
-//		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-//
-//		if (tripleStore != null) {
-//
-//			fail("exists: " + namespace);
-//			
-//		}
-//
-//		/*
-//		 * Create the KB instance.
-//		 */
-//
-//		if (log.isInfoEnabled()) {
-//			log.info("Creating KB instance: namespace="+namespace);
-//			log.info("Properties=" + properties.toString());
-//		}
-//
-//		if (indexManager instanceof Journal) {
-//
-//	        // Create the kb instance.
-//			tripleStore = new LocalTripleStore(indexManager, namespace,
-//					ITx.UNISOLATED, properties);
-//
-//		} else {
-//
-//			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
-//					ITx.UNISOLATED, properties);
-//		}
-//
-//        // create the triple store.
-//        tripleStore.create();
-
         if(log.isInfoEnabled())
         	log.info("Created tripleStore: " + namespace);
-
-//        // New KB instance was created.
-//        return tripleStore;
 
         /**
          * Return a view of the new KB to the caller.
@@ -233,32 +194,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
       
     }
 
-	protected void dropTripleStore(final IIndexManager indexManager,
+	private void dropTripleStore(final IIndexManager indexManager,
 			final String namespace) throws InterruptedException, ExecutionException {
 
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
-
-//		// Locate the resource declaration (aka "open"). This tells us if it
-//		// exists already.
-//		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-//
-//		if (tripleStore != null) {
-//
-//			if (log.isInfoEnabled())
-//				log.info("Destroying: " + namespace);
-//
-//            if (!BigdataStatics.NSS_GROUP_COMMIT) {
-//                /*
-//                 * GROUP COMMIT: We need to submit a task that does this
-//                 * in order to stay inside of the same concurrency control
-//                 * mechanism as the database.
-//                 */
-//                tripleStore.destroy();
-//            }
-//			
-//		}
 
       try {
          AbstractApiTask.submitApiTask(indexManager,
@@ -285,7 +225,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	}
 
 	protected Server newFixture(final String lnamespace) throws Exception {
-		final IIndexManager indexManager = getIndexManager();
+
+	   final IIndexManager indexManager = getIndexManager();
 		
 		final Properties properties = getProperties();
 
@@ -460,9 +401,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	}
 
     /**
-     * Returns a view of the triple store using the sail interface.
-     */
-    @Deprecated// FIXME DO NOT CIRCUMVENT!
+    * Returns a view of the triple store using the sail interface.
+    * 
+    * FIXME DO NOT CIRCUMVENT! Use the REST API throughout this test suite.
+    */
+    @Deprecated
     protected BigdataSail getSail() {
 
 		final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
@@ -472,29 +415,29 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
     }
 
-	protected String getStreamContents(final InputStream inputStream)
-            throws IOException {
-
-        final Reader rdr = new InputStreamReader(inputStream);
-		
-	    final StringBuffer sb = new StringBuffer();
-		
-	    final char[] buf = new char[512];
-	    
-		while (true) {
-		
-		    final int rdlen = rdr.read(buf);
-			
-		    if (rdlen == -1)
-				break;
-			
-		    sb.append(buf, 0, rdlen);
-		    
-		}
-		
-		return sb.toString();
-
-	}
+//	protected String getStreamContents(final InputStream inputStream)
+//            throws IOException {
+//
+//        final Reader rdr = new InputStreamReader(inputStream);
+//		
+//	    final StringBuffer sb = new StringBuffer();
+//		
+//	    final char[] buf = new char[512];
+//	    
+//		while (true) {
+//		
+//		    final int rdlen = rdr.read(buf);
+//			
+//		    if (rdlen == -1)
+//				break;
+//			
+//		    sb.append(buf, 0, rdlen);
+//		    
+//		}
+//		
+//		return sb.toString();
+//
+//	}
 
 	/**
 	 * Counts the #of results in a SPARQL result set.
@@ -657,7 +600,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
     }
 
-    public long countAll() throws Exception {
+    protected long countAll() throws Exception {
     	
     	return getSail().getDatabase().getExplicitStatementCount(null);
     	

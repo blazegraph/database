@@ -64,6 +64,7 @@ import info.aduna.text.StringUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,6 +72,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+
+import javax.servlet.http.HttpServletResponse;
+
+import junit.framework.Test;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -81,7 +86,6 @@ import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.util.ModelUtil;
 import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.query.BindingSet;
-import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.Query;
@@ -95,23 +99,27 @@ import org.openrdf.query.impl.TupleQueryResultBuilder;
 import org.openrdf.query.resultio.QueryResultIO;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultParser;
-import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
-import org.openrdf.rio.RDFParseException;
 import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.journal.ITx;
+import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
+import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.webapp.client.HttpException;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Proxied test suite for SPARQL 1.1 Federated Query. In general, each test
@@ -128,7 +136,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  * @param <S>
  */
 public class TestFederatedQuery<S extends IIndexManager> extends
-        AbstractNanoSparqlServerTestCase<S> {
+        AbstractTestNanoSparqlClient<S> {
 
     public TestFederatedQuery() {
 
@@ -140,20 +148,23 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
     }
 
+    public static Test suite() {
+
+       return ProxySuiteHelper.suiteWhenStandalone(TestFederatedQuery.class,
+                 "test.*", TestMode.quads
+//                 , TestMode.sids
+//                 , TestMode.triples
+                 );
+        
+    }
+
     /**
      * The openrdf services test suite data.
      */
     private static final String PREFIX = "openrdf-service/";
 
-    /**
-     * A local repository (NOT exposed via HTTP).
-     */
-    private BigdataSail localSail;
-    
-    /**
-     * A {@link Repository} view of the {@link #localSail}.
-     */
-    private BigdataSailRepository localRepository;
+    /** The "local" repository. */
+    private RemoteRepository localRepository;
     
     @Override
     public void setUp() throws Exception {
@@ -164,26 +175,13 @@ public class TestFederatedQuery<S extends IIndexManager> extends
        
         p.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
         
-        localSail = new BigdataSail(p);
-//        localSail.initialize();
-        
-        localRepository = new BigdataSailRepository(localSail);
-        localRepository.initialize();
+        localRepository = m_repo;
         
     }
 
     @Override
     public void tearDown() throws Exception {
 
-        if (localSail != null) {
-            
-            localSail.__tearDownUnitTest();
-         
-            localSail = null;
-            localRepository = null;
-            
-        }
-        
         super.tearDown();
         
     }
@@ -219,47 +217,46 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
     
     /**
-     * Get the repository, initialized repositories are called
-     * <pre>
-     * endpoint1
-     * endpoint2
-     * ..
-     * endpoint%MAX_ENDPOINTS%
-     * </pre>
-     * @param i the index of the repository, starting with 1
-     * @return
-     * @throws SailException 
-     * @throws RepositoryException 
-     */
-    private BigdataSailRepository getRepository(final int i)
-            throws SailException, RepositoryException {
+    * Get the repository, initialized repositories are called
+    * 
+    * <pre>
+    * endpoint1
+    * endpoint2
+    * ..
+    * endpoint%MAX_ENDPOINTS%
+    * </pre>
+    * 
+    * @param i
+    *           the index of the repository, starting with 1
+    * @return
+    */
+   private RemoteRepository getRepository(final int i) throws Exception {
 
-        final String ns = getNamespace(i);
+      final String ns = getNamespace(i);
 
-        BigdataSail sail = getSail(ns);
+      try {
+         boolean found = true;
+         try {
+            final Properties p = m_repo.getRepositoryProperties(ns);
+            assert p != null;
+            found = true;
+         } catch (HttpException ex) {
+            if (ex.getStatusCode() == HttpServletResponse.SC_NOT_FOUND) {
+               found = false;
+            }
+         }
+         if (!found) {
+            // Create the repository.
+            final Properties p = new Properties(getProperties());
+            p.setProperty(RemoteRepositoryManager.OPTION_CREATE_KB_NAMESPACE,
+                  ns);
+            m_repo.createRepository(ns, p);
+         }
+      } catch (Exception ex) {
+         throw new RuntimeException(ex);
+      }
 
-        if (sail == null) {
-
-            sail = new BigdataSail(createTripleStore(getIndexManager(), ns,
-                    getProperties()));
-
-        }
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        
-        repo.initialize();
-        
-        return repo;
-        
-    }
-
-    /**
-     * The <code>local</code> repository.
-     * @return
-     */
-    private BigdataSailRepository getRepository() {
-        
-        return localRepository;
+      return m_repo.getRepositoryForNamespace(ns);
         
     }
     
@@ -276,7 +273,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      *            endpoint%i%, use empty list for no remote data
      * @throws Exception
      */
-    protected void prepareTest(final String localData,
+    private void prepareTest(final String localData,
             final List<String> endpointData) throws Exception {
 
 //        if (endpointData.size() > MAX_ENDPOINTS)
@@ -286,20 +283,17 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
         if (localData != null) {
             
-            final BigdataSailRepository repo = getRepository();
-                    
             if (log.isInfoEnabled())
-                log.info("Loading: " + localData + " into local repository as "
-                        + repo);
+                log.info("Loading: " + localData + " into local repository");
 
-            loadDataSet(repo, localData);
+            loadDataSet(localRepository, localData);
             
         }
 
         int i = 1; // endpoint id, start with 1
         for (String s : endpointData) {
 
-            final BigdataSailRepository repo = getRepository(i);
+            final RemoteRepository repo = getRepository(i);
 
             if (log.isInfoEnabled())
                 log.info("Loading: " + s + " into " + getRepositoryUrl(i)
@@ -314,36 +308,41 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
     
     /**
-     * Load a dataset.
-     * 
-     * @param rep
-     * @param datasetFile
-     */
-    protected void loadDataSet(final Repository rep, final String datasetFile)
-            throws RDFParseException, RepositoryException, IOException {
+    * Load a dataset.
+    * 
+    * @param rep
+    * @param datasetFile
+    * @throws Exception
+    */
+    private void loadDataSet(final RemoteRepository rep, final String datasetFile)
+            throws Exception {
 
-        final InputStream dataset = TestFederatedQuery.class
-                .getResourceAsStream(datasetFile);
+       final URL datasetUri = TestFederatedQuery.class.getResource(datasetFile);
+      
+       rep.add(new AddOp(datasetUri.toExternalForm()));
 
-        if (dataset == null)
-            throw new IllegalArgumentException("Datasetfile not found: "
-                    + datasetFile);
-
-        try {
-
-            RepositoryConnection con = rep.getConnection();
-            try {
-                con.setAutoCommit(false);
-                // con.clear();
-                con.add(dataset, ""/* baseURI */,
-                        RDFFormat.forFileName(datasetFile));
-                con.commit();
-            } finally {
-                con.close();
-            }
-        } finally {
-            dataset.close();
-        }
+//        final InputStream dataset = TestFederatedQuery.class
+//                .getResourceAsStream(datasetFile);
+//
+//        if (dataset == null)
+//            throw new IllegalArgumentException("Datasetfile not found: "
+//                    + datasetFile);
+//
+//        try {
+//
+//            RepositoryConnection con = rep.getConnection();
+//            try {
+//                con.setAutoCommit(false);
+//                // con.clear();
+//                con.add(dataset, ""/* baseURI */,
+//                        RDFFormat.forFileName(datasetFile));
+//                con.commit();
+//            } finally {
+//                con.close();
+//            }
+//        } finally {
+//            dataset.close();
+//        }
         
     }
 
@@ -351,7 +350,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
         // test setup
         final String EX_NS = "http://example.org/";
-        final ValueFactory f = getRepository().getValueFactory();
+        final ValueFactory f = new ValueFactoryImpl();
         final URI bob = f.createURI(EX_NS, "bob");
         final URI alice = f.createURI(EX_NS, "alice");
         final URI william = f.createURI(EX_NS, "william");
@@ -369,8 +368,9 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         qb.append("     ?X a <" + FOAF.PERSON + "> . \n");
         qb.append(" } \n");
 
-        final BigdataSailRepositoryConnection conn = localRepository
-                .getConnection();
+        final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
+            localRepository).getConnection();
+        
         try {
 
             final TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL,
@@ -635,46 +635,79 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final String expectedResultFile, final boolean checkOrder)
             throws Exception {
         
-        RepositoryConnection conn = localRepository.getConnection();
-        String queryString = readQueryString(queryFile);
-
-        /*
-         * Replace the constants in the query strings with the actual service
-         * end point.
-         */
-        queryString = queryString.replace(
-                "http://localhost:18080/openrdf/repositories/endpoint",
-                getRepositoryUrlBase());
-        
+       final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
+             localRepository).getConnection();
+       
         try {
-            Query query = conn.prepareQuery(QueryLanguage.SPARQL, queryString);
-            
-            if (query instanceof TupleQuery) {
-                TupleQueryResult queryResult = ((TupleQuery)query).evaluate();
-    
-                TupleQueryResult expectedResult = readExpectedTupleQueryResult(expectedResultFile);
-                
-                compareTupleQueryResults(queryResult, expectedResult, checkOrder);
-    
-            } else if (query instanceof GraphQuery) {
-                GraphQueryResult gqr = ((GraphQuery)query).evaluate();
-                Set<Statement> queryResult = Iterations.asSet(gqr);
-    
-                Set<Statement> expectedResult = readExpectedGraphQueryResult(expectedResultFile);
-    
-                compareGraphs(queryResult, expectedResult);
-                
-            } else if (query instanceof BooleanQuery) {
-                // TODO implement if needed
-                throw new RuntimeException("Not yet supported " + query.getClass());
-            }
-            else {
-                throw new RuntimeException("Unexpected query type: " + query.getClass());
-            }
-        } finally {
-            conn.close();
-        }
-    }
+           
+           final String baseURI = getRepositoryUrlBase();
+           
+           String queryString = readQueryString(queryFile);
+
+           /*
+            * Replace the constants in the query strings with the actual service
+            * end point.
+            */
+           queryString = queryString.replace(
+                   "http://localhost:18080/openrdf/repositories/endpoint",
+                   baseURI);
+
+           /*
+            * Figure out what kind of query this is.
+            */
+         final QueryType queryType;
+         {
+            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+                  .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
+
+            final ASTContainer astContainer = new Bigdata2ASTSPARQLParser(
+                  tripleStore).parseQuery2(queryString, baseURI);
+
+            queryType = astContainer.getOriginalAST().getQueryType();
+         }
+
+         switch (queryType) {
+         case ASK: {
+            // TODO implement if needed
+            throw new RuntimeException("Not yet supported (boolean) "
+                  + queryString);
+         }
+         case CONSTRUCT:
+         case DESCRIBE: {
+
+            final Query query = conn.prepareGraphQuery(QueryLanguage.SPARQL,
+                  queryString);
+
+            final GraphQueryResult gqr = ((GraphQuery) query).evaluate();
+
+            final Set<Statement> queryResult = Iterations.asSet(gqr);
+
+            final Set<Statement> expectedResult = readExpectedGraphQueryResult(expectedResultFile);
+
+            compareGraphs(queryResult, expectedResult);
+
+            break;
+         }
+         case SELECT: {
+            final Query query = conn.prepareTupleQuery(QueryLanguage.SPARQL,
+                  queryString);
+
+            final TupleQueryResult queryResult = ((TupleQuery) query)
+                  .evaluate();
+
+            final TupleQueryResult expectedResult = readExpectedTupleQueryResult(expectedResultFile);
+
+            compareTupleQueryResults(queryResult, expectedResult, checkOrder);
+            break;
+         }
+         default:
+            throw new RuntimeException("Unexpected query type: " + queryString);
+         }
+
+      } finally {
+         conn.close();
+      }
+   }
     
     /**
      * Read the query string from the specified resource
@@ -684,8 +717,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      * @throws RepositoryException
      * @throws IOException
      */
-    private String readQueryString(String queryResource) throws RepositoryException, IOException {
-        InputStream stream = TestFederatedQuery.class.getResourceAsStream(queryResource);
+    private String readQueryString(final String queryResource) throws RepositoryException, IOException {
+       final InputStream stream = TestFederatedQuery.class.getResourceAsStream(queryResource);
         try {
             return IOUtil.readString(new InputStreamReader(stream, "UTF-8"));
         } finally {
@@ -701,17 +734,17 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      * @throws RepositoryException
      * @throws IOException
      */
-    private TupleQueryResult readExpectedTupleQueryResult(String resultFile)    throws Exception
+    private TupleQueryResult readExpectedTupleQueryResult(final String resultFile)    throws Exception
     {
-        TupleQueryResultFormat tqrFormat = QueryResultIO.getParserFormatForFileName(resultFile);
+       final TupleQueryResultFormat tqrFormat = QueryResultIO.getParserFormatForFileName(resultFile);
     
         if (tqrFormat != null) {
-            InputStream in = TestFederatedQuery.class.getResourceAsStream(resultFile);
+           final InputStream in = TestFederatedQuery.class.getResourceAsStream(resultFile);
             try {
-                TupleQueryResultParser parser = QueryResultIO.createParser(tqrFormat);
+               final TupleQueryResultParser parser = QueryResultIO.createParser(tqrFormat);
                 parser.setValueFactory(ValueFactoryImpl.getInstance());
     
-                TupleQueryResultBuilder qrBuilder = new TupleQueryResultBuilder();
+                final TupleQueryResultBuilder qrBuilder = new TupleQueryResultBuilder();
                 parser.setTupleQueryResultHandler(qrBuilder);
     
                 parser.parse(in);
@@ -722,7 +755,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             }
         }
         else {
-            Set<Statement> resultGraph = readExpectedGraphQueryResult(resultFile);
+           final Set<Statement> resultGraph = readExpectedGraphQueryResult(resultFile);
             return DAWGTestResultSetUtil.toTupleQueryResult(resultGraph);
         }
     }
@@ -736,18 +769,18 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      */
     private Set<Statement> readExpectedGraphQueryResult(String resultFile) throws Exception
     {
-        RDFFormat rdfFormat = Rio.getParserFormatForFileName(resultFile);
+        final RDFFormat rdfFormat = Rio.getParserFormatForFileName(resultFile);
     
         if (rdfFormat != null) {
-            RDFParser parser = Rio.createParser(rdfFormat);
+            final RDFParser parser = Rio.createParser(rdfFormat);
             parser.setDatatypeHandling(DatatypeHandling.IGNORE);
             parser.setPreserveBNodeIDs(true);
             parser.setValueFactory(ValueFactoryImpl.getInstance());
     
-            Set<Statement> result = new LinkedHashSet<Statement>();
+            final Set<Statement> result = new LinkedHashSet<Statement>();
             parser.setRDFHandler(new StatementCollector(result));
     
-            InputStream in = TestFederatedQuery.class.getResourceAsStream(resultFile);
+            final InputStream in = TestFederatedQuery.class.getResourceAsStream(resultFile);
             try {
                 parser.parse(in, null);     // TODO check
             }

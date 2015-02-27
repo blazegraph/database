@@ -550,22 +550,22 @@ public class QueryServlet extends BigdataRDFServlet {
 		private final String queryStr;
 		private final BigdataRDFContext context;
 
-		public SparqlQueryTask(final HttpServletRequest req,
-				final HttpServletResponse resp, final String namespace,
-				final long timestamp, final String queryStr,
-				final BigdataRDFContext context) {
+      public SparqlQueryTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp, final String queryStr,
+            final BigdataRDFContext context) {
 
-			super(req, resp, namespace, timestamp);
+         super(req, resp, namespace, timestamp);
 
-			if (queryStr == null)
-				throw new IllegalArgumentException();
-			if (context == null)
-				throw new IllegalArgumentException();
+         if (queryStr == null)
+            throw new IllegalArgumentException();
+         if (context == null)
+            throw new IllegalArgumentException();
 
-			this.queryStr = queryStr;
-            this.context = context;
-            
-        }
+         this.queryStr = queryStr;
+         this.context = context;
+         
+      }
         
         @Override
         final public boolean isReadOnly() {
