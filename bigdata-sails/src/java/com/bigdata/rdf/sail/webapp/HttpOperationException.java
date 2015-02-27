@@ -56,4 +56,10 @@ public class HttpOperationException extends IOException {
       this.content = content;
    }
 
+   @Override
+   public String toString() {
+      return getClass().getName() + "{status=" + status + ", mimeType="
+            + mimeType + ", content=" + content + "}";
+   }
+
 }
