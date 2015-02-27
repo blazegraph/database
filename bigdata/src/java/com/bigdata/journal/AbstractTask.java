@@ -1025,8 +1025,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             // Done.
             return null;
-        }
+      }
 
+      @Override
+      public String toString() {
+         return getClass().getName() + "{name=" + l.name + "}";
+      }
+   
     }
     
     /**
