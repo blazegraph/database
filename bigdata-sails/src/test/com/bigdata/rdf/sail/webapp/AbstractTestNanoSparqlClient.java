@@ -202,7 +202,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
       try {
          AbstractApiTask.submitApiTask(indexManager,
-               new DestroyKBTask(namespace, ITx.UNISOLATED)).get();
+               new DestroyKBTask(namespace)).get();
       } catch (Exception ex) {
          if (InnerCause.isInnerCause(ex, DatasetNotFoundException.class)) {
             if (log.isInfoEnabled())

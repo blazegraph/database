@@ -28,17 +28,18 @@ package com.bigdata.rdf.sail;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 
 /**
- * Task creates a KB for the given namespace iff no such KB exists. The correct
- * use of this class is as follows:
+ * Task destroys a KB for the given namespace. The correct use of this class is
+ * as follows:
  * 
  * <pre>
- * AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace, properties)).get()
+ * AbstractApiTask.submitApiTask(indexManager, new DestroyKBTask(namespace)).get();
  * </pre>
  * 
  * @see CreateKBTask
@@ -50,8 +51,10 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
    private static final transient Logger log = Logger
          .getLogger(DestroyKBTask.class);
 
-   public DestroyKBTask(final String namespace, final long timestamp) {
-      super(namespace, timestamp, true/* isGRSRequired */);
+   public DestroyKBTask(final String namespace) {
+    
+      super(namespace, ITx.UNISOLATED, true/* isGRSRequired */);
+      
    }
 
    @Override
@@ -59,8 +62,11 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
       return false;
    }
 
+   /**
+    * @throws DatasetNotFoundException if the namespace does not exist.
+    */
    @Override
-   public Void call() throws Exception {
+   public Void call() throws Exception, DatasetNotFoundException {
 
       final AbstractTripleStore tripleStore = getTripleStore();
 

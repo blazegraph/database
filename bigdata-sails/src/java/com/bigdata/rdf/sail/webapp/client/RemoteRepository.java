@@ -746,20 +746,25 @@ public class RemoteRepository {
     }
 
     /**
-     * Perform a fast range count on the statement indices for a given
-     * triple (quad) pattern.
-     * 
-     * @param s
-     *             the subject (can be null)
-     * @param p
-     *             the predicate (can be null)
-     * @param o
-     *             the object (can be null)
-     * @param c
-     *             the context (can be null)
-     * @return
-     *             the range count
-     */
+    * Perform a fast range count on the statement indices for a given triple
+    * (quad) pattern.
+    * 
+    * @param s
+    *           the subject (can be null)
+    * @param p
+    *           the predicate (can be null)
+    * @param o
+    *           the object (can be null)
+    * @param c
+    *           the context (can be null)
+    * @return the range count
+    * 
+    *         TODO Add optional boolean property named "exact" whose default
+    *         value is <code>false</code> to preserve the historical behavior.
+    *         This will provide for relatively efficient exact range counts over
+    *         the REST API. See #1127 (Add REST API method for exact range
+    *         counts)
+    */
     public long rangeCount(final Resource s, final URI p, final Value o, final Resource... c) 
             throws Exception {
 
