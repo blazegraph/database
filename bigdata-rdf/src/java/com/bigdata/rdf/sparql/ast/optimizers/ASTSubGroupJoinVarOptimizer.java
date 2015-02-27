@@ -27,18 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
@@ -150,6 +156,47 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
              * appeared previously in the query up to this point. 
              */
             definitelyBoundInGroup.retainAll(maybeIncomingBindings);
+            
+            /**
+             * TODO:
+             * Add the variables that are used inside filters in the OPTIONAL,
+             * since the SPARQL 1.1 semantics lifts these filters to the
+             * upper level in case the join succeeds.
+             * 
+             * However, note that this may not be valid in the general case,
+             * i.e. it is unclear how to deal with ill designed patterns, where
+             * the inner subgroup contains an optional join reusing the 
+             * variables. 
+             */
+            if (group instanceof JoinGroupNode) {
+               JoinGroupNode jgn = (JoinGroupNode)group;
+               if (jgn.isOptional()) {
+                  Set<FilterNode> filters = new HashSet<FilterNode>();
+                  for (BOp node : jgn.args()) {
+
+                     if (node instanceof FilterNode) {
+                        filters.add((FilterNode)node);
+                     } else if (node instanceof StatementPatternNode) {
+                        StatementPatternNode nodeAsSP = (StatementPatternNode)node;
+                        Object filter = nodeAsSP.annotations().get("filters");
+                        if (filter!=null && filter instanceof List<?>) {
+                           List<?> spFilters = (List<?>)filter;
+                           for (Object spFilter : spFilters) {
+                              if (spFilter instanceof FilterNode) {
+                                 filters.add((FilterNode)spFilter);
+                              }
+                           }
+                        }
+                     }
+
+                  }
+                  
+                  for (FilterNode fn : filters) {
+                     definitelyBoundInGroup.addAll(sa.getSpannedVariables(fn,
+                           true/* filters */, new LinkedHashSet<IVariable<?>>()));
+                  }
+               }
+            }
             
             @SuppressWarnings("rawtypes")
             final IVariable[] projectInVars = 
