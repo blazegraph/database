@@ -199,6 +199,28 @@ public class CreateKBTask extends AbstractApiTask<Void> {
                 } else {
                     isSoloOrLeader = false;
                 }
+                
+                final IJournal journal = jnl;
+                if (journal.isGroupCommit()
+                  && journal.getRootBlockView().getCommitCounter() == 0L) {
+                  /*
+                   * Force the GRS to be materialized. This is necessary for the
+                   * initial KB create when using group commit and HA. (For HA the
+                   * initial KB create is single threaded within the context of the
+                   * leader election. However, this is not true for a standalone
+                   * Journal.)
+                   * 
+                   * Note: This logic will fail if AbstractTask uses a
+                   * DefaultResourceLocator that is based on the HAJournal and not
+                   * on an IsolatedActionJournal because that will allow the
+                   * GlobalRowStoreHelper.getGlobalRowStore() method to registerr
+                   * the GSR index on the unisolated Name2Addr rather than the n2a
+                   * class inside of the AbstractTask.
+                   */
+                  journal.getGlobalRowStore();
+                  journal.commit();
+               }
+              
             }
 
             if (isSoloOrLeader) {
