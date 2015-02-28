@@ -80,6 +80,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
      * {@link MetadataServer} ({@link #metadataServer0}). Each runs in its own
      * thread.
      */
+    @Override
     public void setUp() throws Exception {
 
         super.setUp();
@@ -94,6 +95,7 @@ public class TestBigdataClient extends AbstractServerTestCase {
     /**
      * Destroy the test services.
      */
+    @Override
     public void tearDown() throws Exception {
 
         if (helper != null) {
