@@ -229,10 +229,15 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				resp.setContentType(MIME_TEXT_PLAIN);
 			} else if (InnerCause.isInnerCause(t,
 					QuadsOperationInTriplesModeException.class)) {
-
+			   /*
+             * Nice error when attempting to use quads data in a triples only
+             * mode.
+             * 
+             * @see #1086 Loading quads data into a triple store should strip
+             * out the context
+             */
 				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				resp.setContentType(MIME_TEXT_PLAIN);
-
 			} else if (InnerCause.isInnerCause(t, HttpOperationException.class)) {
             /*
              * An AbstractRestApiTask failed and throw out a typed exception to
