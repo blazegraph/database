@@ -2933,6 +2933,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	 * Note: To restore the last root block we copy the alternative root block
 	 * over the current root block. That gives us two identical root blocks and
 	 * restores us to the root block that was in effect before the last commit.
+	 * 
+	 * @deprecated Do not use this method. HA provides point in time restore. Use
+	 * that.  Or you can open a journal using the alternate root block by specifying
+	 * {@link Options#ALTERNATE_ROOT_BLOCK}
 	 */
 	public void rollback() {
 
@@ -2981,7 +2985,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			 * commit point
 			 */
 			historicalIndexCache.clear();
-            indexCache.clear();
+			indexCache.clear();
 
 		} finally {
 
