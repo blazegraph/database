@@ -38,7 +38,6 @@ import com.bigdata.journal.Journal;
  * {@link Journal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestAll.java 7837 2014-01-31 17:44:48Z thompsonbry $
  */
 public class TestAll_LBS extends TestCase {
 
