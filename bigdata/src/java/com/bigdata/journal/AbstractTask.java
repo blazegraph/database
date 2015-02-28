@@ -81,6 +81,7 @@ import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
+import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -283,9 +284,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *       in {@link #n2a}) sufficiently flexible to allow a task to do a
      *       drop/add sequence, or a more general {add,drop}+ sequence.
      */
-    private class Entry extends Name2Addr.Entry {
-        
+    static private class Entry extends Name2Addr.Entry {
+
+       /** <code>true</code> iff the index is registered by the task. */
         boolean registeredIndex = false;
+       
+        /** <code>true</code> iff the index is dropped by the task. */
         boolean droppedIndex = false;
         
         Entry(final Name2Addr.Entry entry) {
@@ -296,7 +300,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         /**
          * Ctor used when registering an index.
-         * 
          * @param name
          * @param checkpointAddr
          * @param commitTime
@@ -2486,17 +2489,33 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             this.delegate = source;
         
-            /*
-             * Setup a locator for resources. Resources that correspond to
-             * indices declared by the task are accessible via the task itself.
-             * Other resources are assessible via the locator on the underlying
-             * journal. When the journal is part of a federation, that locator
-             * will be the federation's locator.
-             */
+         /*
+          * Setup a locator for resources. Resources that correspond to indices
+          * declared by the task are accessible via the task itself.
+          * 
+          * Note: This SHOULD NOT expose the underlying Journal's resource
+          * locator since that can allow a class to register an index without
+          * going through this IsolatedActionJournal. In particular, the
+          * GlobalRowStoreHelper.getGlobalRowStore() can cause the GRS to be
+          * registered on the underlying index. This was breaking HA starts when
+          * I first converted the code to support group commit at the NSS layer.
+          * 
+          * TODO I have left in support for the case where the underlying
+          * Journal the ManagedJournal associated with a DataService in a
+          * federation. While I have not verified it, the following comment
+          * clearly contemplates providing access to non-remote resources in
+          * this manner. "Other resources are assessible via the locator on the
+          * underlying journal. When the journal is part of a federation, that
+          * locator will be the federation's locator." I am not sure if this
+          * comment reflects a sensible design decision or a Bad Idea, in which
+          * case the delegate locator should be [null] for the federation as
+          * well.
+          */
 
             resourceLocator = new DefaultResourceLocator(//
-                    this,// IndexManager
-                    source.getResourceLocator()// delegate locator
+                  this,// IndexManager (IsolatedActionJournal)
+                  ((source instanceof ManagedJournal) ? source
+                     .getResourceLocator() : null/* DO-NOT-DELEGATE */)//
             );
 
             final IBufferStrategy bufferStrategy = source.getBufferStrategy();
