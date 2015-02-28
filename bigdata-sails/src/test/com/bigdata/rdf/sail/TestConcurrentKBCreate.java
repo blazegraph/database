@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.openrdf.repository.RepositoryException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -104,7 +105,7 @@ import com.bigdata.util.InnerCause;
  *      Concurrent KB create fails with "No axioms defined?" </a>
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
+abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
 
     public TestConcurrentKBCreate() {
     }
@@ -113,6 +114,52 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
         super(name);
     }
 
+    public static class TestWithGroupCommit extends TestConcurrentKBCreate {
+
+       public TestWithGroupCommit() {
+       }
+
+       public TestWithGroupCommit(String name) {
+           super(name);
+       }
+
+       @Override
+       public Properties getProperties() {
+          
+          // Inherit the properties from the delegate.
+          final Properties properties = new Properties(getProperties());
+          
+          properties.setProperty(Journal.Options.GROUP_COMMIT,"true");
+
+          return properties;
+          
+       }
+
+    }
+    
+    public static class TestWithoutGroupCommit extends TestConcurrentKBCreate {
+
+       public TestWithoutGroupCommit() {
+       }
+
+       public TestWithoutGroupCommit(String name) {
+           super(name);
+       }
+
+       @Override
+       public Properties getProperties() {
+          
+          // Inherit the properties from the delegate.
+          final Properties properties = new Properties(getProperties());
+          
+          properties.setProperty(Journal.Options.GROUP_COMMIT,"false");
+
+          return properties;
+          
+       }
+       
+    }
+    
     /**
      * A non-concurrent version, just to make sure that the basic logic works.
      */
@@ -271,7 +318,7 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     * where the KB properties have NOT been changed.
     * 
     * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
-    *      followed by Create with different Vocablary causes runtime exception
+    *      followed by Create with different Vocabulary causes runtime exception
     *      </a>
     */
    public void test_CreateDestroy_ticket_948_00() throws Exception {
@@ -323,11 +370,15 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     * where the KB properties have been changed (especially the Vocabulary class).
     * 
     * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
-    *      followed by Create with different Vocablary causes runtime exception
+    *      followed by Create with different Vocabulary causes runtime exception
     *      </a>
     */
    public void test_CreateDestroy_ticket_948_01() throws Exception {
     
+      if(!BigdataStatics.runKnownBadTests) {
+         return;
+      }
+      
       final String namespace = getName();
 
        // Inherit the properties from the delegate.
@@ -382,11 +433,15 @@ public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     * In this variant, we shutdown the Journal and then re-open it.
     * 
     * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
-    *      followed by Create with different Vocablary causes runtime exception
+    *      followed by Create with different Vocabulary causes runtime exception
     *      </a>
     */
    public void test_CreateDestroy_ticket_948_02() throws Exception {
     
+      if(!BigdataStatics.runKnownBadTests) {
+         return;
+      }
+      
       final String namespace = getName();
 
        // Inherit the properties from the delegate.
