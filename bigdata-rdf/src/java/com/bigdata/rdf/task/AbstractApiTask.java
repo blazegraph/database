@@ -98,8 +98,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
 	@Override
 	public String toString() {
 
-		return getClass().getName() + "{namespace=" + getNamespace()
-				+ ",timestamp=" + getTimestamp() + "}";
+      return getClass().getName() + "{namespace=" + getNamespace()
+            + ",timestamp=" + getTimestamp() + ", isGRSRequired=" + isGRSRequired + "}";
 
 	}
     
