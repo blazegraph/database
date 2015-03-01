@@ -64,11 +64,13 @@ import org.openrdf.rio.helpers.StatementCollector;
 import com.bigdata.counters.CAT;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.jsr166.LinkedBlockingQueue;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.store.AbstractTripleStore.Options;
 
 /**
  * A flyweight utility for issuing queries to an http SPARQL endpoint.
@@ -1330,7 +1332,8 @@ public class NanoSparqlClient {
 		boolean groupQueriesBySource = false; // TODO When true, each source represents a batch of queries.
 		long interGroupDelayMillis = 0L; // Latency by the client between query batches. 
 		final QueryOptions opts = new QueryOptions();
-		opts.tmpKb = createTempKb();
+		
+		String mode = null;
         {
 
             int i = 0;
@@ -1463,6 +1466,9 @@ public class NanoSparqlClient {
 					usage();
 
 					System.exit(1);
+				} else if (arg.equals("-dbModus")) {
+
+				   mode = args[++i];
 
 				} else {
 
@@ -1484,6 +1490,8 @@ public class NanoSparqlClient {
 			}
 
         } // parse command line.
+
+        opts.tmpKb = createTempKb(mode);
 
 //		// create a singular HttpClient object
 //		final HttpClient client = new HttpClient();
@@ -1683,13 +1691,34 @@ public class NanoSparqlClient {
      * Create a temporary kb instance for use by the query parser. Since the
      * temporary store is backed by a buffer until that buffer overflows, there
      * will not be a backing disk file unless someone starts writing on this.
+     * 
+     * @param mode the database modus (such as com.bigdata.rdf.store.AbstractTripleStore.Options.TRIPLES_MODE_WITH_PROVENANCE)					
+     * 
      */
-    private static AbstractTripleStore createTempKb() {
+    private static AbstractTripleStore createTempKb(String mode) {
        
         final TemporaryStore tempStore = new TemporaryStore();
         
-        return new TempTripleStore(tempStore, new Properties(), null/* db */);
+        // set the mode
+        Properties p = new Properties();
+        if (mode.equalsIgnoreCase("triples")) {
         
+           p.setProperty(AbstractTripleStore.Options.TRIPLES_MODE, "true");
+
+        } else if (mode.equalsIgnoreCase("quads")) {
+        
+           p.setProperty(Options.QUADS, "true"); 
+           p.setProperty(Options.AXIOMS_CLASS, "com.bigdata.rdf.axioms.NoAxioms");
+           
+        
+        } else if (mode.equalsIgnoreCase("provenance")) {
+        
+           p.setProperty(
+              AbstractTripleStore.Options.TRIPLES_MODE_WITH_PROVENANCE, "true");                                
+
+        } // else: default
+        
+        return new TempTripleStore(tempStore, p, null/* db */);
     }
 
 //	/**
