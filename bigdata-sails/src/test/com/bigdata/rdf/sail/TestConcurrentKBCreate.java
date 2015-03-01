@@ -127,7 +127,7 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
        public Properties getProperties() {
           
           // Inherit the properties from the delegate.
-          final Properties properties = new Properties(getProperties());
+          final Properties properties = new Properties(super.getProperties());
           
           properties.setProperty(Journal.Options.GROUP_COMMIT,"true");
 
@@ -150,7 +150,7 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
        public Properties getProperties() {
           
           // Inherit the properties from the delegate.
-          final Properties properties = new Properties(getProperties());
+          final Properties properties = new Properties(super.getProperties());
           
           properties.setProperty(Journal.Options.GROUP_COMMIT,"false");
 
