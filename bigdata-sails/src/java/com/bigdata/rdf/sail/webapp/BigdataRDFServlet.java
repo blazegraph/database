@@ -268,17 +268,32 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 			}
 		}
 
-		/*
-		 * Attempt to write the stack trace on the response.
-		 * 
-		 * Note: If the OutputStream has already been closed then an IOException
-		 * is caught and ignored.
-		 */
-		{
+      /*
+       * Attempt to write the stack trace on the response.
+       * 
+       * Note: If the OutputStream (or Writer) has already been closed then an
+       * IOException is caught and ignored.
+       * 
+       * Note: If the PrintWriter was already requested, then we use it directly
+       * rather than the OutputStream. This is due to the servlet API which will
+       * not allow us to obtain the OutputStream if we have already obtained the
+       * Writer. Some of the response handling for our servlets use the Writer
+       * (e.g., reportMutationCount()) so this happens if there is a problem
+       * while using the writer. Of course, that also makes it likely that we
+       * will not be able to inform the client of the error.
+       */
+      {
 			OutputStream os = null;
+         PrintWriter w = null;
 			try {
-				os = resp.getOutputStream();
-				final PrintWriter w = new PrintWriter(os);
+			   try {
+			      // first, assume OutputStream is available.
+			      os = resp.getOutputStream();
+				   w = new PrintWriter(os);
+			   } catch(IllegalStateException ex) {
+			      // Writer was already request, so we need to use it instead.
+			      w = resp.getWriter();
+			   }
 				if (queryStr != null) {
 					/*
 					 * Write the query onto the output stream.
@@ -290,14 +305,23 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				 * Write the stack trace onto the output stream.
 				 */
 				t.printStackTrace(w);
-				w.flush();
-				// flush the output stream.
-				os.flush();
+				w.flush(); // flush the writer.
+            if (os != null) {
+               os.flush(); // flush the output stream.
+            }
 			} catch (IOException ex) {
 				// Could not write on output stream.
 			} finally {
 				// ignore any problems here.
 			}
+         if (w != null) {
+            try {
+               // ensure writer is closed.
+               w.close();
+            } catch (Throwable t2) {
+               // ignore any problems here.
+            }
+         }
 			if (os != null) {
 				try {
 					// ensure output stream is closed.
