@@ -53,7 +53,6 @@ import com.bigdata.bop.BOp;
  * @see http://www.w3.org/TR/sparql11-update/#deleteInsert
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DeleteInsertGraph extends GraphUpdate implements
         IGraphPatternContainer, IDataSetNode {
@@ -111,12 +110,14 @@ public class DeleteInsertGraph extends GraphUpdate implements
      * which it is attached (it is not inherited or combined with the data set
      * for later operations in a sequence).
      */
+    @Override
     public void setDataset(final DatasetNode dataset) {
 
         setProperty(Annotations.DATASET, dataset);
 
     }
 
+    @Override
     public DatasetNode getDataset() {
 
         return (DatasetNode) getProperty(Annotations.DATASET);
@@ -136,6 +137,7 @@ public class DeleteInsertGraph extends GraphUpdate implements
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
 
@@ -153,6 +155,7 @@ public class DeleteInsertGraph extends GraphUpdate implements
         
     }
     
+    @Override
     public void setGraphPattern(
             final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
@@ -200,6 +203,7 @@ public class DeleteInsertGraph extends GraphUpdate implements
 
     }
 
+    @Override
     final public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();
