@@ -45,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -469,6 +470,16 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /** True iff we are executing an abort. */
     final private AtomicBoolean abort = new AtomicBoolean(false);
     
+   /**
+    * The first cause if the {@link #commit(boolean)} fails. This is used to
+    * report a commit failure (versus a task failure) through
+    * {@link #afterTask(AbstractTask, Throwable)} back to all tasks in the
+    * commit group.
+    * 
+    * @see #1130 (ClocksNotSynchronizedException (HA, GROUP_COMMIT))
+    */
+    final private AtomicReference<Throwable> firstCauseRef = new AtomicReference<Throwable>();
+    
     /*
      * Counters
      */
@@ -487,7 +498,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     private long committedTaskCount = 0;
     private long noverflow = 0;
 
-    protected AtomicInteger activeTaskCountWithLocksHeld = new AtomicInteger(0);
+    protected final AtomicInteger activeTaskCountWithLocksHeld = new AtomicInteger(0);
 
     /**
      * The #of rejected tasks.
@@ -953,7 +964,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                     if (journal != null && journal.isOpen()) {
 
-                        throw new RuntimeException("Commit failed: "+r);
+                        // Note: rethrows firstCause from commit(). See #1130.
+                        throw new RuntimeException("Commit failed: " + r,
+                              firstCauseRef.get());
                         
                     } else {
                         
@@ -2317,6 +2330,9 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
         assert lock.isHeldByCurrentThread();
 
+        // This thread is running the group commit.
+        firstCauseRef.set(null/* clearCause */);
+        
         /*
          * Note: if the journal was closed asynchronously then do not attempt to
          * commit the write set.
@@ -2392,6 +2408,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // #of bytes on the journal as of the previous commit point.
             final long byteCountBefore = journal.getRootBlockView().getNextOffset();
             
+            /**
+             * ATOMIC COMMIT
+             * 
+             * Note: For HA, this is a 2-Phase commit. For the standalone Journal
+             * and the federation data services, this is a single phase commit.
+             */
             final long timestamp = journal.commit();
             
             // #of bytes on the journal after the commit.
@@ -2473,7 +2495,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * Something went wrong in the commit itself.
              */
 
-            log.error("Commit failed - will abort: "+serviceName+" : "+ t, t);
+            final CommitException ex = new CommitException(
+                  "Commit failed - will abort: " + serviceName + " : " + t, t);
+
+            firstCauseRef.compareAndSet(null/* expect */, ex/* firstCause */);
+            
+            log.error(ex);
 
             abort();
 
