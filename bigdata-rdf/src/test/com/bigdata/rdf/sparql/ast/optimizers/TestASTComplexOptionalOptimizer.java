@@ -120,7 +120,7 @@ public class TestASTComplexOptionalOptimizer extends
      * WITH {
      *      SELECT ?_var1 ?_var6 ?_var4 ?_var10
      *      WHERE {
-     *         INCLUDE %_set1
+     *         INCLUDE %_set2
      *         OPTIONAL {
      *                 ?_var1 <http://www.w3.org/2001/vcard-rdf/3.0#N> ?_var13.
      *                 ?_var13 <http://www.w3.org/2001/vcard-rdf/3.0#Family> ?_var10
