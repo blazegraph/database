@@ -85,6 +85,7 @@ import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.rdf.task.IApiTask;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.relation.locator.ILocatableResource;
 import com.bigdata.relation.locator.IResourceLocator;
@@ -140,6 +141,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     private final ConcurrencyManager concurrencyManager;
 
     /**
+     * <code>true</code> iff the journal has been configured to use group commit.
+     */
+    private final boolean isGroupCommit;
+    
+    /**
      * Options understood by the {@link Journal}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -153,6 +159,55 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             // Note: Do not import. Forces bigdata-ganglia dependency.
             // com.bigdata.journal.GangliaPlugIn.Options
             {
+
+       /**
+       * The name of an boolean option that conditionally enables group commit
+       * semantics for the Journal based on task-oriented concurrent writers.
+       * This option indicates a <em>contract</em> that the application agrees
+       * to respect. When <code>false</code> the application controls when the
+       * database goes through a commit point by invoking
+       * {@link Journal#commit()}. When <code>true</code> ALL mutation
+       * operations MUST be submitted to the {@link IConcurrencyManager} of the
+       * journal. Note that the journal always has supported group commit - this
+       * is how it is used in scale-out. However, embedded applications have
+       * historically made the decision about when the database should commit.
+       * When you specify this option, you are asserting that your code will
+       * always submit tasks for evaluation using the
+       * {@link IConcurrencyManager}.
+       * <p>
+       * There are several benefits of group commit.
+       * <p>
+       * First, you can have multiple tenants in the same database instance and
+       * the updates for one tenant will no longer block the updates for the
+       * other tenants. Thus, one tenant can be safely running a long running
+       * update and other tenants can still enjoy low latency updates.
+       * <p>
+       * Second, group commit automatically combines a sequence of updates on
+       * one (or more) tenant(s) into a single commit point on the disk. This
+       * provides higher potential throughput. It also means that it is no
+       * longer as important for applications to batch their updates since group
+       * commit will automatically perform some batching.
+       * <p>
+       * Third, writes on independent indices may be independent (this behavior
+       * has been around for a long time).
+       * <p>
+       * There are a few "gotchas" with the group commit support. This is
+       * because commits are decided by {@link IApiTask} or {@link AbstractTask}
+       * completion and tasks are scheduled by the concurrency manager, lock
+       * manager, and write executor service.
+       * <ul>
+       * <li>
+       * Mutation tasks that do not complete normally MUST throw an exception!</li>
+       * <li>Applications MUST NOT call Journal.commit(). Instead, they submit
+       * an IApiTask using AbstractApiTask.submit(). The database will meld the
+       * write set of the task into a group commit sometime after the task
+       * completes successfully.</li>
+       * 
+       * @see #566 (NSS GROUP COMMIT).
+       */
+      String GROUP_COMMIT = Journal.class.getName() + ".groupCommit";
+
+      String DEFAULT_GROUP_COMMIT = "false";
 
         /**
          * The capacity of the {@link HardReferenceQueue} backing the
@@ -215,6 +270,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             final Quorum<HAGlue, QuorumService<HAGlue>> quorum) {
 
         super(properties, quorum);
+        
+        isGroupCommit = Boolean.parseBoolean(properties.getProperty(
+            Options.GROUP_COMMIT, Options.DEFAULT_GROUP_COMMIT));
 
         tempStoreFactory = new TemporaryStoreFactory(properties);
         
@@ -265,7 +323,30 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 localTransactionManager, this);
         
         getExecutorService().execute(new StartDeferredTasksTask());
-        
+
+      if (isGroupCommit() && !(this instanceof HAJournal)
+            && getRootBlockView().getCommitCounter() == 0L) {
+
+         /*
+          * GROUP_COMMIT: See #566.
+          * 
+          * This hacks in an initial commit to force the GRS to spring into
+          * existence. Maybe we should just do this for the initial create of
+          * the Journal when using group commit? Or maybe we should make the
+          * AbstractTask smart enough to merge two versions of the GRS - it
+          * should be simple enough to provide write-write conflict resolution
+          * for the GRS.
+          * 
+          * Note: This needs to be done by the leader in HA, hence the
+          * conditional test above.
+          */
+         
+         getGlobalRowStore(); // Force the GRS index to exist.
+         
+         commit(); // Commit.
+         
+      }
+
     }
 
     /**
@@ -1618,6 +1699,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
              * commitNow(), then that change will be detected by the leader and
              * it will break the {@link CyclicBarrier}.
              */
+            @Override
             public IHANotifyReleaseTimeResponse call() throws Exception {
 
                 if (haLog.isInfoEnabled())
@@ -2321,6 +2403,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         return new AbstractLocalTransactionManager() {
 
+           @Override
             public AbstractTransactionService getTransactionService() {
                 
                 return abstractTransactionService;
@@ -2357,12 +2440,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
     
+    @Override
     public AbstractLocalTransactionManager getLocalTransactionManager() {
 
         return localTransactionManager;
 
     }
 
+    @Override
+    public boolean isGroupCommit() {
+       
+       return isGroupCommit;
+       
+    }
+    
     /**
      * Interface defines and documents the counters and counter namespaces
      * reported by the {@link Journal} and the various services which it uses.
@@ -3385,11 +3476,11 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
 
     @Override
-    @SuppressWarnings("rawtypes")
-    public List<Future> invokeAll(
-            Collection<? extends AbstractTask> tasks, long timeout,
-            TimeUnit unit) throws InterruptedException {
-        
+	public <T> List<Future<T>> invokeAll(
+			final Collection<? extends AbstractTask<T>> tasks,
+			final long timeout, final TimeUnit unit)
+			throws InterruptedException {
+
         return concurrencyManager.invokeAll(tasks, timeout, unit);
         
     }

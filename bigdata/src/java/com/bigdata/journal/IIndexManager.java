@@ -53,4 +53,11 @@ public interface IIndexManager extends IIndexStore, IGISTManager, ICounterSetAcc
      */
     IIndex getIndex(String name, long timestamp); // non-GIST
 
+    /**
+     * Return true if the index manager supports group commit semantics.
+     * 
+     * @see #566 (NSS GROUP COMMIT)
+     */
+    boolean isGroupCommit();
+    
 }

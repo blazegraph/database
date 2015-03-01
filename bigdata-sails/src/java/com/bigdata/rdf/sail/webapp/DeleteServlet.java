@@ -365,7 +365,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         if (format == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as RDF: " + contentType);
 
             return;
@@ -377,7 +377,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
         if (rdfParserFactory == null) {
 
-            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                     "Parser factory not found: Content-Type=" + contentType
                             + ", format=" + format);
 
@@ -395,7 +395,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                 try {
                     defaultContext = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -596,7 +596,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 //            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
         	c = EncodeDecodeValue.decodeResources(req.getParameterValues("c"));
         } catch (IllegalArgumentException ex) {
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
             return;
         }

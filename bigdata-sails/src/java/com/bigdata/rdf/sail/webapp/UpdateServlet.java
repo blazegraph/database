@@ -111,6 +111,16 @@ public class UpdateServlet extends BigdataRDFServlet {
 	 * process deleting the statements. This is done while it is holding the
 	 * unisolated connection which prevents concurrent modifications. Therefore
 	 * the entire <code>SELECT + DELETE</code> operation is ACID.
+	 * 
+     * FIXME GROUP COMMIT : Again, a pattern where a query is run to produce
+     * solutions that are then deleted from the database. Can we rewrite this to
+     * be a SPARQL UPDATE? (DELETE WHERE). Note that the ACID semantics of this
+     * operation would be broken by group commit since other tasks could have
+     * updated the KB since the lastCommitTime and been checkpointed and hence
+     * be visible to an unisolated operation without there being an intervening
+     * commit point. [I think that this is resolved by taking the unisolated
+     * connection first and then taking the read-only lastCommitTime connection
+     * view, which is what the code now does.]
 	 */
     private void doUpdateWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -139,7 +149,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         if (requestBodyFormat == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as RDF: " + contentType);
 
             return;
@@ -151,7 +161,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         if (rdfParserFactory == null) {
 
-            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                     "Parser factory not found: Content-Type="
                             + contentType + ", format=" + requestBodyFormat);
             
@@ -169,7 +179,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                     defaultContextInsert = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -188,7 +198,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                 	defaultContextDelete = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -516,7 +526,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                     defaultContextInsert = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -535,7 +545,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                 	defaultContextDelete = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -746,7 +756,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 		
 	    if (contentType == null) {
 	    	
-	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	        buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
 	                "Content-Type not specified");
 	
 	        return false;
@@ -758,7 +768,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 	    if (format == null) {
 	
-	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	        buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
 	                "Content-Type not recognized as RDF: " + contentType);
 	
 	        return false;
@@ -770,7 +780,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 		
 		if (rdfParserFactory == null) {
 		
-		    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+		    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
 		            "Parser factory not found: Content-Type=" + contentType
 		                    + ", format=" + format);
 		
@@ -780,7 +790,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 	    if (item.getInputStream() == null) {
 	    	
-	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	        buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
 	                "No content");
 	
 	        return false;

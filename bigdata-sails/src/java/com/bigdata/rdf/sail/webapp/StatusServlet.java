@@ -216,7 +216,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
             doCancelQuery(req, resp, getIndexManager(), getBigdataRDFContext());
 
-            // Fall through.
+            // Fall through so we will also deliver the status page.
 
         }
 
@@ -248,9 +248,6 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
      *      Cancellation </a>
-     *      
-     *             FIXME GROUP COMMIT: Review cancellation and leader fail
-     *             scenarios.
      */
     static void doCancelQuery(final HttpServletRequest req,
             final HttpServletResponse resp, final IIndexManager indexManager,
@@ -260,8 +257,9 @@ public class StatusServlet extends BigdataRDFServlet {
         final String[] a = req.getParameterValues(QUERY_ID);
 
         if (a == null || a.length == 0) {
-
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN);
+   
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                  "Required parameter not found: " + QUERY_ID);
 
             return;
 
@@ -291,6 +289,8 @@ public class StatusServlet extends BigdataRDFServlet {
             
         }
 
+        buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "");
+        
     }
 
     static private boolean tryCancelQuery(final QueryEngine queryEngine,

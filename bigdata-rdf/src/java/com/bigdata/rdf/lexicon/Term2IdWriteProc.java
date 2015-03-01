@@ -49,6 +49,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.lexicon.Term2IdWriteProc.Result;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -107,12 +108,11 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * index partitions rather than on the whole index.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
+public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure<Result> implements
+        IParallelizableIndexProcedure<Result>, IMutableRelationIndexWriteProcedure<Result> {
     
-    protected static final Logger log = Logger.getLogger(Term2IdWriteProc.class);
+    private static final Logger log = Logger.getLogger(Term2IdWriteProc.class);
     
 //    static {
 //        if(DEBUG) {
@@ -169,7 +169,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * are NOT added to the database.
      */
     private boolean readOnly;
-    
+
+    @Override
     public final boolean isReadOnly() {
         
         return readOnly;
@@ -221,6 +222,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
         /**
          * Values ARE NOT sent.
          */
+        @Override
         public final boolean sendValues() {
             
             return false;
@@ -239,6 +241,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
 
+        @Override
         public Term2IdWriteProc newInstance(final IRabaCoder keySer,
                 final IRabaCoder valSer, final int fromIndex,
                 final int toIndex, final byte[][] keys, final byte[][] vals) {
@@ -271,14 +274,18 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * TODO no point sending bnodes when readOnly.
      */
-    public Object apply(final IIndex ndx) {
-        
+    @Override
+    public Result apply(final IIndex ndx) {
+
+       final boolean DEBUG = log.isDebugEnabled();
+       
         final int numTerms = getKeyCount();
         
         assert numTerms > 0 : "numTerms="+numTerms;
         
         // used to store the discovered / assigned term identifiers.
-        final IV[] ivs = new IV[numTerms];
+        @SuppressWarnings("rawtypes")
+      final IV[] ivs = new IV[numTerms];
         
         // used to assign term identifiers.
         final ICounter counter = ndx.getCounter();
@@ -287,7 +294,8 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
 //        final boolean scaleOut = counter instanceof BTree.PartitionedCounter;
         
         // used to serialize term identifiers.
-        final DataOutputBuffer idbuf = new DataOutputBuffer();
+        @SuppressWarnings("resource")
+      final DataOutputBuffer idbuf = new DataOutputBuffer();
         
         final TermIdEncoder encoder = readOnly ? null
                 : scaleOutTermIdBitsToReverse == 0 ? null : new TermIdEncoder(
@@ -378,7 +386,7 @@ public class Term2IdWriteProc extends AbstractKeyArrayIndexProcedure implements
                         final long termId = encoder == null ? ctr : encoder
                                 .encode(ctr);
 
-                        @SuppressWarnings("unchecked")
+                        @SuppressWarnings("rawtypes")
                         final TermId<?> iv = new TermId(VTE(code), termId);
                         
                         if (DEBUG && enableGroundTruth) {

@@ -35,7 +35,7 @@ import com.bigdata.util.ChecksumUtility;
  * Test the ability to rollback a commit.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * @deprecated Along with {@link AbstractJournal#rollback()}
  */
 public class TestRollbackCommit extends ProxyTestCase<Journal> {
 
