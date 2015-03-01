@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedOutputStream;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -101,22 +103,6 @@ public class DeleteServlet extends BigdataRDFServlet {
 
     /**
      * Delete all statements materialized by a DESCRIBE or CONSTRUCT query.
-     * <p>
-     * Note: To avoid materializing the statements, this runs the query against
-     * the last commit time and uses a pipe to connect the query directly to the
-     * process deleting the statements. This is done while it is holding the
-     * unisolated connection which prevents concurrent modifications. Therefore
-     * the entire SELECT + DELETE operation is ACID.
-     * 
-     * FIXME GROUP COMMIT : Again, a pattern where a query is run to produce
-     * solutions that are then deleted from the database. Can we rewrite this to
-     * be a SPARQL UPDATE? (DELETE WHERE). Note that the ACID semantics of this
-     * operation would be broken by group commit since other tasks could have
-     * updated the KB since the lastCommitTime and been checkpointed and hence
-     * be visible to an unisolated operation without there being an intervening
-     * commit point. [I think that this is resolved by taking the unisolated
-     * connection first and then taking the read-only lastCommitTime connection
-     * view, which is what the code now does.]
      */
     private void doDeleteWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -133,25 +119,68 @@ public class DeleteServlet extends BigdataRDFServlet {
 		if (log.isInfoEnabled())
 			log.info("delete with query: " + queryStr);
 
-		try {
+      try {
 
-			submitApiTask(
-					new DeleteWithQueryTask(req, resp, namespace,
-							ITx.UNISOLATED, //
-							queryStr,//
-							baseURI//
-					)).get();
+         if (getIndexManager().isGroupCommit()) {
 
-		} catch (Throwable t) {
+            /*
+             * When group commit is enabled we must fully materialize the
+             * solutions from the query and then delete them. This is because
+             * intermediate checkpoints of the indices would otherwise not be
+             * visible if we were reading on the last commit time rather than
+             * the unisolated index view.
+             */
 
-			launderThrowable(t, resp, "UPDATE-WITH-QUERY" + ": queryStr="
-					+ queryStr + ", baseURI=" + baseURI);
+            submitApiTask(
+                  new DeleteWithQueryMaterializedTask(req, resp, namespace, ITx.UNISOLATED, //
+                        queryStr,//
+                        baseURI//
+                  )).get();
 
-		}
-		
-    }
+         } else {
 
-    private static class DeleteWithQueryTask extends AbstractRestApiTask<Void> {
+            /*
+             * When group commit is NOT enabled we can use an approach that
+             * streams solutions from the last commit point into the DELETE
+             * operation. This is more scalable since it is a streaming
+             * operation.
+             */
+            
+            submitApiTask(
+                  new DeleteWithQuerySteamingTask(req, resp, namespace, ITx.UNISOLATED, //
+                        queryStr,//
+                        baseURI//
+                  )).get();
+
+         }
+
+      } catch (Throwable t) {
+
+         launderThrowable(t, resp, "UPDATE-WITH-QUERY" + ": queryStr="
+               + queryStr + ", baseURI=" + baseURI);
+
+      }
+
+   }
+
+    /**
+    * An approach based on streaming the query results from the last commit
+    * time. This approach is NOT compatible with group commit since it will not
+    * observe any mutations that have been applied since the last commit point
+    * when it reads on the last commit time.
+    * <p>
+    * Note: To avoid materializing the statements, this runs the query against
+    * the last commit time and uses a pipe to connect the query directly to the
+    * process deleting the statements. This is done while it is holding the
+    * unisolated connection which prevents concurrent modifications. Therefore
+    * the entire SELECT + DELETE operation is ACID. However, when group commit
+    * is enabled the last commit time might not be the last modification to the
+    * indices which would break the serializability guarantee of the applied
+    * mutations.
+    * 
+    * @author bryan
+    */
+    private static class DeleteWithQuerySteamingTask extends AbstractRestApiTask<Void> {
 
     	private final String queryStr;
         private final String baseURI;
@@ -165,7 +194,7 @@ public class DeleteServlet extends BigdataRDFServlet {
          * @param baseURI
          *            The base URI for the operation.
          */
-        public DeleteWithQueryTask(final HttpServletRequest req,
+        public DeleteWithQuerySteamingTask(final HttpServletRequest req,
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
                 final String queryStr,//
@@ -188,124 +217,276 @@ public class DeleteServlet extends BigdataRDFServlet {
             
             final AtomicLong nmodified = new AtomicLong(0L);
 
-			BigdataSailRepositoryConnection conn = null;
-			boolean success = false;
-			try {
+         BigdataSailRepositoryConnection conn = null;
+         boolean success = false;
+         try {
 
-				conn = getUnisolatedConnection();
+            conn = getUnisolatedConnection();
 
-				{
+            {
 
-					if (log.isInfoEnabled())
-						log.info("delete with query: " + queryStr);
+               if (log.isInfoEnabled())
+                  log.info("delete with query: " + queryStr);
 
-					final BigdataRDFContext context = BigdataServlet
-							.getBigdataRDFContext(req.getServletContext());
+               final BigdataRDFContext context = BigdataServlet
+                     .getBigdataRDFContext(req.getServletContext());
 
-					/*
-					 * Note: pipe is drained by this thread to consume the query
-					 * results, which are the statements to be deleted.
-					 */
-					final PipedOutputStream os = new PipedOutputStream();
+               /*
+                * Note: pipe is drained by this thread to consume the query
+                * results, which are the statements to be deleted.
+                */
+               final PipedOutputStream os = new PipedOutputStream();
 
-					// The read-only connection for the query.
-					BigdataSailRepositoryConnection roconn = null;
-					try {
+               // The read-only connection for the query.
+               BigdataSailRepositoryConnection roconn = null;
+               try {
 
-						final long readOnlyTimestamp = ITx.READ_COMMITTED;
+                  final long readOnlyTimestamp = ITx.READ_COMMITTED;
 
-						roconn = getQueryConnection(namespace,
-								readOnlyTimestamp);
+                  roconn = getQueryConnection(namespace,
+                        readOnlyTimestamp);
 
-						// Use this format for the query results.
-						final RDFFormat format = RDFFormat.NTRIPLES;
+                  // Use this format for the query results.
+                  final RDFFormat format = RDFFormat.NTRIPLES;
 
-						final AbstractQueryTask queryTask = context
-								.getQueryTask(roconn, namespace,
-										readOnlyTimestamp, queryStr,
-										format.getDefaultMIMEType(), req, resp,
-										os);
+                  final AbstractQueryTask queryTask = context
+                        .getQueryTask(roconn, namespace,
+                              readOnlyTimestamp, queryStr,
+                              format.getDefaultMIMEType(), req, resp,
+                              os);
 
-						switch (queryTask.queryType) {
-						case DESCRIBE:
-						case CONSTRUCT:
-							break;
-						default:
-							throw new MalformedQueryException(
-									"Must be DESCRIBE or CONSTRUCT query");
-						}
+                  switch (queryTask.queryType) {
+                  case DESCRIBE:
+                  case CONSTRUCT:
+                     break;
+                  default:
+                     throw new MalformedQueryException(
+                           "Must be DESCRIBE or CONSTRUCT query");
+                  }
 
-						final RDFParserFactory factory = RDFParserRegistry
-								.getInstance().get(format);
+                  final RDFParserFactory factory = RDFParserRegistry
+                        .getInstance().get(format);
 
-						final RDFParser rdfParser = factory.getParser();
+                  final RDFParser rdfParser = factory.getParser();
 
-						rdfParser.setValueFactory(conn.getTripleStore()
-								.getValueFactory());
+                  rdfParser.setValueFactory(conn.getTripleStore()
+                        .getValueFactory());
 
-						rdfParser.setVerifyData(false);
+                  rdfParser.setVerifyData(false);
 
-						rdfParser.setStopAtFirstError(true);
+                  rdfParser.setStopAtFirstError(true);
 
-						rdfParser
-								.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+                  rdfParser
+                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
 
-						rdfParser.setRDFHandler(new RemoveStatementHandler(conn
-								.getSailConnection(), nmodified));
+                  rdfParser.setRDFHandler(new RemoveStatementHandler(conn
+                        .getSailConnection(), nmodified /*, defaultDeleteContext*/));
 
-						// Wrap as Future.
-						final FutureTask<Void> ft = new FutureTask<Void>(
-								queryTask);
+                  // Wrap as Future.
+                  final FutureTask<Void> ft = new FutureTask<Void>(
+                        queryTask);
 
-						// Submit query for evaluation.
-						context.queryService.execute(ft);
+                  // Submit query for evaluation.
+                  context.queryService.execute(ft);
 
-						// Reads on the statements produced by the query.
-						final InputStream is = newPipedInputStream(os);
+                  // Reads on the statements produced by the query.
+                  final InputStream is = newPipedInputStream(os);
 
-						// Run parser : visited statements will be deleted.
-						rdfParser.parse(is, baseURI);
+                  // Run parser : visited statements will be deleted.
+                  rdfParser.parse(is, baseURI);
 
-						// Await the Future (of the Query)
-						ft.get();
+                  // Await the Future (of the Query)
+                  ft.get();
 
-					} finally {
+               } finally {
 
-						if (roconn != null) {
-							// close the read-only connection for the query.
-							roconn.rollback();
-						}
+                  if (roconn != null) {
+                     // close the read-only connection for the query.
+                     roconn.rollback();
+                  }
 
-					}
+               }
 
-				}
+            }
 
-				conn.commit();
+            conn.commit();
 
-				success = true;
+            success = true;
 
-				final long elapsed = System.currentTimeMillis() - begin;
+            final long elapsed = System.currentTimeMillis() - begin;
 
-				reportModifiedCount(nmodified.get(), elapsed);
+            reportModifiedCount(nmodified.get(), elapsed);
 
-				return null;
+            return null;
 
-			} finally {
+         } finally {
 
-				if (conn != null) {
+            if (conn != null) {
 
-					if (!success)
-						conn.rollback();
+               if (!success)
+                  conn.rollback();
 
-					conn.close();
+               conn.close();
 
-				}
+            }
 
-			}
+         }
 
-		}
+      }
 
-    } // class DeleteWithQueryTask
+    } // class DeleteWithQueryStreamingTask
+
+    /**
+    * An approach based on fully materializing the
+    * 
+    *         TODO We should use the HTree here for a more scalable buffer if
+    *         the analytic mode is enabled (or transparently overflow to the
+    *         HTree).
+    * 
+    *         TODO This operator materializes the RDF Values for the CONSTRUCTED
+    *         statements, buffers then, and then removes those statements. The
+    *         materialization step is not necessary if we handle this all at the
+    *         IV layer.
+    * 
+    * @author bryan
+    */
+   private static class DeleteWithQueryMaterializedTask extends
+         AbstractRestApiTask<Void> {
+
+      private final String queryStr;
+      private final String baseURI;
+
+      /**
+       * 
+       * @param namespace
+       *           The namespace of the target KB instance.
+       * @param timestamp
+       *           The timestamp used to obtain a mutable connection.
+       * @param baseURI
+       *           The base URI for the operation.
+       */
+      public DeleteWithQueryMaterializedTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp, final String queryStr,//
+            final String baseURI) {
+         super(req, resp, namespace, timestamp);
+         this.queryStr = queryStr;
+         this.baseURI = baseURI;
+      }
+
+      @Override
+      public boolean isReadOnly() {
+         return false;
+      }
+
+      @Override
+      public Void call() throws Exception {
+
+         final long begin = System.currentTimeMillis();
+
+         final AtomicLong nmodified = new AtomicLong(0L);
+
+         BigdataSailRepositoryConnection conn = null;
+         boolean success = false;
+         try {
+
+            conn = getUnisolatedConnection();
+
+            {
+
+               if (log.isInfoEnabled())
+                  log.info("delete with query: " + queryStr);
+
+               final BigdataRDFContext context = BigdataServlet
+                     .getBigdataRDFContext(req.getServletContext());
+
+               /*
+                * Note: pipe is drained by this thread to consume the query
+                * results, which are the statements to be deleted.
+                */
+               final PipedOutputStream os = new PipedOutputStream();
+
+               // Use this format for the query results.
+               final RDFFormat format = RDFFormat.NTRIPLES;
+
+               final AbstractQueryTask queryTask = context.getQueryTask(conn,
+                     namespace, ITx.UNISOLATED, queryStr,
+                     format.getDefaultMIMEType(), req, resp, os);
+
+               switch (queryTask.queryType) {
+               case DESCRIBE:
+               case CONSTRUCT:
+                  break;
+               default:
+                  throw new MalformedQueryException(
+                        "Must be DESCRIBE or CONSTRUCT query");
+               }
+
+               final RDFParserFactory factory = RDFParserRegistry.getInstance()
+                     .get(format);
+
+               final RDFParser rdfParser = factory.getParser();
+
+               rdfParser.setValueFactory(conn.getTripleStore()
+                     .getValueFactory());
+
+               rdfParser.setVerifyData(false);
+
+               rdfParser.setStopAtFirstError(true);
+
+               rdfParser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+               final BufferStatementHandler buffer = new BufferStatementHandler(
+                     conn.getSailConnection(), nmodified /*, defaultDeleteContext*/);
+               
+               rdfParser.setRDFHandler(buffer);
+
+               // Wrap as Future.
+               final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+
+               // Submit query for evaluation.
+               context.queryService.execute(ft);
+
+               // Reads on the statements produced by the query.
+               final InputStream is = newPipedInputStream(os);
+
+               // Run parser : visited statements will be buffered.
+               rdfParser.parse(is, baseURI);
+
+               // Await the Future (of the Query)
+               ft.get();
+
+               // Delete the buffered statements.
+               buffer.removeAll();
+               
+            }
+
+            conn.commit();
+
+            success = true;
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            reportModifiedCount(nmodified.get(), elapsed);
+
+            return null;
+
+         } finally {
+
+            if (conn != null) {
+
+               if (!success)
+                  conn.rollback();
+
+               conn.close();
+
+            }
+
+         }
+
+      }
+
+    } // class DeleteWithQueryMaterializedTask
 
     @Override
     protected void doPost(final HttpServletRequest req,
@@ -519,6 +700,71 @@ public class DeleteServlet extends BigdataRDFServlet {
         }
         
     }
+
+   /**
+    * Helper class buffers statements as they are visited by the parser.
+    */
+   static class BufferStatementHandler extends RDFHandlerBase {
+
+      private final BigdataSailConnection conn;
+      private final AtomicLong nmodified;
+      private final Resource[] defaultContext;
+
+      private final Set<Statement> stmts = new LinkedHashSet<Statement>();
+
+      public BufferStatementHandler(final BigdataSailConnection conn,
+            final AtomicLong nmodified, final Resource... defaultContext) {
+         this.conn = conn;
+         this.nmodified = nmodified;
+         final boolean quads = conn.getTripleStore().isQuads();
+         if (quads && defaultContext != null) {
+            // The context may only be specified for quads.
+            this.defaultContext = defaultContext; // new Resource[] {
+                                                  // defaultContext };
+         } else {
+            this.defaultContext = new Resource[0];
+         }
+      }
+
+      @Override
+      public void handleStatement(final Statement stmt)
+            throws RDFHandlerException {
+         
+         stmts.add(stmt);
+         
+      }
+
+      void removeAll() throws SailException {
+         
+         for (Statement stmt : stmts) {
+         
+            doRemoveStatement(stmt);
+            
+         }
+
+      }
+
+      private void doRemoveStatement(final Statement stmt) throws SailException {
+
+         final Resource[] c = (Resource[]) (stmt.getContext() == null ? defaultContext
+               : new Resource[] { stmt.getContext() });
+
+         conn.removeStatements(//
+               stmt.getSubject(), //
+               stmt.getPredicate(), //
+               stmt.getObject(), //
+               c);
+
+         if (c.length >= 2) {
+            // removed from more than one context
+            nmodified.addAndGet(c.length);
+         } else {
+            nmodified.incrementAndGet();
+         }
+
+      }
+
+   }
 
     /**
      * Helper class removes statements from the sail as they are visited by a parser.
