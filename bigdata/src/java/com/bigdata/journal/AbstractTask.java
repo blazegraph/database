@@ -1490,8 +1490,9 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * FIXME In order to permit concurrent operations by the
                      * same transaction it MUST establish locks on the isolated
                      * resources.  Those resources MUST be locatable (they will
-                     * exist on a temporary store choose by the tx when it first
-                     * started on this data service).
+                     * exist on a temporary store choosen by the tx when it first
+                     * started on this data service). See IsolatedActionJournal's 
+                     * resource locator delegation pattern.
                      */
 
                     final IDistributedTransactionService txs = (IDistributedTransactionService) transactionManager
