@@ -26,6 +26,8 @@ package com.bigdata.rdf.task;
 
 import java.util.concurrent.Callable;
 
+import com.bigdata.journal.IIndexManager;
+
 /**
  * A task that can be run either with direct index access or using the
  * concurrency manager (compatible with group commit).
@@ -36,10 +38,33 @@ import java.util.concurrent.Callable;
  */
 public interface IApiTask<T> extends Callable<T> {
 
-    /** The namespace of the target KB instance. */
-    String getNamespace();
+   /** The namespace of the target KB instance. */
+   String getNamespace();
 
-    /** The timestamp of the view of that KB instance. */
-    long getTimestamp();
-    
+   /** The timestamp of the view of that KB instance. */
+   long getTimestamp();
+
+   /**
+    * Tasks that create or destroy locatable resources need to write on the
+    * global row store (GRS). Such tasks must specify this property. Note that
+    * the GRS lock will have the side-effect of serializing all such tasks that
+    * write on the GRS index.
+    */
+   boolean isGRSRequired();
+   
+   /**
+    * Protocol used to inform the task of the index manager before it is
+    * executed.
+    * 
+    * @throws IllegalStateException
+    *            if the index manager has already been set.
+    */
+   void setIndexManager(IIndexManager indexManager);
+
+   /**
+    * Protocol used to clear the index manager from the task after it is
+    * executed.
+    */
+   void clearIndexManager();
+
 }

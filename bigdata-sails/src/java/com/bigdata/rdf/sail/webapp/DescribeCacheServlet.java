@@ -156,7 +156,7 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
 
         if (externalURIs == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Request attribute not found: " + ATTR_DESCRIBE_URIS);
             
             return;
@@ -167,7 +167,7 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
 
         if (nvalues == 0) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "No URIs");
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN, "No URIs");
 
             return;
 
@@ -213,9 +213,8 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
              * There is no such triple/quad store instance.
              */
             
-            BigdataServlet.buildResponse(resp, BigdataServlet.HTTP_NOTFOUND,
-                    BigdataServlet.MIME_TEXT_PLAIN);
-            
+            buildAndCommitNamespaceNotFoundResponse(req, resp);
+
             return;
         
         }

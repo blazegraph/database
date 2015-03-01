@@ -103,6 +103,7 @@ import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
@@ -4696,14 +4697,12 @@ public class HAJournalServer extends AbstractServer {
 //                NSSConfigurationOptions.CREATE, Boolean.TYPE,
 //                NSSConfigurationOptions.DEFAULT_CREATE);
 
-        if (create) {
+      if (create) {
 
-            final Future<Void> ft = journal.getExecutorService().submit(
-                    new CreateKBTask(journal, namespace));
+         AbstractApiTask.submitApiTask(journal,
+               new CreateKBTask(namespace, journal.getProperties())).get();
 
-            ft.get();
-            
-        }
+      }
 
     }
     

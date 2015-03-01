@@ -2580,6 +2580,14 @@ abstract public class StoreManager extends ResourceEvents implements
 //
 //        }
 
+        /**
+         * The data services support group commit.
+         */
+        @Override
+        public boolean isGroupCommit() {
+           return true;
+        }
+        
         @Override
         public SparseRowStore getGlobalRowStore() {
             

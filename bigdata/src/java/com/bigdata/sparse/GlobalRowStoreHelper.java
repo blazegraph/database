@@ -43,7 +43,7 @@ import com.bigdata.relation.AbstractRelation;
  * Helper class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ *
  */
 public class GlobalRowStoreHelper {
 

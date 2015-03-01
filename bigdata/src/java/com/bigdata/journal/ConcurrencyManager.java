@@ -1534,13 +1534,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *                if any task cannot be scheduled for execution
      */
     @Override
-    public List<Future> invokeAll(
-            final Collection<? extends AbstractTask> tasks, final long timeout,
+    public <T> List<Future<T>> invokeAll(
+            final Collection<? extends AbstractTask<T>> tasks, final long timeout,
             final TimeUnit unit) throws InterruptedException {
 
         assertOpen();
         
-        final List<Future> futures = new LinkedList<Future>();
+        final List<Future<T>> futures = new LinkedList<Future<T>>();
 
         boolean done = false;
         
@@ -1552,7 +1552,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // submit all.
             
-            for (AbstractTask task : tasks) {
+            for (AbstractTask<T> task : tasks) {
 
                 final long now = System.nanoTime();
                 
@@ -1574,7 +1574,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // await all futures.
             
-            for (Future f : futures) {
+            for (Future<T> f : futures) {
 
                 if (!f.isDone()) {
 
@@ -1626,7 +1626,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // At least one future did not complete.
 
-                for (Future f : futures) {
+                for (Future<T> f : futures) {
 
                     if (!f.isDone()) {
 

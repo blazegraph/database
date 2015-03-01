@@ -101,7 +101,8 @@ public class TestBigdataSailWithQuads extends AbstractBigdataSailTestCase {
         
         suite.addTestSuite(TestInlineValues.class);
 
-        suite.addTestSuite(TestConcurrentKBCreate.class);
+        suite.addTestSuite(TestConcurrentKBCreate.TestWithGroupCommit.class);
+        suite.addTestSuite(TestConcurrentKBCreate.TestWithoutGroupCommit.class);
 
         suite.addTestSuite(TestTxCreate.class);
         

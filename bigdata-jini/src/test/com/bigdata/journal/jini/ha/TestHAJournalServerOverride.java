@@ -48,7 +48,6 @@ import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.ClocksNotSynchronizedException;

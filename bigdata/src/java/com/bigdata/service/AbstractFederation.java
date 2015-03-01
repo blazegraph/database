@@ -132,6 +132,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     private final AtomicBoolean open = new AtomicBoolean(false);
     
+    @Override
     public AbstractClient<T> getClient() {
 
         final AbstractClient<T> t = client.get();
@@ -383,6 +384,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
+    @Override
     synchronized public void destroy() {
 
         if (isOpen())
@@ -431,6 +433,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * {@inheritDoc}
      * @see IBigdataClient.Options#COLLECT_PLATFORM_STATISTICS
      */
+    @Override
     public boolean getCollectPlatformStatistics() {
         
         return collectPlatformStatistics;
@@ -442,6 +445,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * 
      * @see IBigdataClient.Options#COLLECT_QUEUE_STATISTICS
      */
+    @Override
     public boolean getCollectQueueStatistics() {
         
         return collectQueueStatistics;
@@ -453,6 +457,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * 
      * @see IBigdataClient.Options#HTTPD_PORT
      */
+    @Override
     public int getHttpdPort() {
         
         return httpdPort;
@@ -471,6 +476,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     private final AtomicReference<String> httpdURL = new AtomicReference<String>();
 
+    @Override
     final public String getHttpdURL() {
         
         return httpdURL.get();
@@ -480,9 +486,10 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Locator for relations, etc.
      */
-    private final DefaultResourceLocator resourceLocator;
-    
-    public DefaultResourceLocator getResourceLocator() {
+    private final DefaultResourceLocator<?> resourceLocator;
+
+    @Override
+    public DefaultResourceLocator<?> getResourceLocator() {
         
         assertOpen();
         
@@ -590,7 +597,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * The embedded ganglia peer.
      */
     private final AtomicReference<BigdataGangliaService> gangliaService = new AtomicReference<BigdataGangliaService>();
-    
+
+    @Override
     public ScheduledFuture<?> addScheduledTask(final Runnable task,
             final long initialDelay, final long delay, final TimeUnit unit) {
 
@@ -626,6 +634,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * remember any history (including the load balancer). Returning a new
      * object every time here basically throws away the data we want.
      */
+    @Override
     final public CounterSet getCounters() {
 
         countersLock.lock();
@@ -712,6 +721,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      */
     private CounterSet serviceRoot;
 
+    @Override
     public CounterSet getHostCounterSet() {
 
         final String pathPrefix = ICounterSet.pathSeparator
@@ -721,6 +731,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         
     }
     
+    @Override
     public CounterSet getServiceCounterSet() {
 
         // note: defines [serviceRoot] as side effect.
@@ -730,6 +741,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         
     }
 
+    @Override
     public String getServiceCounterPathPrefix() {
 
         final String hostname = AbstractStatisticsCollector.fullyQualifiedHostName;
@@ -772,7 +784,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         return pathPrefix;
 
     }
-    
+
+    @Override
     public ExecutorService getExecutorService() {
         
         assertOpen();
@@ -886,7 +899,18 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
                 ((AbstractClient<T>) client).getLocatorCacheTimeout());
         
     }
-    
+
+    /**
+    * The {@link IBigdataFederation} supports group commit (and always has). The
+    * client side API submits tasks. Those tasks are scheduled on the
+    * {@link IDataService} using the group commit mechanisms.
+    */
+    @Override
+    public boolean isGroupCommit() {
+       return true;
+    }
+
+    @Override
     public void registerIndex(final IndexMetadata metadata) {
 
         assertOpen();
@@ -895,6 +919,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
 
     }
 
+    @Override
     public UUID registerIndex(final IndexMetadata metadata, UUID dataServiceUUID) {
 
         assertOpen();
@@ -988,6 +1013,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * 
      * {@inheritDoc}
      */
+    @Override
     public IClientIndex getIndex(final String name, final long timestamp) {
 
         if (log.isInfoEnabled())
@@ -999,6 +1025,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         
     }
 
+    @Override
     public void dropIndex(final String name) {
 
         if (log.isInfoEnabled())
@@ -1035,6 +1062,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
      * <p>
      * Note: This implementation fully buffers the namespace scan.
      */
+    @Override
     public Iterator<String> indexNameScan(final String prefix,
             final long timestamp) {
 
@@ -1070,12 +1098,14 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         
     }
     
+    @Override
     public SparseRowStore getGlobalRowStore() {
         
         return globalRowStoreHelper.getGlobalRowStore();
 
     }
 
+    @Override
     public SparseRowStore getGlobalRowStore(final long timestamp) {
         
         return globalRowStoreHelper.get(timestamp);
@@ -1085,6 +1115,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     private final GlobalRowStoreHelper globalRowStoreHelper = new GlobalRowStoreHelper(
             this);
 
+    @Override
     public BigdataFileSystem getGlobalFileSystem() {
 
         return globalFileSystemHelper.getGlobalFileSystem();
@@ -1094,6 +1125,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     private final GlobalFileSystemHelper globalFileSystemHelper = new GlobalFileSystemHelper(
             this);
 
+    @Override
     public TemporaryStore getTempStore() {
 
         return tempStoreFactory.getTempStore();
@@ -1115,6 +1147,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public T getService() {
 
         return (T) getClient().getDelegate().getService();
@@ -1124,6 +1157,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public String getServiceName() {
 
         return getClient().getDelegate().getServiceName();
@@ -1133,7 +1167,8 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
-    public Class getServiceIface() {
+    @Override
+    public Class<?> getServiceIface() {
 
         return getClient().getDelegate().getServiceIface();
         
@@ -1142,6 +1177,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public UUID getServiceUUID() {
         
         return getClient().getDelegate().getServiceUUID();
@@ -1151,6 +1187,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public boolean isServiceReady() {
 
         final AbstractClient<T> thisClient = client.get();
@@ -1172,6 +1209,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public void reattachDynamicCounters() {
         
         getClient().getDelegate().reattachDynamicCounters();
@@ -1181,6 +1219,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public void didStart() {
 
         getClient().getDelegate().didStart();
@@ -1190,6 +1229,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public AbstractHTTPD newHttpd(final int httpdPort,
             final ICounterSetAccess accessor) throws IOException {
 
@@ -1200,6 +1240,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public void serviceJoin(final IService service, final UUID serviceUUID) {
 
         if (!isOpen()) return;
@@ -1217,6 +1258,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * Delegated. {@inheritDoc}
      */
+    @Override
     public void serviceLeave(final UUID serviceUUID) {
 
         if(!isOpen()) return;
@@ -1289,6 +1331,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         private StartDeferredTasksTask() {
         }
 
+        @Override
         public void run() {
 
             try {
@@ -1807,9 +1850,9 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          */
         final protected Logger log = Logger.getLogger(ReportTask.class);
 
-        private final AbstractFederation fed;
+        private final AbstractFederation<?> fed;
         
-        public ReportTask(AbstractFederation fed) {
+        public ReportTask(AbstractFederation<?> fed) {
 
             if (fed == null)
                 throw new IllegalArgumentException();
@@ -1822,6 +1865,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
          * Note: Don't throw anything here since we don't want to have the task
          * suppressed!
          */
+        @Override
         public void run() {
 
             try {
@@ -1921,11 +1965,12 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
     /**
      * @todo it may be possible to optimize this for the jini case.
      */
+    @Override
     public IDataService[] getDataServices(final UUID[] uuids) {
         
         final IDataService[] services = new IDataService[uuids.length];
 
-        final IBigdataFederation fed = this;
+        final IBigdataFederation<?> fed = this;
         
         int i = 0;
         
@@ -2022,6 +2067,7 @@ abstract public class AbstractFederation<T> implements IBigdataFederation<T> {
         /**
          * Note: Don't throw anything - it will cancel the scheduled task.
          */
+        @Override
         public void run() {
 
             try {

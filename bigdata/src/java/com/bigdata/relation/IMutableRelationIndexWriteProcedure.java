@@ -43,8 +43,7 @@ import com.bigdata.btree.proc.IParallelizableIndexProcedure;
  * procedures should also implement {@link IParallelizableIndexProcedure}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IMutableRelationIndexWriteProcedure extends IIndexProcedure {
+public interface IMutableRelationIndexWriteProcedure<T> extends IIndexProcedure<T> {
 
 }

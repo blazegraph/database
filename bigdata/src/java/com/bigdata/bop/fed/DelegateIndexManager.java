@@ -232,4 +232,12 @@ class DelegateIndexManager implements IIndexManager {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * The data service does support group commit.
+     */
+  @Override
+  public boolean isGroupCommit() {
+     return true;
+  }
+
 }

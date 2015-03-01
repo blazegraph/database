@@ -47,6 +47,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
@@ -65,8 +66,12 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.view.FusedView;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.htree.AbstractHTree;
 import com.bigdata.mdi.IResourceMetadata;
+import com.bigdata.quorum.AsynchronousQuorumCloseException;
+import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.relation.locator.DefaultResourceLocator;
@@ -76,6 +81,7 @@ import com.bigdata.resources.NoSuchStoreException;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.resources.StaleLocatorReason;
+import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
 import com.bigdata.sparse.GlobalRowStoreHelper;
@@ -83,6 +89,7 @@ import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.TaskCounters;
 
+import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
@@ -277,9 +284,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *       in {@link #n2a}) sufficiently flexible to allow a task to do a
      *       drop/add sequence, or a more general {add,drop}+ sequence.
      */
-    private class Entry extends Name2Addr.Entry {
-        
+    static private class Entry extends Name2Addr.Entry {
+
+       /** <code>true</code> iff the index is registered by the task. */
         boolean registeredIndex = false;
+       
+        /** <code>true</code> iff the index is dropped by the task. */
         boolean droppedIndex = false;
         
         Entry(final Name2Addr.Entry entry) {
@@ -290,7 +300,6 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         /**
          * Ctor used when registering an index.
-         * 
          * @param name
          * @param checkpointAddr
          * @param commitTime
@@ -1019,8 +1028,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             // Done.
             return null;
-        }
+      }
 
+      @Override
+      public String toString() {
+         return getClass().getName() + "{name=" + l.name + "}";
+      }
+   
     }
     
     /**
@@ -1579,6 +1593,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Returns a copy of the array of resources declared to the constructor.
      */
+    @Override
     public String[] getResource() {
 
         // clone so that people can not mess with the resource names.
@@ -1594,6 +1609,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @exception IllegalStateException
      *                if more than one resource was declared.
      */
+    @Override
     public String getOnlyResource() {
         
         if (resource.length > 1)
@@ -1739,6 +1755,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
     /**
      * Returns Task{taskName,timestamp,elapsed,resource[]}
      */
+    @Override
     public String toString() {
         
         return "Task{" + getTaskName() + ",timestamp="
@@ -1859,6 +1876,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      *             executor service running the task to be shutdown and thereby
      *             interrupt all running tasks).
      */
+    @Override
     final public T call() throws Exception {
         
         try {
@@ -2125,7 +2143,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             if (!ran) {
 
-                // Do not re-invoke it afterTask failed above.
+                // Note: Do not re-invoke afterTask() if it failed above.
 
                 if (log.isInfoEnabled())
                     log.info("Task failed: class=" + this + " : " + t2);
@@ -2471,17 +2489,33 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
             this.delegate = source;
         
-            /*
-             * Setup a locator for resources. Resources that correspond to
-             * indices declared by the task are accessible via the task itself.
-             * Other resources are assessible via the locator on the underlying
-             * journal. When the journal is part of a federation, that locator
-             * will be the federation's locator.
-             */
+         /*
+          * Setup a locator for resources. Resources that correspond to indices
+          * declared by the task are accessible via the task itself.
+          * 
+          * Note: This SHOULD NOT expose the underlying Journal's resource
+          * locator since that can allow a class to register an index without
+          * going through this IsolatedActionJournal. In particular, the
+          * GlobalRowStoreHelper.getGlobalRowStore() can cause the GRS to be
+          * registered on the underlying index. This was breaking HA starts when
+          * I first converted the code to support group commit at the NSS layer.
+          * 
+          * TODO I have left in support for the case where the underlying
+          * Journal the ManagedJournal associated with a DataService in a
+          * federation. While I have not verified it, the following comment
+          * clearly contemplates providing access to non-remote resources in
+          * this manner. "Other resources are assessible via the locator on the
+          * underlying journal. When the journal is part of a federation, that
+          * locator will be the federation's locator." I am not sure if this
+          * comment reflects a sensible design decision or a Bad Idea, in which
+          * case the delegate locator should be [null] for the federation as
+          * well.
+          */
 
             resourceLocator = new DefaultResourceLocator(//
-                    this,// IndexManager
-                    source.getResourceLocator()// delegate locator
+                  this,// IndexManager (IsolatedActionJournal)
+                  ((source instanceof ManagedJournal) ? source
+                     .getResourceLocator() : null/* DO-NOT-DELEGATE */)//
             );
 
             final IBufferStrategy bufferStrategy = source.getBufferStrategy();
@@ -2796,9 +2830,21 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return delegate.getExecutorService();
             
         }
+
+        @Override
+        public Quorum<HAGlue,QuorumService<HAGlue>> getQuorum() {
+           return delegate.getQuorum();
+        }
+        
+        @Override
+        final public long awaitHAReady(final long timeout, final TimeUnit units)
+                throws InterruptedException, TimeoutException,
+                AsynchronousQuorumCloseException {
+           return delegate.awaitHAReady(timeout, units);
+        }
         
         /*
-         * Disallowed methods (commit protocol and shutdown protocol).
+         *  Disallowed methods (commit protocol and shutdown protocol).
          */
         
         /**
@@ -3071,9 +3117,29 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 final long timestampIsIgnored) {
 
             return new Striterator(n2a.values().iterator())
-                    .addFilter(new Resolver() {
+                    .addFilter(new Filter(){
+                     private static final long serialVersionUID = 1L;
+                     
+                  /*
+                   * Impose prefix restriction on the Name2Addr scan.
+                   * 
+                   * TODO This forces us to scan all indices that were isolated
+                   * by the task. When using hierarchical locking that is
+                   * typically on the order of ~10 indices. If also using
+                   * durable named solution sets, then this could be quite a bit
+                   * more and it might be worthwhile to make [n2a] on
+                   * AbstractTask a TreeMap (using the same comparator
+                   * semantics) such that the prefix scan could be turned into a
+                   * range restricted scan.
+                   */
+                     @Override
+                     public boolean isValid(Object obj) {
+                        return ((Entry)obj).name.startsWith(prefix);
+                     }}).addFilter(new Resolver() {
                         private static final long serialVersionUID = 1L;
-
+                        /*
+                         * Resolve Entry to the name of the index.
+                         */
                         @Override
                         protected Object resolve(final Object obj) {
                             return ((Entry)obj).name;
@@ -3085,6 +3151,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         @Override
         public boolean isDirty() {
             return delegate.isDirty();
+        }
+
+        @Override
+        public boolean isGroupCommit() {
+           return delegate.isGroupCommit();
         }
 
     } // class IsolatatedActionJournal
@@ -3457,6 +3528,18 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         }
 
         @Override
+        public Quorum<HAGlue,QuorumService<HAGlue>> getQuorum() {
+           throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        final public long awaitHAReady(final long timeout, final TimeUnit units)
+                throws InterruptedException, TimeoutException,
+                AsynchronousQuorumCloseException {
+           return delegate.awaitHAReady(timeout, units);
+        }
+
+        @Override
         public long commit() {
             throw new UnsupportedOperationException();
         }
@@ -3653,6 +3736,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public boolean isDirty() {
             return false; // it's readOnly - cannot be dirty
         }
+
+        @Override
+        public boolean isGroupCommit() {
+           return delegate.isGroupCommit();
+        }
+      
     } // class ReadOnlyJournal
 
     /**
@@ -3758,7 +3847,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
         public CounterSet getCounters() {
             return delegate.getCounters();
         }
+
+      @Override
+      public boolean isGroupCommit() {
+         return delegate.isGroupCommit();
+      }
         
-    }
+    }// DelegateIndexClass
     
 }

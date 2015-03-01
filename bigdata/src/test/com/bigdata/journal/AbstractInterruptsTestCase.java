@@ -55,7 +55,6 @@ import com.bigdata.rwstore.IRWStrategy;
  * unmapped under Java.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCase {
 
@@ -240,9 +239,8 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * {@link ClosedByInterruptException}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
-    static class InterruptMyselfTask extends AbstractTask {
+    static class InterruptMyselfTask extends AbstractTask<Void> {
 
         protected InterruptMyselfTask(IConcurrencyManager concurrencyManager,
                 long startTime, String resource) {
@@ -251,7 +249,8 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
         }
 
-        protected Object doTask() throws Exception {
+        @Override
+        protected Void doTask() throws Exception {
             
             // Get the live version of the named index.
             final BTree ndx = (BTree) getIndex(getOnlyResource());

@@ -582,6 +582,16 @@ public class TemporaryStore extends TemporaryRawStore implements IBTreeManager {
 		return 0L;
 		
 	}
+    
+    /**
+     * The {@link TemporaryStore} does not support group commit.
+     */
+    @Override
+    public boolean isGroupCommit() {
+       
+       return false;
+       
+    }
 
     /**
      * Always returns <i>this</i> {@link TemporaryStore}.
