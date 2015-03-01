@@ -37,6 +37,8 @@ import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.GraphTest;
 
 /**
+ * Blueprints test suite for a client communicating with the server over the
+ * REST API.
  */
 public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 
