@@ -1466,7 +1466,7 @@ public class NanoSparqlClient {
 					usage();
 
 					System.exit(1);
-				} else if (arg.equals("-dbModus")) {
+				} else if (arg.equals("-dbMode")) {
 
 				   mode = args[++i];
 
