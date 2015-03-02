@@ -1537,6 +1537,33 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
                     }
 				}
 			});
+         
+         counters.addCounter("bufferMode", new Instrument<String>() {
+            @Override
+            public void sample() {
+               final AbstractJournal jnl = ref.get();
+               if (jnl != null) {
+                  final IBufferStrategy bufferStrategy = jnl.getBufferStrategy();
+                  if (bufferStrategy != null) {
+                     final BufferMode bufferMode = bufferStrategy.getBufferMode();
+                     if (bufferMode != null) {
+                        setValue(bufferMode.toString());
+                     }
+                  }
+               }
+            }
+         });
+			
+         counters.addCounter("groupCommit", new Instrument<Boolean>() {
+            @Override
+            public void sample() {
+               final AbstractJournal jnl = ref.get();
+               if (jnl != null) {
+                  setValue(jnl.isGroupCommit());
+                  }
+            }
+         });
+
 			// counters.addCounter("file", new OneShotInstrument<String>(""
 			// + jnl.getFile()));
 
