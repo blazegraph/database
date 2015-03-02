@@ -1620,9 +1620,22 @@ public class BigdataRDFContext extends BigdataBaseContext {
 				 */
 				resp.setContentType("text/html; charset=" + charset.name());
 
+            /*
+             * Note: Setting this to true is causing an EofException when the
+             * jetty server attempts to write on the client (where the client in
+             * this instance was Chrome). Given that flushing the http response
+             * commits the response, it seems incorrect that we would ever do
+             * this. We probably need to look at other mechanisms for providing
+             * liveness for the SPARQL UPDATE "monitor" option, such as HTTP 1.1
+             * streaming connections.
+             * 
+             * See #1133 (SPARQL UPDATE "MONITOR" LIVENESS)
+             */
+				final boolean flushEachEvent = false;
+				
                 // This will write the response entity.
                 listener = new SparqlUpdateResponseWriter(resp, os, charset,
-                        true /* reportLoadProgress */, true/* flushEachEvent */,
+                        true /* reportLoadProgress */, flushEachEvent,
                         mutationCount);
 
             } else {
@@ -1954,12 +1967,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
                 if (flushEachEvent) {
 
-                    /*
-                     * Flush the response for each event so the client
-                     * (presumably a human operator) can see the progress log
-                     * update "live".
-                     */
-                    
+               /*
+                * Flush the response for each event so the client (presumably a
+                * human operator) can see the progress log update "live".
+                * 
+                * Note: flushing the response is problematic and leads to an
+                * EofException. This has been disabled, but that causes liveness
+                * problems with the SPARQL UPDATE "monitor" option.
+                * 
+                * See #1133 (SPARQL UPDATE "MONITOR" LIVENESS)
+                */
+    
                     w.flush();
                     
                     os.flush();
