@@ -74,7 +74,7 @@ public class TestAll_AST extends TestCase {
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
          *      Reification done right </a>
          */
-		if (false) // TODO Integrate into CI.
+		if (false) // TODO Integrate into CI.  See #1138 Why is RDR parser test suite disabled?
 			suite.addTestSuite(TestReificationDoneRightParser.class);
 
         /*
