@@ -29,8 +29,6 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.parser.QueryParserUtil;
 
-import com.bigdata.rdf.sail.BigdataSail;
-
 /**
  * Non-manifest driven versions of the manifest driven test suite to facilitate
  * debugging.
