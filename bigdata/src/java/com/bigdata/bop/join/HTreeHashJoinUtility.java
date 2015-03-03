@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,7 +40,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HTreeAnnotations;
-import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -49,7 +47,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -75,7 +72,6 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
-import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.util.InnerCause;
@@ -261,23 +257,22 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * The join variables.
      */
     private final IVariable<?>[] joinVars;
-
+    
     /**
      * The variables to be retained (optional, all variables are retained if
      * not specified).
      */
     private final IVariable<?>[] selectVars;
 
-    /**
-     * The variables to be projected into a join group. When non-
-     * <code>null</code> variables that are NOT in this array are NOT flowed
-     * into the join group.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-     *      JoinGroup optimizations </a>
-     */
-    private final IVariable<?>[] projectedInVars;
 
+    /**
+     * The variables to be projected into a join group. When set, a distinct
+     * projection over these variables is computed, otherwise the complete
+     * binding set is passed in. Note that this parameter is only considered
+     * if selectVars is not null.
+     */
+    private final IVariable<?>[] projectInVars;
+       
     /**
      * The join constraints (optional).
      */
@@ -365,8 +360,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
-        if (projectedInVars != null)
-            sb.append(",projectedInVars=" + Arrays.toString(projectedInVars));
+        if (projectInVars != null)
+           sb.append(",projectInVars=" + Arrays.toString(projectInVars));
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -547,9 +542,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         /*
          * The variables that are projected IN to the join group.
          */
-        this.projectedInVars = (IVariable<?>[]) op
+        this.projectInVars = (IVariable<?>[]) op
                 .getProperty(HashJoinAnnotations.PROJECT_IN_VARS);
-
+        
         /*
          * This wraps an efficient raw store interface around a child memory
          * manager created from the IMemoryManager which will back the named
@@ -1631,64 +1626,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    /**
-     * DISTINCT solutions filter for
-     * {@link HTreeHashJoinUtility#outputSolutions(IBuffer)}
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-     *      JoinGroup optimizations </a>
-     */
-    private class HTreeDistinctFilter implements IDistinctFilter {
-
-        /**
-         * The variables used to impose a distinct constraint.
-         */
-        private final IVariable<?>[] vars;
-
-        private final HTreeHashJoinUtility state;
-
-        public HTreeDistinctFilter(final IVariable<?>[] vars, final PipelineOp op) {
-
-            this.vars = vars;
-
-            this.state = new HTreeHashJoinUtility(
-                    ((MemStore) store).getMemoryManager(), op,
-                    JoinTypeEnum.Filter);
-
-        }
-        
-        @Override
-        public IVariable<?>[] getProjectedVars() {
-
-            return vars;
-            
-        }
-
-        @Override
-        public IBindingSet accept(final IBindingSet bset) {
-            // FIXME Auto-generated method stub
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long filterSolutions(ICloseableIterator<IBindingSet[]> itr,
-                BOpStats stats, IBuffer<IBindingSet> sink) {
-            // FIXME Auto-generated method stub
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public void release() {
-
-            state.release();
-            
-        }
-
-    }
-   
-    
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter filter) {
+    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter distinctFilter) {
 
         try {
 
@@ -1711,17 +1650,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 IBindingSet bset = decodeSolution(t);
 
-                if (filter != null) {
+                if (distinctFilter != null) {
 
-                    /*
-                     * Note: The DISTINCT filter is based on the variables
-                     * that are projected INTO the child join group.
-                     * However, those are NOT always the same as the
-                     * variables that are projected OUT of the child join
-                     * group, so we need to
-                     */
-
-                    if ((bset = filter.accept(bset)) == null) {
+                    if ((bset = distinctFilter.accept(bset)) == null) {
 
                         // Drop duplicate solutions.
                         continue;
