@@ -116,16 +116,20 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         final String BINDING_SETS_SOURCE = "bindingSets";
         
         /**
-         * Return the distinct join vars instead of all solutions. Enabling this
-         * option essentially applies an {@link IDistinctFilter} over the join
-         * variables, which can be computed very efficiently while writing the
-         * final output.
+         * Variables to be projected inside the subsequent group. If not
+         * specified, no projection is performed. If a (possibly empty) list
+         * of variables is provided, a DISTINCT projection over these variables
+         * is performed. 
          */
-        final String RETURN_DISTINCT_JOIN_VARS = "distinctJoinVars";
+        final String PROJECT_IN_VARS = "projectInVars";
         
     }
     
-    protected IDistinctFilter distinctJoinVarFilter;
+    /**
+     * Filter for distinct variables, as they might be specified in
+     * PROJECT_IN_VARS annotation above (will be null if the latter is null).
+     */
+    protected IDistinctFilter distinctVarFilter;
 
     /**
      * Deep copy constructor.
@@ -193,11 +197,12 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
         
-        final Boolean returnDistinctJoinVars = 
-            (Boolean)getProperty(Annotations.RETURN_DISTINCT_JOIN_VARS);
-        if (returnDistinctJoinVars!=null && returnDistinctJoinVars) {
+        final IVariable<?>[] projectInVars = 
+            (IVariable<?>[])getProperty(Annotations.PROJECT_IN_VARS);
+        
+        if (projectInVars!=null) {
 
-            distinctJoinVarFilter = new JVMDistinctFilter(joinVars, //
+            distinctVarFilter = new JVMDistinctFilter(projectInVars, //
                 this.getProperty(
                     HashMapAnnotations.INITIAL_CAPACITY,
                     HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
@@ -253,7 +258,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
     @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new ChunkTask(this, context, distinctJoinVarFilter));
+        return new FutureTask<Void>(new ChunkTask(this, context, distinctVarFilter));
         
     }
     
