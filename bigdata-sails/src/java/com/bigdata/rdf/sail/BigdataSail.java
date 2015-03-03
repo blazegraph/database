@@ -69,7 +69,6 @@ import java.util.Properties;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -165,38 +164,49 @@ import cutthecrap.utils.striterators.Striterator;
  * Sesame <code>2.x</code> integration.
  * </p>
  * <p>
- * Read-write operations use {@link #getConnection()} to obtain a mutable view.
- * {@link #getConnection()} uses a {@link Semaphore} to enforce the constraint
- * that there is only one writable {@link BigdataSailConnection} at a time. SAIL
- * transactions will be serialized (at most one will run at a time).
+ * Read-write operations use {@link #getConnection()}to obtain a mutable view.
+ * This delegates to either {@link #getUnisolatedConnection()} or
+ * {@link #getReadWriteConnection()} depending on how the Sail is configured.
+ * </p>
+ * <p>
+ * Concurrent unisolated writers are supported if group commit is enabled, but
+ * at most one unisolated writer will execute against a given Sail instance at a
+ * time - other writers will be serialized. See
+ * {@link #getUnisolatedConnection()} for more information on how to enable
+ * group commit and how to write code that supports group commit.
  * </p>
  * <p>
  * Concurrent readers are possible, and can be very efficient. However, readers
  * MUST use a database commit point corresponding to a desired state of the
  * store, e.g., after loading some data set and (optionally) after computing the
- * closure of that data set. Use {@link #getReadOnlyConnection()} to obtain
- * a read-only view of the database as of the last commit time, or 
+ * closure of that data set. Use {@link #getReadOnlyConnection()} to obtain a
+ * read-only view of the database as of the last commit time, or
  * {@link #getReadOnlyConnection(long)} to obtain a read-only view of the
- * database as of some other historical point.  These connections are safe to
- * use concurrently with the unisolated connection from {@link #getConnection()}.
+ * database as of some other historical point. These connections are safe to use
+ * concurrently with the unisolated connection from {@link #getConnection()}.
  * </p>
  * <p>
- * Read/write transaction are also implemented in the bigdata SAIL.  To turn
- * on read/write transactions, use the option {@link Options#ISOLATABLE_INDICES}.
- * If this option is set to true, then {@link #getConnection} will return an
- * isolated read/write view of the database.  Multiple read/write transactions
- * are allowed, and the database can resolve add/add conflicts between
- * transactions.
+ * Concurrent fully isolated read/write transactions against the same Sail are
+ * also implemented in the bigdata SAIL. To turn on read/write transactions, use
+ * the option {@link Options#ISOLATABLE_INDICES}. If this option is set to true,
+ * then {@link #getConnection()} will return an isolated read/write view of the
+ * database. Multiple concurrent read/write transactions are allowed, and the
+ * database can resolve add/add conflicts between transactions. Unlike group
+ * commit, these fully isolated read/write transactions will in fact execute
+ * concurrently against the same Sail instance (rather than being serialized).
+ * However, there is additional overhead for fully isolated read/write
+ * transactions and graph update patterns can lead to unreconcilable conflicts
+ * during updates (in which case one transaction will be a failed during the
+ * validation phase). The highest throughput is generally obtained using
+ * {@link #getUnisolatedConnection()} in which case you do not need to enabled
+ * {@link Options#ISOLATABLE_INDICES}.
  * </p>
  * <p>
  * The {@link BigdataSail} may be configured as as to provide a triple store
- * with statement-level provenance using <em>statement identifiers</em>. A
- * statement identifier is unique identifier for a <em>triple</em> in the
- * database. Statement identifiers may be used to make statements about
- * statements without using RDF style reification. The statement identifier is
- * bound to the context position during high-level query so you can use
- * high-level query (SPARQL) to obtain statements about statements. See
- * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS}.
+ * with statement-level provenance using <em>statement identifiers</em>. See
+ * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} and <a
+ * href="http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right" >
+ * Reification Done Right </a>.
  * </p>
  * <p>
  * Quads may be enabled using {@link AbstractTripleStore.Options#QUADS}.
@@ -1385,49 +1395,63 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
-	    /**
-     * Return an unisolated connection to the database. The unisolated
-     * connection supports fast, scalable updates against the database. The
-     * unisolated connection is ACID when used with a local {@link Journal} and
-     * shard-wise ACID when used with an {@link IBigdataFederation}.
-     * <p>
-     * In order to guarantee that operations against the unisolated connection
-     * are ACID, only one of unisolated connection is permitted at a time for a
-     * {@link Journal} and this method will block until the connection is
-     * available. If there is an open unisolated connection against a local
-     * {@link Journal}, then the open connection must be closed before a new
-     * connection can be returned by this method.
-     * <p>
-     * This constraint that there can be only one unisolated connection is not
-     * enforced in scale-out since unisolated operations in scale-out are only
-     * shard-wise ACID.
-     * <p>
-     * The correct pattern for obtaining an updatable connection, doing work
-     * with that connection, and committing or rolling back that update is as
-     * follows.
-     * 
-     * <pre>
-     * BigdataSailConnection conn = null;
-     * boolean ok = false;
-     * try {
-     *     conn = sail.getUnisolatedConnection();
-     *     doWork(conn);
-     *     conn.commit();
-     *     ok = true;
-     * } finally {
-     *     if (conn != null) {
-     *         if (!ok) {
-     *             conn.rollback();
-     *         }
-     *         conn.close();
-     *     }
-     * }
-     * </pre>
-     * 
-     * @return The unisolated connection to the database
-     * 
-     * @see #getConnection()
-     */
+   /**
+    * Return an unisolated connection to the database. The unisolated connection
+    * supports fast, scalable updates against the database. The unisolated
+    * connection is ACID when used with a local {@link Journal} and shard-wise
+    * ACID when used with an {@link IBigdataFederation}.
+    * <p>
+    * <h3>Group Commit Enabled</h3>
+    * <p>
+    * If {@link com.bigdata.journal.Journal.Options#GROUP_COMMIT group commit}
+    * is enabled and you use the either the REST API or the
+    * {@link com.bigdata.rdf.task.AbstractApiTask#submitApiTask(IIndexManager, com.bigdata.rdf.task.IApiTask)}
+    * pattern to submit tasks, then concurrent unisolated connections will be
+    * granted for different namespaces and multiple unisolated connections for
+    * the same namespace MAY be melded into the same commit group (whether they
+    * are or not depends on the timing of the tasks and whether they are being
+    * submitted by a single client thread or by a pool of clients).
+    * <p>
+    * <h3>Group Commit Disabled</h3>
+    * <p>
+    * In this mode the application decides when the database will go through a
+    * commit point. In order to guarantee that operations against the unisolated
+    * connection are ACID, only one unisolated connection is permitted at a time
+    * for a {@link Journal}. If there is an open unisolated connection against a
+    * local {@link Journal}, then the open connection must be closed before a
+    * new connection can be returned by this method.
+    * <p>
+    * This constraint that there can be only one unisolated connection is not
+    * enforced in scale-out since unisolated operations in scale-out are only
+    * shard-wise ACID.
+    * <p>
+    * The correct pattern for obtaining an updatable connection, doing work with
+    * that connection, and committing or rolling back that update is as follows.
+    * 
+    * <pre>
+    * BigdataSailConnection conn = null;
+    * boolean ok = false;
+    * try {
+    *    conn = sail.getUnisolatedConnection();
+    *    doWork(conn);
+    *    conn.commit();
+    *    ok = true;
+    * } finally {
+    *    if (conn != null) {
+    *       if (!ok) {
+    *          conn.rollback();
+    *       }
+    *       conn.close();
+    *    }
+    * }
+    * </pre>
+    * 
+    * @return The unisolated connection to the database
+    * 
+    * @see #getConnection()
+    * @see <a href="wiki.bigdata.com/wiki/index.php?title=GroupCommit" > Group
+    *      Commit (wiki) </a>
+    */
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
@@ -1446,7 +1470,20 @@ public class BigdataSail extends SailBase implements Sail {
         BigdataSailConnection conn = null;
         try {
             if (getDatabase().getIndexManager() instanceof Journal) {
-                // acquire permit from Journal.
+            /*
+             * acquire permit from Journal.
+             * 
+             * Note: The [instanceof Journal] test here is correct. What happens
+             * is that an unisolated AbstractTask that is submitted through the
+             * ConcurrencyManager on the Journal is an IJournal (an
+             * IsolatedActionJournal) but not a Journal. Thus the
+             * getUnisolatedConnection() code does not attempt to obtain the
+             * global semaphore. This allows concurrent execution of tasks
+             * requiring unisolated connections for distinct namespaces on the
+             * same journal.
+             * 
+             * @see #1137 (Code review of IJournal vs Journal)
+             */
                 ((Journal) getDatabase().getIndexManager())
                         .acquireUnisolatedConnection();
                 acquiredConnection = true;

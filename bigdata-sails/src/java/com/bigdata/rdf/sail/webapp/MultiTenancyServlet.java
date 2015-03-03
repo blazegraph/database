@@ -38,6 +38,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.impl.GraphImpl;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
@@ -302,9 +303,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             /*
              * Get the default Properties.
              */
-            if (indexManager instanceof Journal) {
+            if (indexManager instanceof IJournal) {
 
-                final Journal jnl = (Journal) indexManager;
+                final IJournal jnl = (IJournal) indexManager;
 
                 defaults = new Properties(jnl.getProperties());
 

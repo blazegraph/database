@@ -78,6 +78,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CAT;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -2516,10 +2517,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         long tx = timestamp; // use dirty reads unless Journal.
 
-        if (getIndexManager() instanceof Journal) {
+        if (getIndexManager() instanceof IJournal) {
             
-            final ITransactionService txs = ((Journal) getIndexManager())
-                    .getLocalTransactionManager().getTransactionService();
+            final ITransactionService txs = ((IJournal) getIndexManager())
+                  .getLocalTransactionManager().getTransactionService();
 
             try {
                 tx = txs.newTx(timestamp);
@@ -2544,9 +2545,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 */
 	public void abortTx(final long tx) {
 
-	    if (getIndexManager() instanceof Journal) {
+	    if (getIndexManager() instanceof IJournal) {
 
-			final ITransactionService txs = ((Journal) getIndexManager())
+			final ITransactionService txs = ((IJournal) getIndexManager())
 					.getLocalTransactionManager().getTransactionService();
 
 			try {
@@ -2571,9 +2572,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //	 */
 //	public void commitTx(final long tx) {
 //
-//	    if (getIndexManager() instanceof Journal) {
+//	    if (getIndexManager() instanceof IJournal) {
 //
-//            final ITransactionService txs = ((Journal) getIndexManager())
+//            final ITransactionService txs = ((IJournal) getIndexManager())
 //                    .getLocalTransactionManager().getTransactionService();
 //
 //            try {

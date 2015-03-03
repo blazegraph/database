@@ -57,8 +57,8 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
 
-//        // Test suite of NSS startup behavior and overrides.
-//        suite.addTestSuite(TestNanoSparqlServer.class);
+        // Test suite of NSS startup behavior and overrides.
+        suite.addTestSuite(TestNanoSparqlServer.class);
 //
 //        /*
 //         * WebApp Client.
