@@ -3859,20 +3859,20 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     /**
-     * An executor service used to read on the local disk.
-     * 
-     * @todo This is currently used by prefetch. We should generalize this
-     *       mechanism, probably moving it to the {@link IResourceManager}, and
-     *       use it to do all IO, ideally using the JSR 166 fork/join
-     *       mechanisms.
-     *       <p>
-     *       This should be reconciled with the {@link ConcurrencyManager},
-     *       which has distinct {@link ExecutorService}s for readers and writers
-     *       which control the per-task concurrency while this controls the disk
-     *       read concurrency.
-     *       <p>
-     *       We could use the same pool for readers and writers on the disk.
-     */
+    * An executor service used to read on the local disk.
+    * 
+    * TODO This is currently used by prefetch. We should generalize this
+    * mechanism, probably moving it to the {@link IResourceManager}, and use it
+    * to do all IO, ideally using the JSR 166 fork/join mechanisms. Without
+    * moving this method to another interface, pre-fetch will not work for
+    * AbstractTask.
+    * <p>
+    * This should be reconciled with the {@link ConcurrencyManager}, which has
+    * distinct {@link ExecutorService}s for readers and writers which control
+    * the per-task concurrency while this controls the disk read concurrency.
+    * <p>
+    * We could use the same pool for readers and writers on the disk.
+    */
     public LatchedExecutor getReadExecutor() {
         
 //        assertOpen();

@@ -46,9 +46,9 @@ import org.eclipse.jetty.server.Server;
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
+import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
@@ -59,9 +59,6 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -251,7 +248,9 @@ public class TestNSSHealthCheck extends TestCase2 {
 		m_indexManager = new Journal(properties);
 
 		// Create the triple store instance.
-		createTripleStore(m_indexManager, m_namespace, properties);
+      AbstractApiTask.submitApiTask(m_indexManager,
+            new CreateKBTask(m_namespace, properties)).get();
+//		createTripleStore(m_indexManager, m_namespace, properties);
 
 		final Map<String, String> initParams = new LinkedHashMap<String, String>();
 		{
@@ -271,55 +270,55 @@ public class TestNSSHealthCheck extends TestCase2 {
 		return fixture;
 	}
 
-	protected AbstractTripleStore createTripleStore(
-			final IIndexManager indexManager, final String namespace,
-			final Properties properties) {
-
-		if (log.isInfoEnabled())
-			log.info("KB namespace=" + namespace);
-
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			fail("exists: " + namespace);
-
-		}
-
-		/*
-		 * Create the KB instance.
-		 */
-
-		if (log.isInfoEnabled()) {
-			log.info("Creating KB instance: namespace=" + namespace);
-			log.info("Properties=" + properties.toString());
-		}
-
-		if (indexManager instanceof Journal) {
-
-			// Create the kb instance.
-			tripleStore = new LocalTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-
-		} else {
-
-			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-		}
-
-		// create the triple store.
-		tripleStore.create();
-
-		if (log.isInfoEnabled())
-			log.info("Created tripleStore: " + namespace);
-
-		// New KB instance was created.
-		return tripleStore;
-
-	}
+//	protected AbstractTripleStore createTripleStore(
+//			final IIndexManager indexManager, final String namespace,
+//			final Properties properties) {
+//
+//		if (log.isInfoEnabled())
+//			log.info("KB namespace=" + namespace);
+//
+//		// Locate the resource declaration (aka "open"). This tells us if it
+//		// exists already.
+//		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//		if (tripleStore != null) {
+//
+//			fail("exists: " + namespace);
+//
+//		}
+//
+//		/*
+//		 * Create the KB instance.
+//		 */
+//
+//		if (log.isInfoEnabled()) {
+//			log.info("Creating KB instance: namespace=" + namespace);
+//			log.info("Properties=" + properties.toString());
+//		}
+//
+//		if (indexManager instanceof Journal) {
+//
+//			// Create the kb instance.
+//			tripleStore = new LocalTripleStore(indexManager, namespace,
+//					ITx.UNISOLATED, properties);
+//
+//		} else {
+//
+//			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
+//					ITx.UNISOLATED, properties);
+//		}
+//
+//		// create the triple store.
+//		tripleStore.create();
+//
+//		if (log.isInfoEnabled())
+//			log.info("Created tripleStore: " + namespace);
+//
+//		// New KB instance was created.
+//		return tripleStore;
+//
+//	}
 
 	@Override
 	public Properties getProperties() {

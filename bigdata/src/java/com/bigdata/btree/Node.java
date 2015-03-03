@@ -42,7 +42,6 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTree.ChildMemoizer;
 import com.bigdata.btree.AbstractBTree.LoadChildRequest;
 import com.bigdata.btree.data.DefaultNodeCoder;
-import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -3078,6 +3077,12 @@ public class Node extends AbstractNode<Node> implements INodeData {
                             // append this node in post-order position.
                             itr.append(new SingleValueIterator(child));
 
+                           /*
+                            * Note: getReadExecutor() is not defined for IJournal. If
+                            * we want to support the read executor pre-fetch pattern
+                            * then the code needs to be updated to use IJournal and
+                            * IJournal needs to expose getReadExecutor.
+                            */
                             if ((btree.store instanceof Journal)
                                     && (((Journal) btree.store)
                                             .getReadExecutor() != null)) {
