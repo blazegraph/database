@@ -114,15 +114,6 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
          * built.
          */
         final String BINDING_SETS_SOURCE = "bindingSets";
-        
-        /**
-         * Variables to be projected inside the subsequent group. If not
-         * specified, no projection is performed. If a (possibly empty) list
-         * of variables is provided, a DISTINCT projection over these variables
-         * is performed. 
-         */
-        final String PROJECT_IN_VARS = "projectInVars";
-        
     }
     
     /**
