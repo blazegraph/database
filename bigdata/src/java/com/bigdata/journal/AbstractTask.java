@@ -2449,6 +2449,8 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         @SuppressWarnings("rawtypes")
         private final IResourceLocator resourceLocator;
+
+        private final GlobalRowStoreHelper globalRowStoreHelper;
         
         @Override
         public String toString() {
@@ -2488,8 +2490,12 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             if (source == null)
                 throw new IllegalArgumentException();
 
+            // Note: The raw journal.
             this.delegate = source;
-        
+
+            // Note: isolated by this class.
+            this.globalRowStoreHelper = new GlobalRowStoreHelper(this);
+            
          /*
           * Setup a locator for resources. Resources that correspond to indices
           * declared by the task are accessible via the task itself.
@@ -2706,16 +2712,20 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             // did the task declare the resource name?
             if(isResource(GlobalRowStoreHelper.GLOBAL_ROW_STORE_INDEX)) {
                 
-                // unisolated view - will create if it does not exist.
-                return new GlobalRowStoreHelper(this).getGlobalRowStore();
-                
+               /*
+                * Return an unisolated view of the index, but the view is still
+                * scoped by the task. The index will be created if it does not
+                * exist.
+                */
+               return globalRowStoreHelper.getGlobalRowStore();
+                   
             }
-            
+               
             // read committed view IFF it exists otherwise [null]
             // TODO Review. Make sure we have tx protection to avoid recycling of the view.
             final long lastCommitTime = getLastCommitTime();
             
-            return new GlobalRowStoreHelper(this).get(lastCommitTime);
+            return globalRowStoreHelper.get(lastCommitTime);
 
             //return new GlobalRowStoreHelper(this).get(ITx.READ_COMMITTED);
             
