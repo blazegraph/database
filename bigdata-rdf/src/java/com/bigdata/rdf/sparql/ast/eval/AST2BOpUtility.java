@@ -116,7 +116,6 @@ import com.bigdata.rdf.sparql.ast.FilterExistsModeEnum;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
-import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -3968,9 +3967,28 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
         
-        final PipelineOp op;
+        /**
+         * If the set of join variables equals the set of variables we want to
+         * project in, then we can efficiently calculate the bindings for the
+         * variables to pass in over the hash index that we calculate. This
+         * is what we actually check for here.
+         */
+        HashSet<IVariable<?>> jVars = new HashSet<IVariable<?>>();
+        HashSet<IVariable<?>> piVars = new HashSet<IVariable<?>>();
+        if (joinVars!=null) {
+           for (IVariable<?> var : joinVars) {
+              jVars.add(var);
+           }
+        }
+        if (projectInVars!=null) {
+           for (IVariable<?> var : projectInVars) {
+              piVars.add(var);
+           }
+        }
+        final boolean inlineProjection = jVars.equals(piVars);
+        
         if(ctx.nativeHashJoins) {
-            op = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
+            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -3982,10 +4000,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
                 new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(JVMHashIndexOp.Annotations.RETURN_DISTINCT_JOIN_VARS, inlineProjection)
             ), subgroup, ctx);
         } else {
-            op = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
+           left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
@@ -3996,50 +4015,57 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
                 new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
                 new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet),//
+                new NV(JVMHashIndexOp.Annotations.RETURN_DISTINCT_JOIN_VARS, inlineProjection)
             ), subgroup, ctx);
         }
-        
-        
-        /*
-         * Only the variables which are projected by the subquery may flow
-         * into the subquery. Adding a projection operator before the
-         * subquery plan ensures that variables which are not visible are
-         * dropped out of the solutions flowing through the subquery.
-         * However, those variables are already present in the hash index so
-         * they can be reunited with the solutions for the subquery in the
-         * solution set hash join at the end of the subquery plan.
-         * 
-         * Note that, when projecting variables inside the subquery, we need
-         * to remove duplicates in the outer solution, to avoid a blowup in
-         * the result size (the inner result is joined with the complete
-         * outer result retained though the previous HashIndexOp at a later
-         * point anyway, what we're doing here just serves the purpose to avoid
-         * the computation of unneeded bindings inside the subclause, in the
-         * sense that we pass in every possible binding once), cf. ticket #835.
-         */
-        final List<NV> anns = new LinkedList<NV>();
-        anns.add(new NV(
-                JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
-        anns.add(new NV(
-                JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectInVars));
-        anns.add(new NV(
-                JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
-                BOpEvaluationContext.CONTROLLER));
-        anns.add(new NV(
-                JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
 
-        left = new JVMDistinctBindingSetsOp(leftOrEmpty(op),//
-                anns.toArray(new NV[anns.size()]));
         
-        // and put the projection on top
-        left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-                new NV(ProjectionOp.Annotations.SELECT, projectInVars))//
-                , subgroup, ctx);        
+        /** 
+         * If the projection has not been inlined into the hash join
+         * computation, we need to apply it via other operators. 
+         */
+        if (!inlineProjection) {
+           /*
+            * Adding a projection operator before the
+            * subquery plan ensures that variables which are not visible are
+            * dropped out of the solutions flowing through the subquery.
+            * However, those variables are already present in the hash index so
+            * they can be reunited with the solutions for the subquery in the
+            * solution set hash join at the end of the subquery plan.
+            * 
+            * Note that, when projecting variables inside the subquery, we need
+            * to remove duplicates in the outer solution, to avoid a blowup in
+            * the result size (the inner result is joined with the complete
+            * outer result retained though the previous HashIndexOp at a later
+            * point anyway, what we're doing here just serves the purpose to avoid
+            * the computation of unneeded bindings inside the subclause, in the
+            * sense that we pass in every possible binding once), cf. ticket #835.
+            */
+           final List<NV> anns = new LinkedList<NV>();
+           anns.add(new NV(
+                   JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
+           anns.add(new NV(
+                   JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectInVars));
+           anns.add(new NV(
+                   JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
+                   BOpEvaluationContext.CONTROLLER));
+           anns.add(new NV(
+                   JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
+
+           left = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
+                   anns.toArray(new NV[anns.size()]));
+           
+           // and put the projection on top
+           left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
+                   new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                   new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                           BOpEvaluationContext.CONTROLLER),//
+                   new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
+                   new NV(ProjectionOp.Annotations.SELECT, projectInVars))//
+                   , subgroup, ctx);        
+           
+        }
 
         final PipelineOp subqueryPlan = convertJoinGroupOrUnion(left,
                 subgroup, doneSet, ctx);

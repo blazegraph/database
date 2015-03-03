@@ -36,6 +36,8 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.ConcurrentHashMapAnnotations;
+import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.ISingleThreadedOp;
@@ -113,7 +115,17 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
          */
         final String BINDING_SETS_SOURCE = "bindingSets";
         
+        /**
+         * Return the distinct join vars instead of all solutions. Enabling this
+         * option essentially applies an {@link IDistinctFilter} over the join
+         * variables, which can be computed very efficiently while writing the
+         * final output.
+         */
+        final String RETURN_DISTINCT_JOIN_VARS = "distinctJoinVars";
+        
     }
+    
+    protected IDistinctFilter distinctJoinVarFilter;
 
     /**
      * Deep copy constructor.
@@ -180,9 +192,21 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
 
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
+        
+        final Boolean returnDistinctJoinVars = 
+            (Boolean)getProperty(Annotations.RETURN_DISTINCT_JOIN_VARS);
+        if (returnDistinctJoinVars!=null && returnDistinctJoinVars) {
 
-//        if (joinVars.length == 0)
-//            throw new IllegalArgumentException(Annotations.JOIN_VARS);
+            distinctJoinVarFilter = new JVMDistinctFilter(joinVars, //
+                this.getProperty(
+                    HashMapAnnotations.INITIAL_CAPACITY,
+                    HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
+                this.getProperty(
+                    HashMapAnnotations.LOAD_FACTOR,
+                    HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
+                ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL);
+           
+        }
 
         for (IVariable<?> var : joinVars) {
 
@@ -229,7 +253,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
     @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new ChunkTask(this, context));
+        return new FutureTask<Void>(new ChunkTask(this, context, distinctJoinVarFilter));
         
     }
     
@@ -248,6 +272,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         
         private final IHashJoinUtility state;
         
+        private final IDistinctFilter distinctJoinVarFilter;
         /**
          * <code>true</code> iff this is the first invocation of this operator.
          */
@@ -263,7 +288,8 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         private final boolean sourceIsPipeline;
         
         public ChunkTask(final HashIndexOp op,
-                final BOpContext<IBindingSet> context) {
+                final BOpContext<IBindingSet> context,
+                IDistinctFilter distinctJoinVarFilter) {
 
             if (op == null)
                 throw new IllegalArgumentException();
@@ -276,6 +302,8 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
             this.op = op;
             
             this.stats = ((NamedSolutionSetStats) context.getStats());
+            
+            this.distinctJoinVarFilter = distinctJoinVarFilter;
 
             // Metadata to identify the target named solution set.
             final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
@@ -470,7 +498,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            state.outputSolutions(unsyncBuffer);
+            state.outputSolutions(unsyncBuffer, distinctJoinVarFilter);
             
             unsyncBuffer.flush();
 

@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -48,6 +49,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -58,7 +60,6 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.counters.CAT;
@@ -74,6 +75,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
+import com.bigdata.relation.rule.eval.Solution;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.util.InnerCause;
@@ -903,7 +905,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     private IBindingSet decodeSolution(final ITuple<?> t) {
         
         final ByteArrayBuffer b = t.getValueBuffer();
-        
+
         return encoder
                 .decodeSolution(b.array(), 0, b.limit(), false/* resolveCachedValues */);
         
@@ -1683,68 +1685,13 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         }
 
     }
+   
     
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out) {
+    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter filter) {
 
         try {
 
-            /*
-             * FIXME Set this to enable "DISTINCT" on the solutions flowing into the
-             * join group.
-             * 
-             * Note: This should be set by the HashIndexOp (or passed in through the
-             * interface).
-             * 
-             * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-             * JoinGroup optimizations </a>
-             */
-            final boolean distinct = false;
-            
-            /*
-             * FIXME Replace with an HTreeDistinctFilter and integrate to NOT
-             * flow duplicate solutions into the sub-group. The HTree
-             * filterSolutions() method needs to be vectored to be efficient.
-             * Therefore, this outputSolutions() method needs to be rewritten to
-             * be vectored as well. It is efficient in reading the solutions
-             * from the HTree, and the solutions are in the "natural" order of
-             * the HTree for the join vars. This order SHOULD be pretty
-             * efficient for the DISTINCT solutions set as well, but note that
-             * joinVars:=projectedInVars. To maximize the corrleation, both the
-             * joinVars[] and the projectedInVars[] should be sorted so the
-             * variables in the solutions will be correllated and any variables
-             * that are NOT in the projectedInVars should appear towards the end
-             * of the joinVars where they will cause the least perturbation in
-             * this scan + filter.
-             */
-            final IDistinctFilter distinctFilter;
-            
-            if (distinct && projectedInVars != null && projectedInVars.length > 0) {
-
-                /*
-                 * Note: We are single threaded here so we can use a lower
-                 * concurrencyLevel value.
-                 * 
-                 * Note: If necessary, this could be replaced with JVMHashIndex so
-                 * we get the #of occurrences of each distinct combination of
-                 * bindings that is projected into the sub-group/-query.
-                 */
-                final int concurrencyLevel = 1;//ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL;
-
-                distinctFilter = new JVMDistinctFilter(projectedInVars, //
-                        op.getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                        op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                                HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
-                                concurrencyLevel
-                );
-                
-            } else {
-             
-                distinctFilter = null;
-                
-            }
-            
            final HTree rightSolutions = getRightSolutions();
 
             if (log.isInfoEnabled()) {
@@ -1764,7 +1711,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
                 IBindingSet bset = decodeSolution(t);
 
-                if (distinctFilter != null) {
+                if (filter != null) {
 
                     /*
                      * Note: The DISTINCT filter is based on the variables
@@ -1774,7 +1721,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                      * group, so we need to
                      */
 
-                    if ((bset = distinctFilter.accept(bset)) == null) {
+                    if ((bset = filter.accept(bset)) == null) {
 
                         // Drop duplicate solutions.
                         continue;
@@ -1809,7 +1756,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         }
 
     } // outputSolutions
-
+    
     @Override
     public void outputJoinSet(final IBuffer<IBindingSet> out) {
 

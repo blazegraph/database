@@ -305,8 +305,10 @@ public interface IHashJoinUtility {
      * 
      * @param out
      *            Where to write the solutions.
+     * @param filter
+     *            An optional distinct filter
      */
-    void outputSolutions(IBuffer<IBindingSet> out);
+    void outputSolutions(IBuffer<IBindingSet> out, IDistinctFilter filter);
 
     /**
      * Return an {@link Iterator} that visits all solutions in the index (index
