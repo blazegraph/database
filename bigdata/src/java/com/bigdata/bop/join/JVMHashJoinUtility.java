@@ -842,47 +842,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
     
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out) {
-
-        /*
-         * FIXME Set this to enable "DISTINCT" on the solutions flowing into the
-         * join group.
-         * 
-         * Note: This should be set by the HashIndexOp (or passed in through the
-         * interface).
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-         * JoinGroup optimizations </a>
-         */
-        final boolean distinct = false;
-        
-        final IDistinctFilter distinctFilter;
-        
-        if (distinct && projectedInVars != null && projectedInVars.length > 0) {
-
-            /*
-             * Note: We are single threaded here so we can use a lower
-             * concurrencyLevel value.
-             * 
-             * Note: If necessary, this could be replaced with JVMHashIndex so
-             * we get the #of occurrences of each distinct combination of
-             * bindings that is projected into the sub-group/-query.
-             */
-            final int concurrencyLevel = 1;//ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL;
-
-            distinctFilter = new JVMDistinctFilter(projectedInVars, //
-                    op.getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                            HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                    op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                            HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
-                            concurrencyLevel
-            );
-            
-        } else {
-         
-            distinctFilter = null;
-            
-        }
+    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter filter) {
         
         try {
 
@@ -905,7 +865,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
 
                     IBindingSet bs = solutionHit.solution;
 
-                    if (distinctFilter != null) {
+                    if (filter != null) {
 
                         /*
                          * Note: The DISTINCT filter is based on the variables
@@ -915,7 +875,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                          * group, so we need to
                          */
 
-                        if ((bs = distinctFilter.accept(bs)) == null) {
+                        if ((bs = filter.accept(bs)) == null) {
 
                             // Drop duplicate solutions.
                             continue;

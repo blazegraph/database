@@ -64,6 +64,14 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
+ * NOTE: this optimizer was buggy previously; the rewritten form should work
+ * fine from a correctness perspective, but does not really optimize the query
+ * from a performance perspective. The description below describes the original
+ * idea, the actual implementation slightly differs in (i) that it passes around
+ * intermediate solutions (rather than computing all joins over the original
+ * outer mapping set) and (ii) does not compute a final join over all
+ * intermediate solutions but simply returns the last computed result.
+ * 
  * Rewrite a join group using two or more complex OPTIONAL groups using a hash
  * join pattern.
  * <p>
@@ -131,9 +139,12 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: ASTComplexOptionalOptimizer.java 5365 2011-10-19 20:56:18Z
- *          thompsonbry $
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
+ * 
  */
+
+
+@Deprecated
 public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger
