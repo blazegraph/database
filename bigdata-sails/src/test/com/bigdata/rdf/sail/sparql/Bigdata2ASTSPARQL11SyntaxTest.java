@@ -54,7 +54,6 @@ import com.bigdata.rdf.store.LocalTripleStore;
  * the Sesame compliance packages.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
@@ -102,6 +101,7 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
     }
 
+    @Override
     protected void setUp() throws Exception {
 
         super.setUp();
@@ -126,6 +126,7 @@ public class Bigdata2ASTSPARQL11SyntaxTest extends SPARQL11SyntaxTest {
 
     }
 
+    @Override
     protected void tearDown() throws Exception {
         
         if (tripleStore != null) {
