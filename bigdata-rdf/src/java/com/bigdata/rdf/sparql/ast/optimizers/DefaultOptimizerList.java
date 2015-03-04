@@ -615,7 +615,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
          */
-        add(new ASTComplexOptionalOptimizer());
+//        add(new ASTComplexOptionalOptimizer());
 
         /**
          * Rewrites join groups having one or more joins which would involve a
