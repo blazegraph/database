@@ -37,7 +37,6 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -45,7 +44,6 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -61,16 +59,26 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
- * NOTE: this optimizer was buggy previously; the rewritten form should work
- * fine from a correctness perspective, but does not really optimize the query
- * from a performance perspective. The description below describes the original
+ * NOTE: this optimizer was not sound from a correctness perspective in previous
+ * versions (cf. http://trac.bigdata.com/ticket/1071); the rewritten form should 
+ * be fine from a correctness perspective, but does not really optimize queries
+ * from a performance perspective, so it has been (temporarily) disabled in the
+ * {@link DefaultOptimizerList}. The description below describes the original
  * idea, the actual implementation slightly differs in (i) that it passes around
  * intermediate solutions (rather than computing all joins over the original
  * outer mapping set) and (ii) does not compute a final join over all
- * intermediate solutions but simply returns the last computed result.
+ * intermediate solutions but simply returns the last computed result (which
+ * is now possible due to (i)). 
+ * 
+ * Also note that the {@link AST2BOpUtility} has been refactored (as part of
+ * ticket #1071 and #1118) and now implements intelligent pushing of projection
+ * variables into OPTIONAL blocks, so there's probably no more need for this
+ * optimizer.
+ * 
  * 
  * Rewrite a join group using two or more complex OPTIONAL groups using a hash
  * join pattern.
@@ -598,79 +606,10 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                         throw new AssertionError();
                 }
 
-                
-                /*
-                 *  also propagate the projected vars to the JoinGroupNode
-                 */
-//                final IVariable<?>[] projectedVarsAsArr = 
-//                    projectedVars.toArray(new IVariable<?>[projectedVars.size()]);
-//                jgn.setProjectInVars(projectedVarsAsArr);
-        
             }
-            
-            // Replace the complex optional group with an INCLUDE of the
-            // generated solution set back into the main query.
-
-
             
             precedingSolutionName = solutionSetName;
         }
 
     }
-
-    private void liftSparql11Subquery(final AST2BOpContext context,
-            final StaticAnalysis sa, final SubqueryRoot subqueryRoot) {
-
-        final String newName = "-subSelect-" + context.nextId();
-
-        final NamedSubqueryInclude include = new NamedSubqueryInclude(newName);
-
-        final IGroupNode<IGroupMemberNode> parent = subqueryRoot.getParent();
-
-        /*
-         * Note: A SubqueryRoot normally starts out as the sole child of a
-         * JoinGroupNode. However, other rewrites may have written out that
-         * JoinGroupNode and it does not appear to be present for an ASK
-         * subquery.
-         * 
-         * Therefore, when the parent of the SubqueryRoot is a JoinGroupNode
-         * having the SubqueryRoot as its only child, we use the parent's parent
-         * in order to replace the JoinGroupNode when we lift out the
-         * SubqueryRoot. Otherwise we use the parent since there is no wrapping
-         * JoinGroupNode (or if there is, it has some other stuff in there as
-         * well).
-         */
-         
-        if ((parent instanceof JoinGroupNode) && ((BOp) parent).arity() == 1
-                && parent.getParent() != null) {
-            
-            final IGroupNode<IGroupMemberNode> pp = parent.getParent();
-
-            // Replace the sub-select with the include.
-            if (((ASTBase) pp).replaceWith((BOp) parent, include) == 0)
-                throw new AssertionError();
-
-        } else {
-
-            // Replace the sub-select with the include.
-            if (((ASTBase) parent).replaceWith((BOp) subqueryRoot, include) == 0)
-                throw new AssertionError();
-            
-        }
-
-        final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
-                subqueryRoot.getQueryType(), newName);
-
-        nsr.setConstruct(subqueryRoot.getConstruct());
-        nsr.setGroupBy(subqueryRoot.getGroupBy());
-        nsr.setHaving(subqueryRoot.getHaving());
-        nsr.setOrderBy(subqueryRoot.getOrderBy());
-        nsr.setProjection(subqueryRoot.getProjection());
-        nsr.setSlice(subqueryRoot.getSlice());
-        nsr.setWhereClause(subqueryRoot.getWhereClause());
-
-        sa.getQueryRoot().getNamedSubqueriesNotNull().add(nsr);
-
-    }
-
 }
