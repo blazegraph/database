@@ -28,6 +28,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServlet;
@@ -237,7 +238,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
     *      Concurrent unisolated operations against multiple KBs </a>
     */
-   protected <T> Future<T> submitApiTask(final AbstractRestApiTask<T> task)
+   protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
          throws DatasetNotFoundException, InterruptedException,
          ExecutionException, IOException {
 
@@ -254,10 +255,10 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
        */
 
       // Submit task. Will run.
-      final Future<T> f = AbstractApiTask.submitApiTask(indexManager, task);
+      final FutureTask<T> ft = AbstractApiTask.submitApiTask(indexManager, task);
 
       // Await Future.
-      f.get();
+      ft.get();
 
       /*
        * IFF successful, flush and close the response.
@@ -269,7 +270,7 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
       task.flushAndClose();
 
       // TODO Modify to return T rather than Future<T> if we are always doing the get() here?
-      return f;
+      return ft;
 
     }
 

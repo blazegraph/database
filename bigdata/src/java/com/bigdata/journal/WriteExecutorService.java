@@ -150,31 +150,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             .getLogger(WriteExecutorService.class);
 
     /**
-     * True iff the {@link #log} level is INFO or less.
-     */
-    final private static boolean INFO = log.isInfoEnabled();
-
-    /**
-     * True iff the {@link #log} level is DEBUG or less.
-     */
-    final private static boolean DEBUG = log.isDebugEnabled();
-
-    /**
      * Uses the {@link OverflowManager} log for things relating to synchronous
      * overflow processing.
      */
     protected static final Logger overflowLog = Logger
             .getLogger(OverflowManager.class);
-
-    /**
-     * True iff the {@link #overflowLog} level is INFO or less.
-     */
-    final protected static boolean OVERFLOW_INFO = overflowLog.isInfoEnabled();
-
-    /**
-     * True iff the {@link #overflowLog} level is DEBUG or less.
-     */
-    final protected static boolean OVERFLOW_DEBUG = overflowLog.isDebugEnabled();
 
     /**
      * When <code>true</code>, writes the set of {@link #active} tasks into
@@ -273,7 +253,8 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
         }
         
-        public void rejectedExecution(Runnable arg0, ThreadPoolExecutor arg1) {
+        @Override
+        public void rejectedExecution(final Runnable arg0, final ThreadPoolExecutor arg1) {
 
             rejectedExecutionCount.incrementAndGet();
 
@@ -723,7 +704,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             if (paused.incrementAndGet() == 0) {
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Pausing write service");
 
             }
@@ -753,7 +734,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             if (paused.decrementAndGet() == 0) {
 
-                if (DEBUG)
+                if (log.isDebugEnabled())
                     log.debug("Resuming write service");
 
                 unpaused.signalAll();
@@ -779,6 +760,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      *            is actually a {@link FutureTask}. See
      *            {@link AbstractExecutorService}.
      */
+    @Override
     protected void beforeExecute(final Thread t, final Runnable r) {
 
         // Note: [r] is the FutureTask.
@@ -859,7 +841,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              */
             MDC.put("commitCounter", "commitCounter=" + ngroupCommits);
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("nrunning=" + nrunning);
             
         } finally {
@@ -902,7 +884,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
             MDC.remove("taskState");
 
-            if(INFO) log.info("nrunning="+nrunning);
+            if(log.isInfoEnabled()) log.info("nrunning="+nrunning);
             
             assert nrunning >= 0;
             
@@ -998,7 +980,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * warning.
                      */
                     
-                    if(INFO) log.info("Validation failed: task=" + r);//, t);
+                    if(log.isInfoEnabled()) log.info("Validation failed: task=" + r);//, t);
 
                 } else if (InnerCause.isInnerCause(t, InterruptedException.class)) {
 
@@ -1022,7 +1004,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * has been registered.
                      */
  
-                    if(INFO) log.info("No such index: task=" + r);//, t);
+                    if(log.isInfoEnabled()) log.info("No such index: task=" + r);//, t);
                     
                 } else if(InnerCause.isInnerCause(t, StaleLocatorException.class)) {
 
@@ -1036,7 +1018,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                      * appropriate index partition.
                      */
  
-                    if(INFO) log.info("Stale locator: task=" + r);//, t);
+                    if(log.isInfoEnabled()) log.info("Stale locator: task=" + r);//, t);
                     
 //                    log.info(this.toString(), t);
                     
@@ -1087,6 +1069,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     /**
      * A snapshot of the executor state.
      */
+    @Override
     public String toString() {
         
         final StringBuilder sb = new StringBuilder();
@@ -1242,7 +1225,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
      */
     private boolean groupCommit(){
 
-        if(DEBUG)
+        if(log.isDebugEnabled())
             log.debug("begin");
 
         assert lock.isHeldByCurrentThread();
@@ -1257,7 +1240,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
          */
         if( abort.get() ) {
 
-            if(INFO) log.info("Abort in progress.");
+            if(log.isInfoEnabled()) log.info("Abort in progress.");
         
             // signal so that abort() will no longer await this task's completion.
             waiting.signalAll();
@@ -1286,7 +1269,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * commit.
              */
 
-            if(DEBUG)
+            if(log.isDebugEnabled())
                 log.debug("Already executing in another thread");
 
             /*
@@ -1350,7 +1333,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // note: the task counters use nanos rather than millis.
             final long nanoTime_beginWait = System.nanoTime();
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("This thread will run group commit: "
                         + currentThread + " : " + r);
 
@@ -1456,7 +1439,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              */
             final int nwrites = this.nwrites.get();
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Committing store: commitGroupSize=" + nwrites
                         + ", #running=" + nrunning + ", active="
                         + active.entrySet());
@@ -1514,14 +1497,14 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Commit Ok : commitLatency=" + commitLatency
                         + ", maxCommitLatency=" + maxCommitServiceTime
                         + ", shouldOverflow=" + shouldOverflow);
 
             if (shouldOverflow && nrunning.get() == 0) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Will do overflow now: nrunning=" + nrunning);
 
                 // this task will do synchronous overflow processing.
@@ -1532,7 +1515,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
 
                 MDC.put("taskState","didSyncOverflow");
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Did overflow.");
                 
             }
@@ -1941,7 +1924,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
     public boolean tryLock(final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("timeout=" + timeout + ", unit=" + unit);
 
         long lastTime = System.nanoTime();
@@ -2400,7 +2383,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  * processing so this is the last commit before we overflow the
                  * journal.
                  */
-                if (OVERFLOW_DEBUG)
+                if (overflowLog.isDebugEnabled())
                     overflowLog.debug("before: " + journal.getRootBlockView());
                 
             }
@@ -2421,7 +2404,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             
             if (timestamp == 0L) {
 
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Nothing to commit");
 
                 return true;
@@ -2463,7 +2446,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
             // this task did the commit.
             MDC.put("taskState", "didCommit");
             
-            if (INFO) {
+            if (log.isInfoEnabled()) {
             
                 log.info("commit: #writes=" + nwrites + ", timestamp="
                         + timestamp);
@@ -2478,11 +2461,11 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                  * journal.
                  */
 
-                if (OVERFLOW_INFO)
+                if (overflowLog.isInfoEnabled())
                     overflowLog.info("commit: #writes=" + nwrites
                             + ", timestamp=" + timestamp + ", paused!");
 
-                if (OVERFLOW_DEBUG)
+                if (overflowLog.isDebugEnabled())
                     overflowLog.debug("after : " + journal.getRootBlockView());
                 
             }
@@ -2568,7 +2551,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
              * will reach the caller.
              */
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Interrupting tasks awaiting commit.");
             
             final Iterator<Map.Entry<Thread, AbstractTask<?>>> itr = active
@@ -2602,12 +2585,12 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Interrupted " + ninterrupted + " tasks.");
             
             // wait for active tasks to complete.
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Waiting for running tasks to complete: nrunning="
                         + nrunning);
 
@@ -2644,7 +2627,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
             
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Doing abort: nrunning=" + nrunning);
             
             // Nothing is running.
@@ -2667,7 +2650,7 @@ public class WriteExecutorService extends ThreadPoolExecutor {
                 
             }
 
-            if (INFO)
+            if (log.isInfoEnabled())
                 log.info("Did abort");
             
         } catch(Throwable t) {
