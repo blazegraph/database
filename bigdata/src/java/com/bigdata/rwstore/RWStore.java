@@ -2322,19 +2322,24 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     } else {
                         immediateFree(addr, sze);
                     }
+                } else if (false && context != null && alloc.canImmediatelyFree(addr, sze, context)) {
+                    immediateFree(addr, sze);
                 } else {
                     // if a free request is made within a context not managed by
                     // the allocator then it is not safe to free
-                    boolean alwaysDefer = m_activeTxCount > 0;
+                    boolean alwaysDefer = m_activeTxCount > 0
+                    		|| (context == null && !m_contexts.isEmpty());
 
-                    if (!alwaysDefer)
-                        alwaysDefer = context == null && !m_contexts.isEmpty();
-                    
                     if (alwaysDefer)
                         if (log.isDebugEnabled())
                             log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
                     if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
-                        deferFree(addr, sze);
+                    	// If the context is != null, then the deferral must be against that context!
+                    	if (context != null) {
+                    		establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
+                    	} else {
+                    		deferFree(addr, sze);
+                    	}
                     } else {
                         immediateFree(addr, sze);
                     }
@@ -5160,12 +5165,19 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //          freeBlobs.addAll(m_freeBlobs);
             
             // now free all deferred frees made within this context for other
-            // allocators
+            // allocators, checking whether they should be added to the global deferred list
             if (log.isDebugEnabled())
                 log.debug("Releasing " + m_deferredFrees.size() + " deferred frees");
             
+            final boolean defer = m_store.m_minReleaseAge > 0 || m_store.m_activeTxCount > 0 || m_store.m_contexts.size() > 0;
             for (Long l : m_deferredFrees) {
-                m_store.immediateFree((int) (l >> 32), l.intValue());
+            	final int addr = (int) (l >> 32);
+            	final int sze = l.intValue();
+            	if (defer) {
+            		m_store.deferFree(addr, sze);
+            	} else {
+            		m_store.immediateFree(addr, sze);
+            	}
             }
             m_deferredFrees.clear();
         }
