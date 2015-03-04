@@ -1,7 +1,6 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -3883,45 +3882,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //            log.warn("No join variables: " + subgroup);
 //
 //        }
-        
-        /*
-         * Pass all variable bindings along.
-         * 
-         * Note: If we restrict the [select] annotation to only those variables
-         * projected by the subquery, then we will wind up pruning any variables
-         * used in the join group which are NOT projected into the subquery.
-         * 
-         * @see https://sourceforge.net/apps/trac/bigdata/ticket/515
-         */
-        @SuppressWarnings("rawtypes")
-        final IVariable[] selectVars = null;
-        
+                
         final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
-        
-        /**
-         * If the set of join variables equals the set of variables we want to
-         * project in, then we can efficiently calculate the bindings for the
-         * variables to pass in over the hash index that we calculate. This
-         * is what we actually check for here.
-         */
-        HashSet<IVariable<?>> jVars = new HashSet<IVariable<?>>();
-        HashSet<IVariable<?>> piVars = new HashSet<IVariable<?>>();
-        if (joinVars!=null) {
-           for (IVariable<?> var : joinVars) {
-              jVars.add(var);
-           }
-        }
-        if (projectInVars!=null) {
-           for (IVariable<?> var : projectInVars) {
-              piVars.add(var);
-           }
-        }
-        
+                
         left = addHashIndexOp(left, ctx, subgroup, joinType, joinVars, 
-              null /* join constraints,TODO */, projectInVars, namedSolutionSet);
+              joinConstraints, projectInVars, namedSolutionSet);
 
         final PipelineOp subqueryPlan = convertJoinGroupOrUnion(left,
                 subgroup, doneSet, ctx);
@@ -5177,23 +5145,21 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * @param joinType type of the join
      * @param joinVars the variables on which the join is performed
      * @param joinConstraints the join constraints
-     * @param projectInVars the variables to be projected into the join group;
+     * @param projectInVars the variables to be projected into the right op;
      *            this parameter is optional, if set to null, the full result
      *            set will be returned by the hash index op
      * @param namedSolutionSet the named solution set
-     * @param inlineProjection whether or not to inline the projection
      * @return the new pipeline op
      */
     private static PipelineOp addHashIndexOp(
         PipelineOp left,
-        AST2BOpContext ctx,
-        ASTBase node,
-        JoinTypeEnum joinType,
-        IVariable[] joinVars,
-        IConstraint[] joinConstraints,
-        IVariable[] projectInVars,
-        INamedSolutionSetRef namedSolutionSet) {
-      
+        final AST2BOpContext ctx,
+        final ASTBase node,
+        final JoinTypeEnum joinType,
+        final IVariable<?>[] joinVars,
+        final IConstraint[] joinConstraints,
+        final IVariable<?>[] projectInVars,
+        final INamedSolutionSetRef namedSolutionSet) {
       
         if(ctx.nativeHashJoins) {
             left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
@@ -5203,11 +5169,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME,// 
+                       new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),
-                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
+                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), node, ctx);
         } else {
@@ -5220,54 +5187,11 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(JVMHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),
-                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+                new NV(JVMHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
+                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// 
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), node, ctx);
         }
-      
-      
-        /*
-        if (!inlineProjection) {
-//            * Adding a projection operator before the
-//            * subquery plan ensures that variables which are not visible are
-//            * dropped out of the solutions flowing through the subquery.
-//            * However, those variables are already present in the hash index so
-//            * they can be reunited with the solutions for the subquery in the
-//            * solution set hash join at the end of the subquery plan.
-//            * 
-//            * Note that, when projecting variables inside the subquery, we need
-//            * to remove duplicates in the outer solution, to avoid a blowup in
-//            * the result size (the inner result is joined with the complete
-//            * outer result retained though the previous HashIndexOp at a later
-//            * point anyway, what we're doing here just serves the purpose to avoid
-//            * the computation of unneeded bindings inside the subclause, in the
-//            * sense that we pass in every possible binding once), cf. ticket #835.
-           final List<NV> anns = new LinkedList<NV>();
-           anns.add(new NV(
-               JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
-           anns.add(new NV(
-               JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectInVars));
-           anns.add(new NV(
-               JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
-               BOpEvaluationContext.CONTROLLER));
-           anns.add(new NV(
-               JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
-   
-           left = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
-               anns.toArray(new NV[anns.size()]));
-         
-           // and put the projection on top
-           left = applyQueryHints(new ProjectionOp(leftOrEmpty(left), //
-               new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-               new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                       BOpEvaluationContext.CONTROLLER),//
-               new NV(PipelineOp.Annotations.SHARED_STATE,true),// live stats
-               new NV(ProjectionOp.Annotations.SELECT, projectInVars))//
-           , node, ctx);        
-         
-        }         
-        */
       
         return left;      
     }
