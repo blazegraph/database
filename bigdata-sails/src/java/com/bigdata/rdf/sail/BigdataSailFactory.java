@@ -109,32 +109,47 @@ public class BigdataSailFactory {
 				normalizeEndpoint(serviceEndpoint));
 
 	}
+	
+	/**
+	 * 
+	 * Convenience method to allow the testing of the URL
+	 * normalization functionality.
+	 * 
+	 * See http://trac.bigdata.com/ticket/1139
+	 * 
+	 */
+	public static String testServiceEndpointUrl(final String serviceEndpoint)
+	{
+		return normalizeEndpoint(serviceEndpoint);
+	}
 
 	/**
 	 * Massage the service endpoint to ensure that it ends with
-	 * </code>/bigdata/sparql</code>
+	 * </code>/bigdata</code>
 	 */
     static private String normalizeEndpoint(final String serviceEndpoint) {
 
-        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
+        if (serviceEndpoint.endsWith("/sparql")) {
             
-        	return serviceEndpoint;
+        	return serviceEndpoint.substring(0,
+        				serviceEndpoint.length()-"/sparql".length());
         	
         } else if (serviceEndpoint.endsWith("/bigdata/")) {
             
-        	return serviceEndpoint + "sparql";
+        	return serviceEndpoint.substring(0, 
+        				serviceEndpoint.length()-1) ;
         	
         } else if (serviceEndpoint.endsWith("/bigdata")) {
             
-        	return serviceEndpoint + "/sparql";
+        	return serviceEndpoint;
         	
         } else if (serviceEndpoint.endsWith("/")) {
             
-        	return serviceEndpoint + "bigdata/sparql";
+        	return serviceEndpoint + "bigdata";
         	
         } else {
             
-        	return serviceEndpoint + "/bigdata/sparql";
+        	return serviceEndpoint + "/bigdata";
         	
         }
         
