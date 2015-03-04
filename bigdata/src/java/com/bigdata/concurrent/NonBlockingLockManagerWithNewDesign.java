@@ -939,7 +939,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *             service is not running or if a blocking queue was used and
      *             the queue is at capacity).
      */
-    public <T> Future<T> submit(final R[] resource, final Callable<T> task) {
+    public <T> FutureTask<T> submit(final R[] resource, final Callable<T> task) {
 
         if (serviceRunState != ServiceRunState.Running)
             throw new RejectedExecutionException();
@@ -1031,7 +1031,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *             service is not running or if a blocking queue was used and
      *             the queue is at capacity).
      */
-    public <T> Future<T> submit(final R[] resource, final Runnable task,
+    public <T> FutureTask<T> submit(final R[] resource, final Runnable task,
             final T val) {
 
         if (serviceRunState != ServiceRunState.Running)

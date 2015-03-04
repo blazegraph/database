@@ -336,7 +336,7 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     *      operations against multiple KBs </a>
     */
    @SuppressWarnings({ "unchecked", "rawtypes" })
-   static public <T> Future<T> submitApiTask(final IIndexManager indexManager,
+   static public <T> FutureTask<T> submitApiTask(final IIndexManager indexManager,
          final IApiTask<T> task) {
 
       final String namespace = task.getNamespace();
@@ -414,10 +414,10 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
           * 
           * TODO Could pass through timeout for submitted task here.
           */
-         final Future<T> f = cc.submit(new ApiTaskForJournal(cc, task
+         final FutureTask<T> ft = cc.submit(new ApiTaskForJournal(cc, task
                .getTimestamp(), locks, task));
 
-         return f;
+         return ft;
 
       }
 
