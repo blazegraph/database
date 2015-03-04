@@ -28,11 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -158,7 +160,6 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
             definitelyBoundInGroup.retainAll(maybeIncomingBindings);
             
             /**
-             * TODO:
              * Add the variables that are used inside filters in the OPTIONAL,
              * since the SPARQL 1.1 semantics lifts these filters to the
              * upper level in case the join succeeds.
@@ -169,26 +170,28 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
              * variables. 
              */
             if (group instanceof JoinGroupNode) {
-               JoinGroupNode jgn = (JoinGroupNode)group;
+               
+               final JoinGroupNode jgn = (JoinGroupNode)group;
                if (jgn.isOptional()) {
-                  Set<FilterNode> filters = new HashSet<FilterNode>();
+                  final Set<FilterNode> filters = new LinkedHashSet<FilterNode>();
+                  
                   for (BOp node : jgn.args()) {
 
-                     if (node instanceof FilterNode) {
-                        filters.add((FilterNode)node);
-                     } else if (node instanceof StatementPatternNode) {
-                        StatementPatternNode nodeAsSP = (StatementPatternNode)node;
-                        Object filter = nodeAsSP.annotations().get("filters");
-                        if (filter!=null && filter instanceof List<?>) {
-                           List<?> spFilters = (List<?>)filter;
-                           for (Object spFilter : spFilters) {
-                              if (spFilter instanceof FilterNode) {
-                                 filters.add((FilterNode)spFilter);
-                              }
+                     final Iterator<BOp> it = BOpUtility.preOrderIterator(node);
+                     while (it.hasNext()) {
+                        final BOp bop = it.next();
+                        if (bop instanceof FilterNode) {
+                           filters.add((FilterNode)bop);                           
+                        } else if (node instanceof StatementPatternNode) {
+                           final StatementPatternNode nodeAsSP = 
+                              (StatementPatternNode)node;
+                           final List<FilterNode> attachedFilters = 
+                              nodeAsSP.getAttachedJoinFilters();
+                           for (final FilterNode filter : attachedFilters) {
+                              filters.add(filter);
                            }
                         }
                      }
-
                   }
                   
                   for (FilterNode fn : filters) {
