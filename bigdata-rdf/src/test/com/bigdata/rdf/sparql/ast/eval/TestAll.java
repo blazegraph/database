@@ -181,9 +181,6 @@ public class TestAll extends TestCase {
         // test suite for custom functions.
         suite.addTestSuite(TestCustomFunction.class);
 
-        // test suite for BIND + GRAPH ticket.
-        suite.addTestSuite(TestBindGraph1007.class);
-
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);
 
