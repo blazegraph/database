@@ -39,6 +39,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -290,124 +291,143 @@ public class CreateKBTask extends AbstractApiTask<Void> {
 
       // throws an exception if there are inconsistent properties
       BigdataSail.checkProperties(properties);
-         
-//         /*
-//          * Note: We need to make this operation mutually exclusive with KB level
-//          * writers in order to avoid the possibility of a triggering a commit
-//          * during the middle of a BigdataSailConnection level operation (or visa
-//          * versa).
-//          */
-//         boolean acquiredConnection = false;
-         try {
-//             try {
-//                 // acquire the unisolated connection permit.
-//                 journal.acquireUnisolatedConnection();
-//                 acquiredConnection = true;
-//             } catch (InterruptedException e) {
-//                 throw new RuntimeException(e);
-//             }
-             
-             // Check for pre-existing instance.
-             {
+      
+      /**
+       * Note: Unless group commit is enabled, we need to make this operation
+       * mutually exclusive with KB level writers in order to avoid the
+       * possibility of a triggering a commit during the middle of a
+       * BigdataSailConnection level operation (or visa versa).
+       * 
+       * Note: When group commit is not enabled, the indexManager will be a
+       * Journal class. When it is enabled, it will merely implement the
+       * IJournal interface.
+       * 
+       * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+       */
+      final boolean isGroupCommit = indexManager.isGroupCommit();
+      boolean acquiredConnection = false;
+      try {
 
-                 final LocalTripleStore lts = (LocalTripleStore) indexManager
-                         .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+         if (!isGroupCommit) {
+            try {
+               // acquire the unisolated connection permit.
+               ((Journal) indexManager).acquireUnisolatedConnection();
+               acquiredConnection = true;
+            } catch (InterruptedException e) {
+               throw new RuntimeException(e);
+            }
+         }
 
-                 if (lts != null) {
+         // Check for pre-existing instance.
+         {
 
-                     return lts;
+            final LocalTripleStore lts = (LocalTripleStore) indexManager
+                  .getResourceLocator().locate(namespace, ITx.UNISOLATED);
 
-                 }
+            if (lts != null) {
 
-             }
-             
-             // Create a new instance.
-             {
-             
-                 if (Boolean.parseBoolean(properties.getProperty(
-                         BigdataSail.Options.ISOLATABLE_INDICES,
-                         BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
-                 
-                     /*
-                      * Isolatable indices: requires the use of a tx to create
-                      * the KB instance.
-                      */
+               return lts;
 
-                     final long txCreate = txService.newTx(ITx.UNISOLATED);
-
-                     boolean ok = false;
-                     try {
-                         
-                         final AbstractTripleStore txCreateView = new LocalTripleStore(
-                                 indexManager, namespace, Long.valueOf(txCreate),
-                                 properties);
-
-                         // create the kb instance within the tx.
-                         txCreateView.create();
-
-                         // commit the tx.
-                         txService.commit(txCreate);
-                         
-                         ok = true;
-
-                     } finally {
-                         
-                         if (!ok)
-                             txService.abort(txCreate);
-                         
-                     }
-                     
-                 } else {
-                     
-                     /*
-                      * Create KB without isolatable indices.
-                      */
-
-                     final LocalTripleStore lts = new LocalTripleStore(
-                             indexManager, namespace, ITx.UNISOLATED, properties);
-                     
-                     lts.create();
-                     
-                 }
-                 
-             }
-
-             /*
-              * Now that we have created the instance, either using a tx or the
-              * unisolated connection, locate the triple store resource and
-              * return it.
-              */
-             {
-
-                 final LocalTripleStore lts = (LocalTripleStore) indexManager
-                         .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-                 if (lts == null) {
-
-                     /*
-                      * This should only occur if there is a concurrent destroy,
-                      * which is highly unlikely to say the least.
-                      */
-                     throw new RuntimeException("Concurrent create/destroy: "
-                             + namespace);
-
-                 }
-
-                 return lts;
-                 
-             }
-             
-         } catch (IOException ex) {
-             
-             throw new RuntimeException(ex);
-             
-//         } finally {
-//
-//             if (acquiredConnection)
-//                 journal.releaseUnisolatedConnection();
+            }
 
          }
-         
-    }
+
+         // Create a new instance.
+         {
+
+            if (Boolean.parseBoolean(properties.getProperty(
+                  BigdataSail.Options.ISOLATABLE_INDICES,
+                  BigdataSail.Options.DEFAULT_ISOLATABLE_INDICES))) {
+
+               /*
+                * Isolatable indices: requires the use of a tx to create the KB
+                * instance.
+                */
+
+               final long txCreate = txService.newTx(ITx.UNISOLATED);
+
+               boolean ok = false;
+               try {
+
+                  final AbstractTripleStore txCreateView = new LocalTripleStore(
+                        indexManager, namespace, Long.valueOf(txCreate),
+                        properties);
+
+                  // create the kb instance within the tx.
+                  txCreateView.create();
+
+                  // commit the tx.
+                  txService.commit(txCreate);
+
+                  ok = true;
+
+               } finally {
+
+                  if (!ok)
+                     txService.abort(txCreate);
+
+               }
+
+            } else {
+
+               /*
+                * Create KB without isolatable indices.
+                */
+
+               final LocalTripleStore lts = new LocalTripleStore(indexManager,
+                     namespace, ITx.UNISOLATED, properties);
+
+               lts.create();
+
+            }
+
+         }
+
+         /*
+          * Now that we have created the instance, either using a tx or the
+          * unisolated connection, locate the triple store resource and return
+          * it.
+          */
+         {
+
+            final LocalTripleStore lts = (LocalTripleStore) indexManager
+                  .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+
+            if (lts == null) {
+
+               /*
+                * This should only occur if there is a concurrent destroy, which
+                * is highly unlikely to say the least.
+                */
+               throw new RuntimeException("Concurrent create/destroy: "
+                     + namespace);
+
+            }
+
+            return lts;
+
+         }
+
+      } catch (IOException ex) {
+
+         throw new RuntimeException(ex);
+
+      } finally {
+
+         if (!isGroupCommit && acquiredConnection) {
+
+            /**
+             * When group commit is not enabled, we need to release the
+             * unisolated connection.
+             * 
+             * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+             */
+            ((Journal) indexManager).releaseUnisolatedConnection();
+
+         }
+
+      }
+
+   }
 
 }
