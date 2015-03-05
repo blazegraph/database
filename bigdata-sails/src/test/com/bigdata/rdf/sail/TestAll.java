@@ -98,6 +98,9 @@ public class TestAll extends TestCase {
 
         // NanoSparqlServer
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
+        
+        //BigdataSailFactory
+        suite.addTest(BigdataSailFactoryTest.suite());
 
         /* FIXME Restore:: quad store in scale-out.
          * 

@@ -1,6 +1,6 @@
 package com.bigdata.rdf.sail;
 
-import static org.junit.Assert.*;
+import junit.framework.TestSuite;
 
 import org.junit.Test;
 
@@ -78,6 +78,10 @@ public class BigdataSailFactoryTest {
 				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
 
 		assert(remoteRepositoryNamespaceUrl.equals(normalizedServiceURL));
+	}
+	
+	public static TestSuite suite(){
+		return new TestSuite(BigdataSailFactoryTest.class);
 	}
 
 }
