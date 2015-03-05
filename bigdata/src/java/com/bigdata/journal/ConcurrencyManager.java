@@ -348,7 +348,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * <code>true</code> until the service is shutdown.
      */
-    private boolean open = true;
+    private volatile boolean open = true;
     
     /**
      * Pool of threads for handling concurrent read/write transactions on named
@@ -364,7 +364,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Once the transaction has acquired those writable indices it then runs its
      * commit phrase as an unisolated operation on the {@link #writeService}.
      */
-    final protected ThreadPoolExecutor txWriteService;
+    final private ThreadPoolExecutor txWriteService;
 
     /**
      * Pool of threads for handling concurrent unisolated read operations on
@@ -382,7 +382,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * historical commit records (which may span more than one logical
      * journal) until the reader terminates.
      */
-    final protected ThreadPoolExecutor readService;
+    final private ThreadPoolExecutor readService;
 
     /**
     * Pool of threads for handling concurrent unisolated write operations on
@@ -415,18 +415,18 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
      */
-    final long shutdownTimeout;
+    final private long shutdownTimeout;
 
-    /**
-     * An object wrapping the properties specified to the ctor.
-     */
-    public Properties getProperties() {
-        
-        return new Properties(properties);
-        
-    }
+//    /**
+//     * An object wrapping the properties specified to the ctor.
+//     */
+//    public Properties getProperties() {
+//        
+//        return new Properties(properties);
+//        
+//    }
     
-    protected void assertOpen() {
+    private void assertOpen() {
         
         if (!open)
             throw new IllegalStateException();
@@ -1428,6 +1428,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
      *      should interrupt NSS requests and AbstractTasks </a>
+     *      
+     *      FIXME Should also shutdown/restart the {@link #txWriteService}
      */
      void abortAllTx() {
        
