@@ -36,15 +36,15 @@ import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -93,8 +93,10 @@ public class TestNanoSparqlServer extends TestCase2 {
         }
 
         // Create the triple store instance.
-        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
-                namespace, tripleStoreProperties);
+//        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
+//                namespace, tripleStoreProperties);
+         AbstractApiTask.submitApiTask(m_indexManager,
+               new CreateKBTask(namespace, tripleStoreProperties)).get();
 
         // Override namespace.  Do not create the default KB.
         final Map<String, String> initParams = new LinkedHashMap<String, String>();
@@ -168,8 +170,10 @@ public class TestNanoSparqlServer extends TestCase2 {
         }
 
         if (m_indexManager != null && namespace != null) {
-
-            dropTripleStore(m_indexManager, namespace);
+           
+//            dropTripleStore(m_indexManager, namespace);
+           AbstractApiTask.submitApiTask(m_indexManager,
+               new DestroyKBTask(namespace)).get();
 
             m_indexManager = null;
 
@@ -190,77 +194,77 @@ public class TestNanoSparqlServer extends TestCase2 {
 
     }
 
-    protected AbstractTripleStore createTripleStore(
-            final IIndexManager indexManager, final String namespace,
-            final Properties properties) {
-        
-        if(log.isInfoEnabled())
-            log.info("KB namespace=" + namespace);
-    
-        // Locate the resource declaration (aka "open"). This tells us if it
-        // exists already.
-        AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-    
-        if (tripleStore != null) {
-    
-            fail("exists: " + namespace);
-            
-        }
-    
-        /*
-         * Create the KB instance.
-         */
-    
-        if (log.isInfoEnabled()) {
-            log.info("Creating KB instance: namespace="+namespace);
-            log.info("Properties=" + properties.toString());
-        }
-    
-        if (indexManager instanceof Journal) {
-    
-            // Create the kb instance.
-            tripleStore = new LocalTripleStore(indexManager, namespace,
-                    ITx.UNISOLATED, properties);
-    
-        } else {
-    
-            tripleStore = new ScaleOutTripleStore(indexManager, namespace,
-                    ITx.UNISOLATED, properties);
-        }
-    
-        // create the triple store.
-        tripleStore.create();
-    
-        if(log.isInfoEnabled())
-            log.info("Created tripleStore: " + namespace);
-    
-        // New KB instance was created.
-        return tripleStore;
-    
-    }
+//    protected AbstractTripleStore createTripleStore(
+//            final IIndexManager indexManager, final String namespace,
+//            final Properties properties) {
+//        
+//        if(log.isInfoEnabled())
+//            log.info("KB namespace=" + namespace);
+//    
+//        // Locate the resource declaration (aka "open"). This tells us if it
+//        // exists already.
+//        AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//    
+//        if (tripleStore != null) {
+//    
+//            fail("exists: " + namespace);
+//            
+//        }
+//    
+//        /*
+//         * Create the KB instance.
+//         */
+//    
+//        if (log.isInfoEnabled()) {
+//            log.info("Creating KB instance: namespace="+namespace);
+//            log.info("Properties=" + properties.toString());
+//        }
+//    
+//        if (indexManager instanceof Journal) {
+//    
+//            // Create the kb instance.
+//            tripleStore = new LocalTripleStore(indexManager, namespace,
+//                    ITx.UNISOLATED, properties);
+//    
+//        } else {
+//    
+//            tripleStore = new ScaleOutTripleStore(indexManager, namespace,
+//                    ITx.UNISOLATED, properties);
+//        }
+//    
+//        // create the triple store.
+//        tripleStore.create();
+//    
+//        if(log.isInfoEnabled())
+//            log.info("Created tripleStore: " + namespace);
+//    
+//        // New KB instance was created.
+//        return tripleStore;
+//    
+//    }
 
-    protected void dropTripleStore(final IIndexManager indexManager,
-            final String namespace) {
-
-        if (log.isInfoEnabled())
-            log.info("KB namespace=" + namespace);
-    
-        // Locate the resource declaration (aka "open"). This tells us if it
-        // exists already.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-    
-        if (tripleStore != null) {
-    
-            if (log.isInfoEnabled())
-                log.info("Destroying: " + namespace);
-    
-            tripleStore.destroy();
-            
-        }
-    
-    }
+//    protected void dropTripleStore(final IIndexManager indexManager,
+//            final String namespace) {
+//
+//        if (log.isInfoEnabled())
+//            log.info("KB namespace=" + namespace);
+//    
+//        // Locate the resource declaration (aka "open"). This tells us if it
+//        // exists already.
+//        final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//    
+//        if (tripleStore != null) {
+//    
+//            if (log.isInfoEnabled())
+//                log.info("Destroying: " + namespace);
+//    
+//            tripleStore.destroy();
+//            
+//        }
+//    
+//    }
 
     /**
      * Simple start/kill in which we verify that the default KB was NOT created

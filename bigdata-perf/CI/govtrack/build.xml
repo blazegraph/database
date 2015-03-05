@@ -80,7 +80,7 @@
 		    description="Run queries against an existing SPARQL endpoint.">
 		<java classname="com.bigdata.rdf.sail.bench.NanoSparqlClient"
                            fork="true" failonerror="true">
-			<arg line="-analytic true -repeat 3 -f queries http://localhost:${ci.nanoServerPort}/sparql ${ci.journalFile}"/>
+			<arg line="-analytic true -dbMode quads -repeat 3 -f queries http://localhost:${ci.nanoServerPort}/sparql ${ci.journalFile}"/>
 			<jvmarg line="-Dlog4j.configuration=file:log4j.properties"/>
 			<classpath>
 				<path refid="runtime.classpath" />

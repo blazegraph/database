@@ -55,6 +55,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+
+import junit.framework.Test;
 
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
@@ -72,6 +76,7 @@ import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -83,7 +88,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  * Note: Also see {@link SPARQLUpdateTest}. These two test suites SHOULD be kept
  * synchronized. {@link SPARQLUpdateTest} runs against a local kb instance while
  * this class runs against the NSS. The two test suites are not exactly the same
- * because one uses the {@link RemoteRepository} to commuicate with the NSS
+ * because one uses the {@link RemoteRepository} to communicate with the NSS
  * while the other uses the local API.
  * 
  * @param <S>
@@ -103,27 +108,47 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 	}
 
-    protected static final String EX_NS = "http://example.org/";
+   /**
+    * We need to be running this test suite for each of the BufferModes that we
+    * want to support. This is because there are subtle interactions between the
+    * BufferMode, the AbstractTask, and the execution of mutation operations.
+    * One approach might be to pass in a collection of BufferMode values rather
+    * than a singleton and then generate the test suite for each BufferMode
+    * value in that collection [I've tried this, but I am missing something in
+    * the proxy test pattern with the outcome that the tests are not properly
+    * distinct.]
+    */
+	static public Test suite() {
 
-    protected ValueFactory f = new ValueFactoryImpl();
-    protected URI bob, alice, graph1, graph2;
+		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
+		      "test.*",
+//				"testStressInsertWhereGraph",
+//				"testInsertWhereGraph",
+				new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[]{
+				BufferMode.Transient, 
+				BufferMode.DiskWORM, 
+				BufferMode.MemStore,
+				BufferMode.DiskRW, 
+				})),
+				TestMode.quads
+				);
+	}
+
+	private static final String EX_NS = "http://example.org/";
+
+    private ValueFactory f = new ValueFactoryImpl();
+    private URI bob, alice, graph1, graph2;
 //    protected RemoteRepository m_repo;
 
 	@Override
 	public void setUp() throws Exception {
-	    
-	    super.setUp();
+
+		super.setUp();
 	    
 //        m_repo = new RemoteRepository(m_serviceURL);
-        
-        /*
-         * Only for testing. Clients should use AddOp(File, RDFFormat).
-         * 
-         * TODO Do this using LOAD or just write tests for LOAD?
-         */
-        loadFile(
-                "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig",
-                RDFFormat.TRIG);
+
+		// Load the test data set.
+		doLoadFile();
 
         bob = f.createURI(EX_NS, "bob");
         alice = f.createURI(EX_NS, "alice");
@@ -132,6 +157,22 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         graph2 = f.createURI(EX_NS, "graph2");
 	}
 	
+	/**
+	 * Load the test data set.
+	 * 
+	 * @throws Exception
+	 */
+	private void doLoadFile() throws Exception {
+        /*
+		 * Only for testing. Clients should use AddOp(File, RDFFormat) or SPARQL
+		 * UPDATE "LOAD".
+		 */
+        loadFile(
+                "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig",
+                RDFFormat.TRIG);
+	}
+	
+	@Override
 	public void tearDown() throws Exception {
 	    
 	    bob = alice = graph1 = graph2 = null;
@@ -151,7 +192,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
      *            The file format.
      * @throws Exception
      */
-    protected void loadFile(final String file, RDFFormat format)
+    protected void loadFile(final String file, final RDFFormat format)
             throws Exception {
 
         final AddOp add = new AddOp(new File(file), format);
@@ -182,16 +223,15 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws RepositoryException {
 
-        try {
+      try {
 
-            return m_repo.getStatements(subj, pred, obj, includeInferred,
-                    contexts).hasNext();
-            
-        } catch (Exception e) {
-            
-            throw new RepositoryException(e);
-            
-        }
+         return m_repo.hasStatement(subj, pred, obj, includeInferred, contexts);
+
+      } catch (Exception e) {
+
+         throw new RepositoryException(e);
+
+      }
 
     }
     
@@ -1346,7 +1386,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     {
 //        log.debug("executing testClearDefault");
 
-        String update = "CLEAR DEFAULT";
+       String update = "CLEAR DEFAULT";
 
 //        Update operation = con.prepareUpdate(QueryLanguage.SPARQL, update);
 
@@ -1869,5 +1909,41 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     	return new LiteralImpl(sb.toString());
     	
     }
+
+    /**
+     * Used for reporting of the last operation issued.
+     */
+    private enum StressTestOpEnum {
+		Update,
+		DropAll,
+		LoadFile
+	};
+	/**
+	 * A stress test written to look for stochastic behaviors in SPARQL UPDATE
+	 * for GROUP COMMIT.
+	 */
+    public void testStressInsertWhereGraph() throws Exception {
+
+		final int LIMIT = 10;
+		int i = 0;
+		StressTestOpEnum lastOp = null;
+		try {
+			for (i = 0; i < LIMIT; i++) {
+
+				lastOp = StressTestOpEnum.Update;
+				testInsertWhereGraph();
+				
+				lastOp = StressTestOpEnum.DropAll;
+				testDropAll();
+				
+				lastOp = StressTestOpEnum.LoadFile;
+				doLoadFile();
+			}
+		} catch (Throwable t) {
+			throw new RuntimeException("Iteration " + (i + 1) + " of " + LIMIT
+					+ ", lastOp=" + lastOp, t);
+		}
+
+	}
 
 }

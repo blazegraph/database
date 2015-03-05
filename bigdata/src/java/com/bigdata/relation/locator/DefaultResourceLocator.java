@@ -48,6 +48,7 @@ import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IIndexStore;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
@@ -643,14 +644,14 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
             
             final long readTime;
             
-            if (indexManager instanceof Journal) {
+            if (indexManager instanceof IJournal) {
 
                 /*
                  * For a Journal, find the commitTime backing that read-only
                  * view.
                  */
 
-                final Journal journal = (Journal) indexManager;
+                final IJournal journal = (IJournal) indexManager;
 
                 /*
                  * Note: Using the local transaction manager to resolve a
@@ -663,7 +664,7 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
                  * not protected by a tx.
                  */
 
-                final ITx tx = journal.getTransactionManager().getTx(
+                final ITx tx = journal.getLocalTransactionManager().getTx(
                         timestamp);
 
                 if (tx != null) {
@@ -822,11 +823,11 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
 
             } else if (TimestampUtility.isReadWriteTx(timestamp)) {
 
-                if (indexManager instanceof Journal) {
+                if (indexManager instanceof IJournal) {
 
-                    final Journal journal = (Journal) indexManager;
+                    final IJournal journal = (IJournal) indexManager;
 
-                    final ITx tx = journal.getTransactionManager().getTx(
+                    final ITx tx = journal.getLocalTransactionManager().getTx(
                             timestamp);
 
                     if (tx == null) {

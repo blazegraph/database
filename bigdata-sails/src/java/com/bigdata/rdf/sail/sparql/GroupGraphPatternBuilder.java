@@ -71,6 +71,7 @@ import com.bigdata.rdf.sparql.ast.ConstructNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -379,6 +380,14 @@ public class GroupGraphPatternBuilder extends TriplePatternExprBuilder {
 
         final TermNode newContext = (TermNode) node.jjtGetChild(0).jjtAccept(
                 this, null);
+
+        if (!context.tripleStore.isQuads()) {
+           if (newContext!=null) {
+               throw new QuadsOperationInTriplesModeException(
+                   "Use of GRAPH construct in query body is not supported "
+                   + "in triples mode.");
+           }
+        }
 
         graphPattern.setContextVar(newContext);
         graphPattern.setStatementPatternScope(Scope.NAMED_CONTEXTS);

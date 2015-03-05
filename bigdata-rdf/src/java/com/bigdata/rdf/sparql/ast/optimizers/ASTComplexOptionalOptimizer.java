@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,7 +37,6 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -43,7 +44,6 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -59,9 +59,27 @@ import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
+ * NOTE: this optimizer was not sound from a correctness perspective in previous
+ * versions (cf. http://trac.bigdata.com/ticket/1071); the rewritten form should 
+ * be fine from a correctness perspective, but does not really optimize queries
+ * from a performance perspective, so it has been (temporarily) disabled in the
+ * {@link DefaultOptimizerList}. The description below describes the original
+ * idea, the actual implementation slightly differs in (i) that it passes around
+ * intermediate solutions (rather than computing all joins over the original
+ * outer mapping set) and (ii) does not compute a final join over all
+ * intermediate solutions but simply returns the last computed result (which
+ * is now possible due to (i)). 
+ * 
+ * Also note that the {@link AST2BOpUtility} has been refactored (as part of
+ * ticket #1071 and #1118) and now implements intelligent pushing of projection
+ * variables into OPTIONAL blocks, so there's probably no more need for this
+ * optimizer.
+ * 
+ * 
  * Rewrite a join group using two or more complex OPTIONAL groups using a hash
  * join pattern.
  * <p>
@@ -129,9 +147,12 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  * 
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/397
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: ASTComplexOptionalOptimizer.java 5365 2011-10-19 20:56:18Z
- *          thompsonbry $
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
+ * 
  */
+
+
+@Deprecated
 public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger
@@ -323,6 +344,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             	IGroupMemberNode t = members[i];
             	optimizationApplicable |= 
             		t instanceof IBindingProducerNode && 
+            		!(t instanceof AssignmentNode) && // assignments run last
             		!(t instanceof JoinGroupNode && ((JoinGroupNode) t).isOptional());
             }
     	
@@ -472,8 +494,24 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             
         }
 
+        /**
+         * Extract maybe produced variables from the complex join groups,
+         * making the accessible in an easy way for reuse in the subsequent
+         * iteration
+         */
+        final List<Set<IVariable<?>>> complexGroupsDefiniteVars = 
+             new ArrayList<Set<IVariable<?>>>(complexGroups.size());
+        for (int i=0; i<complexGroups.size(); i++) {
+           
+           final Set<IVariable<?>> cur = new HashSet<IVariable<?>>();
+           sa.getDefinitelyProducedBindings(complexGroups.get(i), cur, true);
+           complexGroupsDefiniteVars.add(i,cur);
+        }
+        
         // Step 2 (for each direct child complex optional group).
-        for (JoinGroupNode childGroup : complexGroups) {
+        String precedingSolutionName = mainSolutionSetName;
+        for (int i=0; i<complexGroups.size(); i++) {
+            final JoinGroupNode childGroup = complexGroups.get(i);
 
 //            log.error("Convert: " + childGroup);
 
@@ -488,30 +526,70 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
             nsr.setWhereClause(whereClause);
 
             final NamedSubqueryInclude mainInclude = new NamedSubqueryInclude(
-                    mainSolutionSetName);
+                  precedingSolutionName);
 
             whereClause.addChild(mainInclude);
-
-            // Replace the complex optional group with an INCLUDE of the
-            // generated solution set back into the main query.
+            whereClause.addChild(childGroup);
+            
 
             final NamedSubqueryInclude anInclude = new NamedSubqueryInclude(
                     solutionSetName);
-            
+
+            /*
+             * We substitute the current include into the main query.
+             * 
+             * TODO: Note that it may be removed again at the end of the for 
+             * loop: actually, we only keep the final subquery, all others are
+             * dropped again. We just need to add them temporarily,
+             * to be able to reuse the static analysis (call 
+             * sa.getProjectedVars) below. We might try to change this to make
+             * the code more readable.
+             */
             if (group.replaceWith(childGroup, anInclude) != 1)
                 throw new AssertionError();
 
-            whereClause.addChild(childGroup);
-
             /*
-             * Create the projection for the named subquery.
+             * Create the projection for the named subquery and replace the
+             * query with the named subquery ID.
              */
             {
-
+                /*
+                 * sa.getProjectedVars computes required variables according
+                 * to the ancestor axis
+                 */
                 final Set<IVariable<?>> projectedVars = sa.getProjectedVars(
                         anInclude, whereClause, query, exogenousVars,
                         new LinkedHashSet<IVariable<?>>());
+                
+                /*
+                 * In addition to the vars collected by sa.getProjectedVars,
+                 * we need to retain variables appearing in subsequent complex
+                 * join groups. This is necessary to avoid a blowup (duplicates)
+                 * in the number of results, see ticket #801, i.e. we need to
+                 * make sure that joins with subsequent join groups are
+                 * executed over *all* joint variables.
+                 * 
+                 * To do so, we start up with the maybe vars of the group itself
+                 * and retain all maybe vars occurring in one of the following
+                 * join groups, and add them to the list of projected vars.
+                 */
+                final Set<IVariable<?>> joinVarCandidates = 
+                        complexGroupsDefiniteVars.get(i);
+                
+                final Set<IVariable<?>> subsequentGroupDefiniteVars = 
+                        new HashSet<IVariable<?>>();
+                for (int j=i+1; j<complexGroupsDefiniteVars.size(); j++) {
+                   subsequentGroupDefiniteVars.addAll(complexGroupsDefiniteVars.get(j));
+                }
+                
+                joinVarCandidates.retainAll(subsequentGroupDefiniteVars);
 
+                projectedVars.addAll(joinVarCandidates);
+
+                /*
+                 * Having computed the projection vars, we're now ready to 
+                 * build the projection clause for the current named subquery. 
+                 */
                 final ProjectionNode projection = new ProjectionNode();
 
                 for (IVariable<?> v : projectedVars) {
@@ -521,66 +599,17 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
                 }
 
                 nsr.setProjection(projection);
+               
+                // remove group again
+                if (i!=complexGroups.size()-1) {
+                    if (!group.removeArg(anInclude))
+                        throw new AssertionError();
+                }
 
             }
-
-        }
-        
-    }
-
-    private void liftSparql11Subquery(final AST2BOpContext context,
-            final StaticAnalysis sa, final SubqueryRoot subqueryRoot) {
-
-        final String newName = "-subSelect-" + context.nextId();
-
-        final NamedSubqueryInclude include = new NamedSubqueryInclude(newName);
-
-        final IGroupNode<IGroupMemberNode> parent = subqueryRoot.getParent();
-
-        /*
-         * Note: A SubqueryRoot normally starts out as the sole child of a
-         * JoinGroupNode. However, other rewrites may have written out that
-         * JoinGroupNode and it does not appear to be present for an ASK
-         * subquery.
-         * 
-         * Therefore, when the parent of the SubqueryRoot is a JoinGroupNode
-         * having the SubqueryRoot as its only child, we use the parent's parent
-         * in order to replace the JoinGroupNode when we lift out the
-         * SubqueryRoot. Otherwise we use the parent since there is no wrapping
-         * JoinGroupNode (or if there is, it has some other stuff in there as
-         * well).
-         */
-         
-        if ((parent instanceof JoinGroupNode) && ((BOp) parent).arity() == 1
-                && parent.getParent() != null) {
             
-            final IGroupNode<IGroupMemberNode> pp = parent.getParent();
-
-            // Replace the sub-select with the include.
-            if (((ASTBase) pp).replaceWith((BOp) parent, include) == 0)
-                throw new AssertionError();
-
-        } else {
-
-            // Replace the sub-select with the include.
-            if (((ASTBase) parent).replaceWith((BOp) subqueryRoot, include) == 0)
-                throw new AssertionError();
-            
+            precedingSolutionName = solutionSetName;
         }
 
-        final NamedSubqueryRoot nsr = new NamedSubqueryRoot(
-                subqueryRoot.getQueryType(), newName);
-
-        nsr.setConstruct(subqueryRoot.getConstruct());
-        nsr.setGroupBy(subqueryRoot.getGroupBy());
-        nsr.setHaving(subqueryRoot.getHaving());
-        nsr.setOrderBy(subqueryRoot.getOrderBy());
-        nsr.setProjection(subqueryRoot.getProjection());
-        nsr.setSlice(subqueryRoot.getSlice());
-        nsr.setWhereClause(subqueryRoot.getWhereClause());
-
-        sa.getQueryRoot().getNamedSubqueriesNotNull().add(nsr);
-
     }
-
 }

@@ -483,12 +483,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (false && store instanceof Journal
                 && ((Journal) store).getReadExecutor() != null) {
 
-            /*
-             * This code path materializes the child node using the read
-             * service. This has the effect of bounding the #of concurrent IO
-             * requests against the local disk based on the allowed parallelism
-             * for that read service.
-             */
+         /*
+          * This code path materializes the child node using the read service.
+          * This has the effect of bounding the #of concurrent IO requests
+          * against the local disk based on the allowed parallelism for that
+          * read service.
+          * 
+          * Note: getReadExecutor() is not defined for IJournal. If we want to
+          * support the read executor pre-fetch pattern then the code needs to
+          * be updated to use IJournal and IJournal needs to expose
+          * getReadExecutor. 
+          */
 
             final Executor s = ((Journal) store).getReadExecutor();
 

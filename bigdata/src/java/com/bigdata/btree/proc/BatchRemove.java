@@ -38,13 +38,13 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch removal of one or more tuples, optionally returning their existing
- * values.
+ * values, the #of tuples that were deleted, or a mask indicating which tuples
+ * were deleted (polymorphic return type).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+public class BatchRemove extends AbstractKeyArrayIndexProcedure<Object> implements
+        IParallelizableIndexProcedure<Object> {
 
     /**
      * 
@@ -74,6 +74,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
     }
 
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -85,7 +86,6 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
-     * @version $Id$
      */
     private static enum ReturnWhatEnum {
       
@@ -177,6 +177,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
         /**
          * Values ARE NOT sent.
          */
+        @Override
         public final boolean sendValues() {
             
             return false;
@@ -192,6 +193,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
 
         }
 
+        @Override
         public BatchRemove newInstance(IRabaCoder keySer, IRabaCoder valSer,
                 int fromIndex, int toIndex, byte[][] keys, byte[][] vals) {
 
@@ -252,6 +254,7 @@ public class BatchRemove extends AbstractKeyArrayIndexProcedure implements
      *             if {@link #getAssertFound()} is <code>true</code> and a
      *             given key was not found in the index.
      */
+    @Override
     public Object apply(final IIndex ndx) {
 
         final int n = getKeyCount();

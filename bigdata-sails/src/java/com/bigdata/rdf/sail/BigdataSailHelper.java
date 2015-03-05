@@ -44,7 +44,16 @@ import com.bigdata.service.jini.JiniFederation;
  * Class provides guidance on parameter setup a data set and queries.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
+ * 
+ * @deprecated The workbench provides configuration guidance. This class also
+ *             provides some support for people who want to modify some
+ *             properties after a namespace has been created. This is in fact
+ *             possible for some kinds of properties but not for others, but
+ *             there is very little documentation about when this is and is not
+ *             possible. You need to actually understand and reason about
+ *             whether the property controls the manner in which the data is
+ *             stored on the disk or whether it simply controls the runtime
+ *             behavior in a manner that does not impact the disk storage.
  */
 public class BigdataSailHelper {
 

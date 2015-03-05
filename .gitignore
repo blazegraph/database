@@ -335,3 +335,5 @@ benchmark
 /bigdata-perf/gas/*.out
 /bigdata-perf/gas/*.test
 /bigdata-perf/gas/*.jnl
+
+*~

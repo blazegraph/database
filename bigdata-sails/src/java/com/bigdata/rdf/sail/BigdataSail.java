@@ -69,7 +69,6 @@ import java.util.Properties;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -99,8 +98,8 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -120,6 +119,7 @@ import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.rules.BackchainAccessPath;
 import com.bigdata.rdf.rules.InferenceEngine;
+import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -143,6 +143,7 @@ import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
@@ -163,38 +164,49 @@ import cutthecrap.utils.striterators.Striterator;
  * Sesame <code>2.x</code> integration.
  * </p>
  * <p>
- * Read-write operations use {@link #getConnection()} to obtain a mutable view.
- * {@link #getConnection()} uses a {@link Semaphore} to enforce the constraint
- * that there is only one writable {@link BigdataSailConnection} at a time. SAIL
- * transactions will be serialized (at most one will run at a time).
+ * Read-write operations use {@link #getConnection()}to obtain a mutable view.
+ * This delegates to either {@link #getUnisolatedConnection()} or
+ * {@link #getReadWriteConnection()} depending on how the Sail is configured.
+ * </p>
+ * <p>
+ * Concurrent unisolated writers are supported if group commit is enabled, but
+ * at most one unisolated writer will execute against a given Sail instance at a
+ * time - other writers will be serialized. See
+ * {@link #getUnisolatedConnection()} for more information on how to enable
+ * group commit and how to write code that supports group commit.
  * </p>
  * <p>
  * Concurrent readers are possible, and can be very efficient. However, readers
  * MUST use a database commit point corresponding to a desired state of the
  * store, e.g., after loading some data set and (optionally) after computing the
- * closure of that data set. Use {@link #getReadOnlyConnection()} to obtain
- * a read-only view of the database as of the last commit time, or 
+ * closure of that data set. Use {@link #getReadOnlyConnection()} to obtain a
+ * read-only view of the database as of the last commit time, or
  * {@link #getReadOnlyConnection(long)} to obtain a read-only view of the
- * database as of some other historical point.  These connections are safe to
- * use concurrently with the unisolated connection from {@link #getConnection()}.
+ * database as of some other historical point. These connections are safe to use
+ * concurrently with the unisolated connection from {@link #getConnection()}.
  * </p>
  * <p>
- * Read/write transaction are also implemented in the bigdata SAIL.  To turn
- * on read/write transactions, use the option {@link Options#ISOLATABLE_INDICES}.
- * If this option is set to true, then {@link #getConnection} will return an
- * isolated read/write view of the database.  Multiple read/write transactions
- * are allowed, and the database can resolve add/add conflicts between
- * transactions.
+ * Concurrent fully isolated read/write transactions against the same Sail are
+ * also implemented in the bigdata SAIL. To turn on read/write transactions, use
+ * the option {@link Options#ISOLATABLE_INDICES}. If this option is set to true,
+ * then {@link #getConnection()} will return an isolated read/write view of the
+ * database. Multiple concurrent read/write transactions are allowed, and the
+ * database can resolve add/add conflicts between transactions. Unlike group
+ * commit, these fully isolated read/write transactions will in fact execute
+ * concurrently against the same Sail instance (rather than being serialized).
+ * However, there is additional overhead for fully isolated read/write
+ * transactions and graph update patterns can lead to unreconcilable conflicts
+ * during updates (in which case one transaction will be a failed during the
+ * validation phase). The highest throughput is generally obtained using
+ * {@link #getUnisolatedConnection()} in which case you do not need to enabled
+ * {@link Options#ISOLATABLE_INDICES}.
  * </p>
  * <p>
  * The {@link BigdataSail} may be configured as as to provide a triple store
- * with statement-level provenance using <em>statement identifiers</em>. A
- * statement identifier is unique identifier for a <em>triple</em> in the
- * database. Statement identifiers may be used to make statements about
- * statements without using RDF style reification. The statement identifier is
- * bound to the context position during high-level query so you can use
- * high-level query (SPARQL) to obtain statements about statements. See
- * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS}.
+ * with statement-level provenance using <em>statement identifiers</em>. See
+ * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} and <a
+ * href="http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right" >
+ * Reification Done Right </a>.
  * </p>
  * <p>
  * Quads may be enabled using {@link AbstractTripleStore.Options#QUADS}.
@@ -692,6 +704,13 @@ public class BigdataSail extends SailBase implements Sail {
     }
     
     /**
+     * <strong>CAUTION: With the introduction of group commit support the 
+     * correct way to create a new KB instance is using {@link AbstractApiTask}
+     * to submit a {@link CreateKBTask}. This code path will correctly make use
+     * of the group commit mechanisms. A failure to use this approach could 
+     * result in a non-ACID commit!
+     * </strong>
+     * <p>
      * If the {@link LocalTripleStore} with the appropriate namespace exists,
      * then return it. Otherwise, create the {@link LocalTripleStore}. When the
      * properties indicate that full transactional isolation should be
@@ -703,6 +722,10 @@ public class BigdataSail extends SailBase implements Sail {
      *            The properties.
      *            
      * @return The {@link LocalTripleStore}.
+     * 
+     * @see CreateKBTask
+     * 
+     * @deprecated by {@link CreateKBTask}
      */
     public static LocalTripleStore createLTS(final Journal journal,
             final Properties properties) {
@@ -838,7 +861,14 @@ public class BigdataSail extends SailBase implements Sail {
         
     }
 
-    private static void checkProperties(final Properties properties) 
+    /**
+    * Check properties to make sure that they are consistent.
+    * 
+    * @param properties
+    *           The properties.
+    * @throws UnsupportedOperationException
+    */
+    public static void checkProperties(final Properties properties) 
             throws UnsupportedOperationException {
     
         final boolean quads = Boolean.parseBoolean(properties.getProperty(
@@ -1365,49 +1395,63 @@ public class BigdataSail extends SailBase implements Sail {
      */
     final private ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false/*fair*/);
 
-	    /**
-     * Return an unisolated connection to the database. The unisolated
-     * connection supports fast, scalable updates against the database. The
-     * unisolated connection is ACID when used with a local {@link Journal} and
-     * shard-wise ACID when used with an {@link IBigdataFederation}.
-     * <p>
-     * In order to guarantee that operations against the unisolated connection
-     * are ACID, only one of unisolated connection is permitted at a time for a
-     * {@link Journal} and this method will block until the connection is
-     * available. If there is an open unisolated connection against a local
-     * {@link Journal}, then the open connection must be closed before a new
-     * connection can be returned by this method.
-     * <p>
-     * This constraint that there can be only one unisolated connection is not
-     * enforced in scale-out since unisolated operations in scale-out are only
-     * shard-wise ACID.
-     * <p>
-     * The correct pattern for obtaining an updatable connection, doing work
-     * with that connection, and committing or rolling back that update is as
-     * follows.
-     * 
-     * <pre>
-     * BigdataSailConnection conn = null;
-     * boolean ok = false;
-     * try {
-     *     conn = sail.getUnisolatedConnection();
-     *     doWork(conn);
-     *     conn.commit();
-     *     ok = true;
-     * } finally {
-     *     if (conn != null) {
-     *         if (!ok) {
-     *             conn.rollback();
-     *         }
-     *         conn.close();
-     *     }
-     * }
-     * </pre>
-     * 
-     * @return The unisolated connection to the database
-     * 
-     * @see #getConnection()
-     */
+   /**
+    * Return an unisolated connection to the database. The unisolated connection
+    * supports fast, scalable updates against the database. The unisolated
+    * connection is ACID when used with a local {@link Journal} and shard-wise
+    * ACID when used with an {@link IBigdataFederation}.
+    * <p>
+    * <h3>Group Commit Enabled</h3>
+    * <p>
+    * If {@link com.bigdata.journal.Journal.Options#GROUP_COMMIT group commit}
+    * is enabled and you use the either the REST API or the
+    * {@link com.bigdata.rdf.task.AbstractApiTask#submitApiTask(IIndexManager, com.bigdata.rdf.task.IApiTask)}
+    * pattern to submit tasks, then concurrent unisolated connections will be
+    * granted for different namespaces and multiple unisolated connections for
+    * the same namespace MAY be melded into the same commit group (whether they
+    * are or not depends on the timing of the tasks and whether they are being
+    * submitted by a single client thread or by a pool of clients).
+    * <p>
+    * <h3>Group Commit Disabled</h3>
+    * <p>
+    * In this mode the application decides when the database will go through a
+    * commit point. In order to guarantee that operations against the unisolated
+    * connection are ACID, only one unisolated connection is permitted at a time
+    * for a {@link Journal}. If there is an open unisolated connection against a
+    * local {@link Journal}, then the open connection must be closed before a
+    * new connection can be returned by this method.
+    * <p>
+    * This constraint that there can be only one unisolated connection is not
+    * enforced in scale-out since unisolated operations in scale-out are only
+    * shard-wise ACID.
+    * <p>
+    * The correct pattern for obtaining an updatable connection, doing work with
+    * that connection, and committing or rolling back that update is as follows.
+    * 
+    * <pre>
+    * BigdataSailConnection conn = null;
+    * boolean ok = false;
+    * try {
+    *    conn = sail.getUnisolatedConnection();
+    *    doWork(conn);
+    *    conn.commit();
+    *    ok = true;
+    * } finally {
+    *    if (conn != null) {
+    *       if (!ok) {
+    *          conn.rollback();
+    *       }
+    *       conn.close();
+    *    }
+    * }
+    * </pre>
+    * 
+    * @return The unisolated connection to the database
+    * 
+    * @see #getConnection()
+    * @see <a href="wiki.bigdata.com/wiki/index.php?title=GroupCommit" > Group
+    *      Commit (wiki) </a>
+    */
     public BigdataSailConnection getUnisolatedConnection()
             throws InterruptedException {
 
@@ -1426,7 +1470,20 @@ public class BigdataSail extends SailBase implements Sail {
         BigdataSailConnection conn = null;
         try {
             if (getDatabase().getIndexManager() instanceof Journal) {
-                // acquire permit from Journal.
+            /*
+             * acquire permit from Journal.
+             * 
+             * Note: The [instanceof Journal] test here is correct. What happens
+             * is that an unisolated AbstractTask that is submitted through the
+             * ConcurrencyManager on the Journal is an IJournal (an
+             * IsolatedActionJournal) but not a Journal. Thus the
+             * getUnisolatedConnection() code does not attempt to obtain the
+             * global semaphore. This allows concurrent execution of tasks
+             * requiring unisolated connections for distinct namespaces on the
+             * same journal.
+             * 
+             * @see #1137 (Code review of IJournal vs Journal)
+             */
                 ((Journal) getDatabase().getIndexManager())
                         .acquireUnisolatedConnection();
                 acquiredConnection = true;
@@ -1436,9 +1493,22 @@ public class BigdataSail extends SailBase implements Sail {
             writeLock = lock.writeLock();
             writeLock.lock();
 
+            // Note: The database is a final field for this path. For read-only
+            // and read/write connections we actually do discovery and can find
+            // out that the database no longer exists, in which case we throw a
+            // DataSetNotFoundException
+            assert database != null;
+            
             // new writable connection.
             conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
                     .startConn();
+        } catch(DatasetNotFoundException ex) {
+            /*
+             * This exception should not be thrown for the UNISOLATED connection
+             * since we know that the database reference is non-null on entry to
+             * the BigdataSailConnection constructor.
+             */
+           throw new RuntimeException(ex);
         } finally {
             if (conn == null) {
                 // Did not obtain connection.
@@ -1490,7 +1560,7 @@ public class BigdataSail extends SailBase implements Sail {
 			
     	    return _getReadOnlyConnection(timestamp);
     	    
-		} catch (IOException e) {
+		} catch (IOException | DatasetNotFoundException e) {
 			
 		    throw new RuntimeException(e);
 		    
@@ -1508,10 +1578,11 @@ public class BigdataSail extends SailBase implements Sail {
      * @return The transaction.
      * 
      * @throws IOException
+    * @throws DatasetNotFoundException 
      * @see ITransactionService#newTx(long)
      */
     private BigdataSailConnection _getReadOnlyConnection(final long timestamp)
-            throws IOException {
+            throws IOException, DatasetNotFoundException {
 
         return new BigdataSailReadOnlyConnection(timestamp).startConn();
 
@@ -1558,9 +1629,9 @@ public class BigdataSail extends SailBase implements Sail {
 
 		final ITransactionService txService;
 
-		if (indexManager instanceof AbstractJournal) {
+		if (indexManager instanceof IJournal) {
 
-			txService = ((Journal) indexManager).getTransactionManager()
+			txService = ((IJournal) indexManager).getLocalTransactionManager()
 					.getTransactionService();
 
 		} else {
@@ -1872,9 +1943,10 @@ public class BigdataSail extends SailBase implements Sail {
          *            <code>true</code> iff this is an unisolated connection.
          * @param readOnly
          *            <code>true</code> iff this is a read-only connection.
+       * @throws DatasetNotFoundException 
          */
         protected BigdataSailConnection(final AbstractTripleStore database,
-                final Lock lock, final boolean unisolated) {
+                final Lock lock, final boolean unisolated) throws DatasetNotFoundException {
 
             this(lock, unisolated, database.isReadOnly());
 
@@ -2055,14 +2127,20 @@ public class BigdataSail extends SailBase implements Sail {
         }
         
         /**
-         * Attach to a new database view.  Useful for transactions.
-         * 
-         * @param database
-         */
-        protected synchronized void attach(final AbstractTripleStore database) {
+       * Attach to a new database view. Useful for transactions.
+       * 
+       * @param database
+       * @throws DatasetNotFoundException
+       *            if the argument is <code>null</code> (in the context of the
+       *            callers (except for the unisolated connection) a
+       *            <code>null</code> value means that the namespace could not
+       *            be discovered using the locator).
+       */
+      protected synchronized void attach(final AbstractTripleStore database)
+            throws DatasetNotFoundException {
 
             if (database == null)
-                throw new IllegalArgumentException();
+                throw new DatasetNotFoundException();
             
             BigdataSail.this.assertOpenSail();
             
@@ -4412,8 +4490,9 @@ public class BigdataSail extends SailBase implements Sail {
         
         /**
          * Constructor starts a new transaction.
+       * @throws DatasetNotFoundException 
          */
-        BigdataSailReadOnlyConnection(final long timestamp) throws IOException {
+        BigdataSailReadOnlyConnection(final long timestamp) throws IOException, DatasetNotFoundException {
 
             super(null/* lock */, false/* unisolated */, true/* readOnly */);
 
@@ -4430,8 +4509,9 @@ public class BigdataSail extends SailBase implements Sail {
          * Obtain a new read-only transaction from the journal's transaction
          * service, and attach this SAIL connection to the new view of the
          * database.
+       * @throws DatasetNotFoundException 
          */
-        protected void newTx(final long timestamp) throws IOException {
+        protected void newTx(final long timestamp) throws IOException, DatasetNotFoundException {
             
             // The view of the database *outside* of this connection.
             final AbstractTripleStore database = BigdataSail.this.database;

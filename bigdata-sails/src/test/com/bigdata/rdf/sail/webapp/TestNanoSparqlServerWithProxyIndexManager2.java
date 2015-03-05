@@ -424,18 +424,22 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
     	
     	result.addListener(new TestListener() {
 			
+    		@Override
 			public void startTest(Test arg0) {
 				log.info(arg0);
 			}
 			
+    		@Override
 			public void endTest(Test arg0) {
 				log.info(arg0);
 			}
 			
+    		@Override
 			public void addFailure(Test arg0, AssertionFailedError arg1) {
 				log.error(arg0,arg1);
 			}
 			
+    		@Override
 			public void addError(Test arg0, Throwable arg1) {
 				log.error(arg0,arg1);
 			}

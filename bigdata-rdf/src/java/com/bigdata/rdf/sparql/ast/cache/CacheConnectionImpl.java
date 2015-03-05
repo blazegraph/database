@@ -359,6 +359,7 @@ public class CacheConnectionImpl implements ICacheConnection {
  
         }
 
+        @Override
         public String toString() {
             
             /*
@@ -403,6 +404,7 @@ public class CacheConnectionImpl implements ICacheConnection {
 //            
 //        }
 
+        @Override
         public AbstractLocalTransactionManager getLocalTransactionManager() {
 
             return (AbstractLocalTransactionManager) getConcurrencyManager()
@@ -410,24 +412,28 @@ public class CacheConnectionImpl implements ICacheConnection {
 
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore() {
             
             return getLocalIndexManager().getGlobalRowStore();
             
         }
 
+        @Override
         public SparseRowStore getGlobalRowStore(final long timestamp) {
             
             return getLocalIndexManager().getGlobalRowStore(timestamp);
             
         }
 
+        @Override
         public BigdataFileSystem getGlobalFileSystem() {
             
             return getLocalIndexManager().getGlobalFileSystem();
             
         }
         
+        @Override
         @SuppressWarnings("rawtypes")
         public DefaultResourceLocator getResourceLocator() {
             
@@ -436,24 +442,28 @@ public class CacheConnectionImpl implements ICacheConnection {
             
         }
         
+        @Override
         public ExecutorService getExecutorService() {
             
             return getLocalIndexManager().getExecutorService();
             
         }
         
+        @Override
         public IResourceLockService getResourceLockService() {
 
             return getLocalIndexManager().getResourceLockService();
             
         }
 
+        @Override
         public TemporaryStore getTempStore() {
             
             return getLocalIndexManager().getTempStore();
             
         }
 
+        @Override
         public ScheduledFuture<?> addScheduledTask(Runnable task,
                 long initialDelay, long delay, TimeUnit unit) {
 
@@ -462,18 +472,26 @@ public class CacheConnectionImpl implements ICacheConnection {
         
         }
 
+        @Override
         public boolean getCollectPlatformStatistics() {
             return getLocalIndexManager().getCollectPlatformStatistics();
         }
 
+        @Override
         public boolean getCollectQueueStatistics() {
             return getLocalIndexManager().getCollectQueueStatistics();
         }
 
+        @Override
         public int getHttpdPort() {
             return getLocalIndexManager().getHttpdPort();
         }
 
+        @Override
+        public boolean isGroupCommit() {
+           return getLocalIndexManager().isGroupCommit();
+        }
+        
     } // class CacheJournal
 
 }

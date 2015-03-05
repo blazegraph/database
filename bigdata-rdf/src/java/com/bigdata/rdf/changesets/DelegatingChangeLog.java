@@ -27,7 +27,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import org.apache.log4j.Logger;
 
 /**
- * This delegating change log allows change events to be propogated to multiple
+ * This delegating change log allows change events to be propagated to multiple
  * delegates through a listener pattern.
  * 
  * @author mike
@@ -45,6 +45,13 @@ public class DelegatingChangeLog implements IChangeLog {
         
     }
 
+    @Override
+    public String toString() {
+
+       return getClass().getName() + "{delegates=" + delegates.toString() + "}";
+       
+    }
+    
     public void addDelegate(final IChangeLog delegate) {
         
         this.delegates.add(delegate);
@@ -57,6 +64,7 @@ public class DelegatingChangeLog implements IChangeLog {
         
     }
 
+    @Override
     public void changeEvent(final IChangeRecord record) {
 
         if (log.isInfoEnabled())
@@ -70,6 +78,7 @@ public class DelegatingChangeLog implements IChangeLog {
 
     }
 
+    @Override
     public void transactionBegin() {
 
         if (log.isInfoEnabled())
@@ -83,6 +92,7 @@ public class DelegatingChangeLog implements IChangeLog {
 
     }
     
+    @Override
     public void transactionPrepare() {
 
         if (log.isInfoEnabled())
@@ -96,6 +106,7 @@ public class DelegatingChangeLog implements IChangeLog {
 
     }
     
+    @Override
     public void transactionCommited(final long commitTime) {
 
         if (log.isInfoEnabled())
@@ -109,6 +120,7 @@ public class DelegatingChangeLog implements IChangeLog {
 
     }
 
+    @Override
     public void transactionAborted() {
 
         if (log.isInfoEnabled())

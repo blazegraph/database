@@ -37,10 +37,12 @@ import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.GraphTest;
 
 /**
+ * Blueprints test suite for a client communicating with the server over the
+ * REST API.
  */
 public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 
-    protected static final transient Logger log = Logger.getLogger(TestBigdataGraphClient.class);
+    private static final transient Logger log = Logger.getLogger(TestBigdataGraphClient.class);
     
     /**
      * 
@@ -55,6 +57,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
         super(name);
     }
 
+    @Override
     protected GraphTest newBigdataGraphTest() {
         return new BigdataGraphTest();
     }
@@ -108,7 +111,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 		public void doTestSuite(TestSuite testSuite) throws Exception {
 	        for (Method method : testSuite.getClass().getDeclaredMethods()) {
 	            if (method.getName().startsWith("test")) {
-	                System.out.println("Testing " + method.getName() + "...");
+	                log.warn("Testing " + method.getName() + "...");
 	                try {
 		                method.invoke(testSuite);
 	                } catch (Exception ex) {

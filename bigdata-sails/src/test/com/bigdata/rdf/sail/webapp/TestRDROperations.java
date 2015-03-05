@@ -28,6 +28,7 @@ import java.io.InputStream;
 
 import junit.framework.Test;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
@@ -198,7 +199,10 @@ public class TestRDROperations<S extends IIndexManager> extends
 	 */
 	public void test_EXPORT_TURTLE_RDR() throws Exception {
 
-
+	   if(!BigdataStatics.runKnownBadTests) {
+	      return;
+	   }
+	   
     	final long ntriples = 3L;
     	
 		InputStream is = null;

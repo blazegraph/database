@@ -1,0 +1,6 @@
+SELECT ?o
+WHERE 
+{ 
+  ?s ?p ?o
+  BIND ("untypedString" AS ?o)
+}

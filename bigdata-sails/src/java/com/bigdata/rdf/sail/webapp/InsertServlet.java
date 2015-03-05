@@ -112,7 +112,7 @@ public class InsertServlet extends BigdataRDFServlet {
             return;
         }
 
-        if (req.getParameter("uri") != null) {
+        if (req.getParameter(BigdataRDFContext.URI) != null) {
             doPostWithURIs(req, resp);
             return;
         } else {
@@ -139,7 +139,7 @@ public class InsertServlet extends BigdataRDFServlet {
         final String contentType = req.getContentType();
 
         if (contentType == null)
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not specified.");
         
         if (log.isInfoEnabled())
@@ -156,7 +156,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
         if (format == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as RDF: " + contentType);
 
             return;
@@ -171,7 +171,7 @@ public class InsertServlet extends BigdataRDFServlet {
 
         if (rdfParserFactory == null) {
 
-            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                     "Parser factory not found: Content-Type=" + contentType
                             + ", format=" + format);
 
@@ -184,12 +184,12 @@ public class InsertServlet extends BigdataRDFServlet {
          */
         final Resource[] defaultContext;
         {
-            final String[] s = req.getParameterValues("context-uri");
+            final String[] s = req.getParameterValues(BigdataRDFContext.CONTEXT_URI);
             if (s != null && s.length > 0) {
                 try {
                 	defaultContext = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -207,9 +207,12 @@ public class InsertServlet extends BigdataRDFServlet {
             
         } catch (Throwable t) {
 
-            BigdataRDFServlet.launderThrowable(t, resp,
-                    "INSERT-WITH-BODY: baseURI=" + baseURI + ", context-uri="
-                            + Arrays.toString(defaultContext));
+         BigdataRDFServlet.launderThrowable(
+               t,
+               resp,
+               "INSERT-WITH-BODY: baseURI=" + baseURI + ", "
+                     + BigdataRDFContext.CONTEXT_URI + "="
+                     + Arrays.toString(defaultContext));
 
         }
 
@@ -344,25 +347,21 @@ public class InsertServlet extends BigdataRDFServlet {
 	 */
 	private void doPostWithURIs(final HttpServletRequest req,
 			final HttpServletResponse resp) throws IOException {
-
-	    final long begin = System.currentTimeMillis();
 	    
 		final String namespace = getNamespace(req);
 
-		final String[] uris = req.getParameterValues("uri");
+		final String[] uris = req.getParameterValues(BigdataRDFContext.URI);
 
-		if (uris == null)
-			throw new UnsupportedOperationException();
+      if (uris == null || uris.length == 0) {
 
-		if (uris.length == 0) {
+         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+               MIME_TEXT_PLAIN,
+               "Parameter must be specified one or more times: '"
+                     + BigdataRDFContext.URI + "'");
 
-            final long elapsed = System.currentTimeMillis() - begin;
-            
-            reportModifiedCount(resp, 0L/* nmodified */, elapsed);
+         return;
 
-        	return;
-        	
-        }
+      }
 
         if (log.isInfoEnabled())
             log.info("URIs: " + Arrays.toString(uris));
@@ -381,12 +380,12 @@ public class InsertServlet extends BigdataRDFServlet {
          */
         final Resource[] defaultContext;
         {
-            final String[] s = req.getParameterValues("context-uri");
+            final String[] s = req.getParameterValues(BigdataRDFContext.CONTEXT_URI);
             if (s != null && s.length > 0) {
                 try {
                 	defaultContext = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -403,8 +402,12 @@ public class InsertServlet extends BigdataRDFServlet {
 
         } catch (Throwable t) {
 
-            launderThrowable(t, resp, "uri=" + urls + ", context-uri="
-                    + Arrays.toString(defaultContext));
+         launderThrowable(
+               t,
+               resp,
+               BigdataRDFContext.URI + "=" + urls + ", "
+                     + BigdataRDFContext.CONTEXT_URI + "="
+                     + Arrays.toString(defaultContext));
 
         }
 
@@ -502,20 +505,6 @@ public class InsertServlet extends BigdataRDFServlet {
                             /*
                              * Try to get the RDFFormat from the URL's file
                              * path.
-                             * 
-                             * FIXME GROUP COMMIT: There is a potential issue
-                             * where the existing code commits the response and
-                             * returns, e.g., from the InsertServlet. Any task
-                             * that does not fail (thrown exception) will
-                             * commit. This means that mutations operations that
-                             * fail will still attempt to join a commit point.
-                             * This is inappropriate and could cause resource
-                             * leaks (e.g., if the operation failed after
-                             * writing on the Journal). We really should throw
-                             * out a typed exception, but in launderThrowable()
-                             * ignore that typed exception if the response has
-                             * already been committed. That way the task will
-                             * not join a commit point.
                              */
 
                             format = RDFFormat.forFileName(url.getFile());
@@ -524,12 +513,10 @@ public class InsertServlet extends BigdataRDFServlet {
 
                         if (format == null) {
 
-                            buildResponse(resp, HTTP_BADREQUEST,
+                            throw new HttpOperationException(HTTP_BADREQUEST,
                                     MIME_TEXT_PLAIN,
                                     "Content-Type not recognized as RDF: "
                                             + contentType);
-
-                            return null;
 
                         }
 
@@ -537,12 +524,12 @@ public class InsertServlet extends BigdataRDFServlet {
                                 .getInstance().get(format);
 
                         if (rdfParserFactory == null) {
-                            buildResponse(resp, HTTP_INTERNALERROR,
+                        
+                           throw new HttpOperationException(HTTP_INTERNALERROR,
                                     MIME_TEXT_PLAIN,
                                     "Parser not found: Content-Type="
                                             + contentType);
 
-                            return null;
                         }
 
                         final RDFParser rdfParser = rdfParserFactory

@@ -44,7 +44,10 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
+import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**
  * Query hints are directives understood by the SPARQL end point. A query hint
@@ -600,5 +603,20 @@ public interface QueryHints {
 
 	boolean DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER = Boolean.valueOf(System
 			.getProperty(DISTINCT_TERM_SCAN_OPTIMIZER, "true"));
-    
+
+   /**
+    * The name of the subclass derived from {@link ASTOptimizerList} that will
+    * be used to optimize SPARQL QUERY and UPDATE requests. This class MUST
+    * implement a public zero argument constructor.
+    * 
+    * @see #DEFAULT_AST_OPTIMIZER_CLASS
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1113"> Hook to configure the
+    *      ASTOptimizerList </a>
+    */
+   String AST_OPTIMIZER_CLASS = "ASTOptimizerClass";
+
+   String DEFAULT_AST_OPTIMIZER_CLASS = System.getProperty(
+         AST_OPTIMIZER_CLASS, DefaultOptimizerList.class.getName());
+
 }
