@@ -510,10 +510,10 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
         result.put("tasks/sec", ""+tasksPerSecond);
         result.put("commits/sec", ""+commitsPerSecond);
         result.put("tasks/commit", ""+tasksPerCommit);
-        result.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
-        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxCommitWaitingTime());
-        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
-        result.put("poolSize",""+journal.getConcurrencyManager().writeService.getPoolSize());
+        result.put("maxRunning", ""+journal.getConcurrencyManager().getWriteService().getMaxRunning());
+        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().getWriteService().getMaxCommitWaitingTime());
+        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().getWriteService().getMaxCommitServiceTime());
+        result.put("poolSize",""+journal.getConcurrencyManager().getWriteService().getPoolSize());
         
         if (log.isInfoEnabled())
             log.info(result.toString(true/* newline */));
