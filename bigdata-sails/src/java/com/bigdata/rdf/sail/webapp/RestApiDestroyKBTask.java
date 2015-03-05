@@ -43,7 +43,7 @@ class RestApiDestroyKBTask extends AbstractDelegateRestApiTask<Void> {
    }
 
    @Override
-   public boolean isReadOnly() {
+   final public boolean isReadOnly() {
       return false;
    }
 
