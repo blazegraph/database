@@ -435,7 +435,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
     @Override
     public WriteExecutorService getWriteService() {
-        
+
         assertOpen();
         
         return writeService;
@@ -506,7 +506,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         readService.shutdown();
 
-        getWriteService().shutdown();
+        writeService.shutdown();
 
         if (sampleService != null)
             sampleService.shutdown();
@@ -599,7 +599,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
         readService.shutdownNow();
 
-        getWriteService().shutdownNow();
+        writeService.shutdownNow();
 
         if (sampleService != null)
             sampleService.shutdownNow();
