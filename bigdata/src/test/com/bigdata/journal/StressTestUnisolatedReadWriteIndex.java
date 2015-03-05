@@ -387,10 +387,10 @@ public class StressTestUnisolatedReadWriteIndex extends ProxyTestCase<Journal> {
         ret.put("elapsed(ms)", ""+elapsed);
         ret.put("bytesWrittenPerSec", ""+bytesWrittenPerSecond);
         ret.put("tasks/sec", ""+(ncompleted * 1000 / elapsed));
-        ret.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
-        ret.put("maxPoolSize", ""+journal.getConcurrencyManager().writeService.getMaxPoolSize());
-        ret.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxCommitWaitingTime());
-        ret.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
+        ret.put("maxRunning", ""+journal.getConcurrencyManager().getWriteService().getMaxRunning());
+        ret.put("maxPoolSize", ""+journal.getConcurrencyManager().getWriteService().getMaxPoolSize());
+        ret.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().getWriteService().getMaxCommitWaitingTime());
+        ret.put("maxCommitLatency", ""+journal.getConcurrencyManager().getWriteService().getMaxCommitServiceTime());
 
         System.err.println(ret.toString(true/*newline*/));
         
