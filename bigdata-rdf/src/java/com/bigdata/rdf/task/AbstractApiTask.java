@@ -134,25 +134,14 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
   }
 
     @Override
-    public void clearIndexManager() {
+    public void setIndexManager(final IIndexManager indexManager) {
 
-        indexManagerRef.set(null);
+       indexManagerRef.set(indexManager);
 
     }
 
     @Override
-    public void setIndexManager(final IIndexManager indexManager) {
-
-        if (!indexManagerRef
-                .compareAndSet(null/* expect */, indexManager/* update */)) {
-
-            throw new IllegalStateException();
-
-        }
-
-    }
-
-    protected IIndexManager getIndexManager() {
+    public IIndexManager getIndexManager() {
 
         final IIndexManager tmp = indexManagerRef.get();
 
