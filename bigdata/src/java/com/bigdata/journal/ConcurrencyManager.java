@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,7 +52,6 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
-import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -61,6 +61,7 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
+import com.bigdata.util.concurrent.ThreadGuard;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.WriteTaskCounters;
 
@@ -1145,7 +1146,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *                if task null
      */
     @Override
-    public <T> Future<T> submit(final AbstractTask<T> task) {
+    public <T> FutureTask<T> submit(final AbstractTask<T> task) {
 
         assertOpen();
         
@@ -1287,7 +1288,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @return The {@link Future}.
      */
-    private <T> Future<T> submitWithDynamicLatency(
+    private <T> FutureTask<T> submitWithDynamicLatency(
             final AbstractTask<T> task, final ExecutorService service,
             final TaskCounters taskCounters) {
 
@@ -1384,20 +1385,56 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
+        final FutureTask<T> ft;
+        
         if (service instanceof WriteExecutorService) {
 
             final NonBlockingLockManagerWithNewDesign<String> lockManager = ((WriteExecutorService) service)
                     .getLockManager();
 
-            return (LockFutureTask<String, T>) lockManager.submit(task.getResource(), task);
+            ft = lockManager.submit(task.getResource(), task);
 
+//            writeServiceThreadGuard.guard(ft);
+            
         } else {
 
-            return service.submit(task);
+           ft = new FutureTask<T>(task);
+           
+           service.submit(ft);
 
         }
 
+        return ft;
+
     }
+
+//   /**
+//    * Actively running for the {@link WriteExecutorService}.
+//    * 
+//    * FIXME This is really just the same as those tasks actively executing on
+//    * the {@link WriteExecutorService}. It does not include tasks that are
+//    * pending execution (for example, awaiting their locks) and does not include
+//    * tasks that have executed and are pending group commit.
+//    * 
+//    * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
+//    *      should interrupt NSS requests and AbstractTasks </a>
+//    */
+//    private final ThreadGuard writeServiceThreadGuard = new ThreadGuard();
+    
+    /**
+     * Cancel any running or queued tasks on the {@link WriteExecutorService}.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
+     *      should interrupt NSS requests and AbstractTasks </a>
+     */
+     void abortAllTx() {
+       
+//        final NonBlockingLockManagerWithNewDesign<String> lockManager = writeService.getLockManager();
+//        
+//        // interrupt anything running.
+//        writeServiceThreadGuard.interruptAll();
+        
+      }
 
     /**
      * When <code>true</code> imposes dynamic latency on arriving tasks in

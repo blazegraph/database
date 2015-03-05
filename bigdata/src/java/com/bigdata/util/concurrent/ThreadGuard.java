@@ -25,6 +25,7 @@ package com.bigdata.util.concurrent;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
@@ -48,8 +49,24 @@ public class ThreadGuard {
     }
     
     /**
-     * Execute a critical region which needs to be interrupted if we have to
-     * terminate the quorum.
+     * Execute a critical region which needs to be interrupted if some condition
+     * is violated.
+     * 
+     * @param r
+     *            The lambda.
+     */
+    public void guard(final Runnable r) {
+        incThread();
+        try {
+           r.run();
+        } finally {
+            decThread();
+        }
+    }
+
+    /**
+     * Execute a critical region which needs to be interrupted  if some condition
+     * is violated.
      * 
      * @param r
      *            The lambda.
@@ -64,6 +81,25 @@ public class ThreadGuard {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        } finally {
+            decThread();
+        }
+    }
+
+   /**
+    * Execute a critical region which needs to be interrupted if some condition
+    * is violated.
+    * 
+    * @param r
+    *           The lambda.
+    * 
+    * @return The result (if any).
+    * @throws Exception
+    */
+   public <T> T guard(final Callable<T> r) throws Exception {
+        incThread();
+        try {
+           return r.call();
         } finally {
             decThread();
         }
