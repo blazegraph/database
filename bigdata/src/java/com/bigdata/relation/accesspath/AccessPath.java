@@ -297,7 +297,7 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      *            <i>relation</> is not specified when requested an
      *            {@link IAccessPath} for a specific index partition in order to
      *            avoid forcing the materialization of the {@link IRelation}.
-     * @param indexManager
+     * @param localIndexManager
      *            Access to the indices, resource locators, executor service,
      *            etc.
      * @param predicate

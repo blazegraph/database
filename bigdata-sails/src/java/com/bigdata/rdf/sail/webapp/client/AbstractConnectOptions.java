@@ -226,7 +226,8 @@ public class AbstractConnectOptions implements IMimeTypes {
                     first = false;
                     urlString.append(URLEncoder.encode(name, RemoteRepository.UTF8));
                     urlString.append("=");
-                    urlString.append(URLEncoder.encode(val, RemoteRepository.UTF8));
+                    if(val!=null)
+                       urlString.append(URLEncoder.encode(val, RemoteRepository.UTF8));
                 }
             }
         } // next Map.Entry

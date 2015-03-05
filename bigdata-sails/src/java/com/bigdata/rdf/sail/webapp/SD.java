@@ -38,8 +38,8 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -677,10 +677,9 @@ public class SD {
 
             final IIndexManager indexManager = tripleStore.getIndexManager();
 
-            // TODO FEDERATION HA
-            if (indexManager instanceof AbstractJournal) {
+            if (indexManager instanceof IJournal) {
 
-                final AbstractJournal jnl = (AbstractJournal) indexManager;
+                final IJournal jnl = (IJournal) indexManager;
 
                 final Quorum<HAGlue, QuorumService<HAGlue>> quorum = jnl
                         .getQuorum();

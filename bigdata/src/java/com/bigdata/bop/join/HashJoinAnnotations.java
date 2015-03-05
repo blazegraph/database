@@ -86,10 +86,10 @@ public interface HashJoinAnnotations {
     
 
     /**
-     * The {@link IVariable[]} specifying what variables need to flow into
-     * the right operator of the hash join (i.e. what visible variables inside
-     * the right operator have appeared previously in the query and may be
-     * bound). 
+     * The IVariable[] to be projected into a join group. When set, a distinct
+     * projection over these variables is computed, otherwise the complete
+     * binding set is passed in. Note that this parameter is only considered
+     * if selectVars is not null.
      */
     String PROJECT_IN_VARS = HashJoinAnnotations.class.getName() + ".projectInVars";
     

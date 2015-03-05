@@ -83,12 +83,14 @@ public class UpdateRoot extends GroupNodeBase<Update> implements IPrefixDecls {
 
     }
 
+    @Override
     public void setPrefixDecls(final Map<String, String> prefixDecls) {
 
         setProperty(Annotations.PREFIX_DECLS, prefixDecls);
 
     }
 
+    @Override
     public String toString(final int indent) {
         
         final String s = indent(indent);

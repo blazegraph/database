@@ -87,7 +87,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager() {
 
-		this(null/* name */, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
+		this(null/* name */, getTemporaryJournal(BufferMode.DiskRW), TestMode.triples);
 
 	}
 
@@ -96,45 +96,51 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 */
 	public TestNanoSparqlServerWithProxyIndexManager(String name) {
 
-		this(name, getTemporaryJournal(true/*RWStore*/), TestMode.triples);
+		this(name, getTemporaryJournal(BufferMode.DiskRW), TestMode.triples);
 
 	}
 
 	static Journal getTemporaryJournal() {
 	
-		return getTemporaryJournal(false/*use_rwstore*/);
+		return getTemporaryJournal(BufferMode.Transient);
 		
 	}
 	
-	static Journal getTemporaryJournal(final boolean use_rwstore) {
+	static Journal getTemporaryJournal(final BufferMode bufferMode) {
 
+		if (bufferMode == null)
+			throw new IllegalArgumentException();
+		
 		final Properties properties = new Properties();
 
-		if (use_rwstore) {
+		properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+				bufferMode.toString());
+
+      // Enable GROUP_COMMIT. See #566.
+      properties.setProperty(com.bigdata.journal.Journal.Options.GROUP_COMMIT,
+            "true");
+
+		if (bufferMode.isStable()) {
 			
-			// Use the RWStore for some specific test suites.
-			
-			properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-					BufferMode.DiskRW.toString());
-			
+			// Using something that is backed by the disk.
 			properties.setProperty(
 					com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
 			
 			properties.setProperty(com.bigdata.journal.Options.DELETE_ON_CLOSE,
 					"true");
 
-		} else {
+		} else if (bufferMode.isFullyBuffered()) {
 
-			// Otherwise use a transient in-memory buffer.
-			
-			properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
-					BufferMode.Transient.toString());
-			
+			// Using something that is fully buffered in memory. Reduce the
+			// initial buffer size so we do not claim too much memory for the
+			// backing store.
 			properties.setProperty(com.bigdata.journal.Options.INITIAL_EXTENT,
 					"" + (Bytes.megabyte32 * 1));
 		}
 
-		return new Journal(properties);
+      final Journal jnl = new Journal(properties);
+      
+		return jnl;
 
 	}
 
@@ -190,7 +196,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
     public static class test_NSS_RWStore extends TestCase {
         public static Test suite() {
             return TestNanoSparqlServerWithProxyIndexManager.suite(
-                    getTemporaryJournal(true/*RWStore*/), TestMode.triples);
+                    getTemporaryJournal(BufferMode.DiskRW), TestMode.triples);
         }
     }
 
@@ -275,6 +281,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         case quads:
             // QUADS mode UPDATE test suite. 
             suite.addTestSuite(TestSparqlUpdate.class);
+            suite.addTestSuite(TestConcurrentRestApiRequests.class);
             suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
             suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
             break;
@@ -294,14 +301,22 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		final TestNanoSparqlServerWithProxyIndexManager<?> delegate = new TestNanoSparqlServerWithProxyIndexManager(
 				null/* name */, indexManager, testMode); // !!!! THIS CLASS !!!!
 
-        /*
-         * Use a proxy test suite and specify the delegate.
-         */
+      /*
+       * Use a proxy test suite and specify the delegate.
+       */
 
-        final ProxyTestSuite suite = new ProxyTestSuite(delegate,
-                "NanoSparqlServer Proxied Test Suite");
-		return suite;
-	}
+      final ProxyTestSuite suite = new ProxyTestSuite(delegate,
+            "NanoSparqlServer Proxied Test Suite: indexManager="
+                  + indexManager.getClass().getSimpleName()
+                  + ", testMode="
+                  + testMode
+                  + ", bufferMode="
+                  + (indexManager instanceof Journal ? ((Journal) indexManager)
+                        .getBufferStrategy().getBufferMode() : ""));
+
+      return suite;
+      
+   }
 
 	@SuppressWarnings("unchecked")
     public S getIndexManager() {
@@ -312,6 +327,12 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
     
     @Override
 	public Properties getProperties() {
+    
+    	return getProperties(testMode);
+    	
+    }
+    
+	static public Properties getProperties(final TestMode testMode) {
 
 //    	System.err.println("testMode="+testMode);
     	
@@ -522,18 +543,22 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
     	
     	result.addListener(new TestListener() {
 			
+    		@Override
 			public void startTest(Test arg0) {
 				log.info(arg0);
 			}
 			
+    		@Override
 			public void endTest(Test arg0) {
 				log.info(arg0);
 			}
 			
+    		@Override
 			public void addFailure(Test arg0, AssertionFailedError arg1) {
 				log.error(arg0,arg1);
 			}
 			
+    		@Override
 			public void addError(Test arg0, Throwable arg1) {
 				log.error(arg0,arg1);
 			}

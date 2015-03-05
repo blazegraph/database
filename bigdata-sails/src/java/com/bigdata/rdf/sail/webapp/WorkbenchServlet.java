@@ -105,7 +105,7 @@ public class WorkbenchServlet extends BigdataRDFServlet {
 
         if (requestBodyFormat == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as RDF: " + contentType);
 
             return;
@@ -117,7 +117,7 @@ public class WorkbenchServlet extends BigdataRDFServlet {
 
         if (rdfParserFactory == null) {
 
-            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                     "Parser factory not found: Content-Type="
                             + contentType + ", format=" + requestBodyFormat);
             

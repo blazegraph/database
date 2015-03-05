@@ -234,7 +234,7 @@ public class RemoteRepository {
      * options, but the client API must not include a dependency on the Sail so
      * it is given by value again here in a package local scope.
      */
-    static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
+    public static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
 
     /**
      * Return the maximum requestURL length before the request is converted into
@@ -666,7 +666,38 @@ public class RemoteRepository {
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
         
-        return (rangeCount(subj, pred, obj, contexts) > 0);
+       if(false) {
+          /*
+          * FIXME This is only correct when the remote repository does not use
+          * full read/write transactions. Otherwise it may overestimate since it
+          * will also count deleted tuples. In order to fix this, we really need
+          * to make hasStatements() a top-level REST API method since the client
+          * can not correctly decide whether or not the server supports delete
+          * markers and therefore can not correctly choose between
+          * hasStatements() based on getStatements() LIMIT 1 and hasStatements()
+          * based on rangeCount. Note that the server side API in
+          * AbstractTripleStore considers this information and always uses the
+          * correct backend strategy. See #1109.
+          * 
+          * In fact, the situation appears to be worse than that since
+          * TestSparqlUpdate fails several tests when we use the rangeCount
+          * which pass if we use getStatements() !!!
+          */
+         return (rangeCount(subj, pred, obj, contexts) > 0);
+      } else {
+         /*
+          * FIXME This should be pushed down to a server-side operation for
+          * improved performance.  We need to lift hasStatements() into the
+          * REST API for that.  See #1109.
+          */
+         final GraphQueryResult ret = getStatements(subj, pred, obj,
+               includeInferred, contexts);
+         try {
+            return ret.hasNext();
+         } finally {
+            ret.close();
+         }
+      }
         
     }
     
@@ -715,20 +746,25 @@ public class RemoteRepository {
     }
 
     /**
-     * Perform a fast range count on the statement indices for a given
-     * triple (quad) pattern.
-     * 
-     * @param s
-     *             the subject (can be null)
-     * @param p
-     *             the predicate (can be null)
-     * @param o
-     *             the object (can be null)
-     * @param c
-     *             the context (can be null)
-     * @return
-     *             the range count
-     */
+    * Perform a fast range count on the statement indices for a given triple
+    * (quad) pattern.
+    * 
+    * @param s
+    *           the subject (can be null)
+    * @param p
+    *           the predicate (can be null)
+    * @param o
+    *           the object (can be null)
+    * @param c
+    *           the context (can be null)
+    * @return the range count
+    * 
+    *         TODO Add optional boolean property named "exact" whose default
+    *         value is <code>false</code> to preserve the historical behavior.
+    *         This will provide for relatively efficient exact range counts over
+    *         the REST API. See #1127 (Add REST API method for exact range
+    *         counts)
+    */
     public long rangeCount(final Resource s, final URI p, final Value o, final Resource... c) 
             throws Exception {
 

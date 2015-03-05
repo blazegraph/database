@@ -19,7 +19,6 @@ import com.bigdata.btree.keys.IKeyBuilder;
  * returned {@link ITPS} object.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
 
@@ -31,7 +30,8 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
     private static final Logger log = Logger.getLogger(AtomicRowDelete.class);
 
     private long writeTime;
-    
+
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -80,7 +80,8 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
      * 
      * @return The matching properties as read before they were deleted.
      */
-    public TPS apply(IIndex ndx) {
+    @Override
+    public TPS apply(final IIndex ndx) {
 
         final long timestamp = TimestampChooser.chooseTimestamp(ndx, this.writeTime);
                 
@@ -167,7 +168,8 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
         
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         
         super.readExternal(in);
         
@@ -175,7 +177,8 @@ public class AtomicRowDelete extends AbstractAtomicRowReadOrWrite {
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
 

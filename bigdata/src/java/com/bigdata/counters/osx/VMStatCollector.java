@@ -28,10 +28,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.counters.osx;
 
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
@@ -50,7 +53,6 @@ import com.bigdata.counters.ProcessReaderHelper;
  * Collects some counters using <code>vmstat</code>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: VMStatCollector.java 4289 2011-03-10 21:22:30Z thompsonbry $
  */
 public class VMStatCollector extends AbstractProcessCollector implements
         ICounterHierarchy, IRequiredHostCounters, IHostCounters{
@@ -142,6 +144,15 @@ public class VMStatCollector extends AbstractProcessCollector implements
     }
 
     /**
+     * A map from the name of a column to the order of that column in the output (origin ZERO).
+     * This mapping was added when the format was changed to make the parser more robust to such
+     * changes.
+     * 
+     * @see #1125 (OSX vm_stat output has changed)
+     */
+    private final Map<String,Integer> keys = new LinkedHashMap<String,Integer>();
+    
+    /**
      * Map containing the current values for the configured counters. The keys
      * are paths into the {@link CounterSet}. The values are the data most
      * recently read from <code>vmstat</code>.
@@ -230,248 +241,318 @@ public class VMStatCollector extends AbstractProcessCollector implements
         
     }
 
-	/**
-	 * Sample output for <code>vm_stat 60</code>, where <code>60</code> is the
-	 * interval. Unlike the linux <code>vmstat</code>, there is no option to
-	 * suppress the periodic repeat of the header. The header repeats in its
-	 * entirety every "page" full.
-	 * 
-	 * <pre>
-	 * Mach Virtual Memory Statistics: (page size of 4096 bytes, cache hits 0%)
-	 *   free active   spec inactive   wire   faults     copy    0fill reactive  pageins  pageout
-	 * 346061  1246K  51002   196922 190727 1004215K 19835511  525442K  7555575  2897558  2092534 
-	 * 346423  1247K  50754   196922 189767     2707        0     1263        0        0        0 
-	 * 343123  1247K  52180   198906 189767     3885        0     1754        0        0        0 
-	 * 342474  1247K  52101   198978 190116    21739     2013     4651        0        0        0 
-	 * 342542  1247K  52016   199319 189799     5792       17     2561        0        0        0
-	 * </pre>
-	 * 
-	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
-	 *         Thompson</a>
-	 */
-    private class VMStatReader extends ProcessReaderHelper {
-        
-        @Override
-        protected ActiveProcess getActiveProcess() {
-            
-            if (activeProcess == null)
-                throw new IllegalStateException();
-            
-            return activeProcess;
-            
-        }
+   /**
+    * Sample output for <code>vm_stat 60</code>, where <code>60</code> is the
+    * interval. Unlike the linux <code>vmstat</code>, there is no option to
+    * suppress the periodic repeat of the header. The header repeats in its
+    * entirety every "page" full.
+    * 
+    * <pre>
+    * Mach Virtual Memory Statistics: (page size of 4096 bytes, cache hits 0%)
+    *   free active   spec inactive   wire   faults     copy    0fill reactive  pageins  pageout
+    * 346061  1246K  51002   196922 190727 1004215K 19835511  525442K  7555575  2897558  2092534 
+    * 346423  1247K  50754   196922 189767     2707        0     1263        0        0        0 
+    * 343123  1247K  52180   198906 189767     3885        0     1754        0        0        0 
+    * 342474  1247K  52101   198978 190116    21739     2013     4651        0        0        0 
+    * 342542  1247K  52016   199319 189799     5792       17     2561        0        0        0
+    * </pre>
+    * 
+    * For more recent OSX releases (e.g., Yosemite) there are now additional
+    * columns:
+    * 
+    * <pre>
+    * Mach Virtual Memory Statistics: (page size of 4096 bytes)
+    *     free   active   specul inactive throttle    wired  prgable   faults     copy    0fill reactive   purged file-backed anonymous cmprssed cmprssor  dcomprs   comprs  pageins  pageout  swapins swapouts
+    *    17656  1502912   110218  1329298        0   783121    32302 1122834K 22138464  897721K  4538117  2220029      382716   2559712  1093181   449012  1856773  4298532 67248050   263644   779970   886296
+    *    41993  1479331   110174  1329290        0   782241    33940     2115        1     1316        0        0      382671   2536124  1093181   449012        0        0       24        0        0        0
+    * </pre>
+    * 
+    * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+    *         Thompson</a>
+    */
+   private class VMStatReader extends ProcessReaderHelper {
 
-        public VMStatReader() {
+      @Override
+      protected ActiveProcess getActiveProcess() {
 
-            super();
-            
-        }
+         if (activeProcess == null)
+            throw new IllegalStateException();
 
-        /**
-         * 
-         * @see TestParse_vm_stat#test_vmstat_header_and_data_parse()
-         */
-        @Override
-        protected void readProcess() throws Exception {
-            
-            if(log.isInfoEnabled())
-                log.info("begin");
+         return activeProcess;
 
-			for (int i = 0; i < 10 && !getActiveProcess().isAlive(); i++) {
+      }
 
-                if(log.isInfoEnabled())
-                    log.info("waiting for the readerFuture to be set.");
+      public VMStatReader() {
 
-                Thread.sleep(100/*ms*/);
-                
+         super();
+
+      }
+
+      /**
+       * The index of the field associated with the "free" counter.
+       */
+      private final AtomicInteger INDEX_FREE = new AtomicInteger();
+      /**
+       * The index of the field associated with the "active" counter (in use and
+       * pageable).
+       */
+      private AtomicInteger INDEX_ACTIVE = new AtomicInteger();
+      /**
+       * The index of the field associated with "spec" or "specul" (aka
+       * speculative) counter.
+       */
+      private AtomicInteger INDEX_SPEC = new AtomicInteger();
+      /**
+       * The index of the field associated with "speculative" counter.
+       */
+      private AtomicInteger INDEX_WIRED = new AtomicInteger();
+      /**
+       * The index of the field associated with "pagein" counter.
+       */
+      private AtomicInteger INDEX_PAGEINS = new AtomicInteger();
+      /**
+       * The index of the field associated with "pageout" counter.
+       */
+      private AtomicInteger INDEX_PAGEOUT = new AtomicInteger();
+
+      /**
+       * 
+       * @see TestParse_vm_stat#test_vmstat_header_and_data_parse()
+       */
+      @Override
+      protected void readProcess() throws Exception {
+
+         if (log.isInfoEnabled())
+            log.info("begin");
+
+         for (int i = 0; i < 10 && !getActiveProcess().isAlive(); i++) {
+
+            if (log.isInfoEnabled())
+               log.info("waiting for the readerFuture to be set.");
+
+            Thread.sleep(100/* ms */);
+
+         }
+
+         if (log.isInfoEnabled())
+            log.info("running");
+
+         // 1st header: we need the pageSize.
+         final String h0;
+         final int pageSize;
+         {
+
+            h0 = readLine();
+
+            final String[] fields = pattern.split(h0.trim(), 0/* limit */);
+
+            if (log.isInfoEnabled())
+               log.info("header: " + h0);
+
+            assertFieldByPosition(0/* index */, fields, "Mach"/* expected */);
+
+            pageSize = Integer.valueOf(fields[7]);
+
+            if (pageSize <= 0 || (pageSize % 512 != 0))
+               throw new RuntimeException("pageSize=" + pageSize);
+
+            if (log.isInfoEnabled())
+               log.info("pageSize: " + pageSize);
+
+         }
+
+         // read 2nd header and verify expected fields.
+         final String h1;
+         {
+
+            h1 = readLine();
+
+            if (log.isInfoEnabled())
+               log.info("header: " + h1);
+
+            final String[] fields = pattern.split(h1.trim(), 0/* limit */);
+
+            // Store mapping from field name to ordinal index (origin zero).
+            for (int i = 0; i < fields.length; i++) {
+               keys.put(fields[i], i);
             }
 
-            if(log.isInfoEnabled())
-                log.info("running");
+            // Check for field names that we use.
+            getIndexIfDefined(INDEX_FREE, "free");
+            getIndexIfDefined(INDEX_ACTIVE, "active");
+            getIndexIfDefined(INDEX_SPEC, "spec", "specul");
+            getIndexIfDefined(INDEX_WIRED, "wire", "wired");
+            getIndexIfDefined(INDEX_PAGEINS, "pageins");
+            getIndexIfDefined(INDEX_PAGEOUT, "pageout");
 
-            // 1st header: we need the pageSize.
-            final String h0;
-            final int pageSize;
+         }
+
+         /*
+          * Note: Some fields are reported with a 'K' suffix. Some are in
+          * "pages". The pageSize was extracted from the header above.
+          */
+         // Mach Virtual Memory Statistics: (page size of 4096 bytes, cache hits
+         // 0%)
+         // free active spec inactive wire faults copy 0fill reactive pageins
+         // pageout
+         // 398649 1196K 47388 203418 185941 145234K 2036323 82012367 1353888
+         // 351301 149940
+         // 400080 1197K 44784 205254 183886 1829 0 1046 0 0 0
+
+         // read lines until interrupted.
+         long pageout_tm1 = 0;
+         boolean first = true;
+         while (true) {
+
+            // read the next line of data.
+            final String data;
             {
+               String s = readLine();
+               if (s.startsWith("Mach")) { // 1st header line.
+                  s = readLine(); // 2nd header line.
+                  s = readLine(); // data line.
+                  if (log.isInfoEnabled())
+                     log.info("Skipped headers.");
+               }
+               data = s;
+            }
 
-                h0 = readLine();
+            try {
 
-                final String[] fields = pattern.split(h0.trim(), 0/* limit */);
+               // timestamp
+               lastModified.set(System.currentTimeMillis());
 
-				if (log.isInfoEnabled())
-					log.info("header: " + h0);
+               final String[] fields = pattern.split(data.trim(), 0/* limit */);
 
-				assertField(0, fields, "Mach");
+               final String free = fields[INDEX_FREE.get()]; // free
+               final String active = fields[INDEX_ACTIVE.get()]; // in use and pageable
+               final String spec = fields[INDEX_SPEC.get()]; // speculative
+               // final String inactive = fields[3]; //
+               final String wire = fields[INDEX_WIRED.get()]; // wired down
+               // final String faults = fields[5]; // translation faults
 
-				pageSize = Integer.valueOf(fields[7]);
+               final String pageins = fields[INDEX_PAGEINS.get()]; // pageins
+               final String pageout = fields[INDEX_PAGEOUT.get()]; // pageout
 
-				if (pageSize <= 0 || (pageSize % 512 != 0))
-					throw new RuntimeException("pageSize=" + pageSize);
-				
-				if (log.isInfoEnabled())
-					log.info("pageSize: " + pageSize);
+               if (log.isInfoEnabled())
+                  log.info("\nfree=" + free + ", active=" + active + ", spec="
+                        + spec + ", wire=" + wire + ", si=" + pageins + ", so="
+                        + pageout + "\n" + h1 + "\n" + data);
 
-			}
+               {
 
-            // read 2nd header and verify expected fields.
-            final String h1;
-            {
+                  final double _free = parseDouble(free);
+                  final double _active = parseDouble(active);
+                  final double _spec = parseDouble(spec);
+                  final double _wire = parseDouble(wire);
 
-                h1 = readLine();
+                  final double swapBytesUsed = _active + _spec + _wire;
 
-                if (log.isInfoEnabled())
-                    log.info("header: " + h1);
+                  vals.put(IHostCounters.Memory_Bytes_Free, _free * pageSize);
 
-				final String[] fields = pattern
-						.split(h1.trim(), 0/* limit */);
+                  vals.put(IHostCounters.Memory_SwapBytesUsed, swapBytesUsed
+                        * pageSize);
 
-				assertField(0, fields, "free");
-				assertField(9, fields, "pageins");
+               }
+
+               /*
+                * pageout is reported as a total over time. we have to compute a
+                * delta, then divide through by the interval to get
+                * pages/second.
+                */
+               {
+                  final double _pageout = parseDouble(pageout);
+
+                  if (!first) {
+
+                     final double delta = _pageout - pageout_tm1;
+
+                     final double majorPageFaultsPerSec = delta / getInterval();
+
+                     vals.put(
+                           IRequiredHostCounters.Memory_majorFaultsPerSecond,
+                           majorPageFaultsPerSec);
+
+                  }
+               }
+               first = false;
+
+            } catch (Exception ex) {
+
+               /*
+                * Issue warning for parsing problems.
+                */
+
+               log.warn(ex.getMessage() //
+                     + "\nheader: " + h1 //
+                     + "\n  data: " + data //
+               , ex);
 
             }
 
-			/*
-			 * Note: Some fields are reported with a 'K' suffix. Some are in
-			 * "pages". The pageSize was extracted from the header above.
-			 */
-        //  Mach Virtual Memory Statistics: (page size of 4096 bytes, cache hits 0%)
-        //  free active   spec inactive   wire   faults     copy    0fill reactive  pageins  pageout
-        //398649  1196K  47388   203418 185941  145234K  2036323 82012367  1353888   351301   149940 
-        //400080  1197K  44784   205254 183886     1829        0     1046        0        0        0 
+         } // while(true)
 
-            // read lines until interrupted.
-            long pageout_tm1 = 0;
-            boolean first = true;
-            while(true) {
-                
-                // read the next line of data.
-            	final String data;
-            	{
-            		String s = readLine();
-            		if(s.startsWith("Mach")) { // 1st header line.
-            			s = readLine(); // 2nd header line.
-            			s = readLine(); // data line.
-            			if(log.isInfoEnabled())
-            				log.info("Skipped headers.");
-            		}
-            		data = s;
-            	}
-                
-                try {
+      } // readProcess()
 
-                    // timestamp
-                    lastModified.set(System.currentTimeMillis());
+   } // class VMStatReader
 
-                    final String[] fields = pattern.split(data.trim(), 0/* limit */);
-                    
-                    final String free     = fields[0]; // free
-                    final String active   = fields[1]; // in use and pageable
-                    final String spec     = fields[2]; // speculative
-//                    final String inactive = fields[3]; // 
-                    final String wire     = fields[4]; // wired down
-//                    final String faults   = fields[5]; // translation faults
+   /**
+    * Parse a string which may have a "K" suffix, returning a double. If the "K"
+    * suffix is present, then the returned value is scaled by 1000. This handles
+    * an OSX specific oddity for <code>vm_stat</code>
+    * 
+    * @param s
+    *           The string.
+    * 
+    * @return The (possibly scaled) value.
+    */
+   private static double parseDouble(final String s) {
 
-                    final String pageins = fields[9]; // pageins
-                    final String pageout = fields[10]; // pageout
+      final int pos = s.indexOf("K");
 
-					if (log.isInfoEnabled())
-						log.info("\nfree=" + free + ", active=" + active
-								+ ", spec=" + spec + ", wire=" + wire + ", si="
-								+ pageins + ", so=" + pageout + "\n" + h1
-								+ "\n" + data);
+      if (pos == -1) {
 
-					{
+         return Long.valueOf(s);
 
-						final double _free = parseDouble(free);
-						final double _active = parseDouble(active);
-						final double _spec = parseDouble(spec);
-						final double _wire = parseDouble(wire);
+      }
 
-						final double swapBytesUsed = _active + _spec + _wire;
+      final long val = Long.valueOf(s.substring(0, pos));
 
-						vals.put(IHostCounters.Memory_Bytes_Free, _free
-								* pageSize);
+      return val * 1000;
 
-						vals.put(IHostCounters.Memory_SwapBytesUsed,
-								swapBytesUsed * pageSize);
+   }
 
-					}
+   private static void assertFieldByPosition(final int index,
+         final String[] fields, final String expected) {
 
-					/*
-					 * pageout is reported as a total over time. we have to
-					 * compute a delta, then divide through by the interval to
-					 * get pages/second.
-					 */
-					{
-						final double _pageout = parseDouble(pageout);
+      if (!expected.equals(fields[index]))
+         throw new RuntimeException("Expecting '" + expected + "', found: '"
+               + fields[0] + "'");
 
-						if (!first) {
+   }
 
-							final double delta = _pageout - pageout_tm1;
-
-							final double majorPageFaultsPerSec = delta
-									/ getInterval();
-
-							vals.put(
-									IRequiredHostCounters.Memory_majorFaultsPerSecond,
-									majorPageFaultsPerSec);
-
-						}
-					}
-					first = false;
-
-                } catch (Exception ex) {
-
-                    /*
-                     * Issue warning for parsing problems.
-                     */
-
-                    log.warn(ex.getMessage() //
-                            + "\nheader: " + h1 //
-                            + "\n  data: " + data //
-                    , ex);
-
-                }
-
-            } // while(true)
-
-        } // readProcess()
-
-    } // class VMStatReader
-
-	/**
-	 * Parse a string which may have a "K" suffix, returning a double. If the
-	 * "K" suffix is present, then the returned value is scaled by 1000. This
-	 * handles an OSX specific oddity for <code>vm_stat</code>
-	 * 
-	 * @param s
-	 *            The string.
-	 * 
-	 * @return The (possibly scaled) value.
-	 */
-	private static double parseDouble(final String s) {
-
-		final int pos = s.indexOf("K");
-
-		if(pos == -1) {
-
-			return Long.valueOf(s);
-
-		}
-
-		final long val = Long.valueOf(s.substring(0, pos));
-
-		return val * 1000;
-    	
-    }
-    
-	private static void assertField(final int index, final String[] fields,
-			final String expected) {
-    	
-		if (!expected.equals(fields[index]))
-			throw new RuntimeException("Expecting '" + expected + "', found: '"
-					+ fields[0] + "'");
-
-	}
+   /**
+    * If the name of the performance counter appears in {@link #keys} then set
+    * the index of that counter on the <i>indexOf</i> field.
+    * 
+    * @param indexOf
+    *           The index of that performance counter in the table generated by
+    *           the OS.
+    * @param name
+    *           The name(s) of the performance counter.
+    */
+   private void getIndexIfDefined(final AtomicInteger indexOf,
+         final String... name) {
+      Integer index = null;
+      for (String s : name) {
+         index = keys.get(s);
+         if (index != null) {
+            indexOf.set(index);
+            return;
+         }
+      }
+      throw new RuntimeException("Required performance counter not found: '"
+            + Arrays.toString(name) + "'");
+   }
 
 }

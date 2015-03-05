@@ -34,8 +34,7 @@ package com.bigdata.btree.proc;
  * safely applied in parallel to multiple index partitions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IParallelizableIndexProcedure extends IIndexProcedure {
+public interface IParallelizableIndexProcedure<T> extends IIndexProcedure<T> {
 
 }

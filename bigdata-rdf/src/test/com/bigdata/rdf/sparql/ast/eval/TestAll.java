@@ -34,7 +34,6 @@ import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
  * Aggregates test suites into increasing dependency order.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
@@ -139,9 +138,20 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTCK.class);
 
+        /* test suite for complex BIND operations creating values that are
+         * reused in other parts of the query, targeted at covering problems
+         * with dictionary resolving these constructed values correctly (in
+         * order to resolve mocked IDs)
+         */
+        suite.addTestSuite(TestTicket1007.class);
+
         // additional bottom-up evaluation tests.
         suite.addTestSuite(TestTicket1087.class);
-        
+
+        // test static analysis for quads constructs in triples mode, raising
+        // an early exception when accessing named graphs in triples mode
+        suite.addTest(TestTicket1105.suite());
+
 		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*
@@ -170,9 +180,6 @@ public class TestAll extends TestCase {
 
         // test suite for custom functions.
         suite.addTestSuite(TestCustomFunction.class);
-
-        // test suite for BIND + GRAPH ticket.
-        suite.addTestSuite(TestBindGraph1007.class);
 
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);

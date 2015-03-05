@@ -97,7 +97,7 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert__insertInto_01() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = //
                   "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
                 + "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"//
@@ -194,7 +194,7 @@ public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
     @SuppressWarnings("rawtypes")
     public void test_delete_insert__deleteFrom_01() throws MalformedQueryException,
             TokenMgrError, ParseException {
-
+       
         final String sparql = //
                   "PREFIX dc:  <http://purl.org/dc/elements/1.1/>\n"//
                 + "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"//

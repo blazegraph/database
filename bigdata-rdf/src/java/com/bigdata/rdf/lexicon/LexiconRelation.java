@@ -767,6 +767,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
     }
 
+    @Override
     public void destroy() {
 
         final IResourceLock resourceLock = acquireExclusiveLock();
