@@ -51,3 +51,9 @@ fi
 if [ -z "${JETTY_PORT}" ] ; then
 	export JETTY_PORT=8080
 fi
+
+#Group commit (true|false)
+
+if [ -z "${GROUP_COMMIT}" ] ; then
+	export GROUP_COMMIT=false
+fi
