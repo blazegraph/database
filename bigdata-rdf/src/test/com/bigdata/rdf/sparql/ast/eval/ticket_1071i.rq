@@ -1,0 +1,11 @@
+SELECT *
+WHERE
+{ 
+  BIND(1 as ?A)
+  BIND(2 as ?B)
+  BIND(3 as ?C)
+
+  OPTIONAL { BIND( 'unbound' as ?D ) }
+  OPTIONAL { BIND( 'unbound' as ?B ) }
+  OPTIONAL { BIND( 'unbound' as ?C ) }
+} 

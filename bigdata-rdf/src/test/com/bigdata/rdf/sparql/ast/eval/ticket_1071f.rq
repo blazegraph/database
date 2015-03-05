@@ -1,0 +1,10 @@
+SELECT *
+WHERE
+{ 
+  BIND (1 AS ?A)
+  BIND (1 AS ?C)
+  OPTIONAL { 
+    BIND (1 AS ?B)
+    OPTIONAL { BIND (2 AS ?C) }
+  }
+} 

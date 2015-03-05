@@ -98,8 +98,8 @@ import org.openrdf.sail.UpdateContext;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -1629,9 +1629,9 @@ public class BigdataSail extends SailBase implements Sail {
 
 		final ITransactionService txService;
 
-		if (indexManager instanceof AbstractJournal) {
+		if (indexManager instanceof IJournal) {
 
-			txService = ((Journal) indexManager).getTransactionManager()
+			txService = ((IJournal) indexManager).getLocalTransactionManager()
 					.getTransactionService();
 
 		} else {

@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
@@ -2351,6 +2352,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             return super.commit(tx);
 
         }
+        
         @Override
         protected void activateTx(final TxState state) {
             if (txLog.isInfoEnabled())
@@ -2366,6 +2368,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
             }
             super.activateTx(state);
         }
+        
         @Override
         protected void deactivateTx(final TxState state) {
             if (txLog.isInfoEnabled())
@@ -2384,7 +2387,19 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
                 tx.close();
             }
         }
-
+        
+      /**
+       * Extended to cancel any running or queued tasks on the {@link WriteExecutorService}.
+       * 
+       * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
+       *      should interrupt NSS requests and AbstractTasks </a>
+       */
+        @Override
+        public void abortAllTx() {
+           super.abortAllTx();
+           concurrencyManager.abortAllTx();
+        }
+        
     } // class InnerJournalTransactionService
     
     protected JournalTransactionService newTransactionService() {
@@ -3469,7 +3484,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     
     @Override
-    public <T> Future<T> submit(AbstractTask<T> task) {
+    public <T> FutureTask<T> submit(AbstractTask<T> task) {
 
         return concurrencyManager.submit(task);
         

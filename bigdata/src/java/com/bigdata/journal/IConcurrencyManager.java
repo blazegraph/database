@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -138,7 +139,7 @@ public interface IConcurrencyManager extends IServiceShutdown, ICounterSetAccess
      * @exception NullPointerException
      *                if task is <code>null</code>
      */
-    public <T> Future<T> submit(AbstractTask<T> task);
+    public <T> FutureTask<T> submit(AbstractTask<T> task);
 
     /**
      * Executes the given tasks, returning a list of Futures holding their
