@@ -1,10 +1,13 @@
 package com.bigdata.rdf.sail;
 
+import java.util.Properties;
+
+import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.TestSuite;
 
 import org.junit.Test;
 
-public class BigdataSailFactoryTest {
+public class BigdataSailFactoryTest extends AbstractBigdataSailTestCase {
 	
 	protected static final String remoteRepositoryUrl = "http://localhost:9999/bigdata";
 	protected static final String remoteRepositoryNamespaceUrl = "http://localhost:9999/bigdata/namespace";
@@ -81,7 +84,26 @@ public class BigdataSailFactoryTest {
 	}
 	
 	public static TestSuite suite(){
-		return new TestSuite(BigdataSailFactoryTest.class);
+		
+		BigdataSailFactoryTest delegate = new BigdataSailFactoryTest();
+		
+		final ProxyTestSuite theSuite = new ProxyTestSuite(delegate, BigdataSailFactoryTest.class.getName());
+		
+		theSuite.addTestSuite(BigdataSailFactoryTest.class);
+		
+		return theSuite;
+	}
+
+	@Override
+	protected BigdataSail getSail(Properties properties) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	protected BigdataSail reopenSail(BigdataSail sail) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }
