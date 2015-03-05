@@ -41,6 +41,7 @@ import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.StackInfoReport;
 
 /**
  * FixedAllocator
@@ -181,7 +182,7 @@ public class FixedAllocator implements Allocator {
 			
 		    m_store.showWriteCacheDebug(paddr);			
 			
-		    log.warn("Physical address " + paddr + " not accessible for Allocator of size " + m_size);
+		    log.warn("Physical address " + paddr + " not accessible for Allocator of size " + m_size, new StackInfoReport());
 			
 			return 0L;
 		}

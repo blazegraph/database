@@ -2322,8 +2322,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     } else {
                         immediateFree(addr, sze);
                     }
-                } else if (false && context != null && alloc.canImmediatelyFree(addr, sze, context)) {
-                    immediateFree(addr, sze);
+                } else if (context != null && alloc.canImmediatelyFree(addr, sze, context)) {
+                	// This is the condition with ContextAllocations to safely be able to avoid deferred
+                	// frees.
+                	immediateFree(addr, sze);
                 } else {
                     // if a free request is made within a context not managed by
                     // the allocator then it is not safe to free
