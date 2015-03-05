@@ -71,7 +71,7 @@ public class ApiTaskForIndexManager<T> implements Callable<T> {
 
       } finally {
 
-         delegate.clearIndexManager();
+         delegate.setIndexManager(null);
 
       }
 

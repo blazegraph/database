@@ -76,7 +76,7 @@ public class ApiTaskForJournal<T> extends AbstractTask<T> {
       } finally {
 
          // Clear reference to the Journal from the delegate.
-         delegate.clearIndexManager();
+         delegate.setIndexManager(null);
 
       }
 
