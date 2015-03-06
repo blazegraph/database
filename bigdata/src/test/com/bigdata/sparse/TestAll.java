@@ -38,8 +38,9 @@ import com.bigdata.service.TestEDS;
 import com.bigdata.service.TestJournal;
 
 /**
+ * Test suite for the spare row store facility (aka key-value store).
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
