@@ -34,7 +34,6 @@ import java.util.concurrent.TimeoutException;
 import net.jini.config.Configuration;
 
 import org.apache.zookeeper.ZooKeeper;
-import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.ha.HACommitGlue;
@@ -48,7 +47,6 @@ import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.journal.jini.ha.HAJournalTest.SpuriousTestException;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.InnerCause;
@@ -793,13 +791,11 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
 					awaitNSSAndHAReady(service);
 
-					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+					final RemoteRepositoryManager repo = getRemoteRepository(service, httpClient);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -812,9 +808,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					}
 
 				}
-			} finally {
-            	client.stop();
-            }
 
         }
         
@@ -894,13 +887,11 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
 					awaitNSSAndHAReady(service);
 
-					final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+					final RemoteRepositoryManager repo = getRemoteRepository(service, httpClient);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -912,9 +903,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 						repo.close();
 					}
 				}
-			} finally {
-            	client.stop();
-            }
 
         }
         
@@ -1106,14 +1094,12 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 			 * Note: It is important to test the reads for the first commit on
 			 * both the leader and the follower.
 			 */
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB }) {
 
 					awaitNSSAndHAReady(service);
 
 					final RemoteRepositoryManager repo = getRemoteRepository(
-							service, client);
+							service, httpClient);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -1126,9 +1112,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					}
 
 				}
-			} finally {
-				client.stop();
-			}
 
 		}
         
@@ -1208,14 +1191,12 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 			 * Note: It is important to test the reads for the first commit on
 			 * both the leader and the follower.
 			 */
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-			try {
 				for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
 					awaitNSSAndHAReady(service);
 
 					final RemoteRepositoryManager repo = getRemoteRepository(
-							service, client);
+							service, httpClient);
 					try {
 						// Should be empty.
 						assertEquals(
@@ -1227,9 +1208,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 						repo.close();
 					}
 				}
-			} finally {
-				client.stop();
-			}
 
 		}
 
@@ -1309,13 +1287,11 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
              * Note: It is important to test the reads for the first commit on
              * both the leader and the follower.
              */
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-            try {
 			for (HAGlue service : new HAGlue[] { serverA, serverB, serverC }) {
 
 				awaitNSSAndHAReady(service);
 
-				final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+				final RemoteRepositoryManager repo = getRemoteRepository(service, httpClient);
 				try {
 					// Should be empty.
 					assertEquals(
@@ -1326,9 +1302,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					repo.close();
 				}
 			}
-            } finally {
-            	client.stop();
-            }
 
         }
         
@@ -1738,11 +1711,9 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
         /*
          * Can query B/C. 
          */
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-		try {
 			for (HAGlue service : new HAGlue[] { serverB, serverC }) {
 
-				final RemoteRepositoryManager repo = getRemoteRepository(service, client);
+				final RemoteRepositoryManager repo = getRemoteRepository(service, httpClient);
 				try {
 					assertEquals(
 							1L,
@@ -1753,9 +1724,6 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					repo.close();
 				}
 			}
-		} finally {
-        	client.stop();
-        }
         
         // restart zookeeper.
         ((HAGlueTest)serverA).log("MARK");

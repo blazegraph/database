@@ -26,17 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
-import java.io.IOException;
 import java.util.UUID;
-
-import org.eclipse.jetty.client.HttpClient;
 
 import net.jini.config.Configuration;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
@@ -106,7 +103,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
          * Do CANCEL for each service using the default namespace.
          */
         final RemoteRepositoryManager[] rpms = new RemoteRepositoryManager[3];
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        final HttpClient client = this.httpClient;
         
         {
             // Get RemoteRepository for each service.

@@ -412,7 +412,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         
         // Setup quorum client.
         quorum = newQuorum();
-        
+
     }
     
     @Override
@@ -2896,14 +2896,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
-                useLoadBalancer, client);
+                useLoadBalancer, httpClient);
         try {
-        	repo.prepareUpdate(updateStr).evaluate();
+           repo.prepareUpdate(updateStr).evaluate();
         } finally {
-        	repo.close();
-        	client.stop();
+        	   repo.close();
         }
 
     }
@@ -2924,24 +2922,23 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        try {
-
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
-        	try {
-        		repo.prepareUpdate(updateStr).evaluate();
-        	} finally {
-        		repo.close();
-        		client.stop();
-        	}
-
-        } catch (HttpException ex) {
-        	
-        	log.warn("Status Code: " + ex.getStatusCode(), ex);
-
+         try {
+   
+            final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+                  httpClient);
+            try {
+               repo.prepareUpdate(updateStr).evaluate();
+            } finally {
+               repo.close();
+            }
+   
+         } catch (HttpException ex) {
+   
+            log.warn("Status Code: " + ex.getStatusCode(), ex);
+   
             assertEquals("statusCode", 405, ex.getStatusCode());
-
-        }
+   
+         }
         
     }
 
@@ -2954,13 +2951,11 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+           final RemoteRepositoryManager repo = getRemoteRepository(haGlue, httpClient);
         	try {
         		repo.prepareTupleQuery(queryStr).evaluate();
         	} finally {
         		repo.close();
-        		client.stop();
         	}
             
         } catch (HttpException ex) {
@@ -3083,6 +3078,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
       }
 
+      @Override
       public Void call() throws Exception {
 
          final StringBuilder sb = new StringBuilder();
@@ -3109,9 +3105,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
          quorum.assertQuorum(token);
 
          final long elapsed;
-         final HttpClient client = HttpClientConfigurator.getInstance()
-               .newInstance();
-         final RemoteRepositoryManager mgr = getRemoteRepository(leader, client);
+         final RemoteRepositoryManager mgr = getRemoteRepository(leader, httpClient);
          try {
             final RemoteRepository repo = mgr
                   .getRepositoryForNamespace(namespace);
@@ -3122,7 +3116,6 @@ public abstract class AbstractHA3JournalServerTestCase extends
             elapsed = System.nanoTime() - begin;
          } finally {
             mgr.close();
-            client.stop();
          }
 
          // Verify quorum is still valid.

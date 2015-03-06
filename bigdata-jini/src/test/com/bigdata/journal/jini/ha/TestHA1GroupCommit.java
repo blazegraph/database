@@ -121,4 +121,23 @@ public class TestHA1GroupCommit extends AbstractHAGroupCommitTestCase {
 
     }
 
+   /**
+    * Test creates N namespaces and then loads the data into those namespaces in
+    * parallel using a "DROP ALL; LOAD" pattern and a small payload for the
+    * updates. Due to the small payload, it is reasonable to expect that some
+    * commit groups will be melded that have more than one update for a given
+    * namespace.
+    */
+   public void test_HA1_groupCommit_ManyNamespacesConcurrentWritersSmallUpdates()
+         throws Exception {
+
+      final int nnamespaces = 10;
+      final int nruns = 50;
+
+      startA();
+
+      doManyNamespacesConcurrentWritersSmallUpdatesTest(nnamespaces, nruns);
+
+   }
+
 }

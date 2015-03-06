@@ -32,16 +32,6 @@ import net.jini.config.Configuration;
  * postCommit() or postHACommit(). Thus some kinds of errors will only be
  * observable in HA3. See #1136.
  * 
- * TODO Do concurrent create / drop KB stress test with small loads in each KB.
- * 
- * TODO Do concurrent writers on the same KB. The operations should be
- * serialized (but if we do this from a pool of client threads then the N
- * updates can be melded into fewer than N commit points).
- * 
- * TODO Do concurrent writer use cases for concurrent writers that eventually
- * cause leader or follower fails to make sure that error recovery is Ok with
- * concurrent writers.
- * 
  * @see TestHA1GroupCommit
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -120,6 +110,25 @@ public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
       new ABC(false/* sequential */); // simultaneous start.
 
       doManyNamespacesConcurrentWritersTest(nnamespaces, nruns, reallyLargeLoad);
+
+   }
+
+   /**
+    * Test creates N namespaces and then loads the data into those namespaces in
+    * parallel using a "DROP ALL; LOAD" pattern and a small payload for the
+    * updates. Due to the small payload, it is reasonable to expect that some
+    * commit groups will be melded that have more than one update for a given
+    * namespace.
+    */
+   public void test_HA3_groupCommit_ManyNamespacesConcurrentWritersSmallUpdates()
+         throws Exception {
+
+      final int nnamespaces = 10;
+      final int nruns = 50;
+
+      new ABC(false/* sequential */); // simultaneous start.
+
+      doManyNamespacesConcurrentWritersSmallUpdatesTest(nnamespaces, nruns);
 
    }
 

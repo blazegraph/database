@@ -32,8 +32,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Calendar;
 import java.util.Properties;
 
-import org.eclipse.jetty.client.HttpClient;
-
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.msg.HADigestRequest;
@@ -43,11 +41,9 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 
 /**
  * Abstract base class for testing the {@link ISnapshotPolicy} and
@@ -113,10 +109,9 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
         JettyResponseListener response = null;
 
         try {
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         	
 			final RemoteRepositoryManager rpm = new RemoteRepositoryManager(
-					serviceURL, client, executorService);
+					serviceURL, httpClient, executorService);
 			try {
 	            RemoteRepository.checkResponseCode(response = rpm.doConnect(opts));
 			} finally {
@@ -124,7 +119,6 @@ public class AbstractHA3BackupTestCase extends AbstractHA3JournalServerTestCase 
 					response.abort();
 				
 				rpm.close();
-				client.stop();
 			}
 
         } catch (IOException ex) {
