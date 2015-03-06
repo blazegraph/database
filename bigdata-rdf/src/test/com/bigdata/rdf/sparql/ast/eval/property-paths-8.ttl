@@ -1,0 +1,12 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://s1> rdfs:subClassOf <http://s2> .
+<http://s1> rdfs:subClassOf <http://s3> .
+<http://s2> rdfs:subClassOf <http://s3> .
+<http://s3> rdfs:subClassOf <http://s4> .
+<http://s3> rdfs:subClassOf <http://s5> .
+<http://s4> rdfs:subClassOf <http://s6> .
+<http://s5> rdfs:subClassOf <http://s7> .
+<http://s7> rdfs:subClassOf <http://s7> .
+
