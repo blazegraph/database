@@ -41,7 +41,6 @@ import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
 import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.StackInfoReport;
 
 /**
  * FixedAllocator
@@ -182,7 +181,7 @@ public class FixedAllocator implements Allocator {
 			
 		    m_store.showWriteCacheDebug(paddr);			
 			
-		    log.warn("Physical address " + paddr + " not accessible for Allocator of size " + m_size, new StackInfoReport());
+		    log.warn("Physical address " + paddr + " not accessible for Allocator of size " + m_size);
 			
 			return 0L;
 		}
@@ -230,6 +229,7 @@ public class FixedAllocator implements Allocator {
 	}
 
 	volatile private IAllocationContext m_context;
+	volatile private Thread m_contextThread;
 
 	/**
 	 * @return whether the allocator is unassigned to an AllocationContext
@@ -275,6 +275,12 @@ public class FixedAllocator implements Allocator {
 			// NO! m_store.removeFromCommit(this);
 		}
 		m_context = context;
+		
+		if (m_context != null) {
+			m_contextThread = Thread.currentThread();
+		} else {
+			m_contextThread = null;
+		}
 		
         if (log.isDebugEnabled())
             checkBits();
@@ -753,6 +759,9 @@ public class FixedAllocator implements Allocator {
 	            
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
+					
+					if (m_contextThread != null && m_contextThread != Thread.currentThread())
+						throw new IllegalStateException("Check thread context");
 					
 					m_freeBits++;
 

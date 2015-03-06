@@ -2392,7 +2392,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
             final int headerEntries = maxAlloc / 4;
             final int threshold = headerEntries * leafEntries;
             
-            final int nallocs = threshold << 4; // 16 times greater than allocation threshold
+            final int nallocs = threshold << 3; // 8 times greater than allocation threshold
 
 			Journal store = (Journal) getStore(properties);
             try {
