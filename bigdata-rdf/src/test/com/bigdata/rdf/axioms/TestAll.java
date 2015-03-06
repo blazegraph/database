@@ -31,7 +31,6 @@ import junit.framework.TestSuite;
  * Aggregates test suites into increasing dependency order.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
@@ -55,7 +54,7 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        TestSuite suite = new TestSuite("RDF Axiom Models");
+        final TestSuite suite = new TestSuite("RDF Axiom Models");
 
         // test suite for the axiom models.
         suite.addTestSuite(TestAxioms.class);

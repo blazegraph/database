@@ -68,12 +68,6 @@ abstract public class AbstractDelegateRestApiTask<T> extends
    }
 
    @Override
-   public void clearIndexManager() {
-      super.clearIndexManager();
-      delegate.clearIndexManager();
-   }
-
-   @Override
    public boolean isGRSRequired() {
       return super.isGRSRequired() || delegate.isGRSRequired();
    }
