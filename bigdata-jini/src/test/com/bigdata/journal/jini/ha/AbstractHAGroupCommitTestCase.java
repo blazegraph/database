@@ -39,13 +39,12 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  * <p>
  * Note: A different code path is used for commit for HA1 than HA3 (no call to
  * postCommit() or postHACommit(). Thus some kinds of errors will only be
- * observable in HA3.  See #1136.
- * 
- * TODO Do concurrent create / drop KB stress test with small loads in each KB.
+ * observable in HA3. See #1136.
  * 
  * TODO Do concurrent writer use cases for concurrent writers that eventually
  * cause leader or follower fails to make sure that error recovery is Ok with
- * concurrent writers.
+ * concurrent writers (we should be testing this in our release QA for HA as
+ * well).
  * 
  * @author bryan
  */
@@ -459,4 +458,164 @@ public class AbstractHAGroupCommitTestCase extends AbstractHA3JournalServerTestC
 
    }
 
+   /**
+    * A unit test of concurrent create/destroy of namespaces.
+    * <p>
+    * Note: Namespace create/destroy tasks contend for the GSR index. This
+    * limits the potential parallelism since at most one create/destroy task can
+    * run at a time regardless of the namespace it addresses.  However, multiple
+    * create and/or destroy operations can still be melded into a single commit
+    * group.
+    * 
+    * @param nnamespaces
+    *           The #of namespaces to use.
+    * @param nruns
+    *           The #of tasks to submit for each namespace.
+    * 
+    * @throws Exception
+    * 
+    * FIXME Chase down why this does not work!  I am hitting errors with the 
+    */
+   protected void doGroupCommit_createDestroy_ManyNamespacesTest(
+         final int nnamespaces, final int nruns) throws Exception {
+      
+      final String[] namespaces = new String[nnamespaces];
+      {
+
+         for (int i = 0; i < nnamespaces; i++) {
+
+            namespaces[i] = getName() + "-" + i;
+
+         }
+
+      }
+
+      // Verify quorum is FULLY met.
+      final long token = awaitFullyMetQuorum();
+
+      final HAGlue leader = quorum.getClient().getLeader(token);
+
+      final RemoteRepositoryManager repo = getRemoteRepository(leader,
+            httpClient);
+
+      try {
+
+         final StringBuilder sb = new StringBuilder();
+         sb.append("DROP ALL;\n");
+         sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+         sb.append("INSERT DATA {\n");
+         sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+         sb.append("  dc:creator \"A.N.Other\" .\n");
+         sb.append("}\n");
+         final String updateStr = sb.toString();
+
+         /*
+          * Create a set of tasks organized as a series of iterations. For each
+          * iteration, we will either create or destroy all namespaces.
+          */
+
+         final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
+
+         for (int i = 0; i < nruns; i++) {
+
+//            final boolean create = (i % 2 == 0);
+
+            for (int j = 0; j < nnamespaces; j++) {
+
+               // FIXME Why is it a problem to create/destroy the same namespaces?!?
+               final String theNamespace = namespaces[j]
+                     +"::round="+nruns
+                     ;
+
+               tasks.add(new Callable<Void>() {
+
+                  @Override
+                  public Void call() throws Exception {
+
+                     try {
+
+//                        if (create) {
+
+                           final Properties properties = new Properties();
+
+                           properties.setProperty(
+                                 RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
+                                 theNamespace);
+
+                           log.warn("Creating: " + theNamespace);
+                           repo.createRepository(theNamespace, properties);
+
+                           if(true) {
+                              // send an update request.
+                              repo.getRepositoryForNamespace(theNamespace)
+                                 .prepareUpdate(updateStr).evaluate();
+                           }
+                           
+//                        } else {
+
+                           log.warn("Destroying: " + theNamespace);
+                           repo.deleteRepository(theNamespace);
+
+//                        }
+                        return null;
+                     } catch (Throwable t) {
+                        log.error("namespace=" + theNamespace + " :: " + t);
+                        throw new RuntimeException(t);
+                     }
+                  }
+               });
+
+            }
+
+         }
+
+         final List<Future<Void>> futures = executorService.invokeAll(tasks,
+               TimeUnit.MINUTES.toMillis(4), TimeUnit.MILLISECONDS);
+
+         for (Future<Void> f : futures) {
+
+            f.get();
+
+         }
+
+         // Count the #of statements in each repo.
+
+         final long count0 = countResults(repo
+               .getRepositoryForNamespace(namespaces[0])
+               .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
+
+         assertTrue(count0 > 0);
+
+         for (int i = 1; i < nnamespaces; i++) {
+
+            final long count2 = countResults(repo
+                  .getRepositoryForNamespace(namespaces[i])
+                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
+
+            assertEquals(count0, count2);
+
+         }
+
+         // Verify still met on token.
+         assertEquals(token, quorum.token());
+
+         // Verify still fully met on token.
+         assertTrue(quorum.isQuorumFullyMet(token));
+
+         final long commitCounter = leader
+               .getRootBlock(new HARootBlockRequest(null/* storeUUID */))
+               .getRootBlock().getCommitCounter();
+         
+         if (log.isInfoEnabled())
+            log.info("There were " + commitCounter + " commits with "
+                  + nnamespaces + " namespaces and " + nruns + " runs.");
+         
+      } finally {
+
+         repo.close();
+
+      }
+
+   }
+   
 }

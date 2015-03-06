@@ -132,4 +132,25 @@ public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
 
    }
 
+   /**
+    * A unit test of concurrent create/destroy of namespaces.
+    * <p>
+    * Note: Namespace create/destroy tasks contend for the GSR index. This
+    * limits the potential parallelism since at most one create/destroy task can
+    * run at a time regardless of the namespace it addresses. However, multiple
+    * create and/or destroy operations can still be melded into a single commit
+    * group.
+    */
+   public void test_HA3_GroupCommit_createDestroy_ManyNamespaces()
+         throws Exception {
+
+      final int nnamespaces = 10;
+      final int nruns = 50;
+
+      new ABC(false/* sequential */); // simultaneous start.
+
+      doGroupCommit_createDestroy_ManyNamespacesTest(nnamespaces, nruns);
+
+   }
+
 }
