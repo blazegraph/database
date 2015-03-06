@@ -66,10 +66,13 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * input variable and a single output variable. Continue this in rounds, using 
  * the output of the previous round as the input of the next round. This has
  * the effect of producing the transitive closure of the subquery operation.
- * The input binding set is expected to be a distinct projection over
+ * 
+ * IMPORTANT: The input binding set is expected to be a distinct projection over
  * the variables that are bound through the operator; in the general case, this
  * requires a {@link JVMDistinctBindingSetsOp} over these variable(s) prior to
- * calling the operator.
+ * calling the operator. In particular, this operator does *not* join with
+ * incoming bindings, but discards all variables that are not bound by the
+ * associated ALP node.
  * 
  * <p>
  * The basic idea behind this operator is to run a series of rounds until the
@@ -93,10 +96,21 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * solutions from the subquery with those in the parent context.
  * 
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * 
  *         TODO There should be two version of this operator. One for the JVM
  *         heap and another for the native heap. This will help when large
  *         amounts of data are materialized by the internal collections.
+ *         
+ *         TODO think about whether the whole SolutionKey mechanism is required
+ *         at all, now that we have a distinct projection at the end. It might
+ *         well be enough to store the input for the previous rounds in a map.
+ *         This would also be more "precise" than remembering the solutions:
+ *         for paths such as s1 -p-> s2 -p-> s3 and s1 -p-> s3 and an ALP such
+ *         as s1 p* ?x, we currently visit s3 twice, once in the first round
+ *         and once in the second round. This is unnecessary overhead and it
+ *         might help saving a lot in case of cycles (where we currently run
+ *         through over and over again).
  */
 public class ArbitraryLengthPathOp extends PipelineOp {
 
@@ -362,108 +376,116 @@ public class ArbitraryLengthPathOp extends PipelineOp {
             
         }
         
-        @SuppressWarnings("unchecked")
-        private void processChunk(final IBindingSet[] chunkIn) throws Exception {
-        
-            final Map<SolutionKey, IBindingSet> solutions = 
-            		new LinkedHashMap<SolutionKey, IBindingSet>();
-            
-            final QueryEngine queryEngine = this.context
-                    .getRunningQuery().getQueryEngine();
+      private void processChunk(final IBindingSet[] chunkIn) throws Exception {
+
+         final Map<SolutionKey, IBindingSet> solutions = new LinkedHashMap<SolutionKey, IBindingSet>();
+
+         final QueryEngine queryEngine = this.context.getRunningQuery()
+               .getQueryEngine();
+
+         /*
+          * The input to each round of transitive chaining.
+          */
+         final Set<IBindingSet> nextRoundInput = new LinkedHashSet<IBindingSet>();
+
+         /*
+          * Decide based on the schematics of the path and the incoming data
+          * whether to run in forward or reverse gear.
+          * 
+          * TODO Break the incoming chunk into two chunks - one to be run in
+          * forward gear and one to be run in reverse. This is an extremely
+          * unlikely scenario.
+          */
+         final Gearing gearing = chooseGearing(chunkIn);
+
+         if (log.isDebugEnabled()) {
+            log.debug("gearing: " + gearing);
+         }
+
+         for (IBindingSet parentSolutionIn : chunkIn) {
+
+            if (log.isDebugEnabled())
+               log.debug("parent solution in: " + parentSolutionIn);
+
+            final IBindingSet childSolutionIn = parentSolutionIn.clone();
 
             /*
-             * The input to each round of transitive chaining.
+             * The seed is either a constant on the input side of the property
+             * path or a bound value for the property path's input variable from
+             * the incoming binding set.
              */
-            final Set<IBindingSet> nextRoundInput = new LinkedHashSet<IBindingSet>();
+            final IConstant<?> seed = gearing.inConst != null ? gearing.inConst
+                  : childSolutionIn.get(gearing.inVar);
 
-            /*
-             * Decide based on the schematics of the path and the
-             * incoming data whether to run in forward or reverse gear.
-             * 
-             * TODO Break the incoming chunk into two chunks - one to be run
-             * in forward gear and one to be run in reverse.  This is an
-             * extremely unlikely scenario.
-             */
-            final Gearing gearing = chooseGearing(chunkIn);
-            
-            if (log.isDebugEnabled()) {
-            	log.debug("gearing: " + gearing);
+            if (log.isDebugEnabled())
+               log.debug("seed: " + seed);
+
+            if (seed != null) {
+
+               childSolutionIn.set(gearing.tVarIn, seed);
+
+               /*
+                * Add a zero length path from the seed to itself. By handling
+                * this here (instead of in a separate operator) we get the
+                * cardinality right. Except in the case on nested arbitrary
+                * length paths, we are getting too few solutions from that
+                * (over-filtering). See the todo below. Again, this seems to be
+                * a very esoteric problem stemming from an unlikely scenario.
+                * Not going to fix it for now.
+                * 
+                * TODO Add a binding for the bop id for the subquery that
+                * generated this solution and use that as part of the solution
+                * key somehow? This would allow duplicates from nested paths to
+                * remain in the outbound solutions, which seems to be the
+                * problem with the TCK query:
+                * 
+                * :a (:p*)* ?y
+                */
+               if (lowerBound == 0 && canBind(gearing, childSolutionIn, seed)) {
+
+                  final IBindingSet bs = parentSolutionIn.clone();
+
+                  bs.set(gearing.tVarIn, seed);
+
+                  bs.set(gearing.tVarOut, seed);
+
+                  storeAndEmit(bs, gearing, solutions);
+
+                  if (log.isDebugEnabled()) {
+                     log.debug("added a zero length path: " + bs);
+                  }
+
+               }
+
             }
-                       
-            for (IBindingSet parentSolutionIn : chunkIn) {
-            
-	            if (log.isDebugEnabled())
-	            	log.debug("parent solution in: " + parentSolutionIn);
-        
-                final IBindingSet childSolutionIn = parentSolutionIn.clone();
-                
-                /*
-                 * The seed is either a constant on the input side of
-                 * the property path or a bound value for the property 
-                 * path's input variable from the incoming binding set.
-                 */
-                final IConstant<?> seed = gearing.inConst != null ?
-            		gearing.inConst : childSolutionIn.get(gearing.inVar);
-                
-                if (log.isDebugEnabled())
-                	log.debug("seed: " + seed);
-                
-                if (seed != null) {
-                	
-                	childSolutionIn.set(gearing.tVarIn, seed);
-                	
-                	/*
-                	 * Add a zero length path from the seed to itself. By handling
-                	 * this here (instead of in a separate operator) we get the 
-                	 * cardinality right.  Except in the case on nested
-                	 * arbitrary length paths, we are getting too few solutions
-                	 * from that (over-filtering).  See the todo below.  Again,
-                	 * this seems to be a very esoteric problem stemming from
-                	 * an unlikely scenario.  Not going to fix it for now.
-                	 * 
-                	 * TODO Add a binding for the bop id for the
-                	 * subquery that generated this solution and use
-                	 * that as part of the solution key somehow?  This
-                	 * would allow duplicates from nested paths to
-                	 * remain in the outbound solutions, which seems to
-                	 * be the problem with the TCK query:
-                	 * 
-                	 * :a (:p*)* ?y
-                	 */
-                	if (lowerBound == 0 && canBind(gearing, childSolutionIn, seed)) {
-                		
-                		final IBindingSet bs = parentSolutionIn.clone();
-                		               		
-                		bs.set(gearing.tVarIn, seed);
-                		
-                		bs.set(gearing.tVarOut, seed);
-                		
-                		storeAndEmit(bs, gearing, solutions);
-                		
-                		if (log.isDebugEnabled()) {
-                			log.debug("added a zero length path: " + bs);
-                		}
-                		
-                	}
-                	
-                }
-                
-                nextRoundInput.add(childSolutionIn);
-            
-	        }
-	
-	        if (log.isDebugEnabled()) {
-	        	for (IBindingSet childSolutionIn : nextRoundInput)
-	        		log.debug("first round input: " + childSolutionIn);
-	        }
-	        
-	        // go into iteration
-	        doIterate(solutions, queryEngine, nextRoundInput, gearing);
-                
-        } // processChunk method
 
-        
+            nextRoundInput.add(childSolutionIn);
 
+         }
+
+         if (log.isDebugEnabled()) {
+            for (IBindingSet childSolutionIn : nextRoundInput)
+               log.debug("first round input: " + childSolutionIn);
+         }
+
+         // go into iteration
+         doIterate(solutions, queryEngine, nextRoundInput, gearing);
+
+      } // processChunk method
+
+
+      /**
+       * Performs up to upperBound iterations (or stops if a fixed point has
+       * been reached), to detect new bindings for the property
+       * paths. Detected bindings are flushed immediately and stored in the
+       * solutions map, in order to avoid duplicate work (and break cycles in
+       * the graph). 
+       * 
+       * @param solutions map to store solutions
+       * @param queryEngine the query engine to execute the driver subquery
+       * @param nextRoundInput input for the first iteration
+       * @param gearing the given gearing
+       */
       private void doIterate(
             final Map<SolutionKey, IBindingSet> solutions,
             final QueryEngine queryEngine, final Set<IBindingSet> nextRoundInput, 
@@ -650,8 +672,6 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
                final IBindingSet bs = it.next().getValue();
 
-               /*
-         		 */
                if (!bs.get(gearing.tVarOut).equals(gearing.outConst)) {
 
                   if (log.isDebugEnabled()) {
@@ -813,64 +833,56 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         }
             
        
-        /**
-		 * Need to filter the duplicates per the spec:
-		 * 
-		 * "Such connectivity matching does not introduce duplicates
-		 * (it does not incorporate any count of the number of ways
-		 * the connection can be made) even if the repeated path
-		 * itself would otherwise result in duplicates.
-		 * 
-		 * The graph matched may include cycles. Connectivity
-		 * matching is defined so that matching cycles does not lead
-		 * to undefined or infinite results."
-		 * 
-		 * We handle this by keeping the solutions in a Map with a solution
-		 * key that keeps duplicates from getting in.
-		 */
-        private SolutionKey newSolutionKey(final Gearing gearing, final IBindingSet bs) {
-        	
-        	if (gearing.inVar != null && gearing.outVar != null) {
-        		return new SolutionKey(new IConstant<?>[] {
-    				bs.get(gearing.inVar), bs.get(gearing.outVar), bs.get(gearing.tVarOut)
-        		});
-        	} else if (gearing.inVar != null) {
-        		return new SolutionKey(new IConstant<?>[] {
-    				bs.get(gearing.inVar), bs.get(gearing.tVarOut)
-        		});
-        	} else if (gearing.outVar != null) {
-        		return new SolutionKey(new IConstant<?>[] {
-    				bs.get(gearing.outVar), bs.get(gearing.tVarOut)
-        		});
-        	} else {
-        		return new SolutionKey(new IConstant<?>[] {
-    				bs.get(gearing.tVarOut)
-        		});
-        	}
-        	
-        }
+      /**
+       * Need to filter the duplicates per the spec:
+       * 
+       * "Such connectivity matching does not introduce duplicates (it does not
+       * incorporate any count of the number of ways the connection can be made)
+       * even if the repeated path itself would otherwise result in duplicates.
+       * 
+       * The graph matched may include cycles. Connectivity matching is defined
+       * so that matching cycles does not lead to undefined or infinite
+       * results."
+       * 
+       * We handle this by keeping the solutions in a Map with a solution key
+       * that keeps duplicates from getting in.
+       */
+      private SolutionKey newSolutionKey(final Gearing gearing,
+            final IBindingSet bs) {
 
-        /**
-       * Generates a new solution key from the binding set and the gearing
-       * and adds this combination to the solutions map. Once this has been
-       * done, the solution is emitted (it will still run through a distinct
-       * filter, taking care that we don't emit solutions that have been
-       * emited before already).
+         if (gearing.inVar != null && gearing.outVar != null) {
+            return new SolutionKey(new IConstant<?>[] { bs.get(gearing.inVar),
+                  bs.get(gearing.outVar), bs.get(gearing.tVarOut) });
+         } else if (gearing.inVar != null) {
+            return new SolutionKey(new IConstant<?>[] { bs.get(gearing.inVar),
+                  bs.get(gearing.tVarOut) });
+         } else if (gearing.outVar != null) {
+            return new SolutionKey(new IConstant<?>[] { bs.get(gearing.outVar),
+                  bs.get(gearing.tVarOut) });
+         } else {
+            return new SolutionKey(
+                  new IConstant<?>[] { bs.get(gearing.tVarOut) });
+         }
+
+      }
+
+      /**
+       * Generates a new solution key from the binding set and the gearing and
+       * adds this combination to the solutions map. Once this has been done,
+       * the solution is emitted (it will still run through a distinct filter,
+       * taking care that we don't emit solutions that have been emited before
+       * already).
        * 
        * @param bs the binding set representing the solution
        * @param gearing the associated gearing
-       * @param parentSolutionsToJoin parent solutions to join in
-       * @param noInput true if no join has to be performed
-       * @param joinVar the join variables
        * @param solutions the solutions map where to store bindings
        */
-      private void storeAndEmit(
-            final IBindingSet bs, final Gearing gearing,
+      private void storeAndEmit(final IBindingSet bs, final Gearing gearing,
             final Map<SolutionKey, IBindingSet> solutions) {
-      
+
          final SolutionKey solutionKey = newSolutionKey(gearing, bs);
          storeAndEmit(solutionKey, bs, gearing, solutions);
-      
+
       }
 
 
@@ -881,11 +893,9 @@ public class ArbitraryLengthPathOp extends PipelineOp {
        * filter, taking care that we don't emit solutions that have been
        * emited before already).
        * 
+       * @param solution the key for the solution
        * @param bs the binding set representing the solution
        * @param gearing the associated gearing
-       * @param parentSolutionsToJoin parent solutions to join in
-       * @param noInput true if no join has to be performed
-       * @param joinVar the join variables
        * @param solutions the solutions map where to store bindings
        */
       private void storeAndEmit(
@@ -898,7 +908,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
       }
 
       /**
-       * Flushes a solution to the output buffer.
+       * Flushes a solution to the output buffer, in case it is not a duplicate.
        * 
        * @param bs
        * @param gearing
@@ -919,22 +929,14 @@ public class ArbitraryLengthPathOp extends PipelineOp {
       
                }
       
-               applyFilterAndAddIfNotDuplicate(bset);
+               /**
+                * The filter projects the relevant variables as a side effect
+                */
+               if ((bset = distinctVarFilter.accept(bset)) != null) {
+
+                  out.add(bset);
+               }
       }
-      
-      
-     void applyFilterAndAddIfNotDuplicate(IBindingSet bset) {
-
-        /**
-         * The filter projects the relevant variables as a side effect
-         */
-        if ((bset = distinctVarFilter.accept(bset)) != null) {
-
-           out.add(bset);
-        }
-        
-     }
-      
 
       /**
          * This operator can work in forward or reverse gear.  In forward gear,
@@ -1026,6 +1028,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
          * TODO Refactor to use {@link JVMDistinctFilter} directly iff possible
          * (e.g., a chain of the AALP operator followed by the DISTINCT
          * solutions operator)
+         * 
          */
         private final static class SolutionKey {
 
