@@ -2541,9 +2541,66 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final ArbitraryLengthPathNode alpNode, final Set<IVariable<?>> doneSet,
             final AST2BOpContext ctx) {
 
+        /**
+         * The inner operations is quite complex, we definitely want to avoid
+         * executing it for the same variable bindings over and over again.
+         * Furthermore, the current version of the operator is not capable of
+         * joining with unknown variables. Therefore, we need to compute the
+         * distinct projection over the variables that are passed in. We do
+         * this through the common HashJoinPattern, i.e. pass in the distinct
+         * variables that are bound inside the ALP and re-join in the end using
+         * the hash index. This can help significantly to reduce efforts.
+         */
+
+        /**
+         * Calculate the join variables as the intersection of the maybe
+         * incoming bindings of the ALP node with the variables bound inside.
+         * For short, this is the subset of the ALP node's variable that
+         * is possibly also bound from previous computations.
+         */
+        final Set<IVariable<?>> alpVars =
+              ctx.sa.getDefinitelyProducedBindings
+              (alpNode, new LinkedHashSet<IVariable<?>>(), true);
+        
+        final Set<IVariable<?>> joinVarsSet = ctx.sa.getDefinitelyIncomingBindings(
+              alpNode, new LinkedHashSet<IVariable<?>>());
+        joinVarsSet.retainAll(alpVars);
+
+        final IVariable<?>[] joinVars = 
+              joinVarsSet.toArray(new IVariable<?>[joinVarsSet.size()]);
+
+        /**
+         * We project in everything that might help in binding the variables
+         * of the ALP node.
+         */
+        final Set<IVariable<?>> projectInVars = ctx.sa.getMaybeIncomingBindings(
+              alpNode, new LinkedHashSet<IVariable<?>>());
+        projectInVars.retainAll(alpVars);
+        IVariable<?>[] projectInVarsArr =
+              projectInVars.toArray(new IVariable<?>[projectInVars.size()]);
+
+        
+        /**
+         * Set up a named solution set associated with a hash index operation.
+         * Note that we pass in the project in variables, so the hash join
+         * will output a distinct projection over these variables (which is
+         * a prerequisite to guarantee correctness and efficiency of the ALP op.
+         */
+        final String solutionSetName = "--set-" + ctx.nextId(); // Unique name.
+              
+        final INamedSolutionSetRef namedSolutionSet = 
+              NamedSolutionSetRefUtility.newInstance(
+              ctx.queryId, solutionSetName, joinVars);
+
+        left = addHashIndexOp(left, ctx, alpNode, JoinTypeEnum.Normal, 
+              joinVars, null, projectInVarsArr, namedSolutionSet);       
+        
+        
+        /**
+         * Next, convert the child join group into a subquery
+         */
         final JoinGroupNode subgroup = (JoinGroupNode) alpNode.subgroup();
-    	
-        // Convert the child join group.
+
         PipelineOp subquery = convertJoinGroup(null/*left*/,
                 subgroup, doneSet, ctx, false/* needsEndOp */);
 
@@ -2574,6 +2631,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
         }
 
+        /**
+         * Now, we're ready to set up the ALPOp at the core. 
+         */
         final IVariableOrConstant<?> leftTerm = 
         		(IVariableOrConstant<?>) alpNode.left().getValueExpression();
         
@@ -2585,16 +2645,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         
         final IVariable<?> tVarRight = 
         		(IVariable<?>) alpNode.tVarRight().getValueExpression();
-        
-        /**
-         * We need to drop the internal variables bound by the subquery (in the
-         * case where the subquery is a nested path).
-         */
-        final Set<IVariable<?>> varsToDrop = new LinkedHashSet<IVariable<?>>();
-        ctx.sa.getDefinitelyProducedBindings(subgroup, varsToDrop, true);
-        varsToDrop.remove(tVarLeft);
-        varsToDrop.remove(tVarRight);
-    	
+           	
         left = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(left),//
     			new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
     			new NV(ArbitraryLengthPathOp.Annotations.LEFT_TERM, leftTerm),
@@ -2603,13 +2654,43 @@ public class AST2BOpUtility extends AST2BOpRTO {
     			new NV(ArbitraryLengthPathOp.Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
     			new NV(ArbitraryLengthPathOp.Annotations.LOWER_BOUND, alpNode.lowerBound()),
     			new NV(ArbitraryLengthPathOp.Annotations.UPPER_BOUND, alpNode.upperBound()),
-    			new NV(ArbitraryLengthPathOp.Annotations.VARS_TO_DROP, 
-    					varsToDrop.toArray(new IVariable<?>[varsToDrop.size()])),
-                new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER)//
-                ), alpNode, ctx);
+    			new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
+    			new NV(BOp.Annotations.EVALUATION_CONTEXT,
+    			       BOpEvaluationContext.CONTROLLER)//
+            ), alpNode, ctx);
+        
 
+        /**
+         * Finally, re-join the inner result with the hash index.
+         */
+        if(ctx.nativeHashJoins) {
+           left = applyQueryHints(new HTreeSolutionSetHashJoinOp(
+               leftOrEmpty(left),//
+               new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+               new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                       BOpEvaluationContext.CONTROLLER),//
+               new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+               new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+               new NV(HTreeSolutionSetHashJoinOp.Annotations.CONSTRAINTS, null),//
+               new NV(HTreeSolutionSetHashJoinOp.Annotations.RELEASE, true),//
+               new NV(HTreeSolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+               new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+               ), subgroup, ctx);
+       } else {
+           left = applyQueryHints(new JVMSolutionSetHashJoinOp(
+                 leftOrEmpty(left),//
+                   new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                   new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                           BOpEvaluationContext.CONTROLLER),//
+                   new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                   new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+                   new NV(JVMSolutionSetHashJoinOp.Annotations.CONSTRAINTS, null),//
+                   new NV(JVMSolutionSetHashJoinOp.Annotations.RELEASE, true),//
+                   new NV(JVMSolutionSetHashJoinOp.Annotations.LAST_PASS, true),//
+                   new NV(JVMSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+           ), subgroup, ctx);
+       }
+       
         return left;
 
     }
