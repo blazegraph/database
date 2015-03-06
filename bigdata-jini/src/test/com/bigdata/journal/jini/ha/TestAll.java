@@ -115,8 +115,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHAJournalServerOverride.class); 
 
         // Test suite for concurrent writers and group commit.
-//        suite.addTestSuite(TestHA1GroupCommit.class);
-//        suite.addTestSuite(TestHA3GroupCommit.class);
+        suite.addTestSuite(TestHA1GroupCommit.class);
+        suite.addTestSuite(TestHA3GroupCommit.class);
 
         // The HA load balancer test suite.
         suite.addTest(TestAll_LBS.suite());
