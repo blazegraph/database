@@ -573,6 +573,28 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
                         input.set(gearing.tVarIn, bs.get(gearing.tVarOut));
                         input.clear(gearing.tVarOut);
+                        
+                        /*
+                         * We also have to filter out anonymous variables
+                         * introduced in this run, taking care we do not
+                         * remove potential anonymous variables driving
+                         * the evaluation.
+                         */
+                        final Iterator<IVariable> vit = input.vars();
+                        Set<IVariable<?>> anonymousVars = 
+                              new LinkedHashSet<IVariable<?>>();
+                        while (vit.hasNext()) {
+                           final IVariable<?> var = vit.next();
+                           if (var.isAnonymous() && 
+                                 !var.equals(gearing.inVar) &&
+                                 !var.equals(gearing.tVarIn)) {
+                              anonymousVars.add(var);
+                           }
+                        }
+                        
+                        for (IVariable<?> anonymousVar : anonymousVars) {
+                           input.clear(anonymousVar);
+                        }
 
                         nextRoundInput.add(input);
 
