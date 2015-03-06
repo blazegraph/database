@@ -52,7 +52,6 @@ import com.bigdata.rdf.store.AbstractTripleStore.Options;
  * {@link AbstractTripleStore}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAxioms extends AbstractTripleStoreTestCase {
 

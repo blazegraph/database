@@ -138,8 +138,8 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
     final protected static Logger log = Logger
             .getLogger(NonBlockingLockManagerWithNewDesign.class);
 
-    final protected static boolean INFO = log.isInfoEnabled();
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final private static boolean INFO = log.isInfoEnabled();
+    final private static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Each resource that can be locked has an associated {@link ResourceQueue}.

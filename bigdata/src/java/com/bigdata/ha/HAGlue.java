@@ -49,6 +49,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
+import com.bigdata.rdf.task.IApiTask;
 import com.bigdata.service.IService;
 
 /**
@@ -298,6 +299,11 @@ public interface HAGlue extends HAGlueBase, HAPipelineGlue, HAReadGlue,
 
     /**
      * Run the caller's task on the service.
+     * <p>
+     * Note: This interface provides direct access to the raw index manager.
+     * Caller's requiring concurrency control should submit an {@link IApiTask}
+     * in order to have their task queue for the necessary locks and run on the
+     * appropriate executor service.
      * 
      * @param callable
      *            The task to run on the service.

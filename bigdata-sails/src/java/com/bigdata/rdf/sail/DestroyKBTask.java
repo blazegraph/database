@@ -28,7 +28,9 @@ package com.bigdata.rdf.sail;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -68,27 +70,70 @@ public class DestroyKBTask extends AbstractApiTask<Void> {
    @Override
    public Void call() throws Exception, DatasetNotFoundException {
 
-      final AbstractTripleStore tripleStore = getTripleStore();
+      /**
+       * Note: Unless group commit is enabled, we need to make this operation
+       * mutually exclusive with KB level writers in order to avoid the
+       * possibility of a triggering a commit during the middle of a
+       * BigdataSailConnection level operation (or visa versa).
+       * 
+       * Note: When group commit is not enabled, the indexManager will be a
+       * Journal class. When it is enabled, it will merely implement the
+       * IJournal interface.
+       * 
+       * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+       */
+      final IIndexManager indexManager = getIndexManager();
+      final boolean isGroupCommit = indexManager.isGroupCommit();
+      boolean acquiredConnection = false;
+      try {
 
-      if (tripleStore == null) {
+         if (!isGroupCommit) {
+            try {
+               // acquire the unisolated connection permit.
+               ((Journal) indexManager).acquireUnisolatedConnection();
+               acquiredConnection = true;
+            } catch (InterruptedException e) {
+               throw new RuntimeException(e);
+            }
+         }
 
-         throw new DatasetNotFoundException("Not found: namespace="
-               + namespace + ", timestamp="
-               + TimestampUtility.toString(timestamp));
+         final AbstractTripleStore tripleStore = getTripleStore();
+
+         if (tripleStore == null) {
+
+            throw new DatasetNotFoundException("Not found: namespace="
+                  + namespace + ", timestamp="
+                  + TimestampUtility.toString(timestamp));
+
+         }
+
+         // Destroy the KB instance.
+         tripleStore.destroy();
+
+         // Note: This is the commit point only if group commit is NOT enabled.
+         tripleStore.commit();
+
+         if (log.isInfoEnabled())
+            log.info("Destroyed: namespace=" + namespace);
+
+         return null;
+
+      } finally {
+
+         if (!isGroupCommit && acquiredConnection) {
+
+            /**
+             * When group commit is not enabled, we need to release the
+             * unisolated connection.
+             * 
+             * @see #1143 (Isolation broken in NSS when groupCommit disabled)
+             */
+            ((Journal) indexManager).releaseUnisolatedConnection();
+
+         }
 
       }
 
-      // Destroy the KB instance.
-      tripleStore.destroy();
-
-      // Note: This is the commit point only if group commit is NOT enabled.
-      tripleStore.commit();
-      
-      if (log.isInfoEnabled())
-         log.info("Destroyed: namespace=" + namespace);
-      
-      return null;
-      
    }
 
 }

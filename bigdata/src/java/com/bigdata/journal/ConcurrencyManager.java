@@ -61,7 +61,6 @@ import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.concurrent.TaskCounters;
-import com.bigdata.util.concurrent.ThreadGuard;
 import com.bigdata.util.concurrent.ThreadPoolExecutorStatisticsTask;
 import com.bigdata.util.concurrent.WriteTaskCounters;
 
@@ -349,7 +348,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * <code>true</code> until the service is shutdown.
      */
-    private boolean open = true;
+    private volatile boolean open = true;
     
     /**
      * Pool of threads for handling concurrent read/write transactions on named
@@ -365,7 +364,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Once the transaction has acquired those writable indices it then runs its
      * commit phrase as an unisolated operation on the {@link #writeService}.
      */
-    final protected ThreadPoolExecutor txWriteService;
+    final private ThreadPoolExecutor txWriteService;
 
     /**
      * Pool of threads for handling concurrent unisolated read operations on
@@ -383,20 +382,22 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * historical commit records (which may span more than one logical
      * journal) until the reader terminates.
      */
-    final protected ThreadPoolExecutor readService;
+    final private ThreadPoolExecutor readService;
 
     /**
-     * Pool of threads for handling concurrent unisolated write operations on
-     * named indices. Unisolated writes are always performed against the current
-     * state of the named index. Unisolated writes for the same named index (or
-     * index partition) conflict and must be serialized. The size of this thread
-     * pool and the #of distinct named indices together govern the maximum
-     * practical concurrency for unisolated writers.
-     * <p>
-     * Serialization of access to unisolated named indices is acomplished by
-     * gaining an exclusive lock on the unisolated named index.
-     */
-    final protected WriteExecutorService writeService;
+    * Pool of threads for handling concurrent unisolated write operations on
+    * named indices and namespaces spanning multiple named indices (via
+    * hierarchical locking). Unisolated writes are always performed against the
+    * current state of the named index. Unisolated writes for the same named
+    * index (or index partition) conflict and must be serialized. The size of
+    * this thread pool and the #of distinct named indices (or namespaces)
+    * together govern the maximum practical concurrency for unisolated writers.
+    * <p>
+    * Serialization of access to unisolated named indices is accomplished by
+    * gaining an exclusive lock on the named resource(s) corresponding to the
+    * index(es) or namespace.
+    */
+    private final WriteExecutorService writeService;
 
     /**
      * When <code>true</code> the {@link #sampleService} will be used run
@@ -414,26 +415,27 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
      */
-    final long shutdownTimeout;
+    final private long shutdownTimeout;
 
-    /**
-     * An object wrapping the properties specified to the ctor.
-     */
-    public Properties getProperties() {
-        
-        return new Properties(properties);
-        
-    }
+//    /**
+//     * An object wrapping the properties specified to the ctor.
+//     */
+//    public Properties getProperties() {
+//        
+//        return new Properties(properties);
+//        
+//    }
     
-    protected void assertOpen() {
+    private void assertOpen() {
         
         if (!open)
             throw new IllegalStateException();
         
     }
-    
+
+    @Override
     public WriteExecutorService getWriteService() {
-        
+
         assertOpen();
         
         return writeService;
@@ -876,7 +878,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             if (writeServicePrestart) {
 
-                writeService.prestartAllCoreThreads();
+                getWriteService().prestartAllCoreThreads();
                 
             }
             
@@ -909,7 +911,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final TimeUnit unit = TimeUnit.MILLISECONDS;
             
             writeServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("writeService",
-                    writeService, countersUN, w);
+                    getWriteService(), countersUN, w);
 
             txWriteServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("txWriteService",
                     txWriteService, countersTX, w);
@@ -925,7 +927,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                     initialDelay, delay, unit);
             
             // the lock service for the write service.
-            sampleService.scheduleWithFixedDelay(writeService.getLockManager().statisticsTask,
+            sampleService.scheduleWithFixedDelay(getWriteService().getLockManager().statisticsTask,
                     initialDelay, delay, unit);
             
             // the tx write service.
@@ -1075,7 +1077,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     IConcurrencyManagerCounters.writeService
                                             + ICounterSet.pathSeparator
                                             + IConcurrencyManagerCounters.LockManager)
-                            .attach(writeService.getLockManager().getCounters());
+                            .attach(getWriteService().getLockManager().getCounters());
 
                 }
 
@@ -1205,7 +1207,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                             + task.getClass().getName() + ", timestamp="
                             + task.timestamp);
 
-                return submitWithDynamicLatency(task, writeService, countersUN);
+                return submitWithDynamicLatency(task, getWriteService(), countersUN);
 
             }
 
@@ -1426,6 +1428,8 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
      *      should interrupt NSS requests and AbstractTasks </a>
+     *      
+     *      FIXME Should also shutdown/restart the {@link #txWriteService}
      */
      void abortAllTx() {
        
