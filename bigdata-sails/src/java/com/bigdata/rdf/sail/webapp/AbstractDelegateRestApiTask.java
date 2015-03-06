@@ -32,9 +32,9 @@ import com.bigdata.rdf.task.IApiTask;
 
 /**
  * Base class for delegation patterns where the delegate is an {@link IApiTask}.
- * This is necessary in order to pass through the
- * {@link #setIndexManager(IIndexManager)} and {@link #clearIndexManager()}
- * methods to both the base class and the delegate.
+ * This is necessary in order to pass through the {@link #isGRSRequired()} and
+ * {@link #setIndexManager(IIndexManager)} method to both the base class and the
+ * delegate.
  * 
  * @author bryan
  * 
@@ -45,31 +45,37 @@ abstract public class AbstractDelegateRestApiTask<T> extends
 
    private final IApiTask<T> delegate;
 
-   public AbstractDelegateRestApiTask(HttpServletRequest req,
-         HttpServletResponse resp, String namespace, long timestamp,
-         final IApiTask<T> delegate) {
-      super(req, resp, namespace, timestamp);
+   public AbstractDelegateRestApiTask(final HttpServletRequest req,
+         final HttpServletResponse resp, final String namespace,
+         final long timestamp, final IApiTask<T> delegate) {
 
-      if (delegate == null)
-         throw new IllegalArgumentException();
+      super(req, resp, namespace, timestamp, delegate.isGRSRequired());
 
       this.delegate = delegate;
+      
    }
 
    @Override
    public T call() throws Exception {
+      
       return delegate.call();
+      
    }
 
    @Override
-   public void setIndexManager(IIndexManager indexManager) {
+   public void setIndexManager(final IIndexManager indexManager) {
+
       super.setIndexManager(indexManager);
+      
       delegate.setIndexManager(indexManager);
+      
    }
 
    @Override
    public boolean isGRSRequired() {
+      
       return super.isGRSRequired() || delegate.isGRSRequired();
+      
    }
    
 }

@@ -181,7 +181,26 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
     protected AbstractRestApiTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp) {
-        super(namespace,timestamp);
+        this(req, resp, namespace,timestamp, false/*isGSRRequired*/);
+    }
+
+    /**
+     * @param req
+     *            The {@link HttpServletRequest}.
+     * @param resp
+     *            The {@link HttpServletResponse}.
+     * @param namespace
+     *            The namespace of the target KB instance.
+     * @param timestamp
+     *            The timestamp of the view of that KB instance.
+     *            @param isGSRRequired 
+     *            <code>true</code>
+     *             iff the task requires a lock on the GRS index.
+     */
+    protected AbstractRestApiTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp, final boolean isGRSRequired) {
+        super(namespace,timestamp, isGRSRequired);
         this.req = req;
         this.resp = resp;
     }
