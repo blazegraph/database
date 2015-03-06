@@ -97,6 +97,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
         
     }
 
+    @Override
     public Properties getProperties() {
 
         final Properties properties = super.getProperties();
@@ -120,6 +121,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
 
     }
     
+    @Override
     protected AbstractTripleStore getStore(final Properties properties) {
         
         return LocalTripleStore.getInstance( properties );
@@ -139,6 +141,7 @@ public class TestLocalTripleStore extends AbstractTestCase {
      *                be re-opened, e.g., from failure to obtain a file lock,
      *                etc.
      */
+    @Override
     protected AbstractTripleStore reopenStore(final AbstractTripleStore store) {
 
         // close the store.
