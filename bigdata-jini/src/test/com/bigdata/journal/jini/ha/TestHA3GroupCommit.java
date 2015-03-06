@@ -23,21 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
 import net.jini.config.Configuration;
-
-import org.eclipse.jetty.client.HttpClient;
-
-import com.bigdata.ha.HAGlue;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Test suite for HA3 with concurrent writers.
@@ -48,10 +34,9 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  * 
  * TODO Do concurrent create / drop KB stress test with small loads in each KB.
  * 
- * TODO Do sequence of DROP ALL; LOAD concurent operations on multiple KBs.
- * 
  * TODO Do concurrent writers on the same KB. The operations should be
- * serialized.
+ * serialized (but if we do this from a pool of client threads then the N
+ * updates can be melded into fewer than N commit points).
  * 
  * TODO Do concurrent writer use cases for concurrent writers that eventually
  * cause leader or follower fails to make sure that error recovery is Ok with
@@ -61,7 +46,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestHA3GroupCommit extends AbstractHA3JournalServerTestCase {
+public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
 
    /**
     * {@inheritDoc}
@@ -95,194 +80,28 @@ public class TestHA3GroupCommit extends AbstractHA3JournalServerTestCase {
      * 
      * @throws Exception
      */
-    public void test_HA3_groupCommit_create2Namespaces_concurrentLoad() throws Exception {
+    public void test_HA3_GroupCommit_2Namespaces_ConcurrentWriters() throws Exception {
 
-      final String namespace1 = getName() + "-1";
+       new ABC(false/*sequential*/); // simultaneous start.
 
-      final String namespace2 = getName() + "-2";
-
-      final Properties properties1 = new Properties();
-      {
-         properties1.setProperty(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-               namespace1);
-      }
-      final Properties properties2 = new Properties();
-      {
-         properties2.setProperty(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-               namespace2);
-      }
-
-      final HttpClient client = HttpClientConfigurator.getInstance()
-            .newInstance();
-      try {
-
-         new ABC(false/*sequential*/); // simultaneous start.
-
-         // Verify quorum is FULLY met.
-         final long token = awaitFullyMetQuorum();
-
-         final HAGlue leader = quorum.getClient().getLeader(token);
-         
-         final RemoteRepositoryManager repo = getRemoteRepository(leader,
-               client);
-
-         try {
-
-            // Create both repositories in a single thread.
-            repo.createRepository(namespace1, properties1);
-            repo.createRepository(namespace2, properties2);
-
-            // Load data into both repositories using parallel threads.
-
-            final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
-
-            tasks.add(new LargeLoadTask(token, false/* reallyLargeLoad */,
-                  false/* dropAll */, namespace1));
-
-            tasks.add(new LargeLoadTask(token, false/* reallyLargeLoad */,
-                  false/* dropAll */, namespace2));
-
-            final List<Future<Void>> futures = executorService.invokeAll(tasks,
-                  TimeUnit.MINUTES.toMillis(4), TimeUnit.MILLISECONDS);
-
-            for (Future<Void> f : futures) {
-
-               f.get();
-
-            }
-
-            // Count the #of statements in each repo.
-
-            final long count1 = countResults(repo
-                  .getRepositoryForNamespace(namespace1)
-                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
-
-            final long count2 = countResults(repo
-                  .getRepositoryForNamespace(namespace2)
-                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
-
-            assertEquals(count1, count2);
-
-            assertTrue(count1 > 0);
-            
-            // Verify still met on token.
-            assertEquals(token, quorum.token());
-            
-            // Verify still fully met on token.
-            assertTrue(quorum.isQuorumFullyMet(token));
-            
-         } finally {
-
-            repo.close();
-            
-         }
-
-      } finally {
-         
-         client.stop();
-
-      }
-
-   }
+       doGroupCommit_2Namespaces_ConcurrentWriters(false/* reallyLargeLoad */);
+       
+    }
 
     /**
-     * Create 2 namespaces and then load data into those namespaces in parallel.
-     * <p>
-     * Note: This variant loads more data.
+     * Create 2 namespaces and then load a large amount data into those namespaces in parallel.
      * 
      * @throws Exception
      */
-    public void test_HA3_groupCommit_create2Namespaces_concurrentLargeLoad() throws Exception {
+    public void test_HA3_GroupCommit_2Namespaces_ConcurrentWriters_LargeLoad() throws Exception {
 
-      final String namespace1 = getName() + "-1";
+       new ABC(false/*sequential*/); // simultaneous start.
 
-      final String namespace2 = getName() + "-2";
+       doGroupCommit_2Namespaces_ConcurrentWriters(true/* reallyLargeLoad */);
+       
+    }
 
-      final Properties properties1 = new Properties();
-      {
-         properties1.setProperty(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-               namespace1);
-      }
-      final Properties properties2 = new Properties();
-      {
-         properties2.setProperty(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-               namespace2);
-      }
-
-      final HttpClient client = HttpClientConfigurator.getInstance()
-            .newInstance();
-      try {
-
-         new ABC(false/*sequential*/); // simultaneous start.
-
-         // Verify quorum is FULLY met.
-         final long token = awaitFullyMetQuorum();
-
-         final HAGlue leader = quorum.getClient().getLeader(token);
-         
-         final RemoteRepositoryManager repo = getRemoteRepository(leader,
-               client);
-
-         try {
-
-            // Create both repositories in a single thread.
-            repo.createRepository(namespace1, properties1);
-            repo.createRepository(namespace2, properties2);
-
-            // Load data into both repositories using parallel threads.
-
-            final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
-
-            tasks.add(new LargeLoadTask(token, true/* reallyLargeLoad */,
-                  false/* dropAll */, namespace1));
-
-            tasks.add(new LargeLoadTask(token, true/* reallyLargeLoad */,
-                  false/* dropAll */, namespace2));
-
-            final List<Future<Void>> futures = executorService.invokeAll(tasks,
-                  TimeUnit.MINUTES.toMillis(4), TimeUnit.MILLISECONDS);
-
-            for (Future<Void> f : futures) {
-
-               f.get();
-
-            }
-
-            // Count the #of statements in each repo.
-
-            final long count1 = countResults(repo
-                  .getRepositoryForNamespace(namespace1)
-                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
-
-            final long count2 = countResults(repo
-                  .getRepositoryForNamespace(namespace2)
-                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
-
-            assertEquals(count1, count2);
-
-            assertTrue(count1 > 0);
-
-            // Verify still met on token.
-            assertEquals(token, quorum.token());
-            
-            // Verify still fully met on token.
-            assertTrue(quorum.isQuorumFullyMet(token));
-            
-         } finally {
-
-            repo.close();
-            
-         }
-
-      } finally {
-         
-         client.stop();
-
-      }
-
-   }
-
-    /**
+   /**
     * Create 2 namespaces and then load data into those namespaces in parallel
     * using a "DROP ALL; LOAD" pattern. A set of such tasks are generated and
     * the submitted in parallel. LOADs into the same namespace will be
@@ -291,97 +110,16 @@ public class TestHA3GroupCommit extends AbstractHA3JournalServerTestCase {
     * 
     * @throws Exception
     */
-    public void test_HA3_groupCommit_create2Namespaces_manyConcurrentLoadWithDropAll() throws Exception {
+   public void test_HA3_groupCommit_create2Namespaces_manyConcurrentLoadWithDropAll()
+         throws Exception {
 
-      final String namespace1 = getName() + "-1";
+      final int nnamespaces = 2;
+      final int nruns = 20;
+      final boolean reallyLargeLoad = false;
 
-      final String namespace2 = getName() + "-2";
+      new ABC(false/* sequential */); // simultaneous start.
 
-      final Properties properties1 = new Properties();
-      {
-         properties1.setProperty(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-               namespace1);
-      }
-      final Properties properties2 = new Properties();
-      {
-         properties2.setProperty(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-               namespace2);
-      }
-
-      final HttpClient client = HttpClientConfigurator.getInstance()
-            .newInstance();
-      try {
-
-         new ABC(false/*sequential*/); // simultaneous start.
-
-         // Verify quorum is FULLY met.
-         final long token = awaitFullyMetQuorum();
-
-         final HAGlue leader = quorum.getClient().getLeader(token);
-         
-         final RemoteRepositoryManager repo = getRemoteRepository(leader,
-               client);
-
-         try {
-
-            // Create both repositories in a single thread.
-            repo.createRepository(namespace1, properties1);
-            repo.createRepository(namespace2, properties2);
-
-            // Load data into both repositories using parallel threads.
-
-            final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
-
-            for (int i = 0; i < 20; i++) {
-
-               tasks.add(new LargeLoadTask(token, false/* reallyLargeLoad */,
-                     true/* dropAll */, namespace1));
-
-               tasks.add(new LargeLoadTask(token, false/* reallyLargeLoad */,
-                     true/* dropAll */, namespace2));
-
-            }
-            
-            final List<Future<Void>> futures = executorService.invokeAll(tasks,
-                  TimeUnit.MINUTES.toMillis(4), TimeUnit.MILLISECONDS);
-
-            for (Future<Void> f : futures) {
-
-               f.get();
-
-            }
-
-            // Count the #of statements in each repo.
-
-            final long count1 = countResults(repo
-                  .getRepositoryForNamespace(namespace1)
-                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
-
-            final long count2 = countResults(repo
-                  .getRepositoryForNamespace(namespace2)
-                  .prepareTupleQuery("select * {?a ?b ?c}").evaluate());
-
-            assertEquals(count1, count2);
-
-            assertTrue(count1 > 0);
-
-            // Verify still met on token.
-            assertEquals(token, quorum.token());
-            
-            // Verify still fully met on token.
-            assertTrue(quorum.isQuorumFullyMet(token));
-            
-         } finally {
-
-            repo.close();
-            
-         }
-
-      } finally {
-         
-         client.stop();
-
-      }
+      doManyNamespacesConcurrentWritersTest(nnamespaces, nruns, reallyLargeLoad);
 
    }
 
