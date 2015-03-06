@@ -558,7 +558,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                 log.info("Awaiting write service termination: will wait "
                         + timeout + "ms");
 
-            if(!getWriteService().awaitTermination(timeout, unit)) {
+            if(!writeService.awaitTermination(timeout, unit)) {
                 
                 log.warn("Write service termination : timeout");
                 
