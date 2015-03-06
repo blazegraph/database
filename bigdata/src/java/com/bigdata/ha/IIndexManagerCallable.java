@@ -47,19 +47,17 @@ public interface IIndexManagerCallable<T> extends Serializable, Callable<T> {
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>
      * @throws IllegalStateException
-     *             if {@link #setIndexManager(IIndexManager)} has already been
-     *             invoked and was set with a different value.
+     *             if {@link #setIndexManager(IIndexManager)} has already set.
      */
     void setIndexManager(IIndexManager indexManager);
 
     /**
      * Return the {@link IIndexManager}.
      * 
-     * @return The data service and never <code>null</code>.
+     * @return The index manager and never <code>null</code>.
      * 
      * @throws IllegalStateException
-     *             if {@link #setIndexManager(IIndexManager)} has not been
-     *             invoked.
+     *             if index manager reference is not set.
      */
     IIndexManager getIndexManager();
 

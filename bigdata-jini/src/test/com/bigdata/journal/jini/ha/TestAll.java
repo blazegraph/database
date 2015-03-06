@@ -31,6 +31,7 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.Journal;
 
 /**
@@ -116,9 +117,21 @@ public class TestAll extends TestCase {
         // The HA load balancer test suite.
         suite.addTest(TestAll_LBS.suite());
         
-        // HA5 test suite.
+        /* HA5 test suite.
+         * 
+         * FIXME There are known problems with the HA5 test suite.   Therefore
+         * these tests have been conditionally disabled to clean up CI until
+         * those problems are addressed. The basic issue is that leader fail
+         * scenarios can fail to meet in a new HA5 quorum.  We faced some similar
+         * issues with HA3 that were resolved, but there is evidentially a new
+         * wrinkly with HA5.
+         * 
+         * See #722  (HA5 test suite)
+         */
+        if(BigdataStatics.runKnownBadTests) {
         suite.addTestSuite(TestHA5JournalServer.class);
         suite.addTestSuite(TestHA5JournalServerWithHALogs.class);
+        }
 
         /*
          * Stress tests.

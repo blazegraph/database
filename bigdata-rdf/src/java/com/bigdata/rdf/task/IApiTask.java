@@ -53,18 +53,21 @@ public interface IApiTask<T> extends Callable<T> {
    boolean isGRSRequired();
    
    /**
-    * Protocol used to inform the task of the index manager before it is
-    * executed.
+    * Invoked to inform the task of the index manager before it is executed.
     * 
-    * @throws IllegalStateException
-    *            if the index manager has already been set.
+    * @param indexManager
+    *           The index manager.
     */
    void setIndexManager(IIndexManager indexManager);
 
    /**
-    * Protocol used to clear the index manager from the task after it is
-    * executed.
+    * Return the {@link IIndexManager}.
+    * 
+    * @return The index manager.
+    * 
+    * @throws IllegalStateException
+    *            if the {@link IIndexManager} reference is not set.
     */
-   void clearIndexManager();
+   IIndexManager getIndexManager();
 
 }
