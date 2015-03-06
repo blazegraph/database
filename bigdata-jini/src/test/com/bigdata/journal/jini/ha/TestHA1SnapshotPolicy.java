@@ -331,15 +331,13 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 		// The HAGlue interfaces for those joined services, in join order.
 		final HAGlue[] services = new HAGlue[joined.length];
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        
 		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[joined.length];
 		try {
 			for (int i = 0; i < joined.length; i++) {
 
 				services[i] = quorum.getClient().getService(joined[i]);
 
-				repos[i] = getRemoteRepository(services[i], client);
+				repos[i] = getRemoteRepository(services[i], httpClient);
 
 			}
 
@@ -447,11 +445,10 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 					r.close();
 
 			}
-			
-			client.stop();
 		}
 
 	}
+
     /**
      * Unit test starts A and runs N transactions. It then takes a snapshot.
      * The existance of the snapshot is verified, as is the existence of the
