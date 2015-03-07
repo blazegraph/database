@@ -134,6 +134,11 @@ public class BigdataSailFactory {
         	return serviceEndpoint.substring(0,
         				serviceEndpoint.length()-"/sparql".length());
         	
+        } if (serviceEndpoint.endsWith("/sparql/")) {
+            
+        	return serviceEndpoint.substring(0,
+        				serviceEndpoint.length()-"/sparql/".length());
+        	
         } else if (serviceEndpoint.endsWith("/bigdata/")) {
             
         	return serviceEndpoint.substring(0, 
@@ -143,16 +148,22 @@ public class BigdataSailFactory {
             
         	return serviceEndpoint;
         	
-        } else if(serviceEndpoint.contains("/bigdata")) { 
-        	//This is the case of /bigdata/namespace/NAMESPACE/
-            
-        	return serviceEndpoint;
-        	
-        } else if (serviceEndpoint.endsWith("/")) { 
-        
-        	return serviceEndpoint + "bigdata";
-        	
-    	} else {
+		} else if (serviceEndpoint.contains("/bigdata")
+				&& serviceEndpoint.endsWith("/")) {
+			// This is the case of /bigdata/namespace/NAMESPACE/
+
+			return serviceEndpoint.substring(0, serviceEndpoint.length() - 1);
+
+		} else if (serviceEndpoint.contains("/bigdata")) {
+			// This is the case of /bigdata/namespace/NAMESPACE
+
+			return serviceEndpoint;
+
+		} else if (serviceEndpoint.endsWith("/")) {
+
+			return serviceEndpoint + "bigdata";
+
+		} else {
             
         	return serviceEndpoint + "/bigdata";
         	
