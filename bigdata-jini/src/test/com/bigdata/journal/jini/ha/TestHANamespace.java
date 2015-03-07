@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  * Note: The underlying issue is NOT HA specific. This test SHOULD be ported
  * to the standard NSS test suite.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+ * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
  *      problem with list namespaces and create namespace </a>
  */
 public class TestHANamespace extends AbstractHA3JournalServerTestCase {
@@ -61,7 +61,7 @@ public class TestHANamespace extends AbstractHA3JournalServerTestCase {
      * Note: The underlying issue is NOT HA specific. This test SHOULD be ported
      * to the standard NSS test suite.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+     * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
      *      problem with list namespaces and create namespace </a>
      */
 	public void test_ticket_867() throws Throwable {

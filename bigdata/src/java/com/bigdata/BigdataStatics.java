@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ public class BigdataStatics {
      * @see com.bigdata.counters.AbstractStatisticsCollector
      * @see com.bigdata.Banner
      * @see com.bigdata.ganglia.GangliaService#HOSTNAME
-     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     * @see <a href="http://trac.blazegraph.com/ticket/886" >Provide workaround for
      *      bad reverse DNS setups</a>
      */
     public static final String HOSTNAME = "com.bigdata.hostname";
@@ -116,27 +116,12 @@ public class BigdataStatics {
     }
     
     /**
-	 * FIXME GROUP COMMIT : Disable/Enable group commit on the Journal from the
-	 * NSS API. Some global flag should control this and also disable the
-	 * journal's semaphore and should disable the wrapping of BTree as an
-	 * UnisolatedReadWriteIndex by AbstractRelation#getIndex(IIndexManager,
-	 * String, long), and should disable the calls to commit() or abort() from
-	 * the LocalTripleStore to the Journal.
-	 * 
-	 * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/753" > HA
-	 *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
-	 * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
-	 *      Concurrent unisolated operations against multiple KBs </a>
-	 */
-    public static final boolean NSS_GROUP_COMMIT = Boolean.getBoolean("com.bigdata.nssGroupCommit");
-
-    /**
 	 * Write a thread dump onto the caller's object.
 	 * <p>
 	 * Note: This code should not obtain any locks. This is necessary in order
 	 * for the code to run even when the server is in a deadlock.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 * @see <a href="http://trac.blazegraph.com/ticket/1082" > Add ability to dump
 	 *      threads to status page </a>
 	 */
 	public static void threadDump(final Appendable w) {

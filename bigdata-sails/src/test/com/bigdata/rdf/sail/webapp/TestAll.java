@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,8 @@ package com.bigdata.rdf.sail.webapp;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.journal.BufferMode;
 
 /**
  * Test suite.
@@ -55,8 +57,8 @@ public class TestAll extends TestCase {
 
         final TestSuite suite = new TestSuite("WebApp");
 
-//        // Test suite of NSS startup behavior and overrides.
-//        suite.addTestSuite(TestNanoSparqlServer.class);
+        // Test suite of NSS startup behavior and overrides.
+        suite.addTestSuite(TestNanoSparqlServer.class);
 //
 //        /*
 //         * WebApp Client.
@@ -89,7 +91,7 @@ public class TestAll extends TestCase {
 		// RWStore specific unit tests.
 		suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(
 				TestNanoSparqlServerWithProxyIndexManager
-						.getTemporaryJournal(true/* RWStore */),
+						.getTemporaryJournal(BufferMode.DiskRW),
 				TestMode.triples));
 
         suite.addTest(TestNanoSparqlServerWithProxyIndexManager.suite(TestMode.sids));

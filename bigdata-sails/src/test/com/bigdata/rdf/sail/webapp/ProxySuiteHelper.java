@@ -3,9 +3,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,7 +26,9 @@ package com.bigdata.rdf.sail.webapp;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import junit.extensions.TestSetup;
@@ -34,6 +36,8 @@ import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.journal.BufferMode;
 
 /**
  * This class provides static methods to help creating
@@ -66,49 +70,58 @@ public class ProxySuiteHelper {
 	private static class MultiModeTestSuite extends TestSuite  {
 		private final ProxyTestSuite subs[];
 		
-		public MultiModeTestSuite(String name, TestMode ...modes ) {
+		public MultiModeTestSuite(final String name, final Set<BufferMode> bufferModes, final TestMode ...testModes ) {
 			super(name);
-			subs = new ProxyTestSuite[modes.length];
+			if (bufferModes.isEmpty())
+				throw new IllegalArgumentException();
+         final int ntests = testModes.length * bufferModes.size();
+			subs = new ProxyTestSuite[ntests];
 			int i = 0;
-			for (final TestMode mode: modes) {
-				final ProxyTestSuite suite2 = TestNanoSparqlServerWithProxyIndexManager.createProxyTestSuite(TestNanoSparqlServerWithProxyIndexManager.getTemporaryJournal(),mode);
-				super.addTest(new TestSetup(suite2) {
-		    		protected void setUp() throws Exception {
-		    		}
-		    		protected void tearDown() throws Exception {
-		    			((TestNanoSparqlServerWithProxyIndexManager)suite2.getDelegate()).tearDownAfterSuite();
-                        /*
-                         * Note: Do not clear. Will not leak unless the
-                         * QueryEngine objects are pinned. They will not be
-                         * pinned if you shutdown the Journal correctly for each
-                         * test; the call to tearDownAfterSuite above calls the destroy() method
-                         * on temporary journals, which appears to do the necessary thing.
-                         */
-    //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
-		    		}
-		    	});
-				suite2.setName(mode.name());
-				subs[i++] = suite2;
+			for( final BufferMode bufferMode : bufferModes) {
+				for (final TestMode testMode: testModes) {
+					final ProxyTestSuite suite2 = TestNanoSparqlServerWithProxyIndexManager.createProxyTestSuite(TestNanoSparqlServerWithProxyIndexManager.getTemporaryJournal(bufferMode),testMode);
+					super.addTest(new TestSetup(suite2) {
+						@Override
+			    		protected void setUp() throws Exception {
+			    		}
+						@SuppressWarnings("rawtypes")
+						@Override
+			    		protected void tearDown() throws Exception {
+			    			((TestNanoSparqlServerWithProxyIndexManager)suite2.getDelegate()).tearDownAfterSuite();
+	                        /*
+	                         * Note: Do not clear. Will not leak unless the
+	                         * QueryEngine objects are pinned. They will not be
+	                         * pinned if you shutdown the Journal correctly for each
+	                         * test; the call to tearDownAfterSuite above calls the destroy() method
+	                         * on temporary journals, which appears to do the necessary thing.
+	                         */
+	    //		    			QueryEngineFactory.clearStandAloneQECacheDuringTesting();
+			    		}
+			    	});
+//               suite2.setName(name + ", bufferMode=" + bufferMode.name()
+//                     + ", testMode=" + testMode.name());
+					subs[i++] = suite2;
+				}
 			}
 		}
 
 		@SuppressWarnings("rawtypes")
 		@Override
-		public void addTestSuite(Class clazz) {
+		public void addTestSuite(final Class clazz) {
 			for (final ProxyTestSuite s:subs) {
 				s.addTestSuite(clazz);
 			}
 		}
 
 		@Override
-		public void addTest(Test test) {
+		public void addTest(final Test test) {
 			for (final ProxyTestSuite s:subs) {
 				s.addTest(cloneTest(s.getDelegate(),test));
 			}
 		}
 	}
 
-	private static Test cloneTest(Test delegate, Test test) {
+	private static Test cloneTest(final Test delegate, final Test test) {
 		if (test instanceof TestSuite) {
 			return cloneSuite(delegate, (TestSuite)test);
 		}
@@ -119,15 +132,13 @@ public class ProxySuiteHelper {
 	}
 
 
-	private static Test cloneTestCase(TestCase test) {
+	private static Test cloneTestCase(final TestCase test) {
 		return createTest(test.getClass(),test.getName());
 	}
 
-	private static Test cloneSuite(Test delegate, TestSuite suite) {
+	private static Test cloneSuite(final Test delegate, final TestSuite suite) {
 		final TestSuite rslt =  new CloningTestSuite(delegate,suite.getName());
-		@SuppressWarnings("unchecked")
-		final
-		Enumeration<Test> enumerate = suite.tests();
+		final Enumeration<Test> enumerate = suite.tests();
 		while( enumerate.hasMoreElements() ) {
 			rslt.addTest(enumerate.nextElement());
 		}
@@ -151,19 +162,24 @@ public class ProxySuiteHelper {
 	 * 
 	 * @param clazz  The clazz to be tested, i.e. the calling class
 	 * @param regex  Matched against the test names to decide which tests to run. Should usually start in "test.*"
-	 * @param modes  One or more TestModes.
+	 * @param bufferMode The {@link BufferMode}(s) to be tested. 
+	 * @param testModes  One or more TestModes.
 	 * @return
 	 */
-	public static Test suiteWhenStandalone(Class<? extends TestCase> clazz, String regex, TestMode ... modes) {
+	public static TestSuite suiteWhenStandalone(final Class<? extends TestCase> clazz, final String regex, final Set<BufferMode> bufferModes, final TestMode ... testModes) {
 		if (!proxyIndexManagerTestingHasStarted) {
 			final Pattern pat = Pattern.compile(regex);
 			proxyIndexManagerTestingHasStarted = true;
-			final TestSuite suite = new MultiModeTestSuite(clazz.getName(),modes);
+			final TestSuite suite = new MultiModeTestSuite(clazz.getName(),bufferModes, testModes);
 			addMatchingTestsFromClass(suite, clazz, pat);
 			return suite;
 		} else {
 			return new TestSuite(clazz);
 		}
+	}
+
+	public static Test suiteWhenStandalone(final Class<? extends TestCase> clazz, final String regex, final TestMode ... testModes) {
+		return suiteWhenStandalone(clazz, regex, Collections.singleton(BufferMode.Transient), testModes);
 	}
 
 	/**
@@ -174,16 +190,19 @@ public class ProxySuiteHelper {
 	 * @param modes  One or more TestModes.
 	 * @return
 	 */
-	public static TestSuite suiteWithOptionalProxy(String name, TestMode ... mode) {
+	public static TestSuite suiteWithOptionalProxy(final String name, final Set<BufferMode> bufferModes, final TestMode ... testMode) {
 		if (!proxyIndexManagerTestingHasStarted) {
 			proxyIndexManagerTestingHasStarted = true;
-			return new MultiModeTestSuite(name,mode);
+			return new MultiModeTestSuite(name,bufferModes,testMode);
 		} else {
 			return new TestSuite(name);
 		}
 	}
+	public static TestSuite suiteWithOptionalProxy(final String name, final TestMode ... testMode) {
+		return suiteWithOptionalProxy(name,Collections.singleton(BufferMode.Transient),testMode);
+	}
 
-	private static void addMatchingTestsFromClass(TestSuite suite3, Class<? extends TestCase> clazz, Pattern pat) {
+	private static void addMatchingTestsFromClass(final TestSuite suite3, final Class<? extends TestCase> clazz, final Pattern pat) {
 		for (final Method m:clazz.getMethods()) {
 			if ( m.getParameterTypes().length==0 && pat.matcher(m.getName()).matches() ) {
 				suite3.addTest(createTest(clazz,m.getName()));
@@ -191,11 +210,9 @@ public class ProxySuiteHelper {
 		}
 	}
 
-	private static Test createTest(Class<? extends TestCase> clazz, String name) {
+	private static Test createTest(final Class<? extends TestCase> clazz, final String name) {
 		try {
-			@SuppressWarnings("unchecked")
-			final
-			Constructor<?> cons = TestSuite.getTestConstructor(clazz);
+			final Constructor<?> cons = TestSuite.getTestConstructor(clazz);
 			if (cons.getParameterTypes().length == 1) {
 				return (Test) cons.newInstance(name);
 			} else {

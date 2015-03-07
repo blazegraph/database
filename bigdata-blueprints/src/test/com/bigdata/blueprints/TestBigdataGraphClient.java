@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -37,10 +37,12 @@ import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.GraphTest;
 
 /**
+ * Blueprints test suite for a client communicating with the server over the
+ * REST API.
  */
 public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 
-    protected static final transient Logger log = Logger.getLogger(TestBigdataGraphClient.class);
+    private static final transient Logger log = Logger.getLogger(TestBigdataGraphClient.class);
     
     /**
      * 
@@ -55,6 +57,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
         super(name);
     }
 
+    @Override
     protected GraphTest newBigdataGraphTest() {
         return new BigdataGraphTest();
     }
@@ -108,7 +111,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 		public void doTestSuite(TestSuite testSuite) throws Exception {
 	        for (Method method : testSuite.getClass().getDeclaredMethods()) {
 	            if (method.getName().startsWith("test")) {
-	                System.out.println("Testing " + method.getName() + "...");
+	                log.warn("Testing " + method.getName() + "...");
 	                try {
 		                method.invoke(testSuite);
 	                } catch (Exception ex) {

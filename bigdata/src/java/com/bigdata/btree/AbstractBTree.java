@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -172,7 +172,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * An unisolated index view is in an error state. It must be discarded and
      * reloaded from the current checkpoint record.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     * @see <a href="http://trac.blazegraph.com/ticket/1005"> Invalidate BTree
      *      objects if error occurs during eviction </a>
      */
     final protected static String ERROR_ERROR_STATE = "Index is in error state";
@@ -483,12 +483,17 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         if (false && store instanceof Journal
                 && ((Journal) store).getReadExecutor() != null) {
 
-            /*
-             * This code path materializes the child node using the read
-             * service. This has the effect of bounding the #of concurrent IO
-             * requests against the local disk based on the allowed parallelism
-             * for that read service.
-             */
+         /*
+          * This code path materializes the child node using the read service.
+          * This has the effect of bounding the #of concurrent IO requests
+          * against the local disk based on the allowed parallelism for that
+          * read service.
+          * 
+          * Note: getReadExecutor() is not defined for IJournal. If we want to
+          * support the read executor pre-fetch pattern then the code needs to
+          * be updated to use IJournal and IJournal needs to expose
+          * getReadExecutor. 
+          */
 
             final Executor s = ((Journal) store).getReadExecutor();
 
@@ -574,7 +579,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
      * checkpoint before it can be used (that is, you need to obtain a new view
      * of the unisolated index since this field is sticky once set).
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     * @see <a href="http://trac.blazegraph.com/ticket/1005"> Invalidate BTree
      *      objects if error occurs during eviction </a>
      */
     protected volatile Throwable error;
@@ -3460,7 +3465,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * both owning the read lock and having the per-thread read lock counter
          * incremented for that thread.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError:
+         * @see <a href="http://trac.blazegraph.com/ticket/855"> AssertionError:
          *      Child does not have persistent identity </a>
          */
         final int rcount = lockManager.getReadLockCount();
@@ -3764,7 +3769,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
          * the nodes that were being evicted would an inconsistent state state.
          * The test does not fail if it is run to completion (no timeout).
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/343" >Stochastic assert
+         * @see <a href="http://trac.blazegraph.com/ticket/343" >Stochastic assert
          *      in AbstractBTree#writeNodeOrLeaf() in CI </a>
          * 
          *      TestMROWTransactions might also demonstrate an issue

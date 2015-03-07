@@ -3,9 +3,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -45,10 +46,12 @@ import org.eclipse.jetty.server.Server;
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Journal.Options;
+import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sail.webapp.DatasetNotFoundException;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
@@ -56,9 +59,8 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 
@@ -119,17 +121,15 @@ public class TestNSSHealthCheck extends TestCase2 {
 
 	}
 
-	/**
-	 * FIXME hacked in test suite constructor.
-	 */
-	private static String requestURI; // No longer used!
-
 	protected Server m_fixture;
 
 	protected String m_namespace;
 
 	private Journal m_indexManager;
 
+	/**
+	 * Setup a random namespace for each test.
+	 */
 	@Override
 	protected void setUp() throws Exception {
 
@@ -218,32 +218,23 @@ public class TestNSSHealthCheck extends TestCase2 {
 
 	}
 
-	protected void dropTripleStore(final IIndexManager indexManager,
-			final String namespace) {
+   private void dropTripleStore(final IIndexManager indexManager,
+         final String namespace) {
 
-		if (log.isInfoEnabled())
-			log.info("KB namespace=" + namespace);
+      if (log.isInfoEnabled())
+         log.info("KB namespace=" + namespace);
 
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			if (log.isInfoEnabled())
-				log.info("Destroying: " + namespace);
-
-			if (!BigdataStatics.NSS_GROUP_COMMIT) {
-				/*
-				 * FIXME GROUP COMMIT: We need to submit a task that does this
-				 * in order to stay inside of the same concurrency control
-				 * mechanism as the database.
-				 */
-				tripleStore.destroy();
-			}
-
-		}
+      try {
+         AbstractApiTask.submitApiTask(indexManager,
+               new DestroyKBTask(namespace)).get();
+      } catch (InterruptedException | ExecutionException e) {
+         if (InnerCause.isInnerCause(e, DatasetNotFoundException.class)) {
+            // Namespace does not exist.
+            return;
+         }
+         // Wrap and throw.
+         throw new RuntimeException(e);
+      }
 
 	}
 
@@ -257,7 +248,9 @@ public class TestNSSHealthCheck extends TestCase2 {
 		m_indexManager = new Journal(properties);
 
 		// Create the triple store instance.
-		createTripleStore(m_indexManager, m_namespace, properties);
+      AbstractApiTask.submitApiTask(m_indexManager,
+            new CreateKBTask(m_namespace, properties)).get();
+//		createTripleStore(m_indexManager, m_namespace, properties);
 
 		final Map<String, String> initParams = new LinkedHashMap<String, String>();
 		{
@@ -277,58 +270,60 @@ public class TestNSSHealthCheck extends TestCase2 {
 		return fixture;
 	}
 
-	protected AbstractTripleStore createTripleStore(
-			final IIndexManager indexManager, final String namespace,
-			final Properties properties) {
+//	protected AbstractTripleStore createTripleStore(
+//			final IIndexManager indexManager, final String namespace,
+//			final Properties properties) {
+//
+//		if (log.isInfoEnabled())
+//			log.info("KB namespace=" + namespace);
+//
+//		// Locate the resource declaration (aka "open"). This tells us if it
+//		// exists already.
+//		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+//				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//		if (tripleStore != null) {
+//
+//			fail("exists: " + namespace);
+//
+//		}
+//
+//		/*
+//		 * Create the KB instance.
+//		 */
+//
+//		if (log.isInfoEnabled()) {
+//			log.info("Creating KB instance: namespace=" + namespace);
+//			log.info("Properties=" + properties.toString());
+//		}
+//
+//		if (indexManager instanceof Journal) {
+//
+//			// Create the kb instance.
+//			tripleStore = new LocalTripleStore(indexManager, namespace,
+//					ITx.UNISOLATED, properties);
+//
+//		} else {
+//
+//			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
+//					ITx.UNISOLATED, properties);
+//		}
+//
+//		// create the triple store.
+//		tripleStore.create();
+//
+//		if (log.isInfoEnabled())
+//			log.info("Created tripleStore: " + namespace);
+//
+//		// New KB instance was created.
+//		return tripleStore;
+//
+//	}
 
-		if (log.isInfoEnabled())
-			log.info("KB namespace=" + namespace);
-
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			fail("exists: " + namespace);
-
-		}
-
-		/*
-		 * Create the KB instance.
-		 */
-
-		if (log.isInfoEnabled()) {
-			log.info("Creating KB instance: namespace=" + namespace);
-			log.info("Properties=" + properties.toString());
-		}
-
-		if (indexManager instanceof Journal) {
-
-			// Create the kb instance.
-			tripleStore = new LocalTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-
-		} else {
-
-			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-		}
-
-		// create the triple store.
-		tripleStore.create();
-
-		if (log.isInfoEnabled())
-			log.info("Created tripleStore: " + namespace);
-
-		// New KB instance was created.
-		return tripleStore;
-
-	}
-
+	@Override
 	public Properties getProperties() {
-		final Properties props = super.getProperties();
+
+	   final Properties props = super.getProperties();
 
 		props.setProperty(Options.BUFFER_MODE, BufferMode.DiskRW.toString());
 
@@ -356,9 +351,6 @@ public class TestNSSHealthCheck extends TestCase2 {
 			super(name);
 
 			this.requestURI = requestURI;
-
-			// FIXME Hacked through static field.
-			TestNSSHealthCheck.requestURI = requestURI;
 
 		}
 
@@ -533,7 +525,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	public static void main(final String[] args) throws MalformedURLException {
 
 		if (args.length < 1) {
-			System.err.println("usage: <cmd> Request-URI");
+			System.err.println("usage: Request-URI");
 			System.exit(1);
 		}
 

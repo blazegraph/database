@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -103,6 +103,7 @@ import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.jini.FakeLifeCycle;
@@ -386,7 +387,7 @@ public class HAJournalServer extends AbstractServer {
          * to accelerate the service start. The minimum is ONE (1). The default
          * is {@value #DEFAULT_STARTUP_THREADS}.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+         * @see <a href="http://trac.blazegraph.com/ticket/775" > HAJournal start()
          *      (optimization) </a>
          */
         String STARTUP_THREADS = "startupThreads";
@@ -793,7 +794,7 @@ public class HAJournalServer extends AbstractServer {
              * needs to (a) set the IIndexManager on the ServletContext; and (b)
              * initiate the default KB create (if it is the quorum leader).
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal
+             * @see <a href="http://trac.blazegraph.com/ticket/775" > HAJournal
              *      start() (optimization) </a>
              */
             this.journal = newHAJournal(this, config, quorum);
@@ -926,7 +927,7 @@ public class HAJournalServer extends AbstractServer {
      * section in which we validate the consistency of those resources with
      * respect to the HAJournal's current root block.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/775" > HAJournal start()
+     * @see <a href="http://trac.blazegraph.com/ticket/775" > HAJournal start()
      *      (optimization) </a>
      */
     @Override
@@ -4571,7 +4572,7 @@ public class HAJournalServer extends AbstractServer {
      * 
      * @see <a href="http://wiki.eclipse.org/Jetty/Tutorial/Embedding_Jetty">
      *      Embedding Jetty </a>
-     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
+     * @see <a href="http://trac.blazegraph.com/ticket/730" > Allow configuration
      *      of embedded NSS jetty server using jetty-web.xml </a>
      */
     private void startNSS() {
@@ -4696,14 +4697,12 @@ public class HAJournalServer extends AbstractServer {
 //                NSSConfigurationOptions.CREATE, Boolean.TYPE,
 //                NSSConfigurationOptions.DEFAULT_CREATE);
 
-        if (create) {
+      if (create) {
 
-            final Future<Void> ft = journal.getExecutorService().submit(
-                    new CreateKBTask(journal, namespace));
+         AbstractApiTask.submitApiTask(journal,
+               new CreateKBTask(namespace, journal.getProperties())).get();
 
-            ft.get();
-            
-        }
+      }
 
     }
     

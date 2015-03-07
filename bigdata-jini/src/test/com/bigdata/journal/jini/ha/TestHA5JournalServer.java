@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,15 +28,11 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jetty.client.HttpClient;
-
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.msg.HARootBlockRequest;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
@@ -627,16 +623,13 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-				           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-					        
-							final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
+							final RemoteRepositoryManager repo = getRemoteRepository(leader, httpClient);
 				        	try {
 				        		repo.prepareUpdate(
 										updateStr).evaluate();
 								log.warn("COMPLETED TRANSACTION " + count);
 				        	} finally {
 				        		repo.close();
-				        		client.stop();
 				        	}
 
 								Thread.sleep(transactionDelay);

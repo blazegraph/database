@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@ package com.bigdata.rwstore;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -40,7 +39,6 @@ import java.nio.channels.FileChannel;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -48,8 +46,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -70,7 +66,6 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.counters.CAT;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.counters.striped.StripedCounters;
@@ -95,6 +90,7 @@ import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
 import com.bigdata.journal.FileMetadata;
@@ -106,7 +102,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreState;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IAllocationContext;
@@ -3148,7 +3143,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * {@link CommitState} methods are invoked out of the corresponding
      * {@link RWStore} methods.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is not
+     * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is not
      *      robust to internal failure.</a>
      */
     private class CommitState {
@@ -3187,7 +3182,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     }
 
     /**
-     * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is not
+     * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is not
      *      robust to internal failure.</a>
      */
     private final AtomicReference<CommitState> m_commitStateRef = new AtomicReference<CommitState>();
@@ -3614,9 +3609,9 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * The {@link #cVersion} value corresponding to the use of the demi-space
      * for the metabits.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/936"> Support larger metabit
+     * @see <a href="http://trac.blazegraph.com/ticket/936"> Support larger metabit
      *      allocations</a>
-     * @see <a href="http://wiki.bigdata.com/wiki/index.php/DataMigration" >
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/DataMigration" >
      *      Data migration </a>
      */
     final private int cVersionDemispace = 0x0500;
@@ -6325,6 +6320,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             activateTx();
         }
         
+        @Override
         public void close() {
             if (m_open.compareAndSet(true/*expect*/, false/*update*/)) {
                 deactivateTx();
@@ -6332,6 +6328,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         }
     }
     
+    @Override
     public IRawTx newTx() {
         return new RawTx();
     }
@@ -6375,7 +6372,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 	 * Therefore this method MAY NOT be used reliably outside of code that can
 	 * guarantee that there are no concurrent committers on the {@link RWStore}.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1036"> Journal file growth
+	 * @see <a href="http://trac.blazegraph.com/ticket/1036"> Journal file growth
 	 *      reported with 1.3.3 </a>
 	 */
     public int getActiveTxCount() {
@@ -6390,7 +6387,8 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     /**
      * Returns the slot size associated with this address
      */
-    public int getAssociatedSlotSize(int addr) {
+    @Override
+    public int getAssociatedSlotSize(final int addr) {
         return getBlock(addr).getBlockSize();
     }
 
@@ -6400,13 +6398,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      * 
      * @param addr - address to be locked
      */
-    public void lockAddress(int addr) {
+    public void lockAddress(final int addr) {
         if (m_lockAddresses.putIfAbsent(addr, System.currentTimeMillis()) != null) {
             throw new IllegalStateException("address already locked, logical: " + addr + ", physical: " + physicalAddress(addr, true));
         }
     }
 
-    public void showWriteCacheDebug(long paddr) {
+    public void showWriteCacheDebug(final long paddr) {
         log.warn("WriteCacheDebug: " + paddr + " - " + m_writeCacheService.addrDebugInfo(paddr));
     }
 
@@ -6420,6 +6418,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //   * 
 //   * @return time of last release
 //   */
+    @Override
     public long getLastReleaseTime() {
         return m_lastDeferredReleaseTime;
     }
@@ -6427,6 +6426,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     private ConcurrentWeakValueCache<Long, ICommitter> m_externalCache = null;
     private int m_cachedDatasize = 0;
 
+    @Override
     public void registerExternalCache(
             final ConcurrentWeakValueCache<Long, ICommitter> externalCache,
             final int dataSize) {
@@ -6479,10 +6479,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         
     }
 
+    @Override
     public InputStream getInputStream(long addr) {
         return new PSInputStream(this, addr);
     }
 
+    @Override
     public IPSOutputStream getOutputStream() {
         return getOutputStream(null);
     }  

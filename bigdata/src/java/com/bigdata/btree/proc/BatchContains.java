@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@ package com.bigdata.btree.proc;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBitBuffer;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
@@ -38,10 +39,9 @@ import com.bigdata.btree.raba.codec.IRabaCoder;
  * key in the index).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class BatchContains extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+public class BatchContains extends AbstractKeyArrayIndexProcedure<ResultBitBuffer> implements
+        IParallelizableIndexProcedure<ResultBitBuffer> {
 
     /**
      * 
@@ -62,12 +62,14 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
             
         }
         
+        @Override
         public final boolean sendValues() {
             
             return false;
             
         }
  
+        @Override
         public BatchContains newInstance(IRabaCoder keysCoder,
                 IRabaCoder valsCoder, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
@@ -104,6 +106,7 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
 
     }
 
+    @Override
     public final boolean isReadOnly() {
         
         return true;
@@ -117,7 +120,8 @@ public class BatchContains extends AbstractKeyArrayIndexProcedure implements
      * 
      * @return A {@link ResultBitBuffer}.
      */
-    public Object apply(final IIndex ndx) {
+    @Override
+    public ResultBitBuffer apply(final IIndex ndx) {
 
         final int n = getKeyCount();
 

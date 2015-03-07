@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -41,10 +41,9 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
+public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure<Void> implements
+        IParallelizableIndexProcedure<Void>, IMutableRelationIndexWriteProcedure<Void> {
 
     /**
      * 
@@ -88,6 +87,7 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     static private transient final boolean validate = false;
     
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -118,6 +118,7 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
         /**
          * Values are required.
          */
+        @Override
         public final boolean sendValues() {
             
             return true;
@@ -126,6 +127,7 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         private Id2TermWriteProcConstructor() {}
         
+        @Override
         public Id2TermWriteProc newInstance(final IRabaCoder keysCoder,
                 final IRabaCoder valsCoder, final int fromIndex,
                 final int toIndex, final byte[][] keys, final byte[][] vals) {
@@ -149,7 +151,8 @@ public class Id2TermWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @return <code>null</code>.
      */
-    public Object apply(final IIndex ndx) {
+    @Override
+    public Void apply(final IIndex ndx) {
         
         final int n = getKeyCount();
         

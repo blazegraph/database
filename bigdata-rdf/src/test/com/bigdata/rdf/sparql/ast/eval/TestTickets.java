@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -333,7 +333,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
         ).runTest();
         
     }
-
+    
     public void test_ticket_765() throws Exception {
         new TestHelper("ticket-765",// testURI,
                 "ticket-765.rq",// queryFileURL
@@ -439,6 +439,181 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_792.trig",// dataFileURL
              "ticket_792d.srx"// resultFileURL
        ).runTest();
+    }
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071a() throws Exception {
+       new TestHelper("ticket_1071a",// testURI,
+             "ticket_1071a.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071a.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071b() throws Exception {
+       new TestHelper("ticket_1071b",// testURI,
+             "ticket_1071b.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071b.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071c() throws Exception {
+       new TestHelper("ticket_1071c",// testURI,
+             "ticket_1071c.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071c.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071d() throws Exception {
+       new TestHelper("ticket_1071d",// testURI,
+             "ticket_1071d.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071d.srx"// resultFileURL
+       ).runTest();
+    } 
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071e() throws Exception {
+       new TestHelper("ticket_1071e",// testURI,
+             "ticket_1071e.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071e.srx"// resultFileURL
+       ).runTest();
+    } 
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071f() throws Exception {
+       new TestHelper("ticket_1071f",// testURI,
+             "ticket_1071f.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071f.srx"// resultFileURL
+       ).runTest();
+    } 
+        
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071g() throws Exception {
+       new TestHelper("ticket_1071g",// testURI,
+             "ticket_1071g.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071g.srx"// resultFileURL
+       ).runTest();
+    } 
+
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071h() throws Exception {
+       new TestHelper("ticket_1071h",// testURI,
+             "ticket_1071h.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071h.srx"// resultFileURL
+       ).runTest();
+    }     
+    
+    /**
+     * BIND + UNION + OPTIONAL combination fails, 
+     * as reported in bug #1071 (associated test)
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_1071i() throws Exception {
+       new TestHelper("ticket_1071i",// testURI,
+             "ticket_1071i.rq",// queryFileURL
+             "ticket_1071.trig",// dataFileURL
+             "ticket_1071i.srx"// resultFileURL
+       ).runTest();
+    }     
+    
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * Query solutions are duplicated and increase by adding graph patterns</a>
+     */
+    public void test_ticket_835a() throws Exception {
+       new TestHelper("ticket_835a",// testURI,
+             "ticket_835a.rq",// queryFileURL
+             "ticket_835.trig",// dataFileURL
+             "ticket_835.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * Query solutions are duplicated and increase by adding graph patterns</a>
+     */
+    public void test_ticket_835b() throws Exception {
+       new TestHelper("ticket_835b",// testURI,
+             "ticket_835b.rq",// queryFileURL
+             "ticket_835.trig",// dataFileURL
+             "ticket_835.srx"// resultFileURL
+       ).runTest();    
+    }
+
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * Query solutions are duplicated and increase by adding graph patterns</a>
+     */
+    public void test_ticket_835c() throws Exception {
+       new TestHelper("ticket_835c",// testURI,
+             "ticket_835c.rq",// queryFileURL
+             "ticket_835.trig",// dataFileURL
+             "ticket_835.srx"// resultFileURL
+       ).runTest();    
+    }
+    
+    /**
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * Query solutions are duplicated and increase by adding graph patterns</a>.
+     * Related test case using a complex join group instead of subquery.
+     */
+    public void test_ticket_835d() throws Exception {
+       new TestHelper("ticket_835d",// testURI,
+             "ticket_835d.rq",// queryFileURL
+             "ticket_835.trig",// dataFileURL
+             "ticket_835.srx"// resultFileURL
+       ).runTest();    
     }
 
 }

@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ import java.io.InputStream;
 
 import junit.framework.Test;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
@@ -198,7 +199,10 @@ public class TestRDROperations<S extends IIndexManager> extends
 	 */
 	public void test_EXPORT_TURTLE_RDR() throws Exception {
 
-
+	   if(!BigdataStatics.runKnownBadTests) {
+	      return;
+	   }
+	   
     	final long ntriples = 3L;
     	
 		InputStream is = null;

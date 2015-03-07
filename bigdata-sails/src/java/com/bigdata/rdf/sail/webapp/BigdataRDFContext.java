@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -65,12 +66,10 @@ import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultWriter;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
 import org.openrdf.query.resultio.sparqlxml.SPARQLResultsXMLWriter;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.sail.SailQuery;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -79,18 +78,17 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.counters.CAT;
 import com.bigdata.io.NullOutputStream;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailQuery;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
@@ -201,6 +199,22 @@ public class BigdataRDFContext extends BigdataBaseContext {
     protected static final String USING_GRAPH_URI = "using-graph-uri";
 
     /**
+    * URL query parameter used to specify the URI(s) from which data will be
+    * loaded for INSERT (POST-WITH-URIs.
+    * 
+    * @see InsertServlet
+    */
+    protected static final String URI = "uri";
+
+    /**
+    * URL query parameter used to specify the default context(s) for INSERT
+    * (POST-WITH-URIs, POST-WITH-BODY).
+    * 
+    * @see InsertServlet
+    */
+    protected static final String CONTEXT_URI = "context-uri";
+    
+    /**
      * URL query parameter used to specify a URI in the set of named graphs for
      * SPARQL UPDATE.
      */
@@ -218,7 +232,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
     /**
      * HTTP header may be used to specify the timeout for a query.
      * 
-     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
      */
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
 
@@ -369,7 +383,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * Immediate shutdown interrupts any running queries.
      * 
      * FIXME GROUP COMMIT: Shutdown should abort open transactions (including
-     * queries and updates). This hould be addressed when we handle group commit
+     * queries and updates). This should be addressed when we handle group commit
      * since that provides us with a means to recognize and interrupt each
      * running {@link AbstractRestApiTask}.
      */
@@ -1037,7 +1051,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
              * Handle data races in CANCEL of an UPDATE operation whose
              * cancellation was requested before it began to execute.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+             * @see <a href="http://trac.blazegraph.com/ticket/899"> REST API Query
              *      Cancellation </a>
              */
             {
@@ -1071,7 +1085,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * 
          * @return The query.
          * 
-         * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+         * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
@@ -1295,8 +1309,35 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 } else {
                     doQuery(cxn, os);
 //                        success = true;
-                    os.flush();
-                    os.close();
+                  /*
+                   * GROUP_COMMIT: For mutation requests, calling flush() on the
+                   * output stream unblocks the client and allows it to proceed
+                   * BEFORE the write set of a mutation has been melded into a
+                   * group commit. This is only a problem for UPDATE requests.
+                   * 
+                   * The correct way to handle this is to allow the servlet
+                   * container to close the output stream. That way the close
+                   * occurs only after the group commit and when the control has
+                   * been returned to the servlet container layer.
+                   * 
+                   * There are some REST API methods (DELETE-WITH-QUERY,
+                   * UPDATE-WITH-QUERY) that reenter the API using a
+                   * PipedInputStream / PipedOutputStream to run a query (against
+                   * the last commit time) and pipe the results into a parser that
+                   * then executes a mutation without requiring the results to be
+                   * fully buffered. In order for those operations to not deadlock
+                   * we MUST flush() and close() the PipedOutputStream here (at
+                   * last for now - it looks like we probably need to execute those
+                   * REST API methods differently in order to support group commit
+                   * since reading from the lastCommitTime does NOT provide the
+                   * proper visibility guarantees when there could already be
+                   * multiple write sets buffered for the necessary indices by
+                   * other mutation tasks within the current commit group.)
+                   */
+                     if (os instanceof PipedOutputStream) {
+                     os.flush();
+                     os.close();
+                  }
                 }
                 if (log.isTraceEnabled())
                     log.trace("Query done.");
@@ -1468,8 +1509,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final RDFWriter w = RDFWriterRegistry.getInstance().get(format)
                     .getWriter(os);
 
-			query.evaluate(w);
-
+         query.evaluate(w);
+         
         }
 
 	}
@@ -1568,9 +1609,34 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // Always sending an OK with a response entity.
                 resp.setStatus(BigdataServlet.HTTP_OK);
 
+				/**
+				 * Note: Content Type header is required. See <a href=
+				 * "http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1"
+				 * >RFC2616</a>
+				 * 
+				 * Note: This needs to be written before we write on the stream
+				 * and after we decide on the status code. Since this code path
+				 * handles the "monitor" mode, we are writing it out immediately
+				 * and the response will be an XHTML document.
+				 */
+				resp.setContentType("text/html; charset=" + charset.name());
+
+            /*
+             * Note: Setting this to true is causing an EofException when the
+             * jetty server attempts to write on the client (where the client in
+             * this instance was Chrome). Given that flushing the http response
+             * commits the response, it seems incorrect that we would ever do
+             * this. We probably need to look at other mechanisms for providing
+             * liveness for the SPARQL UPDATE "monitor" option, such as HTTP 1.1
+             * streaming connections.
+             * 
+             * See #1133 (SPARQL UPDATE "MONITOR" LIVENESS)
+             */
+				final boolean flushEachEvent = false;
+				
                 // This will write the response entity.
                 listener = new SparqlUpdateResponseWriter(resp, os, charset,
-                        true /* reportLoadProgress */, true/* flushEachEvent */,
+                        true /* reportLoadProgress */, flushEachEvent,
                         mutationCount);
 
             } else {
@@ -1593,6 +1659,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // buffer the response here.
                 baos = new ByteArrayOutputStream();
 
+				/*
+				 * Note: Do NOT set the ContentType yet. This action needs to be
+				 * deferred until we decide that a normal response (vs an
+				 * exception) will be delivered.
+				 */
+                
                 listener = new SparqlUpdateResponseWriter(resp, baos, charset,
                         false/* reportLoadProgress */, false/* flushEachEvent */,
                         mutationCount);
@@ -1627,12 +1699,31 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // Send an OK with a response entity.
                 resp.setStatus(BigdataServlet.HTTP_OK);
 
-                // Copy the document into the response.
+				/**
+				 * Note: Content Type header is required. See <a href=
+				 * "http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1"
+				 * >RFC2616</a>
+				 * 
+				 * Note: This needs to be written before we write on the stream
+				 * and after we decide on the status code. Since this code path
+				 * defers the status code until we know whether or not the
+				 * SPARQL UPDATE was atomically committed, we write it out now
+				 * and then serialize the response document.
+				 */
+				resp.setContentType("text/html; charset=" + charset.name());
+
+				// Copy the document into the response.
                 baos.flush();
                 os.write(baos.toByteArray());
 
-                // Flush the response.
-                os.flush();
+                /*
+                 * DO NOT FLUSH THE RESPONSE HERE.  IT WILL COMMIT THE RESPONSE
+                 * TO THE CLIENT BEFORE THE GROUP COMMMIT !!!
+                 * 
+                 * @see #566
+                 */
+//                // Flush the response.
+//                os.flush();
 
             }
 
@@ -1703,10 +1794,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             this.resp = resp;
             
-            /** Content Type header is required:
-            http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1
-            */
-            resp.setContentType("text/html; charset="+charset.name());
+//            /** Content Type header is required: Note: This should be handled when we make the decision to incrementally evict vs wait until the UPDATE completes and then write the status code (monitor vs non-monitor).
+//            http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2.1
+//            */
+//            resp.setContentType("text/html; charset="+charset.name());
             
             this.os = os;
             
@@ -1877,12 +1968,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
                 if (flushEachEvent) {
 
-                    /*
-                     * Flush the response for each event so the client
-                     * (presumably a human operator) can see the progress log
-                     * update "live".
-                     */
-                    
+               /*
+                * Flush the response for each event so the client (presumably a
+                * human operator) can see the progress log update "live".
+                * 
+                * Note: flushing the response is problematic and leads to an
+                * EofException. This has been disabled, but that causes liveness
+                * problems with the SPARQL UPDATE "monitor" option.
+                * 
+                * See #1133 (SPARQL UPDATE "MONITOR" LIVENESS)
+                */
+    
                     w.flush();
                     
                     os.flush();
@@ -1956,8 +2052,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 *            materialized query results.
 	 * @param req
 	 *            The request.
-	 * @param os
-	 *            Where to write the results.
+    * @param resp The response.
+	 * @param os  Where to write the results. Note: This is NOT always the OutputStream associated with the response!  For DELETE-WITH-QUERY and UPDATE-WITH-QUERY this is a PipedOutputStream.
 	 * 
 	 * @return The task.
 	 * 
@@ -2259,56 +2355,53 @@ public class BigdataRDFContext extends BigdataBaseContext {
         
     }
 
-    /**
-     * Return an UNISOLATED connection.
-     * 
-     * @param namespace
-     *            The namespace.
-     * 
-     * @return The UNISOLATED connection.
-     * 
-     * @throws SailException
-     * 
-     * @throws RepositoryException
-     * 
-     *             FIXME GROUP COMMIT: This is deprecated by the support for
-     *             {@link RestApiMutationTask}s
-     */
-    @Deprecated // deprecated by the 
-    BigdataSailRepositoryConnection getUnisolatedConnection(
-            final String namespace) throws SailException, RepositoryException {
-
-        // resolve the default namespace.
-        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-        if (tripleStore == null) {
-
-            throw new RuntimeException("Not found: namespace=" + namespace);
-
-        }
-
-        // Wrap with SAIL.
-        final BigdataSail sail = new BigdataSail(tripleStore);
-
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-
-        repo.initialize();
-
-        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
-                .getUnisolatedConnection();
-
-        conn.setAutoCommit(false);
-
-        return conn;
-
-    }
+//    /**
+//     * Return an UNISOLATED connection.
+//     * 
+//     * @param namespace
+//     *            The namespace.
+//     * 
+//     * @return The UNISOLATED connection.
+//     * 
+//     * @throws SailException
+//     * 
+//     * @throws RepositoryException
+//     */
+//    @Deprecated // deprecated by the by the support for group commit. 
+//    BigdataSailRepositoryConnection getUnisolatedConnection(
+//            final String namespace) throws SailException, RepositoryException {
+//
+//        // resolve the default namespace.
+//        final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
+//                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+//
+//        if (tripleStore == null) {
+//
+//            throw new RuntimeException("Not found: namespace=" + namespace);
+//
+//        }
+//
+//        // Wrap with SAIL.
+//        final BigdataSail sail = new BigdataSail(tripleStore);
+//
+//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
+//
+//        repo.initialize();
+//
+//        final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
+//                .getUnisolatedConnection();
+//
+//        conn.setAutoCommit(false);
+//
+//        return conn;
+//
+//    }
 
     /**
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+     * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
      *      problem with list namespaces and create namespace </a>
      */
     /*package*/ List<String> getNamespaces(final long timestamp) {
@@ -2417,17 +2510,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 * 
 	 * @see ITransactionService#newTx(long)
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+	 * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
 	 *      problem with list namespaces and create namespace </a>
 	 */
     public long newTx(final long timestamp) {
 
         long tx = timestamp; // use dirty reads unless Journal.
 
-        if (getIndexManager() instanceof Journal) {
+        if (getIndexManager() instanceof IJournal) {
             
-            final ITransactionService txs = ((Journal) getIndexManager())
-                    .getLocalTransactionManager().getTransactionService();
+            final ITransactionService txs = ((IJournal) getIndexManager())
+                  .getLocalTransactionManager().getTransactionService();
 
             try {
                 tx = txs.newTx(timestamp);
@@ -2452,9 +2545,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 */
 	public void abortTx(final long tx) {
 
-	    if (getIndexManager() instanceof Journal) {
+	    if (getIndexManager() instanceof IJournal) {
 
-			final ITransactionService txs = ((Journal) getIndexManager())
+			final ITransactionService txs = ((IJournal) getIndexManager())
 					.getLocalTransactionManager().getTransactionService();
 
 			try {
@@ -2479,9 +2572,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //	 */
 //	public void commitTx(final long tx) {
 //
-//	    if (getIndexManager() instanceof Journal) {
+//	    if (getIndexManager() instanceof IJournal) {
 //
-//            final ITransactionService txs = ((Journal) getIndexManager())
+//            final ITransactionService txs = ((IJournal) getIndexManager())
 //                    .getLocalTransactionManager().getTransactionService();
 //
 //            try {

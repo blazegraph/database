@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,7 +52,6 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.concurrent.NonBlockingLockManager;
 import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign;
-import com.bigdata.concurrent.NonBlockingLockManagerWithNewDesign.LockFutureTask;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.counters.Instrument;
@@ -348,7 +348,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * <code>true</code> until the service is shutdown.
      */
-    private boolean open = true;
+    private volatile boolean open = true;
     
     /**
      * Pool of threads for handling concurrent read/write transactions on named
@@ -364,7 +364,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * Once the transaction has acquired those writable indices it then runs its
      * commit phrase as an unisolated operation on the {@link #writeService}.
      */
-    final protected ThreadPoolExecutor txWriteService;
+    final private ThreadPoolExecutor txWriteService;
 
     /**
      * Pool of threads for handling concurrent unisolated read operations on
@@ -382,20 +382,22 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * historical commit records (which may span more than one logical
      * journal) until the reader terminates.
      */
-    final protected ThreadPoolExecutor readService;
+    final private ThreadPoolExecutor readService;
 
     /**
-     * Pool of threads for handling concurrent unisolated write operations on
-     * named indices. Unisolated writes are always performed against the current
-     * state of the named index. Unisolated writes for the same named index (or
-     * index partition) conflict and must be serialized. The size of this thread
-     * pool and the #of distinct named indices together govern the maximum
-     * practical concurrency for unisolated writers.
-     * <p>
-     * Serialization of access to unisolated named indices is acomplished by
-     * gaining an exclusive lock on the unisolated named index.
-     */
-    final protected WriteExecutorService writeService;
+    * Pool of threads for handling concurrent unisolated write operations on
+    * named indices and namespaces spanning multiple named indices (via
+    * hierarchical locking). Unisolated writes are always performed against the
+    * current state of the named index. Unisolated writes for the same named
+    * index (or index partition) conflict and must be serialized. The size of
+    * this thread pool and the #of distinct named indices (or namespaces)
+    * together govern the maximum practical concurrency for unisolated writers.
+    * <p>
+    * Serialization of access to unisolated named indices is accomplished by
+    * gaining an exclusive lock on the named resource(s) corresponding to the
+    * index(es) or namespace.
+    */
+    private final WriteExecutorService writeService;
 
     /**
      * When <code>true</code> the {@link #sampleService} will be used run
@@ -413,26 +415,27 @@ public class ConcurrencyManager implements IConcurrencyManager {
     /**
      * The timeout for {@link #shutdown()} -or- ZERO (0L) to wait for ever.
      */
-    final long shutdownTimeout;
+    final private long shutdownTimeout;
 
-    /**
-     * An object wrapping the properties specified to the ctor.
-     */
-    public Properties getProperties() {
-        
-        return new Properties(properties);
-        
-    }
+//    /**
+//     * An object wrapping the properties specified to the ctor.
+//     */
+//    public Properties getProperties() {
+//        
+//        return new Properties(properties);
+//        
+//    }
     
-    protected void assertOpen() {
+    private void assertOpen() {
         
         if (!open)
             throw new IllegalStateException();
         
     }
-    
+
+    @Override
     public WriteExecutorService getWriteService() {
-        
+
         assertOpen();
         
         return writeService;
@@ -875,7 +878,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             if (writeServicePrestart) {
 
-                writeService.prestartAllCoreThreads();
+                getWriteService().prestartAllCoreThreads();
                 
             }
             
@@ -908,7 +911,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
             final TimeUnit unit = TimeUnit.MILLISECONDS;
             
             writeServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("writeService",
-                    writeService, countersUN, w);
+                    getWriteService(), countersUN, w);
 
             txWriteServiceQueueStatisticsTask = new ThreadPoolExecutorStatisticsTask("txWriteService",
                     txWriteService, countersTX, w);
@@ -924,7 +927,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                     initialDelay, delay, unit);
             
             // the lock service for the write service.
-            sampleService.scheduleWithFixedDelay(writeService.getLockManager().statisticsTask,
+            sampleService.scheduleWithFixedDelay(getWriteService().getLockManager().statisticsTask,
                     initialDelay, delay, unit);
             
             // the tx write service.
@@ -1074,7 +1077,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                                     IConcurrencyManagerCounters.writeService
                                             + ICounterSet.pathSeparator
                                             + IConcurrencyManagerCounters.LockManager)
-                            .attach(writeService.getLockManager().getCounters());
+                            .attach(getWriteService().getLockManager().getCounters());
 
                 }
 
@@ -1145,7 +1148,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *                if task null
      */
     @Override
-    public <T> Future<T> submit(final AbstractTask<T> task) {
+    public <T> FutureTask<T> submit(final AbstractTask<T> task) {
 
         assertOpen();
         
@@ -1204,7 +1207,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
                             + task.getClass().getName() + ", timestamp="
                             + task.timestamp);
 
-                return submitWithDynamicLatency(task, writeService, countersUN);
+                return submitWithDynamicLatency(task, getWriteService(), countersUN);
 
             }
 
@@ -1287,7 +1290,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
      * 
      * @return The {@link Future}.
      */
-    private <T> Future<T> submitWithDynamicLatency(
+    private <T> FutureTask<T> submitWithDynamicLatency(
             final AbstractTask<T> task, final ExecutorService service,
             final TaskCounters taskCounters) {
 
@@ -1384,20 +1387,58 @@ public class ConcurrencyManager implements IConcurrencyManager {
             
         }
 
+        final FutureTask<T> ft;
+        
         if (service instanceof WriteExecutorService) {
 
             final NonBlockingLockManagerWithNewDesign<String> lockManager = ((WriteExecutorService) service)
                     .getLockManager();
 
-            return (LockFutureTask<String, T>) lockManager.submit(task.getResource(), task);
+            ft = lockManager.submit(task.getResource(), task);
 
+//            writeServiceThreadGuard.guard(ft);
+            
         } else {
 
-            return service.submit(task);
+           ft = new FutureTask<T>(task);
+           
+           service.submit(ft);
 
         }
 
+        return ft;
+
     }
+
+//   /**
+//    * Actively running for the {@link WriteExecutorService}.
+//    * 
+//    * FIXME This is really just the same as those tasks actively executing on
+//    * the {@link WriteExecutorService}. It does not include tasks that are
+//    * pending execution (for example, awaiting their locks) and does not include
+//    * tasks that have executed and are pending group commit.
+//    * 
+//    * @see <a href="http://trac.blazegraph.com/ticket/753" > HA doLocalAbort()
+//    *      should interrupt NSS requests and AbstractTasks </a>
+//    */
+//    private final ThreadGuard writeServiceThreadGuard = new ThreadGuard();
+    
+    /**
+     * Cancel any running or queued tasks on the {@link WriteExecutorService}.
+     * 
+     * @see <a href="http://trac.blazegraph.com/ticket/753" > HA doLocalAbort()
+     *      should interrupt NSS requests and AbstractTasks </a>
+     *      
+     *      FIXME Should also shutdown/restart the {@link #txWriteService}
+     */
+     void abortAllTx() {
+       
+//        final NonBlockingLockManagerWithNewDesign<String> lockManager = writeService.getLockManager();
+//        
+//        // interrupt anything running.
+//        writeServiceThreadGuard.interruptAll();
+        
+      }
 
     /**
      * When <code>true</code> imposes dynamic latency on arriving tasks in
@@ -1534,13 +1575,13 @@ public class ConcurrencyManager implements IConcurrencyManager {
      *                if any task cannot be scheduled for execution
      */
     @Override
-    public List<Future> invokeAll(
-            final Collection<? extends AbstractTask> tasks, final long timeout,
+    public <T> List<Future<T>> invokeAll(
+            final Collection<? extends AbstractTask<T>> tasks, final long timeout,
             final TimeUnit unit) throws InterruptedException {
 
         assertOpen();
         
-        final List<Future> futures = new LinkedList<Future>();
+        final List<Future<T>> futures = new LinkedList<Future<T>>();
 
         boolean done = false;
         
@@ -1552,7 +1593,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // submit all.
             
-            for (AbstractTask task : tasks) {
+            for (AbstractTask<T> task : tasks) {
 
                 final long now = System.nanoTime();
                 
@@ -1574,7 +1615,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
             // await all futures.
             
-            for (Future f : futures) {
+            for (Future<T> f : futures) {
 
                 if (!f.isDone()) {
 
@@ -1626,7 +1667,7 @@ public class ConcurrencyManager implements IConcurrencyManager {
 
                 // At least one future did not complete.
 
-                for (Future f : futures) {
+                for (Future<T> f : futures) {
 
                     if (!f.isDone()) {
 

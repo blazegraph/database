@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -74,7 +74,7 @@ public class TestAll_AST extends TestCase {
          * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
          *      Reification done right </a>
          */
-		if (false) // TODO Integrate into CI.
+		if (false) // TODO Integrate into CI.  See #1138 Why is RDR parser test suite disabled?
 			suite.addTestSuite(TestReificationDoneRightParser.class);
 
         /*

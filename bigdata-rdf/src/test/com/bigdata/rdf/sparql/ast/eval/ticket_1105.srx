@@ -1,13 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <sparql xmlns='http://www.w3.org/2005/sparql-results#'>
     <head>
+        <variable name='s'/>
+        <variable name='p'/>
         <variable name='o'/>
+        <variable name='o3'/>
     </head>
     <results>
-        <result>
-            <binding name='o'>
-                <literal datatype="http://www.w3.org/2001/XMLSchema#integer">10</literal>
-            </binding>
-        </result>
     </results>
 </sparql>

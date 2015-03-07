@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,8 +34,8 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 /**
  * This procedure computes a range count on an index.
  */
-public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
-        implements IParallelizableIndexProcedure {
+public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure<Long>
+        implements IParallelizableIndexProcedure<Long> {
 
     private static final long serialVersionUID = 5856712176446915328L;
 
@@ -84,6 +84,7 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
         
     }
 
+    @Override
     public final boolean isReadOnly() {
         
         return true;
@@ -125,7 +126,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
      * @return The upper bound estimate of the #of key-value pairs in the key
      *         range of the named index.
      */
-    public Object apply(final IIndex ndx) {
+    @Override
+    public Long apply(final IIndex ndx) {
 
         /*
          * Constrain the (fromKey, toKey) so that they address only the current
@@ -158,7 +160,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
 
     }
 
-    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
 
         super.readExternal(in);
         
@@ -168,7 +171,8 @@ public class RangeCountProcedure extends AbstractKeyRangeIndexProcedure
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         super.writeExternal(out);
         

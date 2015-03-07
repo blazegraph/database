@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
 SYSTAP, LLC
-4501 Tower Road
-Greensboro, NC 27410
-licenses@bigdata.com
+2501 Calvert ST NW #106
+Washington, DC 20008
+licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -46,32 +46,35 @@ import com.bigdata.service.IBigdataFederation;
  */
 public class ApiTaskForIndexManager<T> implements Callable<T> {
 
-    private final IIndexManager indexManager;
-    private final AbstractApiTask<T> delegate;
+   private final IIndexManager indexManager;
+   private final IApiTask<T> delegate;
 
-    public ApiTaskForIndexManager(final IIndexManager indexManager,
-            final AbstractApiTask<T> delegate) {
+   public ApiTaskForIndexManager(final IIndexManager indexManager,
+         final IApiTask<T> delegate) {
 
-        this.indexManager = indexManager;
-        this.delegate = delegate;
+      this.indexManager = indexManager;
+      this.delegate = delegate;
 
-    }
+   }
 
-    @Override
-    public T call() throws Exception {
+   @Override
+   public T call() throws Exception {
 
-        delegate.setIndexManager(indexManager);
+      delegate.setIndexManager(indexManager);
 
-        try {
+      try {
 
-            return delegate.call();
+         // Run the delegate task.
+         final T ret = delegate.call();
 
-        } finally {
+         return ret;
 
-            delegate.clearIndexManager();
+      } finally {
 
-        }
+         delegate.setIndexManager(null);
 
-    }
+      }
+
+   }
 
 }

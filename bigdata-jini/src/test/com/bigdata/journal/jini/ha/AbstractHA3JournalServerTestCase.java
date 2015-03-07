@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -97,10 +97,11 @@ import com.bigdata.quorum.QuorumClient;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.RemoteDestroyAdmin;
@@ -243,7 +244,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
     /**
      * The HTTP ports at which the services will respond.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/730" > Allow configuration
+     * @see <a href="http://trac.blazegraph.com/ticket/730" > Allow configuration
      *      of embedded NSS jetty server using jetty-web.xml </a>
      */
     protected final int A_JETTY_PORT = 8090;
@@ -411,7 +412,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         
         // Setup quorum client.
         quorum = newQuorum();
-        
+
     }
     
     @Override
@@ -2579,6 +2580,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         // Wait for a fully met quorum.
         assertCondition(new Runnable() {
+           @Override
             public void run() {
                 try {
                     // Verify quorum is FULLY met for that token.
@@ -2595,10 +2597,17 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
     }
 
+   /**
+    * Wait up to 2 ticks for the quorum to be fully met.
+    * 
+    * @return The token token if the quorum becomes fully met before the timeout.
+    */
     protected long awaitFullyMetQuorum() throws IOException,
             AsynchronousQuorumCloseException, InterruptedException,
             TimeoutException {
-        return awaitFullyMetQuorum(2); // default 2 ticks
+
+       return awaitFullyMetQuorum(2); // default 2 ticks
+       
     }
 
     /**
@@ -2610,6 +2619,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
     protected long awaitNextQuorumMeet(final long token) {
 
         assertCondition(new Runnable() {
+           @Override
             public void run() {
                 try {
                     final long token2 = quorum.awaitQuorum(100/* ms */,
@@ -2886,14 +2896,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
         final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
-                useLoadBalancer, client);
+                useLoadBalancer, httpClient);
         try {
-        	repo.prepareUpdate(updateStr).evaluate();
+           repo.prepareUpdate(updateStr).evaluate();
         } finally {
-        	repo.close();
-        	client.stop();
+        	   repo.close();
         }
 
     }
@@ -2914,24 +2922,23 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
         final String updateStr = sb.toString();
 
-        try {
-
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
-        	try {
-        		repo.prepareUpdate(updateStr).evaluate();
-        	} finally {
-        		repo.close();
-        		client.stop();
-        	}
-
-        } catch (HttpException ex) {
-        	
-        	log.warn("Status Code: " + ex.getStatusCode(), ex);
-
+         try {
+   
+            final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+                  httpClient);
+            try {
+               repo.prepareUpdate(updateStr).evaluate();
+            } finally {
+               repo.close();
+            }
+   
+         } catch (HttpException ex) {
+   
+            log.warn("Status Code: " + ex.getStatusCode(), ex);
+   
             assertEquals("statusCode", 405, ex.getStatusCode());
-
-        }
+   
+         }
         
     }
 
@@ -2944,13 +2951,11 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final String queryStr = "SELECT (COUNT(*) as ?count) {?s ?p ?o}";
 
         try {
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+           final RemoteRepositoryManager repo = getRemoteRepository(haGlue, httpClient);
         	try {
         		repo.prepareTupleQuery(queryStr).evaluate();
         	} finally {
         		repo.close();
-        		client.stop();
         	}
             
         } catch (HttpException ex) {
@@ -2993,96 +2998,139 @@ public abstract class AbstractHA3JournalServerTestCase extends
         }
     }
 
-    
-    /**
-     * Task loads a large data set.
-     */
-    protected class LargeLoadTask implements Callable<Void> {
-        
-        private final long token;
-        private final boolean reallyLargeLoad;
-        private final boolean dropAll;
+   /**
+    * Task loads a large data set.
+    */
+   protected class LargeLoadTask implements Callable<Void> {
 
-        /**
-         * Large load.
-         * 
-         * @param token
-         *            The token that must remain valid during the operation.
-         */
-        public LargeLoadTask(final long token) {
-        
-            this(token, false/*reallyLargeLoad*/);
-            
-        }
-        
+      private final long token;
+      private final boolean reallyLargeLoad;
+      private final boolean dropAll;
+      private final String namespace;
 
-        public LargeLoadTask(long token, boolean reallyLargeLoad) {
-            this(token, reallyLargeLoad, true/*dropAll*/);
-        }
-        /**
-         * Either large or really large load.
-         * 
-         * @param token
-         *            The token that must remain valid during the operation.
-         * @param reallyLargeLoad
-         *            if we will also load the 3 degrees of freedom file.
-         */
-        public LargeLoadTask(final long token, final boolean reallyLargeLoad, final boolean dropAll) {
+      @Override
+      public String toString() {
+         return getClass().getName() + "{token=" + token + ", reallyLargeLoad="
+               + reallyLargeLoad + ", dropAll=" + dropAll + ", namespace="
+               + namespace + "}";
+      }
 
-            this.token = token;
-            
-            this.reallyLargeLoad = reallyLargeLoad;
+      /**
+       * Large load.
+       * 
+       * @param token
+       *           The token that must remain valid during the operation.
+       */
+      public LargeLoadTask(final long token) {
 
-            this.dropAll = dropAll;
+         this(token, false/* reallyLargeLoad */);
 
-        }
+      }
 
-        public Void call() throws Exception {
+      public LargeLoadTask(final long token, final boolean reallyLargeLoad) {
 
-            final StringBuilder sb = new StringBuilder();
-            if (dropAll)
+         this(token, reallyLargeLoad, true/* dropAll */);
+
+      }
+
+      /**
+       * Either large or really large load.
+       * 
+       * @param token
+       *           The token that must remain valid during the operation.
+       * @param reallyLargeLoad
+       *           if we will also load the 3 degrees of freedom file.
+       * @param dropAll
+       *           when <code>true</code> a DROP ALL is executed before the
+       *           load.
+       */
+      public LargeLoadTask(final long token, final boolean reallyLargeLoad,
+            final boolean dropAll) {
+
+         this(token, reallyLargeLoad, dropAll,
+               BigdataSail.Options.DEFAULT_NAMESPACE);
+
+      }
+
+      /**
+       * Either large or really large load.
+       * 
+       * @param token
+       *           The token that must remain valid during the operation.
+       * @param reallyLargeLoad
+       *           if we will also load the 3 degrees of freedom file.
+       * @param dropAll
+       *           when <code>true</code> a DROP ALL is executed before the
+       *           load.
+       * @param namespace
+       *           The namespace against which the operation will be executed.
+       */
+      public LargeLoadTask(final long token, final boolean reallyLargeLoad,
+            final boolean dropAll, final String namespace) {
+
+         this.token = token;
+
+         this.reallyLargeLoad = reallyLargeLoad;
+
+         this.dropAll = dropAll;
+
+         this.namespace = namespace;
+
+      }
+
+      @Override
+      public Void call() throws Exception {
+
+         final StringBuilder sb = new StringBuilder();
+         if (dropAll)
             sb.append("DROP ALL;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
-            sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
-            if (reallyLargeLoad)
-                sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
-            sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
-            sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
-            sb.append("INSERT DATA\n");
-            sb.append("{\n");
-            sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
-            sb.append("    dc:creator \"A.N.Other\" .\n");
-            sb.append("}\n");
+         sb.append("LOAD <" + getFoafFileUrl("data-0.nq.gz") + ">;\n");
+         sb.append("LOAD <" + getFoafFileUrl("data-1.nq.gz") + ">;\n");
+         sb.append("LOAD <" + getFoafFileUrl("data-2.nq.gz") + ">;\n");
+         if (reallyLargeLoad)
+            sb.append("LOAD <" + getFoafFileUrl("data-3.nq.gz") + ">;\n");
+         sb.append("INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y };\n");
+         sb.append("PREFIX dc: <http://purl.org/dc/elements/1.1/>\n");
+         sb.append("INSERT DATA\n");
+         sb.append("{\n");
+         sb.append("  <http://example/book1> dc:title \"A new book\" ;\n");
+         sb.append("    dc:creator \"A.N.Other\" .\n");
+         sb.append("}\n");
 
-            final String updateStr = sb.toString();
+         final String updateStr = sb.toString();
 
-            final HAGlue leader = quorum.getClient().getLeader(token);
+         final HAGlue leader = quorum.getClient().getLeader(token);
 
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
+         // Verify quorum is still valid.
+         quorum.assertQuorum(token);
 
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-            final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
-        	try {
-        		repo.prepareUpdate(updateStr).evaluate();
-        	} finally {
-        		repo.close();
-        		client.stop();
-        	}
+         final long elapsed;
+         final RemoteRepositoryManager mgr = getRemoteRepository(leader, httpClient);
+         try {
+            final RemoteRepository repo = mgr
+                  .getRepositoryForNamespace(namespace);
+            final long begin = System.nanoTime();
+            if (log.isInfoEnabled())
+               log.info("load begin: " + repo);
+            repo.prepareUpdate(updateStr).evaluate();
+            elapsed = System.nanoTime() - begin;
+         } finally {
+            mgr.close();
+         }
 
-            // Verify quorum is still valid.
-            quorum.assertQuorum(token);
-            
-            if(log.isInfoEnabled())
-                log.info("Done with load.");
-            
-            // Done.
-            return null;
+         // Verify quorum is still valid.
+         quorum.assertQuorum(token);
 
-        }
-        
-    }
+         if (log.isInfoEnabled())
+            log.info("load done: " + this + ", elapsed="
+                  + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
+
+         // Done.
+         return null;
+
+      }
+
+   } // class LargeLoadTask
     
     /**
      * Spin, looking for the quorum to fully meet *before* the LOAD is finished.

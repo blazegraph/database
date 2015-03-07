@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -108,7 +108,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
         this.repo = repo;
 
     }
-	
+
+   /**
+    * Report the fast range count (aka ESTCARD) associated with the specified
+    * access path.
+    */
 	public long count(final Resource s, final URI p, final Value o, 
 			final Resource... c) 
 			throws RepositoryException {
@@ -241,7 +245,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 	
 				/**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
 				 */
                 @Override
                 public int getMaxQueryTime() {
@@ -259,7 +263,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
                 }
                 
                 /**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
                  */
 				@Override
 				public void setMaxQueryTime(final int seconds) {
@@ -362,7 +366,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 	
                 /**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
                  *      remote query)
                  */
                 @Override
@@ -381,7 +385,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
                 }
 
                 /**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
                  *      remote query)
                  */
                 @Override
@@ -511,7 +515,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 
                 /**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
                  *      remote query)
                  */
                 @Override
@@ -530,7 +534,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 
                 /**
-                 * @see http://trac.bigdata.com/ticket/914 (Set timeout on
+                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
                  *      remote query)
                  */
                 @Override

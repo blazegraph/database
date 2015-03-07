@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -40,7 +40,6 @@ import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -75,10 +74,9 @@ import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
+import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -143,20 +141,28 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected ExecutorService executorService = null;
 
-    /**
-     * Used to talk to the {@link NanoSparqlServer}.
-     */
-    protected org.eclipse.jetty.client.HttpClient ccm = null;
-    
     private Level oldProcessHelperLevel = null;
+    
+    /**
+     * The client used to connect to the remote repository interface(s). The same
+     * client is reused across all concurrent requests. This keeps down the #of
+     * threads that are pre-allocated by the {@link HttpClient}.
+     */
+    protected HttpClient httpClient;
     
     @Override
     protected void setUp() throws Exception {
-        super.setUp(); if(log.isInfoEnabled()) log.info("---- TEST START "+getName() + "----");
+
+       super.setUp();
+      
+        if (log.isInfoEnabled())
+         log.info("---- TEST START " + getName() + "----");
+        
         executorService = Executors
                 .newCachedThreadPool(new DaemonThreadFactory(getName()));
 
-        ccm = HttpClientConfigurator.getInstance().newInstance();
+        // Setup the http client.
+        httpClient = HttpClientConfigurator.getInstance().newInstance();
 
         /*
          * Override the log level for the ProcessHelper to ensure that we
@@ -184,11 +190,16 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         }
 
-        if (ccm != null) {
+        // Tear down the HttpClient
+        if (httpClient != null) {
 
-            ccm.stop();
-
-            ccm = null;
+              try {
+                 httpClient.stop();
+              } catch (Throwable t) {
+                 log.error(t, t);
+              } finally {
+                 httpClient = null;
+              }
 
         }
 
@@ -206,7 +217,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             oldProcessHelperLevel = null;
             
         }
-        if(log.isInfoEnabled()) log.info("---- TEST END "+getName() + "----");        
+
+        if (log.isInfoEnabled())
+           log.info("---- TEST END " + getName() + "----");
+
     }
 
     /**
@@ -304,10 +318,9 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 		JettyResponseListener response = null;
 		try {
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 			
 			final RemoteRepositoryManager rpm = new RemoteRepositoryManager(
-					serviceURL, client, executorService);
+					serviceURL, httpClient, executorService);
 			try {
 				RemoteRepository.checkResponseCode(response = rpm
 						.doConnect(opts));
@@ -317,7 +330,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 					response.abort();
 				
 				rpm.close();
-				client.stop();
 			}
 
 		} catch (IOException ex) {
@@ -404,8 +416,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
         opts.method = "GET";
 
         try {
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        	final RemoteRepositoryManager rpm = getRemoteRepository(haGlue, client);
+        	final RemoteRepositoryManager rpm = getRemoteRepository(haGlue, httpClient);
 			try {
 	            final JettyResponseListener response = rpm.doConnect(opts);
 				RemoteRepository.checkResponseCode(response);
@@ -415,7 +426,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 				return HAStatusEnum.valueOf(s);
 			} finally {
 				rpm.close();
-				client.stop();
 			}
 
         } catch (IOException ex) {
@@ -432,9 +442,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 		final String serviceURL = getNanoSparqlServerURL(haGlue);
 		final String query = serviceURL + "/status?HA";
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 		try {
-			final org.eclipse.jetty.client.api.Request request = client
+			final org.eclipse.jetty.client.api.Request request = httpClient
 					.newRequest(query).method(HttpMethod.GET);
 
 			final JettyResponseListener response = new JettyResponseListener(
@@ -450,8 +459,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 		} catch (IOException ex) {
 			log.error(ex, ex);
 			throw ex;
-		} finally {
-			client.stop();
 		}
 
 	}
@@ -520,10 +527,8 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
         final String endpointURL = getNanoSparqlServerURL(haGlue);
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        
         final RemoteRepositoryManager repo = new RemoteRepositoryManager(
-                endpointURL, useLBS, client, executorService);
+                endpointURL, useLBS, httpClient, executorService);
 
         return repo;
         
@@ -652,8 +657,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             final String query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }";
 
             // Run query.
-           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-            final RemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, client);
+            final RemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, httpClient);
             try {
 	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
 	                    .evaluate();
@@ -666,7 +670,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 	            return ((org.openrdf.model.Literal) v).longValue();
             } finally {
             	remoteRepo.close();
-            	client.stop();
             }
 
         }
@@ -748,11 +751,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     protected void awaitKBExists(final HAGlue haGlue) throws Exception {
       
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-    	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, client);
+    	final RemoteRepositoryManager repo = getRemoteRepository(haGlue, httpClient);
         
         try {
 	        assertCondition(new Runnable() {
+ 	           @Override
 	            public void run() {
 	                try {
 	                    repo.size();
@@ -765,7 +768,6 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 	        }, 5, TimeUnit.SECONDS);
         } finally {
         	repo.close();
-        	client.stop();
         }
         
     }

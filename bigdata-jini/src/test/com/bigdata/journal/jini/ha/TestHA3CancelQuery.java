@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,17 +26,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal.jini.ha;
 
-import java.io.IOException;
 import java.util.UUID;
-
-import org.eclipse.jetty.client.HttpClient;
 
 import net.jini.config.Configuration;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
@@ -82,7 +79,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
      * verifies that all services are willing to accept a POST of the CANCEL
      * request.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/883">CANCEL Query fails on
+     * @see <a href="http://trac.blazegraph.com/ticket/883">CANCEL Query fails on
      *      non-default kb namespace on HA follower</a>
      */
     public void test_ABC_CancelQuery() throws Exception {
@@ -106,7 +103,7 @@ public class TestHA3CancelQuery extends AbstractHA3JournalServerTestCase {
          * Do CANCEL for each service using the default namespace.
          */
         final RemoteRepositoryManager[] rpms = new RemoteRepositoryManager[3];
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+        final HttpClient client = this.httpClient;
         
         {
             // Get RemoteRepository for each service.

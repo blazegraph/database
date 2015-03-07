@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,10 +32,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -54,7 +52,6 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.SimpleEntry;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.AbstractInterruptsTestCase;
-import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.journal.AbstractJournal.ISnapshotEntry;
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.AbstractMRMWTestCase;
@@ -63,7 +60,6 @@ import com.bigdata.journal.AbstractRestartSafeTestCase;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitRecordIndex;
 import com.bigdata.journal.CommitRecordSerializer;
-import com.bigdata.journal.DiskOnlyStrategy;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
@@ -72,7 +68,6 @@ import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalAbort;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.VerifyCommitRecordIndex;
-import com.bigdata.rawstore.AbstractRawStoreTestCase;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
@@ -579,12 +574,6 @@ public class TestRWJournal extends AbstractJournalTestCase {
     /**
 	 * Test suite integration for {@link AbstractRestartSafeTestCase}.
 	 * 
-	 * @todo there are several unit tests in this class that deal with
-	 *       {@link DiskOnlyStrategy#allocate(int)} and
-	 *       {@link DiskOnlyStrategy#update(long, int, ByteBuffer)}. If those
-	 *       methods are added to the {@link IRawStore} API then move these unit
-	 *       tests into {@link AbstractRawStoreTestCase}.
-	 * 
 	 * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
 	 *         Thompson</a>
 	 */
@@ -598,6 +587,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			super(name);
 		}
 
+		@Override
 		protected BufferMode getBufferMode() {
 
 			return BufferMode.DiskRW;
@@ -605,6 +595,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
+      @Override
 		public Properties getProperties() {
 
             if (log.isInfoEnabled())
@@ -651,6 +642,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		}
 
+      @Override
 		protected IRawStore getStore() {
 
 			return getStore(0);
@@ -2174,7 +2166,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          * {@link RWStore#commit()} is followed by {@link RWStore#reset()}
          * rather than {@link RWStore#postCommit()}.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is
          *      not robust to internal failure.</a>
          */
 		public void test_commitState() {
@@ -2213,7 +2205,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          * discarded by {@link RWStore#reset()} such that subsequent write sets
          * run into persistent addressing errors.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is
          *      not robust to internal failure.</a>
          */
 		public void test_commitStateError() {
@@ -2263,7 +2255,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          * Further verify that an {@link RWStore#reset()} allwos us to then
          * apply and commit new write sets.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is
          *      not robust to internal failure.</a>
          */
 		public void test_commitStateIllegal() {
@@ -3167,6 +3159,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        	assertTrue(bs.isCommitted(addrs[0]));
 	        	
 				Runnable writer = new Runnable() {
+               @Override
 	        		public void run() {
 	        			for (int i = 0; i < 2000; i++) {
 	        				bs.delete(addrs[r.nextInt(addrs.length)]);
@@ -3176,8 +3169,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        			}
 	        		}
 	        	};
-				final Future wfuture = es.submit(writer);
+				final Future<?> wfuture = es.submit(writer);
 				Runnable reader1 = new Runnable() {
+               @Override
 	        		public void run() {
 	        			for (int i = 0; i < 5000; i++) {
 	        				for (int rdr = 0; rdr < addrs.length; rdr++) {
@@ -3191,8 +3185,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        			}
 	        		}
 	        	};
-	        	final Future r1future = es.submit(reader1);
+	        	final Future<?> r1future = es.submit(reader1);
 	        	Runnable reader2 = new Runnable() {
+	        	   @Override
 	        		public void run() {
 	        			for (int i = 0; i < 5000; i++) {
 	        				for (int rdr = 0; rdr < addrs.length; rdr++) {
@@ -3206,7 +3201,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	        			}
 	        		}
 	        	};
-	        	final Future r2future = es.submit(reader2);
+	        	final Future<?> r2future = es.submit(reader2);
 	        	
 	        	try {
 		        	wfuture.get();
@@ -3256,6 +3251,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			super(name);
 		}
 
+      @Override
 		protected IRawStore getStore() {
 
 			final Properties properties = getProperties();
@@ -3290,6 +3286,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			super(name);
 		}
 
+      @Override
 		protected IRawStore getStore() {
 
 			final Properties properties = getProperties();
@@ -3324,6 +3321,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			super(name);
 		}
 	
+      @Override
 		protected IRawStore getStore() {
 	
 			final Properties properties = getProperties();

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -52,7 +52,6 @@ import com.bigdata.ha.msg.HARootBlockRequest;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
@@ -367,11 +366,9 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			for (int i = 0; i < joined.length; i++) {
 
-	           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-
 	        	services[i] = quorum.getClient().getService(joined[i]);
 
-				repos[i] = getRemoteRepository(services[i], client);
+				repos[i] = getRemoteRepository(services[i], httpClient);
 
 			}
 
@@ -995,6 +992,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 			// start concurrent task loads that continue until fully met
 			final Callable<Void> task = new Callable<Void>() {
+			   @Override
 				public Void call() throws Exception {
 					int count = 0;
 						while (!quorum.isQuorumFullyMet(token)) {
@@ -1015,15 +1013,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							// Verify quorum is still valid.
 							quorum.assertQuorum(token);
 
-				           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-							final RemoteRepositoryManager repo = getRemoteRepository(leader, client);
+							final RemoteRepositoryManager repo = getRemoteRepository(leader, httpClient);
 				        	try {
 				        		repo.prepareUpdate(
 										updateStr).evaluate();
 								log.info("COMPLETED TRANSACTION " + count);
 				        	} finally {
 				        		repo.close();
-				        		client.stop();
 				        	}
 
 								Thread.sleep(transactionDelay);
@@ -2222,10 +2218,10 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 				}
 
+				@Override
 				public Void call() throws Exception {
-		           	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
 					
-					final RemoteRepositoryManager remoteRepo = getRemoteRepository(leader, client);
+					final RemoteRepositoryManager remoteRepo = getRemoteRepository(leader, httpClient);
 					try {
 						for (int n = 0; n < nTransactions; n++) {
 
@@ -2258,7 +2254,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 						return null;
 					} finally {
 						remoteRepo.close();
-						client.stop();
 					}
 
 				}
@@ -2315,14 +2310,13 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
                 }
 
+                @Override
                 public Long call() throws Exception {
                     
                     long queryCount = 0;
                     
-                   	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-                    
                     final RemoteRepositoryManager remoteRepo;
-                    remoteRepo = getRemoteRepository(haGlue, client);
+                    remoteRepo = getRemoteRepository(haGlue, httpClient);
 					try {
 						while (!updateTaskFuture.isDone()) {
 
@@ -2353,7 +2347,6 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 						}
 					} finally {
                     	remoteRepo.close();
-                    	client.stop();
                     }
  
                     // done.
@@ -3513,7 +3506,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
     /**
      * Test verifies that we can POST a SPARQL query to a follower.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/853"> Follower does not
+     * @see <a href="http://trac.blazegraph.com/ticket/853"> Follower does not
      *      accept POST of idempotent operations (HA) </a>
      */
 	public void test_postQueryOnFollowers() throws Exception {
@@ -3531,7 +3524,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 		// Verify binary equality of ALL journals.
 		assertDigestsEquals(new HAGlue[] { serverA, serverB, serverC });
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+		final HttpClient client = this.httpClient;
 		
 		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
 		try {

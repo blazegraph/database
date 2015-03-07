@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -41,33 +41,45 @@ import com.bigdata.journal.Journal;
  */
 public class ApiTaskForJournal<T> extends AbstractTask<T> {
 
-    private final AbstractApiTask<T> delegate;
+   private final IApiTask<T> delegate;
 
-    public ApiTaskForJournal(final IConcurrencyManager concurrencyManager,
-            final long timestamp, final String[] resource,
-            final AbstractApiTask<T> delegate) {
+   @Override
+   public String toString() {
 
-        super(concurrencyManager, timestamp, resource);
+      return super.toString() + "::{delegate=" + delegate + "}";
 
-        this.delegate = delegate;
+   }
 
-    }
+   public ApiTaskForJournal(final IConcurrencyManager concurrencyManager,
+         final long timestamp, final String[] resource,
+         final IApiTask<T> delegate) {
 
-    @Override
-    protected T doTask() throws Exception {
+      super(concurrencyManager, timestamp, resource);
 
-        delegate.setIndexManager(getJournal());
+      this.delegate = delegate;
 
-        try {
+   }
 
-            return delegate.call();
+   @Override
+   protected T doTask() throws Exception {
 
-        } finally {
+      // Set reference to Journal on the delegate.
+      delegate.setIndexManager(getJournal());
 
-            delegate.clearIndexManager();
+      try {
 
-        }
+         // Run the delegate task.
+         final T ret = delegate.call();
 
-    }
+         return ret;
+
+      } finally {
+
+         // Clear reference to the Journal from the delegate.
+         delegate.setIndexManager(null);
+
+      }
+
+   }
 
 }

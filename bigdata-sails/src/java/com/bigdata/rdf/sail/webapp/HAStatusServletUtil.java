@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1009,7 +1009,7 @@ public class HAStatusServletUtil {
         // TODO Alternatively "max-age=1" for max-age in seconds.
         resp.addHeader("Cache-Control", "no-cache");
 
-        BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+        BigdataRDFServlet.buildAndCommitResponse(resp, BigdataRDFServlet.HTTP_OK,
                 BigdataRDFServlet.MIME_TEXT_PLAIN, status.name());
         
         log.warn("Responding to HA status request");
@@ -1098,7 +1098,7 @@ public class HAStatusServletUtil {
       // TODO Alternatively "max-age=1" for max-age in seconds.
       resp.addHeader("Cache-Control", "no-cache");
 
-      BigdataRDFServlet.buildResponse(resp, BigdataRDFServlet.HTTP_OK,
+      BigdataRDFServlet.buildAndCommitResponse(resp, BigdataRDFServlet.HTTP_OK,
             BigdataRDFServlet.MIME_APPLICATION_JSON, writer.toString());
 
       return;

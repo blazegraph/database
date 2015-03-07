@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.io.Reader;
@@ -38,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -60,7 +60,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -72,15 +71,13 @@ import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
 import org.openrdf.rio.helpers.StatementCollector;
-import org.openrdf.sail.SailException;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
@@ -89,8 +86,8 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.store.LocalTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.config.NicUtil;
 
 /**
@@ -107,8 +104,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected static final String packagePath = "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/";
 
 	/**
-	 * A jetty {@link Server} running a {@link NanoSparqlServer} instance which
-	 * is running against that {@link #m_indexManager}.
+	 * A jetty {@link Server} running a {@link NanoSparqlServer} instance.
 	 */
 	protected Server m_fixture;
 
@@ -168,89 +164,69 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
 	}
 
-	protected AbstractTripleStore createTripleStore(
-			final IIndexManager indexManager, final String namespace,
-			final Properties properties) {
-        
+   private AbstractTripleStore createTripleStore(
+         final IIndexManager indexManager, final String namespace,
+         final Properties properties) throws InterruptedException,
+         ExecutionException {
+
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
 
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			fail("exists: " + namespace);
-			
-		}
-
-		/*
-		 * Create the KB instance.
-		 */
-
-		if (log.isInfoEnabled()) {
-			log.info("Creating KB instance: namespace="+namespace);
-			log.info("Properties=" + properties.toString());
-		}
-
-		if (indexManager instanceof Journal) {
-
-	        // Create the kb instance.
-			tripleStore = new LocalTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-
-		} else {
-
-			tripleStore = new ScaleOutTripleStore(indexManager, namespace,
-					ITx.UNISOLATED, properties);
-		}
-
-        // create the triple store.
-        tripleStore.create();
-
+      AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(namespace,
+            properties)).get();
+		
         if(log.isInfoEnabled())
         	log.info("Created tripleStore: " + namespace);
 
-        // New KB instance was created.
-        return tripleStore;
+        /**
+         * Return a view of the new KB to the caller.
+         * 
+         * Note: The caller MUST NOT attempt to modify this KB view outside of
+         * the group commit mechanisms. Therefore I am now returning a read-only
+         * view.
+         */
+      final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
+            .getResourceLocator().locate(namespace, ITx.READ_COMMITTED);
 
+      assert tripleStore != null;
+
+      return tripleStore;
+      
     }
 
-	protected void dropTripleStore(final IIndexManager indexManager,
-			final String namespace) {
+	private void dropTripleStore(final IIndexManager indexManager,
+			final String namespace) throws InterruptedException, ExecutionException {
 
 		if(log.isInfoEnabled())
 			log.info("KB namespace=" + namespace);
 
-		// Locate the resource declaration (aka "open"). This tells us if it
-		// exists already.
-		final AbstractTripleStore tripleStore = (AbstractTripleStore) indexManager
-				.getResourceLocator().locate(namespace, ITx.UNISOLATED);
-
-		if (tripleStore != null) {
-
-			if (log.isInfoEnabled())
-				log.info("Destroying: " + namespace);
-
-            if (!BigdataStatics.NSS_GROUP_COMMIT) {
-                /*
-                 * FIXME GROUP COMMIT: We need to submit a task that does this
-                 * in order to stay inside of the same concurrency control
-                 * mechanism as the database.
-                 */
-                tripleStore.destroy();
-            }
-			
+      try {
+         AbstractApiTask.submitApiTask(indexManager,
+               new DestroyKBTask(namespace)).get();
+      } catch (Exception ex) {
+         if (InnerCause.isInnerCause(ex, DatasetNotFoundException.class)) {
+            if (log.isInfoEnabled())
+               log.info("namespace does not exist: " + namespace);
+         }
 		}
 
 	}
 	
-	TestMode testMode = null;
+	/**
+	 * The {@link TestMode} that is in effect.
+	 */
+	private TestMode testMode = null;
 	
+	/**
+	 * The {@link TestMode} that is in effect.
+	 */
+	protected TestMode getTestMode() {
+		return testMode;
+	}
+
 	protected Server newFixture(final String lnamespace) throws Exception {
-		final IIndexManager indexManager = getIndexManager();
+
+	   final IIndexManager indexManager = getIndexManager();
 		
 		final Properties properties = getProperties();
 
@@ -259,7 +235,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         		lnamespace, properties);
         
         if (tripleStore.isStatementIdentifiers()) {
-            testMode = TestMode.sids;
+			testMode = TestMode.sids;
         } else if (tripleStore.isQuads()) {
             testMode = TestMode.quads;
         } else {
@@ -425,8 +401,11 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	}
 
     /**
-     * Returns a view of the triple store using the sail interface.
-     */
+    * Returns a view of the triple store using the sail interface.
+    * 
+    * FIXME DO NOT CIRCUMVENT! Use the REST API throughout this test suite.
+    */
+    @Deprecated
     protected BigdataSail getSail() {
 
 		final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
@@ -436,29 +415,29 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
     }
 
-	protected String getStreamContents(final InputStream inputStream)
-            throws IOException {
-
-        final Reader rdr = new InputStreamReader(inputStream);
-		
-	    final StringBuffer sb = new StringBuffer();
-		
-	    final char[] buf = new char[512];
-	    
-		while (true) {
-		
-		    final int rdlen = rdr.read(buf);
-			
-		    if (rdlen == -1)
-				break;
-			
-		    sb.append(buf, 0, rdlen);
-		    
-		}
-		
-		return sb.toString();
-
-	}
+//	protected String getStreamContents(final InputStream inputStream)
+//            throws IOException {
+//
+//        final Reader rdr = new InputStreamReader(inputStream);
+//		
+//	    final StringBuffer sb = new StringBuffer();
+//		
+//	    final char[] buf = new char[512];
+//	    
+//		while (true) {
+//		
+//		    final int rdlen = rdr.read(buf);
+//			
+//		    if (rdlen == -1)
+//				break;
+//			
+//		    sb.append(buf, 0, rdlen);
+//		    
+//		}
+//		
+//		return sb.toString();
+//
+//	}
 
 	/**
 	 * Counts the #of results in a SPARQL result set.
@@ -621,7 +600,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
     }
 
-    public long countAll() throws Exception {
+    protected long countAll() throws Exception {
     	
     	return getSail().getDatabase().getExplicitStatementCount(null);
     	
@@ -850,13 +829,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 		{
 			final String queryStr = "select * where {?s ?p ?o}";
 
-//			final QueryOptions opts = new QueryOptions();
-//			opts.serviceURL = m_serviceURL;
-//			opts.queryStr = queryStr;
-//			opts.method = "GET";
-//
-//			assertEquals(ntriples, countResults(doSparqlQuery(opts, requestPath)));
-			
 			final IPreparedTupleQuery query = m_repo.prepareTupleQuery(queryStr);
 			
 			assertEquals(ntriples, countResults(query.evaluate()));
@@ -869,32 +841,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      * Insert a resource into the {@link NanoSparqlServer}.  This is used to
      * load resources in the test package into the server.
      */
-    protected long doInsertbyURL(final String method, /*final String servlet,*/
-            final String resource) throws Exception {
+    protected long doInsertbyURL(final String method, final String resource)
+         throws Exception {
 
         final String uri = new File(resource).toURI().toString();
 
-//        HttpURLConnection conn = null;
-//        try {
-//
-//            // Load the resource into the KB.
-//            final QueryOptions opts = new QueryOptions();
-//            opts.serviceURL = m_serviceURL;
-//            opts.method = "POST";
-//            opts.requestParams = new LinkedHashMap<String, String[]>();
-//            opts.requestParams.put("uri", new String[] { uri });
-//
-//            return getMutationResult(doSparqlQuery(opts, requestPath));
-//
-//        } catch (Throwable t) {
-//            // clean up the connection resources
-//            if (conn != null)
-//                conn.disconnect();
-//            throw new RuntimeException(t);
-//        }
-        
-//        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final AddOp add = new AddOp(uri);
+
         return m_repo.add(add);
 
     }
@@ -1165,38 +1118,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label1 = new LiteralImpl("Mike");
         final Literal label2 = new LiteralImpl("Bryan");
 
-        final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        
-        try {
+      {
+         final Graph g = new GraphImpl();
+         g.add(mike, RDF.TYPE, person);
+         g.add(mike, likes, rdf);
+         g.add(mike, RDFS.LABEL, label1);
+         g.add(bryan, RDF.TYPE, person);
+         g.add(bryan, likes, rdfs);
+         g.add(bryan, RDFS.LABEL, label2);
 
-            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
-                    .getConnection();
-            try {
-
-                cxn.setAutoCommit(false);
-
-                cxn.add(mike, RDF.TYPE, person);
-                cxn.add(mike, likes, rdf);
-                cxn.add(mike, RDFS.LABEL, label1);
-                cxn.add(bryan, RDF.TYPE, person);
-                cxn.add(bryan, likes, rdfs);
-                cxn.add(bryan, RDFS.LABEL, label2);
-
-                /*
-                 * Note: The either flush() or commit() is required to flush the
-                 * statement buffers to the database before executing any
-                 * operations that go around the sail.
-                 */
-                cxn.commit();
-            } finally {
-                cxn.close();
-            }
-             
-        } finally {
-            sail.shutDown();
-        }
+         m_repo.add(new AddOp(g));
+      }
 
         // The expected results.
         final Graph expected = new GraphImpl();
@@ -1209,22 +1141,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         // Run the query and verify the results.
         {
             
-//            final QueryOptions opts = new QueryOptions();
-//            opts.serviceURL = m_serviceURL;
-//            opts.method = method;
-//            opts.acceptHeader = format.getDefaultMIMEType();
-//            opts.queryStr =//
-//                "prefix bd: <"+BD.NAMESPACE+"> " +//
-//                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
-//                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
-//                "DESCRIBE ?x " +//
-//                "WHERE { " +//
-//                "  ?x rdf:type bd:Person . " +//
-//                "  ?x bd:likes bd:RDF " +//
-//                "}";
-//
-//            final Graph actual = buildGraph(doSparqlQuery(opts, requestPath));
-            
         	final String queryStr =
                 "prefix bd: <"+BD.NAMESPACE+"> " +//
                 "prefix rdf: <"+RDF.NAMESPACE+"> " +//
@@ -1235,23 +1151,18 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
                 "  ?x bd:likes bd:RDF " +//
                 "}";
 
-//        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
-            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-            final Graph actual = asGraph(query.evaluate());
-
-            assertSameGraph(expected, actual);
+        	assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr));
             
         }
 
     }
     
     /**
-     * Sets up a simple data set on the server.
-     * 
-     * @throws SailException
-     * @throws RepositoryException
-     */
-    protected void setupDataOnServer() throws SailException, RepositoryException {
+    * Sets up a simple data set on the server.
+    * 
+    * @throws Exception
+    */
+    protected void setupDataOnServer() throws Exception {
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1262,47 +1173,25 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label1 = new LiteralImpl("Mike");
         final Literal label2 = new LiteralImpl("Bryan");
 
-        final BigdataSail sail = getSail();
-        try {
+      {
+         final Graph g = new GraphImpl();
+         g.add(mike, RDF.TYPE, person);
+         g.add(mike, likes, rdf);
+         g.add(mike, RDFS.LABEL, label1);
+         g.add(bryan, RDF.TYPE, person);
+         g.add(bryan, likes, rdfs);
+         g.add(bryan, RDFS.LABEL, label2);
 
-            sail.initialize();
-            final BigdataSailRepository repo = new BigdataSailRepository(sail);
-            
-            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
-                    .getConnection();
-            try {
+         m_repo.add(new AddOp(g));
+      }
 
-                cxn.setAutoCommit(false);
-
-                cxn.add(mike, RDF.TYPE, person);
-                cxn.add(mike, likes, rdf);
-                cxn.add(mike, RDFS.LABEL, label1);
-                cxn.add(bryan, RDF.TYPE, person);
-                cxn.add(bryan, likes, rdfs);
-                cxn.add(bryan, RDFS.LABEL, label2);
-
-                /*
-                 * Note: The either flush() or commit() is required to flush the
-                 * statement buffers to the database before executing any
-                 * operations that go around the sail.
-                 */
-                cxn.commit();
-            } finally {
-                cxn.close();
-            }
-             
-        } finally {
-            sail.shutDown();
-        }
     }
     
     /**
      * Sets up a simple data set on the server.
-     * 
-     * @throws SailException
-     * @throws RepositoryException
+    * @throws Exception 
      */
-    protected void setupQuadsDataOnServer() throws SailException, RepositoryException {
+    protected void setupQuadsDataOnServer() throws Exception {
         
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
@@ -1316,38 +1205,17 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label1 = new LiteralImpl("Mike");
         final Literal label2 = new LiteralImpl("Bryan");
 
-        final BigdataSail sail = getSail();
-        try {
+      {
+         final Graph g = new GraphImpl();
+         g.add(mike, RDF.TYPE, person, c1, c2, c3);
+         g.add(mike, likes, rdf, c1, c2, c3);
+         g.add(mike, RDFS.LABEL, label1, c1, c2, c3);
+         g.add(bryan, RDF.TYPE, person, c1, c2, c3);
+         g.add(bryan, likes, rdfs, c1, c2, c3);
+         g.add(bryan, RDFS.LABEL, label2, c1, c2, c3);
+         m_repo.add(new AddOp(g));
+      }
 
-            sail.initialize();
-            final BigdataSailRepository repo = new BigdataSailRepository(sail);
-            
-            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
-                    .getConnection();
-            try {
-
-                cxn.setAutoCommit(false);
-
-                cxn.add(mike, RDF.TYPE, person, c1, c2, c3);
-                cxn.add(mike, likes, rdf, c1, c2, c3);
-                cxn.add(mike, RDFS.LABEL, label1, c1, c2, c3);
-                cxn.add(bryan, RDF.TYPE, person, c1, c2, c3);
-                cxn.add(bryan, likes, rdfs, c1, c2, c3);
-                cxn.add(bryan, RDFS.LABEL, label2, c1, c2, c3);
-
-                /*
-                 * Note: The either flush() or commit() is required to flush the
-                 * statement buffers to the database before executing any
-                 * operations that go around the sail.
-                 */
-                cxn.commit();
-            } finally {
-                cxn.close();
-            }
-             
-        } finally {
-            sail.shutDown();
-        }
     }
     
     protected void doConstructTest(final String method, final RDFFormat format)
@@ -1357,44 +1225,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final URI mike = new URIImpl(BD.NAMESPACE + "Mike");
         final URI bryan = new URIImpl(BD.NAMESPACE + "Bryan");
         final URI person = new URIImpl(BD.NAMESPACE + "Person");
-//        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
-//        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
-//        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
-//        final Literal label1 = new LiteralImpl("Mike");
-//        final Literal label2 = new LiteralImpl("Bryan");
-//
-//        final BigdataSail sail = getSail();
-//        sail.initialize();
-//        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-//        
-//        try {
-//
-//            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
-//                    .getConnection();
-//            try {
-//
-//                cxn.setAutoCommit(false);
-//
-//                cxn.add(mike, RDF.TYPE, person);
-//                cxn.add(mike, likes, rdf);
-//                cxn.add(mike, RDFS.LABEL, label1);
-//                cxn.add(bryan, RDF.TYPE, person);
-//                cxn.add(bryan, likes, rdfs);
-//                cxn.add(bryan, RDFS.LABEL, label2);
-//
-//                /*
-//                 * Note: The either flush() or commit() is required to flush the
-//                 * statement buffers to the database before executing any
-//                 * operations that go around the sail.
-//                 */
-//                cxn.commit();
-//            } finally {
-//                cxn.close();
-//            }
-//             
-//        } finally {
-//            sail.shutDown();
-//        }
 
         // The expected results.
         final Graph expected = new GraphImpl();
@@ -1407,22 +1237,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
         // Run the query and verify the results.
         {
-            
-//            final QueryOptions opts = new QueryOptions();
-//            opts.serviceURL = m_serviceURL;
-//            opts.method = method;
-//            opts.acceptHeader = format.getDefaultMIMEType();
-//            opts.queryStr =//
-//                "prefix bd: <"+BD.NAMESPACE+"> " +//
-//                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
-//                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
-//                "CONSTRUCT { ?x rdf:type bd:Person }" +//
-//                "WHERE { " +//
-//                "  ?x rdf:type bd:Person . " +//
-////                "  ?x bd:likes bd:RDF " +//
-//                "}";
-//
-//            final Graph actual = buildGraph(doSparqlQuery(opts, requestPath));
 
             final String queryStr =
                 "prefix bd: <"+BD.NAMESPACE+"> " +//
@@ -1434,21 +1248,23 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //                "  ?x bd:likes bd:RDF " +//
                 "}";
 
-//        	final RemoteRepository remote = new RemoteRepository(m_serviceURL);
             final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-            final Graph actual = asGraph(query.evaluate());
 
-            assertSameGraph(expected, actual);
+//            final Graph actual = asGraph(query.evaluate());
+
+            assertSameGraph(expected, query);
             
         }
     
     }
     
-    protected void assertSameGraph(final Graph expected, final GraphQueryResult actual) throws Exception {
-    	
-    	assertSameGraph(expected, asGraph(actual));
-    	
+   protected void assertSameGraph(final Graph expected,
+         final IPreparedGraphQuery actual) throws Exception {
+
+      assertSameGraph(expected, asGraph(actual));
+
     }
+    
     /**
      * Compare two graphs for equality.
      * <p>
@@ -1473,21 +1289,62 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         assertEquals("size", expected.size(), actual.size());
 
     }
-    
-    protected Graph asGraph(final GraphQueryResult result) throws Exception {
-    	
-    	final Graph g = new GraphImpl();
-    	
-    	while (result.hasNext()) {
-    	
-    		g.add(result.next());
-    		
-    	}
-    	
-    	result.close();
-    	
-    	return g;
-    	
+
+    /**
+    * Preferred version executes the {@link IPreparedGraphQuery} and ensures
+    * that the {@link GraphQueryResult} is closed.
+    * 
+    * @param preparedQuery
+    *           The prepared query.
+    * 
+    * @return The resulting graph.
+    * 
+    * @throws Exception
+    */
+    protected Graph asGraph(final IPreparedGraphQuery preparedQuery) throws Exception {
+
+       final GraphQueryResult result = preparedQuery.evaluate();
+       
+       try {
+          
+          final Graph g = new GraphImpl();
+
+          while (result.hasNext()) {
+
+             g.add(result.next());
+
+          }
+
+          return g;
+          
+       } finally {
+          
+          result.close();
+          
+       }
+       
+    }
+
+   /**
+    * @deprecated by {@link #asGraph(IPreparedGraphQuery)} which can ensure that
+    *             the {@link GraphQueryResult} is closed.
+    */
+   protected Graph asGraph(final GraphQueryResult result) throws Exception {
+
+      try {
+         final Graph g = new GraphImpl();
+
+         while (result.hasNext()) {
+
+            g.add(result.next());
+
+         }
+
+         return g;
+      } finally {
+         result.close();
+      }
+
     }
 
     /**
@@ -1530,65 +1387,29 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
         final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
 
-        final BigdataSail sail = getSail();
-        sail.initialize();
-        final BigdataSailRepository repo = new BigdataSailRepository(sail);
-        
-        try {
+        {
+           // create a large number of mikes and bryans
+           final Graph g = new GraphImpl();
+           for (int n = 0; n < statements; n++) {
+               final URI miken = new URIImpl(BD.NAMESPACE + "Mike#" + n);
+               final URI bryann = new URIImpl(BD.NAMESPACE + "Bryan#" + n);
+               final Literal nameMiken = new LiteralImpl("Mike#" + n);
+               final Literal nameBryann = new LiteralImpl("Bryan#" + n);
+              g.add(miken, RDF.TYPE, person);
+              g.add(miken, likes, rdf);
+              g.add(miken, RDFS.LABEL, nameMiken);
+              g.add(bryann, RDF.TYPE, person);
+              g.add(bryann, likes, rdfs);
+              g.add(bryann, RDFS.LABEL, nameBryann);
+           }
 
-            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo
-                    .getConnection();
-            try {
-
-                cxn.setAutoCommit(false);
-                
-                // create a large number of mikes and bryans
-                for (int n = 0; n < statements; n++) {
-                    final URI miken = new URIImpl(BD.NAMESPACE + "Mike#" + n);
-                    final URI bryann = new URIImpl(BD.NAMESPACE + "Bryan#" + n);
-                    final Literal nameMiken = new LiteralImpl("Mike#" + n);
-                    final Literal nameBryann = new LiteralImpl("Bryan#" + n);
-	                cxn.add(miken, RDF.TYPE, person);
-	                cxn.add(miken, likes, rdf);
-	                cxn.add(miken, RDFS.LABEL, nameMiken);
-	                cxn.add(bryann, RDF.TYPE, person);
-	                cxn.add(bryann, likes, rdfs);
-	                cxn.add(bryann, RDFS.LABEL, nameBryann);
-                }
-
-                /*
-                 * Note: The either flush() or commit() is required to flush the
-                 * statement buffers to the database before executing any
-                 * operations that go around the sail.
-                 */
-                cxn.commit();
-            } finally {
-                cxn.close();
-            }
-             
-        } finally {
-            sail.shutDown();
+           m_repo.add(new AddOp(g));
+           
         }
-
+        
         // The expected results.
         // Run the query and verify the results.
         {
-            
-//            final QueryOptions opts = new QueryOptions();
-//            opts.serviceURL = m_serviceURL;
-//            opts.method = method;
-//            opts.acceptHeader = format.getDefaultMIMEType();
-//            opts.queryStr =//
-//                "prefix bd: <"+BD.NAMESPACE+"> " +//
-//                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
-//                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
-//                "DESCRIBE ?x " +//
-//                "WHERE { " +//
-//                "  ?x rdf:type bd:Person . " +//
-//                "  ?x bd:likes bd:RDF " +//
-//                "}";
-//
-//            final Graph actual = buildGraph(doSparqlQuery(opts, requestPath));
             
         	final String queryStr =
                 "prefix bd: <"+BD.NAMESPACE+"> " +//
@@ -1606,8 +1427,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 				@Override
 				public Void call() throws Exception {
 					try {
-			            final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
-			            final Graph actual = asGraph(query.evaluate());
+
+					      final Graph actual = asGraph(m_repo.prepareGraphQuery(queryStr));
 			
 			            assertTrue(!actual.isEmpty());
 			            
@@ -1648,4 +1469,5 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         }
 
     }
+
 }

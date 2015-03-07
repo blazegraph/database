@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -424,18 +424,22 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
     	
     	result.addListener(new TestListener() {
 			
+    		@Override
 			public void startTest(Test arg0) {
 				log.info(arg0);
 			}
 			
+    		@Override
 			public void endTest(Test arg0) {
 				log.info(arg0);
 			}
 			
+    		@Override
 			public void addFailure(Test arg0, AssertionFailedError arg1) {
 				log.error(arg0,arg1);
 			}
 			
+    		@Override
 			public void addError(Test arg0, Throwable arg1) {
 				log.error(arg0,arg1);
 			}

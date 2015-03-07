@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -63,7 +63,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @return An iterator from which the materialized statements spanned by
  *         those triple patterns may be read.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/866" > Efficient batch
+ * @see <a href="http://trac.blazegraph.com/ticket/866" > Efficient batch
  *      remove of a collection of triple patterns </a>
  */
 public class BigdataTriplePatternMaterializer
@@ -124,7 +124,7 @@ public class BigdataTriplePatternMaterializer
          * in the data will be dropped and will not put anything into this
          * output queue.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/985" > Deadlock in
+         * @see <a href="http://trac.blazegraph.com/ticket/985" > Deadlock in
          *      BigdataTriplePatternMaterializer </a>
          */
         final Queue<ISPO[]> out = new ConcurrentLinkedQueue<ISPO[]>(
@@ -280,7 +280,7 @@ public class BigdataTriplePatternMaterializer
                     /**
                      * This will never fail for a ConcurrentLinkedQueue.
                      * 
-                     * @see <a href="http://trac.bigdata.com/ticket/985" >
+                     * @see <a href="http://trac.blazegraph.com/ticket/985" >
                      *      Deadlock in BigdataTriplePatternMaterializer </a>
                      */
                     final boolean result = out.offer(a);

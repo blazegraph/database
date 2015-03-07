@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -554,6 +554,153 @@ public class AbstractDataDrivenSPARQLTestCase extends
         }
        
     }
+    
+    
+    /**
+     * Data-driven unit tests for SPARQL queries.
+     * <p>
+     * Note: This class was derived from the openrdf SPARQLQueryTest file (Aduna
+     * BSD style license).
+     */
+    public class UpdateTestHelper extends AbsHelper {
+
+        public ASTContainer getASTContainer() {
+            
+            return astContainer;
+            
+        }
+        
+        public AbstractTripleStore getTripleStore() {
+            
+            return store;
+            
+        }
+        
+        
+        /**
+         * 
+         * @param testURI
+         * @throws Exception
+         * 
+         */
+        public UpdateTestHelper(final String testURI) throws Exception {
+            
+            this(testURI, testURI + ".rq", testURI + ".trig");
+            
+        }
+
+
+        public UpdateTestHelper(final String testURI, final String queryFileURL,
+                final String dataFileURL)
+                throws Exception {
+            
+            this(testURI, queryFileURL, new String[] { dataFileURL });
+
+        }
+        
+        /**
+         * Read the query and load the data file(s) but do not run the query.
+         * 
+         * @param testURI
+         * @param queryFileURL
+         * @param dataFileURLs
+         * @param resultFileURL
+         * @param checkOrder
+         * @throws Exception
+         */
+        public UpdateTestHelper(final String testURI, final String queryFileURL,
+                final String[] dataFileURLs)
+                throws Exception {
+
+            super(getResourceAsString(queryFileURL));
+
+            if (log.isInfoEnabled())
+                log.info("\ntestURI:\n" + testURI);
+
+            if (log.isInfoEnabled())
+                log.info("\nquery:\n" + queryStr);
+
+            if (dataFileURLs != null) {
+
+                for (String dataFileURL : dataFileURLs) {
+
+                    final long nparsed = loadData(dataFileURL);
+
+                    if (log.isInfoEnabled())
+                        log.info("\nLoaded " + nparsed + " statements from "
+                                + dataFileURL);
+                }
+                
+            }
+
+            /**
+             * Note: This should be the URL specified in the manifest as having
+             * the appropriate scope for the value of the qt:query attribute,
+             * which is normally specified as something like:
+             * 
+             * <pre>
+             * <dataset-01.rq>
+             * </pre>
+             * 
+             * and hence interpreted as relative to the baseURI.
+             */
+            final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
+                    + queryFileURL;
+
+            astContainer = new Bigdata2ASTSPARQLParser(store).parseUpdate2(
+                    queryStr, baseURI);
+
+        }
+
+
+        /**
+         * Load some RDF data.
+         * 
+         * @param resource
+         *            The resource whose data will be loaded.
+         * 
+         * @return The #of statements parsed from the source. If there are
+         *         duplicate told statements, then there may be fewer statements
+         *         written onto the KB.
+         */
+        protected long loadData(final String resource) {
+
+            if (log.isInfoEnabled())
+                log.info("Loading " + resource);
+            
+            final String baseURL = new File(resource).toURI().toString();
+
+            InputStream is = null;
+            try {
+
+                is = getResourceAsStream(resource);
+
+                final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
+
+                if (rdfFormat == null)
+                    throw new RuntimeException("Unknown format: resource="
+                            + resource);
+
+                // final RDFFormat rdfFormat = guessFormat(new File(resource),
+                // null/* default */);
+
+                return loadData(is, rdfFormat, baseURL);
+
+            } finally {
+                if (is != null) {
+                    try {
+                        is.close();
+                    } catch (IOException e) {
+                        log.error("Could not close: resource=" + resource, e);
+                    }
+                    is = null;
+                }
+            }
+
+
+        }
+       
+    }    
     
 //    private static RDFFormat guessFormat(final File file,
 //            final RDFFormat defaultFormat) {

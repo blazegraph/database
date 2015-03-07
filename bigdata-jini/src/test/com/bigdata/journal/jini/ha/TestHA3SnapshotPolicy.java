@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,8 +33,6 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jetty.client.HttpClient;
-
 import net.jini.config.Configuration;
 
 import com.bigdata.ha.HAGlue;
@@ -46,8 +44,6 @@ import com.bigdata.journal.IHABufferStrategy;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
@@ -450,15 +446,15 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
 		// The HAGlue interfaces for those joined services, in join order.
 		final HAGlue[] services = new HAGlue[joined.length];
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-		try {
-			final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[joined.length];
-			try {
-				for (int i = 0; i < joined.length; i++) {
+		   final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[joined.length];
+			
+		   try {
+			
+		      for (int i = 0; i < joined.length; i++) {
 
 					services[i] = quorum.getClient().getService(joined[i]);
 
-					repos[i] = getRemoteRepository(services[i], client);
+					repos[i] = getRemoteRepository(services[i], httpClient);
 
 				}
 
@@ -567,9 +563,6 @@ public class TestHA3SnapshotPolicy extends AbstractHA3BackupTestCase {
 
 				}
 			}
-		} finally {
-        	client.stop();
-        }
 	}
     
     /**

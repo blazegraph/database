@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@ import org.openrdf.model.vocabulary.SESAME;
 
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTALPServiceOptimizer;
 
 
 /**
@@ -194,4 +195,15 @@ public interface BD {
      */
     URI SERVICE_PARAM = new URIImpl(NAMESPACE + "serviceParam");
     
+    /**
+    * The well-known URI of the ALP SERVICE extension.
+    * 
+    * @see ASTALPServiceOptimizer
+    * @see <a href="http://trac.blazegraph.com/ticket/1072"> Configurable ALP
+    *      Service </a>
+    * @see <a href="http://trac.blazegraph.com/ticket/1117"> Document the ALP
+    *      Service </a>
+    */
+    URI ALP_SERVICE = new URIImpl(NAMESPACE + "alp");
+
 }

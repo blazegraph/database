@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -199,8 +199,12 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
         final Properties properties = new Properties();
 
-//        // turn on quads.
-//        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
+        /*
+         * Note: we execute the parser tests in quads mode, since some of them
+         * use constructs such as GRAPH keywords for which exceptions are
+         * thrown at parse time in triples mode. 
+         */
+        properties.setProperty(AbstractTripleStore.Options.QUADS, "true");
 
         // override the default vocabulary.
         properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,

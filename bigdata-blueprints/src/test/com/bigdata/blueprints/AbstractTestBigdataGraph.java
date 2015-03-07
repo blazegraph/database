@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,10 +22,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
@@ -34,18 +30,13 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.AbstractBigdataSailTestCase;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.EdgeTestSuite;
-import com.tinkerpop.blueprints.Element;
-import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.GraphQueryTestSuite;
 import com.tinkerpop.blueprints.GraphTestSuite;
 import com.tinkerpop.blueprints.TestSuite;
-import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.VertexQueryTestSuite;
 import com.tinkerpop.blueprints.VertexTestSuite;
 import com.tinkerpop.blueprints.impls.GraphTest;
-import com.tinkerpop.blueprints.util.io.MockSerializable;
 
 /**
  */
@@ -72,6 +63,7 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
         
     }
     
+    @Override
     public Properties getProperties() {
         
         Properties props = super.getProperties();

@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -67,15 +67,6 @@ public class BlueprintsServlet extends BigdataRDFServlet {
     @Override
     protected void doPost(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
-
-//        if (getBigdataRDFContext().getTripleStore(getNamespace(req),
-//                getTimestamp(req)) == null) {
-//            /*
-//             * There is no such triple/quad store instance.
-//             */
-//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-//            return;
-//        }
         
         final String contentType = req.getContentType();
 
@@ -86,7 +77,7 @@ public class BlueprintsServlet extends BigdataRDFServlet {
 
         if (!mimeTypes.contains(mimeType)) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as graph data: " + contentType);
 
             return;

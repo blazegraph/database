@@ -99,7 +99,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * An unisolated index view is in an error state. It must be discarded and
      * reloaded from the current checkpoint record.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     * @see <a href="http://trac.blazegraph.com/ticket/1005"> Invalidate BTree
      *      objects if error occurs during eviction </a>
      */
     final protected static String ERROR_ERROR_STATE = "Index is in error state";
@@ -582,7 +582,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
      * checkpoint before it can be used (that is, you need to obtain a new view
      * of the unisolated index since this field is sticky once set).
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate BTree
+     * @see <a href="http://trac.blazegraph.com/ticket/1005"> Invalidate BTree
      *      objects if error occurs during eviction </a>
      */
     protected volatile Throwable error;
@@ -1463,7 +1463,7 @@ abstract public class AbstractHTree implements ICounterSetAccess,
          * both owning the read lock and having the per-thread read lock counter
          * incremented for that thread.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError:
+         * @see <a href="http://trac.blazegraph.com/ticket/855"> AssertionError:
          *      Child does not have persistent identity </a>
          */
         final int rcount = lockManager.getReadLockCount();

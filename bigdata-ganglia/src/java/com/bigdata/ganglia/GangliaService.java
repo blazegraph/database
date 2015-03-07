@@ -1,5 +1,5 @@
 /*
-   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+   Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -1464,7 +1464,7 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
      * used by the {@link GangliaService}, which is responsible for obtaining
      * and reporting the canonical hostname for host metrics reporting.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     * @see <a href="http://trac.blazegraph.com/ticket/886" >Provide workaround for
      *      bad reverse DNS setups</a>
      */
     public static final String HOSTNAME = "com.bigdata.hostname";
@@ -1473,7 +1473,7 @@ public class GangliaService implements Runnable, IGangliaMetricsReporter {
      * The name for this host.
      * 
      * @see #HOSTNAME
-     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     * @see <a href="http://trac.blazegraph.com/ticket/886" >Provide workaround for
      *      bad reverse DNS setups</a>
      */
     public static final String getCanonicalHostName() {

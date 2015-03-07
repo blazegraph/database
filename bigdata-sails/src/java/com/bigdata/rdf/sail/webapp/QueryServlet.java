@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,7 +48,6 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.GraphImpl;
-import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -69,7 +68,6 @@ import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
-import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -240,7 +238,7 @@ public class QueryServlet extends BigdataRDFServlet {
     private void doUUID(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
-        buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, UUID.randomUUID()
+        buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, UUID.randomUUID()
                 .toString());
 
     }
@@ -257,7 +255,7 @@ public class QueryServlet extends BigdataRDFServlet {
         /**
          * Protect the entire operation with a transaction.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
          *      problem with list namespaces and create namespace </a>
          */
         final long tx = getBigdataRDFContext().newTx(getTimestamp(req));
@@ -271,7 +269,7 @@ public class QueryServlet extends BigdataRDFServlet {
                 /*
                  * There is no such triple/quad store instance.
                  */
-                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
+                buildAndCommitNamespaceNotFoundResponse(req, resp);
                 return;
             }
 
@@ -336,29 +334,37 @@ public class QueryServlet extends BigdataRDFServlet {
 
         if (updateStr == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-                    "Not found: update");
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                  "Required parameter not found: " + ATTR_UPDATE);
 
             return;
 
-        }
+      }
 
-		try {
+      try {
 
-	        final String namespace = getNamespace(req);
+         final String namespace = getNamespace(req);
 
-	        final long timestamp = ITx.UNISOLATED;//getTimestamp(req);
+         final long timestamp = ITx.UNISOLATED;// getTimestamp(req);
 
-			submitApiTask(
-					new SparqlUpdateTask(req, resp, namespace, timestamp,
-							updateStr, getBigdataRDFContext() //
-					)).get();
+         /*
+          * Note: When GROUP_COMMIT (#566) is enabled the http output stream
+          * MUST NOT be closed from within the submitted task. Doing so would
+          * permit the client to conclude that the operation was finished before
+          * the group commit actually occurs. Instead, we leave it to the
+          * servlet container to close the http output stream only once the
+          * execution thread leaves this context. This provides the appropriate
+          * visibility guarantees.
+          */
+         submitApiTask(
+               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr,
+                     getBigdataRDFContext())).get();
 
-		} catch (Throwable t) {
+      } catch (Throwable t) {
 
-			launderThrowable(t, resp, "SPARQL-UPDATE: updateStr=" + updateStr);
+         launderThrowable(t, resp, "SPARQL-UPDATE: updateStr=" + updateStr);
 
-		}
+      }
 
     }
 
@@ -483,6 +489,15 @@ public class QueryServlet extends BigdataRDFServlet {
             }
 
         }
+        
+    	@Override
+    	public String toString() {
+
+			return getClass().getName() + "{namespace=" + getNamespace()
+					+ ",timestamp=" + getTimestamp() + ", updateStr=["
+					+ updateStr + "]}";
+
+    	}
 
 	}
 
@@ -501,30 +516,30 @@ public class QueryServlet extends BigdataRDFServlet {
 
         if (queryStr == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Not found: query");
 
             return;
 
-        }
+      }
 
-		try {
+      try {
 
-	        final String namespace = getNamespace(req);
+         final String namespace = getNamespace(req);
 
-	        final long timestamp = getTimestamp(req);
+         final long timestamp = getTimestamp(req);
 
-			submitApiTask(
-					new SparqlQueryTask(req, resp, namespace, timestamp,
-							queryStr, getBigdataRDFContext() //
-					)).get();
+         submitApiTask(
+               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr,
+                     getBigdataRDFContext())).get();
 
-		} catch (Throwable t) {
-			// if (!InnerCause.isInnerCause(t, DatasetNotFoundException.class))
-			launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
-		}
-	
-	}
+      } catch (Throwable t) {
+
+         launderThrowable(t, resp, "SPARQL-QUERY: queryStr=" + queryStr);
+
+      }
+
+   }
 
     /**
      * Helper task for the SPARQL QUERY.
@@ -536,22 +551,22 @@ public class QueryServlet extends BigdataRDFServlet {
 		private final String queryStr;
 		private final BigdataRDFContext context;
 
-		public SparqlQueryTask(final HttpServletRequest req,
-				final HttpServletResponse resp, final String namespace,
-				final long timestamp, final String queryStr,
-				final BigdataRDFContext context) {
+      public SparqlQueryTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp, final String queryStr,
+            final BigdataRDFContext context) {
 
-			super(req, resp, namespace, timestamp);
+         super(req, resp, namespace, timestamp);
 
-			if (queryStr == null)
-				throw new IllegalArgumentException();
-			if (context == null)
-				throw new IllegalArgumentException();
+         if (queryStr == null)
+            throw new IllegalArgumentException();
+         if (context == null)
+            throw new IllegalArgumentException();
 
-			this.queryStr = queryStr;
-            this.context = context;
-            
-        }
+         this.queryStr = queryStr;
+         this.context = context;
+         
+      }
         
         @Override
         final public boolean isReadOnly() {
@@ -1122,7 +1137,7 @@ public class QueryServlet extends BigdataRDFServlet {
             o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
             c = EncodeDecodeValue.decodeResources(req.getParameterValues("c"));
         } catch (IllegalArgumentException ex) {
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
             return;
         }
@@ -1205,7 +1220,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 final long elapsed = System.currentTimeMillis() - begin;
 
-                reportRangeCount(resp, rangeCount, elapsed);
+                buildAndCommitRangeCountResponse(resp, rangeCount, elapsed);
 
                 return null;
 
@@ -1237,7 +1252,7 @@ public class QueryServlet extends BigdataRDFServlet {
         try {
             
             submitApiTask(
-                    new GetContextsTask(req, resp, getNamespace(req),
+                    new RestApiGetContextsTask(req, resp, getNamespace(req),
                             getTimestamp(req))).get();
 
         } catch (Throwable t) {
@@ -1248,76 +1263,6 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
 
-    /**
-     * Task to report the contexts used by a QUADS mode KB instance.
-     * 
-     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     */
-    private static class GetContextsTask extends AbstractRestApiTask<Void> {
-
-        public GetContextsTask(final HttpServletRequest req,
-                final HttpServletResponse resp, final String namespace,
-                final long timestamp) {
- 
-            super(req, resp, namespace, timestamp);
-            
-        }
-
-        @Override
-        public boolean isReadOnly() {
-            return true;
-        }
-
-        @Override
-        public Void call() throws Exception {
-
-            BigdataSailRepositoryConnection conn = null;
-            try {
-
-                conn = getQueryConnection();
-
-                final StringWriter w = new StringWriter();
-
-                final RepositoryResult<Resource> it = conn.getContextIDs();
-
-                try {
-
-                    final XMLBuilder t = new XMLBuilder(w);
-
-                    final Node root = t.root("contexts");
-
-                    while (it.hasNext()) {
-
-                        root.node("context").attr("uri", it.next()).close();
-
-                    }
-
-                    root.close();
-
-                } finally {
-
-                    it.close();
-
-                }
-
-                buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-                
-                return null;
-
-            } finally {
-
-                if (conn != null) {
-
-                    conn.close();
-                    
-                }
-
-            }
-
-        }
-        
-    }
-    
     /**
      * Private API reports the shards against which the access path would
      * read.
@@ -1334,7 +1279,7 @@ public class QueryServlet extends BigdataRDFServlet {
         }
 
         if (!getBigdataRDFContext().isScaleOut()) {
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Not scale-out");
             return;
         }
@@ -1350,7 +1295,7 @@ public class QueryServlet extends BigdataRDFServlet {
             o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
             c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
         } catch (IllegalArgumentException ex) {
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
             return;
         }

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -83,9 +83,8 @@ import com.bigdata.util.NV;
  *       minimum effort that a task can do to write on the store.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class StressTestGroupCommit extends ProxyTestCase implements IComparisonTest {
+public class StressTestGroupCommit extends ProxyTestCase<Journal> implements IComparisonTest {
 
     /**
      * 
@@ -346,7 +345,6 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * Options understood by this stress test.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static interface TestOptions extends Options {
         
@@ -388,7 +386,7 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         /*
          * Create the tasks.
          */
-        final Collection<AbstractTask> tasks = new HashSet<AbstractTask>(ntasks);
+        final Collection<AbstractTask<Void>> tasks = new HashSet<AbstractTask<Void>>(ntasks);
 
         // updated by each task that runs.
         final AtomicLong nrun = new AtomicLong(0);
@@ -406,9 +404,10 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
 //                    new RegisterIndexTask(journal, resource, 
 //                            new IndexMetadata(resource, indexUUID)),
 
-                    new AbstractTask(journal, ITx.UNISOLATED, resource) {
+                    new AbstractTask<Void>(journal, ITx.UNISOLATED, resource) {
                         
-                        protected Object doTask() throws Exception {
+                    	@Override
+                        protected Void doTask() throws Exception {
 
                             getJournal().registerIndex(resource, new IndexMetadata(resource, indexUUID));
                             
@@ -511,10 +510,10 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
         result.put("tasks/sec", ""+tasksPerSecond);
         result.put("commits/sec", ""+commitsPerSecond);
         result.put("tasks/commit", ""+tasksPerCommit);
-        result.put("maxRunning", ""+journal.getConcurrencyManager().writeService.getMaxRunning());
-        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().writeService.getMaxCommitWaitingTime());
-        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
-        result.put("poolSize",""+journal.getConcurrencyManager().writeService.getPoolSize());
+        result.put("maxRunning", ""+journal.getConcurrencyManager().getWriteService().getMaxRunning());
+        result.put("maxLatencyUntilCommit", ""+journal.getConcurrencyManager().getWriteService().getMaxCommitWaitingTime());
+        result.put("maxCommitLatency", ""+journal.getConcurrencyManager().getWriteService().getMaxCommitServiceTime());
+        result.put("poolSize",""+journal.getConcurrencyManager().getWriteService().getPoolSize());
         
         if (log.isInfoEnabled())
             log.info(result.toString(true/* newline */));
@@ -609,7 +608,6 @@ public class StressTestGroupCommit extends ProxyTestCase implements IComparisonT
      * Experiment generation utility class.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class GenerateExperiment extends ExperimentDriver {
         

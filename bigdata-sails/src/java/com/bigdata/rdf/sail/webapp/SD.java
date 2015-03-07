@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -38,8 +38,8 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.axioms.Axioms;
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -677,10 +677,9 @@ public class SD {
 
             final IIndexManager indexManager = tripleStore.getIndexManager();
 
-            // TODO FEDERATION HA
-            if (indexManager instanceof AbstractJournal) {
+            if (indexManager instanceof IJournal) {
 
-                final AbstractJournal jnl = (AbstractJournal) indexManager;
+                final IJournal jnl = (IJournal) indexManager;
 
                 final Quorum<HAGlue, QuorumService<HAGlue>> quorum = jnl
                         .getQuorum();

@@ -1,12 +1,12 @@
 /**
 
- Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -138,8 +138,8 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
     final protected static Logger log = Logger
             .getLogger(NonBlockingLockManagerWithNewDesign.class);
 
-    final protected static boolean INFO = log.isInfoEnabled();
-    final protected static boolean DEBUG = log.isDebugEnabled();
+    final private static boolean INFO = log.isInfoEnabled();
+    final private static boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Each resource that can be locked has an associated {@link ResourceQueue}.
@@ -939,7 +939,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *             service is not running or if a blocking queue was used and
      *             the queue is at capacity).
      */
-    public <T> Future<T> submit(final R[] resource, final Callable<T> task) {
+    public <T> FutureTask<T> submit(final R[] resource, final Callable<T> task) {
 
         if (serviceRunState != ServiceRunState.Running)
             throw new RejectedExecutionException();
@@ -1031,7 +1031,7 @@ public abstract class NonBlockingLockManagerWithNewDesign</* T, */R extends Comp
      *             service is not running or if a blocking queue was used and
      *             the queue is at capacity).
      */
-    public <T> Future<T> submit(final R[] resource, final Runnable task,
+    public <T> FutureTask<T> submit(final R[] resource, final Runnable task,
             final T val) {
 
         if (serviceRunState != ServiceRunState.Running)

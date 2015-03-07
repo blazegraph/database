@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,19 +27,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
@@ -129,30 +135,74 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
             group.setJoinVars(joinVars);
             
             /*
-             * The variables used by the group and its children, including 
-             * filters.
+             * The variables that will definitely be bound inside the subquery.
              */
-            final Set<IVariable<?>> usedByGroup = sa
-            		.getSpannedVariables(group, 
-            				true /*filters*/, new LinkedHashSet<IVariable<?>>());
+            final Set<IVariable<?>> definitelyBoundInGroup =
+                sa.getDefinitelyProducedBindings(
+                    group, new LinkedHashSet<IVariable<?>>(), true);
+            
+            
 
             /*
              * Find the set of variables which have appeared in the query and
              * may be bound by the time the group is evaluated.
              */
             final Set<IVariable<?>> maybeIncomingBindings = sa
-                    .getMaybeIncomingBindings(
-                            (GraphPatternGroup<?>) group,
-                            new LinkedHashSet<IVariable<?>>());
+                .getMaybeIncomingBindings(
+                    (GraphPatternGroup<?>) group, 
+                    new LinkedHashSet<IVariable<?>>());
 
             /*
-             * Retain the variables used by the group that have already
+             * Retain the defintely bound variables that have already
              * appeared previously in the query up to this point. 
              */
-            usedByGroup.retainAll(maybeIncomingBindings);
+            definitelyBoundInGroup.retainAll(maybeIncomingBindings);
+            
+            /**
+             * Add the variables that are used inside filters in the OPTIONAL,
+             * since the SPARQL 1.1 semantics lifts these filters to the
+             * upper level in case the join succeeds.
+             * 
+             * However, note that this may not be valid in the general case,
+             * i.e. it is unclear how to deal with ill designed patterns, where
+             * the inner subgroup contains an optional join reusing the 
+             * variables. 
+             */
+            if (group instanceof JoinGroupNode) {
+               
+               final JoinGroupNode jgn = (JoinGroupNode)group;
+               if (jgn.isOptional()) {
+                  final Set<FilterNode> filters = new LinkedHashSet<FilterNode>();
+                  
+                  for (BOp node : jgn.args()) {
+
+                     final Iterator<BOp> it = BOpUtility.preOrderIterator(node);
+                     while (it.hasNext()) {
+                        final BOp bop = it.next();
+                        if (bop instanceof FilterNode) {
+                           filters.add((FilterNode)bop);                           
+                        } else if (node instanceof StatementPatternNode) {
+                           final StatementPatternNode nodeAsSP = 
+                              (StatementPatternNode)node;
+                           final List<FilterNode> attachedFilters = 
+                              nodeAsSP.getAttachedJoinFilters();
+                           for (final FilterNode filter : attachedFilters) {
+                              filters.add(filter);
+                           }
+                        }
+                     }
+                  }
+                  
+                  for (FilterNode fn : filters) {
+                     definitelyBoundInGroup.addAll(sa.getSpannedVariables(fn,
+                           true/* filters */, new LinkedHashSet<IVariable<?>>()));
+                  }
+               }
+            }
             
             @SuppressWarnings("rawtypes")
-            final IVariable[] projectInVars = usedByGroup.toArray(new IVariable[0]);
+            final IVariable[] projectInVars = 
+                definitelyBoundInGroup.toArray(new IVariable[0]);
 
             group.setProjectInVars(projectInVars);
             
