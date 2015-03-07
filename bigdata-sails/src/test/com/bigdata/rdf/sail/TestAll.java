@@ -113,20 +113,4 @@ public class TestAll extends TestCase {
 
     }
     
-    public static Test test2()
-    {
-    	
-        final TestSuite suite = new TestSuite("Sesame 2.x integration");
-
-    	 //BigdataSailFactory
-       suite.addTestSuite(BigdataSailFactoryTest.class);
-       //suite.addTest(BigdataSailFactoryTest.suite());
-       
-       System.err.println("Help!");
-
-
-        
-        return suite;
-    }
-
 }
