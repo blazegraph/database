@@ -30,6 +30,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.rdf.model.BigdataStatement;
 
 /**
  * The DELETE DATA operation removes some triples, given inline in the request,
@@ -42,7 +43,6 @@ import com.bigdata.bop.BOp;
  * @see http://www.w3.org/TR/sparql11-update/#deleteData
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DeleteData extends AbstractGraphDataUpdate {
 
@@ -70,4 +70,11 @@ public class DeleteData extends AbstractGraphDataUpdate {
         super(args, anns);
     }
 
+    @Override
+    public void setData(final BigdataStatement[] data) {
+
+      setProperty(Annotations.DATA, data);
+
+   }
+    
 }

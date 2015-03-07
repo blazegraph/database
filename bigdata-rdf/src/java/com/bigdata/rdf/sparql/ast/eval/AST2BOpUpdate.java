@@ -2108,7 +2108,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
             conn.addStatement(s, p, o, contexts);
             
         } else {
-            
+         
             conn.removeStatements(s, p, o, contexts);
             
         }
