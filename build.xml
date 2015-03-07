@@ -432,7 +432,7 @@ public class BuildInfo {
          <doctitle>
                 <![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
          <bottom>
-            <![CDATA[<i>Copyright &#169; 2006-2014 SYSTAP, LLC. All Rights Reserved.</i>
+            <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
