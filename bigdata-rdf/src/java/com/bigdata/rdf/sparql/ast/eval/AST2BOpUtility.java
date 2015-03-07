@@ -2027,7 +2027,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/515">
      *      Query with two "FILTER NOT EXISTS" expressions returns no
      *      results</a>
-     * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for
+     * @see <a href="http://trac.blazegraph.com/ticket/988"> bad performance for
      *      FILTER EXISTS </a>
      * @see http://www.w3.org/2009/sparql/wiki/Design:Negation
      */
@@ -2615,9 +2615,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
              * Note: There may be other ways to "fix" this. See the ticket for
              * more information.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/478" > Cluster does
+             * @see <a href="http://trac.blazegraph.com/ticket/478" > Cluster does
              *      not map input solution(s) across shards </a>
-             * @see <a href="http://trac.bigdata.com/ticket/942" > Property path
+             * @see <a href="http://trac.blazegraph.com/ticket/942" > Property path
              *      errors in scale-out </a>
              */
             

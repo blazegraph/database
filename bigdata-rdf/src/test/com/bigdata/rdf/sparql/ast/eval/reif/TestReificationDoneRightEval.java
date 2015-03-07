@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -505,7 +505,7 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
     /**
      * <pre>
      * </pre>
-     * @see <a href="http://trac.bigdata.com/ticket/815"> RDR query does too
+     * @see <a href="http://trac.blazegraph.com/ticket/815"> RDR query does too
      *      much work</a>
      */
     public void test_reificationDoneRight_04() throws Exception {

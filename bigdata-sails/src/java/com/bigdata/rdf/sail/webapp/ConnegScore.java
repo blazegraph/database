@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ public class ConnegScore<E> implements Comparable<ConnegScore<E>> {
      * agent's preference. A mime type without an explicit <code>q</code> score
      * has an implicit score of <code>1</code>.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/920" > Content negotiation
+     * @see <a href="http://trac.blazegraph.com/ticket/920" > Content negotiation
      *      orders accept header scores in reverse </a>
      */
     @Override

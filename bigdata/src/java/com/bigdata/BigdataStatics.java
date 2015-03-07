@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ public class BigdataStatics {
      * @see com.bigdata.counters.AbstractStatisticsCollector
      * @see com.bigdata.Banner
      * @see com.bigdata.ganglia.GangliaService#HOSTNAME
-     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     * @see <a href="http://trac.blazegraph.com/ticket/886" >Provide workaround for
      *      bad reverse DNS setups</a>
      */
     public static final String HOSTNAME = "com.bigdata.hostname";
@@ -121,7 +121,7 @@ public class BigdataStatics {
 	 * Note: This code should not obtain any locks. This is necessary in order
 	 * for the code to run even when the server is in a deadlock.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 * @see <a href="http://trac.blazegraph.com/ticket/1082" > Add ability to dump
 	 *      threads to status page </a>
 	 */
 	public static void threadDump(final Appendable w) {

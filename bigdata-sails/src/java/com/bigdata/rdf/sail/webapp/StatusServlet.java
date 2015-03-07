@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -186,7 +186,7 @@ public class StatusServlet extends BigdataRDFServlet {
 	 * written onto the http response. This is intended to provide an aid when
 	 * analyzing either node-local or distributed deadlocks.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 * @see <a href="http://trac.blazegraph.com/ticket/1082" > Add ability to dump
 	 *      threads to status page </a>
 	 */
     static final String THREAD_DUMP = "threadDump";
@@ -246,7 +246,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * 
      * @throws IOException
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     * @see <a href="http://trac.blazegraph.com/ticket/899"> REST API Query
      *      Cancellation </a>
      */
     static void doCancelQuery(final HttpServletRequest req,
@@ -1362,7 +1362,7 @@ public class StatusServlet extends BigdataRDFServlet {
 	 * Note: This code should not obtain any locks. This is necessary in order
 	 * for the code to run even when the server is in a deadlock.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1082" > Add ability to dump
+	 * @see <a href="http://trac.blazegraph.com/ticket/1082" > Add ability to dump
 	 *      threads to status page </a>
 	 */
 	private static void doThreadDump(final HttpServletRequest req,

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ abstract public class SubqueryFunctionNodeBase extends FunctionNode implements
          * when the FILTER (NOT) EXISTS is turned into an ASK subquery.
          * 
          * @see FilterExistsModeEnum
-         * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance
+         * @see <a href="http://trac.blazegraph.com/ticket/988"> bad performance
          *      for FILTER EXISTS </a>
          */
         String FILTER_EXISTS = QueryHints.FILTER_EXISTS;

@@ -1,11 +1,11 @@
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,95 +26,3 @@ License: http://www.apache.org/licenses/LICENSE-2.0
 ----
 
 This product includes software from the openrdf project (http://www.openrdf.org/).  
-Copyright Aduna (http://www.aduna-software.com/) © 2001-2011 All rights reserved.
-License: http://www.openrdf.org/download.jsp
-----
-
-This product includes software from the colt project (http://acs.lbl.gov/software/colt/).  
-Copyright © 1999 CERN - European Organization for Nuclear Research.
-License: http://acs.lbl.gov/software/colt/license.html
-----
-
-This product includes software from the fastutil project (http://fastutil.dsi.unimi.it/).  
-Copyright (C) 2002-2011 Sebastiano Vigna 
-License: http://www.apache.org/licenses/LICENSE-2.0.html
-----
-
-This product includes software from the dsiutils project (http://dsiutils.dsi.unimi.it/).  
-Copyright (C) 2002-2009 Sebastiano Vigna
-License: http://www.gnu.org/licenses/lgpl-2.1.html
-----
-
-This product includes software from the flot project (http://code.google.com/p/flot/).
-Released under the MIT license by IOLA, December 2007.
-License: http://www.opensource.org/licenses/mit-license.php
-----
-
-This product includes software from the jquery project (http://jquery.com/).
-Copyright (c) 2011 John Resig, http://jquery.com/
-License: https://github.com/jquery/jquery/blob/master/MIT-LICENSE.txt
-----
-
-This product includes software from the slf4j project (http://www.slf4j.org/).
-Copyright (c) 2004-2008 QOS.ch All rights reserved.
-License: http://www.slf4j.org/license.html
-----
-
-This product includes software from the ICU project (http://site.icu-project.org/).
-Copyright (c) 1995-2011 International Business Machines Corporation and others All rights reserved.
-License: http://source.icu-project.org/repos/icu/icu/trunk/license.html
-----
-
-This product includes software from the nxparser project (http://sw.deri.org/2006/08/nxparser/)
-Copyright (c) 2005-2010, Aidan Hogan, Andreas Harth, Juergen Umbrich. All rights reserved.
-License: http://sw.deri.org/2006/08/nxparser/license.txt
-----
-
-This product includes software from the highscalelib project (https://sourceforge.net/projects/high-scale-lib/).
-Written by Cliff Click and released to the public domain, as explained at http://creativecommons.org/licenses/publicdomain.
-----
-
-This product includes software from http://elonen.iki.fi/code/nanohttpd/.
-Copyright (c) 2001,2005-2007 Jarno Elonen (elonen@iki.fi, http://iki.fi/elonen/)
-License: http://elonen.iki.fi/code/nanohttpd/#license
-----
-
-This product includes software from http://www.eclipse.org/jetty.
-==============================================================
- Jetty Web Container 
- Copyright 1995-2009 Mort Bay Consulting Pty Ltd
-==============================================================
-
-The Jetty Web Container is Copyright Mort Bay Consulting Pty Ltd
-unless otherwise noted. It is dual licensed under the apache 2.0
-license and eclipse 1.0 license. Jetty may be distributed under
-either license.
-
-The javax.servlet package used was sourced from the Apache
-Software Foundation and is distributed under the apache 2.0
-license.
-
-The UnixCrypt.java code implements the one way cryptography used by
-Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
-modified April 2001  by Iris Van den Broeke, Daniel Deville.
-Permission to use, copy, modify and distribute UnixCrypt 
-for non-commercial or commercial purposes and without fee is
-granted provided that the copyright notice appears in all copies.
-
-License: http://www.apache.org/licenses/LICENSE-2.0 
-----
-
-This product includes software developed by the infinispan project (http://www.jboss.org/infinispan).
-Copyright 2010 Red Hat Inc. and/or its affiliates and other
-contributors as indicated by the @author tags. All rights reserved.
-See the copyright.txt in the distribution for a full listing of
-individual contributors.
-License: http://www.opensource.org/licenses/lgpl-2.1.php
-----
-
-This product includes software developed by the JUnit project (http://www.junit.org/).
-License: http://junit.sourceforge.net/cpl-v10.html
-----
-
-Source code for included Open Source software is available from the respective
-websites of the copyright holders of the included software.

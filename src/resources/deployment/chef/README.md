@@ -97,7 +97,7 @@ If the `build_from_svn` attribute is set to `true` Bigdata will be build from th
 
 ### nss
 
-Installs the Bigdata server to run in the [NanoSparqlServer](http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer) (Jetty) mode.
+Installs the Bigdata server to run in the [NanoSparqlServer](http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer) (Jetty) mode.
 
 
 If the `build_from_svn` attribute is set to `true` Bigdata will be build from the Subversion repository given in the `svn_branch` attribute.

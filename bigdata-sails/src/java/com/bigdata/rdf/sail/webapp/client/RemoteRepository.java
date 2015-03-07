@@ -3,9 +3,9 @@ Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -140,7 +140,7 @@ public class RemoteRepository {
      * 
      * @see #DEFAULT_QUERY_METHOD
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
+     * @see <a href="http://trac.blazegraph.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
     static public final String QUERY_METHOD = RemoteRepository.class
@@ -162,7 +162,7 @@ public class RemoteRepository {
      * length (in characters) for a requestURL associated with an HTTP GET
      * before it is automatically converted to an HTTP POST.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
+     * @see <a href="http://trac.blazegraph.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
     static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
@@ -183,7 +183,7 @@ public class RemoteRepository {
     /**
      * HTTP header may be used to specify the timeout for a query.
      * 
-     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
      */
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
@@ -194,7 +194,7 @@ public class RemoteRepository {
      * <code>false</code>, the REST API methods will NOT use the load balancer
      * aware requestURLs.
      * 
-     * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
     protected final boolean useLBS;
@@ -357,7 +357,7 @@ public class RemoteRepository {
      * 
      * @see RemoteRepositoryManager
      * @see HttpClientConfigurator
-     * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
     public RemoteRepository(final String sparqlEndpointURL,
@@ -2054,7 +2054,7 @@ public class RemoteRepository {
              * whether a Reader or InputStream will be used to construct and
              * apply the RDF parser.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/920" > Content
+             * @see <a href="http://trac.blazegraph.com/ticket/920" > Content
              *      negotiation orders accept header scores in reverse </a>
              */
             Charset charset = format.getCharset();//Charset.forName(UTF8);

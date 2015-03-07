@@ -4,9 +4,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ package com.bigdata.rdf.sparql.ast.eval;
  * Test suite for an issue where ill designed patterns consisting of a
  * combination of UNION and nested OPTIONAL cause problems.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/1087">
+ * @see <a href="http://trac.blazegraph.com/ticket/1087">
  * Named subquery results not referenced within query (bottom-up evaluation)</a>
  */
 public class TestTicket1087 extends AbstractDataDrivenSPARQLTestCase {
