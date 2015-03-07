@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -913,7 +913,7 @@ public class TestRunState extends TestCase2 {
      * Unit test for {@link RunState#getOperatorRunState(int)} when some
      * operators require at-once evaluation.
      *
-     * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
+     * @see <a href="http://trac.blazegraph.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
      */
     public void test_getOperatorRunState_atOnceRequested() {
 

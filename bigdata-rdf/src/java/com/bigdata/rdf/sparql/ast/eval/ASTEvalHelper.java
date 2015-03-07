@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -716,7 +716,7 @@ public class ASTEvalHelper {
      * As explained in some depth at <a
      * href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
      * BlockingBuffer.close() does not unblock threads </a> and <a
-     * href="http://trac.bigdata.com/ticket/864"> Semantics of interrupting a
+     * href="http://trac.blazegraph.com/ticket/864"> Semantics of interrupting a
      * running query</a>, (a) you can not interrupted the thread that submits a
      * query until the {@link CloseableIteration} has been returned to the
      * caller submitting that query; (b)
@@ -736,7 +736,7 @@ public class ASTEvalHelper {
      * {@link CloseableIteration} or otherwise cause
      * {@link CloseableIteration#close()} to become invoked, then the
      * {@link IRunningQuery} will be interrupted. Per <a
-     * href="http://trac.bigdata.com/ticket/864"> Semantics of interrupting a
+     * href="http://trac.blazegraph.com/ticket/864"> Semantics of interrupting a
      * running query</a>, that interrupt is interpreted as <em>normal</em>
      * termination (this supports the use case of LIMIT and is built deeply into
      * the {@link QueryEngine} semantics). In order for the application to
@@ -770,7 +770,7 @@ public class ASTEvalHelper {
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/707">
      *      BlockingBuffer.close() does not unblock threads </a>
-     * @see <a href="http://trac.bigdata.com/ticket/864"> Semantics of
+     * @see <a href="http://trac.blazegraph.com/ticket/864"> Semantics of
      *      interrupting a running query</a>
      */
     static //private Note: Exposed to CBD class.

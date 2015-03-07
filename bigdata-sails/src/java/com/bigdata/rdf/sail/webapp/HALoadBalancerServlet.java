@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ import com.bigdata.util.StackInfoReport;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * @see <a href="http://trac.bigdata.com/ticket/624"> HA Load Balancer </a>
+ * @see <a href="http://trac.blazegraph.com/ticket/624"> HA Load Balancer </a>
  */
 public class HALoadBalancerServlet extends ProxyServlet {
 
@@ -393,7 +393,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * 
      * @throws ServletException
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/965" > Cannot run queries in
+     * @see <a href="http://trac.blazegraph.com/ticket/965" > Cannot run queries in
      *      LBS mode with HA1 setup </a>
      */
     @Override
@@ -863,7 +863,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * @throws IOException
      * @throws ServletException
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/965" > Cannot run queries in
+     * @see <a href="http://trac.blazegraph.com/ticket/965" > Cannot run queries in
      *      LBS mode with HA1 setup </a>
      */
     public void forwardToLocalService(//
@@ -1169,7 +1169,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
      * method in the base {@link ProxyServlet} class, but logs @ ERROR so we can
      * see more about the underlying problem.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/941" > HA LBS Gateway errors
+     * @see <a href="http://trac.blazegraph.com/ticket/941" > HA LBS Gateway errors
      *      under heavy load </a>
      * 
      *      TODO jetty 9.2 provides a fully asynchronous proxy servlet. We will

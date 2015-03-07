@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -89,12 +89,12 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
 
         xsdMap = getXSDMap();
         
-        // @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert data with boolean object causes IllegalArgumentException </a>
-        // @see <a href="http://trac.bigdata.com/ticket/980"> Object position query hint is not a Literal </a>
+        // @see <a href="http://trac.blazegraph.com/ticket/983"> Concurrent insert data with boolean object causes IllegalArgumentException </a>
+        // @see <a href="http://trac.blazegraph.com/ticket/980"> Object position query hint is not a Literal </a>
 //        /**
 //         * Cache the IV on the BigdataValue for these boolean constants.
 //         * 
-//         * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert
+//         * @see <a href="http://trac.blazegraph.com/ticket/983"> Concurrent insert
 //         *      data with boolean object causes IllegalArgumentException </a>
 //         */
 //        TRUE.setIV(XSDBooleanIV.TRUE);
@@ -354,9 +354,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     /**
      * {@inheritDoc}
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/983"> Concurrent insert data
+     * @see <a href="http://trac.blazegraph.com/ticket/983"> Concurrent insert data
      *      with boolean object causes IllegalArgumentException </a>
-     * @see <a href="http://trac.bigdata.com/ticket/980"> Object position of
+     * @see <a href="http://trac.blazegraph.com/ticket/980"> Object position of
      *      query hint is not a Literal </a>
      */
     @Override

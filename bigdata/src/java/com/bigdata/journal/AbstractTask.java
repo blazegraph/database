@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -425,7 +425,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * last checkpoint metadata from Name2Addr.
                      * 
                      * @see <a
-                     *      href="http://trac.bigdata.com/ticket/566"
+                     *      href="http://trac.blazegraph.com/ticket/566"
                      *      > Concurrent unisolated operations against multiple
                      *      KBs </a>
                      */
@@ -561,7 +561,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * {@link IJournal#getIndex(String)} on that journal, which is simply
      * delegated to this method. See {@link IsolatedActionJournal}.
      * 
-     * @see http://trac.bigdata.com/ticket/585 (GIST)
+     * @see http://trac.blazegraph.com/ticket/585 (GIST)
      */
     @Override
     synchronized final public ILocalBTreeView getIndex(final String name) {
@@ -995,7 +995,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      *         
-     * @see <a href="http://trac.bigdata.com/ticket/675" >
+     * @see <a href="http://trac.blazegraph.com/ticket/675" >
      *      Flush indices in parallel during checkpoint to reduce IO latency</a>
      */
     private class CheckpointIndexTask implements Callable<Void> {
@@ -1048,7 +1048,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @return The elapsed time in nanoseconds for this operation.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/675"
+     * @see <a href="http://trac.blazegraph.com/ticket/675"
      *      >Flush indices in parallel during checkpoint to reduce IO
      *      latency</a>
      */
@@ -1520,11 +1520,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                      * submitted primarily for the clustered database
                      * deployment.
                      * 
-                     * @see http://trac.bigdata.com/ticket/266
+                     * @see http://trac.blazegraph.com/ticket/266
                      * (refactor native long tx id to thin object)
                      * 
                      * @see <a
-                     * href="http://trac.bigdata.com/ticket/546"
+                     * href="http://trac.blazegraph.com/ticket/546"
                      * > Add cache for access to historical index views on the
                      * Journal by name and commitTime. </a>
                      */
@@ -1652,10 +1652,10 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * the indices in Name2Addr since getIndex(name) will fail if the
              * Name2Addr entry has not been buffered within the [n2a] cache.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/753" > HA
+             * @see <a href="http://trac.blazegraph.com/ticket/753" > HA
              *      doLocalAbort() should interrupt NSS requests and
              *      AbstractTasks </a>
-             * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent
+             * @see <a href="http://trac.blazegraph.com/ticket/566" > Concurrent
              *      unisolated operations against multiple KBs </a>
              */
             if (theRequestedResource.startsWith(theDeclaredResource)) {
@@ -2569,7 +2569,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * FIXME GIST : Support registration of index types other than BTree
              * (HTree, Stream, etc).
              * 
-             * @see http://trac.bigdata.com/ticket/585 (GIST)
+             * @see http://trac.blazegraph.com/ticket/585 (GIST)
              */
 
             throw new UnsupportedOperationException();
@@ -2616,7 +2616,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                  * FIXME GIST. This will throw a ClassCastException if the
                  * returned index is an ILocalBTreeView.
                  * 
-                 * @see http://trac.bigdata.com/ticket/585 (GIST)
+                 * @see http://trac.blazegraph.com/ticket/585 (GIST)
                  */
 
                 return (ICheckpointProtocol) AbstractTask.this.getIndex(name);
@@ -2686,7 +2686,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              * in a ClassCastException.
              * 
              * @see <a
-             *      href="http://trac.bigdata.com/ticket/585"
+             *      href="http://trac.blazegraph.com/ticket/585"
              *      > GIST </a>
              */
             return (ICheckpointProtocol) resourceManager.getIndex(name, commitTime);

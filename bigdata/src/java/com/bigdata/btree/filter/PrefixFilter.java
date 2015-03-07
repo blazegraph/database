@@ -106,7 +106,7 @@ import cutthecrap.utils.striterators.FilterBase;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * @see <a href="http://trac.bigdata.com/ticket/974" >
+ * @see <a href="http://trac.blazegraph.com/ticket/974" >
  *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
  */
 public class PrefixFilter<E> extends FilterBase implements ITupleFilter<E> {

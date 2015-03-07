@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
     /**
      * This static code block is responsible obtaining the canonical hostname.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/886" >Provide workaround for
+     * @see <a href="http://trac.blazegraph.com/ticket/886" >Provide workaround for
      *      bad reverse DNS setups</a>
      */
     static {
