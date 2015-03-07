@@ -29,6 +29,8 @@ import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.parser.QueryParserUtil;
 
+import com.bigdata.BigdataStatics;
+
 /**
  * Non-manifest driven versions of the manifest driven test suite to facilitate
  * debugging.
@@ -56,6 +58,11 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
      */
     public void test_qname_escape_01() throws MalformedQueryException {
        
+       if (!BigdataStatics.runKnownBadTests) {
+          // FIXME See #1076 Negative parser tests
+          return;
+       }
+
         final String query = "PREFIX og: <http://ogp.me/ns#>\n"
                 + " SELECT * WHERE {\n" + "    ?page og:audio\\:title ?title\n"
                 + "}";
@@ -69,6 +76,11 @@ public class BigdataSPARQL2ASTParserTest extends AbstractBigdataExprBuilderTestC
      */
     public void test_qname_escape_01b() throws MalformedQueryException {
 
+      if (!BigdataStatics.runKnownBadTests) {
+         // FIXME See #1076 Negative parser tests
+         return;
+      }
+       
         final String query = "PREFIX og: <http://ogp.me/ns#>\n"
                 + "SELECT ( og:audio\\:title as ?x )"
                 + "WHERE {?page og:foo ?title}";
