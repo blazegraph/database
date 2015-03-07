@@ -97,6 +97,16 @@ public class BigdataSailFactoryTest extends TestCase {
 	}
 	
 	@Test
+	public void testWithNamespaceNoSparqlWithTrailingSlash() {
+		
+		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE/";
+		String normalizedServiceURL = 
+				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
+
+		assertEquals(remoteRepositoryNamespaceUrl, normalizedServiceURL);
+	}
+	
+	@Test
 	public void testWithNamespaceSparql() {
 		
 		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE/sparql";
@@ -106,5 +116,14 @@ public class BigdataSailFactoryTest extends TestCase {
 		assertEquals(remoteRepositoryNamespaceUrl, normalizedServiceURL);
 	}
 	
+	@Test
+	public void testWithNamespaceSparqlTrailingSlash() {
+		
+		String serviceEndpoint = "http://localhost:9999/bigdata/namespace/NAMESPACE/sparql/";
+		String normalizedServiceURL = 
+				BigdataSailFactory.testServiceEndpointUrl(serviceEndpoint);
+
+		assertEquals(remoteRepositoryNamespaceUrl, normalizedServiceURL);
+	}
 
 }
