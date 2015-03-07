@@ -143,11 +143,16 @@ public class BigdataSailFactory {
             
         	return serviceEndpoint;
         	
-        } else if (serviceEndpoint.endsWith("/")) {
+        } else if(serviceEndpoint.contains("/bigdata")) { 
+        	//This is the case of /bigdata/namespace/NAMESPACE/
             
+        	return serviceEndpoint;
+        	
+        } else if (serviceEndpoint.endsWith("/")) { 
+        
         	return serviceEndpoint + "bigdata";
         	
-        } else {
+    	} else {
             
         	return serviceEndpoint + "/bigdata";
         	
