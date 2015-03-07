@@ -106,6 +106,7 @@ import org.openrdf.rio.RDFParser.DatatypeHandling;
 import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
@@ -173,6 +174,14 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         
         final Properties p = getProperties();
        
+      /*
+       * Note: I have seen some OOMs in the federated query test suite when
+       * running it locally. These appear to come from extending the backing
+       * buffer for a Transient store, so I am specifying a disk-backed mode
+       * here.
+       */
+        p.setProperty(com.bigdata.journal.Options.BUFFER_MODE, BufferMode.DiskRW.toString());
+        
         p.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
         
         localRepository = m_repo;

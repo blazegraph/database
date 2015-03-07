@@ -29,9 +29,9 @@ import java.io.Serializable;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 
-import org.eclipse.jetty.client.HttpClient;
-
 import net.jini.config.Configuration;
+
+import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -39,10 +39,8 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.jini.ha.HAJournalServer.HAQuorumService;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 
 /**
@@ -181,17 +179,14 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         // Impose the desired LBS policy.
         setPolicy(newTestPolicy(), services);
         
-        // Shared JettyHttpCLient
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        
         // Repositories without the LBS.
         final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
         // Repositories with the LBS.
         final RemoteRepositoryManager[] reposLBS = new RemoteRepositoryManager[3];
         try {
-	        repos[0] = getRemoteRepository(serverA, client);
-	        repos[1] = getRemoteRepository(serverB, client);
-	        repos[2] = getRemoteRepository(serverC, client);
+	        repos[0] = getRemoteRepository(serverA, httpClient);
+	        repos[1] = getRemoteRepository(serverB, httpClient);
+	        repos[2] = getRemoteRepository(serverC, httpClient);
 	
 	        /*
 	         * Verify that query on all nodes is allowed.
@@ -205,9 +200,9 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	
 	        }
 	
-	        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, client);
-	        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, client);
-	        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, client);
+	        reposLBS[0] = getRemoteRepository(serverA, true/* useLBS */, httpClient);
+	        reposLBS[1] = getRemoteRepository(serverB, true/* useLBS */, httpClient);
+	        reposLBS[2] = getRemoteRepository(serverC, true/* useLBS */, httpClient);
 	
 	        /*
 	         * Verify that query on all nodes is allowed using the LBS.
@@ -247,7 +242,6 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	        		r.close();
 	        }
 	        
-	        client.stop();
         }
 
     }
@@ -287,7 +281,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
         setPolicy(newTestPolicy(), services);
         
         // Shared HttpClient
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+       	final HttpClient client = this.httpClient;
         
         // Repositories without the LBS.
         final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
@@ -374,7 +368,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 		// Impose the desired LBS policy.
 		setPolicy(newTestPolicy(), services);
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+      final HttpClient client = this.httpClient;
 		// Repositories without the LBS.
 		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
 		// Repositories with the LBS.
@@ -484,7 +478,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 		// Impose the desired LBS policy.
 		setPolicy(newTestPolicy(), services);
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
+      final HttpClient client = this.httpClient;
 		
 		// Repositories without the LBS.
 		final RemoteRepositoryManager[] repos = new RemoteRepositoryManager[3];
@@ -550,16 +544,13 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
         final String updateStr = sb.toString();
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        
-        final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
-                useLoadBalancer, client);
-        try {
-        	repo.prepareUpdate(updateStr).evaluate();
-        } finally {
-        	repo.close();
-        	client.stop();
-        }
+         final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+               useLoadBalancer, httpClient);
+         try {
+            repo.prepareUpdate(updateStr).evaluate();
+         } finally {
+            repo.close();
+         }
 
     }
 
@@ -575,16 +566,13 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 
 		final String updateStr = sb.toString();
 
-       	final HttpClient client = HttpClientConfigurator.getInstance().newInstance();
-        
-		final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
-				useLoadBalancer, client);
-		try {
-			repo.prepareUpdate(updateStr).evaluate();
-		} finally {
-			repo.close();
-			client.stop();
-		}
+      final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
+            useLoadBalancer, httpClient);
+      try {
+         repo.prepareUpdate(updateStr).evaluate();
+      } finally {
+         repo.close();
+      }
 
 	}
 
