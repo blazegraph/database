@@ -4,9 +4,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ public class TestTicket887 extends AbstractDataDrivenSPARQLTestCase {
      * LIMIT 1
      * </pre>
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/887" > BIND is leaving a
+     * @see <a href="http://trac.blazegraph.com/ticket/887" > BIND is leaving a
      *      variable unbound </a>
      */
     public void test_ticket_887_bind() throws Exception {

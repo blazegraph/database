@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * @see <a href="http://trac.bigdata.com/ticket/624"> HA Load Balancer </a>
+ * @see <a href="http://trac.blazegraph.com/ticket/624"> HA Load Balancer </a>
  * 
  *      FIXME Test query using GET and POST to ensure that we have coverage in
  *      the load balancer servlet for proper forwarding (to the local service)

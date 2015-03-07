@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -63,7 +63,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * query, e.g. by joining such a mock URI with a statement pattern, they need to
  * be resolved to their real IVs.Ø
  * 
- * @see <a href="http://trac.bigdata.com/ticket/1007">Ticket 1007: Using bound
+ * @see <a href="http://trac.blazegraph.com/ticket/1007">Ticket 1007: Using bound
  *      variables to refer to a graph</a>
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -600,11 +600,11 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * such operations so we can check their assigned UUIDs and cancel them when
      * requested.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     * @see <a href="http://trac.blazegraph.com/ticket/899"> REST API Query
      *      Cancellation </a>
-     * @see <a href="http://trac.bigdata.com/ticket/753"> HA doLocalAbort()
+     * @see <a href="http://trac.blazegraph.com/ticket/753"> HA doLocalAbort()
      *      should interrupt NSS requests and AbstractTasks </a>
-     * @see <a href="http://trac.bigdata.com/ticket/566"> Concurrent unisolated
+     * @see <a href="http://trac.blazegraph.com/ticket/566"> Concurrent unisolated
      *      operations against multiple KBs on the same Journal </a>
      * @see #startEval(UUID, PipelineOp, Map, IChunkMessage)
      */
@@ -619,7 +619,7 @@ public class QueryEngine implements IQueryPeer, IQueryClient, ICounterSetAccess 
      * @param queryId
      *            The UUID of the operation to be cancelled.
      *            
-     * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+     * @see <a href="http://trac.blazegraph.com/ticket/899"> REST API Query
      *      Cancellation </a>
      */
     public void addPendingCancel(final UUID queryId) {

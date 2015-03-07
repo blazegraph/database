@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -2166,7 +2166,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          * {@link RWStore#commit()} is followed by {@link RWStore#reset()}
          * rather than {@link RWStore#postCommit()}.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is
          *      not robust to internal failure.</a>
          */
 		public void test_commitState() {
@@ -2205,7 +2205,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          * discarded by {@link RWStore#reset()} such that subsequent write sets
          * run into persistent addressing errors.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is
          *      not robust to internal failure.</a>
          */
 		public void test_commitStateError() {
@@ -2255,7 +2255,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
          * Further verify that an {@link RWStore#reset()} allwos us to then
          * apply and commit new write sets.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/973" >RWStore commit is
+         * @see <a href="http://trac.blazegraph.com/ticket/973" >RWStore commit is
          *      not robust to internal failure.</a>
          */
 		public void test_commitStateIllegal() {

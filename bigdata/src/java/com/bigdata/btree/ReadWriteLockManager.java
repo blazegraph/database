@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ import com.bigdata.journal.ICommitter;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * 
- * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError: Child does
+ * @see <a href="http://trac.blazegraph.com/ticket/855"> AssertionError: Child does
  *      not have persistent identity </a>
  */
 public class ReadWriteLockManager implements IReadWriteLockManager {
@@ -161,7 +161,7 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
      * determine whether the touch should be ignored or trigger potential
      * evictions.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError: Child
+     * @see <a href="http://trac.blazegraph.com/ticket/855"> AssertionError: Child
      *      does not have persistent identity </a>
      */
     private class WrappedReadLock implements Lock {
@@ -173,7 +173,7 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
          * read-only operations protected by an {@link ReadWriteLockManager}
          * causing evictions of dirty nodes and leaves.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError: Child
+         * @see <a href="http://trac.blazegraph.com/ticket/855"> AssertionError: Child
          *      does not have persistent identity </a>
          */
         private final ConcurrentHashMap<Long, Integer> threadLockMap;
@@ -315,7 +315,7 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
      *         Thompson</a>
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/855"> AssertionError: Child
+     * @see <a href="http://trac.blazegraph.com/ticket/855"> AssertionError: Child
      *      does not have persistent identity </a>
      */
     private class WrappedWriteLock implements Lock {
@@ -505,7 +505,7 @@ public class ReadWriteLockManager implements IReadWriteLockManager {
              * AbstractBTree.touch() and is the primary basis for the fix the
              * ticket below.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/855">
+             * @see <a href="http://trac.blazegraph.com/ticket/855">
              *      AssertionError: Child does not have persistent identity </a>
              */
             this.readLock = new WrappedReadLock(readWriteLock.readLock());

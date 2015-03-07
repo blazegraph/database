@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -57,7 +57,7 @@ import com.bigdata.sparse.GlobalRowStoreHelper;
  * guideline can break the ACID contract.</strong>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
+ * @see <a href="http://trac.blazegraph.com/ticket/566" > Concurrent unisolated
  *      operations against multiple KBs </a>
  */
 abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
@@ -320,9 +320,9 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     * 
     * @return The {@link Future} for that task.
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/753" > HA doLocalAbort()
+    * @see <a href="http://trac.blazegraph.com/ticket/753" > HA doLocalAbort()
     *      should interrupt NSS requests and AbstractTasks </a>
-    * @see <a href="http://trac.bigdata.com/ticket/566" > Concurrent unisolated
+    * @see <a href="http://trac.blazegraph.com/ticket/566" > Concurrent unisolated
     *      operations against multiple KBs </a>
     */
    @SuppressWarnings({ "unchecked", "rawtypes" })

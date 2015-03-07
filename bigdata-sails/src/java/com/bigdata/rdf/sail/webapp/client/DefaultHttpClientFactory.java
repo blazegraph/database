@@ -3,9 +3,9 @@
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -70,9 +70,9 @@ public final class DefaultHttpClientFactory implements IHttpClientFactory {
 		 * size (in bytes) for the Jetty response buffer (default @value
 		 * {@value #DEFAULT_RESPONSE_BUFFER_SIZE})
 		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1092"> Set query timeout and
+		 * @see <a href="http://trac.blazegraph.com/ticket/1092"> Set query timeout and
 		 *      response buffer length on jetty response listener</a>
-		 * @see <a href="http://trac.bigdata.com/ticket/1096"> Set jetty request
+		 * @see <a href="http://trac.blazegraph.com/ticket/1096"> Set jetty request
 		 *      buffer size</a>
 		 */
 		static public final String RESPONSE_BUFFER_SIZE = DefaultHttpClientFactory.class
@@ -91,7 +91,7 @@ public final class DefaultHttpClientFactory implements IHttpClientFactory {
 		 * size (in bytes) for the Jetty request buffer (default @value
 		 * {@value #DEFAULT_REQUEST_BUFFER_SIZE})
 		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1096"> Set jetty request
+		 * @see <a href="http://trac.blazegraph.com/ticket/1096"> Set jetty request
 		 *      buffer size</a>
 		 */
 		public static final String REQUEST_BUFFER_SIZE = DefaultHttpClientFactory.class
