@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -282,7 +282,7 @@ public class InsertServlet extends BigdataRDFServlet {
                  * FIXME This does not handle .gz or .zip files. We handle this
                  * in the
                  * 
-                 * @see <a href="http://trac.bigdata.com/ticket/991" >REST API:
+                 * @see <a href="http://trac.blazegraph.com/ticket/991" >REST API:
                  *      INSERT does not handle .gz</a>
                  */
 
@@ -491,7 +491,7 @@ public class InsertServlet extends BigdataRDFServlet {
                          *      FIXME This does not handle .gz or .zip files. We
                          *      handle this in the
                          * 
-                         * @see <a href="http://trac.bigdata.com/ticket/991"
+                         * @see <a href="http://trac.blazegraph.com/ticket/991"
                          *      >REST API: INSERT does not handle .gz</a>
                          */
 

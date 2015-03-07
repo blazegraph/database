@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1251,7 +1251,7 @@ abstract public class WriteCacheService implements IWriteCache {
          * @throws ExecutionException
          * @throws IOException
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
+         * @see <a href="http://trac.blazegraph.com/ticket/721"> HA1 </a>
          */
         private void sendAddressMetadata(final WriteCache cache)
                 throws IllegalStateException, InterruptedException,
@@ -1358,7 +1358,7 @@ abstract public class WriteCacheService implements IWriteCache {
              * Note: This is true for HA1 as well. The code path enabled by this
              * is responsible for writing the HALog files.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/721"> HA1 </a>
+             * @see <a href="http://trac.blazegraph.com/ticket/721"> HA1 </a>
              */
             final boolean isHALeader = quorum != null
                     && quorum.getClient().isLeader(quorumToken);

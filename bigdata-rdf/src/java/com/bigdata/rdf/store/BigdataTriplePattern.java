@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ import org.openrdf.model.Value;
 /**
  * A simple class that represents a triple (or quad) pattern.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/866" > Efficient batch remove of
+ * @see <a href="http://trac.blazegraph.com/ticket/866" > Efficient batch remove of
  *      a collection of triple patterns </a>
  */
 public class BigdataTriplePattern {

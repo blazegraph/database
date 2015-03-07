@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -120,9 +120,9 @@ public class ServiceProviderHook {
      * The extension MIME type for RDR data interchange using the RDR extension
      * of TURTLE.
      * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 * @see <a href="http://trac.blazegraph.com/ticket/1038" >RDR RDF parsers not
 	 *      always discovered </a>
-	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+	 * @see http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right
 	 */
 	public static final RDFFormat TURTLE_RDR;  
 
@@ -130,9 +130,9 @@ public class ServiceProviderHook {
      * The extension MIME type for RDR data interchange using the RDR extension
      * of N-TRIPLES.
      * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 * @see <a href="http://trac.blazegraph.com/ticket/1038" >RDR RDF parsers not
 	 *      always discovered </a>
-	 * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+	 * @see http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right
 	 */
 	public static final RDFFormat NTRIPLES_RDR; 
 

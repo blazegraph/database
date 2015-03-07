@@ -4,9 +4,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ package com.bigdata.rdf.sparql.ast.eval;
  * Test suite for an issue where an empty projection causes an
  * {@link IllegalArgumentException}.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/946"> Empty PROJECTION causes
+ * @see <a href="http://trac.blazegraph.com/ticket/946"> Empty PROJECTION causes
  *      IllegalArgumentException</a>
  */
 public class TestTicket946 extends AbstractDataDrivenSPARQLTestCase {

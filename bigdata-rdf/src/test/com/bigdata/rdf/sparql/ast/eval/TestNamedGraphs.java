@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -641,10 +641,10 @@ public class TestNamedGraphs extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * Note: This is a duplicate of <a href="http://trac.bigdata.com/ticket/792>
+     * Note: This is a duplicate of <a href="http://trac.blazegraph.com/ticket/792>
      * GRAPH ?g { FILTER NOT EXISTS { ?s ?p ?o } } not respecting ?g </a>
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/888> GRAPH ignored by FILTER
+     * @see <a href="http://trac.blazegraph.com/ticket/888> GRAPH ignored by FILTER
      *      NOT EXISTS </a>
      */
     public void test_named_graphs_ticket_888() throws Exception {
@@ -664,7 +664,7 @@ public class TestNamedGraphs extends AbstractDataDrivenSPARQLTestCase {
     /**
      * Unit test of a work around for {@link #test_named_graphs_ticket_888()}.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/888> GRAPH ignored by FILTER
+     * @see <a href="http://trac.blazegraph.com/ticket/888> GRAPH ignored by FILTER
      *      NOT EXISTS </a>
      */
     public void test_named_graphs_ticket_888b() throws Exception {

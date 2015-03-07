@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ public class GlobalRowStoreHelper {
     * break isolation when using group commit by allowing the GRS index to be 
     * registered from within a task .
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/1132"> GlobalRowStoreHelper
+    * @see <a href="http://trac.blazegraph.com/ticket/1132"> GlobalRowStoreHelper
     *      can hold hard reference to GSR index (GROUP COMMIT) </a>
     */
     private final IIndexManager indexManager;
@@ -75,9 +75,9 @@ public class GlobalRowStoreHelper {
     /**
     * @return The unisolated view of the GRS index
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency problem
+    * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency problem
     *      with list namespaces and create namespace </a>
-    * @see <a href="http://trac.bigdata.com/ticket/1132"> GlobalRowStoreHelper
+    * @see <a href="http://trac.blazegraph.com/ticket/1132"> GlobalRowStoreHelper
     *      can hold hard reference to GSR index (GROUP COMMIT) </a>
     */
     synchronized public SparseRowStore getGlobalRowStore() {
@@ -93,7 +93,7 @@ public class GlobalRowStoreHelper {
              * The GRS view needs to be protected by an
              * UnisolatedReadWriteIndex.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/867"> NSS
+             * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS
              *      concurrency problem with list namespaces and create
              *      namespace </a>
              */
@@ -186,7 +186,7 @@ public class GlobalRowStoreHelper {
     * Note: The hard reference to the unisolated view of the GSR is no longer
     * cached.
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/1132"> GlobalRowStoreHelper
+    * @see <a href="http://trac.blazegraph.com/ticket/1132"> GlobalRowStoreHelper
     *      can hold hard reference to GSR index (GROUP COMMIT) </a>
     */
 //    private transient SparseRowStore globalRowStore;

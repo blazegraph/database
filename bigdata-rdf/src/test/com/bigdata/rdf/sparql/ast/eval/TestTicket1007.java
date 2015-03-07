@@ -4,9 +4,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ package com.bigdata.rdf.sparql.ast.eval;
  * after joining/filtering the variable - BINDing to values that are in the
  * dictionary vs. BINDing to values that are not in the dictionary
  * 
- * @see <a href="http://trac.bigdata.com/ticket/1007">Ticket 1007: Using bound
+ * @see <a href="http://trac.blazegraph.com/ticket/1007">Ticket 1007: Using bound
  *      variables to refer to a graph</a>
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>

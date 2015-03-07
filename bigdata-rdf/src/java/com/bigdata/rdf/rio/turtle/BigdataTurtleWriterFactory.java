@@ -20,14 +20,14 @@ import com.bigdata.rdf.ServiceProviderHook;
  * @author Arjohn Kampman
  * @openrdf
  * 
- * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+ * @see http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right
  */
 public class BigdataTurtleWriterFactory implements RDFWriterFactory {
 
 	/**
 	 * Returns {@link ServiceProviderHook#TURTLE_RDR}.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1038" >RDR RDF parsers not
+	 * @see <a href="http://trac.blazegraph.com/ticket/1038" >RDR RDF parsers not
 	 *      always discovered </a>
 	 */
 	@Override

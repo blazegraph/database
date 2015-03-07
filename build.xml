@@ -432,7 +432,7 @@ public class BuildInfo {
          <doctitle>
                 <![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
          <bottom>
-            <![CDATA[<i>Copyright &#169; 2006-2014 SYSTAP, LLC. All Rights Reserved.</i>
+            <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
   jQuery('ul.sf-menu').superfish({
@@ -1291,10 +1291,10 @@ ${postInstallMessage}</echo>
 
       <!-- Stage documentation from the wiki. -->
       <get dest="${dist.doc}/HAJournalServer.html" ignoreerrors="true"
-          src="http://wiki.bigdata.com/wiki/index.php/HAJournalServer?printable=yes"
+          src="http://wiki.blazegraph.com/wiki/index.php/HAJournalServer?printable=yes"
          />
       <get dest="${dist.doc}/NanoSparqlServer.html" ignoreerrors="true"
-          src="http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer?printable=yes"
+          src="http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer?printable=yes"
          />
 
       <!-- Stage files specific to NSS deployments provided by Brew and Chef. -->
@@ -2673,8 +2673,8 @@ ${postInstallMessage}</echo>
 	 <!-- for the first time.  bigdata is developed using eclipse, so that  -->
 	 <!-- makes the most sense for development.  The recommended deployers  -->
 	 <!-- are documented at the following links:                            -->
-	 <!-- http://wiki.bigdata.com/wiki/index.php/NanoSparqlServer           -->
-	 <!-- http://wiki.bigdata.com/wiki/index.php/HAJournalServer            -->
+	 <!-- http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer           -->
+	 <!-- http://wiki.blazegraph.com/wiki/index.php/HAJournalServer            -->
     <target name="start-bigdata" depends="compile" description="Start the Bigdata Server (simple triples mode start).">
         <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
             <classpath refid="runtime.classpath" />
