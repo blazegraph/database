@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.impl.GraphImpl;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.ITx;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
@@ -47,7 +47,7 @@ import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.ScaleOutTripleStore;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.PropertyUtil;
@@ -63,13 +63,6 @@ import com.bigdata.util.PropertyUtil;
  *      NanoSparqlServer Admin API for Multi-tenant deployments</a>
  * 
  * @author thompsonbry
- * 
- *         FIXME GROUP COMMIT: The CREATE and DESTROY operations require special
- *         attention. Define DropKBTask and CreateKBTask for use by the
- *         multi-tenancy API and fix up the callers of CreateKBTask and
- *         tripleStore.destroy() to use these tasks. This means that the base
- *         implementations of those tasks must not require the servlet
- *         parameters.
  * 
  *         FIXME GROUP COMMIT: The other operations in this class also should
  *         use the new REST API pattern, but are not intrinsically sensitive.
@@ -262,7 +255,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
          * 3. Add the given properties to the flattened defaults to obtain the
          * effective properties.
          */
-        final Properties given, defaults, effective;
+        final Properties given, defaults, effectiveProperties;
         {        
 
             final String contentType = req.getContentType();
@@ -274,7 +267,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             if (format == null) {
 
-                buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                         "Content-Type not recognized as Properties: "
                                 + contentType);
 
@@ -290,7 +283,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             if (parserFactory == null) {
 
-                buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                         "Parser factory not found: Content-Type="
                                 + contentType + ", format=" + format);
                 
@@ -310,9 +303,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             /*
              * Get the default Properties.
              */
-            if (indexManager instanceof Journal) {
+            if (indexManager instanceof IJournal) {
 
-                final Journal jnl = (Journal) indexManager;
+                final IJournal jnl = (IJournal) indexManager;
 
                 defaults = new Properties(jnl.getProperties());
 
@@ -329,7 +322,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
              */
             {
                 
-                effective = PropertyUtil.flatCopy(defaults);
+                effectiveProperties = PropertyUtil.flatCopy(defaults);
 
                 for (Map.Entry<Object, Object> e : given.entrySet()) {
 
@@ -340,7 +333,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                     if (val != null) {
 
                         // Note: Hashtable does not allow nulls.
-                        effective.put(name, val);
+                        effectiveProperties.put(name, val);
 
                     }
 
@@ -351,77 +344,25 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
         }
 
         // The effective namespace for the new KB.
-        final String namespace = effective.getProperty(
+        final String namespace = effectiveProperties.getProperty(
                 BigdataSail.Options.NAMESPACE,
                 BigdataSail.Options.DEFAULT_NAMESPACE);
 
-        {
+      try {
 
-            final long timestamp = ITx.UNISOLATED;
-            
-            // resolve the namespace.
-            final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                    .getResourceLocator().locate(namespace, timestamp);
+         AbstractApiTask.submitApiTask(
+               indexManager,
+               new RestApiCreateKBTask(req, resp, namespace,
+                     effectiveProperties)).get();
 
-            if (tripleStore != null) {
-                /*
-                 * The namespace already exists.
-                 * 
-                 * Note: The response code is defined as 409 (Conflict) since
-                 * 1.3.2.
-                 */
-                buildResponse(resp, HttpServletResponse.SC_CONFLICT, MIME_TEXT_PLAIN,
-                        "EXISTS: " + namespace);
-                return;
-            }
-            
-        }
+      } catch (Throwable e) {
 
-        try {
+         launderThrowable(e, resp, "namespace=" + namespace);
 
-            if (indexManager instanceof Journal) {
+      }
 
-                /*
-                 * Create a local triple store.
-                 * 
-                 * Note: This hands over the logic to some custom code located
-                 * on the BigdataSail.
-                 */
-
-                final Journal jnl = (Journal) indexManager;
-
-                // create the appropriate as configured triple/quad store.
-                BigdataSail.createLTS(jnl, effective);
-
-            } else {
-
-                /*
-                 * Register triple store for scale-out.
-                 * 
-                 * TODO Review guidance for creation of KBs on a cluster.
-                 */
-
-                final ScaleOutTripleStore ts = new ScaleOutTripleStore(
-                        indexManager, namespace, ITx.UNISOLATED, effective);
-
-                ts.create();
-
-            }
-
-            /*
-             * Note: The response code is defined as 201 (Created) since 1.3.2.
-             */
-            buildResponse(resp, HttpServletResponse.SC_CREATED,
-                    MIME_TEXT_PLAIN, "CREATED: " + namespace);
-
-        } catch (Throwable e) {
-
-            launderThrowable(e, resp, "namespace=" + namespace);
-
-        }
-        
-    }
-
+   }
+    
     /**
      * Delete an existing namespace.
      * 
@@ -434,109 +375,20 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         final String namespace = getNamespace(req);
 
-        final long timestamp = ITx.UNISOLATED;
+      try {
 
-        boolean acquiredConnection = false;
-        try {
-            
-            if (getIndexManager() instanceof Journal) {
-                // acquire permit from Journal.
-                ((Journal) getIndexManager()).acquireUnisolatedConnection();
-                acquiredConnection = true;
-            }
-
-            final AbstractTripleStore tripleStore = getBigdataRDFContext()
-                    .getTripleStore(namespace, timestamp); 
-
-            if (tripleStore == null) {
-                /*
-                 * There is no such triple/quad store instance.
-                 */
-                buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-                return;
-            }
-
-            // Destroy the KB instance.
-            tripleStore.destroy();
-            
-            tripleStore.commit();
-            
-            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
-                    + namespace);
+         AbstractApiTask.submitApiTask(getIndexManager(),
+               new RestApiDestroyKBTask(req, resp, namespace)).get();
 
         } catch (Throwable e) {
 
-            launderThrowable(e, resp, "");
-
-        } finally {
-
-            if (acquiredConnection) {
-            
-                ((Journal) getIndexManager()).releaseUnisolatedConnection();
-                
-            }
+            launderThrowable(e, resp, "DELETE NAMESPACE: namespace="+namespace);
             
         }
 
-    }
-    
-//    private void doDeleteNamespace(final HttpServletRequest req,
-//            final HttpServletResponse resp) throws IOException {
-//
-//        final String namespace = getNamespace(req);
-//
-//        final long timestamp = ITx.UNISOLATED;
-//
-//        final AbstractTripleStore tripleStore = getBigdataRDFContext()
-//                .getTripleStore(namespace, timestamp);
-//
-//        if (tripleStore == null) {
-//            /*
-//             * There is no such triple/quad store instance.
-//             */
-//            buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-//            return;
-//        }
-//
-//        try {
-//
-//            final BigdataSail sail = new BigdataSail(tripleStore);
-//
-//            BigdataSailConnection con = null;
-//
-//            try {
-//
-//                sail.initialize();
-//                // This basically puts a lock on the KB instance.
-//                con = sail.getUnisolatedConnection();
-//                // Destroy the KB instance.
-//                tripleStore.destroy();
-//                // Commit.
-//                con.commit();
-//
-//            } finally {
-//
-//                if (con != null)
-//                    con.close();
-//
-//                sail.shutDown();
-//                
-//            }
-//
-//            buildResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "DELETED: "
-//                    + namespace);
-//
-//        } catch (Throwable e) {
-//
-//            log.error(e, e);
-//            
-//            throw launderThrowable(e, resp, "");
-//            
-//        }
-//
-//    }
+   }
 
-    /**
+   /**
      * Send the configuration properties for the addressed KB instance.
      * 
      * @param req
@@ -550,25 +402,45 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
 		final long timestamp = getTimestamp(req);
 
+		// TODO Why is it necessary to protect this operation with a transaction?
 		final long tx = getBigdataRDFContext().newTx(timestamp);
 		
 		try {
-		    
-			final AbstractTripleStore tripleStore = getBigdataRDFContext()
-					.getTripleStore(namespace, tx);
+		   
+         AbstractApiTask.submitApiTask(getIndexManager(),
+               new AbstractRestApiTask<Void>(req, resp, namespace, timestamp) {
 
-			if (tripleStore == null) {
-				/*
-				 * There is no such triple/quad store instance.
-				 */
-				buildResponse(resp, HTTP_NOTFOUND, MIME_TEXT_PLAIN);
-				return;
-			}
+                  @Override
+                  public boolean isReadOnly() {
+                     return true;
+                  }
 
-			final Properties properties = PropertyUtil.flatCopy(tripleStore
-					.getProperties());
+                  @Override
+                  public Void call() throws Exception {
 
-			sendProperties(req, resp, properties);
+                     final AbstractTripleStore tripleStore = getTripleStore(
+                           namespace, tx);
+
+                     if (tripleStore == null) {
+                        /*
+                         * There is no such triple/quad store instance.
+                         */
+                        throw new HttpOperationException(
+                              HttpServletResponse.SC_NOT_FOUND,
+                              BigdataServlet.MIME_TEXT_PLAIN,
+                              "Not found: namespace=" + namespace);
+                     }
+
+                     final Properties properties = PropertyUtil
+                           .flatCopy(tripleStore.getProperties());
+
+                     sendProperties(req, resp, properties);
+
+                     return null;
+
+                  }
+
+               }).get();
 
 		} catch(Throwable t) {
 			
@@ -610,7 +482,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
          * Protect the entire operation with a transaction, including the
          * describe of each namespace that we discover.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
          *      problem with list namespaces and create namespace </a>
          */
         final long tx = getBigdataRDFContext().newTx(timestamp);

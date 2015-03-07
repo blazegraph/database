@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -55,7 +55,6 @@ import com.bigdata.rwstore.IRWStrategy;
  * unmapped under Java.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCase {
 
@@ -240,9 +239,8 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
      * {@link ClosedByInterruptException}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
-    static class InterruptMyselfTask extends AbstractTask {
+    static class InterruptMyselfTask extends AbstractTask<Void> {
 
         protected InterruptMyselfTask(IConcurrencyManager concurrencyManager,
                 long startTime, String resource) {
@@ -251,7 +249,8 @@ abstract public class AbstractInterruptsTestCase extends AbstractRawStoreTestCas
             
         }
 
-        protected Object doTask() throws Exception {
+        @Override
+        protected Void doTask() throws Exception {
             
             // Get the live version of the named index.
             final BTree ndx = (BTree) getIndex(getOnlyResource());

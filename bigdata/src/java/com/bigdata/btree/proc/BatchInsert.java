@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,16 +34,16 @@ import java.io.ObjectOutput;
 import com.bigdata.btree.Errors;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleBTree;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch insert operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+public class BatchInsert extends AbstractKeyArrayIndexProcedure<ResultBuffer> implements
+        IParallelizableIndexProcedure<ResultBuffer> {
 
     /**
      * 
@@ -62,6 +62,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
         
     }
 
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -72,7 +73,6 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * Factory for {@link BatchInsert} procedures.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class BatchInsertConstructor extends
             AbstractKeyArrayIndexProcedureConstructor<BatchInsert> {
@@ -100,12 +100,14 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
         /**
          * Values are required.
          */
+        @Override
         public final boolean sendValues() {
 
             return true;
 
         }
 
+        @Override
         public BatchInsert newInstance(IRabaCoder keysCoder,
                 IRabaCoder valsCoder, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
@@ -166,6 +168,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
      * @return Either <code>null</code> if the old values were not requested
      *         or a {@link ResultBuffer} containing the old values.
      */
+    @Override
     public ResultBuffer apply(final IIndex ndx) {
 
         int i = 0;
@@ -221,7 +224,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
     }
     
     @Override
-    protected void readMetadata(ObjectInput in) throws IOException, ClassNotFoundException {
+    protected void readMetadata(final ObjectInput in) throws IOException, ClassNotFoundException {
 
         super.readMetadata(in);
 
@@ -230,7 +233,7 @@ public class BatchInsert extends AbstractKeyArrayIndexProcedure implements
     }
 
     @Override
-    protected void writeMetadata(ObjectOutput out) throws IOException {
+    protected void writeMetadata(final ObjectOutput out) throws IOException {
 
         super.writeMetadata(out);
 

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -47,19 +47,17 @@ public interface IIndexManagerCallable<T> extends Serializable, Callable<T> {
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>
      * @throws IllegalStateException
-     *             if {@link #setIndexManager(IIndexManager)} has already been
-     *             invoked and was set with a different value.
+     *             if {@link #setIndexManager(IIndexManager)} has already set.
      */
     void setIndexManager(IIndexManager indexManager);
 
     /**
      * Return the {@link IIndexManager}.
      * 
-     * @return The data service and never <code>null</code>.
+     * @return The index manager and never <code>null</code>.
      * 
      * @throws IllegalStateException
-     *             if {@link #setIndexManager(IIndexManager)} has not been
-     *             invoked.
+     *             if index manager reference is not set.
      */
     IIndexManager getIndexManager();
 

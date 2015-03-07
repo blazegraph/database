@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -40,7 +40,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.HTreeAnnotations;
-import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
@@ -58,7 +57,6 @@ import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.counters.CAT;
@@ -259,23 +257,22 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      * The join variables.
      */
     private final IVariable<?>[] joinVars;
-
+    
     /**
      * The variables to be retained (optional, all variables are retained if
      * not specified).
      */
     private final IVariable<?>[] selectVars;
 
-    /**
-     * The variables to be projected into a join group. When non-
-     * <code>null</code> variables that are NOT in this array are NOT flowed
-     * into the join group.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-     *      JoinGroup optimizations </a>
-     */
-    private final IVariable<?>[] projectedInVars;
 
+    /**
+     * The variables to be projected into a join group. When set, a distinct
+     * projection over these variables is computed, otherwise the complete
+     * binding set is passed in. Note that this parameter is only considered
+     * if selectVars is not null.
+     */
+    private final IVariable<?>[] projectInVars;
+       
     /**
      * The join constraints (optional).
      */
@@ -363,8 +360,8 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
-        if (projectedInVars != null)
-            sb.append(",projectedInVars=" + Arrays.toString(projectedInVars));
+        if (projectInVars != null)
+           sb.append(",projectInVars=" + Arrays.toString(projectInVars));
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -545,9 +542,9 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         /*
          * The variables that are projected IN to the join group.
          */
-        this.projectedInVars = (IVariable<?>[]) op
+        this.projectInVars = (IVariable<?>[]) op
                 .getProperty(HashJoinAnnotations.PROJECT_IN_VARS);
-
+        
         /*
          * This wraps an efficient raw store interface around a child memory
          * manager created from the IMemoryManager which will back the named
@@ -903,7 +900,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     private IBindingSet decodeSolution(final ITuple<?> t) {
         
         final ByteArrayBuffer b = t.getValueBuffer();
-        
+
         return encoder
                 .decodeSolution(b.array(), 0, b.limit(), false/* resolveCachedValues */);
         
@@ -1629,122 +1626,11 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         
     }
 
-    /**
-     * DISTINCT solutions filter for
-     * {@link HTreeHashJoinUtility#outputSolutions(IBuffer)}
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-     *      JoinGroup optimizations </a>
-     */
-    private class HTreeDistinctFilter implements IDistinctFilter {
-
-        /**
-         * The variables used to impose a distinct constraint.
-         */
-        private final IVariable<?>[] vars;
-
-        private final HTreeHashJoinUtility state;
-
-        public HTreeDistinctFilter(final IVariable<?>[] vars, final PipelineOp op) {
-
-            this.vars = vars;
-
-            this.state = new HTreeHashJoinUtility(
-                    ((MemStore) store).getMemoryManager(), op,
-                    JoinTypeEnum.Filter);
-
-        }
-        
-        @Override
-        public IVariable<?>[] getProjectedVars() {
-
-            return vars;
-            
-        }
-
-        @Override
-        public IBindingSet accept(final IBindingSet bset) {
-            // FIXME Auto-generated method stub
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public long filterSolutions(ICloseableIterator<IBindingSet[]> itr,
-                BOpStats stats, IBuffer<IBindingSet> sink) {
-            // FIXME Auto-generated method stub
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public void release() {
-
-            state.release();
-            
-        }
-
-    }
-    
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out) {
+    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter distinctFilter) {
 
         try {
 
-            /*
-             * FIXME Set this to enable "DISTINCT" on the solutions flowing into the
-             * join group.
-             * 
-             * Note: This should be set by the HashIndexOp (or passed in through the
-             * interface).
-             * 
-             * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-             * JoinGroup optimizations </a>
-             */
-            final boolean distinct = false;
-            
-            /*
-             * FIXME Replace with an HTreeDistinctFilter and integrate to NOT
-             * flow duplicate solutions into the sub-group. The HTree
-             * filterSolutions() method needs to be vectored to be efficient.
-             * Therefore, this outputSolutions() method needs to be rewritten to
-             * be vectored as well. It is efficient in reading the solutions
-             * from the HTree, and the solutions are in the "natural" order of
-             * the HTree for the join vars. This order SHOULD be pretty
-             * efficient for the DISTINCT solutions set as well, but note that
-             * joinVars:=projectedInVars. To maximize the corrleation, both the
-             * joinVars[] and the projectedInVars[] should be sorted so the
-             * variables in the solutions will be correllated and any variables
-             * that are NOT in the projectedInVars should appear towards the end
-             * of the joinVars where they will cause the least perturbation in
-             * this scan + filter.
-             */
-            final IDistinctFilter distinctFilter;
-            
-            if (distinct && projectedInVars != null && projectedInVars.length > 0) {
-
-                /*
-                 * Note: We are single threaded here so we can use a lower
-                 * concurrencyLevel value.
-                 * 
-                 * Note: If necessary, this could be replaced with JVMHashIndex so
-                 * we get the #of occurrences of each distinct combination of
-                 * bindings that is projected into the sub-group/-query.
-                 */
-                final int concurrencyLevel = 1;//ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL;
-
-                distinctFilter = new JVMDistinctFilter(projectedInVars, //
-                        op.getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                                HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                        op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                                HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
-                                concurrencyLevel
-                );
-                
-            } else {
-             
-                distinctFilter = null;
-                
-            }
-            
            final HTree rightSolutions = getRightSolutions();
 
             if (log.isInfoEnabled()) {
@@ -1765,14 +1651,6 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
                 IBindingSet bset = decodeSolution(t);
 
                 if (distinctFilter != null) {
-
-                    /*
-                     * Note: The DISTINCT filter is based on the variables
-                     * that are projected INTO the child join group.
-                     * However, those are NOT always the same as the
-                     * variables that are projected OUT of the child join
-                     * group, so we need to
-                     */
 
                     if ((bset = distinctFilter.accept(bset)) == null) {
 
@@ -1809,7 +1687,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         }
 
     } // outputSolutions
-
+    
     @Override
     public void outputJoinSet(final IBuffer<IBindingSet> out) {
 

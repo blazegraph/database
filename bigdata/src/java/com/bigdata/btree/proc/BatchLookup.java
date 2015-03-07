@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,16 +28,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree.proc;
 
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure.ResultBuffer;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 
 /**
  * Batch lookup operation.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure {
+public class BatchLookup extends AbstractKeyArrayIndexProcedure<ResultBuffer> implements
+        IParallelizableIndexProcedure<ResultBuffer> {
 
     /**
      * 
@@ -48,7 +48,6 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
      * Factory for {@link BatchLookup} procedures.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class BatchLookupConstructor extends AbstractKeyArrayIndexProcedureConstructor<BatchLookup> {
 
@@ -61,12 +60,14 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
         /**
          * Values ARE NOT sent.
          */
+        @Override
         public final boolean sendValues() {
             
             return false;
             
         }
 
+        @Override
         public BatchLookup newInstance(IRabaCoder keysCoder,
                 IRabaCoder valsCoder, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
@@ -103,6 +104,7 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
         
     }
 
+    @Override
     public final boolean isReadOnly() {
        
         return true;
@@ -112,7 +114,8 @@ public class BatchLookup extends AbstractKeyArrayIndexProcedure implements
     /**
      * @return {@link ResultBuffer}
      */
-    public Object apply(final IIndex ndx) {
+    @Override
+    public ResultBuffer apply(final IIndex ndx) {
 
         final int n = getKeyCount();
         

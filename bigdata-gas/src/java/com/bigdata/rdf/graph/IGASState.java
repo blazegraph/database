@@ -1,5 +1,5 @@
 /**
-   Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+   Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -268,7 +268,7 @@ public interface IGASState<VS,ES, ST> {
      * @see <a href="http://www.bigdata.com/whitepapers/reifSPARQL.pdf" >
      *      Reification Done Right </a>
      *      
-     * @see <a href="http://wiki.bigdata.com/wiki/index.php/RDF_GAS_API" > RDF
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/RDF_GAS_API" > RDF
      *      GAS API</a>
      */
     Statement decodeStatement(Value v);

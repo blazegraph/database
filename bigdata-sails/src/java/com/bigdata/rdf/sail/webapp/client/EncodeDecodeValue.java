@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,6 +26,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 package com.bigdata.rdf.sail.webapp.client;
+
+import java.util.LinkedList;
+import java.util.List;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -430,12 +433,17 @@ public class EncodeDecodeValue {
     	if (strings == null || strings.length == 0)
     		return null;
     	
-    	final Resource[] resources = new Resource[strings.length];
+    	final List<Resource> tmp = new LinkedList<Resource>();
     	for (int i = 0; i < strings.length; i++) {
-    		resources[i] = decodeResource(strings[i]);
+    	   final String s = strings[i];
+    	   if(s.length()==0) continue;
+    		tmp.add(decodeResource(s));
     	}
     	
-    	return resources;
+      final Resource[] resources = tmp.toArray(new Resource[tmp.size()]);
+
+      return resources;
+      
     }
 
     /**

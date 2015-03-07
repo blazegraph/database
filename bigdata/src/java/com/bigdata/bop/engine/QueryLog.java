@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -132,7 +132,7 @@ public class QueryLog {
              * StringBuilder object here will not have an adverse impact on
              * the heap and avoids the possibility of a deadlock.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/992" > Deadlock
+             * @see <a href="http://trac.blazegraph.com/ticket/992" > Deadlock
              *      between AbstractRunningQuery.cancel(), QueryLog.log(),
              *      and ArbitraryLengthPathTask</a>
              */

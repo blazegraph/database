@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -60,6 +60,7 @@ import com.bigdata.journal.Journal;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.CreateKBTask;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DefaultClientDelegate;
 import com.bigdata.service.IBigdataClient;
@@ -72,7 +73,6 @@ import com.bigdata.util.httpd.AbstractHTTPD;
  * interpreting the configuration parameters in the {@link ServletContext}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataRDFServletContextListener implements
         ServletContextListener {
@@ -269,20 +269,31 @@ public class BigdataRDFServletContextListener implements
             // we are responsible for the life cycle.
             closeIndexManager = true;
 
-        }
+      }
 
-        if (create) {
+      if (create) {
 
-            /*
-             * Note: Nobody is watching this future. The task will log any
-             * errors.
-             */
+         /*
+          * Note: Nobody is watching this future. The task will log any errors.
+          */
 
-            indexManager.getExecutorService().submit(
-                    new CreateKBTask(indexManager, namespace));
+         // indexManager.getExecutorService().submit(
+         // new CreateKBTask(indexManager, namespace));
 
-        } // if( create )
-        
+         final Properties properties;
+         if (indexManager instanceof IBigdataFederation) {
+
+            properties = ((IBigdataFederation<?>) indexManager).getClient()
+                  .getProperties();
+         } else {
+            properties = ((Journal) indexManager).getProperties();
+         }
+
+         AbstractApiTask.submitApiTask(indexManager, new CreateKBTask(
+               namespace, properties));
+
+      } // if( create )
+
         txs = (indexManager instanceof Journal ? ((Journal) indexManager)
                 .getTransactionManager().getTransactionService()
                 : ((IBigdataFederation<?>) indexManager)

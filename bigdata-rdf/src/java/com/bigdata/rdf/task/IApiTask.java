@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -26,6 +26,8 @@ package com.bigdata.rdf.task;
 
 import java.util.concurrent.Callable;
 
+import com.bigdata.journal.IIndexManager;
+
 /**
  * A task that can be run either with direct index access or using the
  * concurrency manager (compatible with group commit).
@@ -36,10 +38,36 @@ import java.util.concurrent.Callable;
  */
 public interface IApiTask<T> extends Callable<T> {
 
-    /** The namespace of the target KB instance. */
-    String getNamespace();
+   /** The namespace of the target KB instance. */
+   String getNamespace();
 
-    /** The timestamp of the view of that KB instance. */
-    long getTimestamp();
-    
+   /** The timestamp of the view of that KB instance. */
+   long getTimestamp();
+
+   /**
+    * Tasks that create or destroy locatable resources need to write on the
+    * global row store (GRS). Such tasks must specify this property. Note that
+    * the GRS lock will have the side-effect of serializing all such tasks that
+    * write on the GRS index.
+    */
+   boolean isGRSRequired();
+   
+   /**
+    * Invoked to inform the task of the index manager before it is executed.
+    * 
+    * @param indexManager
+    *           The index manager.
+    */
+   void setIndexManager(IIndexManager indexManager);
+
+   /**
+    * Return the {@link IIndexManager}.
+    * 
+    * @return The index manager.
+    * 
+    * @throws IllegalStateException
+    *            if the {@link IIndexManager} reference is not set.
+    */
+   IIndexManager getIndexManager();
+
 }

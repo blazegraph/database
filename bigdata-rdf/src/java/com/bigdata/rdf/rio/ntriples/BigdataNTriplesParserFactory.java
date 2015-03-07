@@ -17,7 +17,7 @@ import com.bigdata.rdf.ServiceProviderHook;
  * @author Arjohn Kampman
  * @openrdf
  * 
- * @see http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right
+ * @see http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right
  */
 public class BigdataNTriplesParserFactory implements RDFParserFactory {
 

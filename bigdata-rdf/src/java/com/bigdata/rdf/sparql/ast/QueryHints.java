@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -561,7 +561,7 @@ public interface QueryHints {
      * its advantages.
      * 
      * @see FilterExistsModeEnum
-     * @see <a href="http://trac.bigdata.com/ticket/988"> bad performance for
+     * @see <a href="http://trac.blazegraph.com/ticket/988"> bad performance for
      *      FILTER EXISTS </a>
      */
     String FILTER_EXISTS = "filterExists";
@@ -583,7 +583,7 @@ public interface QueryHints {
 	 * The name of an property that may be used to enable or disable the
 	 * {@link ASTFastRangeCountOptimizer}.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+	 * @see <a href="http://trac.blazegraph.com/ticket/1037" > Rewrite SELECT
 	 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 	 *      </a>
 	 */
@@ -596,7 +596,7 @@ public interface QueryHints {
 	 * The name of an property that may be used to enable or disable the
 	 * {@link ASTDistinctTermScanOptimizer}.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+	 * @see <a href="http://trac.blazegraph.com/ticket/1035" > DISTINCT PREDICATEs
 	 *      query is slow </a>
 	 */
     String DISTINCT_TERM_SCAN_OPTIMIZER = "distinctTermScanOptimizer";
@@ -611,7 +611,7 @@ public interface QueryHints {
     * 
     * @see #DEFAULT_AST_OPTIMIZER_CLASS
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/1113"> Hook to configure the
+    * @see <a href="http://trac.blazegraph.com/ticket/1113"> Hook to configure the
     *      ASTOptimizerList </a>
     */
    String AST_OPTIMIZER_CLASS = "ASTOptimizerClass";

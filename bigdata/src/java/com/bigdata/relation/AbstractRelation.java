@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@ import com.bigdata.btree.IndexTypeEnum;
 import com.bigdata.btree.UnisolatedReadWriteIndex;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryRawStore;
@@ -239,9 +240,15 @@ abstract public class AbstractRelation<E> extends AbstractResource<IRelation<E>>
 
         IIndex ndx = indexManager.getIndex(fqn, timestamp);
 
+      /**
+       * Note: We need to wrap any unisolated index on the Journal (included the
+       * IsolatedActionJournal managed by the AbstractTask).
+       * 
+       * @see #1129 (Concurrent modification error with group commit).
+       */
         if (ndx != null
                 && timestamp == ITx.UNISOLATED
-                && (indexManager instanceof Journal || indexManager instanceof TemporaryStore)) {
+                && (indexManager instanceof IJournal || indexManager instanceof TemporaryStore)) {
 
             if(log.isDebugEnabled()) {
                 

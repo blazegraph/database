@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -31,7 +31,6 @@ import java.util.Properties;
 
 import junit.framework.AssertionFailedError;
 
-import com.bigdata.bop.joinGraph.NoSolutionsException;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 
@@ -284,7 +283,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        final int[] expected = new int[] { 13, 12, 14, 10, 11, 15, 16 };
+        final int[] expected = new int[] { 8, 7, 9, 5, 6, 10, 11 };
 
         assertSameJoinOrder(expected, helper);
 

@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2010.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -335,7 +335,7 @@ class RunState {
          * is removed from this set as soon as it is started.
          * 
          * @see #startOp(IStartOpMessage, boolean)
-         * @see <a href="http://trac.bigdata.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
+         * @see <a href="http://trac.blazegraph.com/ticket/868"> COUNT(DISTINCT) returns no rows rather than ZERO. </a>
          */
         final Set<Integer/* bopId */> atOnceRequired = new LinkedHashSet<Integer>();
 
@@ -643,7 +643,7 @@ class RunState {
          * that the query terminates normally).
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/377#comment:12
-         * @see http://trac.bigdata.com/ticket/868
+         * @see http://trac.blazegraph.com/ticket/868
          */
         final UUID controllerId = msg.getQueryControllerId();
         {

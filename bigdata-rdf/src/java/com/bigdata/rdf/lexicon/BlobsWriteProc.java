@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,6 +48,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.AbstractIV;
 import com.bigdata.rdf.internal.impl.BlobIV;
+import com.bigdata.rdf.lexicon.BlobsWriteProc.Result;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
 
 /**
@@ -62,10 +63,9 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * operation by {@link BlobsWriteProc}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: Term2IdWriteProc.java 4582 2011-05-31 19:12:53Z thompsonbry $
  */
-public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
-        IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
+public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure<Result> implements
+        IParallelizableIndexProcedure<Result>, IMutableRelationIndexWriteProcedure<Result> {
     
     private static final Logger log = Logger.getLogger(BlobsWriteProc.class);
     
@@ -80,6 +80,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
      */
     private boolean readOnly;
     
+    @Override
     public final boolean isReadOnly() {
         
         return readOnly;
@@ -124,6 +125,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 		private final boolean readOnly;
 		private final boolean toldBNodes;
 
+		@Override
 		public final boolean sendValues() {
 
 			return true;
@@ -139,6 +141,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         }
 
+        @Override
         public BlobsWriteProc newInstance(final IRabaCoder keySer,
                 final IRabaCoder valSer, final int fromIndex,
                 final int toIndex, final byte[][] keys, final byte[][] vals) {
@@ -170,7 +173,8 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 	 *         told bnodes mode because the caller is unable to unify a blank
 	 *         node with an entry in the index.
 	 */
-    public Object apply(final IIndex ndx) {
+	@Override
+    public Result apply(final IIndex ndx) {
         
         final int numTerms = getKeyCount();
         
@@ -314,6 +318,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
     } // apply(ndx)
 
+	@Override
 	protected void readMetadata(final ObjectInput in) throws IOException,
 			ClassNotFoundException {
 
@@ -334,6 +339,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
      * 
      * @throws IOException
      */
+	@Override
     protected void writeMetadata(final ObjectOutput out) throws IOException {
 
         super.writeMetadata(out);
@@ -413,6 +419,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
 
         private final static transient short VERSION0 = 0x0;
         
+        @Override
 		public void readExternal(final ObjectInput in) throws IOException,
 				ClassNotFoundException {
 
@@ -443,6 +450,7 @@ public class BlobsWriteProc extends AbstractKeyArrayIndexProcedure implements
             
         }
 
+        @Override
         public void writeExternal(final ObjectOutput out) throws IOException {
 
             final int n = counters.length;

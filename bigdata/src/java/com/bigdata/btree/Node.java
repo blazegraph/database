@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -42,7 +42,6 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.btree.AbstractBTree.ChildMemoizer;
 import com.bigdata.btree.AbstractBTree.LoadChildRequest;
 import com.bigdata.btree.data.DefaultNodeCoder;
-import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.data.INodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
@@ -3078,6 +3077,12 @@ public class Node extends AbstractNode<Node> implements INodeData {
                             // append this node in post-order position.
                             itr.append(new SingleValueIterator(child));
 
+                           /*
+                            * Note: getReadExecutor() is not defined for IJournal. If
+                            * we want to support the read executor pre-fetch pattern
+                            * then the code needs to be updated to use IJournal and
+                            * IJournal needs to expose getReadExecutor.
+                            */
                             if ((btree.store instanceof Journal)
                                     && (((Journal) btree.store)
                                             .getReadExecutor() != null)) {

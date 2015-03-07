@@ -3,9 +3,9 @@ Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -143,7 +143,12 @@ public class JettyResponseListener extends InputStreamResponseListener {
 				
 		final HttpFields headers = m_response.getHeaders();
 		
-		final MiniMime mimeType = new MiniMime(headers.get(HttpHeader.CONTENT_TYPE));
+      final String contentType = headers.get(HttpHeader.CONTENT_TYPE);
+
+      if (contentType == null)
+         return null;
+
+      final MiniMime mimeType = new MiniMime(contentType);
 		
 		return mimeType.getContentEncoding();
 	}
@@ -186,7 +191,7 @@ public class JettyResponseListener extends InputStreamResponseListener {
 				 * Explicit content encoding. 
 				 */
 				r = new InputStreamReader(getInputStream(), contentEncoding);
-			} else if (getContentType().startsWith("text/")) {
+			} else if (getContentType()!=null && getContentType().startsWith("text/")) {
 				/**
 				 * Note: Per Section 3.7.1 Canonicalization and Text Defaults of
 				 * the HTTP 1.1 specification:

@@ -513,7 +513,7 @@ public class ConcurrentWeakValueCache<K, V> implements
                      * We lost a potential concurrent data race, so make
                      * recursive call to ensure correct value is returned.
                      * 
-                     * @see <a href="http://trac.bigdata.com/ticket/1004">
+                     * @see <a href="http://trac.blazegraph.com/ticket/1004">
                      *      Concurrent binding problem </a>
                      */
 

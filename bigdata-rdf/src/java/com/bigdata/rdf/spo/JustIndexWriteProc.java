@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -41,17 +41,17 @@ import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
  * partition.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class JustIndexWriteProc
-        extends AbstractKeyArrayIndexProcedure
-        implements IParallelizableIndexProcedure, IMutableRelationIndexWriteProcedure {
+        extends AbstractKeyArrayIndexProcedure<Long>
+        implements IParallelizableIndexProcedure<Long>, IMutableRelationIndexWriteProcedure<Long> {
 
     /**
      * 
      */
     private static final long serialVersionUID = -7469842097766417950L;
 
+    @Override
     public final boolean isReadOnly() {
         
         return false;
@@ -83,6 +83,7 @@ public class JustIndexWriteProc
         /**
          * Values ARE NOT used.
          */
+        @Override
         public final boolean sendValues() {
         
             return false;
@@ -92,6 +93,7 @@ public class JustIndexWriteProc
         private WriteJustificationsProcConstructor() {
         }
 
+        @Override
         public JustIndexWriteProc newInstance(IRabaCoder keySer,
                 IRabaCoder valSer, int fromIndex, int toIndex,
                 byte[][] keys, byte[][] vals) {
@@ -108,7 +110,8 @@ public class JustIndexWriteProc
      * @return The #of justifications actually written on the index as a
      *         {@link Long}.
      */
-    public Object apply(final IIndex ndx) {
+    @Override
+    public Long apply(final IIndex ndx) {
 
         long nwritten = 0;
         

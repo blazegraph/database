@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -201,7 +201,7 @@ public class StatementPatternNode extends
 		 * An optional annotation whose value is a variable which will become
 		 * bound to the fast range count of the associated triple pattern.
 		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1037" > SELECT
+		 * @see <a href="http://trac.blazegraph.com/ticket/1037" > SELECT
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} is slow.
 		 *      </a>
 		 */
@@ -211,7 +211,7 @@ public class StatementPatternNode extends
 		 * An optional annotation whose value the variable that will be bound by
 		 * a {@link DistinctTermAdvancer} layered over the access path.
 		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1034" > DISTINCT
+		 * @see <a href="http://trac.blazegraph.com/ticket/1034" > DISTINCT
 		 *      PREDICATEs query is slow </a>
 		 */
         String DISTINCT_TERM_SCAN_VAR = "distinctTermScanVar";

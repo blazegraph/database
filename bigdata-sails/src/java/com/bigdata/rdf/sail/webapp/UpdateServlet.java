@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -49,6 +49,7 @@ import org.openrdf.rio.RDFParserRegistry;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.webapp.DeleteServlet.BufferStatementHandler;
 import com.bigdata.rdf.sail.webapp.DeleteServlet.RemoveStatementHandler;
 import com.bigdata.rdf.sail.webapp.InsertServlet.AddStatementHandler;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
@@ -111,6 +112,16 @@ public class UpdateServlet extends BigdataRDFServlet {
 	 * process deleting the statements. This is done while it is holding the
 	 * unisolated connection which prevents concurrent modifications. Therefore
 	 * the entire <code>SELECT + DELETE</code> operation is ACID.
+	 * 
+     * FIXME GROUP COMMIT : Again, a pattern where a query is run to produce
+     * solutions that are then deleted from the database. Can we rewrite this to
+     * be a SPARQL UPDATE? (DELETE WHERE). Note that the ACID semantics of this
+     * operation would be broken by group commit since other tasks could have
+     * updated the KB since the lastCommitTime and been checkpointed and hence
+     * be visible to an unisolated operation without there being an intervening
+     * commit point. [I think that this is resolved by taking the unisolated
+     * connection first and then taking the read-only lastCommitTime connection
+     * view, which is what the code now does.]
 	 */
     private void doUpdateWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -139,7 +150,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         if (requestBodyFormat == null) {
 
-            buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     "Content-Type not recognized as RDF: " + contentType);
 
             return;
@@ -151,7 +162,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         if (rdfParserFactory == null) {
 
-            buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+            buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                     "Parser factory not found: Content-Type="
                             + contentType + ", format=" + requestBodyFormat);
             
@@ -169,7 +180,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                     defaultContextInsert = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -188,7 +199,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                 	defaultContextDelete = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -199,8 +210,11 @@ public class UpdateServlet extends BigdataRDFServlet {
         
 		try {
 
-			submitApiTask(
-					new UpdateWithQueryTask(req, resp, namespace,
+		   if(getIndexManager().isGroupCommit()) {
+
+		      // compatible with group commit serializability semantics.
+		      submitApiTask(
+					new UpdateWithQueryMaterializedTask(req, resp, namespace,
 							ITx.UNISOLATED, //
 							queryStr,//
 							baseURI,//
@@ -209,6 +223,21 @@ public class UpdateServlet extends BigdataRDFServlet {
 							defaultContextInsert//
 					)).get();
 
+		   } else {
+
+		      // streaming implementation. not compatible with group commit.
+		      submitApiTask(
+	               new UpdateWithQueryStreamingTask(req, resp, namespace,
+	                     ITx.UNISOLATED, //
+	                     queryStr,//
+	                     baseURI,//
+	                     rdfParserFactory,//
+	                     defaultContextDelete,//
+	                     defaultContextInsert//
+	               )).get();
+		      
+		   }
+		   
 		} catch (Throwable t) {
 
 			launderThrowable(
@@ -230,7 +259,19 @@ public class UpdateServlet extends BigdataRDFServlet {
 
     }
 
-    private static class UpdateWithQueryTask extends AbstractRestApiTask<Void> {
+    /**
+    * Streaming version is more scalable but is not compatible with group
+    * commit. The underlying issue is the serializability of the mutation
+    * operations. This task reads from the last commit time and writes on the
+    * unisolated indices. It holds the lock on the unisolated indices while
+    * doing this. However, if group commit is enabled, then it might not observe
+    * mutations which may have been applied since the last commit which breaks
+    * the serializability guarantee.
+    * 
+    * @author bryan
+    * 
+    */
+    private static class UpdateWithQueryStreamingTask extends AbstractRestApiTask<Void> {
 
     	private final String queryStr;
         private final String baseURI;
@@ -255,7 +296,7 @@ public class UpdateServlet extends BigdataRDFServlet {
          *            without an explicit named graph when the KB instance is
          *            operating in a quads mode.
          */
-        public UpdateWithQueryTask(final HttpServletRequest req,
+        public UpdateWithQueryStreamingTask(final HttpServletRequest req,
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
                 final String queryStr,//
@@ -440,7 +481,211 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         }
 
-    } // class UpdateWithQueryTask
+    } // class UpdateWithQueryStreamingTask
+
+    /**
+    * This version runs the query against the unisolated connection, fully
+    * buffers the statements to be removed, and then removes them. Since both
+    * the read and the write are on the unisolated connection, it see all
+    * mutations that have been applied since the last group commit and preserves
+    * the serializability guarantee.
+    * 
+    * @author bryan
+    * 
+    */
+   private static class UpdateWithQueryMaterializedTask extends
+         AbstractRestApiTask<Void> {
+
+      private final String queryStr;
+      private final String baseURI;
+      private final RDFParserFactory parserFactory;
+      private final Resource[] defaultContextDelete;
+      private final Resource[] defaultContextInsert;
+
+      /**
+       * 
+       * @param namespace
+       *           The namespace of the target KB instance.
+       * @param timestamp
+       *           The timestamp used to obtain a mutable connection.
+       * @param baseURI
+       *           The base URI for the operation.
+       * @param defaultContextDelete
+       *           When removing statements, the context(s) for triples without
+       *           an explicit named graph when the KB instance is operating in
+       *           a quads mode.
+       * @param defaultContextInsert
+       *           When inserting statements, the context(s) for triples without
+       *           an explicit named graph when the KB instance is operating in
+       *           a quads mode.
+       */
+      public UpdateWithQueryMaterializedTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp,
+            final String queryStr,//
+            final String baseURI, final RDFParserFactory parserFactory,
+            final Resource[] defaultContextDelete,//
+            final Resource[] defaultContextInsert//
+      ) {
+         super(req, resp, namespace, timestamp);
+         this.queryStr = queryStr;
+         this.baseURI = baseURI;
+         this.parserFactory = parserFactory;
+         this.defaultContextDelete = defaultContextDelete;
+         this.defaultContextInsert = defaultContextInsert;
+      }
+
+      @Override
+      public boolean isReadOnly() {
+         return false;
+      }
+
+      @Override
+      public Void call() throws Exception {
+
+         final long begin = System.currentTimeMillis();
+
+         final AtomicLong nmodified = new AtomicLong(0L);
+
+         BigdataSailRepositoryConnection conn = null;
+         boolean success = false;
+         try {
+
+            conn = getUnisolatedConnection();
+
+            {
+
+               if (log.isInfoEnabled())
+                  log.info("update with query: " + queryStr);
+
+               final BigdataRDFContext context = BigdataServlet
+                     .getBigdataRDFContext(req.getServletContext());
+
+               /*
+                * Note: pipe is drained by this thread to consume the query
+                * results, which are the statements to be deleted.
+                */
+               final PipedOutputStream os = new PipedOutputStream();
+
+               // Use this format for the query results.
+               final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
+
+               final AbstractQueryTask queryTask = context.getQueryTask(conn,
+                     namespace, ITx.UNISOLATED, queryStr,
+                     deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
+
+               switch (queryTask.queryType) {
+               case DESCRIBE:
+               case CONSTRUCT:
+                  break;
+               default:
+                  throw new MalformedQueryException(
+                        "Must be DESCRIBE or CONSTRUCT query");
+               }
+
+               // Run DELETE
+               {
+
+                  final RDFParserFactory factory = RDFParserRegistry
+                        .getInstance().get(deleteQueryFormat);
+
+                  final RDFParser rdfParser = factory.getParser();
+
+                  rdfParser.setValueFactory(conn.getTripleStore()
+                        .getValueFactory());
+
+                  rdfParser.setVerifyData(false);
+
+                  rdfParser.setStopAtFirstError(true);
+
+                  rdfParser
+                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+//                  rdfParser.setRDFHandler(new BufferStatementHandler(conn
+//                        .getSailConnection(), nmodified, defaultContextDelete));
+
+                  final BufferStatementHandler buffer = new BufferStatementHandler(
+                        conn.getSailConnection(), nmodified, defaultContextDelete);
+                  
+                  rdfParser.setRDFHandler(buffer);
+
+                  // Wrap as Future.
+                  final FutureTask<Void> ft = new FutureTask<Void>(queryTask);
+
+                  // Submit query for evaluation.
+                  context.queryService.execute(ft);
+
+                  // Reads on the statements produced by the query.
+                  final InputStream is = newPipedInputStream(os);
+
+                  // Run parser : visited statements will be buffered.
+                  rdfParser.parse(is, baseURI);
+
+                  // Await the Future (of the Query)
+                  ft.get();
+
+                  // Delete the buffered statements.
+                  buffer.removeAll();
+
+               }
+
+               // Run INSERT
+               {
+
+                  /*
+                   * There is a request body, so let's try and parse it.
+                   */
+
+                  final RDFParser rdfParser = parserFactory.getParser();
+
+                  rdfParser.setValueFactory(conn.getTripleStore()
+                        .getValueFactory());
+
+                  rdfParser.setVerifyData(true);
+
+                  rdfParser.setStopAtFirstError(true);
+
+                  rdfParser
+                        .setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+
+                  rdfParser.setRDFHandler(new AddStatementHandler(conn
+                        .getSailConnection(), nmodified, defaultContextInsert));
+
+                  /*
+                   * Run the parser, which will cause statements to be inserted.
+                   */
+                  rdfParser.parse(req.getInputStream(), baseURI);
+
+               }
+
+            }
+
+            conn.commit();
+
+            success = true;
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            reportModifiedCount(nmodified.get(), elapsed);
+
+            return null;
+
+         } finally {
+
+            if (conn != null) {
+
+               if (!success)
+                  conn.rollback();
+
+               conn.close();
+
+            }
+
+         }
+
+      }
+
+   } // class UpdateWithQueryMaterializedTask
 
     @Override
     protected void doPost(final HttpServletRequest req,
@@ -516,7 +761,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                     defaultContextInsert = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -535,7 +780,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 try {
                 	defaultContextDelete = toURIs(s);
                 } catch (IllegalArgumentException ex) {
-                    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+                    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
                             ex.getLocalizedMessage());
                     return;
                 }
@@ -746,7 +991,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 		
 	    if (contentType == null) {
 	    	
-	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	        buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
 	                "Content-Type not specified");
 	
 	        return false;
@@ -758,7 +1003,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 	    if (format == null) {
 	
-	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	        buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
 	                "Content-Type not recognized as RDF: " + contentType);
 	
 	        return false;
@@ -770,7 +1015,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 		
 		if (rdfParserFactory == null) {
 		
-		    buildResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
+		    buildAndCommitResponse(resp, HTTP_INTERNALERROR, MIME_TEXT_PLAIN,
 		            "Parser factory not found: Content-Type=" + contentType
 		                    + ", format=" + format);
 		
@@ -780,7 +1025,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 	    if (item.getInputStream() == null) {
 	    	
-	        buildResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+	        buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
 	                "No content");
 	
 	        return false;

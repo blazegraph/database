@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -86,6 +86,7 @@ import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.lexicon.ITermIVFilter;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.rdf.sparql.ast.service.history.HistoryIndexTupleSerializer;
 import com.bigdata.rdf.spo.JustIndexWriteProc.WriteJustificationsProcConstructor;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -490,6 +491,7 @@ public class SPORelation extends AbstractRelation<ISPO> {
      * @todo force drop of all indices rather than throwing an exception if an
      * index does not exist?
      */
+    @Override
     public void destroy() {
 
         final IResourceLock resourceLock = acquireExclusiveLock();
@@ -1209,7 +1211,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
                  * The 4th position should never become bound for a triple store
                  * without statement identifiers.
                  */
-                throw new UnsupportedOperationException();
+                      
+                throw new RuntimeException(
+                   new QuadsOperationInTriplesModeException(
+                    "Predicate lookup with bound context, but DB is initialized"
+                    + " in triples mode. Please do either re-init your database"
+                    + " in quads mode or use operations over triples only."));
             }
             break;
         case 4:

@@ -1,12 +1,12 @@
 /*
 
- Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
  Contact:
  SYSTAP, LLC
- 4501 Tower Road
- Greensboro, NC 27410
- licenses@bigdata.com
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -50,10 +50,9 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
  * both {@link AtomicRowRead} and {@link AtomicRowWriteRead}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractAtomicRowReadOrWrite extends
-        AbstractIndexProcedure implements ISimpleIndexProcedure,
+        AbstractIndexProcedure<TPS> implements ISimpleIndexProcedure<TPS>,
         IRowStoreConstants, Externalizable {
 
     private static final Logger log = Logger.getLogger(AbstractAtomicRowReadOrWrite.class);
@@ -436,7 +435,8 @@ abstract public class AbstractAtomicRowReadOrWrite extends
      */
     private static final transient byte VERSION = VERSION0;
 
-    public void readExternal(ObjectInput in) throws IOException,
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException,
             ClassNotFoundException {
         
         final byte version = in.readByte();
@@ -461,7 +461,8 @@ abstract public class AbstractAtomicRowReadOrWrite extends
         
     }
 
-    public void writeExternal(ObjectOutput out) throws IOException {
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeByte(VERSION);
 

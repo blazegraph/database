@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -186,7 +186,7 @@ public class NanoSparqlServer {
          * </ol>
          * </ol>
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/939" > NSS does not
+         * @see <a href="http://trac.blazegraph.com/ticket/939" > NSS does not
          *      start from command line: bigdata-war/src not found </a>
          */
         String JETTY_RESOURCE_BASE = "jetty.resourceBase";
@@ -203,7 +203,7 @@ public class NanoSparqlServer {
          * override the location of that resource explicitly by setting the
          * environment variable before starting the server.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/940" > ProxyServlet in
+         * @see <a href="http://trac.blazegraph.com/ticket/940" > ProxyServlet in
          *      web.xml breaks tomcat WAR (HA LBS) </a>
          */
         String JETTY_OVERRIDE_WEB_XML = "jetty.overrideWebXml";
@@ -794,7 +794,7 @@ public class NanoSparqlServer {
      * 
      * @throws MalformedURLException
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/939" > NSS does not start
+     * @see <a href="http://trac.blazegraph.com/ticket/939" > NSS does not start
      *      from command line: bigdata-war/src not found </a>
      */
     private static void configureEffectiveResourceBase(
@@ -822,8 +822,9 @@ public class NanoSparqlServer {
             final URL resourceBaseURL;
             if (file.exists()) {
 
-                // Check the file system.
-                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
+                // Check the file system. See #1108
+//                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
+                resourceBaseURL = file.toURI().toURL();
                 isFile = true;
 
             } else {

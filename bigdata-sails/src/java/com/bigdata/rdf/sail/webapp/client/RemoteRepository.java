@@ -3,9 +3,9 @@ Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -140,7 +140,7 @@ public class RemoteRepository {
      * 
      * @see #DEFAULT_QUERY_METHOD
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
+     * @see <a href="http://trac.blazegraph.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
     static public final String QUERY_METHOD = RemoteRepository.class
@@ -162,7 +162,7 @@ public class RemoteRepository {
      * length (in characters) for a requestURL associated with an HTTP GET
      * before it is automatically converted to an HTTP POST.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/854"> Allow overrride of
+     * @see <a href="http://trac.blazegraph.com/ticket/854"> Allow overrride of
      *      maximum length before converting an HTTP GET to an HTTP POST </a>
      */
     static public final String MAX_REQUEST_URL_LENGTH = RemoteRepository.class
@@ -183,7 +183,7 @@ public class RemoteRepository {
     /**
      * HTTP header may be used to specify the timeout for a query.
      * 
-     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
      */
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
@@ -194,7 +194,7 @@ public class RemoteRepository {
      * <code>false</code>, the REST API methods will NOT use the load balancer
      * aware requestURLs.
      * 
-     * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
     protected final boolean useLBS;
@@ -234,7 +234,7 @@ public class RemoteRepository {
      * options, but the client API must not include a dependency on the Sail so
      * it is given by value again here in a package local scope.
      */
-    static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
+    public static final String OPTION_CREATE_KB_NAMESPACE = "com.bigdata.rdf.sail.namespace";
 
     /**
      * Return the maximum requestURL length before the request is converted into
@@ -357,7 +357,7 @@ public class RemoteRepository {
      * 
      * @see RemoteRepositoryManager
      * @see HttpClientConfigurator
-     * @see <a href="http://wiki.bigdata.com/wiki/index.php/HALoadBalancer">
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
     public RemoteRepository(final String sparqlEndpointURL,
@@ -666,7 +666,38 @@ public class RemoteRepository {
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
         
-        return (rangeCount(subj, pred, obj, contexts) > 0);
+       if(false) {
+          /*
+          * FIXME This is only correct when the remote repository does not use
+          * full read/write transactions. Otherwise it may overestimate since it
+          * will also count deleted tuples. In order to fix this, we really need
+          * to make hasStatements() a top-level REST API method since the client
+          * can not correctly decide whether or not the server supports delete
+          * markers and therefore can not correctly choose between
+          * hasStatements() based on getStatements() LIMIT 1 and hasStatements()
+          * based on rangeCount. Note that the server side API in
+          * AbstractTripleStore considers this information and always uses the
+          * correct backend strategy. See #1109.
+          * 
+          * In fact, the situation appears to be worse than that since
+          * TestSparqlUpdate fails several tests when we use the rangeCount
+          * which pass if we use getStatements() !!!
+          */
+         return (rangeCount(subj, pred, obj, contexts) > 0);
+      } else {
+         /*
+          * FIXME This should be pushed down to a server-side operation for
+          * improved performance.  We need to lift hasStatements() into the
+          * REST API for that.  See #1109.
+          */
+         final GraphQueryResult ret = getStatements(subj, pred, obj,
+               includeInferred, contexts);
+         try {
+            return ret.hasNext();
+         } finally {
+            ret.close();
+         }
+      }
         
     }
     
@@ -715,20 +746,25 @@ public class RemoteRepository {
     }
 
     /**
-     * Perform a fast range count on the statement indices for a given
-     * triple (quad) pattern.
-     * 
-     * @param s
-     *             the subject (can be null)
-     * @param p
-     *             the predicate (can be null)
-     * @param o
-     *             the object (can be null)
-     * @param c
-     *             the context (can be null)
-     * @return
-     *             the range count
-     */
+    * Perform a fast range count on the statement indices for a given triple
+    * (quad) pattern.
+    * 
+    * @param s
+    *           the subject (can be null)
+    * @param p
+    *           the predicate (can be null)
+    * @param o
+    *           the object (can be null)
+    * @param c
+    *           the context (can be null)
+    * @return the range count
+    * 
+    *         TODO Add optional boolean property named "exact" whose default
+    *         value is <code>false</code> to preserve the historical behavior.
+    *         This will provide for relatively efficient exact range counts over
+    *         the REST API. See #1127 (Add REST API method for exact range
+    *         counts)
+    */
     public long rangeCount(final Resource s, final URI p, final Value o, final Resource... c) 
             throws Exception {
 
@@ -2018,7 +2054,7 @@ public class RemoteRepository {
              * whether a Reader or InputStream will be used to construct and
              * apply the RDF parser.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/920" > Content
+             * @see <a href="http://trac.blazegraph.com/ticket/920" > Content
              *      negotiation orders accept header scores in reverse </a>
              */
             Charset charset = format.getCharset();//Charset.forName(UTF8);

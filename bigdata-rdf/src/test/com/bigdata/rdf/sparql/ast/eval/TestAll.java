@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,7 +34,6 @@ import com.bigdata.rdf.sparql.ast.eval.reif.TestReificationDoneRightEval;
  * Aggregates test suites into increasing dependency order.
  *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
@@ -148,7 +147,11 @@ public class TestAll extends TestCase {
 
         // additional bottom-up evaluation tests.
         suite.addTestSuite(TestTicket1087.class);
-        
+
+        // test static analysis for quads constructs in triples mode, raising
+        // an early exception when accessing named graphs in triples mode
+        suite.addTest(TestTicket1105.suite());
+
 		if (QueryHints.DEFAULT_REIFICATION_DONE_RIGHT) {
 
 			/*
@@ -177,9 +180,6 @@ public class TestAll extends TestCase {
 
         // test suite for custom functions.
         suite.addTestSuite(TestCustomFunction.class);
-
-        // test suite for BIND + GRAPH ticket.
-        suite.addTestSuite(TestBindGraph1007.class);
 
         // test suite for a sub-select with an empty PROJECTION.
         suite.addTestSuite(TestTicket946.class);

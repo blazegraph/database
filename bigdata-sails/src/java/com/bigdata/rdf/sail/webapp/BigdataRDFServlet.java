@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@ import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.net.URLDecoder;
 import java.util.Iterator;
 import java.util.Properties;
@@ -59,6 +60,7 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
+import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -178,7 +180,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	 *            -or- a summary of the REST API command -or- an empty string if
 	 *            nothing else is more appropriate.
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/1075" > LaunderThrowable
+	 * @see <a href="http://trac.blazegraph.com/ticket/1075" > LaunderThrowable
 	 *      should never throw an exception </a>
 	 */
     protected static void launderThrowable(final Throwable t,
@@ -225,23 +227,73 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				 */
 				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t,
+					QuadsOperationInTriplesModeException.class)) {
+			   /*
+             * Nice error when attempting to use quads data in a triples only
+             * mode.
+             * 
+             * @see #1086 Loading quads data into a triple store should strip
+             * out the context
+             */
+				resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+				resp.setContentType(MIME_TEXT_PLAIN);
+			} else if (InnerCause.isInnerCause(t, HttpOperationException.class)) {
+            /*
+             * An AbstractRestApiTask failed and throw out a typed exception to
+             * avoid joining a commit group.
+             * 
+             * TODO The queryStr is ignored on this code path. Review the places
+             * where the HttpOperationException is thrown and standardize the
+             * information contained in its [content] as we have already done
+             * for the [queryStr].
+             */
+            final HttpOperationException ex = (HttpOperationException) InnerCause
+                  .getInnerCause(t, HttpOperationException.class);
+            resp.setStatus(ex.status);
+            resp.setContentType(ex.mimeType);
+            try {
+               final Writer w = resp.getWriter();
+               if (ex.content != null)
+                  w.write(ex.content); // write content iff given.
+               w.flush(); // Commit the response.
+            } catch (IOException ex2) {
+               // ignore any problems here.
+            }
+            return;
 			} else {
 				// Internal server error.
 				resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 				resp.setContentType(MIME_TEXT_PLAIN);
 			}
 		}
-		/*
-		 * Attempt to write the stack trace on the response.
-		 * 
-		 * Note: If the OutputStream has already been closed then an IOException
-		 * is caught and ignored.
-		 */
-		{
+
+      /*
+       * Attempt to write the stack trace on the response.
+       * 
+       * Note: If the OutputStream (or Writer) has already been closed then an
+       * IOException is caught and ignored.
+       * 
+       * Note: If the PrintWriter was already requested, then we use it directly
+       * rather than the OutputStream. This is due to the servlet API which will
+       * not allow us to obtain the OutputStream if we have already obtained the
+       * Writer. Some of the response handling for our servlets use the Writer
+       * (e.g., reportMutationCount()) so this happens if there is a problem
+       * while using the writer. Of course, that also makes it likely that we
+       * will not be able to inform the client of the error.
+       */
+      {
 			OutputStream os = null;
+         PrintWriter w = null;
 			try {
-				os = resp.getOutputStream();
-				final PrintWriter w = new PrintWriter(os);
+			   try {
+			      // first, assume OutputStream is available.
+			      os = resp.getOutputStream();
+				   w = new PrintWriter(os);
+			   } catch(IllegalStateException ex) {
+			      // Writer was already request, so we need to use it instead.
+			      w = resp.getWriter();
+			   }
 				if (queryStr != null) {
 					/*
 					 * Write the query onto the output stream.
@@ -253,14 +305,23 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 				 * Write the stack trace onto the output stream.
 				 */
 				t.printStackTrace(w);
-				w.flush();
-				// flush the output stream.
-				os.flush();
+				w.flush(); // flush the writer.
+            if (os != null) {
+               os.flush(); // flush the output stream.
+            }
 			} catch (IOException ex) {
 				// Could not write on output stream.
 			} finally {
 				// ignore any problems here.
 			}
+         if (w != null) {
+            try {
+               // ensure writer is closed.
+               w.close();
+            } catch (Throwable t2) {
+               // ignore any problems here.
+            }
+         }
 			if (os != null) {
 				try {
 					// ensure output stream is closed.
@@ -378,31 +439,20 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
 	}
 
-    /**
-     * Report a mutation count and elapsed time back to the user agent.
-     * 
-     * @param resp
-     *            The response.
-     * @param nmodified
-     *            The mutation count.
-     * @param elapsed
-     *            The elapsed time (milliseconds).
-     * 
-     * @throws IOException
-     */
-    static protected void reportModifiedCount(final HttpServletResponse resp,
-            final long nmodified, final long elapsed) throws IOException {
+	/**
+    * Report that a namespace is not found. The namespace is extracted from the
+    * {@link HttpServletRequest}.
+    */
+   protected void buildAndCommitNamespaceNotFoundResponse(
+         final HttpServletRequest req, final HttpServletResponse resp)
+         throws IOException {
 
-        final StringWriter w = new StringWriter();
-    	
-        final XMLBuilder t = new XMLBuilder(w);
+      buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+            MIME_TEXT_PLAIN, "Not found: namespace=" + getNamespace(req)
+      // +", timestamp="+getTimestamp(req)
+      );
 
-        t.root("data").attr("modified", nmodified)
-                .attr("milliseconds", elapsed).close();
-
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
-
-    }
+   }
 
     /**
      * Report an access path range count and elapsed time back to the user agent.
@@ -416,8 +466,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * 
      * @throws IOException
      */
-    static protected void reportRangeCount(final HttpServletResponse resp,
-            final long rangeCount, final long elapsed) throws IOException {
+   static protected void buildAndCommitRangeCountResponse(
+         final HttpServletResponse resp, final long rangeCount,
+         final long elapsed) throws IOException {
 
         final StringWriter w = new StringWriter();
         
@@ -426,7 +477,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         t.root("data").attr("rangeCount", rangeCount)
                 .attr("milliseconds", elapsed).close();
 
-        buildResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+        buildAndCommitResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
 
     }
         
@@ -436,7 +487,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    protected void sendGraph(final HttpServletRequest req,
+    static protected void sendGraph(final HttpServletRequest req,
             final HttpServletResponse resp, final Graph g) throws IOException {
         /*
          * CONNEG for the MIME type.
@@ -506,7 +557,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * @param req
      * @param resp
      */
-    protected void sendProperties(final HttpServletRequest req,
+    static protected void sendProperties(final HttpServletRequest req,
             final HttpServletResponse resp, final Properties properties)
             throws IOException {
         /*
@@ -566,7 +617,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     /**
      * Convert an array of URI strings to an array of URIs.
      */
-    protected Resource[] toURIs(final String[] s) {
+    static protected Resource[] toURIs(final String[] s) {
     	
     	if (s == null)
     		return null;

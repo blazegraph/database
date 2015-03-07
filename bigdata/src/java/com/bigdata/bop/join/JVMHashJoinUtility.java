@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -125,14 +125,12 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     private final IVariable<?>[] selectVars;
 
     /**
-     * The variables to be projected into a join group. When non-
-     * <code>null</code> variables that are NOT in this array are NOT flowed
-     * into the join group.
-     * 
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-     *      JoinGroup optimizations </a>
+     * The variables to be projected into a join group. When set, a distinct
+     * projection over these variables is computed, otherwise the complete
+     * binding set is passed in. Note that this parameter is only considered
+     * if selectVars is not null.
      */
-    private final IVariable<?>[] projectedInVars;
+    private final IVariable<?>[] projectInVars;
     
     /**
      * The join constraints (optional).
@@ -191,8 +189,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
-        if (projectedInVars != null)
-            sb.append(",projectedInVars=" + Arrays.toString(projectedInVars));
+        if (projectInVars != null)
+           sb.append(",projectInVars=" + Arrays.toString(projectInVars));        
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -283,9 +281,9 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         /*
          * The variables that are projected IN to the join group.
          */
-        this.projectedInVars = (IVariable<?>[]) op
+        this.projectInVars = (IVariable<?>[]) op
                 .getProperty(HashJoinAnnotations.PROJECT_IN_VARS);
-
+        
         // The join constraints (optional).
         this.constraints = (IConstraint[]) op
                 .getProperty(JoinAnnotations.CONSTRAINTS);
@@ -842,47 +840,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
     
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out) {
-
-        /*
-         * FIXME Set this to enable "DISTINCT" on the solutions flowing into the
-         * join group.
-         * 
-         * Note: This should be set by the HashIndexOp (or passed in through the
-         * interface).
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/668" >
-         * JoinGroup optimizations </a>
-         */
-        final boolean distinct = false;
-        
-        final IDistinctFilter distinctFilter;
-        
-        if (distinct && projectedInVars != null && projectedInVars.length > 0) {
-
-            /*
-             * Note: We are single threaded here so we can use a lower
-             * concurrencyLevel value.
-             * 
-             * Note: If necessary, this could be replaced with JVMHashIndex so
-             * we get the #of occurrences of each distinct combination of
-             * bindings that is projected into the sub-group/-query.
-             */
-            final int concurrencyLevel = 1;//ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL;
-
-            distinctFilter = new JVMDistinctFilter(projectedInVars, //
-                    op.getProperty(HashMapAnnotations.INITIAL_CAPACITY,
-                            HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                    op.getProperty(HashMapAnnotations.LOAD_FACTOR,
-                            HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
-                            concurrencyLevel
-            );
-            
-        } else {
-         
-            distinctFilter = null;
-            
-        }
+    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter distinctFilter) {
         
         try {
 
@@ -906,14 +864,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
                     IBindingSet bs = solutionHit.solution;
 
                     if (distinctFilter != null) {
-
-                        /*
-                         * Note: The DISTINCT filter is based on the variables
-                         * that are projected INTO the child join group.
-                         * However, those are NOT always the same as the
-                         * variables that are projected OUT of the child join
-                         * group, so we need to
-                         */
 
                         if ((bs = distinctFilter.accept(bs)) == null) {
 

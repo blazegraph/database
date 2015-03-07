@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -233,18 +233,21 @@ abstract public class DataService extends AbstractService
 
         return new ResourceManager(properties) {
 
-            public IBigdataFederation getFederation() {
+            @Override
+            public IBigdataFederation<?> getFederation() {
                 
                 return DataService.this.getFederation();
                                 
             }
             
+            @Override
             public DataService getDataService() {
                 
                 return DataService.this;
                 
             }
             
+            @Override
             public UUID getDataServiceUUID() {
 
                 return DataService.this.getServiceUUID();
@@ -287,6 +290,7 @@ abstract public class DataService extends AbstractService
      */
     private final Session session = new Session();
     
+    @Override
     public Session getSession() {
 
         return session;
@@ -545,6 +549,7 @@ abstract public class DataService extends AbstractService
 
 //        private long lastReattachMillis = 0L;
 
+        @Override
         public boolean isServiceReady() {
             
             if(!dataService.resourceManager.isOpen()) {
@@ -582,6 +587,7 @@ abstract public class DataService extends AbstractService
          * Extended to setup {@link DataService} specific counters and to write
          * the client URL onto a file in the service's data directory.
          */
+        @Override
         public void didStart() {
 
             super.didStart();
@@ -653,6 +659,7 @@ abstract public class DataService extends AbstractService
                 CounterSet tmp = serviceRoot.makePath("Block API");
 
                 tmp.addCounter("Blocks Read", new Instrument<Long>() {
+                    @Override
                     public void sample() {
                         setValue(dataService.readBlockApiCounters.readBlockCount);
                     }
@@ -660,6 +667,7 @@ abstract public class DataService extends AbstractService
 
                 tmp.addCounter("Blocks Read Per Second",
                         new Instrument<Double>() {
+                	@Override
                             public void sample() {
 
                                 // @todo encapsulate this logic.
@@ -692,6 +700,7 @@ abstract public class DataService extends AbstractService
      * Polite shutdown does not accept new requests and will shutdown once the
      * existing requests have been processed.
      */
+    @Override
     synchronized public void shutdown() {
 
         if (!isOpen())
@@ -726,6 +735,7 @@ abstract public class DataService extends AbstractService
      * Shutdown attempts to abort in-progress requests and shutdown as soon as
      * possible.
      */
+    @Override
     synchronized public void shutdownNow() {
 
         if (!isOpen())
@@ -756,6 +766,7 @@ abstract public class DataService extends AbstractService
 
     }
     
+    @Override
     synchronized public void destroy() {
         
         super.destroy();
@@ -822,6 +833,7 @@ abstract public class DataService extends AbstractService
      * ITxCommitProtocol.
      */
     
+    @Override
     public void setReleaseTime(final long releaseTime) {
         
         setupLoggingContext();
@@ -843,6 +855,7 @@ abstract public class DataService extends AbstractService
      * 
      * @see JournalTransactionService#commitImpl(long)}.
      */
+    @Override
     public long singlePhaseCommit(final long tx) throws ExecutionException,
             InterruptedException, IOException {
         
@@ -1020,6 +1033,7 @@ abstract public class DataService extends AbstractService
         
     }
 
+    @Override
     public void prepare(final long tx, final long revisionTime)
             throws ExecutionException, InterruptedException, IOException {
         
@@ -1379,7 +1393,7 @@ abstract public class DataService extends AbstractService
             if (metadata == null)
                 throw new IllegalArgumentException();
 
-            final AbstractTask task = new RegisterIndexTask(concurrencyManager,
+            final AbstractTask<UUID> task = new RegisterIndexTask(concurrencyManager,
                     name, metadata);
             
             concurrencyManager.submit(task).get();
@@ -1400,7 +1414,7 @@ abstract public class DataService extends AbstractService
         
         try {
         
-            final AbstractTask task = new DropIndexTask(concurrencyManager,
+            final AbstractTask<Boolean> task = new DropIndexTask(concurrencyManager,
                     name);
             
             concurrencyManager.submit(task).get();
@@ -1426,7 +1440,7 @@ abstract public class DataService extends AbstractService
                     ? ITx.READ_COMMITTED
                     : timestamp);
 
-            final AbstractTask task = new GetIndexMetadataTask(
+            final AbstractTask<IndexMetadata> task = new GetIndexMetadataTask(
                     concurrencyManager, startTime, name);
 
             return (IndexMetadata) concurrencyManager.submit(task).get();
@@ -1445,7 +1459,7 @@ abstract public class DataService extends AbstractService
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    public static class GetIndexMetadataTask extends AbstractTask {
+    public static class GetIndexMetadataTask extends AbstractTask<IndexMetadata> {
 
         public GetIndexMetadataTask(ConcurrencyManager concurrencyManager,
                 long startTime, String name) {
@@ -1474,8 +1488,8 @@ abstract public class DataService extends AbstractService
      * MUST be a proxy. This gets handled by the concrete server implementation.
      */
     @Override
-    public Future submit(final long tx, final String name,
-            final IIndexProcedure proc) {
+    public <T> Future<T> submit(final long tx, final String name,
+            final IIndexProcedure<T> proc) {
 
         setupLoggingContext();
 
@@ -1493,7 +1507,7 @@ abstract public class DataService extends AbstractService
                         : tx);
 
             // wrap the caller's task.
-            final AbstractTask task = new IndexProcedureTask(
+            final AbstractTask<T> task = new IndexProcedureTask<T>(
                     concurrencyManager, timestamp, name, proc);
             
             if (task instanceof IFederationCallable) {
@@ -1642,7 +1656,7 @@ abstract public class DataService extends AbstractService
                     capacity, flags, filter);
 
             // submit the task and wait for it to complete.
-            return (ResultSet) concurrencyManager.submit(task).get();
+            return concurrencyManager.submit(task).get();
         
         } finally {
             
@@ -1694,7 +1708,8 @@ abstract public class DataService extends AbstractService
             final int byteCount = store.getByteCount(addr);
             
             return new IBlock() {
-    
+
+            	@Override
                 public long getAddress() {
                     
                     return addr;
@@ -1702,6 +1717,7 @@ abstract public class DataService extends AbstractService
                 }
     
                 // @todo reuse buffers
+            	@Override
                 public InputStream inputStream() {
     
                     // this is when it actually reads the data.
@@ -1715,6 +1731,7 @@ abstract public class DataService extends AbstractService
     
                 }
     
+            	@Override
                 public int length() {
     
                     return byteCount;
@@ -1740,7 +1757,7 @@ abstract public class DataService extends AbstractService
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    static protected class RangeIteratorTask extends AbstractTask {
+    static protected class RangeIteratorTask extends AbstractTask<ResultSet> {
 
         private final byte[] fromKey;
         private final byte[] toKey;
@@ -1762,6 +1779,7 @@ abstract public class DataService extends AbstractService
 
         }
 
+        @Override
         public ResultSet doTask() throws Exception {
 
             final IIndex ndx = getIndex(getOnlyResource());
@@ -1787,7 +1805,7 @@ abstract public class DataService extends AbstractService
              * support continuation queries.
              */
             
-            final ITupleIterator itr = ndx.rangeIterator(fromKey, toKey, limit,
+            final ITupleIterator<?> itr = ndx.rangeIterator(fromKey, toKey, limit,
                     flags | IRangeQuery.KEYS, filter);
             
             /*
@@ -1819,7 +1837,7 @@ abstract public class DataService extends AbstractService
 
             }
             
-            final Callable task = new ForceOverflowTask(compactingMerge);
+            final Callable<Void> task = new ForceOverflowTask(compactingMerge);
             
             log.warn("Will force overflow: immediate=" + immediate
                     + ", compactingMerge=" + compactingMerge);
@@ -1840,12 +1858,12 @@ abstract public class DataService extends AbstractService
                  */
 
                 getConcurrencyManager().submit(
-                        new AbstractTask(getConcurrencyManager(),
+                        new AbstractTask<Void>(getConcurrencyManager(),
                                 ITx.UNISOLATED,
                                 new String[] { "__forceOverflow" }) {
 
                     @Override
-                    protected Object doTask() throws Exception {
+                    protected Void doTask() throws Exception {
 
                         // write a one byte record on the journal.
                         getJournal().write(ByteBuffer.wrap(new byte[]{1}));

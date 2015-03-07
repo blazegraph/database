@@ -81,6 +81,7 @@ export HA_OPTS="\
  -DZK_SERVERS=${ZK_SERVERS}\
  -DRMI_PORT=${RMI_PORT}\
  -DHA_PORT=${HA_PORT}\
+ -DgroupCommit=${GROUP_COMMIT}\
  -DWRITE_CACHE_BUFFER_COUNT=${WRITE_CACHE_BUFFER_COUNT}\
  "-Dcom.bigdata.hostname=${BIGDATA_HOSTNAME}"\
  "-Djetty.port=${JETTY_PORT}"\
