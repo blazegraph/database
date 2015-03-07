@@ -39,19 +39,19 @@ import org.apache.log4j.Logger;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class TestAll extends TestCase {
+public class CopyOfTestAll extends TestCase {
 
     /**
      * 
      */
-    public TestAll() {
+    public CopyOfTestAll() {
         super();
     }
 
     /**
      * @param arg0
      */
-    public TestAll(String arg0) {
+    public CopyOfTestAll(String arg0) {
         super(arg0);
     }
 
@@ -80,27 +80,11 @@ public class TestAll extends TestCase {
         }
         
         final TestSuite suite = new TestSuite("Sesame 2.x integration");
-
-        // test suite for the SPARQL parse tree => bigdata AST translation.
-        suite.addTest(com.bigdata.rdf.sail.sparql.TestAll.suite());
-        
-        // bootstrap tests for the BigdataSail
-        suite.addTestSuite(TestBootstrapBigdataSail.class);
-
-        // run the test suite with statement identifiers enabled.
-        suite.addTest(TestBigdataSailWithSids.suite());
-        
-        // run the test suite without statement identifiers enabled.
-        suite.addTest(TestBigdataSailWithoutSids.suite());
-        
-        // quad store test suite w/ pipeline joins.
-        suite.addTest(TestBigdataSailWithQuads.suite());
-
-        // NanoSparqlServer
-        suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
         
         //BigdataSailFactory
+        //suite.addTest(BigdataSailFactoryTest.suite());
         suite.addTestSuite(BigdataSailFactoryTest.class);
+
 
         /* FIXME Restore:: quad store in scale-out.
          * 
@@ -113,4 +97,20 @@ public class TestAll extends TestCase {
 
     }
     
+    public static Test test2()
+    {
+    	
+        final TestSuite suite = new TestSuite("Sesame 2.x integration");
+
+    	 //BigdataSailFactory
+       suite.addTestSuite(BigdataSailFactoryTest.class);
+       //suite.addTest(BigdataSailFactoryTest.suite());
+       
+       System.err.println("Help!");
+
+
+        
+        return suite;
+    }
+
 }
