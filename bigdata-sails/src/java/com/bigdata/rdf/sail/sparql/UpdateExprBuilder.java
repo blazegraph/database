@@ -38,6 +38,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.openrdf.model.BNode;
 import org.openrdf.model.Statement;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 import org.openrdf.repository.sail.helpers.SPARQLUpdateDataBlockParser;
@@ -786,7 +787,29 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
               }
            }
         }
-        
+
+         if (!allowBlankNodes) {
+   
+            for (Statement stmt : stmts) {
+   
+               /**
+                * Blank nodes are not allowed in DELETE DATA.
+                * 
+                * See http://trac.bigdata.com/ticket/1076#comment:5
+                */
+               if (stmt.getSubject() instanceof BNode
+                     || stmt.getPredicate() instanceof BNode
+                     || stmt.getObject() instanceof BNode
+                     || (stmt.getContext() != null && stmt.getContext() instanceof BNode)) {
+   
+                  throw new VisitorException(
+                        "Blank nodes are not permitted in DELETE DATA");
+   
+               }
+   
+            }
+         }
+
         final BigdataStatement[] a = stmts.toArray(
                 new BigdataStatement[stmts.size()]);
 
