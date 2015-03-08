@@ -61,3 +61,70 @@ public class TestJavaScriptGOM extends TestCase2 {
         
         jsEngine = mgr.getEngineByName("ECMAScript"); // or JavaScript
         
+//        �try {
+//        �} catch (ScriptException ex) {
+//        � � �ex.printStackTrace();
+//        �}
+    }
+
+    protected void tearDown() throws Exception {
+
+        jsEngine = null;
+        
+    }
+
+    /**
+     * Verify that the scripting engine is running.
+     */
+    public void testScriptRuns() throws ScriptException {
+
+        final String[] attrs = new String[] {
+                ScriptEngine.ENGINE,
+                ScriptEngine.ENGINE_VERSION,
+                ScriptEngine.LANGUAGE,
+                ScriptEngine.LANGUAGE_VERSION,
+        };
+        
+        if (log.isInfoEnabled()) {
+
+            for (String s : attrs) {
+
+                log.info(s + "=" + jsEngine.get(s));
+
+            }
+            
+        }
+
+        jsEngine.eval("print('Hello, world!');");
+
+    }
+
+    /**
+     * Verify that the scripting engine will throw an exception if there is an
+     * error.
+     * 
+     * @throws ScriptException
+     */
+    public void testScriptExceptionThrown() throws ScriptException {
+
+        try {
+
+            /*
+             * Note: random() should not be resolved, leading to a thrown
+             * exception.
+             */
+
+            jsEngine.eval("print('Hello, world!'); y=random()/0");
+
+            fail("Expected exception not thrown");
+            
+        } catch (ScriptException ex) {
+            
+            if (log.isInfoEnabled())
+                log.info("Ignoring expected exception: " + ex);
+            
+        }
+
+    }
+    
+}
