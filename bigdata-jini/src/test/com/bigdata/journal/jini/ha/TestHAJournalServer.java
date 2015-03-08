@@ -379,3 +379,191 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
      * <pre>
      * Hi Bryan:
      * 
+     * I would expect the remote task to complete and return, despite the caller being interrupted.  The JERI subsystem (I�m guessing the invocation layer, but it might be the transport layer) might log an exception when it tried to return, but there was nobody on the calling end.
+     * 
+     * That�s consistent with a worst-case failure, where the caller drops off the network.  How is the called service supposed to know what happened to the caller?
+     * 
+     * In the case of a typical short operation, I wouldn�t see that as a big issue, as the wasted computational effort on the service side won�t be consequential.
+     * 
+     * In the case of a long-running operation where it becomes more likely that the caller wants to stop or cancel an operation (in addition to the possibility of having it interrupted), I�d try to break it into a series of operations (chunks), or setup an ongoing notification or update protocol.  You probably want to do that anyway, because clients probably would like to see interim updates while a long operation is in process.
+     * 
+     * Unfortunately, I don�t think these kinds of things can be reasonably handled in a communication layer - the application almost always needs to be involved in the resolution of a problem when we have a service-oriented system.
+     * 
+     * Cheers,
+     * 
+     * Greg.
+     * </pre>
+     * 
+     * and
+     * 
+     * <pre>
+     * Hi Bryan,
+     * 
+     * A number of years ago Ann Wollrath (the inventor of RMI) wrote some example code
+     * related to RMI call cancellation; providing both a JRMP and a JERI
+     * configuration.
+     * Although the example is old and hasn't been maintained, it may provide
+     * the sort of
+     * guidance and patterns you're looking for.
+     * 
+     * You can find the source code and related collateral at the following link:
+     * 
+     * <https://java.net/projects/bodega/sources/svn/show/trunk/src/archive/starterkit-examples/src/com/sun/jini/example/cancellation?rev-219>
+     * 
+     * I hope this helps,
+     * Brian
+     * </pre>
+     * <pre>
+     * This is one of the places where a lease could help. An extension of the
+     * existing JERI details could add a lease into the dispatcher layer so that
+     * a constant �I am here� message would come through to the service. If the
+     * client thread is interrupted it would no longer be pinging/notifying of
+     * it�s interest in the results. That would allow the service end, to take
+     * appropriate actions. I think that I�d want the export operation or
+     * exporter creation, to include the setup of a call back that would occur
+     * when an client wants something to stop. I would make the API include a
+     * �correlation-ID�, and I�d have that passed into the call to do work, and
+     * passed into the call back for cancellation.
+     * 
+     * Gregg
+     * </pre>
+     */
+    public void test_interruptRMI() throws Exception {
+        
+        // Start a service.
+        final HAGlue serverA = startA();
+
+        final AtomicReference<Throwable> localCause = new AtomicReference<Throwable>();
+
+        final ExecutorService executorService = Executors
+                .newSingleThreadScheduledExecutor(DaemonThreadFactory
+                        .defaultThreadFactory());
+        
+        try {
+
+            final FutureTask<Void> localFuture = new FutureTask<Void>(
+                    new Callable<Void>() {
+
+                        @Override
+                        public Void call() throws Exception {
+
+                            try {
+                                final Future<Void> ft = ((HAGlueTest) serverA)
+                                        .submit(new SleepTask(6000/* ms */),
+                                                false/* asyncFuture */);
+
+                                return ft.get();
+                            } catch (Throwable t) {
+                                localCause.set(t);
+                                log.error(t, t);
+                                throw new RuntimeException(t);
+                            } finally {
+                                log.warn("Local submit of remote task is done.");
+                            }
+                        }
+                    });
+            /*
+             * Submit task that will execute sleep on A. This task will block
+             * until A finishes its sleep. When we cancel this task, the RMI to
+             * A will be interrupted.
+             */
+            executorService.execute(localFuture);
+            
+            // Wait a bit to ensure that the task was started on A.
+            Thread.sleep(2000/* ms */);
+
+            // interrupt the local future. will cause interrupt of the RMI.
+            localFuture.cancel(true/*mayInterruptIfRunning*/);
+
+        } finally {
+        
+            executorService.shutdownNow();
+            
+        }
+
+        /*
+         * The local root cause of the RMI failure is an InterruptedException.
+         * 
+         * Note: There is a data race between when the [localCause] is set and
+         * when we exit the code block above. This is because we are
+         * interrupting the local task and have no means to await the completion
+         * of its error handling routine which sets the [localCause].
+         */
+        {
+            assertCondition(new Runnable() {
+                @Override
+                public void run() {
+                    final Throwable tmp = localCause.get();
+                    assertNotNull(tmp);
+                    assertTrue(InnerCause.isInnerCause(tmp,
+                            InterruptedException.class));
+                }
+            }, 10000/*timeout*/, TimeUnit.MILLISECONDS);
+        }
+
+        /*
+         * Verify that A does NOT observe the interrupt. Instead, the
+         * Thread.sleep() should complete normally on A. See the comments at the
+         * head of this test method.
+         * 
+         * Note: Again, there is a data race.
+         * 
+         * Note: Because we might retry this, we do NOT use the getAndClearXXX()
+         * method to recover the remote exception.
+         */
+        {
+            assertCondition(new Runnable() {
+                @Override
+                public void run() {
+                    Throwable tmp;
+                    try {
+                        tmp = ((HAGlueTest) serverA).getLastRootCause();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    assertNull(tmp);
+//                    log.warn("Received non-null lastRootCause=" + tmp, tmp);
+//                    assertTrue(InnerCause.isInnerCause(tmp,
+//                            InterruptedException.class));
+                }
+            }, 10000/* timeout */, TimeUnit.MILLISECONDS);
+        }
+        
+    }
+
+    /**
+     * Task sleeps for a specified duration.
+     * 
+     * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+     *         Thompson</a>
+     */
+    private static class SleepTask extends IndexManagerCallable<Void> {
+
+        private static final long serialVersionUID = 1L;
+
+        private long millis;
+
+        SleepTask(final long millis) {
+            this.millis = millis;
+        }
+
+        @Override
+        public Void call() throws Exception {
+            log.warn("Will sleep: millis=" + millis);
+            try {
+                Thread.sleep(millis);
+                log.warn("Sleep finished normally.");
+            } catch (Throwable t) {
+                log.error("Exception during sleep: "+t, t);
+                ((HAJournalTest) getIndexManager()).getRemoteImpl()
+                        .setLastRootCause(t);
+                throw new RuntimeException(t);
+            } finally {
+                log.warn("Did sleep: millis=" + millis);
+            }
+            return null;
+        }
+
+    }
+
+}
