@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -212,7 +212,7 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/831">Union with FILTER
+     * @see <a href="http://trac.blazegraph.com/ticket/831">Union with FILTER
      *      issue</a>
      */
     public void test_union_ticket_831() throws Exception {
@@ -228,7 +228,7 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
 
     /**
      * The original query.
-     * @see <a href="http://trac.bigdata.com/ticket/874">FILTER not applied when
+     * @see <a href="http://trac.blazegraph.com/ticket/874">FILTER not applied when
      *      there is UNION in the same join group</a>
      */
     public void test_union_ticket_874() throws Exception {
@@ -245,7 +245,7 @@ public class TestUnions extends AbstractDataDrivenSPARQLTestCase {
     /**
      * A rewrite of the original query that works.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/874">FILTER not applied when
+     * @see <a href="http://trac.blazegraph.com/ticket/874">FILTER not applied when
      *      there is UNION in the same join group</a>
      */
     public void test_union_ticket_874b() throws Exception {

@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2014.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -109,32 +109,63 @@ public class BigdataSailFactory {
 				normalizeEndpoint(serviceEndpoint));
 
 	}
+	
+	/**
+	 * 
+	 * Convenience method to allow the testing of the URL
+	 * normalization functionality.
+	 * 
+	 * See http://trac.blazegraph.com/ticket/1139
+	 * 
+	 */
+	public static String testServiceEndpointUrl(final String serviceEndpoint)
+	{
+		return normalizeEndpoint(serviceEndpoint);
+	}
 
 	/**
 	 * Massage the service endpoint to ensure that it ends with
-	 * </code>/bigdata/sparql</code>
+	 * </code>/bigdata</code>
 	 */
     static private String normalizeEndpoint(final String serviceEndpoint) {
 
-        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
+        if (serviceEndpoint.endsWith("/sparql")) {
             
-        	return serviceEndpoint;
+        	return serviceEndpoint.substring(0,
+        				serviceEndpoint.length()-"/sparql".length());
+        	
+        } if (serviceEndpoint.endsWith("/sparql/")) {
+            
+        	return serviceEndpoint.substring(0,
+        				serviceEndpoint.length()-"/sparql/".length());
         	
         } else if (serviceEndpoint.endsWith("/bigdata/")) {
             
-        	return serviceEndpoint + "sparql";
+        	return serviceEndpoint.substring(0, 
+        				serviceEndpoint.length()-1) ;
         	
         } else if (serviceEndpoint.endsWith("/bigdata")) {
             
-        	return serviceEndpoint + "/sparql";
+        	return serviceEndpoint;
         	
-        } else if (serviceEndpoint.endsWith("/")) {
+		} else if (serviceEndpoint.contains("/bigdata")
+				&& serviceEndpoint.endsWith("/")) {
+			// This is the case of /bigdata/namespace/NAMESPACE/
+
+			return serviceEndpoint.substring(0, serviceEndpoint.length() - 1);
+
+		} else if (serviceEndpoint.contains("/bigdata")) {
+			// This is the case of /bigdata/namespace/NAMESPACE
+
+			return serviceEndpoint;
+
+		} else if (serviceEndpoint.endsWith("/")) {
+
+			return serviceEndpoint + "bigdata";
+
+		} else {
             
-        	return serviceEndpoint + "bigdata/sparql";
-        	
-        } else {
-            
-        	return serviceEndpoint + "/bigdata/sparql";
+        	return serviceEndpoint + "/bigdata";
         	
         }
         

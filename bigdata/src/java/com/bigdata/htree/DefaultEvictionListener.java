@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -75,7 +75,7 @@ public class DefaultEvictionListener implements
              * discarded the index and caused it to be reloaded from the most
              * recent checkpoint.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/1005"> Invalidate
+             * @see <a href="http://trac.blazegraph.com/ticket/1005"> Invalidate
              *      BTree objects if error occurs during eviction </a>
              */
             throw new IllegalStateException(AbstractHTree.ERROR_ERROR_STATE,
@@ -177,7 +177,7 @@ public class DefaultEvictionListener implements
                  * If the btree is mutable and an eviction fails, then the index
                  * MUST be discarded.
                  * 
-                 * @see <a href="http://trac.bigdata.com/ticket/1005">
+                 * @see <a href="http://trac.blazegraph.com/ticket/1005">
                  *      Invalidate BTree objects if error occurs during eviction
                  *      </a>
                  */

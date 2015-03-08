@@ -3,9 +3,9 @@ Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -449,8 +449,8 @@ SELECT ?s WHERE {
           final URI X = vf.createURI(BD.NAMESPACE + "X");
           final URI Y = vf.createURI(BD.NAMESPACE + "Y");
           final Literal _1 = vf.createLiteral("That Seventies Show","en");
-          final Literal _2 = vf.createLiteral("Cette SŽrie des AnnŽes Soixante-dix","fr");
-          final Literal _3 = vf.createLiteral("Cette SŽrie des AnnŽes Septante","fr-BE");
+          final Literal _2 = vf.createLiteral("Cette Sï¿½rie des Annï¿½es Soixante-dix","fr");
+          final Literal _3 = vf.createLiteral("Cette Sï¿½rie des Annï¿½es Septante","fr-BE");
           final Literal _4 = vf.createLiteral("Il Buono, il Bruto, il Cattivo");
 
           /*

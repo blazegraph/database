@@ -46,7 +46,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * The {@link ASTBindingAssigner} will then replace occurrences of variable
  * ?uri through a {@link Constant} node for more efficient evaluation.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/653">Slow query with bind</a>
+ * @see <a href="http://trac.blazegraph.com/ticket/653">Slow query with bind</a>
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * 

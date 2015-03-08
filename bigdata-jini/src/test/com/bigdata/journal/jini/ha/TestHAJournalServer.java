@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -379,15 +379,15 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
      * <pre>
      * Hi Bryan:
      * 
-     * I would expect the remote task to complete and return, despite the caller being interrupted.  The JERI subsystem (IÕm guessing the invocation layer, but it might be the transport layer) might log an exception when it tried to return, but there was nobody on the calling end.
+     * I would expect the remote task to complete and return, despite the caller being interrupted.  The JERI subsystem (Iï¿½m guessing the invocation layer, but it might be the transport layer) might log an exception when it tried to return, but there was nobody on the calling end.
      * 
-     * ThatÕs consistent with a worst-case failure, where the caller drops off the network.  How is the called service supposed to know what happened to the caller?
+     * Thatï¿½s consistent with a worst-case failure, where the caller drops off the network.  How is the called service supposed to know what happened to the caller?
      * 
-     * In the case of a typical short operation, I wouldnÕt see that as a big issue, as the wasted computational effort on the service side wonÕt be consequential.
+     * In the case of a typical short operation, I wouldnï¿½t see that as a big issue, as the wasted computational effort on the service side wonï¿½t be consequential.
      * 
-     * In the case of a long-running operation where it becomes more likely that the caller wants to stop or cancel an operation (in addition to the possibility of having it interrupted), IÕd try to break it into a series of operations (chunks), or setup an ongoing notification or update protocol.  You probably want to do that anyway, because clients probably would like to see interim updates while a long operation is in process.
+     * In the case of a long-running operation where it becomes more likely that the caller wants to stop or cancel an operation (in addition to the possibility of having it interrupted), Iï¿½d try to break it into a series of operations (chunks), or setup an ongoing notification or update protocol.  You probably want to do that anyway, because clients probably would like to see interim updates while a long operation is in process.
      * 
-     * Unfortunately, I donÕt think these kinds of things can be reasonably handled in a communication layer - the application almost always needs to be involved in the resolution of a problem when we have a service-oriented system.
+     * Unfortunately, I donï¿½t think these kinds of things can be reasonably handled in a communication layer - the application almost always needs to be involved in the resolution of a problem when we have a service-oriented system.
      * 
      * Cheers,
      * 
@@ -416,13 +416,13 @@ public class TestHAJournalServer extends AbstractHA3JournalServerTestCase {
      * <pre>
      * This is one of the places where a lease could help. An extension of the
      * existing JERI details could add a lease into the dispatcher layer so that
-     * a constant ÒI am hereÓ message would come through to the service. If the
+     * a constant ï¿½I am hereï¿½ message would come through to the service. If the
      * client thread is interrupted it would no longer be pinging/notifying of
-     * itÕs interest in the results. That would allow the service end, to take
-     * appropriate actions. I think that IÕd want the export operation or
+     * itï¿½s interest in the results. That would allow the service end, to take
+     * appropriate actions. I think that Iï¿½d want the export operation or
      * exporter creation, to include the setup of a call back that would occur
      * when an client wants something to stop. I would make the API include a
-     * Òcorrelation-IDÓ, and IÕd have that passed into the call to do work, and
+     * ï¿½correlation-IDï¿½, and Iï¿½d have that passed into the call to do work, and
      * passed into the call back for cancellation.
      * 
      * Gregg

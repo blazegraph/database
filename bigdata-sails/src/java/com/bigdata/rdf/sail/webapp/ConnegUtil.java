@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -114,7 +114,7 @@ public class ConnegUtil {
 	 * @param req
 	 * @return The value of the format string, if present or the Accept Header.
 	 * 
-	 * @see http://trac.bigdata.com/ticket/984
+	 * @see http://trac.blazegraph.com/ticket/984
 	 */
 	public static String getMimeTypeForQueryParameter(String outputFormat,
 			String acceptHeader) {

@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -98,6 +98,9 @@ public class TestAll extends TestCase {
 
         // NanoSparqlServer
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
+        
+        //BigdataSailFactory
+        suite.addTestSuite(BigdataSailFactoryTest.class);
 
         /* FIXME Restore:: quad store in scale-out.
          * 
@@ -109,5 +112,5 @@ public class TestAll extends TestCase {
         return suite;
 
     }
-
+    
 }
