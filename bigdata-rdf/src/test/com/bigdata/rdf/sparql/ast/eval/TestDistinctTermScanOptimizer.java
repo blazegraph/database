@@ -4,9 +4,9 @@ Copyright (C) SYSTAP, LLC 2013.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * SPARQL level test suite for the {@link ASTDistinctTermScanOptimizer} and its
  * physical operator {@link DistinctTermScanOp}.
  * 
- * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT PREDICATEs
+ * @see <a href="http://trac.blazegraph.com/ticket/1035" > DISTINCT PREDICATEs
  *      query is slow </a>
  * 
  *      FIXME Write SPARQL layer tests correct rejection tests for DISTINCT ?var

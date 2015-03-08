@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -205,7 +205,7 @@ import cutthecrap.utils.striterators.Striterator;
  * The {@link BigdataSail} may be configured as as to provide a triple store
  * with statement-level provenance using <em>statement identifiers</em>. See
  * {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS} and <a
- * href="http://wiki.bigdata.com/wiki/index.php/Reification_Done_Right" >
+ * href="http://wiki.blazegraph.com/wiki/index.php/Reification_Done_Right" >
  * Reification Done Right </a>.
  * </p>
  * <p>
@@ -410,7 +410,7 @@ public class BigdataSail extends SailBase implements Sail {
          * although the latter was not stored internally. This property only
          * effects data loaded through the {@link Sail}.
          * 
-         * @see http://trac.bigdata.com/ticket/1086
+         * @see http://trac.blazegraph.com/ticket/1086
          */
         public static final String REJECT_QUADS_IN_TRIPLE_MODE = BigdataSail.
               class.getPackage().getName() + ".rejectQuadsInTripleMode"; 
@@ -1449,7 +1449,7 @@ public class BigdataSail extends SailBase implements Sail {
     * @return The unisolated connection to the database
     * 
     * @see #getConnection()
-    * @see <a href="wiki.bigdata.com/wiki/index.php?title=GroupCommit" > Group
+    * @see <a href="wiki.blazegraph.com/wiki/index.php?title=GroupCommit" > Group
     *      Commit (wiki) </a>
     */
     public BigdataSailConnection getUnisolatedConnection()

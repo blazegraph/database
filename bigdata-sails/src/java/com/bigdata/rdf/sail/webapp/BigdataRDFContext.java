@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -232,7 +232,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
     /**
      * HTTP header may be used to specify the timeout for a query.
      * 
-     * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+     * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
      */
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
 
@@ -1051,7 +1051,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
              * Handle data races in CANCEL of an UPDATE operation whose
              * cancellation was requested before it began to execute.
              * 
-             * @see <a href="http://trac.bigdata.com/ticket/899"> REST API Query
+             * @see <a href="http://trac.blazegraph.com/ticket/899"> REST API Query
              *      Cancellation </a>
              */
             {
@@ -1085,7 +1085,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          * 
          * @return The query.
          * 
-         * @see http://trac.bigdata.com/ticket/914 (Set timeout on remote query)
+         * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
          */
         private AbstractQuery newQuery(final BigdataSailRepositoryConnection cxn) {
 
@@ -2401,7 +2401,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * Return a list of the namespaces for the {@link AbstractTripleStore}s
      * registered against the bigdata instance.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+     * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
      *      problem with list namespaces and create namespace </a>
      */
     /*package*/ List<String> getNamespaces(final long timestamp) {
@@ -2510,7 +2510,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 	 * 
 	 * @see ITransactionService#newTx(long)
 	 * 
-	 * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+	 * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
 	 *      problem with list namespaces and create namespace </a>
 	 */
     public long newTx(final long timestamp) {

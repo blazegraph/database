@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -317,7 +317,7 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     * A non-concurrent version testing both create, destroy, and then re-create
     * where the KB properties have NOT been changed.
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
+    * @see <a href="http://trac.blazegraph.com/ticket/948"> Create/Destroy of KB
     *      followed by Create with different Vocabulary causes runtime exception
     *      </a>
     */
@@ -369,7 +369,7 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     * A non-concurrent version testing both create, destroy, and then re-create
     * where the KB properties have been changed (especially the Vocabulary class).
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
+    * @see <a href="http://trac.blazegraph.com/ticket/948"> Create/Destroy of KB
     *      followed by Create with different Vocabulary causes runtime exception
     *      </a>
     */
@@ -432,7 +432,7 @@ abstract public class TestConcurrentKBCreate extends ProxyBigdataSailTestCase {
     * <p>
     * In this variant, we shutdown the Journal and then re-open it.
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/948"> Create/Destroy of KB
+    * @see <a href="http://trac.blazegraph.com/ticket/948"> Create/Destroy of KB
     *      followed by Create with different Vocabulary causes runtime exception
     *      </a>
     */

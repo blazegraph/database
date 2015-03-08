@@ -1,12 +1,12 @@
 /*
 
-Copyright (C) SYSTAP, LLC 2006-2008.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ public interface IKeyBuilderFactory {
      * may be used to form successors for Unicode prefix scans without having
      * the secondary sort ordering characteristics mucking things up.
      * 
-     * @see <a href="http://trac.bigdata.com/ticket/974" >
+     * @see <a href="http://trac.blazegraph.com/ticket/974" >
      *      Name2Addr.indexNameScan(prefix) uses scan + filter </a>
      */
     public IKeyBuilder getPrimaryKeyBuilder();

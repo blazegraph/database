@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -482,7 +482,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
          * Protect the entire operation with a transaction, including the
          * describe of each namespace that we discover.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/867"> NSS concurrency
+         * @see <a href="http://trac.blazegraph.com/ticket/867"> NSS concurrency
          *      problem with list namespaces and create namespace </a>
          */
         final long tx = getBigdataRDFContext().newTx(timestamp);

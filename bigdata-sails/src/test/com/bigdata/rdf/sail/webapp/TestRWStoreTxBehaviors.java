@@ -1,11 +1,11 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,13 +62,13 @@ public class TestRWStoreTxBehaviors<S extends IIndexManager> extends
    /**
     * Unit test verifies that the native journal transaction counter for the
     * RWStore is properly closed for SPARQL UPDATE. This bug was introduced when
-    * addressing <a href="http://trac.bigdata.com/ticket/1026> SPARQL UPDATE
+    * addressing <a href="http://trac.blazegraph.com/ticket/1026> SPARQL UPDATE
     * with runtime errors causes problems with lexicon indices </a>.
     * <p>
     * Note: This test will fail if group commit is enabled and the servlet
     * commits the http response before the group commit.
     * 
-    * @see <a href="http://trac.bigdata.com/ticket/1036"> Journal file growth
+    * @see <a href="http://trac.blazegraph.com/ticket/1036"> Journal file growth
     *      reported with 1.3.3 </a>
     */
     public void test_SPARQL_UPDATE_Tx_Properly_Closed() throws Exception {

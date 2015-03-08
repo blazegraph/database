@@ -1,12 +1,12 @@
 /**
 
-Copyright (C) SYSTAP, LLC 2006-2011.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
-     4501 Tower Road
-     Greensboro, NC 27410
-     licenses@bigdata.com
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -410,7 +410,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Rewrites aspects of queries where bottom-up evaluation would produce
          * different results.
          * 
-         * @see <a href="http://trac.bigdata.com/ticket/1113"> Hook to configure
+         * @see <a href="http://trac.blazegraph.com/ticket/1113"> Hook to configure
          * the ASTOptimizerList </a>
          */
         add(new ASTBottomUpOptimizer());
@@ -496,7 +496,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 * count mechanisms when that feature would produce exact results for
 		 * the KB instance.
 		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1037" > Rewrite SELECT
+		 * @see <a href="http://trac.blazegraph.com/ticket/1037" > Rewrite SELECT
 		 *      COUNT(...) (DISTINCT|REDUCED) {single-triple-pattern} as ESTCARD
 		 *      </a>
 		 */
@@ -529,7 +529,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 		 * cardinality estimates attached by this optimizer and this optimizer
 		 * could run first.
 		 * 
-		 * @see <a href="http://trac.bigdata.com/ticket/1035" > DISTINCT
+		 * @see <a href="http://trac.blazegraph.com/ticket/1035" > DISTINCT
 		 *      PREDICATEs query is slow </a>
 		 */
 		if (QueryHints.DEFAULT_DISTINCT_TERM_SCAN_OPTIMIZER)
