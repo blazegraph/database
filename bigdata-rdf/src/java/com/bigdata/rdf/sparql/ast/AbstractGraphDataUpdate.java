@@ -40,7 +40,6 @@ import com.bigdata.rdf.spo.ISPO;
  * <code>DELETE DATA</code> operations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public abstract class AbstractGraphDataUpdate extends GraphUpdate {
 
@@ -108,6 +107,7 @@ public abstract class AbstractGraphDataUpdate extends GraphUpdate {
 
     }
 
+    @Override
     final public String toString(final int indent) {
 
         final StringBuilder sb = new StringBuilder();

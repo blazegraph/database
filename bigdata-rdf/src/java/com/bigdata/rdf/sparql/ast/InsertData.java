@@ -42,7 +42,6 @@ import com.bigdata.bop.BOp;
  * @see http://www.w3.org/TR/sparql11-update/#insertData
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class InsertData extends AbstractGraphDataUpdate {
 
