@@ -1,5 +1,5 @@
 /**
-Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+Copyright (C) SYSTAP, LLC 2006-2007.  All rights reserved.
 
 Contact:
      SYSTAP, LLC
@@ -449,3 +449,82 @@ SELECT ?s WHERE {
           final URI X = vf.createURI(BD.NAMESPACE + "X");
           final URI Y = vf.createURI(BD.NAMESPACE + "Y");
           final Literal _1 = vf.createLiteral("That Seventies Show","en");
+          final Literal _2 = vf.createLiteral("Cette S�rie des Ann�es Soixante-dix","fr");
+          final Literal _3 = vf.createLiteral("Cette S�rie des Ann�es Septante","fr-BE");
+          final Literal _4 = vf.createLiteral("Il Buono, il Bruto, il Cattivo");
+
+          /*
+           * Create some statements.
+           */
+          cxn.add(X, RDFS.LABEL, _1);
+          cxn.add(X, RDFS.LABEL, _2);
+          cxn.add(X, RDFS.LABEL, _3);
+          cxn.add(Y, RDFS.LABEL, _4);
+          
+          /*
+           * Note: The either flush() or commit() is required to flush the
+           * statement buffers to the database before executing any operations
+           * that go around the sail.
+           */
+          cxn.commit();
+          
+          if (log.isInfoEnabled()) {
+          	log.info(sail.getDatabase().dumpStore());
+          }
+          
+          {
+              
+              String query =
+//                  QueryOptimizerEnum.queryHint(QueryOptimizerEnum.None) +
+                  "prefix bd: <"+BD.NAMESPACE+"> " +
+                  "prefix rdf: <"+RDF.NAMESPACE+"> " +
+                  "prefix rdfs: <"+RDFS.NAMESPACE+"> " +
+                  "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#> " +
+                  
+                  "select ?title " +
+                  "where { " +
+                  "  hint:Query hint:"+QueryHints.OPTIMIZER+" \""+QueryOptimizerEnum.None+"\"."+
+                  "  ?s rdfs:label \"That Seventies Show\"@en . " +
+                  "  ?s rdfs:label ?title . " +
+                  "  FILTER langMatches( lang(?title), \"FR\" ) . " +
+                  "}"; 
+  
+              final SailTupleQuery tupleQuery = (SailTupleQuery)
+                  cxn.prepareTupleQuery(QueryLanguage.SPARQL, query);
+              tupleQuery.setIncludeInferred(false /* includeInferred */);
+             
+              if (log.isInfoEnabled()) {
+                  
+                  log.info(query);
+                  
+                  final TupleQueryResult result = tupleQuery.evaluate();
+                  while (result.hasNext()) {
+                      log.info(result.next());
+                  }
+                  
+              }
+              
+              final Collection<BindingSet> answer = new LinkedList<BindingSet>();
+              answer.add(createBindingSet(
+                      new BindingImpl("title", _2)
+                      ));
+              answer.add(createBindingSet(
+                      new BindingImpl("title", _3)
+                      ));
+
+              final TupleQueryResult result = tupleQuery.evaluate();
+              compare(result, answer);
+
+            }
+          
+        } finally {
+            cxn.close();
+        }
+        } finally {
+            if (sail instanceof BigdataSail)
+                ((BigdataSail)sail).__tearDownUnitTest();//shutDown();
+        }
+
+    }
+    
+}
