@@ -523,8 +523,9 @@ public class AbstractHAGroupCommitTestCase extends AbstractHA3JournalServerTestC
             for (int j = 0; j < nnamespaces; j++) {
 
                // FIXME Why is it a problem to create/destroy the same namespaces?!?
-               final String theNamespace = namespaces[j]
-                     +"::round="+nruns
+               final String theNamespace = namespaces[j];
+               final String theNamespaceDisplay = theNamespace
+                     +"::round="+i
                      ;
 
                tasks.add(new Callable<Void>() {
@@ -542,7 +543,7 @@ public class AbstractHAGroupCommitTestCase extends AbstractHA3JournalServerTestC
                                  RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
                                  theNamespace);
 
-                           log.warn("Creating: " + theNamespace);
+                           log.warn("Creating: " + theNamespaceDisplay);
                            repo.createRepository(theNamespace, properties);
 
                            if(true) {
@@ -553,7 +554,7 @@ public class AbstractHAGroupCommitTestCase extends AbstractHA3JournalServerTestC
                            
 //                        } else {
 
-                           log.warn("Destroying: " + theNamespace);
+                           log.warn("Destroying: " + theNamespaceDisplay);
                            repo.deleteRepository(theNamespace);
 
 //                        }

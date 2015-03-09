@@ -2634,6 +2634,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 final int i = fixedAllocatorIndex(size);
                 if (context != null) {
                     allocator = establishContextAllocation(context).getFreeFixed(i);
+                    
+                    if (allocator.checkBlock0()) {
+                    	if (log.isInfoEnabled())
+                    		log.info("Adding new shadowed allocator, index: " + allocator.getIndex() + ", diskAddr: " + allocator.getDiskAddr());
+                    	m_commitList.add(allocator);
+                    }
+
                 } else {
                     final int block = 64 * m_allocSizes[i];
                     m_spareAllocation += (block - size); // Isn't adjusted by frees!
@@ -2653,6 +2660,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         
                         if (m_storageStats != null) {
                             m_storageStats.register(allocator, true);
+                        }
+                        
+                        if (allocator.checkBlock0()) {
+                        	m_commitList.add(allocator);
                         }
                     } else {
                         // Verify free list only has allocators with free bits
@@ -2968,11 +2979,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 // FIXME: we should be able to clear the dirty list, but this currently causes
                 //  problems in HA.
                 // If the allocators are torn down correctly, we should be good to clear the commitList
-                m_commitList.clear();
+                 m_commitList.clear();
                 
                 // Flag no allocations since last commit
                 m_recentAlloc = false;
+            } else {
+            	// there are isolated writes, so we must not clear the commit list since otherwise
+            	//	the Alloction index wil get out of sync as per Ticket #1136
             }
+            
             if (m_quorum != null) {
                 /**
                  * When the RWStore is part of an HA quorum, we need to close
@@ -7023,13 +7038,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 if (stats.m_freed.containsKey(nxtAddr)) {
                     stats.m_duplicates.add(nxtAddr);
                     if (writeAll) {
-                        System.err.println("" + commitTime + " " + nxtAddr
+                        log.warn("" + commitTime + " " + nxtAddr
                                 + " FREE DUP");
                     }
                 } else {
                     stats.m_freed.put(nxtAddr, nxtAddr);
                     if (writeAll) {
-                        System.err.println("" + commitTime + " " + nxtAddr
+                    	log.warn("" + commitTime + " " + nxtAddr
                                 + " FREE");
                     }
                 }

@@ -116,8 +116,8 @@ public class TestAll extends TestCase {
 
         // Test suite for concurrent writers and group commit. See #1136
         // FIXME Enable these for the #1136 branch. Disabled in master for release.
-//        suite.addTestSuite(TestHA1GroupCommit.class);
-//        suite.addTestSuite(TestHA3GroupCommit.class);
+        suite.addTestSuite(TestHA1GroupCommit.class);
+        suite.addTestSuite(TestHA3GroupCommit.class);
 
         // The HA load balancer test suite.
         suite.addTest(TestAll_LBS.suite());
