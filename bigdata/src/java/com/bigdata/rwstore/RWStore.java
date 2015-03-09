@@ -4154,103 +4154,21 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     public void showAllocators(final StringBuilder str) {
         m_storageStats.showStats(str);
-//      final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
-//      for (int i = 0; i < stats.length; i++) {
-//          stats[i] = new AllocationStats(m_allocSizes[i]*64);
-//      }
-//      
-//      final Iterator<FixedAllocator> allocs = m_allocs.iterator();
-//      while (allocs.hasNext()) {
-//          Allocator alloc = (Allocator) allocs.next();
-//          alloc.appendShortStats(str, stats);
-//      }
-//      
-//      // Append Summary
-//      str.append("\n-------------------------\n");
-//      str.append("RWStore Allocation Summary\n");
-//      str.append("-------------------------\n");
-//      str.append(padRight("Allocator", 10));
-//      str.append(padLeft("SlotsUsed", 12));
-//      str.append(padLeft("reserved", 12));
-//      str.append(padLeft("StoreUsed", 14));
-//      str.append(padLeft("reserved", 14));
-//      str.append(padLeft("Usage", 8));
-//      str.append(padLeft("Store", 8));
-//      str.append("\n");
-//      long treserved = 0;
-//      long treservedSlots = 0;
-//      long tfilled = 0;
-//      long tfilledSlots = 0;
-//      for (int i = 0; i < stats.length; i++) {
-//          final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
-//          treserved += reserved;
-//          treservedSlots += stats[i].m_reservedSlots;
-//          final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-//          tfilled += filled;
-//          tfilledSlots += stats[i].m_filledSlots;
-//      }
-//      for (int i = 0; i < stats.length; i++) {
-//          final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
-//          final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-//          str.append(padRight("" + stats[i].m_blockSize, 10));
-//          str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
-//          str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
-//          str.append(padLeft("" + (reserved==0?0:(filled * 100 / reserved)) + "%", 8));
-//          str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
-//          str.append("\n");
-//      }
-//      str.append("\n");
-//
-//      str.append(padRight("Totals", 10));
-//        str.append(padLeft("" + tfilledSlots, 12));
-//        str.append(padLeft("" + treservedSlots, 12));
-//        str.append(padLeft("" + tfilled, 14));
-//        str.append(padLeft("" + treserved, 14));
-//        str.append(padLeft("" + (treserved==0?0:(tfilled * 100 / treserved)) + "%", 8));
-//        str.append("\nFile size: " + convertAddr(m_fileSize) + "bytes\n");
+        str.append("\nChecking regions.....");
+        
+        // Now check all allocators to confirm that each file region maps to only one allocator
+        try {
+	        final HashMap<Integer, FixedAllocator> map = new HashMap<Integer, FixedAllocator>();
+	        for (FixedAllocator fa : m_allocs) {
+	        	fa.addToRegionMap(map);
+	        }
+	        str.append("okay\n");
+        } catch (IllegalStateException is) {
+        	str.append(is.getMessage() + "\n");
+        }
+        
     }
     
-//  private String padLeft(String str, int minlen) {
-//      if (str.length() >= minlen)
-//          return str;
-//      
-//      StringBuffer out = new StringBuffer();
-//      int pad = minlen - str.length();
-//      while (pad-- > 0) {
-//          out.append(' ');
-//      }
-//      out.append(str);
-//      
-//      return out.toString();
-//  }
-//  private String padRight(String str, int minlen) {
-//      if (str.length() >= minlen)
-//          return str;
-//      
-//      StringBuffer out = new StringBuffer();
-//      out.append(str);
-//      int pad = minlen - str.length();
-//      while (pad-- > 0) {
-//          out.append(' ');
-//      }
-//      
-//      return out.toString();
-//  }
-
-//  public ArrayList<Allocator> getStorageBlockAddresses() {
-//      final ArrayList<Allocator> addrs = new ArrayList<Allocator>(m_allocs.size());
-//
-//      final Iterator<Allocator> allocs = m_allocs.iterator();
-//      while (allocs.hasNext()) {
-//          final Allocator alloc = allocs.next();
-//          alloc.addAddresses(addrs);
-//      }
-//
-//      return addrs;
-//  }
-
-    // --------------------------------------------------------------------------------------
-
     /**
      * Given a physical address (byte offset on the store), return true if that
      * address could be managed by an allocated block.
