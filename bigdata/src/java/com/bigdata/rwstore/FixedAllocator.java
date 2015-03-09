@@ -952,7 +952,11 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 	
-	void checkBlock(final AllocBlock block) {
+	boolean checkBlock0() {
+		return checkBlock(m_allocBlocks.get(0));
+	}
+	
+	boolean checkBlock(final AllocBlock block) {
 		if (block.m_addr == 0) {
 			int blockSize = 32 * m_bitSize;
 			if (m_statsBucket != null) {
@@ -970,6 +974,10 @@ public class FixedAllocator implements Allocator {
 				m_startAddr = block.m_addr;
 			}
 			m_endAddr = block.m_addr - blockSize;
+			
+			return true; // commit required
+		} else {
+			return false;
 		}
 
 	}
@@ -1402,7 +1410,8 @@ public class FixedAllocator implements Allocator {
              * state to m_saveCommit
              */
             if (m_context != null) {
-                throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
+            	// do not copy live bits to committed bits, leave to context.release()
+                // throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
 //            } else if (m_store.isSessionPreserved()) {
 //                block.m_commit = block.m_transients.clone();
             } else {
