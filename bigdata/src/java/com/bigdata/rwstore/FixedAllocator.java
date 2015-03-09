@@ -1573,4 +1573,15 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 
+	public void addToRegionMap(HashMap<Integer, FixedAllocator> map) {
+		for (AllocBlock ab : m_allocBlocks) {
+			if (ab.m_addr != 0) {
+				final FixedAllocator pa = map.put(ab.m_addr, this);
+				if (pa != null) {
+					throw new IllegalStateException("Duplicate mapping Allocators, " + pa.m_index + ", " + m_index);
+				}
+			}
+		}
+	}
+
 }
