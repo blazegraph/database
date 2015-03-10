@@ -32,6 +32,7 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -163,6 +164,14 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     if (pathExpr != null) {
                         throw new RuntimeException("Only one " + PATH_EXPR + " allowed");
                     }
+                    /*
+                     * Make all variables in the ALP service (other than the
+                     * left and right) anonymous, since they cannot be projected
+                     * out in a meaningful fashion.
+                     */
+                    if (child.p() instanceof VarNode) {
+                        ((VarNode) child.p()).setAnonymous(true);
+                    }
                     left = child.s();
                     right = child.o();
                     if (bidirectional) {
@@ -219,10 +228,24 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             alpNode.subgroup().addChild(pathExpr);
             for (StatementPatternNode child : subgroup.getStatementPatterns()) {
                 if (!child.getQueryHintAsBoolean(PATH_EXPR, false)) {
+                    /*
+                     * Make all variables in the ALP service (other than the
+                     * left and right) anonymous, since they cannot be projected
+                     * out in a meaningful fashion.
+                     */
+                    for (BOp term : child.args()) {
+                        if (term instanceof VarNode) {
+                            ((VarNode) term).setAnonymous(true);
+                        }
+                    }
                     child.setQueryHints(new Properties());
                     subgroup.removeChild(child);
                     alpNode.subgroup().addChild(child);
                 }
+            }
+            
+            if (log.isDebugEnabled()) {
+                log.debug("optimized alpNode:\n"+alpNode);
             }
             
             group.removeChild(node);
