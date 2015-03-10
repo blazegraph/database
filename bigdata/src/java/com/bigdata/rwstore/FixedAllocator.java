@@ -229,7 +229,6 @@ public class FixedAllocator implements Allocator {
 	}
 
 	volatile private IAllocationContext m_context;
-	volatile private Thread m_contextThread;
 
 	/**
 	 * @return whether the allocator is unassigned to an AllocationContext
@@ -275,12 +274,6 @@ public class FixedAllocator implements Allocator {
 			// NO! m_store.removeFromCommit(this);
 		}
 		m_context = context;
-		
-		if (m_context != null) {
-			m_contextThread = Thread.currentThread();
-		} else {
-			m_contextThread = null;
-		}
 		
         if (log.isDebugEnabled())
             checkBits();
@@ -760,9 +753,6 @@ public class FixedAllocator implements Allocator {
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 					
-					if (m_contextThread != null && m_contextThread != Thread.currentThread())
-						throw new IllegalStateException("Check thread context");
-					
 					m_freeBits++;
 
 					checkFreeList();
@@ -1179,18 +1169,32 @@ public class FixedAllocator implements Allocator {
 		return RWStore.tstBit(block.m_commit, bit);
 	}
 
+	protected final AllocBlock getBlockFromLocalOffset(int offset) {
+	  	offset -= 3;
+
+	  	final int allocBlockRange = 32 * m_bitSize;
+
+		return (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+	}
+
 	/**
 	 * If the context is this allocators context AND it is not in the commit bits
 	 * then we can immediately free.
 	 */
     public boolean canImmediatelyFree(final int addr, final int size,
             final IAllocationContext context) {
+		final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
+		final boolean committed = isCommitted(offset);
+
 		if (context == m_context && !m_pendingContextCommit) {
-			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
-
-			final boolean ret = !isCommitted(offset);
-
-			return ret;
+			
+			return !committed;
+		} else if (m_context != null) {
+			// This must *not* be an address transiently allocated by the associated Allocator
+			if (!committed)
+				throw new IllegalStateException("Attempt to free address with invalid context");
+			
+			return false;
 		} else {
 			return false;
 		}

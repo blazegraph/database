@@ -111,6 +111,7 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.MergeStreamWithSnapshotData;
+import com.bigdata.util.StackInfoReport;
 
 /**
  * Storage class
@@ -2310,13 +2311,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         if (alloc.canImmediatelyFree(addr, sze, context)) {
                             immediateFree(addr, sze, true);
                         } else {
-                            establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
+                             establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
                         }
                     } else if (this.isSessionProtected()) {
                         immediateFree(addr, sze, false);
                     } else {
                         immediateFree(addr, sze);
                     }
+                } else if (context != null && alloc.canImmediatelyFree(addr, sze, context)){
+                    immediateFree(addr, sze);
                 } else {
                     // if a free request is made within a context not managed by
                     // the allocator then it is not safe to free
@@ -2329,7 +2332,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         if (log.isDebugEnabled())
                             log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
                     if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
-                        deferFree(addr, sze);
+                    	// If the context is != null, then the deferral must be against that context!
+                    	if (context != null) {
+                     		establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
+                    	} else {
+                    		deferFree(addr, sze);
+                    	}
                     } else {
                         immediateFree(addr, sze);
                     }
@@ -2434,10 +2442,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             int rem = sze;
             for (int i = 0; i < allocs; i++) {
                 final int nxt = instr.readInt();
-                free(nxt, rem < alloc ? rem : alloc);
+                free(nxt, rem < alloc ? rem : alloc, context);
                 rem -= alloc;
             }
-            free(hdr_addr, hdr.length);
+            free(hdr_addr, hdr.length, context);
             
             return true;
         } catch (IOException ioe) {
@@ -5092,8 +5100,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             if (log.isDebugEnabled())
                 log.debug("Releasing " + m_deferredFrees.size() + " deferred frees");
             
+            final boolean defer = m_store.m_minReleaseAge > 0 || m_store.m_activeTxCount > 0 || m_store.m_contexts.size() > 0;
             for (Long l : m_deferredFrees) {
-                m_store.immediateFree((int) (l >> 32), l.intValue());
+            	final int addr = (int) (l >> 32);
+            	final int sze = l.intValue();
+            	if (defer) {
+            		m_store.deferFree(addr, sze);
+            	} else {
+            		m_store.immediateFree(addr, sze);
+            	}
             }
             m_deferredFrees.clear();
         }
