@@ -205,12 +205,28 @@ public class FixedAllocator implements Allocator {
 	private ArrayList m_freeList;
 
 	public void setFreeList(final ArrayList list) {
+		setFreeList(list, false);
+		
+	}
+	/**
+	 * The force parameter is set to true when the allocator is being moved from one
+	 * free list to another.
+	 */
+	public void setFreeList(final ArrayList list, boolean force) {
 		if (m_freeList != list) {
 			m_freeList = list;
 			m_freeWaiting = true;
 		}
 
-		if (!m_pendingContextCommit && hasFree() && meetsSmallSlotThreshold()) {
+		if (m_pendingContextCommit || !hasFree()) {
+			if (force) {
+				throw new IllegalStateException("The allocator cannot be added to the free list, pendingContextCommit: " + m_pendingContextCommit + ", hasFree: " + hasFree());
+			}
+			
+			return;
+		}
+		
+		if (force || meetsSmallSlotThreshold()) {
 			addToFreeList();
 		}
 		
