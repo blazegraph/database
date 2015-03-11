@@ -244,7 +244,7 @@ public class FixedAllocator implements Allocator {
 	 */
 	private boolean m_sessionActive;
 
-	private boolean m_pendingContextCommit = false;
+	boolean m_pendingContextCommit = false; // accessible from RWStore
 	
 	public void setAllocationContext(final IAllocationContext context) {
 		if (m_pendingContextCommit) {

@@ -5135,8 +5135,17 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final ArrayList<FixedAllocator> free = m_freeFixed[i];
             if (free.size() == 0) {
                 final FixedAllocator falloc = establishFixedAllocator(i);
+                if (falloc.m_pendingContextCommit) {
+                	throw new IllegalStateException("Allocator on free list while pendingContextCommit");
+                }
+                
                 falloc.setAllocationContext(m_context);
                 falloc.setFreeList(free); // will add to free list
+                
+                if (free.size() == 0 ) {
+                	throw new IllegalStateException("Free list should not be empty, pendingContextCommit: " + falloc.m_pendingContextCommit);
+                }
+                
                 m_allFixed.add(falloc);
             }
             
