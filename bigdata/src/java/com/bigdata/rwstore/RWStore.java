@@ -5140,7 +5140,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 }
                 
                 falloc.setAllocationContext(m_context);
-                falloc.setFreeList(free); // will add to free list
+                // The normal check for adding to the free list is whether to return to the free list,
+                //	but in this case, we are moving to another free list, so we should not need to
+                //	check for the smallAllocation threshold.
+                falloc.setFreeList(free, true/*force*/);
                 
                 if (free.size() == 0 ) {
                 	throw new IllegalStateException("Free list should not be empty, pendingContextCommit: " + falloc.m_pendingContextCommit);
