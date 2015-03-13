@@ -523,7 +523,7 @@ public class AbstractHAGroupCommitTestCase extends AbstractHA3JournalServerTestC
             for (int j = 0; j < nnamespaces; j++) {
 
                // FIXME Why is it a problem to create/destroy the same namespaces?!?
-               final String theNamespace = namespaces[j];
+               final String theNamespace = namespaces[j] + "-" + i;
                final String theNamespaceDisplay = theNamespace
                      +"::round="+i
                      ;
