@@ -21,11 +21,13 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sail.remote;
 
 import junit.framework.TestCase;
 
 import org.junit.Test;
+
+import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 
 public class BigdataSailFactoryTest extends TestCase {
 
