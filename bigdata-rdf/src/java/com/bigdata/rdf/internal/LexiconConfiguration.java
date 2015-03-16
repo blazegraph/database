@@ -301,7 +301,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             final IExtensionFactory xFactory,//
             final Vocabulary vocab,
             final BigdataValueFactory valueFactory,//
-            final IInlineURIFactory uriFactory//
+            final IInlineURIFactory uriFactory
             ) {
 
         if (blobsThreshold < 0)
