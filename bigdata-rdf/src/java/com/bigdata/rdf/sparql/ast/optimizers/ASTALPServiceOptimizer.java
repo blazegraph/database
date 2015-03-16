@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -33,8 +34,12 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
+import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -141,7 +146,8 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             }
             
             for (IGroupMemberNode child : subgroup.getChildren()) {
-                if (!(child instanceof StatementPatternNode)) {
+                if (!(child instanceof StatementPatternNode ||
+                        child instanceof FilterNode)) {
                     throw new RuntimeException("Complex groups not allowed in alp service");
                 }
             }
@@ -226,16 +232,21 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     );
             
             alpNode.subgroup().addChild(pathExpr);
-            for (StatementPatternNode child : subgroup.getStatementPatterns()) {
+            for (@SuppressWarnings("rawtypes") GroupMemberNodeBase child : 
+                    subgroup.getChildren(GroupMemberNodeBase.class)) {
                 if (!child.getQueryHintAsBoolean(PATH_EXPR, false)) {
                     /*
                      * Make all variables in the ALP service (other than the
                      * left and right) anonymous, since they cannot be projected
                      * out in a meaningful fashion.
                      */
-                    for (BOp term : child.args()) {
-                        if (term instanceof VarNode) {
-                            ((VarNode) term).setAnonymous(true);
+//                    for (BOp term : child.args()) {
+                    final Iterator<BOp> it = 
+                            BOpUtility.preOrderIteratorWithAnnotations(child);
+                    while (it.hasNext()) {
+                        final BOp bop = it.next();
+                        if (bop instanceof VarNode) {
+                            ((VarNode) bop).setAnonymous(true);
                         }
                     }
                     child.setQueryHints(new Properties());
