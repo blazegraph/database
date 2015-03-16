@@ -20,7 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail;
+package com.bigdata.rdf.sail.remote;
 
 import java.io.File;
 import java.util.Arrays;
@@ -33,13 +33,16 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
-import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 
 /**
  * Helper class to create a bigdata instance.
  * 
  * @author mikepersonick
- *
+ * 
+ * @see <a href="http://trac.bigdata.com/ticket/1152" > BigdataSailFactory must be
+ *      moved to the client package </a>
  */
 public class BigdataSailFactory {
 
@@ -97,7 +100,7 @@ public class BigdataSailFactory {
     /**
 	 * Connect to a remote bigdata instance.
 	 * 
-	 * FIXME This does not support the HA load balancer pattern.
+	 * FIXME This does not support the HA load balancer pattern. See #1148.
 	 * 
 	 * FIXME This does not parameterize the value of the ContextPath. See
 	 * {@link BigdataStatics#getContextPath()}.
@@ -110,14 +113,14 @@ public class BigdataSailFactory {
 
 	}
 	
-	/**
-	 * 
-	 * Convenience method to allow the testing of the URL
-	 * normalization functionality.
-	 * 
-	 * See http://trac.blazegraph.com/ticket/1139
-	 * 
-	 */
+   /**
+    * 
+    * Convenience method to allow the testing of the URL normalization
+    * functionality.
+    * 
+    * @see <a href="http://trac.blazegraph.com/ticket/1139">
+    *      BigdataSailFactory.connect() </a>
+    */
 	public static String testServiceEndpointUrl(final String serviceEndpoint)
 	{
 		return normalizeEndpoint(serviceEndpoint);
