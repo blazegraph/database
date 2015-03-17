@@ -27,7 +27,7 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailFactory;
+import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 
 
 /**
