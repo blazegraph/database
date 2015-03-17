@@ -86,18 +86,18 @@ public class TestHA1GroupCommit extends AbstractHAGroupCommitTestCase {
        
     }
 
-    /**
-     * Create 2 namespaces and then load a large amount data into those namespaces in parallel.
-     * 
-     * @throws Exception
-     */
-    public void test_HA1_GroupCommit_2Namespaces_ConcurrentWriters_LargeLoad() throws Exception {
-
-       startA();
-
-       doGroupCommit_2Namespaces_ConcurrentWriters(true/* reallyLargeLoad */);
-       
-    }
+//    /**
+//     * Create 2 namespaces and then load a large amount data into those namespaces in parallel.
+//     * 
+//     * @throws Exception
+//     */
+//    public void test_HA1_GroupCommit_2Namespaces_ConcurrentWriters_LargeLoad() throws Exception {
+//
+//       startA();
+//
+//       doGroupCommit_2Namespaces_ConcurrentWriters(true/* reallyLargeLoad */);
+//       
+//    }
 
     /**
      * Create 2 namespaces and then load data into those namespaces in parallel
@@ -112,7 +112,7 @@ public class TestHA1GroupCommit extends AbstractHAGroupCommitTestCase {
           throws Exception {
 
        final int nnamespaces = 2;
-       final int nruns = 20;
+       final int nruns = 10;
        final boolean reallyLargeLoad = false;
 
        startA();
@@ -131,8 +131,8 @@ public class TestHA1GroupCommit extends AbstractHAGroupCommitTestCase {
    public void test_HA1_groupCommit_ManyNamespacesConcurrentWritersSmallUpdates()
          throws Exception {
 
-      final int nnamespaces = 10;
-      final int nruns = 50;
+      final int nnamespaces = 6;
+      final int nruns = 10;
 
       startA();
 

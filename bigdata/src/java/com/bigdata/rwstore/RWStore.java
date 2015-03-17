@@ -111,6 +111,7 @@ import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.MergeStreamWithSnapshotData;
+import com.bigdata.util.StackInfoReport;
 
 /**
  * Storage class
@@ -2310,13 +2311,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         if (alloc.canImmediatelyFree(addr, sze, context)) {
                             immediateFree(addr, sze, true);
                         } else {
-                            establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
+                             establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
                         }
                     } else if (this.isSessionProtected()) {
                         immediateFree(addr, sze, false);
                     } else {
                         immediateFree(addr, sze);
                     }
+                } else if (context != null && alloc.canImmediatelyFree(addr, sze, context)){
+                    immediateFree(addr, sze);
                 } else {
                     // if a free request is made within a context not managed by
                     // the allocator then it is not safe to free
@@ -2329,7 +2332,12 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         if (log.isDebugEnabled())
                             log.debug("Should defer " + addr + " real: " + physicalAddress(addr));
                     if (alwaysDefer || !alloc.canImmediatelyFree(addr, sze, context)) {
-                        deferFree(addr, sze);
+                    	// If the context is != null, then the deferral must be against that context!
+                    	if (context != null) {
+                     		establishContextAllocation(context).deferFree(encodeAddr(addr, sze));
+                    	} else {
+                    		deferFree(addr, sze);
+                    	}
                     } else {
                         immediateFree(addr, sze);
                     }
@@ -2434,10 +2442,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             int rem = sze;
             for (int i = 0; i < allocs; i++) {
                 final int nxt = instr.readInt();
-                free(nxt, rem < alloc ? rem : alloc);
+                free(nxt, rem < alloc ? rem : alloc, context);
                 rem -= alloc;
             }
-            free(hdr_addr, hdr.length);
+            free(hdr_addr, hdr.length, context);
             
             return true;
         } catch (IOException ioe) {
@@ -2634,6 +2642,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 final int i = fixedAllocatorIndex(size);
                 if (context != null) {
                     allocator = establishContextAllocation(context).getFreeFixed(i);
+                    
+                    if (allocator.checkBlock0()) {
+                    	if (log.isInfoEnabled())
+                    		log.info("Adding new shadowed allocator, index: " + allocator.getIndex() + ", diskAddr: " + allocator.getDiskAddr());
+                    	m_commitList.add(allocator);
+                    }
+
                 } else {
                     final int block = 64 * m_allocSizes[i];
                     m_spareAllocation += (block - size); // Isn't adjusted by frees!
@@ -2653,6 +2668,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                         
                         if (m_storageStats != null) {
                             m_storageStats.register(allocator, true);
+                        }
+                        
+                        if (allocator.checkBlock0()) {
+                        	m_commitList.add(allocator);
                         }
                     } else {
                         // Verify free list only has allocators with free bits
@@ -2968,11 +2987,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 // FIXME: we should be able to clear the dirty list, but this currently causes
                 //  problems in HA.
                 // If the allocators are torn down correctly, we should be good to clear the commitList
-                m_commitList.clear();
+                 m_commitList.clear();
                 
                 // Flag no allocations since last commit
                 m_recentAlloc = false;
+            } else {
+            	// there are isolated writes, so we must not clear the commit list since otherwise
+            	//	the Alloction index wil get out of sync as per Ticket #1136
             }
+            
             if (m_quorum != null) {
                 /**
                  * When the RWStore is part of an HA quorum, we need to close
@@ -4139,103 +4162,21 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
      */
     public void showAllocators(final StringBuilder str) {
         m_storageStats.showStats(str);
-//      final AllocationStats[] stats = new AllocationStats[m_allocSizes.length];
-//      for (int i = 0; i < stats.length; i++) {
-//          stats[i] = new AllocationStats(m_allocSizes[i]*64);
-//      }
-//      
-//      final Iterator<FixedAllocator> allocs = m_allocs.iterator();
-//      while (allocs.hasNext()) {
-//          Allocator alloc = (Allocator) allocs.next();
-//          alloc.appendShortStats(str, stats);
-//      }
-//      
-//      // Append Summary
-//      str.append("\n-------------------------\n");
-//      str.append("RWStore Allocation Summary\n");
-//      str.append("-------------------------\n");
-//      str.append(padRight("Allocator", 10));
-//      str.append(padLeft("SlotsUsed", 12));
-//      str.append(padLeft("reserved", 12));
-//      str.append(padLeft("StoreUsed", 14));
-//      str.append(padLeft("reserved", 14));
-//      str.append(padLeft("Usage", 8));
-//      str.append(padLeft("Store", 8));
-//      str.append("\n");
-//      long treserved = 0;
-//      long treservedSlots = 0;
-//      long tfilled = 0;
-//      long tfilledSlots = 0;
-//      for (int i = 0; i < stats.length; i++) {
-//          final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
-//          treserved += reserved;
-//          treservedSlots += stats[i].m_reservedSlots;
-//          final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-//          tfilled += filled;
-//          tfilledSlots += stats[i].m_filledSlots;
-//      }
-//      for (int i = 0; i < stats.length; i++) {
-//          final long reserved = stats[i].m_reservedSlots * stats[i].m_blockSize;
-//          final long filled = stats[i].m_filledSlots * stats[i].m_blockSize;
-//          str.append(padRight("" + stats[i].m_blockSize, 10));
-//          str.append(padLeft("" + stats[i].m_filledSlots, 12) + padLeft("" + stats[i].m_reservedSlots, 12));
-//          str.append(padLeft("" + filled, 14) + padLeft("" + reserved, 14));
-//          str.append(padLeft("" + (reserved==0?0:(filled * 100 / reserved)) + "%", 8));
-//          str.append(padLeft("" + (treserved==0?0:(reserved * 100 / treserved)) + "%", 8));
-//          str.append("\n");
-//      }
-//      str.append("\n");
-//
-//      str.append(padRight("Totals", 10));
-//        str.append(padLeft("" + tfilledSlots, 12));
-//        str.append(padLeft("" + treservedSlots, 12));
-//        str.append(padLeft("" + tfilled, 14));
-//        str.append(padLeft("" + treserved, 14));
-//        str.append(padLeft("" + (treserved==0?0:(tfilled * 100 / treserved)) + "%", 8));
-//        str.append("\nFile size: " + convertAddr(m_fileSize) + "bytes\n");
+        str.append("\nChecking regions.....");
+        
+        // Now check all allocators to confirm that each file region maps to only one allocator
+        try {
+	        final HashMap<Integer, FixedAllocator> map = new HashMap<Integer, FixedAllocator>();
+	        for (FixedAllocator fa : m_allocs) {
+	        	fa.addToRegionMap(map);
+	        }
+	        str.append("okay\n");
+        } catch (IllegalStateException is) {
+        	str.append(is.getMessage() + "\n");
+        }
+        
     }
     
-//  private String padLeft(String str, int minlen) {
-//      if (str.length() >= minlen)
-//          return str;
-//      
-//      StringBuffer out = new StringBuffer();
-//      int pad = minlen - str.length();
-//      while (pad-- > 0) {
-//          out.append(' ');
-//      }
-//      out.append(str);
-//      
-//      return out.toString();
-//  }
-//  private String padRight(String str, int minlen) {
-//      if (str.length() >= minlen)
-//          return str;
-//      
-//      StringBuffer out = new StringBuffer();
-//      out.append(str);
-//      int pad = minlen - str.length();
-//      while (pad-- > 0) {
-//          out.append(' ');
-//      }
-//      
-//      return out.toString();
-//  }
-
-//  public ArrayList<Allocator> getStorageBlockAddresses() {
-//      final ArrayList<Allocator> addrs = new ArrayList<Allocator>(m_allocs.size());
-//
-//      final Iterator<Allocator> allocs = m_allocs.iterator();
-//      while (allocs.hasNext()) {
-//          final Allocator alloc = allocs.next();
-//          alloc.addAddresses(addrs);
-//      }
-//
-//      return addrs;
-//  }
-
-    // --------------------------------------------------------------------------------------
-
     /**
      * Given a physical address (byte offset on the store), return true if that
      * address could be managed by an allocated block.
@@ -5159,8 +5100,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             if (log.isDebugEnabled())
                 log.debug("Releasing " + m_deferredFrees.size() + " deferred frees");
             
+            final boolean defer = m_store.m_minReleaseAge > 0 || m_store.m_activeTxCount > 0 || m_store.m_contexts.size() > 0;
             for (Long l : m_deferredFrees) {
-                m_store.immediateFree((int) (l >> 32), l.intValue());
+            	final int addr = (int) (l >> 32);
+            	final int sze = l.intValue();
+            	if (defer) {
+            		m_store.deferFree(addr, sze);
+            	} else {
+            		m_store.immediateFree(addr, sze);
+            	}
             }
             m_deferredFrees.clear();
         }
@@ -5187,8 +5135,20 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
             final ArrayList<FixedAllocator> free = m_freeFixed[i];
             if (free.size() == 0) {
                 final FixedAllocator falloc = establishFixedAllocator(i);
+                if (falloc.m_pendingContextCommit) {
+                	throw new IllegalStateException("Allocator on free list while pendingContextCommit");
+                }
+                
                 falloc.setAllocationContext(m_context);
-                falloc.setFreeList(free); // will add to free list
+                // The normal check for adding to the free list is whether to return to the free list,
+                //	but in this case, we are moving to another free list, so we should not need to
+                //	check for the smallAllocation threshold.
+                falloc.setFreeList(free, true/*force*/);
+                
+                if (free.size() == 0 ) {
+                	throw new IllegalStateException("Free list should not be empty, pendingContextCommit: " + falloc.m_pendingContextCommit);
+                }
+                
                 m_allFixed.add(falloc);
             }
             
@@ -7023,13 +6983,13 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                 if (stats.m_freed.containsKey(nxtAddr)) {
                     stats.m_duplicates.add(nxtAddr);
                     if (writeAll) {
-                        System.err.println("" + commitTime + " " + nxtAddr
+                        log.warn("" + commitTime + " " + nxtAddr
                                 + " FREE DUP");
                     }
                 } else {
                     stats.m_freed.put(nxtAddr, nxtAddr);
                     if (writeAll) {
-                        System.err.println("" + commitTime + " " + nxtAddr
+                    	log.warn("" + commitTime + " " + nxtAddr
                                 + " FREE");
                     }
                 }
