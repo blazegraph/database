@@ -2706,14 +2706,34 @@ ${postInstallMessage}</echo>
             preservelastmodified="true"
             description="Stage the executable jar to a temporary directory."
             >
+	<!--
 	   <fileset dir="${build.dir}/lib/">
               <include name="**/*.jar"/>
 	   </fileset>
+	-->
 	   <fileset dir="bigdata-war/src">
               <include name="**/*.properties"/>
               <include name="**/jetty.xml"/>
            </fileset>
         </copy>
+  	<unjar dest="${ejar.dir}">
+	   <fileset dir="${build.dir}/lib/">
+              <include name="**/*.jar"/>
+	   </fileset>
+<!--
+	   <fileset dir="${ejar.dir}">
+              <include name="*.jar"/>
+	   </fileset>
+-->
+	</unjar>
+	<delete>
+	   <fileset dir="${ejar.dir}">
+              <include name="*.jar"/>
+	   </fileset>
+	</delete>
+
+	
+
 	<path id="jar.classpath">
 	   	<fileset file="${ejar.dir}/*.jar"/>
     	</path>
