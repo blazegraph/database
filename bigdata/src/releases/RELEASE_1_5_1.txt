@@ -1,6 +1,6 @@
 Starting with the 1.5.0 release, SYSTAP’s graph database platform will be called Blazegraph™.   It is built on the same platform and maintains 100% binary and API compatibility with Bigdata®.   SYSTAP will be fully integrating the Blazegraph™ brand over the course of 2015 and all of the existing wiki, blog, and other related pages will be updated.  
 
-This is a major release of Blazegraph™.  This is the initial release made into the Sourceforge Git repository.  Releases after 1.4.0 will no longer be made into SVN. [14].
+This is a major release of Blazegraph™.  The official release is made into the Sourceforge Git repository.  Releases after 1.4.0 will no longer be made into SVN. [14].
 
 Blazegraph™ is specifically designed to support big graphs offering both Semantic Web (RDF/SPARQL) and Graph Database (tinkerpop, blueprints, vertex-centric) APIs.   It features robust, scalable, fault-tolerant, enterprise-class storage and query and high-availability with online backup, failover and self-healing.  It is in production use with enterprises such as Autodesk, EMC, Yahoo7!, and many others.   Blazegraph™ provides both embedded and standalone modes of operation.  
 
@@ -22,7 +22,7 @@ http://sourceforge.net/projects/bigdata/
 
 You can checkout this release from:
 
-git clone -b BIGDATA_RELEASE_1_5_0 --single-branch git://git.code.sf.net/p/bigdata/git BIGDATA_RELEASE_1_5_0
+git clone -b BIGDATA_RELEASE_1_5_1 --single-branch git://git.code.sf.net/p/bigdata/git BIGDATA_RELEASE_1_5_1
 
 
 Feature summary:
@@ -52,14 +52,10 @@ Change log:
 Note: Versions with (*) MAY require data migration. For details, see [9].
 
 New features:
-Simplified deployer (Executable Jar)
-Replaced apache client with jetty client (fixes http protocol layer errors in apache)
-Arbitrary Length Path (ALP) Service (http://trac.blazegraph.com/ticket/1072)
-Updated banner.
-Updated logo.
-new splash page.
+BigdataSailFactory moved to client package  (http://trac.bigdata.com/ticket/1152)
 Several bug fixes.
 Several query optimizations.
+
 
 1.5.1:
 
@@ -91,6 +87,8 @@ Several query optimizations.
 - http://trac.blazegraph.com/ticket/1143	GROUP_COMMIT environment variable
 - http://trac.blazegraph.com/ticket/1146    SPARQL Federated Query uses too many HttpClient objects
 - http://trac.blazegraph.com/ticket/1147    DELETE DATA must not allow blank nodes
+- http://trac.blazegraph.com/ticket/1152    BigdataSailFactory? must be moved to the client package
+
 
 1.5.0: "BlazeGraph"
 
