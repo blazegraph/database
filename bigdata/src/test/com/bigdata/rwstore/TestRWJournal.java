@@ -73,6 +73,7 @@ import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.PseudoRandom;
 
 /**
  * Test suite for {@link BufferMode#DiskRW} journals.
@@ -1260,6 +1261,56 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				
 				assertTrue("Global allocation must be protected", paddr != 0);
 
+			} finally {
+				store.destroy();
+			}
+		}
+		
+		/**
+		 * This tests whether AllocationContexts efficiently recycle transient
+		 * allocations.
+		 * 
+		 * To do this it will allocate and free 1 million 50 byte regions, in batches
+		 * of 10K.
+		 */
+		public void testStressAllocationContextRecycling() {
+			
+			final Journal store = (Journal) getStore(1);
+
+			try {
+
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				
+				IAllocationContext cntxt = new IAllocationContext() {};
+				
+				// allocate a global address
+				final int allocs = 100000;
+				final Random ran = new Random();
+				
+				for (int r = 0; r < 20; r++) {
+					ArrayList<Integer> addrs = new ArrayList<Integer>();
+					for (int a = 0; a < allocs; a++) {
+						addrs.add(rw.alloc(50, cntxt));
+					}
+					final PseudoRandom ps = new PseudoRandom(allocs, ran.nextInt(allocs));
+					for (int a : addrs) {
+						rw.free(addrs.get(ps.next()), 50, cntxt);
+					}
+				}
+				
+				assertTrue(rw.getFixedAllocatorCount() < 20);
+				
+				if (log.isInfoEnabled()) {
+					final StringBuilder str = new StringBuilder();
+					rw.showAllocators(str);
+					
+					log.info(str);
+				}
+				
+				store.commit();
+				
 			} finally {
 				store.destroy();
 			}

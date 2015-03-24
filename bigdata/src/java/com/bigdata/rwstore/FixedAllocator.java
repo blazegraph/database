@@ -205,12 +205,28 @@ public class FixedAllocator implements Allocator {
 	private ArrayList m_freeList;
 
 	public void setFreeList(final ArrayList list) {
+		setFreeList(list, false);
+		
+	}
+	/**
+	 * The force parameter is set to true when the allocator is being moved from one
+	 * free list to another.
+	 */
+	public void setFreeList(final ArrayList list, boolean force) {
 		if (m_freeList != list) {
 			m_freeList = list;
 			m_freeWaiting = true;
 		}
 
-		if (!m_pendingContextCommit && hasFree() && meetsSmallSlotThreshold()) {
+		if (m_pendingContextCommit || !hasFree()) {
+			if (force) {
+				throw new IllegalStateException("The allocator cannot be added to the free list, pendingContextCommit: " + m_pendingContextCommit + ", hasFree: " + hasFree());
+			}
+			
+			return;
+		}
+		
+		if (force || meetsSmallSlotThreshold()) {
 			addToFreeList();
 		}
 		
@@ -229,7 +245,6 @@ public class FixedAllocator implements Allocator {
 	}
 
 	volatile private IAllocationContext m_context;
-	volatile private Thread m_contextThread;
 
 	/**
 	 * @return whether the allocator is unassigned to an AllocationContext
@@ -245,7 +260,7 @@ public class FixedAllocator implements Allocator {
 	 */
 	private boolean m_sessionActive;
 
-	private boolean m_pendingContextCommit = false;
+	boolean m_pendingContextCommit = false; // accessible from RWStore
 	
 	public void setAllocationContext(final IAllocationContext context) {
 		if (m_pendingContextCommit) {
@@ -275,12 +290,6 @@ public class FixedAllocator implements Allocator {
 			// NO! m_store.removeFromCommit(this);
 		}
 		m_context = context;
-		
-		if (m_context != null) {
-			m_contextThread = Thread.currentThread();
-		} else {
-			m_contextThread = null;
-		}
 		
         if (log.isDebugEnabled())
             checkBits();
@@ -760,9 +769,6 @@ public class FixedAllocator implements Allocator {
 				if (((AllocBlock) m_allocBlocks.get(block))
 						.freeBit(offset % nbits, m_sessionActive && !overideSession)) { // bit adjust
 					
-					if (m_contextThread != null && m_contextThread != Thread.currentThread())
-						throw new IllegalStateException("Check thread context");
-					
 					m_freeBits++;
 
 					checkFreeList();
@@ -952,7 +958,11 @@ public class FixedAllocator implements Allocator {
 		}
 	}
 	
-	void checkBlock(final AllocBlock block) {
+	boolean checkBlock0() {
+		return checkBlock(m_allocBlocks.get(0));
+	}
+	
+	boolean checkBlock(final AllocBlock block) {
 		if (block.m_addr == 0) {
 			int blockSize = 32 * m_bitSize;
 			if (m_statsBucket != null) {
@@ -970,6 +980,10 @@ public class FixedAllocator implements Allocator {
 				m_startAddr = block.m_addr;
 			}
 			m_endAddr = block.m_addr - blockSize;
+			
+			return true; // commit required
+		} else {
+			return false;
 		}
 
 	}
@@ -1171,18 +1185,32 @@ public class FixedAllocator implements Allocator {
 		return RWStore.tstBit(block.m_commit, bit);
 	}
 
+	protected final AllocBlock getBlockFromLocalOffset(int offset) {
+	  	offset -= 3;
+
+	  	final int allocBlockRange = 32 * m_bitSize;
+
+		return (AllocBlock) m_allocBlocks.get(offset / allocBlockRange);
+	}
+
 	/**
 	 * If the context is this allocators context AND it is not in the commit bits
 	 * then we can immediately free.
 	 */
     public boolean canImmediatelyFree(final int addr, final int size,
             final IAllocationContext context) {
+		final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
+		final boolean committed = isCommitted(offset);
+
 		if (context == m_context && !m_pendingContextCommit) {
-			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
-
-			final boolean ret = !isCommitted(offset);
-
-			return ret;
+			
+			return !committed;
+		} else if (m_context != null) {
+			// This must *not* be an address transiently allocated by the associated Allocator
+			if (!committed)
+				throw new IllegalStateException("Attempt to free address with invalid context");
+			
+			return false;
 		} else {
 			return false;
 		}
@@ -1402,7 +1430,8 @@ public class FixedAllocator implements Allocator {
              * state to m_saveCommit
              */
             if (m_context != null) {
-                throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
+            	// do not copy live bits to committed bits, leave to context.release()
+                // throw new IllegalStateException("Must not commit shadowed FixedAllocator!");
 //            } else if (m_store.isSessionPreserved()) {
 //                block.m_commit = block.m_transients.clone();
             } else {
@@ -1561,6 +1590,17 @@ public class FixedAllocator implements Allocator {
 			return buf;
 		} catch (IOException e) {
 			throw new StorageTerminalError("Error on write", e);
+		}
+	}
+
+	public void addToRegionMap(HashMap<Integer, FixedAllocator> map) {
+		for (AllocBlock ab : m_allocBlocks) {
+			if (ab.m_addr != 0) {
+				final FixedAllocator pa = map.put(ab.m_addr, this);
+				if (pa != null) {
+					throw new IllegalStateException("Duplicate mapping Allocators, " + pa.m_index + ", " + m_index);
+				}
+			}
 		}
 	}
 
