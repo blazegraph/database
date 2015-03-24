@@ -71,7 +71,7 @@ public class SimpleBlueprintsValueFactory extends DefaultBlueprintsValueFactory 
 
         try {
             
-            final Matcher matcher = IPv4AddrIV.pattern.matcher(id);
+            final Matcher matcher = IPv4AddrIV.getIPv4Matcher(id);
             if (matcher.matches()) {
                 return id;
             }
