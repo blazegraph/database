@@ -1756,7 +1756,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 nunknown++;
                 
-            } else if (!readOnly && v instanceof BigdataLiteral) {
+            } else if (!readOnly && this.textIndex && v instanceof BigdataLiteral) {
                 
                 /*
                  * Some inline IVs will be text indexed per the 
@@ -1804,7 +1804,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
         }
         
-        if (textIndex.size() > 0) {
+        if (this.textIndex && textIndex.size() > 0) {
             
             try {
                 
