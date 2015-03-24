@@ -118,8 +118,6 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
         </condition>
         <!--<echo message="today=${today}"/>-->
         <echo message="version=${version}" />
-        <available property="svn.checkout" file="./.svn/entries"/>
-        <echo message="svn.checkout=${svn.checkout}" />
         <!-- create directories. -->
         <mkdir dir="${build.dir}" />
         <mkdir dir="${build.dir}/classes" />
@@ -127,10 +125,11 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
         <mkdir dir="${build.dir}/lib" />
     </target>
 
-    <target name="buildinfo" depends="prepare" if="svn.checkout"
+    <target name="buildinfo" depends="prepare" 
         description="Generate a BuildInfo.java file with metadata about this build.">
         <property name="buildinfo.file" 
-            value="${bigdata.dir}\bigdata\src\java\com\bigdata\BuildInfo.java"/>
+            value="${bigdata.dir}/bigdata/src/java/com/bigdata/BuildInfo.java"/>
+<!--
         <loadfile property="svn.revision" srcFile="./.svn/entries">
             <filterchain>
                 <headfilter lines="1" skip="3"/>
@@ -143,6 +142,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
                  <striplinebreaks/>
             </filterchain>
         </loadfile>
+-->
         <tstamp>
             <format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
         </tstamp>
@@ -152,11 +152,8 @@ package com.bigdata;
 public class BuildInfo {
     public static final String buildVersion="${build.ver}";
     public static final String buildVersionOSGI="${build.ver.osgi}";
-    public static final String svnRevision="${svn.revision}";
-    public static final String svnURL="${svn.url}";
     public static final String buildTimestamp="${build.timestamp}";
     public static final String buildUser="${user.name}";
-    public static final String buildHost="${env.COMPUTERNAME}";
     public static final String osArch="${os.arch}";
     public static final String osName="${os.name}";
     public static final String osVersion="${os.version}";
@@ -2691,6 +2688,7 @@ ${postInstallMessage}</echo>
 
     <target name="executable-jar" depends="bundleJar"
           description="Generates an Executable JAR artifact.">
+        <copy file="${build.dir}/${version}.jar" todir="${build.dir}/lib"/>
       	<property name="ejar.dir" value="${build.dir}/staged-jar"
           description="The staging directory for the executable jar."/>
       	<property name="ejar.file" value="${build.dir}/${version}-bundled.jar"
@@ -2706,14 +2704,34 @@ ${postInstallMessage}</echo>
             preservelastmodified="true"
             description="Stage the executable jar to a temporary directory."
             >
+	<!--
 	   <fileset dir="${build.dir}/lib/">
               <include name="**/*.jar"/>
 	   </fileset>
+	-->
 	   <fileset dir="bigdata-war/src">
               <include name="**/*.properties"/>
               <include name="**/jetty.xml"/>
            </fileset>
         </copy>
+  	<unjar dest="${ejar.dir}">
+	   <fileset dir="${build.dir}/lib/">
+              <include name="**/*.jar"/>
+	   </fileset>
+<!--
+	   <fileset dir="${ejar.dir}">
+              <include name="*.jar"/>
+	   </fileset>
+-->
+	</unjar>
+	<delete>
+	   <fileset dir="${ejar.dir}">
+              <include name="*.jar"/>
+	   </fileset>
+	</delete>
+
+	
+
 	<path id="jar.classpath">
 	   	<fileset file="${ejar.dir}/*.jar"/>
     	</path>

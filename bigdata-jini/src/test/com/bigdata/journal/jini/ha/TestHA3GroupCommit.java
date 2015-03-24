@@ -78,18 +78,18 @@ public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
        
     }
 
-    /**
-     * Create 2 namespaces and then load a large amount data into those namespaces in parallel.
-     * 
-     * @throws Exception
-     */
-    public void test_HA3_GroupCommit_2Namespaces_ConcurrentWriters_LargeLoad() throws Exception {
-
-       new ABC(false/*sequential*/); // simultaneous start.
-
-       doGroupCommit_2Namespaces_ConcurrentWriters(true/* reallyLargeLoad */);
-       
-    }
+//    /**
+//     * Create 2 namespaces and then load a large amount data into those namespaces in parallel.
+//     * 
+//     * @throws Exception
+//     */
+//    public void test_HA3_GroupCommit_2Namespaces_ConcurrentWriters_LargeLoad() throws Exception {
+//
+//       new ABC(false/*sequential*/); // simultaneous start.
+//
+//       doGroupCommit_2Namespaces_ConcurrentWriters(true/* reallyLargeLoad */);
+//       
+//    }
 
    /**
     * Create 2 namespaces and then load data into those namespaces in parallel
@@ -104,7 +104,7 @@ public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
          throws Exception {
 
       final int nnamespaces = 2;
-      final int nruns = 20;
+      final int nruns = 10;
       final boolean reallyLargeLoad = false;
 
       new ABC(false/* sequential */); // simultaneous start.
@@ -123,8 +123,8 @@ public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
    public void test_HA3_groupCommit_ManyNamespacesConcurrentWritersSmallUpdates()
          throws Exception {
 
-      final int nnamespaces = 10;
-      final int nruns = 50;
+      final int nnamespaces = 6;
+      final int nruns = 10;
 
       new ABC(false/* sequential */); // simultaneous start.
 
@@ -132,25 +132,25 @@ public class TestHA3GroupCommit extends AbstractHAGroupCommitTestCase {
 
    }
 
-   /**
-    * A unit test of concurrent create/destroy of namespaces.
-    * <p>
-    * Note: Namespace create/destroy tasks contend for the GSR index. This
-    * limits the potential parallelism since at most one create/destroy task can
-    * run at a time regardless of the namespace it addresses. However, multiple
-    * create and/or destroy operations can still be melded into a single commit
-    * group.
-    */
-   public void test_HA3_GroupCommit_createDestroy_ManyNamespaces()
-         throws Exception {
-
-      final int nnamespaces = 10;
-      final int nruns = 50;
-
-      new ABC(false/* sequential */); // simultaneous start.
-
-      doGroupCommit_createDestroy_ManyNamespacesTest(nnamespaces, nruns);
-
-   }
+//   /**
+//    * A unit test of concurrent create/destroy of namespaces.
+//    * <p>
+//    * Note: Namespace create/destroy tasks contend for the GSR index. This
+//    * limits the potential parallelism since at most one create/destroy task can
+//    * run at a time regardless of the namespace it addresses. However, multiple
+//    * create and/or destroy operations can still be melded into a single commit
+//    * group.
+//    */
+//   public void test_HA3_GroupCommit_createDestroy_ManyNamespaces()
+//         throws Exception {
+//
+//      final int nnamespaces = 10;
+//      final int nruns = 50;
+//
+//      new ABC(false/* sequential */); // simultaneous start.
+//
+//      doGroupCommit_createDestroy_ManyNamespacesTest(nnamespaces, nruns);
+//
+//   }
 
 }
