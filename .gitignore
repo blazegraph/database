@@ -57,6 +57,7 @@
 /bigdata/row
 /bigdata/store
 /bigdata/testIndex
+/bigdata/src/java/com/bigdata/BuildInfo.java
 
 # /bigdata/lib/
 /bigdata/lib/rio-1.2.1.jar
