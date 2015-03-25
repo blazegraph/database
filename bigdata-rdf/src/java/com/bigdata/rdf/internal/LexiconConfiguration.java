@@ -29,8 +29,11 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.UUID;
 
@@ -180,6 +183,12 @@ public class LexiconConfiguration<V extends BigdataValue>
      * extension to the {@link IExtension}.
      */
     private final Map<String, IExtension<BigdataValue>> datatype2ext;
+    
+    /**
+     * The set of inline datatypes that should be included in the text index 
+     * even though they are inline and not normally text indexed.
+     */
+    private final Set<URI> inlineDatatypesToTextIndex;
 
     public final BigdataValueFactory getValueFactory() {
         
@@ -224,6 +233,13 @@ public class LexiconConfiguration<V extends BigdataValue>
         return blobsThreshold;
         
     }
+    
+    @Override
+    public boolean isInlineDatatypeToTextIndex(final URI dt) {
+        
+        return dt != null && inlineDatatypesToTextIndex.contains(dt);
+        
+    }
 
     public String toString() {
     	
@@ -262,6 +278,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         sb.append(", " + AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS + "="
                 + uriFactory.getClass().getName());
+
+        sb.append(", " + LexiconConfiguration.class.getName() + ".inlineDatatypesToTextIndex="
+                + inlineDatatypesToTextIndex);
 
 		sb.append("}");
 		
@@ -309,6 +328,14 @@ public class LexiconConfiguration<V extends BigdataValue>
         this.vocab = vocab;
         this.valueFactory = valueFactory;
         this.uriFactory = uriFactory;
+        
+        /*
+         * TODO Make this configurable.
+         */
+        this.inlineDatatypesToTextIndex =
+                new LinkedHashSet<URI>(Arrays.asList(new URI[] {
+                        XSD.IPV4
+                }));
 
 		/*
 		 * Note: These collections are read-only so we do NOT need additional
