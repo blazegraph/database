@@ -120,11 +120,15 @@ public class IPv4AddrIV<V extends BigdataLiteral>
         
     }
 
-	/*
-	 * Somebody please fix this for the love of god.
+	/**
+	 * Regex pattern for IPv4 Address with optional CIDR
 	 */
-	public static final Pattern pattern = 
-			Pattern.compile("((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?");
+	private static final String IPv4_OPTIONAL_CIDR_PATTERN = "((([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}[01]?\\d\\d?|2[0-4]\\d|25[0-5])(\\/([012]?\\d|3[012]))?";
+	
+	// "((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?
+
+	private static final Pattern pattern = 
+			Pattern.compile(IPv4_OPTIONAL_CIDR_PATTERN);
 	
     /**
 	 * Ctor with host address specified.
@@ -146,7 +150,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 			if (log.isDebugEnabled())
 			    log.debug(ip);
 			
-			final String suffix = matcher.group(4);
+			final String suffix = matcher.group(5);
 			
             if (log.isDebugEnabled())
                 log.debug(suffix);
@@ -184,7 +188,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
             if (log.isDebugEnabled()) {
                 log.debug("not a valid IP: " + hostAddress);
             }
-			throw new UnknownHostException("not a valid IP: " + hostAddress);
+			throw new UnknownHostException("Did not match REGEX - not a valid IP: " + hostAddress);
 			
 		}
         
@@ -361,6 +365,11 @@ public class IPv4AddrIV<V extends BigdataLiteral>
     
     private Object writeReplace() throws ObjectStreamException {
         return new IPAddrIVState(this);
+    }
+    
+    public static Matcher getIPv4Matcher(String addr)
+    {
+    	return IPv4AddrIV.pattern.matcher(addr);
     }
     
 //    /**
