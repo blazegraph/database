@@ -37,7 +37,6 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.TimeUnit;
-import com.bigdata.io.DirectBufferPool;
 
 import org.apache.log4j.Logger;
 
@@ -47,18 +46,14 @@ import com.bigdata.journal.TemporaryRawStore;
  * A helper class for operations on {@link FileChannel}s.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class FileChannelUtility {
 
-    /**
-     * Log for btree opeations.
-     */
-    protected static final Logger log = Logger.getLogger(FileChannelUtility.class);
+    private static final Logger log = Logger.getLogger(FileChannelUtility.class);
 
-    protected static final boolean INFO = log.isInfoEnabled();
-
-    protected static final boolean DEBUG = log.isDebugEnabled();
+//    private static final boolean INFO = log.isInfoEnabled();
+//
+//    private static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Reads {@link ByteBuffer#remaining()} bytes into the caller's
@@ -149,7 +144,7 @@ public class FileChannelUtility {
         if (nbytes == 0)
             throw new IllegalArgumentException();
 
-        if (DEBUG) {
+        if (log.isDebugEnabled()) {
 
             log.debug("pos=" + pos + ", #bytes=" + nbytes);
             
@@ -263,7 +258,7 @@ public class FileChannelUtility {
 
         }
 
-        if (INFO) {
+        if (log.isInfoEnabled()) {
 
             log.info("read " + nbytes + " bytes from offset=" + pos + " in "
                     + nreads + " IOs");
@@ -569,7 +564,7 @@ public class FileChannelUtility {
          * for at least some implementations.
          */
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("fromPosition=" + fromPosition + ", count=" + count
                     + ", toPosition=" + toPosition);
 
@@ -635,7 +630,7 @@ public class FileChannelUtility {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (INFO)
+        if (log.isInfoEnabled())
             log.info("Transferred " + count
                     + " bytes from disk channel at offset " + fromPosition
                     + " to disk channel at offset=" + toPosition + " in "
