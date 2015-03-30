@@ -1704,6 +1704,9 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
         // Either same reference -or- distinct reference but equals().
         final List<BigdataValue> dups = new LinkedList<BigdataValue>();
+        
+        // Inline literals that should still make it into the text index.
+        final LinkedHashSet<BigdataValue> textIndex = new LinkedHashSet<BigdataValue>(/* default */);
 
         int nunknown = 0, nblobs = 0, nterms = 0;
 
@@ -1753,6 +1756,17 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                 
                 nunknown++;
                 
+            } else if (!readOnly && this.textIndex && v instanceof BigdataLiteral) {
+                
+                /*
+                 * Some inline IVs will be text indexed per the 
+                 * LexiconConfiguration.
+                 */
+                final URI dt = ((BigdataLiteral) v).getDatatype();
+                if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
+                    textIndex.add(v);
+                }
+                
             }
             
         }
@@ -1788,6 +1802,24 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             addTerms(a, a.length, readOnly, stats);
         
+        }
+        
+        if (this.textIndex && textIndex.size() > 0) {
+            
+            try {
+                
+                stats.fullTextIndexTime
+                    .addAndGet(new FullTextIndexWriterTask(
+                            getSearchEngine(), textIndex.size()/* capacity */, 
+                            textIndex.iterator())
+                            .call());
+
+            } catch (Exception ex) {
+                
+                throw new RuntimeException(ex);
+                
+            }
+            
         }
 
         if(!dups.isEmpty()) {

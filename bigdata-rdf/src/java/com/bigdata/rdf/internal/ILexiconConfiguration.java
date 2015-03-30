@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.Set;
 import java.util.TimeZone;
 
 import org.openrdf.model.URI;
@@ -139,5 +140,11 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Return the value factory for the lexicon.
      */
     BigdataValueFactory getValueFactory();
+    
+    /**
+     * Should the specified datatype be included in the text index (even though
+     * it is an inline datatype, for example IPv4).
+     */
+    boolean isInlineDatatypeToTextIndex(URI datatype);
 
 }
