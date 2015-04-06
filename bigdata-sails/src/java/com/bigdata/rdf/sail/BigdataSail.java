@@ -896,12 +896,12 @@ public class BigdataSail extends SailBase implements Sail {
                 BigdataSail.Options.DEFAULT_AXIOMS_CLASS).equals(
                         NoAxioms.class.getName());
         
-        final boolean noVocab = properties.getProperty(
-                BigdataSail.Options.VOCABULARY_CLASS,
-                BigdataSail.Options.DEFAULT_VOCABULARY_CLASS).equals(
-                        NoVocabulary.class.getName());
+//        final boolean noVocab = properties.getProperty(
+//                BigdataSail.Options.VOCABULARY_CLASS,
+//                BigdataSail.Options.DEFAULT_VOCABULARY_CLASS).equals(
+//                        NoVocabulary.class.getName());
         
-        // check for problematic propery combinations
+        // check for problematic property combinations
         if (isolatable && !quadsMode) {
             
             if (tm) {
@@ -922,14 +922,14 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
-            if (!noVocab) {
-                
-                throw new UnsupportedOperationException(
-                        "Cannot use transactions with a vocabulary class. " +
-                        "Set option " + Options.VOCABULARY_CLASS + 
-                        " = " + NoVocabulary.class.getName());
-                
-            }
+//            if (!noVocab) {
+//                
+//                throw new UnsupportedOperationException(
+//                        "Cannot use transactions with a vocabulary class. " +
+//                        "Set option " + Options.VOCABULARY_CLASS + 
+//                        " = " + NoVocabulary.class.getName());
+//                
+//            }
 
             if (justify) {
                 
