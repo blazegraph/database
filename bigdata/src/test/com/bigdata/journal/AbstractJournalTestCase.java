@@ -68,7 +68,8 @@ abstract public class AbstractJournalTestCase
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
-    public void setUp(final ProxyTestCase testCase) throws Exception {
+    @Override
+    public void setUp(final ProxyTestCase<Journal> testCase) throws Exception {
 
         super.setUp(testCase);
 
@@ -83,7 +84,8 @@ abstract public class AbstractJournalTestCase
     /**
      * Invoked from {@link TestCase#tearDown()} for each test in the suite.
      */
-    public void tearDown(final ProxyTestCase testCase) throws Exception {
+    @Override
+    public void tearDown(final ProxyTestCase<Journal> testCase) throws Exception {
 
         super.tearDown(testCase);
 
@@ -166,6 +168,7 @@ abstract public class AbstractJournalTestCase
      * 
      * @return A new properties object.
      */
+    @Override
     public Properties getProperties() {
         
         if( m_properties == null ) {
@@ -197,6 +200,7 @@ abstract public class AbstractJournalTestCase
         
     }
 
+    @Override
     protected Journal getStore(final Properties properties) {
         
         return new Journal(properties);
@@ -215,6 +219,7 @@ abstract public class AbstractJournalTestCase
      *                if the existing store is closed or if the store can not be
      *                re-opened, e.g., from failure to obtain a file lock, etc.
      */
+    @Override
     protected Journal reopenStore(final Journal store) {
 
         if (LRUNexus.INSTANCE != null) {

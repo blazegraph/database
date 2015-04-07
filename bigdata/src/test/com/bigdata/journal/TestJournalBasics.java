@@ -105,6 +105,9 @@ public class TestJournalBasics extends TestCase {
         // test compacting merge of a Journal.
         suite.addTestSuite(TestCompactJournal.class);
 
+        // test snapshot of a Journal
+        suite.addTestSuite(TestSnapshotJournal.class);
+
         // test the DumpJournal utility.
         suite.addTestSuite(TestDumpJournal.class);
 

@@ -6069,8 +6069,10 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
     		filein.close();
     	}
     	
-        if (!quorum.getClient().isJoinedMember(token))
+        if (quorum!=null&&!quorum.getClient().isJoinedMember(token)) {
+           // See #1172
             throw new QuorumException();
+        }
     }
     
     public void writeOnStream2(final OutputStream os, final Set<java.util.Map.Entry<Long, byte[]>> snapshotData,
