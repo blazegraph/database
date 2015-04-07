@@ -35,7 +35,6 @@ import junit.framework.TestSuite;
  * Runs all tests for all journal implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
