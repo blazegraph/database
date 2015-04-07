@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -50,9 +51,6 @@ import com.bigdata.util.InnerCause;
  * 
  * @see <a href="http://trac.bigdata.com/ticket/1172"> Online backup for Journal
  *      </a>
- * 
- *      TODO Test with concurrent writes on the journal. The snapshot should
- *      be consistent regardless of concurrent writers.
  */
 public class TestSnapshotJournal extends ProxyTestCase<Journal> {
 
@@ -493,7 +491,7 @@ public class TestSnapshotJournal extends ProxyTestCase<Journal> {
     }
 
     /**
-     * Test with a journal on which many indies have been registered and
+     * Test with a journal on which many indices have been registered and
      * populated with random data.
      * 
      * @throws IOException
@@ -566,6 +564,180 @@ public class TestSnapshotJournal extends ProxyTestCase<Journal> {
                final ISnapshotResult snapshotResult = src.snapshot(
                      snapshotFactory).get();
 
+               final Journal newJournal = openSnapshot(snapshotResult);
+
+               // verify state
+               try {
+
+                  for (int i = 0; i < NUM_INDICES; i++) {
+
+                     final String name = PREFIX + i;
+
+                     // verify index exists.
+                     assertNotNull(newJournal.getIndex(name));
+
+                     // verify data is the same.
+                     AbstractBTreeTestCase.assertSameBTree(src.getIndex(name),
+                           newJournal.getIndex(name));
+
+                     // and verify the counter was correctly propagated.
+                     assertEquals(src.getIndex(name).getCounter().get(),
+                           newJournal.getIndex(name).getCounter().get());
+
+                  }
+
+               } finally {
+
+                  newJournal.destroy();
+
+               }
+
+            }
+
+         } finally {
+
+            src.destroy();
+
+         }
+
+      } finally {
+
+         out.delete();
+
+      }
+
+   }
+
+    /**
+     * Test with a journal on which many indices have been registered and
+     * populated with random data.
+     * 
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void test_journal_manyIndicesRandomData_concurrentWriter() throws IOException,
+            InterruptedException, ExecutionException {
+
+      final File out = File.createTempFile(getName(), Options.JNL);
+
+      try {
+
+         final Journal src = getStore(getProperties());
+
+         try {
+
+            if (!(src.getBufferStrategy() instanceof IHABufferStrategy)) {
+               // Feature is not supported.
+               return;
+            }
+
+            final String PREFIX = "testIndex#";
+            final int NUM_INDICES = 20;
+
+            for (int i = 0; i < NUM_INDICES; i++) {
+
+               // register an index
+               final String name = PREFIX + i;
+
+               src.registerIndex(new IndexMetadata(name, UUID.randomUUID()));
+               {
+
+                  // lookup the index.
+                  final BTree ndx = src.getIndex(name);
+
+                  // #of tuples to write.
+                  final int ntuples = r.nextInt(10000);
+
+                  // generate random data.
+                  final KV[] a = AbstractBTreeTestCase
+                        .getRandomKeyValues(ntuples);
+
+                  // write tuples (in random order)
+                  for (KV kv : a) {
+
+                     ndx.insert(kv.key, kv.val);
+
+                     if (r.nextInt(100) < 10) {
+
+                        // randomly increment the counter (10% of the time).
+                        ndx.getCounter().incrementAndGet();
+
+                     }
+
+                  }
+
+               }
+
+            }
+
+            // commit the journal (!)
+            src.commit();
+
+            /*
+             * Submit task for concurrent writes. Note that this task does not
+             * do a commit, but it does write modifications onto the live
+             * indices. Those changes should not be visible in the snapshot.
+             * Since the task does not do a commit, the snapshot should have
+             * exactly the same data that was in the journal as of the previous
+             * commit point. That commit point is restored (below) when we
+             * discard the write set.
+             */
+            final Future<Void> f = src.getExecutorService().submit(new Callable<Void>() {
+
+               @Override
+               public Void call() throws Exception {
+
+                  for (int i = 0; i < NUM_INDICES; i++) {
+
+                     final String name = PREFIX + i;
+
+                     // lookup the index.
+                     final BTree ndx = src.getIndex(name);
+
+                     // #of tuples to write.
+                     final int ntuples = r.nextInt(10000);
+
+                     // generate random data.
+                     final KV[] a = AbstractBTreeTestCase
+                           .getRandomKeyValues(ntuples);
+
+                     // write tuples (in random order)
+                     for (KV kv : a) {
+
+                        ndx.insert(kv.key, kv.val);
+
+                        if (r.nextInt(100) < 10) {
+
+                           // randomly increment the counter (10% of the time).
+                           ndx.getCounter().incrementAndGet();
+
+                        }
+
+                     }
+
+                  }
+                  // Done.
+                  return null;
+               }});
+
+            // Take a snapshot while the writer is running.
+
+            final ISnapshotFactory snapshotFactory = new MySnapshotFactory(
+                  getName(), false/* compressed */);
+
+            final ISnapshotResult snapshotResult = src
+                  .snapshot(snapshotFactory).get();
+
+            // Await the success of the writer.
+            f.get();
+
+            // Discard the write set.
+            src.abort();
+            
+            // Verify the snapshot.
+            {
+             
                final Journal newJournal = openSnapshot(snapshotResult);
 
                // verify state
