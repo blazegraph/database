@@ -4165,9 +4165,14 @@ abstract public class AbstractTripleStore extends
      * @param src
      *            The source iterator.
      */
+    @SuppressWarnings("unused")
     public IChunkedOrderedIterator<ISPO> computeClosureForStatementIdentifiers(
             IChunkedOrderedIterator<ISPO> src) {
      
+        if (true) {
+            return src;
+        }
+        
         if(!statementIdentifiers) {
             
             // There will be no statement identifiers unless they were enabled.

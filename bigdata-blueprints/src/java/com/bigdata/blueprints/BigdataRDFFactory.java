@@ -65,6 +65,17 @@ public class BigdataRDFFactory extends DefaultBlueprintsValueFactory {
      */
     public static final URI EDGE = new URIImpl(BD.NAMESPACE + "Edge");
     
+    /**
+     * URI used to mark an atom as added in the history.
+     */
+    public static final URI ADDED = new URIImpl(BD.NAMESPACE + "added");
+    
+    /**
+     * URI used to mark an atom as removed in the history.
+     */
+    public static final URI REMOVED = new URIImpl(BD.NAMESPACE + "removed");
+
+    
     public static BigdataRDFFactory INSTANCE = new BigdataRDFFactory();
     
 	/**
@@ -73,7 +84,7 @@ public class BigdataRDFFactory extends DefaultBlueprintsValueFactory {
 	private BigdataRDFFactory() {
 		super(new ValueFactoryImpl(), 
 		        GRAPH_NAMESPACE, VERTEX_NAMESPACE, EDGE_NAMESPACE,
-		        RDF.TYPE, VERTEX, EDGE, RDFS.LABEL);
+		        RDF.TYPE, VERTEX, EDGE, RDFS.LABEL, ADDED, REMOVED);
 	}
 	
 }
