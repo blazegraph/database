@@ -124,9 +124,9 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	 * Regex pattern for IPv4 Address with optional CIDR
 	 */
 	private static final String IPv4_OPTIONAL_CIDR_PATTERN = 
-//	        "((([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}[01]?\\d\\d?|2[0-4]\\d|25[0-5])(\\/([012]?\\d|3[012]))?";
-//	        "(([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\/([012]?\\d|3[012])"
-	        "((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?";
+	        "((([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.){3}([01]?\\d\\d?|2[0-4]\\d|25[0-5]))(\\/([012]?\\d|3[012]))?";
+
+//	        "((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?";
 
 	public static final Pattern pattern = 
 			Pattern.compile(IPv4_OPTIONAL_CIDR_PATTERN);
@@ -151,7 +151,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 			if (log.isDebugEnabled())
 			    log.debug(ip);
 			
-			final String suffix = matcher.group(5);
+			final String suffix = matcher.group(6);
 			
             if (log.isDebugEnabled())
                 log.debug(suffix);
