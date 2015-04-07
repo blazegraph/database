@@ -54,6 +54,60 @@ public class IPv4AddrIVTest extends TestCase {
 		assert(true);
 		
 	}
+	
+	@Test
+	public void testIPAddress1() {
+		String testCase = "66.249.211.254";
+
+		IPv4AddrIV<BigdataLiteral> addr = null;
+		
+		try {
+			addr = new IPv4AddrIV<BigdataLiteral>(testCase);
+		} catch (UnknownHostException uh)
+		{
+			log.info(uh);
+			fail();
+		}
+		
+		assert(true);
+		
+	}
+
+	@Test
+	public void testIPAddress2() {
+		String testCase = "66.249.71.255";
+
+		IPv4AddrIV<BigdataLiteral> addr = null;
+		
+		try {
+			addr = new IPv4AddrIV<BigdataLiteral>(testCase);
+		} catch (UnknownHostException uh)
+		{
+			log.info(uh);
+			fail();
+		}
+		
+		assert(true);
+		
+	}
+
+	@Test
+	public void testIPAddress3() {
+		String testCase = "66.249.71.253/32";
+
+		IPv4AddrIV<BigdataLiteral> addr = null;
+		
+		try {
+			addr = new IPv4AddrIV<BigdataLiteral>(testCase);
+		} catch (UnknownHostException uh)
+		{
+			log.info(uh);
+			fail();
+		}
+		
+		assert(true);
+		
+	}
 
 	@Test
 	public void testIPAddressCIDR() {
@@ -76,6 +130,27 @@ public class IPv4AddrIVTest extends TestCase {
 
 		
 	}
+
+	@Test
+	public void testIPAddressCIDR2() {
+		String testCase = "192.168.1.100/24";
+		
+		boolean test = true;
+		
+		IPv4AddrIV<BigdataLiteral> addr = null;
+		
+		try {
+			addr = new IPv4AddrIV<BigdataLiteral>(testCase);
+		} catch (UnknownHostException uh)
+		{
+			log.info(uh);
+			test = false;
+		}
+		
+		assertEquals(true, test);
+		
+	}
+		
 
 	@Test
 	public void testIPAddressBadCIDR() {
