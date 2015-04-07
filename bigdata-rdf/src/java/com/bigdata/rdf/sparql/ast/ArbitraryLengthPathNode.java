@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
@@ -204,13 +206,13 @@ public class ArbitraryLengthPathNode
 
         final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
 
-        addProducedBindings(left(), producedBindings);
-        addProducedBindings(right(), producedBindings);
+        addProducedBinding(left(), producedBindings);
+        addProducedBinding(right(), producedBindings);
         for (StatementPatternNode sp : subgroup().getStatementPatterns()) {
-            addProducedBindings(sp.s(), producedBindings);
-            addProducedBindings(sp.p(), producedBindings);
-            addProducedBindings(sp.o(), producedBindings);
-            addProducedBindings(sp.c(), producedBindings);
+            addProducedBinding(sp.s(), producedBindings);
+            addProducedBinding(sp.p(), producedBindings);
+            addProducedBinding(sp.o(), producedBindings);
+            addProducedBinding(sp.c(), producedBindings);
         }
         
         return producedBindings;
@@ -225,11 +227,66 @@ public class ArbitraryLengthPathNode
 
         final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
 
-        addProducedBindings(left(), producedBindings);
-        addProducedBindings(right(), producedBindings);
+        addProducedBinding(left(), producedBindings);
+        addProducedBinding(right(), producedBindings);
         
         return producedBindings;
 
+    }
+    
+    /**
+     * Return the set of variables used by this ALP node (statement pattern
+     * terms and inside filters).  Used to determine what needs to be projected
+     * into the op.
+     */
+    public Set<IVariable<?>> getUsedVars() {
+        
+        final Set<IVariable<?>> used = new LinkedHashSet<IVariable<?>>();
+        
+        addUsedVar(left(), used);
+        addUsedVar(right(), used);
+
+        for (StatementPatternNode sp : subgroup().getStatementPatterns()) {
+            addUsedVar(sp.s(), used);
+            addUsedVar(sp.p(), used);
+            addUsedVar(sp.o(), used);
+            addUsedVar(sp.c(), used);
+            for (FilterNode filter : sp.getAttachedJoinFilters()) {
+                final Iterator<BOp> it = BOpUtility.preOrderIteratorWithAnnotations(filter);
+                while (it.hasNext()) {
+                    final BOp bop = it.next();
+                    if (bop instanceof TermNode) {
+                        addUsedVar((TermNode) bop, used);
+                    }
+                }
+            }
+        }
+        for (FilterNode filter : subgroup().getChildren(FilterNode.class)) {
+            final Iterator<BOp> it = BOpUtility.preOrderIteratorWithAnnotations(filter);
+            while (it.hasNext()) {
+                final BOp bop = it.next();
+                if (bop instanceof TermNode) {
+                    addUsedVar((TermNode) bop, used);
+                }
+            }
+        }
+        
+        return used;
+        
+    }
+
+    private void addUsedVar(final TermNode t, 
+            final Set<IVariable<?>> vars) {
+        
+        addVar(t, vars, true);
+        
+    }
+    
+    private void addProducedBinding(final TermNode t, 
+            final Set<IVariable<?>> producedBindings) {
+        
+        addVar(t, producedBindings, false);
+        
     }
     
     /**
@@ -239,12 +296,12 @@ public class ArbitraryLengthPathNode
      * 
      * @see StaticAnalysis._getJoinVars
      */
-    private void addProducedBindings(final TermNode t, 
-            final Set<IVariable<?>> producedBindings) {
+    private void addVar(final TermNode t, 
+            final Set<IVariable<?>> producedBindings, final boolean addAnonymous) {
     	
     	if (t instanceof VarNode) {
     		
-    	    if (!((VarNode) t).isAnonymous()) {
+    	    if (addAnonymous || !((VarNode) t).isAnonymous()) {
     	        producedBindings.add(((VarNode) t).getValueExpression());
     	    }
             
