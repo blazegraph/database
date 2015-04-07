@@ -2865,6 +2865,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     * 
     * @see <a href="http://trac.bigdata.com/ticket/1172"> Online backup for
     *      Journal </a>
+    * @since 1.5.2
     */
    public Future<ISnapshotResult> snapshot(
          final ISnapshotFactory snapshotFactory) {
