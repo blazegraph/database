@@ -56,9 +56,13 @@ public interface BigdataGraphListener {
 
         private final BigdataGraphAtom atom;
         
-        public BigdataGraphEdit(final Action action, final BigdataGraphAtom atom) {
+//        private final long timestamp;
+        
+        public BigdataGraphEdit(final Action action, 
+                final BigdataGraphAtom atom) {//, final long timestamp) {
             this.action = action;
             this.atom = atom;
+//            this.timestamp = timestamp;
         }
 
         public Action getAction() {
@@ -68,6 +72,10 @@ public interface BigdataGraphListener {
         public BigdataGraphAtom getAtom() {
             return atom;
         }
+        
+//        public long getTimestamp() {
+//            return timestamp;
+//        }
 
         public String getId() {
             return atom.getId();
