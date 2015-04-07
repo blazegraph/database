@@ -240,7 +240,7 @@ public class BuildInfo {
          <src path="${bigdata.dir}/bigdata-gom/src/java" />
          <src path="${bigdata.dir}/bigdata-ganglia/src/java" />
          <src path="${bigdata.dir}/bigdata-gas/src/java" />
-            <src path="${bigdata.dir}/ctc-striterators/src/java" />
+            <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
             <!-- Do not include the unit tests @todo conditionally include?
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test"/>
@@ -324,7 +324,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-sails/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
-            <fileset dir="${bigdata.dir}/ctc-striterators/src/java" />
+            <fileset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
         </jar>
     </target>
 
@@ -425,7 +425,7 @@ public class BuildInfo {
          <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-gas/src/java" />
-         <packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
+         <packageset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
          <doctitle>
                 <![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
          <bottom>
