@@ -52,14 +52,14 @@
 		<javac destdir="${build.dir}/classes" classpathref="build.classpath" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
-			<src path="${bigdata-ganglia.dir}/src/java" />
+			<src path="${bigdata-ganglia.dir}/src/main/java" />
 			<!-- Do not include the unit tests @todo conditionally include?
-            <src path="${bigdata-ganglia.dir}/src/test"/>
+            <src path="${bigdata-ganglia.dir}/src/test/java"/>
             -->
 		</javac>
 		<!-- copy resources. -->
 		<copy toDir="${build.dir}/classes">
-			<fileset dir="${bigdata-ganglia.dir}/src/java">
+			<fileset dir="${bigdata-ganglia.dir}/src/main/java">
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
@@ -77,11 +77,11 @@
 	<target name="test" depends="compile">
 		<javac destdir="${build.dir}/test" debug="${javac.debug}" debuglevel="${javac.debuglevel}" verbose="${javac.verbose}" encoding="${javac.encoding}">
 			<classpath refid="test.classpath" />
-			<src path="${bigdata-ganglia.dir}/src/test" />
+			<src path="${bigdata-ganglia.dir}/src/test/java" />
 		</javac>
 		<!-- copy resources. -->
 		<copy toDir="${build.dir}/test">
-			<fileset dir="${bigdata-ganglia.dir}/src/test">
+			<fileset dir="${bigdata-ganglia.dir}/src/test/java">
 				<exclude name="**/*.java" />
 			</fileset>
 		</copy>
@@ -109,7 +109,7 @@
 		<!-- overview="....overview.html"  -->
 		<javadoc destdir="${build.dir}/docs/api" defaultexcludes="yes" author="true" version="true" use="true" windowtitle="bigdata-ganglia" classpathref="build.classpath">
 			<arg value="-J-Xmx1000m" />
-			<packageset dir="${bigdata-ganglia.dir}/src/java" />
+			<packageset dir="${bigdata-ganglia.dir}/src/main/java" />
 			<doctitle>
 				<![CDATA[<h1>bigdata-ganglia</h1>]]></doctitle>
 		<bottom>
