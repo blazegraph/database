@@ -30,7 +30,6 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 import java.util.Properties;
-import java.util.Random;
 import java.util.concurrent.Callable;
 
 import junit.framework.TestCase;
@@ -39,13 +38,12 @@ import com.bigdata.io.TestCase3;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> extends TestCase3 {
 
-    private final static boolean INFO = log.isInfoEnabled();
+//    private final static boolean INFO = log.isInfoEnabled();
 
-    private final static boolean DEBUG = log.isDebugEnabled();
+//    private final static boolean DEBUG = log.isDebugEnabled();
     
     //
     // Constructors.
@@ -62,9 +60,9 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
     /**
      * Invoked from {@link TestCase#setUp()} for each test in the suite.
      */
-    public void setUp(ProxyTestCase testCase) throws Exception {
+    public void setUp(final ProxyTestCase<S> testCase) throws Exception {
 
-        if(INFO)
+        if(log.isInfoEnabled())
         log.info("\n\n================:BEGIN:" + testCase.getName()
                 + ":BEGIN:====================");
 
@@ -73,19 +71,40 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
     /**
      * Invoked from {@link TestCase#tearDown()} for each test in the suite.
      */
-    public void tearDown(ProxyTestCase testCase) throws Exception {
+    public void tearDown(final ProxyTestCase<S> testCase) throws Exception {
 
-        if(INFO)
+        if(log.isInfoEnabled())
         log.info("\n================:END:" + testCase.getName()
                 + ":END:====================\n");
       
         TestHelper.checkJournalsClosed(testCase, this);
 
     }
-    
+
+//    /**
+//     * A random number generated - the seed is NOT fixed.
+//     * 
+//     * This is not required. The problem was that the base class field
+//     * of the same name was winding up not initialized because nobody was.
+//     * calling super.setUp() and super.tearDown().
+//     */
+//    protected Random r = new Random();
+
+    @Override
+    public void setUp() throws Exception {
+        
+        super.setUp();
+        
+//        r = new Random();
+        
+    }
+
+    @Override
     public void tearDown() throws Exception {
         
         super.tearDown();
+        
+//        r = null;
         
     }
 
@@ -349,12 +368,7 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
 //    }
 
     /**
-     * A random number generated - the seed is NOT fixed.
-     */
-    protected Random r = new Random();
-
-    /**
-     * Returns random data that will fit in N bytes. N is choosen randomly in
+     * Returns random data that will fit in N bytes. N is chosen randomly in
      * 1:1024.
      * 
      * @return A new {@link ByteBuffer} wrapping a new <code>byte[]</code> of
@@ -369,7 +383,7 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
         r.nextBytes(bytes);
         
         return ByteBuffer.wrap(bytes);
-        
+       
     }
     
     /**
@@ -384,7 +398,7 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
      * 
      * @todo refactor into junit-ext.
      */
-    protected void fail(final Callable c,
+    protected void fail(final Callable<?> c,
             final Class<? extends Throwable> expected) {
         
         if (c == null)
@@ -401,7 +415,7 @@ public abstract class AbstractIndexManagerTestCase<S extends IIndexManager> exte
             
             if (t.getClass().isAssignableFrom(expected)) {
             
-                if (INFO)
+                if (log.isInfoEnabled())
                     log.info("Ignoring expected exception: " + t);
                 
                 return;

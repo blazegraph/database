@@ -123,7 +123,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     /**
      * Logger.
      */
-    private static final Logger log = Logger.getLogger(Journal.class);
+    static final Logger log = Logger.getLogger(Journal.class);
 
     /**
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for
@@ -2840,7 +2840,47 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    @Override
+   /**
+    * Submit a task that will take a snapshot of the journal and return the
+    * {@link Future} for that task. The snapshot is taken on a temporary file.
+    * Iff the snapshot is successful, the temporary file is renamed to the
+    * application determined file. Thus all snapshots are either valid or are
+    * were not written. A snapshot of an empty journal is not permitted. Also,
+    * the backing store MUST implement the {@link IHABufferStrategy}.
+    * <p>
+    * Note: This method supports application controlled snapshots and is
+    * primarily intended for non-HA deployments. HA has an integrated snapshot
+    * and transaction log mechanism which is preferred in HA deployments and
+    * also provides the ability for an application to take snapshots on demand.
+    * 
+    * @param snapshotFactory
+    *           The factory that will provide the name of the file on which the
+    *           snapshot will be written.
+    * 
+    * @return The {@link Future} for the snapshot.
+    * 
+    * @throws UnsupportedOperationException
+    *            if the backing store does not implement the
+    *            {@link IHABufferStrategy} interface.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1172"> Online backup for
+    *      Journal </a>
+    * @since 1.5.2
+    */
+   public Future<ISnapshotResult> snapshot(
+         final ISnapshotFactory snapshotFactory) {
+
+      if (!(getBufferStrategy() instanceof IHABufferStrategy)) {
+      
+         throw new UnsupportedOperationException();
+         
+      }
+
+      return executorService.submit(new SnapshotTask(this, snapshotFactory));
+
+   }
+
+   @Override
 	public void dropIndex(final String name) {
 
 		final BTreeCounters btreeCounters = getIndexCounters(name);
