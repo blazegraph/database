@@ -64,12 +64,15 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
     private AbstractIndexManagerTestCase<S> m_delegate = null;
 
+    @SuppressWarnings("unchecked")
+    @Override
     public void setDelegate(Test delegate) {
 
-        m_delegate = (AbstractIndexManagerTestCase<S>)delegate;
+       m_delegate = (AbstractIndexManagerTestCase<S>) delegate;
 
     }
 
+    @Override
     public Test getDelegate() throws IllegalStateException {
 
         return m_delegate;
@@ -99,7 +102,7 @@ public abstract class ProxyTestCase<S extends IIndexManager>
              * 
              * @todo document.
              */
-            String testClass = System.getProperty("testClass");
+            final String testClass = System.getProperty("testClass");
             if (testClass == null) {
 
                 throw new IllegalStateException(
@@ -107,7 +110,7 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
             }
             try {
-                Class cl = Class.forName(testClass);
+                final Class<?> cl = Class.forName(testClass);
                 m_delegate = (AbstractIndexManagerTestCase<S>) cl.newInstance();
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
@@ -150,6 +153,8 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
         startupActiveThreads = Thread.currentThread().getThreadGroup().activeCount();
     	
+        super.setUp();
+        
         getOurDelegate().setUp(this);
         
     }
@@ -161,6 +166,8 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
         getOurDelegate().tearDown(this);
 
+        super.tearDown();
+        
         if (s_checkThreads) {
 
             final ThreadGroup grp = Thread.currentThread().getThreadGroup();
@@ -226,7 +233,10 @@ public abstract class ProxyTestCase<S extends IIndexManager>
 
     /**
      * Open/create an {@link IIndexManager} using the given properties.
+     * <p>
+     * {@inheritDoc}
      */
+    @Override
     public S getStore(Properties properties) {
         return getOurDelegate().getStore(properties);
     }
@@ -234,7 +244,10 @@ public abstract class ProxyTestCase<S extends IIndexManager>
     /**
      * Close the {@link IIndexManager} and re-open an {@link IIndexManager}
      * backed by the same persistent storage.
+     * <p>
+     * {@inheritDoc}
      */
+    @Override
     public S reopenStore(S store) {
         return getOurDelegate().reopenStore(store);
     }
