@@ -347,3 +347,5 @@ target/**
 *.log
 
 *.log
+
+/*/target
