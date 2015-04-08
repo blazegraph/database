@@ -6926,9 +6926,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			
 			// clone rootblocks
 			final ByteBuffer rb0 = bs.readRootBlock(true/*is rb0*/);
-			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK0, rb0.array());
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK0, BytesUtil.toArray(rb0));
 			final ByteBuffer rb1 = bs.readRootBlock(false/*is rb0*/);
-			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK1, rb1.array());
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK1, BytesUtil.toArray(rb1));
 			
 			// return last commitCounter
             final IRootBlockView rbv0 = new RootBlockView(true/* rootBlock0 */, rb0, checker);            
