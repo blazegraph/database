@@ -337,6 +337,11 @@ benchmark
 /bigdata-perf/gas/*.test
 /bigdata-perf/gas/*.jnl
 
+#Maven
+target/
+target/**
+*/target/**
+
 *~
 
 *.log
