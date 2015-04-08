@@ -18,8 +18,8 @@
 	<classpathentry kind="src" path="contrib/src/problems"/>
 	<classpathentry kind="src" path="bigdata/src/samples"/>
 	<classpathentry kind="src" path="dsi-utils/src/test"/>
-	<classpathentry kind="src" path="ctc-striterators/src/java"/>
-	<classpathentry kind="src" path="ctc-striterators/src/test"/>
+	<classpathentry kind="src" path="ctc-striterators/src/main/java"/>
+	<classpathentry kind="src" path="ctc-striterators/src/test/java"/>
 	<classpathentry kind="src" path="junit-ext/src/test"/>
 	<classpathentry kind="src" path="junit-ext/src/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/java"/>
