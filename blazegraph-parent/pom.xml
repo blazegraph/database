@@ -55,7 +55,7 @@ dependencies.
    <version>1.5.1-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
-    <description>Blazegraph Maven Build</description>
+    <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
     <url>http://www.blazegraph.com/</url>
     <organization>
         <name>SYSTAP, LLC</name>
