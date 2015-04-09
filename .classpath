@@ -22,8 +22,8 @@
 	<classpathentry kind="src" path="ctc-striterators/src/test/java"/>
 	<classpathentry kind="src" path="junit-ext/src/test/java"/>
 	<classpathentry kind="src" path="junit-ext/src/main/java"/>
-	<classpathentry kind="src" path="lgpl-utils/src/test/java"/>
 	<classpathentry kind="src" path="lgpl-utils/src/main/java"/>
+	<classpathentry kind="src" path="lgpl-utils/src/test/java"/>
 	<classpathentry kind="src" path="bigdata-ganglia/src/main/java"/>
 	<classpathentry kind="src" path="bigdata-ganglia/src/test/java"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/resources/service-providers"/>
