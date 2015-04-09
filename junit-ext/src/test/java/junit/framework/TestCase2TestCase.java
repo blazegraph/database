@@ -159,48 +159,6 @@ public class TestCase2TestCase
     //************************************************************
 
     /**
-     * <p>
-     * Tests some of the property loader behaviors.
-     * </p>
-     * <p>
-     * Note: This test will fail unless your <code>build.properties</code>
-     * defines <code>junit.framework.TestCase2.enabled=false</code>.  This
-     * file must be located in <code>${user.home}</code>, wherever that is
-     * for your system.
-     * </p>
-     */
-
-    public void test_getProperties()
-    {
-
-	Properties p = getProperties();
-				// force loading of properties.
-	
-	// This is bound locally in TestCase2Test.properties.
-	
-	assertEquals
-	    ( "red",
-	      p.getProperty( "color" )
-	      );
-	
-	// This is enabled in our .properties file but disabled in
-	// _my_ ${user.home}/build.properties.  Since the latter
-	// overrides the former, the property should be reported as
-	// disabled.  If _your_ build.properties does not define this
-	// property then this test will fail.
-	
-	final String userHome = System.getProperty("user.home");
-	System.err.println("user.home = "+userHome);
-	final String buildProperties = userHome+File.pathSeparator+"build.properties";
-	if( ! new File(buildProperties).exists() ) {
-	    log.warn("File not found: "+buildProperties);
-	}
-	final String actual = p.getProperty("junit.framework.TestCase2.enabled");
-	assertEquals("false", actual);
-	
-    }
-
-    /**
      * Tests correct reading of a local text resource.
      */
 
