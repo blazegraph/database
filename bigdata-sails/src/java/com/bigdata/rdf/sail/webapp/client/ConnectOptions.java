@@ -27,55 +27,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.http.HttpEntity;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.message.BasicNameValuePair;
 
 /**
  * Options for the HTTP connection.
  */
 public class ConnectOptions extends AbstractConnectOptions {
 
-	/**
-	 * Request entity.
-	 */
+   /**
+    * Request entity.
+    * 
+    * TODO This field is read/written by the {@link RemoteRepository}. We should
+    * try to encapsulate this within the scope of the logic that manages its
+    * value and pass it through function calls rather than by side effect on
+    * this object.
+    */
 	public HttpEntity entity = null;
 
 	public ConnectOptions(String serviceURL) {
 		super(serviceURL);
-	}
-
-	/**
-	 * Add query params to an {@link IMimeTypes#MIME_APPLICATION_URL_ENCODED}
-	 * entity.
-	 */
-	public static HttpEntity getFormEntity(
-			final Map<String, String[]> requestParams) throws Exception {
-
-		final List<NameValuePair> formparams = new ArrayList<NameValuePair>();
-
-		if (requestParams != null) {
-			for (Map.Entry<String, String[]> e : requestParams.entrySet()) {
-				final String name = e.getKey();
-				final String[] vals = e.getValue();
-
-				if (vals == null) {
-					formparams.add(new BasicNameValuePair(name, null));
-				} else {
-					for (String val : vals) {
-						formparams.add(new BasicNameValuePair(name, val));
-					}
-				}
-			} // next Map.Entry
-		}
-
-		return new UrlEncodedFormEntity(formparams, RemoteRepository.UTF8);
-
 	}
 
 }

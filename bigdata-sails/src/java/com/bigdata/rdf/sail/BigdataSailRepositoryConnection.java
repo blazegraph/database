@@ -1,6 +1,33 @@
+/**
+
+ Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+ Contact:
+ SYSTAP, LLC
+ 2501 Calvert ST NW #106
+ Washington, DC 20008
+ licenses@systap.com
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 package com.bigdata.rdf.sail;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.Update;
@@ -33,6 +60,7 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
 	private static transient final Logger log = Logger
 			.getLogger(BigdataSailRepositoryConnection.class);
 
+	@Override
 	public String toString() {
 		return getClass().getName() + "{timestamp="
 				+ TimestampUtility.toString(getTripleStore().getTimestamp())
@@ -66,6 +94,29 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         return (BigdataValueFactory) super.getValueFactory();
         
     }
+
+    /**
+    * {@inheritDoc}
+    * <p>
+    * This code path is optimized for cases where isolatable indices are not in
+    * use and where inferences can not appear.
+    */
+   @Override
+   public boolean hasStatement(final Resource s, final URI p, final Value o,
+         final boolean includeInferred, final Resource... contexts)
+         throws RepositoryException {
+
+      try {
+
+         return getSailConnection().hasStatement(s, p, o, includeInferred, contexts);
+
+      } catch (SailException e) {
+         
+         throw new RepositoryException(e);
+         
+      }
+            
+   }
 
     @Override
     public BigdataSailGraphQuery prepareGraphQuery(final QueryLanguage ql,
