@@ -30,6 +30,11 @@ public class ProxyTestCase
     implements IProxyTest
 {
 
+    public ProxyTestCase()
+    {
+	this.m_delegate = new DelegateTestCase();
+    }
+
     //************************************************************
     //*********************** IProxyTest *************************
     //************************************************************
@@ -68,12 +73,12 @@ public class ProxyTestCase
 
 	if( delegate == null ) {
 
+
 	    System.err.println
 		( "The delegate was not setup."
 		  );
 
-	    fail( "The delegate was not setup."
-		  );
+	    fail("The delegate was not setup.");
 
 	}
 
