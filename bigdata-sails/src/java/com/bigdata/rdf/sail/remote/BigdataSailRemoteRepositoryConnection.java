@@ -35,7 +35,6 @@ import java.net.URL;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -94,7 +93,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
  * TODO Implement buffering of adds and removes so that we can turn off
  * auto-commit.
  * 
- * TODO Fix all the Query objects (TupleQuery, GraphQuery, BooleanQuery) to
+ * FIXME (***) Fix all the Query objects (TupleQuery, GraphQuery, BooleanQuery) to
  * support the various possible operations on them, such as setting a binding.
  * 
  * TODO Support baseURIs
@@ -105,8 +104,8 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
  */
 public class BigdataSailRemoteRepositoryConnection implements RepositoryConnection {
 
-    private static final transient Logger log = Logger
-            .getLogger(BigdataSailRemoteRepositoryConnection.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(BigdataSailRemoteRepositoryConnection.class);
 
     private final BigdataSailRemoteRepository repo;
 
@@ -138,9 +137,18 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		}
 		
 	}
-	
+
+   /**
+    * {@inheritDoc}
+    * 
+    * FIXME (***) includeInferred is currently ignored by getStatements() (in the
+    * delegate RemoteRepository class).
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
+    *      ignores includeInferred (REST API) </a>
+    */
 	@Override
-    public RepositoryResult<Statement> getStatements(final Resource s,
+	public RepositoryResult<Statement> getStatements(final Resource s,
             final URI p, final Value o, final boolean includeInferred,
             final Resource... c) throws RepositoryException {
 		
@@ -202,8 +210,14 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	}
 
+   /**
+    * {@inheritDoc}
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1109"> hasStatements can
+    *      overestimate and ignores includeInferred (REST API) </a>
+    */
 	@Override
-    public boolean hasStatement(final Resource s, final URI p, final Value o,
+	public boolean hasStatement(final Resource s, final URI p, final Value o,
             final boolean includeInferred, final Resource... c)
             throws RepositoryException {
 
@@ -222,7 +236,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-    public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
+	public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
             final String query) throws RepositoryException,
             MalformedQueryException {
 		
@@ -892,13 +906,38 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 	}
 
-   @Override
+   /**
+    * {@inheritDoc}
+    * <p>
+    * This uses the HASSTMT REST API method to do the minimum amount of work on
+    * the server.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1174" >
+    *      Sail/Repository.size() should not count inferred statements </a>
+    * 
+    *      TODO size() and isEmpty() are defined by openrdf in terms of explicit
+    *      statements. However, we have historically always realized them in
+    *      terms of statements without respect to filtering out inferences (when
+    *      present).
+    */
+	@Override
    public boolean isEmpty() throws RepositoryException {
-      
-      return size() > 0;
+
+      return hasStatement(null/* s */, null/* p */, null/* o */, false/* includeInferred */);
       
    }
-   
+
+	/**
+	 * {@inheritDoc}
+	 * 
+    * @see <a href="http://trac.bigdata.com/ticket/1174" >
+    *      Sail/Repository.size() should not count inferred statements </a>
+    * 
+    *      TODO size() and isEmpty() are defined by openrdf in terms of explicit
+    *      statements. However, we have historically always realized them in
+    *      terms of statements without respect to filtering out inferences (when
+    *      present).
+	 */
 	@Override
 	public long size(final Resource... c) throws RepositoryException {
 		
@@ -1088,9 +1127,24 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	@Override
 	public ValueFactory getValueFactory() {
-		throw new UnsupportedOperationException();
+		return repo.getValueFactory();
 	}
 
+   /*
+    * FIXME (***) Implement proper tx semantics. Use remote tx to buffer if
+    * supported (we might have to query for this or just leave it to the user to
+    * prepare() and if the backend does not support full read/write tx then it
+    * returns ITx.UNISOLATED vs a read/write transaction identifier).
+    * 
+    * When the backend is unisolated I am not sure if we need to use local
+    * buffering of complex mutations but definitely flush before read would
+    * cause a commit so it is not really possible to make this correct remotely
+    * without using isolatable indices.
+    * 
+    * (non-Javadoc)
+    * 
+    * @see org.openrdf.repository.RepositoryConnection#close()
+    */
    @Override
    public void close() throws RepositoryException {
       // noop

@@ -254,11 +254,20 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		// Protocol
 		suite.addTest(TestProtocolAll.suite());
         
-        // Multi-tenancy API.
-        suite.addTestSuite(TestMultiTenancyAPI.class);
-
         // RemoteRepository test (nano sparql server client-wrapper using Jetty)
+        suite.addTestSuite(Test_REST_Structure.class);
+        suite.addTestSuite(Test_REST_ASK.class);
+        suite.addTestSuite(Test_REST_DESCRIBE.class);
+        suite.addTestSuite(Test_REST_ESTCARD.class);
+        suite.addTestSuite(Test_REST_ESTCARD.ReadWriteTx.class);
+        suite.addTestSuite(Test_REST_HASSTMT.class);
+        suite.addTestSuite(Test_REST_HASSTMT.ReadWriteTx.class);
+        suite.addTestSuite(Test_REST_HASSTMT.TruthMaintenance.class);
+        suite.addTestSuite(Test_REST_ServiceDescription.class);
+        suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
         suite.addTestSuite(TestNanoSparqlClient.class);
+        suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
+        suite.addTestSuite(StressTest_REST_MultiTenancy.class);
         
         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
@@ -344,6 +353,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 					"true");
 			properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
 					"false");
+         properties.setProperty(BigdataSail.Options.JUSTIFY,
+               "false");
 			properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
 					NoAxioms.class.getName());
 			properties.setProperty(
@@ -355,6 +366,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		case triples:
 			properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
 					"false");
+         properties.setProperty(BigdataSail.Options.JUSTIFY,
+               "false");
 			properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
 					NoAxioms.class.getName());
 			properties.setProperty(
@@ -366,6 +379,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		case sids:
 			properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
 					"false");
+         properties.setProperty(BigdataSail.Options.JUSTIFY,
+               "false");
 			properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
 					NoAxioms.class.getName());
 			properties.setProperty(

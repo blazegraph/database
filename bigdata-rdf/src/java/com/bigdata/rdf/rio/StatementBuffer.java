@@ -1377,13 +1377,13 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     /**
      * Adds the values and the statement into the buffer.
      * 
-     * @param s
+     * @param _s
      *            The subject.
-     * @param p
+     * @param _p
      *            The predicate.
-     * @param o
+     * @param _o
      *            The object.
-     * @param c
+     * @param _c
      *            The context (may be null).
      * @param type
      *            The statement type.
