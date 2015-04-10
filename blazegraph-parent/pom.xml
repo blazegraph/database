@@ -145,7 +145,7 @@ dependencies.
     </repository>
     <repository>
       <id>bigdata.snapshots</id>
-      <url>http://www.systap.com/maven/snapshot/</url>
+      <url>http://www.systap.com/maven/snapshots/</url>
     </repository>
     <!-- 
     <repository>
