@@ -1,0 +1,108 @@
+<?xml version="1.0" ?>
+<!DOCTYPE experiment PUBLIC "-//systap.com//DTD BIGDATA EXPERIMENT 0.1//EN" "Experiment.dtd">
+<!-- There are 20 conditions. -->
+<experiment class="com.bigdata.service.jini.PerformanceTest">
+ <defaults>
+  <property name="test.timeout">5000</property>
+ </defaults>
+ <!-- condition#1 -->
+ <condition>
+  <property name="test.period">1</property>
+  <property name="test.nbytes">0</property>
+ </condition>
+ <!-- condition#2 -->
+ <condition>
+  <property name="test.period">2</property>
+  <property name="test.nbytes">0</property>
+ </condition>
+ <!-- condition#3 -->
+ <condition>
+  <property name="test.period">3</property>
+  <property name="test.nbytes">0</property>
+ </condition>
+ <!-- condition#4 -->
+ <condition>
+  <property name="test.period">4</property>
+  <property name="test.nbytes">0</property>
+ </condition>
+ <!-- condition#5 -->
+ <condition>
+  <property name="test.period">5</property>
+  <property name="test.nbytes">0</property>
+ </condition>
+ <!-- condition#6 -->
+ <condition>
+  <property name="test.period">1</property>
+  <property name="test.nbytes">100</property>
+ </condition>
+ <!-- condition#7 -->
+ <condition>
+  <property name="test.period">2</property>
+  <property name="test.nbytes">100</property>
+ </condition>
+ <!-- condition#8 -->
+ <condition>
+  <property name="test.period">3</property>
+  <property name="test.nbytes">100</property>
+ </condition>
+ <!-- condition#9 -->
+ <condition>
+  <property name="test.period">4</property>
+  <property name="test.nbytes">100</property>
+ </condition>
+ <!-- condition#10 -->
+ <condition>
+  <property name="test.period">5</property>
+  <property name="test.nbytes">100</property>
+ </condition>
+ <!-- condition#11 -->
+ <condition>
+  <property name="test.period">1</property>
+  <property name="test.nbytes">1000</property>
+ </condition>
+ <!-- condition#12 -->
+ <condition>
+  <property name="test.period">2</property>
+  <property name="test.nbytes">1000</property>
+ </condition>
+ <!-- condition#13 -->
+ <condition>
+  <property name="test.period">3</property>
+  <property name="test.nbytes">1000</property>
+ </condition>
+ <!-- condition#14 -->
+ <condition>
+  <property name="test.period">4</property>
+  <property name="test.nbytes">1000</property>
+ </condition>
+ <!-- condition#15 -->
+ <condition>
+  <property name="test.period">5</property>
+  <property name="test.nbytes">1000</property>
+ </condition>
+ <!-- condition#16 -->
+ <condition>
+  <property name="test.period">1</property>
+  <property name="test.nbytes">10000</property>
+ </condition>
+ <!-- condition#17 -->
+ <condition>
+  <property name="test.period">2</property>
+  <property name="test.nbytes">10000</property>
+ </condition>
+ <!-- condition#18 -->
+ <condition>
+  <property name="test.period">3</property>
+  <property name="test.nbytes">10000</property>
+ </condition>
+ <!-- condition#19 -->
+ <condition>
+  <property name="test.period">4</property>
+  <property name="test.nbytes">10000</property>
+ </condition>
+ <!-- condition#20 -->
+ <condition>
+  <property name="test.period">5</property>
+  <property name="test.nbytes">10000</property>
+ </condition>
+</experiment>
