@@ -24,9 +24,15 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.message.BasicNameValuePair;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
 import org.openrdf.rio.RDFFormat;
@@ -203,9 +209,11 @@ public class AbstractConnectOptions implements IMimeTypes {
     }
     
     /**
-     * Add any URL query parameters.
+     * Add any URL query parameters (for a GET request).
      * 
      * @see #1097 (Extension REST API does not support multiple context values)
+     * 
+     * @see #getFormEntity(Map)
      */
     static public void addQueryParams(final StringBuilder urlString,
             final Map<String, String[]> requestParams)
@@ -234,6 +242,43 @@ public class AbstractConnectOptions implements IMimeTypes {
 
     }
     
+    /**
+     * Variant of {@link #addQueryParams(StringBuilder, Map)} that returns an
+     * entity for a POST request.
+     * <p>
+     * Add query params to an {@link IMimeTypes#MIME_APPLICATION_URL_ENCODED}
+     * entity.
+     * 
+     * @see #addQueryParams(StringBuilder, Map)
+     * 
+     * TODO Rename either this or {@link #addQueryParams(StringBuilder, Map)}
+     * to align the method names since they serve the same purpose but for
+     * GET vs POST.
+     */
+    public static HttpEntity getFormEntity(
+          final Map<String, String[]> requestParams) throws Exception {
+
+       final List<NameValuePair> formparams = new ArrayList<NameValuePair>();
+
+       if (requestParams != null) {
+          for (Map.Entry<String, String[]> e : requestParams.entrySet()) {
+             final String name = e.getKey();
+             final String[] vals = e.getValue();
+
+             if (vals == null) {
+                formparams.add(new BasicNameValuePair(name, null));
+             } else {
+                for (String val : vals) {
+                   formparams.add(new BasicNameValuePair(name, val));
+                }
+             }
+          } // next Map.Entry
+       }
+
+       return new UrlEncodedFormEntity(formparams, RemoteRepository.UTF8);
+
+    }
+
     /**
      * Apply a UTF8 encoding to a component of a URL.
      * 

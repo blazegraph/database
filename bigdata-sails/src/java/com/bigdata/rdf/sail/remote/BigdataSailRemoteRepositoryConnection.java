@@ -35,7 +35,6 @@ import java.net.URL;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -81,24 +80,32 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
  * bigdata RemoteRepository. This provides SAIL API based client access to a
- * bigdata remote NanoSparqlServer. This implementation operates only in
- * auto-commit mode (each mutation operation results in a commit on the server).
- * It also throws UnsupportedOperationExceptions all over the place due to
- * incompatibilities with our own remoting interface. If there is something
- * important that you need implemented for your application don't be afraid to
- * reach out and contact us.
+ * bigdata remote NanoSparqlServer.
+ * <p>
+ * 
+ * This implementation operates only in auto-commit mode (each mutation
+ * operation results in a commit on the server). It also throws
+ * UnsupportedOperationExceptions all over the place due to incompatibilities
+ * with our own remoting interface. If there is something important that you
+ * need implemented for your application don't be afraid to reach out and
+ * contact us.
  * 
  * TODO Implement buffering of adds and removes so that we can turn off
- * 		auto-commit. 
- * TODO Fix all the Query objects (TupleQuery, GraphQuery,
- * 		BooleanQuery) to support the various possible operations on them, such as
- * 		setting a binding. 
+ * auto-commit.
+ * 
+ * FIXME (***) Fix all the Query objects (TupleQuery, GraphQuery, BooleanQuery) to
+ * support the various possible operations on them, such as setting a binding.
+ * 
  * TODO Support baseURIs
+ * 
+ * @see <a href="http://trac.bigdata.com/ticket/1156"> Read/write tx support in
+ *      NSS and BigdataSailRemoteRepositoryConnection </a>
+ * 
  */
 public class BigdataSailRemoteRepositoryConnection implements RepositoryConnection {
 
-    private static final transient Logger log = Logger
-            .getLogger(BigdataSailRemoteRepositoryConnection.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(BigdataSailRemoteRepositoryConnection.class);
 
     private final BigdataSailRemoteRepository repo;
 
@@ -130,9 +137,18 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		}
 		
 	}
-	
+
+   /**
+    * {@inheritDoc}
+    * 
+    * FIXME (***) includeInferred is currently ignored by getStatements() (in the
+    * delegate RemoteRepository class).
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
+    *      ignores includeInferred (REST API) </a>
+    */
 	@Override
-    public RepositoryResult<Statement> getStatements(final Resource s,
+	public RepositoryResult<Statement> getStatements(final Resource s,
             final URI p, final Value o, final boolean includeInferred,
             final Resource... c) throws RepositoryException {
 		
@@ -194,8 +210,14 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	}
 
+   /**
+    * {@inheritDoc}
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1109"> hasStatements can
+    *      overestimate and ignores includeInferred (REST API) </a>
+    */
 	@Override
-    public boolean hasStatement(final Resource s, final URI p, final Value o,
+	public boolean hasStatement(final Resource s, final URI p, final Value o,
             final boolean includeInferred, final Resource... c)
             throws RepositoryException {
 
@@ -214,7 +236,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-    public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
+	public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
             final String query) throws RepositoryException,
             MalformedQueryException {
 		
@@ -283,16 +305,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 	
 				@Override
-				public Dataset getDataset() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public boolean getIncludeInferred() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
 				public void removeBinding(String arg0) {
 					throw new UnsupportedOperationException();
 				}
@@ -302,11 +314,21 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public Dataset getDataset() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setDataset(Dataset arg0) {
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public boolean getIncludeInferred() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setIncludeInferred(boolean arg0) {
 					throw new UnsupportedOperationException();
@@ -406,16 +428,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 	
 				@Override
-				public Dataset getDataset() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public boolean getIncludeInferred() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
 				public void removeBinding(String arg0) {
 					throw new UnsupportedOperationException();
 				}
@@ -425,11 +437,21 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public Dataset getDataset() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setDataset(Dataset arg0) {
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public boolean getIncludeInferred() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setIncludeInferred(boolean arg0) {
 					throw new UnsupportedOperationException();
@@ -555,16 +577,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 	
 				@Override
-				public Dataset getDataset() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public boolean getIncludeInferred() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
 				public void removeBinding(String arg0) {
 					throw new UnsupportedOperationException();
 				}
@@ -574,11 +586,21 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public Dataset getDataset() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setDataset(Dataset arg0) {
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public boolean getIncludeInferred() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setIncludeInferred(boolean arg0) {
 					throw new UnsupportedOperationException();
@@ -626,8 +648,11 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             throws RepositoryException, E {
 		
 		final Graph g = new GraphImpl();
+
 		while (stmts.hasNext()) {
-			g.add(stmts.next());
+		
+		   g.add(stmts.next());
+		   
 		}
 		
 		add(g, c);
@@ -642,11 +667,12 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 	}
 
-    /**
-     * <strong>single statement updates not recommended</strong>
-     * <p>
-     * {@inheritDoc}
-     */
+   /**
+    * <strong>single statement updates not recommended for performance
+    * reasons</strong>. Remember, batch is beautiful.
+    * <p>
+    * {@inheritDoc}
+    */
 	@Override
 	public void add(final Statement stmt, final Resource... c)
 			throws RepositoryException {
@@ -654,6 +680,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 //		log.warn("single statement updates not recommended");
 		
 		final Graph g = new GraphImpl();
+
 		g.add(stmt);
 		
 		add(g, c);
@@ -751,25 +778,31 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             throws RepositoryException, E {
 
 		final Graph g = new GraphImpl();
-		while (stmts.hasNext())
-			g.add(stmts.next());
-		
+
+      while (stmts.hasNext()) {
+
+         g.add(stmts.next());
+
+      }
+	
 		remove(g, c);
 
 	}
 
-    /**
-     * <strong>single statement updates not recommended</strong>
-     * <p>
-     * {@inheritDoc}
-     */
+   /**
+    * <strong>single statement updates not recommended for performance
+    * reasons</strong>. Remember, batch is beautiful.
+    * <p>
+    * {@inheritDoc}
+    */
     @Override
 	public void remove(final Statement stmt, final Resource... c)
 			throws RepositoryException {
 		
-		log.warn("single statement updates not recommended");
+//		log.warn("single statement updates not recommended");
 		
 		final Graph g = new GraphImpl();
+	
 		g.add(stmt);
 		
 		remove(g, c);
@@ -825,28 +858,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void close() throws RepositoryException {
-		// noop
-	}
-
-	@Override
-	public boolean isOpen() throws RepositoryException {
-		
-		return true;
-		
-	}
-
-	@Override
-	public void commit() throws RepositoryException {
-		// noop
-	}
-
-	@Override
-	public void rollback() throws RepositoryException {
-		// noop
-	}
-
-	@Override
 	public Repository getRepository() {
 		
 		return repo;
@@ -895,6 +906,38 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 	}
 
+   /**
+    * {@inheritDoc}
+    * <p>
+    * This uses the HASSTMT REST API method to do the minimum amount of work on
+    * the server.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1174" >
+    *      Sail/Repository.size() should not count inferred statements </a>
+    * 
+    *      TODO size() and isEmpty() are defined by openrdf in terms of explicit
+    *      statements. However, we have historically always realized them in
+    *      terms of statements without respect to filtering out inferences (when
+    *      present).
+    */
+	@Override
+   public boolean isEmpty() throws RepositoryException {
+
+      return hasStatement(null/* s */, null/* p */, null/* o */, false/* includeInferred */);
+      
+   }
+
+	/**
+	 * {@inheritDoc}
+	 * 
+    * @see <a href="http://trac.bigdata.com/ticket/1174" >
+    *      Sail/Repository.size() should not count inferred statements </a>
+    * 
+    *      TODO size() and isEmpty() are defined by openrdf in terms of explicit
+    *      statements. However, we have historically always realized them in
+    *      terms of statements without respect to filtering out inferences (when
+    *      present).
+	 */
 	@Override
 	public long size(final Resource... c) throws RepositoryException {
 		
@@ -954,21 +997,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public boolean isAutoCommit() throws RepositoryException {
-		
-		return true;
-		
-	}
-
-	@Override
-	public boolean isEmpty() throws RepositoryException {
-		
-		return size() > 0;
-		
-	}
-
-	
-	@Override
     public Update prepareUpdate(final QueryLanguage ql, final String query)
             throws RepositoryException, MalformedQueryException {
 
@@ -1009,16 +1037,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 				}
 	
 				@Override
-				public Dataset getDataset() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public boolean getIncludeInferred() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
 				public void removeBinding(String arg0) {
 					throw new UnsupportedOperationException();
 				}
@@ -1028,11 +1046,21 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public Dataset getDataset() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setDataset(Dataset arg0) {
 					throw new UnsupportedOperationException();
 				}
 	
+            @Override
+            public boolean getIncludeInferred() {
+               throw new UnsupportedOperationException();
+            }
+   
 				@Override
 				public void setIncludeInferred(boolean arg0) {
 					throw new UnsupportedOperationException();
@@ -1099,8 +1127,45 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	@Override
 	public ValueFactory getValueFactory() {
-		throw new UnsupportedOperationException();
+		return repo.getValueFactory();
 	}
+
+   /*
+    * FIXME (***) Implement proper tx semantics. Use remote tx to buffer if
+    * supported (we might have to query for this or just leave it to the user to
+    * prepare() and if the backend does not support full read/write tx then it
+    * returns ITx.UNISOLATED vs a read/write transaction identifier).
+    * 
+    * When the backend is unisolated I am not sure if we need to use local
+    * buffering of complex mutations but definitely flush before read would
+    * cause a commit so it is not really possible to make this correct remotely
+    * without using isolatable indices.
+    * 
+    * (non-Javadoc)
+    * 
+    * @see org.openrdf.repository.RepositoryConnection#close()
+    */
+   @Override
+   public void close() throws RepositoryException {
+      // noop
+   }
+
+   @Override
+   public boolean isOpen() throws RepositoryException {
+      
+      return true;
+      
+   }
+
+   @Override
+   public void commit() throws RepositoryException {
+      // noop
+   }
+
+   @Override
+   public void rollback() throws RepositoryException {
+      // noop
+   }
 
     @Override
     public void begin() throws RepositoryException {
@@ -1111,6 +1176,13 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
     public boolean isActive() 
             throws UnknownTransactionStateException, RepositoryException {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isAutoCommit() throws RepositoryException {
+       
+       return true;
+       
     }
 
 }
