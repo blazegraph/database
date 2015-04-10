@@ -66,8 +66,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.cognitiveweb</groupId>
-      <artifactId>cweb-junit-ext</artifactId>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>junit-ext</artifactId>
       <version>1.1-b3-dev</version>
     </dependency>
     <dependency>
