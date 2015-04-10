@@ -233,6 +233,7 @@ public class BuildInfo {
             >
             <!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
             <src path="${bigdata.dir}/bigdata/src/java" />
+            <src path="${bigdata.dir}/bigdata-client/src/main/java" />
             <src path="${bigdata.dir}/bigdata-jini/src/main/java" />
          <src path="${bigdata.dir}/bigdata-rdf/src/java" />
             <src path="${bigdata.dir}/bigdata-sails/src/java" />
@@ -242,6 +243,7 @@ public class BuildInfo {
          <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
             <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
             <src path="${bigdata.dir}/bigdata/src/test"/>
+            <src path="${bigdata.dir}/bigdata-client/src/test/java"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test/java"/>
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
             <src path="${bigdata.dir}/bigdata-sails/src/test"/>
@@ -264,6 +266,10 @@ public class BuildInfo {
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
                 <exclude name="**/BytesUtil.c" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-client/src/main/java">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
             </fileset>
             <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java">
                 <exclude name="**/*.java" />
@@ -325,6 +331,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
+            <fileset dir="${bigdata.dir}/bigdata-client/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
@@ -386,8 +393,9 @@ public class BuildInfo {
                 <attribute name="Bundle-Description" value="Bigdata Source" />
             </manifest>
             <fileset dir="bigdata/src/java" />
+            <fileset dir="bigdata-client/src/main/java" />
             <fileset dir="bigdata-jini/src/main/java" />
-         <fileset dir="bigdata-rdf/src/java" />
+            <fileset dir="bigdata-rdf/src/java" />
             <fileset dir="bigdata-sails/src/java" />
             <fileset dir="bigdata-blueprints/src/java" />
          <fileset dir="bigdata-gom/src/java" />
@@ -426,6 +434,7 @@ public class BuildInfo {
          <arg value="-quiet" />
          <packageset dir="${bigdata.dir}/bigdata/src/java" />
          <packageset dir="${bigdata.dir}/bigdata/src/samples" />
+         <packageset dir="${bigdata.dir}/bigdata-client/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
@@ -1522,6 +1531,9 @@ substitutions.
       <copy toDir="${build.dir}/bigdata/src">
         <fileset dir="${bigdata.dir}/bigdata/src" />
       </copy>
+      <copy toDir="${build.dir}/bigdata-client/src">
+        <fileset dir="${bigdata.dir}/bigdata-client/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-jini/src">
         <fileset dir="${bigdata.dir}/bigdata-jini/src" />
       </copy>
@@ -1624,6 +1636,7 @@ substitutions.
           <include name="**/LEGAL/*" />
 
           <include name="bigdata/src/**" />
+          <include name="bigdata-client/src/**" />
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
           <include name="bigdata-sails/src/**" />
@@ -1955,6 +1968,7 @@ ${postInstallMessage}</echo>
         >
 
         <src path="${bigdata.dir}/bigdata/src/test" />
+        <src path="${bigdata.dir}/bigdata-client/src/test/java" />
         <src path="${bigdata.dir}/bigdata-jini/src/test/java" />
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
@@ -2015,6 +2029,9 @@ ${postInstallMessage}</echo>
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-gom/src/test">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-client/src/test/java">
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-jini/src/test/java">

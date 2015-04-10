@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import junit.framework.TestCase;
+import junit.framework.TestCase2;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -49,7 +49,7 @@ import com.bigdata.rdf.store.BD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class TestEncodeDecodeValue extends TestCase {
+public class TestEncodeDecodeValue extends TestCase2 {
 
    private static final Logger log = Logger.getLogger(TestEncodeDecodeValue.class);
    
