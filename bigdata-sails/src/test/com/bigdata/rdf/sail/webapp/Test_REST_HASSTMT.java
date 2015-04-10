@@ -35,11 +35,8 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 
 /**
  * Proxied test suite for the <code>HASSTMT</code> REST API method.
@@ -304,19 +301,20 @@ public class Test_REST_HASSTMT<S extends IIndexManager> extends
 
       }
 
+      /**
+       * Overlay the properties configuration for triples plus incremental truth
+       * maintenance.
+       * <p>
+       * Note: You still only want to run this test suite when the test mode is
+       * triples or sids. It will fail if you attempt to run with quads since
+       * inference is not supported for quads.
+       */
       @Override
       public Properties getProperties() {
 
-         final Properties p = new Properties(super.getProperties());
-
-         p.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE, "true");
-
-         p.setProperty(BigdataSail.Options.AXIOMS_CLASS,
-               OwlAxioms.class.getName());
+         final Properties p = TestMode.triplesPlusTruthMaintenance
+               .getProperties(super.getProperties());
          
-         p.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
-               DefaultBigdataVocabulary.class.getName());
-
          return p;
 
       }
