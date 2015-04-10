@@ -105,16 +105,16 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
    public boolean hasStatement(final Resource s, final URI p, final Value o,
          final boolean includeInferred, final Resource... contexts)
          throws RepositoryException {
-
-      try {
-
-         return getSailConnection().hasStatement(s, p, o, includeInferred, contexts);
-
-      } catch (SailException e) {
-         
-         throw new RepositoryException(e);
-         
-      }
+      return super.hasStatement(s,p,o, includeInferred, contexts);
+//      try {
+//
+//         return getSailConnection().hasStatement(s, p, o, includeInferred, contexts);
+//
+//      } catch (SailException e) {
+//         
+//         throw new RepositoryException(e);
+//         
+//      }
             
    }
 
