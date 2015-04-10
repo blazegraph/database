@@ -76,8 +76,8 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
         /**
          * The data file.
          */
-        static private final String smallGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
-        static private final String smallGraph2 = "src/test/com/bigdata/rdf/graph/data/smallGraph.ttl";
+        static private final String smallGraph1 = "src/test/resources/com/bigdata/rdf/graph/data/smallGraph.ttl";
+        static private final String smallGraph2 = "src/test/resources/com/bigdata/rdf/graph/data/smallGraph.ttl";
         
         private final URI rdfType, foafKnows, foafPerson, mike, bryan, martyn, dc;
 
@@ -202,8 +202,8 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
         /**
          * The data file.
          */
-        static private final String ssspGraph1 = "bigdata-gas/src/test/com/bigdata/rdf/graph/data/ssspGraph.ttlx";
-        static private final String ssspGraph2 = "src/test/com/bigdata/rdf/graph/data/ssspGraph.ttlx";
+        static private final String ssspGraph1 = "src/test/resources/com/bigdata/rdf/graph/data/ssspGraph.ttlx";
+        static private final String ssspGraph2 = "src/test/resources/com/bigdata/rdf/graph/data/ssspGraph.ttlx";
         
         public final URI link, v1, v2, v3, v4, v5;
 
@@ -274,6 +274,12 @@ public class AbstractSailGraphTestCase extends AbstractGraphTestCase {
 
         return new SSSPGraphProblem(getGraphFixture());
 
+    }
+
+    public void testNoop()
+    {
+	//FIXME:  Write some test.
+	assert(true);
     }
 
 }

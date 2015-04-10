@@ -161,4 +161,9 @@ public class AbstractRAMGraphTestCase extends AbstractGraphTestCase {
 
     }
 
+    public void testNoop()
+    {
+	assert(true);
+    }
+
 }
