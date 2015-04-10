@@ -36,13 +36,16 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
+import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.task.AbstractApiTask;
 
 /**
@@ -525,4 +528,80 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
 
    }
 
+   /**
+    * Return the effective boolean value of a request parameter. The text
+    * <code>"true"</code> is recognized. All other values are interpreted as
+    * <code>false</code>.
+    * 
+    * @param req
+    *           The request.
+    * @param name
+    *           The name of the request parameter.
+    * @param defaultValue
+    *           The default value.
+    * 
+    * @return The effective value.
+    */
+   protected boolean getBooleanValue(final HttpServletRequest req,
+         final String name, final boolean defaultValue) {
+
+      final String s = req.getParameter(name);
+
+      if (s == null)
+         return defaultValue;
+
+      // Note: returns true iff "true" and otherwise returns false.
+      final boolean b = Boolean.valueOf(s);
+
+      return b;
+      
+   }
+
+   /**
+    * Decode an array of named graph contexts from a request.
+    * 
+    * @param req
+    *           The request.
+    * 
+    * @param name
+    *           The name of the request parameter to be decoded.
+    * 
+    * @return An array of decoded resources and never <code>null</code>. If the
+    *         request parameter does not appear in the request then this method
+    *         returns <code>Resource[0]</code>.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see EncodeDecodeValue#decodeContexts(String[])
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   protected static Resource[] decodeContexts(final HttpServletRequest req,
+         final String name) {
+
+      /*
+       * Note: return value is [null] if the parameter does not appear for the
+       * request.
+       */
+      final String[] values = req.getParameterValues(name);
+
+      if (values == null) {
+
+         // This needs to be treated as an empty[].
+         return EMPTY_RESOURCE_ARRAY;
+         
+      }
+
+      /*
+       * Otherwise one or more parameter values.  Decode into a Resource[].
+       */
+      final Resource[] contexts = EncodeDecodeValue.decodeContexts(values);
+
+      return contexts;
+
+   }
+
+   /** An empty Resource[] for decode. */
+   static private final Resource[] EMPTY_RESOURCE_ARRAY = new Resource[0];
+   
 }

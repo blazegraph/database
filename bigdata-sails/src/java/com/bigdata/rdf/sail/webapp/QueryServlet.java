@@ -29,6 +29,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -114,6 +115,13 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     static final transient String ATTR_ESTCARD = "ESTCARD";
     
+   /**
+    * The name of the URL query parameter that indicates an HASSTMT request
+    * (test for the existence of one or more statements matching a triple
+    * pattern).
+    */
+   static final transient String ATTR_HASSTMT = "HASSTMT";
+
     /**
      * The name of the URL query parameter that indicates an request
      * to return all contexts in the database.
@@ -178,6 +186,11 @@ public class QueryServlet extends BigdataRDFServlet {
             // ESTCARD with caching defeated.
             doEstCard(req, resp);
             
+        } else if (req.getParameter(ATTR_HASSTMT) != null) {
+        
+           // HASSTMT with caching defeated.
+           doHasStmt(req, resp);
+
         } else if (req.getParameter(ATTR_CONTEXTS) != null) {
 
             // CONTEXTS with caching defeated.
@@ -211,6 +224,10 @@ public class QueryServlet extends BigdataRDFServlet {
             
             doEstCard(req, resp);
             
+        } else if (req.getParameter(ATTR_HASSTMT) != null) {
+           
+           doHasStmt(req, resp);
+           
         } else if (req.getParameter(ATTR_CONTEXTS) != null) {
             
             doContexts(req, resp);
@@ -1114,11 +1131,15 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
     
-	/**
-	 * Estimate the cardinality of an access path (fast range count).
-	 * @param req
-	 * @param resp
-	 */
+   /**
+    * Estimate the cardinality of an access path (fast range count).
+    * 
+    * @param req
+    * @param resp
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1127"> Extend ESTCARD method
+    *      for exact range counts </a>
+    */
     private void doEstCard(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
@@ -1127,6 +1148,7 @@ public class QueryServlet extends BigdataRDFServlet {
             return;
         }
         
+        final boolean exact = getBooleanValue(req, "exact", false/* default */);
         final Resource s;
         final URI p;
         final Value o;
@@ -1135,7 +1157,8 @@ public class QueryServlet extends BigdataRDFServlet {
             s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
             p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
             o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
-            c = EncodeDecodeValue.decodeResources(req.getParameterValues("c"));
+            c = decodeContexts(req, "c");
+//            c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
         } catch (IllegalArgumentException ex) {
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
@@ -1143,32 +1166,35 @@ public class QueryServlet extends BigdataRDFServlet {
         }
         
         if (log.isInfoEnabled())
-            log.info("ESTCARD: access path: (s=" + s + ", p=" + p + ", o="
-                    + o + ", c=" + c + ")");
+           log.info("ESTCARD: access path: (exact=" + exact + ", s=" + s + ", p="
+               + p + ", o=" + o + ", c=" + Arrays.toString(c) + ")");
 
         try {
             
             submitApiTask(
                     new EstCardTask(req, resp, getNamespace(req),
                             getTimestamp(req), //
+                            exact,//
                             s, p, o, c)).get();
 
         } catch (Throwable t) {
 
-            launderThrowable(t, resp, "ESTCARD: access path: (s=" + s + ", p="
-                    + p + ", o=" + o + ", c=" + c + ")");
+            launderThrowable(t, resp,
+                  "ESTCARD: access path: (exact=" + exact + ", s=" + s + ", p="
+                        + p + ", o=" + o + ", c=" + Arrays.toString(c) + ")");
 
         }
         
     }
     
-    /**
+   /**
      * Helper task for the ESTCARD query.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
     private static class EstCardTask extends AbstractRestApiTask<Void> {
 
+        private final boolean exact;
         private final Resource s;
         private final URI p;
         private final Value o;
@@ -1176,11 +1202,13 @@ public class QueryServlet extends BigdataRDFServlet {
         
         public EstCardTask(final HttpServletRequest req,
                 final HttpServletResponse resp, final String namespace,
-                final long timestamp, final Resource s, final URI p,
+                final long timestamp, final boolean exact, 
+                final Resource s, final URI p,
                 final Value o, final Resource[] c) {
 
             super(req, resp, namespace, timestamp);
 
+            this.exact = exact;
             this.s = s;
             this.p = p;
             this.o = o;
@@ -1209,13 +1237,13 @@ public class QueryServlet extends BigdataRDFServlet {
                     for (Resource r : c) {
                         rangeCount += conn.getSailConnection().getBigdataSail()
                                 .getDatabase().getAccessPath(s, p, o, r)
-                                .rangeCount(false/* exact */);
+                                .rangeCount(exact);
                     }
                 } else {
                     rangeCount += conn.getSailConnection().getBigdataSail()
                             .getDatabase()
                             .getAccessPath(s, p, o, (Resource) null)
-                            .rangeCount(false/* exact */);
+                            .rangeCount(exact);
                 }
 
                 final long elapsed = System.currentTimeMillis() - begin;
@@ -1238,7 +1266,134 @@ public class QueryServlet extends BigdataRDFServlet {
 
     } // ESTCARD task.
 
-	/**
+   /**
+    * Return <code>true</code> iff at least one matching statement exists in the
+    * namespace.
+    * 
+    * @param req
+    * @param resp
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1109"> hasStatements can
+    *      overestimate and ignores includeInferred (REST API) </a>
+    */
+   private void doHasStmt(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      if (!isReadable(getServletContext(), req, resp)) {
+         // HA Quorum in use, but quorum is not met.
+         return;
+      }
+
+      final boolean includeInferred = getBooleanValue(req, "includeInferred",
+            true/* default */);
+      final Resource s;
+      final URI p;
+      final Value o;
+      final Resource[] c;
+      try {
+         s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
+         p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
+         o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
+         c = decodeContexts(req, "c");
+//         c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
+      } catch (IllegalArgumentException ex) {
+         buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+               ex.getLocalizedMessage());
+         return;
+      }
+
+      if (log.isInfoEnabled())
+         log.info("HASSTMT: access path: (includeInferred=" + includeInferred
+               + ", s=" + s + ", p=" + p + ", o=" + o + ", c="
+               + Arrays.toString(c) + ")");
+
+      try {
+
+         submitApiTask(
+               new HasStmtTask(req, resp, getNamespace(req), getTimestamp(req), //
+                     includeInferred,//
+                     s, p, o, c)).get();
+
+      } catch (Throwable t) {
+
+         launderThrowable(t, resp, "HASSTMT: access path: (includeInferred="
+               + includeInferred + ", s=" + s + ", p=" + p + ", o=" + o
+               + ", c=" + Arrays.toString(c) + ")");
+
+      }
+
+   }
+
+   /**
+    * Helper task for the HASSTMT query.
+    * 
+    * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+    *         Thompson</a>
+    */
+   private static class HasStmtTask extends AbstractRestApiTask<Void> {
+
+      private final boolean includeInferred;
+      private final Resource s;
+      private final URI p;
+      private final Value o;
+      private final Resource[] c;
+
+      public HasStmtTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp, final boolean includeInferred,
+            final Resource s, final URI p, final Value o, final Resource[] c) {
+
+         super(req, resp, namespace, timestamp);
+
+         this.includeInferred = includeInferred;
+         this.s = s;
+         this.p = p;
+         this.o = o;
+         this.c = c;
+
+      }
+
+      @Override
+      public boolean isReadOnly() {
+         return true;
+      }
+
+      @Override
+      public Void call() throws Exception {
+
+         final long begin = System.currentTimeMillis();
+
+         BigdataSailRepositoryConnection conn = null;
+         try {
+
+            conn = getQueryConnection();
+
+            // Note: We have to align Sail semantics for Resource... with the
+            // REST API.
+            final boolean found = conn.hasStatement(s, p, o, includeInferred,
+                  c == null ? new Resource[0] : c);
+
+            final long elapsed = System.currentTimeMillis() - begin;
+
+            buildAndCommitBooleanResponse(resp, found, elapsed);
+
+            return null;
+
+         } finally {
+
+            if (conn != null) {
+
+               conn.close();
+
+            }
+
+         }
+
+      }
+
+   } // HASSTMT task.
+
+     /**
 	 * Report on the contexts in use in the quads database.
 	 */
     private void doContexts(final HttpServletRequest req,

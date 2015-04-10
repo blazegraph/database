@@ -72,11 +72,13 @@ var DEFAULT_NAMESPACE, NAMESPACE;
 // namespace creation
 var NAMESPACE_PARAMS = {
    'name': 'com.bigdata.rdf.sail.namespace',
-   'index': 'com.bigdata.rdf.store.AbstractTripleStore.textIndex',
+   'textIndex': 'com.bigdata.rdf.store.AbstractTripleStore.textIndex',
    'truthMaintenance': 'com.bigdata.rdf.sail.truthMaintenance',
    'quads': 'com.bigdata.rdf.store.AbstractTripleStore.quads',
    'rdr': 'com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers',
-   'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass'
+   'axioms': 'com.bigdata.rdf.store.AbstractTripleStore.axiomsClass',
+   'justify': 'com.bigdata.rdf.store.AbstractTripleStore.justify',
+   'isolatableIndices': 'com.bigdata.rdf.sail.isolatableIndices'
 };
 
 var NAMESPACE_SHORTCUTS = {
@@ -354,7 +356,8 @@ function cloneNamespace(namespace) {
       }
       $('#new-namespace-mode').val(mode);
       $('#new-namespace-inference').prop('checked', params[NAMESPACE_PARAMS.axioms] == 'com.bigdata.rdf.axioms.OwlAxioms');
-      $('#new-namespace-index').prop('checked', params[NAMESPACE_PARAMS.index] == 'true');
+      $('#new-namespace-textIndex').prop('checked', params[NAMESPACE_PARAMS.textIndex] == 'true');
+      $('#new-namespace-isolatableIndices').prop('checked', params[NAMESPACE_PARAMS.isolatableIndices] == 'true');
 
       $('#new-namespace-name').focus();
    });
@@ -376,6 +379,9 @@ function validateNamespaceOptions() {
    if($('#new-namespace-mode').val() == 'quads' && $('#new-namespace-inference').is(':checked')) {
       errors.push('Inference is incompatible with quads mode');
    }
+   if($('#new-namespace-isolatableIndices').is(':checked') && $('#new-namespace-inference').is(':checked')) {
+      errors.push('Inference is incompatible with isolatable indices');
+   }
    $('#namespace-create-errors').html('');
    for(i=0; i<errors.length; i++) {
       $('#namespace-create-errors').append('<li>' + errors[i] + '</li>');
@@ -383,15 +389,22 @@ function validateNamespaceOptions() {
    return errors.length === 0;
 }
 
+// Invoked when changing the new namespace mode (triples, rdr, quads).
+// Invoked when (un)checking the isolatableIndices option.
+// Responsible for (en|dis)abling the Inference option and hiding or showing the message explaining why inference is not permitted.
 function changeNamespaceMode() {
-   var quads = this.value == 'quads';
-   $('#new-namespace-inference').prop('disabled', quads);
-   $('#inference-quads-incompatible').toggle(quads);
-   if(quads) {
-      $('#new-namespace-inference').prop('checked', false);
+   var quads = $('#new-namespace-mode').val() == 'quads'; // Figure out the current mode (quads, triples, rdr).
+   var isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked'); // Are isolatable indices requested?
+   var inferenceDisabled = (quads || isolatableIndices) ? true : false; // true iff inference is not supported.
+//alert("quads="+quads+", isolatableIndices="+isolatableIndices+", inferenceDisallowed="+inferenceDisallowed);
+   $('#new-namespace-inference').prop('disabled', inferenceDisabled); // conditionally disable inference checkbox.
+   $('#inference-incompatible').toggle(inferenceDisabled); // hide/show inference incompatible message.
+   if(inferenceDisabled) {
+      $('#new-namespace-inference').prop('checked', false); // uncheck inference checkbox if not allowed.
    }
 }
 
+// Create a new namespace.
 function createNamespace(e) {
    e.preventDefault();
    if(!validateNamespaceOptions()) {
@@ -401,30 +414,33 @@ function createNamespace(e) {
    var params = {};
    
    params.name = $('#new-namespace-name').val().trim();
-   params.index = $('#new-namespace-index').is(':checked');
+   params.textIndex = $('#new-namespace-textIndex').is(':checked');
+   params.isolatableIndices = $('#new-namespace-isolatableIndices').is(':checked');
    
    var mode = $('#new-namespace-mode').val();
    if(mode == 'triples') {
       params.quads = false;
       params.rdr = false;
-      params.truthMaintenance = true;
    } else if(mode == 'rdr') {
       params.quads = false;
       params.rdr = true;
-      params.truthMaintenance = true;
    } else { // quads
       params.quads = true;
       params.rdr = false;
-      params.truthMaintenance = false;
    }
    
    if($('#new-namespace-inference').is(':checked')) {
+      // Enable inference related options.
       params.axioms = 'com.bigdata.rdf.axioms.OwlAxioms';
+      params.truthMaintenance = true;
+      params.justify = true;
    } else {
+      // Disable inference related options.
       params.axioms = 'com.bigdata.rdf.axioms.NoAxioms';
+      params.truthMaintenance = false;
+      params.justify = false;
    }
 
-   // TODO: allow for other options to be specified
    var data = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">\n<properties>\n';
    for(var key in NAMESPACE_PARAMS) {
       data += '<entry key="' + NAMESPACE_PARAMS[key] + '">' + params[key] + '</entry>\n';
@@ -1864,6 +1880,7 @@ function setupHandlers() {
    $('.namespace-shortcuts').on('click', 'button', showCustomNamespacesModal);
 
    $('#new-namespace-mode').change(changeNamespaceMode);
+   $('#new-namespace-isolatableIndices').change(changeNamespaceMode);
    $('#namespace-create').submit(createNamespace);
 
    $('#update-type').change(function() { setUpdateSettings(this.value); });
@@ -1908,8 +1925,9 @@ function setupHandlers() {
 function startup() {
    // load namespaces, default namespace, HA status
    useLBS(false); // Note: default to false. Otherwise workbench breaks when not deployed into jetty container.
-   getNamespaces(true);
+   getNamespaces(true/*synchronous*/); // Note: 'synchronous' is slow if there are a lot of namespaces. Only used on startup.
    //getDefaultNamespace();
+   changeNamespaceMode(); // Note: Appears to be required to hide error message on load.
    showHealthTab();
 
    // complete setup
