@@ -35,8 +35,8 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.7-270114.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/servlet-api-3.1.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/colt-1.2.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/fastutil-6.5.16.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4.8.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4.8.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.4.5.jar"/>
