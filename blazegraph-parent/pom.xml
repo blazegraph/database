@@ -143,6 +143,10 @@ dependencies.
       <id>bigdata.releases</id>
       <url>http://www.systap.com/maven/releases/</url>
     </repository>
+    <repository>
+      <id>bigdata.releases</id>
+      <url>http://www.systap.com/maven/snapshot/</url>
+    </repository>
     <!-- 
     <repository>
       <id>jetty.releases</id>
