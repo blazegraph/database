@@ -239,13 +239,13 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-blueprints/src/java" />
          <src path="${bigdata.dir}/bigdata-gom/src/java" />
          <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
-         <src path="${bigdata.dir}/bigdata-gas/src/java" />
+         <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
             <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test/java"/>
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
             <src path="${bigdata.dir}/bigdata-sails/src/test"/>
-            <src path="${bigdata.dir}/bigdata-gas/src/test" />
+            <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
             <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
             <src path="${bigdata.dir}/bigdata-gom/src/test" />
             <!-- Do not include the unit tests @todo conditionally include?
@@ -285,7 +285,7 @@ public class BuildInfo {
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
          </fileset>
-         <fileset dir="${bigdata.dir}/bigdata-gas/src/java">
+         <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java">
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
          </fileset>
@@ -324,7 +324,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata/src/java" />
             <fileset dir="${bigdata.dir}/bigdata/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
-            <fileset dir="${bigdata.dir}/bigdata-gas/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
@@ -434,7 +434,7 @@ public class BuildInfo {
          <packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
-         <packageset dir="${bigdata.dir}/bigdata-gas/src/java" />
+         <packageset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
          <packageset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
          <doctitle>
                 <![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
@@ -452,7 +452,7 @@ jQuery(document).ready(function(){
 (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
 m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-ga('create', 'UA-50971023-1', 'bigdata.com');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
@@ -1960,7 +1960,7 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
         <src path="${bigdata.dir}/bigdata-blueprints/src/test" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
-        <src path="${bigdata.dir}/bigdata-gas/src/test" />
+        <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
         <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
 <!--
@@ -2487,7 +2487,7 @@ ${postInstallMessage}</echo>
 
         <!-- Test suites to run when -DtestName is not set -->
 
-        <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" />
+        <!-- <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" /> -->
         <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.io.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.net.TestAll" todir="${test.results.dir}" unless="testName" />
