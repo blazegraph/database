@@ -3870,7 +3870,7 @@ public class BigdataSail extends SailBase implements Sail {
       /**
        * Return <code>true</code> iff a statement exists matching the supplied
        * constraints.
-       * 
+       * <p>
        * This code path is optimized for cases where isolatable indices are not
        * in use and where inferences can not appear.
        * 
@@ -3880,7 +3880,10 @@ public class BigdataSail extends SailBase implements Sail {
        * @param includeInferred
        * @param contexts
        * @return
-       * @throws SailException 
+       * @throws SailException
+       * 
+       * @see <a href="http://trac.bigdata.com/ticket/1178" > Optimize
+       *      hasStatement() </a>
        */
        public boolean hasStatement(final Resource s, final URI p, final Value o,
               final boolean includeInferred, final Resource... contexts)
