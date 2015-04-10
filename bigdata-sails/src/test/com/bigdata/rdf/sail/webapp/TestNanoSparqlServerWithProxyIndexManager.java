@@ -250,60 +250,62 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         /*
          * Proxied test suites.
          */
-		
-		// Protocol
-		suite.addTest(TestProtocolAll.suite());
-        
-        // RemoteRepository test (nano sparql server client-wrapper using Jetty)
-        suite.addTestSuite(Test_REST_Structure.class);
-        suite.addTestSuite(Test_REST_ASK.class);
-        suite.addTestSuite(Test_REST_DESCRIBE.class);
-        suite.addTestSuite(Test_REST_ESTCARD.class);
-        suite.addTestSuite(Test_REST_ESTCARD.ReadWriteTx.class);
-        suite.addTestSuite(Test_REST_HASSTMT.class);
-        suite.addTestSuite(Test_REST_HASSTMT.ReadWriteTx.class);
-        suite.addTestSuite(Test_REST_HASSTMT.TruthMaintenance.class);
-        suite.addTestSuite(Test_REST_ServiceDescription.class);
-        suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
-        suite.addTestSuite(TestNanoSparqlClient.class);
-        suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
-        suite.addTestSuite(StressTest_REST_MultiTenancy.class);
-        
-        // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
-        suite.addTestSuite(TestBigdataSailRemoteRepository.class);
-        
-        // Insert tests from trac issues
-        suite.addTestSuite(TestInsertFilterFalse727.class);
-        suite.addTestSuite(TestCBD731.class);
-        
-        suite.addTestSuite(TestService794.class);
 
-        // SPARQL UPDATE test suite.
-        switch(testMode) {
-        case triples:
-            // TODO TRIPLES mode UPDATE test suite.
-            break;
-        case sids:
-            // TODO SIDS mode UPDATE test suite.
-        	suite.addTestSuite(TestRDROperations.class);
-            break;
-        case quads:
-            // QUADS mode UPDATE test suite. 
+         // Protocol
+         suite.addTest(TestProtocolAll.suite());
+
+         // RemoteRepository test (nano sparql server client-wrapper using
+         // Jetty)
+         suite.addTestSuite(Test_REST_Structure.class);
+         suite.addTestSuite(Test_REST_ASK.class);
+         suite.addTestSuite(Test_REST_DESCRIBE.class);
+         suite.addTestSuite(Test_REST_ESTCARD.class);
+         suite.addTestSuite(Test_REST_ESTCARD.ReadWriteTx.class);
+         suite.addTestSuite(Test_REST_HASSTMT.class);
+         suite.addTestSuite(Test_REST_HASSTMT.ReadWriteTx.class);
+         if (testMode.isTruthMaintenanceSupported()) {
+            suite.addTestSuite(Test_REST_HASSTMT.TruthMaintenance.class);
+         }
+         suite.addTestSuite(Test_REST_ServiceDescription.class);
+         suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
+         suite.addTestSuite(TestNanoSparqlClient.class);
+         suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
+         suite.addTestSuite(StressTest_REST_MultiTenancy.class);
+
+         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
+         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
+
+         // Insert tests from trac issues
+         suite.addTestSuite(TestInsertFilterFalse727.class);
+         suite.addTestSuite(TestCBD731.class);
+
+         suite.addTestSuite(TestService794.class);
+
+         if (testMode == TestMode.sids) {
+            // Tests that require sids mode.
+            suite.addTestSuite(TestRDROperations.class);
+         }
+
+         if (testMode == TestMode.quads) {
+            /*
+             * Tests that require quads mode.
+             * 
+             * TODO The SPARQL UPDATE test suite is quads-mode only at this
+             * time.
+             */
             suite.addTestSuite(TestSparqlUpdate.class);
             suite.addTestSuite(TestConcurrentRestApiRequests.class);
-            suite.addTestSuite( NativeDistinctNamedGraphUpdateTest.class );
-            suite.addTestSuite( HashDistinctNamedGraphUpdateTest.class );
-            break;
-        default: throw new UnsupportedOperationException();
-        }
+            suite.addTestSuite(NativeDistinctNamedGraphUpdateTest.class);
+            suite.addTestSuite(HashDistinctNamedGraphUpdateTest.class);
+         }
 
-        // SPARQL 1.1 Federated Query.
-        suite.addTestSuite(TestFederatedQuery.class);
+         // SPARQL 1.1 Federated Query.
+         suite.addTestSuite(TestFederatedQuery.class);
 
-        }
-        
-        return suite;
-    
+      }
+
+      return suite;
+
     }
 
 	static ProxyTestSuite createProxyTestSuite(final IIndexManager indexManager, final TestMode testMode) {
@@ -337,73 +339,13 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
     @Override
 	public Properties getProperties() {
     
-    	return getProperties(testMode);
-    	
+      if (testMode == null)
+         throw new IllegalStateException();
+
+      return testMode.getProperties();
+
     }
     
-	static public Properties getProperties(final TestMode testMode) {
-
-//    	System.err.println("testMode="+testMode);
-    	
-	    final Properties properties = new Properties();
-
-		switch (testMode) {
-		case quads:
-			properties.setProperty(AbstractTripleStore.Options.QUADS_MODE,
-					"true");
-			properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
-					"false");
-         properties.setProperty(BigdataSail.Options.JUSTIFY,
-               "false");
-			properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
-					NoAxioms.class.getName());
-			properties.setProperty(
-					AbstractTripleStore.Options.VOCABULARY_CLASS,
-					NoVocabulary.class.getName());
-			properties.setProperty(
-					AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
-			break;
-		case triples:
-			properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
-					"false");
-         properties.setProperty(BigdataSail.Options.JUSTIFY,
-               "false");
-			properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
-					NoAxioms.class.getName());
-			properties.setProperty(
-					AbstractTripleStore.Options.VOCABULARY_CLASS,
-					NoVocabulary.class.getName());
-			properties.setProperty(
-					AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "false");
-			break;
-		case sids:
-			properties.setProperty(BigdataSail.Options.TRUTH_MAINTENANCE,
-					"false");
-         properties.setProperty(BigdataSail.Options.JUSTIFY,
-               "false");
-			properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
-					NoAxioms.class.getName());
-			properties.setProperty(
-					AbstractTripleStore.Options.VOCABULARY_CLASS,
-					NoVocabulary.class.getName());
-			properties.setProperty(
-					AbstractTripleStore.Options.STATEMENT_IDENTIFIERS, "true");
-			break;
-		default:
-			fail("Unknown mode: " + testMode);
-		}
-		// if (false/* triples w/ truth maintenance */) {
-		// properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,
-		// "false");
-		// }
-		// if (false/* sids w/ truth maintenance */) {
-		// properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,
-		// "true");
-		// }
-
-		return properties;
-	}
-
     /**
      * Open the {@link IIndexManager} identified by the property file.
      * 
