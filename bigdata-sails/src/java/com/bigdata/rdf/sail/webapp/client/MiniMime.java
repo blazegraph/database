@@ -67,6 +67,14 @@ public class MiniMime {
 	 */
 	private final List<NV> params = new LinkedList<NV>();
 
+   /**
+    * 
+    * @param s
+    *           The value to be parsed.
+    * 
+    * @throws NullPointerException
+    *            if the argument is <code>null</code>
+    */
 	public MiniMime(final String s) {
 		final String[] b = s.split(";");
 		mimeType = b[0].trim();

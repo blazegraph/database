@@ -223,6 +223,8 @@ public class RemoteRepository {
     /**
      * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
      * mutation operation).
+     * 
+     * @see #QUERY_METHOD
      */
     private volatile String queryMethod;
 
@@ -539,18 +541,21 @@ public class RemoteRepository {
     }
 
     /**
-     * Return all matching statements.
-     * 
-     * @param subj
-     * @param pred
-     * @param obj
-     * @param includeInferred
-     * @param contexts
-     * @return
-     * @throws Exception
-     * 
-     *             TODO includeInferred is currently ignored.
-     */
+    * Return all matching statements.
+    * 
+    * @param subj
+    * @param pred
+    * @param obj
+    * @param includeInferred
+    * @param contexts
+    * @return
+    * @throws Exception
+    * 
+    * FIXME (***) includeInferred is currently ignored by getStatements() - #1175.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
+    *      ignores includeInferred (REST API) </a>
+    */
     public IPreparedGraphQuery getStatements2(final Resource subj, final URI pred,
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
@@ -639,7 +644,8 @@ public class RemoteRepository {
      * @return
      * @throws Exception
      * 
-     *             TODO includeInferred is currently ignored.
+     * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
+     *      ignores includeInferred (REST API) </a>
      */
     public GraphQueryResult getStatements(final Resource subj, final URI pred,
             final Value obj, final boolean includeInferred,
@@ -649,57 +655,91 @@ public class RemoteRepository {
                 
     }
 
-    /**
-     * Method to line up with the Sesame interface.
-     * 
-     * @param subj
-     * @param pred
-     * @param obj
-     * @param includeInferred
-     * @param contexts
-     * @return
-     * @throws Exception
-     * 
-     *             TODO includeInferred is currently ignored.
-     */
-    public boolean hasStatement(final Resource subj, final URI pred,
-            final Value obj, final boolean includeInferred,
-            final Resource... contexts) throws Exception {
-        
-       if(false) {
-          /*
-          * FIXME This is only correct when the remote repository does not use
-          * full read/write transactions. Otherwise it may overestimate since it
-          * will also count deleted tuples. In order to fix this, we really need
-          * to make hasStatements() a top-level REST API method since the client
-          * can not correctly decide whether or not the server supports delete
-          * markers and therefore can not correctly choose between
-          * hasStatements() based on getStatements() LIMIT 1 and hasStatements()
-          * based on rangeCount. Note that the server side API in
-          * AbstractTripleStore considers this information and always uses the
-          * correct backend strategy. See #1109.
-          * 
-          * In fact, the situation appears to be worse than that since
-          * TestSparqlUpdate fails several tests when we use the rangeCount
-          * which pass if we use getStatements() !!!
-          */
-         return (rangeCount(subj, pred, obj, contexts) > 0);
-      } else {
+   /**
+    * Method to line up with the Sesame interface.
+    * 
+    * @param s
+    *           The subject (optional).
+    * @param p
+    *           The predicate (optional).
+    * @param o
+    *           The value (optional).
+    * @param includeInferred
+    *           when <code>true</code> inferred statements will also be
+    *           considered.
+    * @param c
+    *           The contexts (optional, BUT may not be a null Resource[]).
+    *           
+    * @return <code>true</code> iff a statement exists that matches the request.
+    * 
+    * @throws Exception
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1109" >hasStatements can
+    *      overestimate and ignores includeInferred (REST API) </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public boolean hasStatement(final Resource s, final URI p, final Value o,
+         final boolean includeInferred, final Resource... c) throws Exception {
+      if (c == null) {
+         // Note: May not be a null Resource[] reference.
+         // MAY be Resource[null], which is the openrdf nullGraph.
+         // See #1177
+         throw new IllegalArgumentException();
+      }
+      if (false) {
          /*
-          * FIXME This should be pushed down to a server-side operation for
-          * improved performance.  We need to lift hasStatements() into the
-          * REST API for that.  See #1109.
+          * This should be pushed down to a server-side operation for improved
+          * performance. We need to lift hasStatements() into the REST API for
+          * that. See #1109.
           */
-         final GraphQueryResult ret = getStatements(subj, pred, obj,
-               includeInferred, contexts);
+         final GraphQueryResult ret = getStatements(s, p, o, includeInferred, c);
          try {
             return ret.hasNext();
          } finally {
             ret.close();
          }
+      } else {
+         /*
+          * This is the new code path that optimizes the effort by the server.
+          */
+         final ConnectOptions opts = newQueryConnectOptions();
+
+         opts.addRequestParam("HASSTMT");
+         opts.addRequestParam("includeInferred",
+               Boolean.toString(includeInferred));
+         if (s != null) {
+            opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
+         }
+         if (p != null) {
+            opts.addRequestParam("p", EncodeDecodeValue.encodeValue(p));
+         }
+         if (o != null) {
+            opts.addRequestParam("o", EncodeDecodeValue.encodeValue(o));
+         }
+         opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(c));
+
+         JettyResponseListener resp = null;
+         try {
+
+            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+
+            checkResponseCode(resp = doConnect(opts));
+
+            final BooleanResult result = booleanResults(resp);
+
+            return result.result;
+
+         } finally {
+
+            if (resp != null)
+               resp.abort();
+
+         }
+
       }
-        
-    }
+
+   }
     
     private String asConstOrVar(final AST2SPARQLUtil util, final String var,
             final Value val) {
@@ -710,7 +750,6 @@ public class RemoteRepository {
         return util.toExternal(val);
         
     }
-    
     
     /**
      * Cancel a query running remotely on the server.
@@ -757,20 +796,64 @@ public class RemoteRepository {
     *           the object (can be null)
     * @param c
     *           the context (can be null)
+    *           
     * @return the range count
     * 
-    *         TODO Add optional boolean property named "exact" whose default
-    *         value is <code>false</code> to preserve the historical behavior.
-    *         This will provide for relatively efficient exact range counts over
-    *         the REST API. See #1127 (Add REST API method for exact range
-    *         counts)
+    * @see <a href="http://trac.bigdata.com/ticket/1127"> Add REST API method
+    *      for exact range counts </a>
     */
-    public long rangeCount(final Resource s, final URI p, final Value o, final Resource... c) 
-            throws Exception {
+   public long rangeCount(final Resource s, final URI p, final Value o,
+         final Resource... c) throws Exception {
 
-        final ConnectOptions opts = newQueryConnectOptions();
+      return rangeCount(false/* exact */, s, p, o, c);
+       
+    }
+
+   /**
+    * Perform a range count on the statement indices for a given triple (quad)
+    * pattern.
+    * <p>
+    * Note: fast range counts are *fast*. They require two key probes into the
+    * indices. Exact range counts are only fast when the indices do not support
+    * isolation or fused views. Isolation is used if the namespace supports full
+    * read/write transactions. Fused views are used in scale-out to model shards
+    * and are also used in full read/write transaction support.
+    * 
+    * @param exact
+    *           if <code>true</code> then an exact range count is requested,
+    *           otherwise a fast range count is requested.
+    * @param s
+    *           the subject (can be null)
+    * @param p
+    *           the predicate (can be null)
+    * @param o
+    *           the object (can be null)
+    * @param c
+    *           the context (can be null)
+    * 
+    * @return the range count
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1127"> Add REST API method
+    *      for exact range counts </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public long rangeCount(final boolean exact, final Resource s, final URI p,
+         final Value o, final Resource... c) throws Exception {
+
+      if (c == null) {
+         // Note: May not be a null Resource[] reference.
+         // MAY be Resource[null], which is the openrdf nullGraph.
+         // See #1177
+         throw new IllegalArgumentException();
+      }
+
+      final ConnectOptions opts = newQueryConnectOptions();
 
         opts.addRequestParam("ESTCARD");
+        if (exact) {
+           opts.addRequestParam("exact", "true");
+        }
         if (s != null) {
             opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
         }
@@ -780,10 +863,8 @@ public class RemoteRepository {
         if (o != null) {
             opts.addRequestParam("o", EncodeDecodeValue.encodeValue(o));
         }
-        if (c != null && c.length > 0) {
-            opts.addRequestParam("c", EncodeDecodeValue.encodeValues(c));
-        }
-
+        opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(c));
+        
         JettyResponseListener resp = null;
         try {
             
@@ -804,25 +885,19 @@ public class RemoteRepository {
 
     }
     
-    /**
-     * Perform a fast range count on the statement indices.
-     * 
-     * @param s
-     *            the subject (can be null)
-     * @param p
-     *            the predicate (can be null)
-     * @param o
-     *            the object (can be null)
-     * @param c
-     *            the context (can be null)
-     *            
-     * @return the range count (#of statements in the database).
-     */
-    public long size() throws Exception {
-        
-        return rangeCount(null, null, null);
-        
-    }
+   /**
+    * Perform a fast range count on the statement indices. This reports an
+    * estimate of the number of statements in the namespace. That estimate is
+    * exact unless the namespace is provisioned for full read/write transactions
+    * or the endpoint is scale-out.
+    * 
+    * @return the range count (#of statements in the database).
+    */
+   public long size() throws Exception {
+
+      return rangeCount(/* s */null, /* p */null, /* o */null);
+
+   }
     
     /**
      * Return a list of contexts in use in a remote quads database.
@@ -909,14 +984,17 @@ public class RemoteRepository {
     }
             
     /**
-     * Removes RDF data from the remote repository.
-     * 
-     * @param remove
-     *        The RDF data to be removed.
-     *        
-     * @return The mutation count.
-     */
-    public long remove(final com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp remove) throws Exception {
+    * Removes RDF data from the remote repository.
+    * 
+    * @param remove
+    *           The RDF data to be removed.
+    * 
+    * @return The mutation count.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+    public long remove(final RemoveOp remove) throws Exception {
         
         final ConnectOptions opts = newUpdateConnectOptions();
         
@@ -957,10 +1035,20 @@ public class RemoteRepository {
 	        if (remove.o != null) {
 	            opts.addRequestParam("o", EncodeDecodeValue.encodeValue(remove.o));
 	        }
-	        
-	        if (remove.c != null && remove.c.length > 0) {
-	            opts.addRequestParam("c", EncodeDecodeValue.encodeValues(remove.c));
-	        }
+	     
+         if (remove.c != null) {
+            /*
+             * Note: Due to the way in which the RemoveOp declares [c] even when
+             * it is not a "delete-by-accesspath" request, we have to check for
+             * [c!=null] here.
+             * 
+             * TODO This could be fixed if we had a factory for RemoveOp such
+             * that the concrete instance only declared [c] when it was a
+             * delete-by-access-path request. See #1177
+             */
+            opts.addRequestParam("c",
+                  EncodeDecodeValue.encodeContexts(remove.c));
+         }
         
         }
         
@@ -1474,7 +1562,7 @@ public class RemoteRepository {
         
         private Value s, p, o;
         
-        private Value[] c;
+        private Resource[] c;
         
         private byte[] data;
         
@@ -1491,8 +1579,21 @@ public class RemoteRepository {
         public RemoveOp(final Iterable<? extends Statement> stmts) {
             this.stmts = stmts;
         }
-        
+
+      /**
+       * 
+       * @param s
+       *           The subject (optional).
+       * @param p
+       *           The predicate (optional).
+       * @param o
+       *           The value (optional).
+       * @param c
+       *           The contexts (optional, BUT may not be a null Resource[]).
+       */
         public RemoveOp(final Resource s, final URI p, final Value o, final Resource... c) {
+            if (c == null)
+               throw new IllegalArgumentException();
             this.s = s;
             this.p = p;
             this.o = o;
@@ -1595,6 +1696,12 @@ public class RemoteRepository {
         
         final StringBuilder urlString = new StringBuilder(requestURL);
 
+      /*
+       * FIXME (***) Why are we using one approach to add the parameters here
+       * and then a different approach if we do a POST? Either one or the other
+       * I think. Try moving this into an else {} block below (if not a POST,
+       * then add query parameters).
+       */
         ConnectOptions.addQueryParams(urlString, opts.requestParams);
 
         final boolean isLongRequestURL = urlString.length() > getMaxRequestURLLength();
@@ -1660,47 +1767,12 @@ public class RemoteRepository {
 
             }
             
-//            // conn = doConnect(urlString.toString(), opts.method);
-//            final URL url = new URL(urlString.toString());
-//            conn = (HttpURLConnection) url.openConnection();
-//            conn.setRequestMethod(opts.method);
-//            conn.setDoOutput(true);
-//            conn.setDoInput(true);
-//            conn.setUseCaches(false);
-//            conn.setReadTimeout(opts.timeout);
-//            conn.setRequestProperty("Accept", opts.acceptHeader);
-//            if (log.isDebugEnabled())
-//                log.debug("Accept: " + opts.acceptHeader);
-            
             if (opts.entity != null) {
 
-//                if (opts.data == null)
-//                    throw new AssertionError();
-
-//                final String contentLength = Integer.toString(opts.data.length);
-
-//                conn.setRequestProperty("Content-Type", opts.contentType);
-//                conn.setRequestProperty("Content-Length", contentLength);
-
-//                if (log.isDebugEnabled()) {
-//                    log.debug("Content-Type: " + opts.contentType);
-//                    log.debug("Content-Length: " + contentLength);
-//                }
-
-//                final ByteArrayEntity entity = new ByteArrayEntity(opts.data);
-//                entity.setContentType(opts.contentType);
-
             	final EntityContentProvider cp = new EntityContentProvider(opts.entity);
-                request.content(cp, cp.getContentType());
-                
-//                final OutputStream os = conn.getOutputStream();
-//                try {
-//                    os.write(opts.data);
-//                    os.flush();
-//                } finally {
-//                    os.close();
-//                }
 
+            	request.content(cp, cp.getContentType());
+                
             }
          
 			final long queryTimeoutMillis;
@@ -2373,6 +2445,9 @@ public class RemoteRepository {
 
     }
 
+    /**
+     * Accept and parse a range count response (NSS specific response type).
+     */
     static protected RangeCountResult rangeCountResults(
             final JettyResponseListener response) throws Exception {
 
@@ -2430,6 +2505,67 @@ public class RemoteRepository {
         }
 
     }
+
+    /**
+     * Accept and parse a boolean response (NSS specific response type).
+     */
+    static protected BooleanResult booleanResults(
+          final JettyResponseListener response) throws Exception {
+
+      try {
+          
+          final String contentType = response.getContentType();
+
+          if (!contentType.startsWith(IMimeTypes.MIME_APPLICATION_XML)) {
+
+              throw new RuntimeException("Expecting Content-Type of "
+                      + IMimeTypes.MIME_APPLICATION_XML + ", not "
+                      + contentType);
+
+          }
+
+          final SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
+          
+          final AtomicBoolean result = new AtomicBoolean();
+          final AtomicLong elapsedMillis = new AtomicLong();
+
+          /*
+           * For example: <data rangeCount="5" milliseconds="112"/>
+           */
+          parser.parse(response.getInputStream(), new DefaultHandler2(){
+
+             @Override
+              public void startElement(final String uri,
+                      final String localName, final String qName,
+                      final Attributes attributes) {
+
+                  if (!"data".equals(qName))
+                      throw new RuntimeException("Expecting: 'data', but have: uri=" + uri
+                              + ", localName=" + localName + ", qName="
+                              + qName);
+
+                  result.set(Boolean.valueOf(attributes
+                          .getValue("result")));
+
+                  elapsedMillis.set(Long.valueOf(attributes
+                          .getValue("milliseconds")));
+                         
+              }
+              
+          });
+          
+          // done.
+          return new BooleanResult(result.get(), elapsedMillis.get());
+
+      } finally {
+
+       if (response != null) {
+          response.abort();
+       }
+       
+      }
+
+  }
 
     static protected ContextsResult contextsResults(
             final JettyResponseListener response) throws Exception {

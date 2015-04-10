@@ -27,8 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.ArrayList;
 
 import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
@@ -37,6 +36,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.store.BD;
 
 /**
  * Utility class to encode/decode RDF {@link Value}s for interchange with the
@@ -222,7 +223,6 @@ public class EncodeDecodeValue {
 //     * 
 //     * @see http://www.w3.org/TR/sparql11-query/#codepointEscape
 //     * 
-//     * FIXME Implement encode/decode.
 //     */
 //    static String decodeEscapeSequences(final String s) {
 //
@@ -350,9 +350,15 @@ public class EncodeDecodeValue {
         
     }
 
-    /**
-     * Type safe variant for a {@link Resource}.
-     */
+   /**
+    * Type safe variant for a {@link Resource}.
+    * 
+    * @param param
+    *           The encoded value.
+    * 
+    * @return The Resource -or- <code>null</code> if the argument was
+    *         <code>null</code>.
+    */
     public static Resource decodeResource(final String param) {
 
         final Value v = decodeValue(param);
@@ -364,10 +370,16 @@ public class EncodeDecodeValue {
 
     }
 
-    /**
-     * Type safe variant for a {@link URI}.
-     */
-    public static URI decodeURI(final String param) {
+   /**
+    * Type safe variant for a {@link URI}.
+    * 
+    * @param param
+    *           The encoded value.
+    * 
+    * @return The URI -or- <code>null</code> if the argument was
+    *         <code>null</code>.
+    */
+   public static URI decodeURI(final String param) {
 
         final Value v = decodeValue(param);
 
@@ -421,49 +433,125 @@ public class EncodeDecodeValue {
         throw new AssertionError();
     }
 
-    /**
-	 * Decode each resource.
-	 * 
-	 * @param strings
-	 *            An array of encoded resources.
-	 * @return An array of decoded resources that is 1:1 with the original
-	 *         array.
-	 */
-    public static Resource[] decodeResources(final String[] strings) {
-    	if (strings == null || strings.length == 0)
-    		return null;
-    	
-    	final List<Resource> tmp = new LinkedList<Resource>();
-    	for (int i = 0; i < strings.length; i++) {
-    	   final String s = strings[i];
-    	   if(s.length()==0) continue;
-    		tmp.add(decodeResource(s));
-    	}
-    	
-      final Resource[] resources = tmp.toArray(new Resource[tmp.size()]);
+   /**
+    * Decode an array of named graph contexts.
+    * 
+    * @param strings
+    *           An array of encoded named graph contexts (required).
+    * 
+    * @return An array of decoded resources that is 1:1 with the original array.
+    * 
+    * @throws IllegalArgumentException
+    *            if the argument is <code>null</code>.
+    * 
+    * @see BD#NULL_GRAPH
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+    public static Resource[] decodeContexts(final String[] strings) {
 
-      return resources;
+       if (strings == null) {
+          // Not allowed per the openrdf pattern.
+          throw new IllegalArgumentException();
+      }
+
+      if (strings.length == 0) {
+
+         // Allowed. Corresponds to all named graphs.
+         return EMPTY_RESOURCE_ARRAY;
+
+      }
+
+      final Resource[] tmp = new Resource[strings.length];
+
+      for (int i = 0; i < strings.length; i++) {
+
+         final String s = strings[i];
+
+         if (s == null || s.length() == 0) {
+
+            /*
+             * Allowed. This is a reference to the openrdf "null" graph.
+             * 
+             * Note: "c=" reports a zero length string so we need to decode that
+             * to a null reference.
+             */
+            tmp[i] = null;
+
+         } else {
+
+            tmp[i] = decodeResource(s);
+
+         }
+
+      }
+
+      return tmp;
       
     }
 
     /**
-	 * Encode each value.
-	 * 
-	 * @param values
-	 *            An array of RDF {@link Value}s.
-	 * @return An array of encoded RDF values that is 1:1 with the original
-	 *         array.
-	 */
-    public static String[] encodeValues(final Value[] values) {
-    	if (values == null || values.length == 0)
-    		return null;
-    	
-    	final String[] strings = new String[values.length];
-    	for (int i = 0; i < values.length; i++) {
-    		strings[i] = encodeValue(values[i]);
-    	}
-    	
-    	return strings;
-    }
+    * Encode each Resource.
+    * <p>
+    * Note: When generating URL parameters, we will have zero or more
+    * <code>&amp;c=...</code> instances. These are turned into a Resource[]. If
+    * there are no such arguments, then the array needs to be turned into
+    * Resource[0] on receipt by the webapp in order to be correctly decoded by
+    * {@link #decodeContexts(String[])}.
+    * 
+    * @param values
+    *           An array of RDF {@link Value}s.
+    * 
+    * @return An array of encoded RDF values that is 1:1 with the original
+    *         array.
+    * 
+    * @throws IllegalArgumentException
+    *            if the argument is <code>null</code>.
+    * 
+    * @see BD#NULL_GRAPH
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public static String[] encodeContexts(final Resource[] values) {
 
+      if (values == null) {
+         // Not allowed per the openrdf patterns.
+         throw new IllegalArgumentException();
+      }
+
+      if (values.length == 0) {
+         // Allowed. Corresponds to all named graphs.
+         return EMPTY_STRING_ARRAY;
+      }
+
+      final String[] strings = new String[values.length];
+
+      for (int i = 0; i < values.length; i++) {
+
+         final Value val = values[i];
+
+         if (val == null) {
+
+            strings[i] = null; // i.e., an openrdf null graph reference.
+
+         } else {
+
+            strings[i] = encodeValue(val);
+
+         }
+
+      }
+
+      return strings;
+      
+   }
+
+   /** An empty String[] for encode. */
+   static private final String[] EMPTY_STRING_ARRAY = new String[0];
+   
+   /** An empty Resource[] for decode. */
+   static private final Resource[] EMPTY_RESOURCE_ARRAY = new Resource[0];
+   
 }

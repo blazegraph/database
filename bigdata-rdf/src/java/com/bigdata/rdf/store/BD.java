@@ -110,19 +110,51 @@ public interface BD {
     URI DESCRIBE = new URIImpl(NAMESPACE + "describe");
 
     /**
-     * Sesame has the notion of a "null" graph. Any time you insert a statement
-     * into a quad store and the context position is not specified, it is
-     * actually inserted into this "null" graph. If SPARQL <code>DATASET</code>
-     * is not specified, then all contexts are queried and you will see
-     * statements from the "null" graph as well as from any other context.
-     * {@link com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)}
-     * will return statements from the "null" graph if the context is either
-     * unbound or is an array whose sole element is <code>null</code>.
-     * 
-     * @see com.bigdata.rdf.sail.BigdataSailConnection#addStatement(Resource, URI, Value, Resource...)
-     * @see com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)
-     * @see SESAME#NIL
-     */
+    * Sesame has the notion of a "null" graph. Any time you insert a statement
+    * into a quad store and the context position is not specified, it is
+    * actually inserted into this "null" graph. If SPARQL <code>DATASET</code>
+    * is not specified, then all contexts are queried and you will see
+    * statements from the "null" graph as well as from any other context.
+    * {@link com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)}
+    * will return statements from the "null" graph if the context is either
+    * unbound or is an array whose sole element is <code>null</code>.
+    * <p>
+    * Given
+    * 
+    * <pre>
+    * void foo(Resource s, final URI p, final Value o, final Resource... contexts)
+    * </pre>
+    * 
+    * <dl>
+    * <dt>foo(s,p,o)</dt>
+    * <dd>All named graphs are addressed. The <i>contexts</i> parameter will be
+    * a Resource[0] reference.</dd>
+    * <dt>foo(s,p,o,(Resource[]) null)</dt>
+    * <dd>
+    * <em>Note: openrdf does not allow this invocation pattern - the Resource[] MUST NOT be a <code>null</code> reference.</em>
+    * </dd>
+    * <dt>foo(s,p,o,(Resource) null)</dt>
+    * <dd>The openrdf "nullGraph" is addressed. The <i>contexts</i> parameter
+    * will be Resource[]{null}. Java will autobox the Resource reference as a
+    * Resource[]{null} array.</dd>
+    * <dt>foo(s,p,o,x,y,z)</dt>
+    * <dd>The openrdf named graphs (x,y,z) are addressed. The <i>contexts</i>
+    * parameter will be Resource[]{x,y,z}.</dd>
+    * <dt>foo(s,p,o,x,null,z)</dt>
+    * <dd>The openrdf named graphs (x,nullGraph,z) are addressed. The
+    * <i>contexts</i> parameter will be Resource[]{x,null,z}</dd>
+    * </dd>
+    * </dl>
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    * 
+    * @see com.bigdata.rdf.sail.BigdataSailConnection#addStatement(Resource,
+    *      URI, Value, Resource...)
+    * @see com.bigdata.rdf.sail.BigdataSailConnection#getStatements(Resource,
+    *      URI, Value, boolean, Resource...)
+    * @see SESAME#NIL
+    */
     URI NULL_GRAPH = new URIImpl(NAMESPACE + "nullGraph");
 
     /**

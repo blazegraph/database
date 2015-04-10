@@ -22,57 +22,29 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Nov 13, 2007
+ * Created on Mar 21, 2012
  */
 
-package com.bigdata.rdf.axioms;
+package com.bigdata.rdf.sail.webapp.client;
 
 /**
- * An empty axiom model.
- * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * Class representing the a boolean result of some operation against
+ * the REST API.
  */
-public class NoAxioms extends BaseAxioms {
+class BooleanResult {
 
-    /**
-     * 
-     */
-    private static final long serialVersionUID = 4149879139683303198L;
+    /** The result. */
+    public final boolean result;
 
-    /**
-     * De-serialization ctor.
-     */
-    public NoAxioms() {
+    /** The elapsed time for the operation. */
+    public final long elapsedMillis;
 
-        super();
+    public BooleanResult(final boolean result, final long elapsedMillis) {
+        
+        this.result = result;
+        
+        this.elapsedMillis = elapsedMillis;
         
     }
 
-    public NoAxioms(final String namespace) {
-        
-        super(namespace);
-        
-    }
-    
-    @Override
-    final public boolean isNone() {
-        
-        return true;
-        
-    }
-
-    @Override
-    final public boolean isRdfSchema() {
-        
-        return false;
-        
-    }
-    
-    @Override
-    final public boolean isOwlSameAs() {
-        
-        return false;
-        
-    }
-    
 }

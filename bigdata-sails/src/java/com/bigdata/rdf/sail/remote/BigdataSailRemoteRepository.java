@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
@@ -82,9 +83,15 @@ public class BigdataSailRemoteRepository implements Repository {
     private final RemoteRepository nss;
 
     /**
+     * This exists solely for {@link #getValueFactory()} - the value factory
+     * is not used inside of this class.
+     */
+    private final ValueFactory valueFactory = new ValueFactoryImpl();
+    
+    /**
      * The object used to communicate with that remote repository.
      */
-	public RemoteRepository getRemoteRepository() {
+    public RemoteRepository getRemoteRepository() {
 		
 		return nss;
 		
@@ -222,19 +229,32 @@ public class BigdataSailRemoteRepository implements Repository {
 		return open;
 	}
 
+	/**
+	 * Unsupported operation
+	 * 
+	 * @throws UnsupportedOperationException
+	 */
 	@Override
-	public void setDataDir(File arg0) {
+	public void setDataDir(File dataDir) {
 		throw new UnsupportedOperationException();
 	}
 
+   /**
+    * Unsupported operation
+    * 
+    * @throws UnsupportedOperationException
+    */
 	@Override
 	public File getDataDir() {
 		throw new UnsupportedOperationException();
 	}
 
+	/**
+	 * Return a client-only {@link ValueFactory} implementation.
+	 */
 	@Override
 	public ValueFactory getValueFactory() {
-		throw new UnsupportedOperationException();
+		return valueFactory;
 	}
 
 }

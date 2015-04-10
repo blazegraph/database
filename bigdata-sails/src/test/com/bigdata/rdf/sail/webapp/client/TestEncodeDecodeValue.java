@@ -29,10 +29,16 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import junit.framework.TestCase2;
 
+import org.openrdf.model.Resource;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDF;
+
+import com.bigdata.rdf.store.BD;
 
 /**
  * Test suite for utility class to encode and decode RDF Values for interchange
@@ -41,7 +47,6 @@ import org.openrdf.model.vocabulary.RDF;
  * @see EncodeDecodeValue
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestEncodeDecodeValue extends TestCase2 {
 
@@ -194,5 +199,194 @@ public class TestEncodeDecodeValue extends TestCase2 {
         }
 
     }
+
+   /*
+    * Test suite for encode/decode of openrdf style contexts. 
+    */
+    
+    /**
+    * Test case for <code>foo(s,p,o,(Resource[]) null)</code>. This is case is
+    * disallowed.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+    public void test_encodeDecodeContexts_quads_context_null_array() {
+
+       // rejected by encode.
+       try {
+          EncodeDecodeValue.encodeContexts(null);
+          fail("Expecting " + IllegalArgumentException.class);
+       } catch (IllegalArgumentException ex) {
+          if (log.isInfoEnabled())
+             log.info("Ignoring expected exception: " + ex);
+       }
+
+       // rejected by decode.
+       try {
+          EncodeDecodeValue.decodeContexts(null);
+          fail("Expecting " + IllegalArgumentException.class);
+       } catch (IllegalArgumentException ex) {
+          if (log.isInfoEnabled())
+             log.info("Ignoring expected exception: " + ex);
+       }
+
+   }
+
+   /**
+    * Test case for <code>foo(s,p,o)</code>. This is case is equivalent to
+    * <code>foo(s,p,o,new Resource[0]). It is allowed and refers
+    * to all named graphs.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public void test_encodeDecodeContexts_quads_context_not_specified() {
+
+      final String[] encoded = EncodeDecodeValue
+            .encodeContexts(new Resource[0]);
+
+      assertEquals(new String[0], encoded);
+
+      final Resource[] decoded = EncodeDecodeValue.decodeContexts(encoded);
+
+      assertEquals(new Resource[0], decoded);
+
+   }
+
+   /**
+    * Test case for <code>foo(s,p,o,(Resource)null)</code>. This is case is
+    * equivalent to
+    * <code>foo(s,p,o,new Resource[]{null}). It is allowed and refers
+    * to the "null" graph.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public void test_encodeDecodeContexts_quads_context_nullGraph() {
+
+      final String[] encoded = EncodeDecodeValue
+            .encodeContexts(new Resource[] { null });
+
+      assertEquals(new String[] { null }, encoded);
+
+      final Resource[] decoded = EncodeDecodeValue.decodeContexts(encoded);
+
+      assertEquals(new Resource[] { null }, decoded);
+
+   }
+
+   /**
+    * Test case for <code>foo(s,p,o,(Resource)null)</code>. This is case is
+    * equivalent to
+    * <code>foo(s,p,o,new Resource[]{null}). It is allowed and refers
+    * to the "null" graph.
+    * <p>
+    * Note: When a <code>null</code> is encoded into an HTTP parameter it will
+    * be represented as <code>c=</code>. On decode, the value will be a zero
+    * length string. Therefore this test verifies that we decode a zero length
+    * string into a <code>null</code>.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public void test_encodeDecodeContexts_quads_context_nullGraph_2() {
+
+      final String[] encoded = new String[] { "" };
+
+      final Resource[] decoded = EncodeDecodeValue.decodeContexts(encoded);
+
+      assertEquals(new Resource[] { null }, decoded);
+
+   }
+
+   /**
+    * Test case for <code>foo(s,p,o,x,y,z)</code>. This is case is equivalent to
+    * <code>foo(s,p,o,new Resource[]{x,y,z}). It is allowed and refers
+    * to the specified named graphs.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public void test_encodeDecodeContexts_quads_context_x_y_z() {
+
+      final ValueFactory vf = new ValueFactoryImpl();
+      final URI x = vf.createURI(":x");
+      final URI y = vf.createURI(":y");
+      final URI z = vf.createURI(":z");
+
+      final String[] encoded = EncodeDecodeValue.encodeContexts(new Resource[] {
+            x, y, z });
+
+      // Note: Encoding wraps URI with <...>
+      assertEquals(new String[] { "<:x>", "<:y>", "<:z>" }, encoded);
+
+      final Resource[] decoded = EncodeDecodeValue.decodeContexts(encoded);
+
+      assertEquals(new Resource[] { x, y, z }, decoded);
+
+   }
+
+   /**
+    * Test case for <code>foo(s,p,o,x,null,z)</code>. This is case is equivalent
+    * to <code>foo(s,p,o,new Resource[]{x,null,z}). It is allowed and refers
+    * to the named graph (x), the null graph, and the named graph (z).
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public void test_encodeDecodeContexts_quads_context_x_null_z() {
+
+      final ValueFactory vf = new ValueFactoryImpl();
+      final URI x = vf.createURI(":x");
+      final URI z = vf.createURI(":z");
+
+      final String[] encoded = EncodeDecodeValue.encodeContexts(new Resource[] {
+            x, null, z });
+
+      // Note: Encoding wraps URI with <...>
+      assertEquals(new String[] { "<:x>", null, "<:z>" }, encoded);
+
+      final Resource[] decoded = EncodeDecodeValue.decodeContexts(encoded);
+
+      assertEquals(new Resource[] { x, null, z }, decoded);
+
+   }
+
+
+   /**
+    * Test case for <code>foo(s,p,o,x,null,z)</code>. This is case is equivalent
+    * to <code>foo(s,p,o,new Resource[]{x,null,z}). It is allowed and refers
+    * to the named graph (x), the null graph, and the named graph (z).
+    * <p>
+    * Note: When a <code>null</code> is encoded into an HTTP parameter it will
+    * be represented as <code>c=</code>. On decode, the value will be a zero
+    * length string. Therefore this test verifies that we decode a zero length
+    * string into a <code>null</code>.
+    * 
+    * @see BD#NULL_GRAPH
+    * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+    *      not encoded/decoded according to openrdf semantics (REST API) </a>
+    */
+   public void test_encodeDecodeContexts_quads_context_x_null_z_2() {
+
+      final ValueFactory vf = new ValueFactoryImpl();
+      final URI x = vf.createURI(":x");
+      final URI z = vf.createURI(":z");
+
+      // Note: Encoding wraps URI with <...>
+      final String[] encoded = new String[] { "<:x>", "", "<:z>" };
+
+      final Resource[] decoded = EncodeDecodeValue.decodeContexts(encoded);
+
+      assertEquals(new Resource[] { x, null, z }, decoded);
+
+   }
 
 }
