@@ -503,13 +503,13 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
     
 //  @Test
-    public void test6() throws Exception {      
+    public void test6() throws Exception { //     fail("FIXME RESTORE"); // FIXME RESTORE
         prepareTest(null, Arrays.asList(PREFIX+"data06endpoint1.ttl"));
         execute(PREFIX+"service06.rq", PREFIX+"service06.srx", false);          
     }
     
 //  @Test
-    public void test7() throws Exception {      
+    public void test7() throws Exception { //     fail("FIXME RESTORE");// FIXME RESTORE
         // clears the repository and adds new data + execute
         prepareTest(PREFIX+"data07.ttl", Collections.<String>emptyList());
         execute(PREFIX+"service07.rq", PREFIX+"service07.srx", false);          

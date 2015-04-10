@@ -255,8 +255,7 @@ public class TestConcurrentRestApiRequests<S extends IIndexManager> extends
 
 				final String namespace = namespaces[i] = "kb#" + i;
 
-				final Properties properties = TestNanoSparqlServerWithProxyIndexManager
-						.getProperties(getTestMode());
+				final Properties properties = getTestMode().getProperties();
 
 				properties.setProperty(
 						RemoteRepository.OPTION_CREATE_KB_NAMESPACE, namespace);
