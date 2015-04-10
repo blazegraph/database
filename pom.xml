@@ -380,8 +380,8 @@ mvn deploy:deploy-file \
            <artifactId>dsi-utils</artifactId>
            <version>${dsiutils.version}</version>
        </dependency>
-       <dependency>
        <!-- 
+       <dependency>
 mvn deploy:deploy-file \
    -DgroupId=org.cognitiveweb \
    -DartifactId=cweb-junit-ext \
@@ -390,11 +390,11 @@ mvn deploy:deploy-file \
    -DrepositoryId=bigdata.releases \
    -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
    -Dfile=bigdata/lib/junit-ext-1.1-b3-dev.jar
-        -->
       <groupId>org.CognitiveWeb</groupId>
          <artifactId>cweb-junit-ext</artifactId>
          <version>1.1-b3-dev</version>
        </dependency>
+        -->
        <dependency>
        <!-- 
 mvn deploy:deploy-file \

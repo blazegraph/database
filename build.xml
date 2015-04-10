@@ -237,7 +237,7 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-jini/src/main/java" />
          <src path="${bigdata.dir}/bigdata-rdf/src/java" />
             <src path="${bigdata.dir}/bigdata-sails/src/java" />
-            <src path="${bigdata.dir}/bigdata-blueprints/src/java" />
+            <src path="${bigdata.dir}/bigdata-blueprints/src/main/java" />
          <src path="${bigdata.dir}/bigdata-gom/src/java" />
          <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
          <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
@@ -283,7 +283,7 @@ public class BuildInfo {
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/java">
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/main/java">
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
@@ -336,7 +336,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-sails/src/java" />
-            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-sails/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
@@ -397,7 +397,7 @@ public class BuildInfo {
             <fileset dir="bigdata-jini/src/main/java" />
             <fileset dir="bigdata-rdf/src/java" />
             <fileset dir="bigdata-sails/src/java" />
-            <fileset dir="bigdata-blueprints/src/java" />
+            <fileset dir="bigdata-blueprints/src/main/java" />
          <fileset dir="bigdata-gom/src/java" />
         </jar>
         <bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
@@ -439,7 +439,7 @@ public class BuildInfo {
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
-         <packageset dir="${bigdata.dir}/bigdata-blueprints/src/java" />
+         <packageset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
@@ -1972,7 +1972,7 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-jini/src/test/java" />
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
-        <src path="${bigdata.dir}/bigdata-blueprints/src/test" />
+        <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
         <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
         <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
@@ -2025,7 +2025,7 @@ ${postInstallMessage}</echo>
         <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
           <exclude name="**/*.java" />
         </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test">
+        <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-gom/src/test">
@@ -2883,7 +2883,7 @@ ${postInstallMessage}</echo>
             </fileset>
         </copy>
         <copy toDir="${build.dir}/rexster-server-2.5.0/config/"
-        	  file="${bigdata.dir}/bigdata-blueprints/src/resources/rexster.xml"
+        	  file="${bigdata.dir}/bigdata-blueprints/src/test/resources/rexster.xml"
         	  overwrite="true"/>
         <chmod file="${build.dir}/rexster-server-2.5.0/bin/rexster.sh" perm="+x"/>
         <echo>Rexster installation complete.
