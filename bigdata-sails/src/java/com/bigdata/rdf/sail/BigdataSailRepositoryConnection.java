@@ -100,6 +100,13 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
     * <p>
     * This code path is optimized for cases where isolatable indices are not in
     * use and where inferences can not appear.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1178" > Optimize
+    *      hasStatement() </a>
+    * 
+    *      TODO This should be using
+    *      {@link BigdataSailConnection#hasStatement(Resource, URI, Value, boolean, Resource...)}
+    *      for improved performance.  See #1178.
     */
    @Override
    public boolean hasStatement(final Resource s, final URI p, final Value o,
