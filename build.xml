@@ -1229,7 +1229,8 @@ ${postInstallMessage}</echo>
 
       <!-- Stage service-specific logging config file -->
 
-      <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/java/com/bigdata" />
+      <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/main/java/com/bigdata" />
+      <property name="bigdata-jini.resource.root" location="${bigdata-jini.dir}/src/test/resources/com/bigdata" />
 
       <copy file="${bigdata-jini.root}/disco/config/disco.config"
             todir="${dist.bin.config}" />
