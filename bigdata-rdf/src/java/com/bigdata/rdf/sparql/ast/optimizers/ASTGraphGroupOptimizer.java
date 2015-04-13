@@ -33,6 +33,8 @@ import java.util.LinkedList;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.Var;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -46,6 +48,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpJoins;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
@@ -305,6 +308,26 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
             }
 
+            /**
+             * Handle edge cases GRAPH ?g { }, which require special handling
+             * (if not rewritten, it won't return any results).
+             */
+            if (group.isEmpty() && graphContext.isVariable()) {
+
+               // our approach is to wrap around a dummy graph pattern with
+               // a distinct term scan annotation
+               final VarNode s = new VarNode((Var<IV>)Var.var());
+               final VarNode p = new VarNode((Var<IV>)Var.var());
+               final VarNode o = new VarNode((Var<IV>)Var.var());
+               
+               final StatementPatternNode sp = 
+                  new StatementPatternNode(
+                  s, p, o, graphContext, Scope.NAMED_CONTEXTS);
+               sp.setDistinctTermScanVar((VarNode)graphContext);
+
+               group.addChild(sp);
+            }            
+            
             graphGroups.add((JoinGroupNode) group);
 
         }
