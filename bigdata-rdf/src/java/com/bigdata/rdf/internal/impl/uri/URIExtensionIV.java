@@ -187,7 +187,8 @@ public class URIExtensionIV<V extends BigdataURI>
 
 			final URI namespace = namespaceIV.asValue(lex);
 			
-			final String localName = delegateIV.getInlineValue().toString();
+			final String localName = lex.getLexiconConfiguration()
+					.getInlineURILocalNameFromDelegate(namespace, delegateIV);
 			
 			v = setValue((V) f.createURI(namespace.stringValue(), localName));
 			
