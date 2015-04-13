@@ -47,6 +47,7 @@ import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.UUIDBNodeIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.UUIDLiteralIV;
@@ -510,6 +511,16 @@ public class LexiconConfiguration<V extends BigdataValue>
         // URI was not inlined.
         return null;
 
+    }
+
+    /**
+     * Inflate the localName portion of an inline URI using its storage delegate.
+     * @param namespace the uris's prefix
+     * @param delegate the storage delegate
+     * @return the inflated localName
+     */
+    public String getInlineURILocalNameFromDelegate(URI namespace, AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+        return uriFactory.getLocalNameFromDelegate(namespace, delegate);
     }
 
     /**
