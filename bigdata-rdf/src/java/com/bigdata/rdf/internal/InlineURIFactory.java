@@ -23,12 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -37,9 +42,10 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * ({@link InlineUUIDURIHandler}.
  */
 public class InlineURIFactory implements IInlineURIFactory {
-
+	private final Logger log = Logger.getLogger(InlineURIFactory.class);
     private final List<InlineURIHandler> handlers = 
             new LinkedList<InlineURIHandler>();
+	private final Map<String, InlineURIHandler> handlersByNamespace = new HashMap<>();
     
     /**
      * By default, handle IPv4 and UUID.
@@ -56,6 +62,7 @@ public class InlineURIFactory implements IInlineURIFactory {
     public void init(final Vocabulary vocab) {
         for (InlineURIHandler handler : handlers) {
             handler.init(vocab);
+            handlersByNamespace.put(handler.getNamespace(), handler);
         }
     }
     
@@ -71,4 +78,21 @@ public class InlineURIFactory implements IInlineURIFactory {
         return null;
     }
 
+	@Override
+	public String getLocalNameFromDelegate(URI namespace,
+			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+		InlineURIHandler handler = handlersByNamespace.get(namespace
+				.stringValue());
+		if (handler == null) {
+			/*
+			 * Since we can't find the handler the default implementation is the
+			 * best we can manage.
+			 */
+			log.warn("Couldn't find InlineURIHandler for "
+					+ namespace.stringValue());
+			return InlineURIHandler
+					.getLocalNameFromDelegateDefaultImplementation(delegate);
+		}
+		return handler.getLocalNameFromDelegate(delegate);
+	}
 }
