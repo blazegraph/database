@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -37,9 +39,11 @@ import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.DTE;
+import com.bigdata.rdf.internal.InlineSignedIntegerURIHandler;
 import com.bigdata.rdf.internal.InlineURIFactory;
 import com.bigdata.rdf.internal.InlineURIHandler;
 import com.bigdata.rdf.internal.InlineUUIDURIHandler;
+import com.bigdata.rdf.internal.InlineUnsignedIntegerURIHandler;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
@@ -52,7 +56,6 @@ import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.BaseVocabularyDecl;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
-import com.bigdata.rdf.vocab.RDFSVocabulary;
 
 /**
  * @author <a href="mailto:mpersonick@users.sourceforge.net">Mike Personick</a>
@@ -290,6 +293,92 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
         
     }
 
+    public void testSignedInteger() throws Exception {
+        uriRoundtripTestCase(
+                SIGNED_INT_NAMESPACE + "1", true,//
+                SIGNED_INT_NAMESPACE + "-123", true,//
+                SIGNED_INT_NAMESPACE + "-123342343214", true,//
+                SIGNED_INT_NAMESPACE + "123342343214", true,//
+                SIGNED_INT_NAMESPACE + Byte.MAX_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Byte.MIN_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Short.MAX_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Short.MIN_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Integer.MAX_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Integer.MIN_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Long.MAX_VALUE, true,//
+                SIGNED_INT_NAMESPACE + Long.MIN_VALUE, true,//
+                SIGNED_INT_NAMESPACE + "19223372036854775807", true,//
+                SIGNED_INT_NAMESPACE + "foo", false);
+    }
+
+    public void testUnsignedInteger() throws Exception {
+        uriRoundtripTestCase(UNSIGNED_INT_NAMESPACE + "1", true,//
+                UNSIGNED_INT_NAMESPACE + "-123", false,//
+                UNSIGNED_INT_NAMESPACE + "-123342343214", false,//
+                UNSIGNED_INT_NAMESPACE + "123342343214", true,//
+                UNSIGNED_INT_NAMESPACE + Byte.MAX_VALUE, true,//
+                UNSIGNED_INT_NAMESPACE + Short.MAX_VALUE, true,//
+                UNSIGNED_INT_NAMESPACE + Integer.MAX_VALUE, true,//
+                UNSIGNED_INT_NAMESPACE + Long.MAX_VALUE, true,//
+                UNSIGNED_INT_NAMESPACE + "19223372036854775807", true,//
+                UNSIGNED_INT_NAMESPACE + "foo", false);
+    }
+
+    public void testSuffixedInteger() throws Exception {
+        uriRoundtripTestCase(SUFFIXED_INT_NAMESPACE + "1-suffix", true,//
+                SUFFIXED_INT_NAMESPACE + "1", false,//
+                SUFFIXED_INT_NAMESPACE + "foo-suffix", false,//
+                SUFFIXED_INT_NAMESPACE + "-suffix", false,//
+                SUFFIXED_INT_NAMESPACE + "foo", false);
+    }
+
+    private void uriRoundtripTestCase(Object... options) throws Exception {
+        final Properties props = getProperties();
+        props.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS, CustomVocab.class.getName());
+        props.setProperty(AbstractTripleStore.Options.INLINE_URI_FACTORY_CLASS,
+                CustomInlineURIFactory.class.getName());
+        /*
+         * The bigdata store, backed by a temporary journal file.
+         */
+        final BigdataSail sail = getSail(props);
+        try {
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            final BigdataSailRepositoryConnection cxn = repo.getConnection();
+            cxn.setAutoCommit(false);
+            try {
+                final BigdataValueFactory vf = cxn.getValueFactory();
+                final List<URI> uris = new ArrayList<>();
+                for (int i = 0; i < options.length; i += 2) {
+                    URI uri = vf.createURI((String) options[i]);
+                    uris.add(uri);
+                    cxn.add(uri, RDF.TYPE, vf.createLiteral("doesn't matter"));
+                }
+                cxn.commit();
+
+                if (log.isDebugEnabled())
+                    log.debug(cxn.getTripleStore().dumpStore());
+
+                final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL,
+                        "select * { ?s ?p ?o }");
+                final TupleQueryResult result = query.evaluate();
+                while (result.hasNext()) {
+                    final BigdataURI uri = (BigdataURI) result.next().getBinding("s").getValue();
+                    int optionsBase = uris.indexOf(uri) * 2;
+                    assertTrue("Returned uri not found in original list:  " + uri, optionsBase >= 0);
+                    assertEquals("String representation different for:  " + options[optionsBase],
+                            options[optionsBase], uri.stringValue());
+                    assertEquals("Inline expectation different for:  " + options[optionsBase],
+                            options[optionsBase + 1], uri.getIV().isInline());
+                }
+            } finally {
+                cxn.close();
+            }
+        } finally {
+            sail.__tearDownUnitTest();
+        }
+    }
+
     public void testMultipurposeIDNamespace() throws Exception {
         
         final Properties props = getProperties();
@@ -378,7 +467,10 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
         
     }
 
-    public static final String CUSTOM_NAMESPACE = "application:id:"; 
+    public static final String CUSTOM_NAMESPACE = "application:id:";
+    public static final String SIGNED_INT_NAMESPACE = "http://example.com/int/";
+    public static final String UNSIGNED_INT_NAMESPACE = "http://example.com/uint/";
+    public static final String SUFFIXED_INT_NAMESPACE = "http://example.com/intsuf/";
     
     public static class CustomVocab extends DefaultBigdataVocabulary {
         
@@ -395,6 +487,9 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
             super.addValues();
             
             addDecl(new BaseVocabularyDecl(CUSTOM_NAMESPACE));
+            addDecl(new BaseVocabularyDecl(SIGNED_INT_NAMESPACE));
+            addDecl(new BaseVocabularyDecl(UNSIGNED_INT_NAMESPACE));
+            addDecl(new BaseVocabularyDecl(SUFFIXED_INT_NAMESPACE));
         }        
         
     }
@@ -404,6 +499,9 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
         public CustomInlineURIFactory() {
             super();
             addHandler(new InlineUUIDURIHandler(CUSTOM_NAMESPACE));
+            addHandler(new InlineSignedIntegerURIHandler(SIGNED_INT_NAMESPACE));
+            addHandler(new InlineUnsignedIntegerURIHandler(UNSIGNED_INT_NAMESPACE));
+            addHandler(new InlineSuffixedIntegerURIHandler(SUFFIXED_INT_NAMESPACE, "-suffix"));
         }
         
         
@@ -476,5 +574,30 @@ public class TestInlineURIs extends ProxyBigdataSailTestCase {
         
     }
 
+	public static class InlineSuffixedIntegerURIHandler extends
+			InlineSignedIntegerURIHandler {
+		private final String suffix;
+
+		public InlineSuffixedIntegerURIHandler(String namespace, String suffix) {
+			super(namespace);
+			this.suffix = suffix;
+		}
+
+		@Override
+		@SuppressWarnings("rawtypes")
+		protected AbstractLiteralIV createInlineIV(String localName) {
+			if (!localName.endsWith(suffix)) {
+				return null;
+			}
+			return super.createInlineIV(localName.substring(0,
+					localName.length() - suffix.length()));
+		}
+
+		@Override
+		public String getLocalNameFromDelegate(
+				AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+			return super.getLocalNameFromDelegate(delegate) + suffix;
+		}
+	}
 
 }

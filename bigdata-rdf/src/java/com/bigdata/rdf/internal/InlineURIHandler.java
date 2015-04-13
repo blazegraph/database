@@ -28,6 +28,7 @@ import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -43,18 +44,18 @@ public abstract class InlineURIHandler {
      * The namespace prefix.
      */
     protected final String namespace;
-    
+
     /**
      * Namespace prefix length.
      */
     protected final int len;
-    
+
     /**
      * The inline vocab IV for the namespace prefix.
      */
     @SuppressWarnings("rawtypes")
     protected transient IV namespaceIV;
-    
+
     /**
      * Create a handler for the supplied namespace prefix.
      */
@@ -62,41 +63,65 @@ public abstract class InlineURIHandler {
         this.namespace = namespace;
         this.len = namespace.length();
     }
-    
+
     /**
      * Lookup the namespace IV from the vocabulary.
      */
     public void init(final Vocabulary vocab) {
         this.namespaceIV = vocab.get(new URIImpl(namespace));
     }
-    
+
+    /**
+     * The namespace this handles. Used for resolving the handler after load so
+     * it can inflate the localName portion of the inlined uri.
+     */
+    public String getNamespace() {
+        return namespace;
+    }
+
     @SuppressWarnings({ "rawtypes", "unchecked" })
     protected URIExtensionIV createInlineIV(final URI uri) {
-        
+
         /*
-         * If the namspace prefix is not in the vocabulary we can't inline 
+         * If the namspace prefix is not in the vocabulary we can't inline
          * anything.
          */
         if (namespaceIV == null) {
             return null;
         }
-        
+
         if (uri.stringValue().startsWith(namespace)) {
             final String localName = uri.stringValue().substring(len);
             final AbstractLiteralIV localNameIV = createInlineIV(localName);
             if (localNameIV != null) {
                 return new URIExtensionIV(localNameIV, namespaceIV);
+                }
             }
-        }
-        
+
         return null;
-    }
-    
+        }
+
+    /**
+     * Unpack the inline value into the localName portion of the uri.
+     */
+    public String getLocalNameFromDelegate(
+            AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+        return getLocalNameFromDelegateDefaultImplementation(delegate);
+        }
+
     /**
      * Concrete subclasses are responsible for actually creating the inline
      * literal IV for the localName.
      */
     @SuppressWarnings("rawtypes")
     protected abstract AbstractLiteralIV createInlineIV(final String localName);
-    
+
+    /**
+     * Default implementation of getLocalNameFromDelegate pulled out so it can
+     * be used in the case where the factory can't find a handler.
+     */
+    public static String getLocalNameFromDelegateDefaultImplementation(
+            AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+        return delegate.getInlineValue().toString();
+    }
 }
