@@ -40,7 +40,6 @@ import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IRawRecordAccess;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.btree.PageStats;
 import com.bigdata.btree.data.DefaultLeafCoder;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.raba.IRaba;
@@ -120,8 +119,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * read operations as long as there is no writer.
  */
 class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
-	static int createdPages = 0;
-	
+
     private static final Logger log = Logger.getLogger(BucketPage.class);
 
 	/**
@@ -135,38 +133,47 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 */
 	ILeafData data;
 	
+	@Override
 	public AbstractFixedByteArrayBuffer data() {
 		return data.data();
 	}
 
-	public boolean getDeleteMarker(int index) {
+   @Override
+	public boolean getDeleteMarker(final int index) {
 		return data.getDeleteMarker(index);
 	}
 
+   @Override
 	public int getKeyCount() {
 		return data.getKeyCount();
 	}
 
+   @Override
 	public IRaba getKeys() {
 		return data.getKeys();
 	}
 
+   @Override
 	public long getMaximumVersionTimestamp() {
 		return data.getMaximumVersionTimestamp();
 	}
 
+   @Override
 	public long getMinimumVersionTimestamp() {
 		return data.getMinimumVersionTimestamp();
 	}
 
+   @Override
 	public long getNextAddr() {
 		return data.getNextAddr();
 	}
 
+   @Override
 	public long getPriorAddr() {
 		return data.getPriorAddr();
 	}
 
+   @Override
 	public long getRawRecord(int index) {
 		return data.getRawRecord(index);
 	}
@@ -175,42 +182,52 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	// return data.getSpannedTupleCount();
 	// }
 
+   @Override
 	public int getValueCount() {
 		return data.getValueCount();
 	}
 
+   @Override
 	public IRaba getValues() {
 		return data.getValues();
 	}
 
-	public long getVersionTimestamp(int index) {
+   @Override
+	public long getVersionTimestamp(final int index) {
 		return data.getVersionTimestamp(index);
 	}
 
+   @Override
 	public boolean hasDeleteMarkers() {
 		return data.hasDeleteMarkers();
 	}
 
+   @Override
 	public boolean hasRawRecords() {
 		return data.hasRawRecords();
 	}
 
+   @Override
 	public boolean hasVersionTimestamps() {
 		return data.hasVersionTimestamps();
 	}
 
+   @Override
 	public boolean isCoded() {
 		return data.isCoded();
 	}
 
+   @Override
 	public boolean isDoubleLinked() {
 		return data.isDoubleLinked();
 	}
 
+   @Override
 	public boolean isLeaf() {
 		return data.isLeaf();
 	}
 
+   @Override
 	public boolean isReadOnly() {
 		return data.isReadOnly();
 	}
@@ -243,7 +260,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 				htree.rawRecords//
 		);
 
-		createdPages++;
 	}
 
 	/**
@@ -262,7 +278,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		
         setIdentity(addr);
 
-		createdPages++;
 	}
 
     /**
@@ -276,8 +291,6 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
     protected BucketPage(final BucketPage src) {
 
         super(src);
-
-		createdPages++;
 
         assert !src.isDirty();
         assert src.isReadOnly();
@@ -1061,6 +1074,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 	}
 
+   @Override
 	protected boolean dump(final Level level, final PrintStream out,
 			final int height, final boolean recursive, final boolean materialize) {
 
@@ -1101,12 +1115,16 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
 	}
 
-	@Override
-    public void dumpPages(final HTreePageStats stats) {
+   @Override
+   public void dumpPages(final boolean recursive, final boolean visitLeaves,
+         final HTreePageStats stats) {
 
-        stats.visit(htree, this);
+      if (!visitLeaves)
+         return;
 
-    }
+      stats.visit(htree, this);
+
+   }
 	
 	/**
 	 * From the current bit resolution, determines how many extra bits are
@@ -1114,7 +1132,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * <p>
 	 * The additional complexity of determining whether the page can really be
 	 * split is left to the parent. A new directory, covering the required
-	 * prefixBits would inititally be created with depth 1. But if the specified
+	 * prefixBits would initially be created with depth 1. But if the specified
 	 * bit is discriminated within buddy buckets AND other bits do not further
 	 * separate the buckets then the depth of the directory will need to be
 	 * increased before the bucket page can be split.
@@ -1217,62 +1235,63 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 //		
 //		np.insertRawTuple(key, val, 0);
 //	}
-
-	private void setValue(final int entryIndex, final byte[] newval) {
-
-		// Tunnel through to the mutable object.
-        final MutableBucketData data = (MutableBucketData) this.data;
-		
-        /*
-		 * Update the entry on the leaf.
-		 */
-		if (hasRawRecords()) {
-
-			/*
-			 * Note: If the old value was a raw record, we need to delete
-			 * that raw record now.
-			 * 
-			 * Note: If the new value will be a raw record, we need to write
-			 * that raw record onto the store now and save its address into
-			 * the values[] raba.
-			 */
-			final long oaddr = getRawRecord(entryIndex);
-
-			if(oaddr != IRawStore.NULL) {
-				
-				htree.deleteRawRecord(oaddr);
-				
-			}
-			
-			final long maxRecLen = htree.getMaxRecLen();
-			
-			if (newval != null && newval.length > maxRecLen) {
-
-				// write the value on the backing store.
-				final long naddr = htree.writeRawRecord(newval);
-
-				// save its address in the values raba.
-				data.vals.values[entryIndex] = ((HTree) htree)
-						.encodeRecordAddr(naddr);
-				
-				// flag as a raw record.
-				data.rawRecords[entryIndex] = true;
-
-			} else {
-				
-				data.vals.values[entryIndex] = newval;
-			
-				data.rawRecords[entryIndex] = false;
-				
-			}
-			
-		} else {
-
-			data.vals.values[entryIndex] = newval;
-			
-		}
-
-	}
+//
+//	// setValue() is unused. only reference is in insertRawTuple (above).
+//	private void setValue(final int entryIndex, final byte[] newval) {
+//
+//		// Tunnel through to the mutable object.
+//        final MutableBucketData data = (MutableBucketData) this.data;
+//		
+//        /*
+//		 * Update the entry on the leaf.
+//		 */
+//		if (hasRawRecords()) {
+//
+//			/*
+//			 * Note: If the old value was a raw record, we need to delete
+//			 * that raw record now.
+//			 * 
+//			 * Note: If the new value will be a raw record, we need to write
+//			 * that raw record onto the store now and save its address into
+//			 * the values[] raba.
+//			 */
+//			final long oaddr = getRawRecord(entryIndex);
+//
+//			if(oaddr != IRawStore.NULL) {
+//				
+//				htree.deleteRawRecord(oaddr);
+//				
+//			}
+//			
+//			final long maxRecLen = htree.getMaxRecLen();
+//			
+//			if (newval != null && newval.length > maxRecLen) {
+//
+//				// write the value on the backing store.
+//				final long naddr = htree.writeRawRecord(newval);
+//
+//				// save its address in the values raba.
+//				data.vals.values[entryIndex] = ((HTree) htree)
+//						.encodeRecordAddr(naddr);
+//				
+//				// flag as a raw record.
+//				data.rawRecords[entryIndex] = true;
+//
+//			} else {
+//				
+//				data.vals.values[entryIndex] = newval;
+//			
+//				data.rawRecords[entryIndex] = false;
+//				
+//			}
+//			
+//		} else {
+//
+//			data.vals.values[entryIndex] = newval;
+//			
+//		}
+//
+//	}
 	
 	/**
 	 * Convenience method returns the byte[] for the given index in the leaf. If
@@ -1329,20 +1348,11 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 
     }
 
+    @Override
 	final public ByteBuffer readRawRecord(long addr) {
 		
 		return htree.readRawRecord(addr);
 
-	}
-
-	@Override
-	int activeBucketPages() {
-		return 1;
-	}
-
-	@Override
-	int activeDirectoryPages() {
-		return 0;
 	}
 
 	/*
@@ -1434,6 +1444,7 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 		return !isDirty();
 	}
 
+   @Override
 	public int removeAll(final byte[] key) {
 		if (isReadOnly()) {
 			BucketPage copy = (BucketPage) copyOnWrite(getIdentity());
@@ -1451,9 +1462,11 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	/**
 	 * Must check for rawRecords and remove the references.
 	 */
+   @Override
 	final public byte[] removeFirst(final byte[] key) {
-		if (isReadOnly()) {
-			BucketPage copy = (BucketPage) copyOnWrite(getIdentity());
+
+      if (isReadOnly()) {
+			final BucketPage copy = (BucketPage) copyOnWrite(getIdentity());
 			
 			return copy.removeFirst(key);
 		}
@@ -1489,7 +1502,8 @@ class BucketPage extends AbstractPage implements ILeafData, IRawRecordAccess {
 	 * @return first key value
 	 */
 	public byte[] getFirstKey() {
-		assert data.getKeys().size() > 0;
+		
+	   assert data.getKeys().size() > 0;
 		
 		return data.getKeys().get(0);
 	}

@@ -5,7 +5,6 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.PageStats;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rawstore.IRawStore;
@@ -84,8 +83,8 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
     }
 
     private void doStressTest(final int limit, final int addressBits) {
-        BucketPage.createdPages = 0;
-        DirectoryPage.createdPages = 0;
+//        BucketPage.createdPages = 0;
+//        DirectoryPage.createdPages = 0;
         
         final IRawStore store = new SimpleMemoryRawStore();
 
@@ -155,12 +154,14 @@ public class TestHTree_stressInsert extends AbstractHTreeTestCase {
             assertSameIteratorAnyOrder(keys, htree.values());
             
             if (log.isInfoEnabled())
-                log.info(htree.getPageInfo());
+               log.info(htree
+                     .dumpPages(true/* recursive */, true/* visitLeaves */));
 
             } catch (Throwable t) {
             	try {
-                	log.error(htree.getPageInfo(), t);
                 	log.error("Pretty Print of error state:\n" + htree.PP());
+                  log.error(htree
+                        .dumpPages(true/* recursive */, true/* visitLeaves */));
             	} catch (Throwable et) {
             		log.error("Problem with PP", et);
             	}

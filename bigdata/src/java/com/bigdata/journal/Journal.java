@@ -62,6 +62,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -3937,6 +3938,49 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final LatchedExecutor readService;
 
+    /*
+     * Warm-up Journal.
+     */
+
+   /**
+    * Warmup the indicated namespaces.
+    * 
+    * @param namespaces
+    *           A list of zero or more namespaces to be warmed up (optional).
+    *           When <code>null</code> all namespaces will be warmed up.
+    * 
+    * @return A future for the task that is warming up the indices associated
+    *         with those namespace(s). The future evaluates to a map from the
+    *         name of the index to the statistics collected for that index
+    *         during the warmup procedure.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    *      
+    * @see WarmUpTask
+    */
+   public Future<Map<String, BaseIndexStats>> warmUp(
+         final List<String> namespaces) {
+
+      /*
+       * The indices will be scanned with one thread per index. This parameter
+       * determines the #of such scans that will execute in parallel. Since the
+       * thread will block on any IO, you need a modestly large number of
+       * threads here to enqueue enough disk reads to drive enough IOPs for an
+       * efficient disk scan.
+       */
+      final int nparallel = 20;
+      
+      final FutureTask<Map<String, BaseIndexStats>> ft = new FutureTask<Map<String, BaseIndexStats>>(
+            new WarmUpTask(this, namespaces, ITx.READ_COMMITTED/* timestamp */,
+                  nparallel, false/* visitLeaves */));
+
+      getExecutorService().submit(ft);
+
+      return ft;
+
+   }
+   
     /**
      * This task runs once starts an (optional)
      * {@link AbstractStatisticsCollector} and an (optional) httpd service.
