@@ -235,12 +235,12 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata/src/java" />
             <src path="${bigdata.dir}/bigdata-client/src/main/java" />
             <src path="${bigdata.dir}/bigdata-jini/src/main/java" />
-         <src path="${bigdata.dir}/bigdata-rdf/src/java" />
+            <src path="${bigdata.dir}/bigdata-rdf/src/java" />
             <src path="${bigdata.dir}/bigdata-sails/src/java" />
             <src path="${bigdata.dir}/bigdata-blueprints/src/main/java" />
-         <src path="${bigdata.dir}/bigdata-gom/src/java" />
-         <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
-         <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-gom/src/java" />
+            <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
             <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-client/src/test/java"/>
@@ -248,8 +248,11 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
             <src path="${bigdata.dir}/bigdata-sails/src/test"/>
             <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
+            <src path="${bigdata.dir}/bigdata-gas/src/test/resources" />
             <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
+            <src path="${bigdata.dir}/bigdata-ganglia/src/test/resources" />
             <src path="${bigdata.dir}/bigdata-gom/src/test" />
+            <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
             <!-- Do not include the unit tests @todo conditionally include?
             -->
             <compilerarg value="-version" />
@@ -283,7 +286,15 @@ public class BuildInfo {
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+            </fileset>
             <fileset dir="${bigdata.dir}/bigdata-blueprints/src/main/java">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
@@ -292,6 +303,10 @@ public class BuildInfo {
             <exclude name="**/package.html" />
          </fileset>
          <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java">
+            <exclude name="**/*.java" />
+            <exclude name="**/package.html" />
+         </fileset>
+         <fileset dir="${bigdata.dir}/bigdata-gas/src/test/java">
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
          </fileset>

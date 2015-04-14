@@ -505,7 +505,9 @@ mvn deploy:deploy-file \
 		</dependency>
 		-->
    </dependencies>
+<!--
   <modules>
     <module>bigdata-client</module>
   </modules>
+-->
 </project>
