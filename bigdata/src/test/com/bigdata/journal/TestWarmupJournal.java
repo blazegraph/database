@@ -50,8 +50,6 @@ import com.bigdata.btree.keys.KV;
  * 
  * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal on
  *      startup </a>
- * 
- *      FIXME Hook the entire thing into web.xml / status servlet.
  */
 public class TestWarmupJournal extends ProxyTestCase<Journal> {
 
