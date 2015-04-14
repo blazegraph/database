@@ -471,7 +471,7 @@ public class TestHTreeWithMemStore extends TestCase {
                     htree.writeCheckpoint();
 
                     // Verify that we can compute the page stats.
-                    final BaseIndexStats stats = htree.dumpPages(true/*recursive*/);
+                    final BaseIndexStats stats = htree.dumpPages(true/* recursive */, true/* visitLeaves */);
 
                     if (log.isInfoEnabled())
                         log.info(stats.toString());

@@ -1711,7 +1711,7 @@ public class HTree extends AbstractHTree
 	}
 
 	@Override
-    public BaseIndexStats dumpPages(final boolean recursive) {
+    public BaseIndexStats dumpPages(final boolean recursive, final boolean visitLeaves) {
 
         if (!recursive) {
 
@@ -1721,7 +1721,7 @@ public class HTree extends AbstractHTree
 
         final HTreePageStats stats = new HTreePageStats();
 
-        getRoot().dumpPages(stats);
+        getRoot().dumpPages(recursive, visitLeaves, stats);
 
         return stats;
 
@@ -2022,33 +2022,6 @@ public class HTree extends AbstractHTree
         
         return nbytes;
 
-    }
-
-    /**
-     * Move to test suite.
-     */
-    @Deprecated
-    public final int activeBucketPages() {
-    	return root.activeBucketPages();
-    }
-
-    /**
-     * Move to test suite.
-     */
-    @Deprecated
-    public final int activeDirectoryPages() {
-    	return root.activeDirectoryPages();
-    }
-    
-    /**
-     * Move to test suite.
-     */
-    @Deprecated
-    public String getPageInfo() {
-    	return "Created Pages for " 
-		+ addressBits + " addressBits"
-		+ ",  directory pages: " + activeDirectoryPages() + " of " + DirectoryPage.createdPages
-		+ ", bucket pages: " + activeBucketPages() + " of " + BucketPage.createdPages;
     }
 
 }

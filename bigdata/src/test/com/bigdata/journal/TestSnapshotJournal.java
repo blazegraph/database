@@ -722,18 +722,25 @@ public class TestSnapshotJournal extends ProxyTestCase<Journal> {
                }});
 
             // Take a snapshot while the writer is running.
+            final ISnapshotResult snapshotResult;
+            try {
 
-            final ISnapshotFactory snapshotFactory = new MySnapshotFactory(
-                  getName(), false/* compressed */);
+               final ISnapshotFactory snapshotFactory = new MySnapshotFactory(
+                     getName(), false/* compressed */);
 
-            final ISnapshotResult snapshotResult = src
-                  .snapshot(snapshotFactory).get();
+               snapshotResult = src.snapshot(snapshotFactory).get();
 
-            // Await the success of the writer.
-            f.get();
+               // Await the success of the writer.
+               f.get();
 
-            // Discard the write set.
-            src.abort();
+               // Discard the write set.
+               src.abort();
+
+            } finally {
+               
+               f.cancel(true/* mayInterruptIfRunning */);
+               
+            }
             
             // Verify the snapshot.
             {
