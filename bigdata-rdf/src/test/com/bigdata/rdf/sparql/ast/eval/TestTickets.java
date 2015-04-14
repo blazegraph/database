@@ -568,7 +568,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }     
     
     /**
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835">
      * Query solutions are duplicated and increase by adding graph patterns</a>
      */
     public void test_ticket_835a() throws Exception {
@@ -580,7 +580,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835">
      * Query solutions are duplicated and increase by adding graph patterns</a>
      */
     public void test_ticket_835b() throws Exception {
@@ -592,7 +592,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835">
      * Query solutions are duplicated and increase by adding graph patterns</a>
      */
     public void test_ticket_835c() throws Exception {
@@ -604,7 +604,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
-     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835>
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/835">
      * Query solutions are duplicated and increase by adding graph patterns</a>.
      * Related test case using a complex join group instead of subquery.
      */
@@ -615,5 +615,17 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_835.srx"// resultFileURL
        ).runTest();    
     }
+    
+    /**
+     * @see <a href="http://trac.bigdata.com/ticket/709">
+     * select ?g { Graph ?g {} } incorrec</a>.
+     */
+    public void test_ticket_709() throws Exception {
+       new TestHelper("ticket_709",// testURI,
+             "ticket_709.rq",// queryFileURL
+             "ticket_709.trig",// dataFileURL
+             "ticket_709.srx"// resultFileURL
+       ).runTest();    
+    } 
 
 }

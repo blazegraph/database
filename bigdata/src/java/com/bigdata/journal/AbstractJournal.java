@@ -5927,7 +5927,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
     }
-
+    
 	/*
 	 * IAddressManager
 	 */

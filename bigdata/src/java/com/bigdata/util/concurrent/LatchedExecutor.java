@@ -54,7 +54,6 @@ import org.apache.log4j.Logger;
  * execute() on the delegate {@link ExecutorService} rather than on this class.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo write unit tests.
  */
@@ -109,12 +108,14 @@ public class LatchedExecutor implements Executor {
 
     }
 
+    @Override
     public void execute(final Runnable r) {
         if (!queue.offer(new Runnable() {
             /*
              * Wrap the Runnable in a class that will start the next Runnable
              * from the queue when it completes.
              */
+           @Override
             public void run() {
                 try {
                     r.run();

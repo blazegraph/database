@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.btree;
 
+import java.io.PrintWriter;
+import java.util.Map;
+
 
 /**
  * Basic stats that are available for all index types and whose collection does
@@ -161,6 +164,58 @@ public class BaseIndexStats {
         sb.append(stats.ntuples);
 
         return sb.toString();
+    }
+
+
+    /**
+     * Helper method may be used to write out a tab-delimited table of the
+     * statistics.
+     * 
+     * @param out
+     *           Where to write the statistics.
+     */
+    static public void writeOn(final PrintWriter out,
+          final Map<String, BaseIndexStats> statsMap) {
+
+       /*
+        * Write out the header.
+        */
+       boolean first = true;
+
+       for (Map.Entry<String, BaseIndexStats> e : statsMap.entrySet()) {
+
+          final String name = e.getKey();
+
+          final BaseIndexStats stats = e.getValue();
+
+          if (stats == null) {
+
+             /*
+              * Something for which we did not extract the PageStats.
+              */
+
+             out.println("name: " + name + " :: no statistics?");
+
+             continue;
+
+          }
+
+          if (first) {
+
+             out.println(stats.getHeaderRow());
+
+             first = false;
+
+          }
+
+          /*
+           * Write out the stats for this index.
+           */
+
+          out.println(stats.getDataRow());
+
+       }
+
     }
 
 }
