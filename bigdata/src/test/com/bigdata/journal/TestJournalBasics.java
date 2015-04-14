@@ -111,6 +111,9 @@ public class TestJournalBasics extends TestCase {
         // test the DumpJournal utility.
         suite.addTestSuite(TestDumpJournal.class);
 
+        // test ability to warmup indices in namespaces on the journal.
+        suite.addTestSuite(TestWarmupJournal.class);
+
         /*
          * tests of transaction support.
          */

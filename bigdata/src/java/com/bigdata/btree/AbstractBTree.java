@@ -1550,7 +1550,8 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
     }
     
     @Override
-    public BaseIndexStats dumpPages(final boolean recursive) {
+   public BaseIndexStats dumpPages(final boolean recursive,
+         final boolean visitLeaves) {
 
         if(!recursive) {
             
@@ -1560,14 +1561,18 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
         
         final BTreePageStats stats = new BTreePageStats();
         
-        dumpPages(this, getRoot(), stats);
+        dumpPages(this, getRoot(), visitLeaves, stats);
 
         return stats;
         
     }
 
-    static private void dumpPages(final AbstractBTree ndx,
-            final AbstractNode<?> node, final BTreePageStats stats) {
+   static private void dumpPages(//
+         final AbstractBTree ndx,//
+         final AbstractNode<?> node, //
+         final boolean visitLeaves,//
+         final BTreePageStats stats//
+         ) {
 
         //node.dump(System.out);
 
@@ -1585,7 +1590,7 @@ abstract public class AbstractBTree implements IIndex, IAutoboxBTree,
                     final AbstractNode<?> child = ((Node) node).getChild(i);
 
                     // recursive dump
-                    dumpPages(ndx, child, stats);
+                    dumpPages(ndx, child, visitLeaves, stats);
                     
                 } catch (Throwable t) {
                     
