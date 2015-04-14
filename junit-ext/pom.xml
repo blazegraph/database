@@ -1,0 +1,79 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.1-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+  </parent>
+<!-- TODO:  Research group IDs and java package naming -->
+  <groupId>com.blazegraph</groupId>
+  <artifactId>junit-ext</artifactId>
+  <version>1.1-b3-dev</version>
+  <name>junit-ext</name>
+  <packaging>jar</packaging>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+	  <version>true</version>
+          <doctitle><![CDATA[<h1>ctc-striterators</h1>]]></doctitle>
+          <bottom> <![CDATA[ <i> 
+                           Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.<p>
+
+                           Licensed under the Apache License, Version 2.0 (the "License");
+                           you may not use this file except in compliance with the License.
+                           You may obtain a copy of the License at<p>
+
+                               http://www.apache.org/licenses/LICENSE-2.0<p>
+
+                           Unless required by applicable law or agreed to in writing, software
+                           distributed under the License is distributed on an 'AS IS' BASIS,
+                           WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                           See the License for the specific language governing permissions and
+                           limitations under the License.<p>
+
+                                                        <hr>
+                        This product includes software developed by The Apache Software Foundation (http://www.apache.org/).
+                        License: http://www.apache.org/licenses/LICENSE-2.0 </i>]]></bottom>
+ 
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+
+  <repositories>
+    <repository>
+      <id>bigdata.releases</id>
+      <url>http://www.systap.com/maven/releases/</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+    </dependency>
+    <dependency>
+       <!-- log4j is the primary logger for bigdata. -->
+       <groupId>log4j</groupId>
+       <artifactId>log4j</artifactId>
+       <version>${log4j.version}</version>
+     </dependency>
+    <dependency>
+      <groupId>com.bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>1.5.1</version>
+    </dependency>
+  </dependencies>
+</project>

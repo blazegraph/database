@@ -3,42 +3,45 @@
 	<classpathentry kind="src" path="bigdata/src/java"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
 	<classpathentry kind="src" path="bigdata-sails/src/java"/>
-	<classpathentry kind="src" path="bigdata-blueprints/src/java"/>
+	<classpathentry kind="src" path="bigdata-blueprints/src/main/java"/>
 	<classpathentry kind="src" path="bigdata/src/test"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/test"/>
 	<classpathentry kind="src" path="bigdata-sails/src/test"/>
-	<classpathentry kind="src" path="bigdata-blueprints/src/test"/>
+	<classpathentry kind="src" path="bigdata-blueprints/src/test/java"/>
 	<classpathentry kind="src" path="bigdata-war/src"/>
 	<classpathentry kind="src" path="bigdata/src/resources/logging"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/samples"/>
-	<classpathentry kind="src" path="dsi-utils/src/java"/>
+	<classpathentry kind="src" path="dsi-utils/src/main/java"/>
 	<classpathentry kind="src" path="bigdata-sails/src/samples"/>
-	<classpathentry kind="src" path="bigdata-jini/src/test"/>
-	<classpathentry kind="src" path="bigdata-jini/src/java"/>
+	<classpathentry kind="src" path="bigdata-jini/src/test/java"/>
+	<classpathentry kind="src" path="bigdata-jini/src/main/java"/>
 	<classpathentry kind="src" path="contrib/src/problems"/>
 	<classpathentry kind="src" path="bigdata/src/samples"/>
-	<classpathentry kind="src" path="dsi-utils/src/test"/>
-	<classpathentry kind="src" path="ctc-striterators/src/java"/>
-	<classpathentry kind="src" path="ctc-striterators/src/test"/>
-	<classpathentry kind="src" path="junit-ext/src/test"/>
-	<classpathentry kind="src" path="junit-ext/src/java"/>
-	<classpathentry kind="src" path="lgpl-utils/src/java"/>
-	<classpathentry kind="src" path="lgpl-utils/src/test"/>
-	<classpathentry kind="src" path="bigdata-ganglia/src/java"/>
-	<classpathentry kind="src" path="bigdata-ganglia/src/test"/>
+	<classpathentry kind="src" path="dsi-utils/src/test/java"/>
+	<classpathentry kind="src" path="ctc-striterators/src/main/java"/>
+	<classpathentry kind="src" path="ctc-striterators/src/test/java"/>
+	<classpathentry kind="src" path="junit-ext/src/test/java"/>
+	<classpathentry kind="src" path="junit-ext/src/main/java"/>
+	<classpathentry kind="src" path="lgpl-utils/src/main/java"/>
+	<classpathentry kind="src" path="lgpl-utils/src/test/java"/>
+	<classpathentry kind="src" path="bigdata-ganglia/src/main/java"/>
+	<classpathentry kind="src" path="bigdata-ganglia/src/test/java"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/resources/service-providers"/>
 	<classpathentry kind="src" path="bigdata-gom/src/java"/>
 	<classpathentry kind="src" path="bigdata-gom/src/test"/>
 	<classpathentry kind="src" path="bigdata-gom/src/samples"/>
-	<classpathentry kind="src" path="bigdata-gas/src/java"/>
-	<classpathentry kind="src" path="bigdata-gas/src/test"/>
+	<classpathentry kind="src" path="bigdata-gas/src/main/java"/>
+	<classpathentry kind="src" path="bigdata-gas/src/test/java"/>
+	<classpathentry kind="src" path="bigdata-client/src/main/java"/>
+	<classpathentry kind="src" path="bigdata-client/src/test/java"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.7-270114.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.3.3.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/servlet-api-3.1.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4.8.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4.8.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.4.5.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/browser.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/classserver.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/fiddler.jar"/>
@@ -80,7 +83,6 @@
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-util-9.2.3.v20140905.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-webapp-9.2.3.v20140905.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-xml-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-4.11.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar" sourcepath="/Users/bryan/cuda-workspace/openrdf-sesame-2.7.13"/>
 	<classpathentry kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.7.13.jar"/>
