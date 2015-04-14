@@ -250,7 +250,6 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
             <src path="${bigdata.dir}/bigdata-gas/src/test/resources" />
             <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
-            <src path="${bigdata.dir}/bigdata-ganglia/src/test/resources" />
             <src path="${bigdata.dir}/bigdata-gom/src/test" />
             <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
             <!-- Do not include the unit tests @todo conditionally include?
