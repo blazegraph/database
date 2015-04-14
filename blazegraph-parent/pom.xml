@@ -52,7 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-   <version>1.5.1</version>
+   <version>1.5.1-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -103,6 +103,10 @@ dependencies.
       <jettison.version>1.3.3</jettison.version>
       <rexster.version>2.5.0</rexster.version>
       <striterator.version>1.0</striterator.version>
+      <jini.version>2.1</jini.version>
+      <junit4.version>4.11</junit4.version>
+      <junit3.version>3.8.1</junit3.version>
+      <servlet.version>3.1.0</servlet.version>
     </properties>
     <build>
     <plugins>
