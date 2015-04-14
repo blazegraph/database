@@ -31,13 +31,11 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.Properties;
-import java.util.concurrent.ExecutionException;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.KeeperException;
 import org.openrdf.model.Value;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
@@ -51,6 +49,7 @@ import com.bigdata.rdf.rio.RDFParserOptions;
 import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStore.Options;
+import com.bigdata.rdf.store.ITripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.jini.JiniClient;
@@ -650,16 +649,10 @@ V extends Serializable//
      * 
      * @param args
      *            The {@link Configuration} and any overrides.
-     * 
-     * @throws ConfigurationException
-     * @throws ExecutionException
-     * @throws InterruptedException
-     * @throws KeeperException
      */
-    static public void main(final String[] args) throws ConfigurationException,
-            ExecutionException, InterruptedException, KeeperException {
+    static public void main(final String[] args) throws Exception {
 
-        final JiniFederation fed = new JiniClient(args).connect();
+        final JiniFederation<?> fed = new JiniClient(args).connect();
 
         try {
 
@@ -686,6 +679,7 @@ V extends Serializable//
     /**
      * Extended to support optional load, closure, and reporting.
      */
+    @Override
     protected void runJob() throws Exception {
 
         final S jobState = getJobState();
