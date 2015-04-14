@@ -51,17 +51,10 @@ public class BigdataGraphFactory  {
      * Connect to a remote bigdata instance.
      */
     public static BigdataGraph connect(final String serviceEndpoint) {
-        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
-            return new BigdataGraphClient(serviceEndpoint);
-        } else if (serviceEndpoint.endsWith("/bigdata/")) {
-            return new BigdataGraphClient(serviceEndpoint + "sparql");
-        } else if (serviceEndpoint.endsWith("/bigdata")) {
-            return new BigdataGraphClient(serviceEndpoint + "/sparql");
-        } else if (serviceEndpoint.endsWith("/")) {
-            return new BigdataGraphClient(serviceEndpoint + "bigdata/sparql");
-        } else {
-            return new BigdataGraphClient(serviceEndpoint + "/bigdata/sparql");
-        }
+
+    	//Ticket #1182:  centralize rewriting in the SAIL factory.
+
+        return new BigdataGraphClient(serviceEndpoint);
     }
 
     /**
