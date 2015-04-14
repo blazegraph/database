@@ -3,11 +3,11 @@
 	<classpathentry kind="src" path="bigdata/src/java"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
 	<classpathentry kind="src" path="bigdata-sails/src/java"/>
-	<classpathentry kind="src" path="bigdata-blueprints/src/java"/>
+	<classpathentry kind="src" path="bigdata-blueprints/src/main/java"/>
 	<classpathentry kind="src" path="bigdata/src/test"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/test"/>
 	<classpathentry kind="src" path="bigdata-sails/src/test"/>
-	<classpathentry kind="src" path="bigdata-blueprints/src/test"/>
+	<classpathentry kind="src" path="bigdata-blueprints/src/test/java"/>
 	<classpathentry kind="src" path="bigdata-war/src"/>
 	<classpathentry kind="src" path="bigdata/src/resources/logging"/>
 	<classpathentry kind="src" path="bigdata-rdf/src/samples"/>
