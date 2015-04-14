@@ -344,6 +344,8 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
 
                 src = reopenStore(src);
 
+//                src.warmUp(null/*namespaces*/);
+                
                 new DumpJournal(src)
                         .dumpJournal(false/* dumpHistory */,
                                 true/* dumpPages */, false/* dumpIndices */,
