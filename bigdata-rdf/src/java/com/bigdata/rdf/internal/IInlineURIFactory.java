@@ -58,7 +58,7 @@ public interface IInlineURIFactory {
      * @param delegate the storage delegate
      * @return the inflated localName
      */
-	String getLocalNameFromDelegate(URI namespace,
-			AbstractLiteralIV<BigdataLiteral, ?> delegate);
+    String getLocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate);
     
 }

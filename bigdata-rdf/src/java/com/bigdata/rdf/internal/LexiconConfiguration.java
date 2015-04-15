@@ -377,7 +377,8 @@ public class LexiconConfiguration<V extends BigdataValue>
         return (V) vocab.asValue(iv);
 
     }
-    
+
+    @Override
     @SuppressWarnings("rawtypes")
     public IV createInlineIV(final Value value) {
 
@@ -519,7 +520,9 @@ public class LexiconConfiguration<V extends BigdataValue>
      * @param delegate the storage delegate
      * @return the inflated localName
      */
-    public String getInlineURILocalNameFromDelegate(URI namespace, AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+    @Override
+    public String getInlineURILocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
         return uriFactory.getLocalNameFromDelegate(namespace, delegate);
     }
 

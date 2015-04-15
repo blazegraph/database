@@ -28,7 +28,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
@@ -42,7 +41,6 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * ({@link InlineUUIDURIHandler}.
  */
 public class InlineURIFactory implements IInlineURIFactory {
-	private final Logger log = Logger.getLogger(InlineURIFactory.class);
     private final List<InlineURIHandler> handlers = 
             new LinkedList<InlineURIHandler>();
 	private final Map<String, InlineURIHandler> handlersByNamespace = new HashMap<>();
@@ -57,18 +55,18 @@ public class InlineURIFactory implements IInlineURIFactory {
     
     protected void addHandler(final InlineURIHandler handler) {
         this.handlers.add(handler);
+        handlersByNamespace.put(handler.getNamespace(), handler);
     }
 
     public void init(final Vocabulary vocab) {
         for (InlineURIHandler handler : handlers) {
             handler.init(vocab);
-            handlersByNamespace.put(handler.getNamespace(), handler);
         }
     }
-    
+
     @Override
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public URIExtensionIV createInlineURIIV(URI uri) {
+    public URIExtensionIV createInlineURIIV(final URI uri) {
         for (InlineURIHandler handler : handlers) {
             final URIExtensionIV iv = handler.createInlineIV(uri);
             if (iv != null) {
@@ -78,21 +76,15 @@ public class InlineURIFactory implements IInlineURIFactory {
         return null;
     }
 
-	@Override
-	public String getLocalNameFromDelegate(URI namespace,
-			AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-		InlineURIHandler handler = handlersByNamespace.get(namespace
-				.stringValue());
-		if (handler == null) {
-			/*
-			 * Since we can't find the handler the default implementation is the
-			 * best we can manage.
-			 */
-			log.warn("Couldn't find InlineURIHandler for "
-					+ namespace.stringValue());
-			return InlineURIHandler
-					.getLocalNameFromDelegateDefaultImplementation(delegate);
-		}
-		return handler.getLocalNameFromDelegate(delegate);
-	}
+    @Override
+    public String getLocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+        InlineURIHandler handler = handlersByNamespace.get(
+                namespace.stringValue());
+        if (handler == null) {
+            throw new IllegalArgumentException("Can't resolve uri handler for \"" + namespace
+                    + "\".  Maybe its be deregistered?");
+        }
+        return handler.getLocalNameFromDelegate(delegate);
+    }
 }
