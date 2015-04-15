@@ -781,7 +781,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
     }
 
-    protected long countAll() throws Exception {
+   /**
+    * @deprecated This is going around REST API. It can be written to that API
+    *             with the added support for ESTCARD exact:=true.
+    *             
+    * @see #getExactSize()
+    */
+   protected long countAll() throws Exception {
     	
     	return getSail().getDatabase().getExplicitStatementCount(null);
     	
@@ -795,6 +801,21 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     	
     }
     
+   /**
+    * Return the exact number of statements in the repository.
+    * 
+    * @deprecated This is going around REST API. It can be written to that API
+    *             with the added support for ESTCARD exact:=true.
+    * 
+    * @see #countAll()
+    */
+   @Deprecated
+   protected long getExactSize() {
+
+       return getSail().getDatabase().getStatementCount(true/* true */);
+
+   }
+
     /**
      * Test helps PUTs some data, verifies that it is visible, DELETEs the data,
      * and then verifies that it is gone.
@@ -804,22 +825,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      */
     protected void doDeleteWithPostTest(final RDFFormat format) throws Exception {
 
-//        final String queryStr = "select * where {?s ?p ?o}";
-
-//        final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "POST";
-
         doInsertWithBodyTest("POST", 23, /*requestPath,*/ format);
 
-//        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(23, countAll());
 
         doDeleteWithBody(/*requestPath,*/ 23, format);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(0, countAll());
         
     }
@@ -1251,17 +1263,4 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     
     }
     
-    /**
-    * Return the exact number of statements in the repository.
-    * 
-    * @deprecated This is going around REST API. It can be written to that API
-    *             with the added support for ESTCARD exact:=true.
-    */
-    @Deprecated
-    protected long getExactSize() {
-
-        return getSail().getDatabase().getStatementCount(true/* true */);
-
-    }
-
 }
