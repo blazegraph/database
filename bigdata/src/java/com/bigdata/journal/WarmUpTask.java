@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.journal;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -34,11 +36,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.ICheckpointProtocol;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -50,6 +54,15 @@ import com.bigdata.util.concurrent.LatchedExecutor;
  * 
  * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal on
  *      startup </a>
+ * 
+ *      TODO The current implementation assigns one thread per index. However,
+ *      it is also possible to use a reader pool to accelerate the index scans.
+ *      This would require a change to the
+ *      {@link com.bigdata.btree.AbstractBTree#dumpPages(boolean, boolean)}
+ *      implementation to parallelize the IOs over the children of a node. We
+ *      have experimented with that in the past but not observed a big win for
+ *      query. It might be more significant for warmup since we are using a full
+ *      scan of each index.
  */
 public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
 
@@ -62,7 +75,7 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
 
    /**
     * A list of zero or more namespaces to be warmed up (optional). When
-    * <code>null</code> all namespaces will be warmed up.
+    * <code>null</code> or empty, all namespaces will be warmed up.
     */
    private final List<String> namespaces;
    
@@ -95,7 +108,7 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
     * 
     * Note: This collection is ordered and is NOT thread-safe.
     */
-   private final Map<String, BaseIndexStats> indexStats = new TreeMap<String, BaseIndexStats>();
+   private final Map<String, BaseIndexStats> statsMap = new TreeMap<String, BaseIndexStats>();
 
    /**
     * 
@@ -103,7 +116,8 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
     *           The journal.
     * @param namespaces
     *           A list of zero or more namespaces to be warmed up (optional).
-    *           When <code>null</code> all namespaces will be warmed up.
+    *           When <code>null</code> or empty, all namespaces will be warmed
+    *           up.
     * @param timestamp
     *           The commit time to be warmed up and -or-
     *           {@link ITx#READ_COMMITTED} to warm up the last commit point on
@@ -143,6 +157,8 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
    @Override
    public Map<String, BaseIndexStats> call() throws Exception {
 
+      final long begin = System.nanoTime();
+      
       // Attempts to pin a view of the journal as of that timestamp.
       final long tx = journal.newTx(timestamp);
 
@@ -196,6 +212,7 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
                
                tasks.add(new FutureTask<BaseIndexStats>(
                      new Callable<BaseIndexStats>() {
+                        @Override
                         public BaseIndexStats call() throws Exception {
                            return warmUpIndex(name, commitRecord);
                         }
@@ -226,7 +243,7 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
                 * Note: collection is not thread safe, but this logic is single
                 * threaded.
                 */
-               indexStats.put(stats.name, stats);
+               statsMap.put(stats.name, stats);
             }
 
          } finally {
@@ -238,10 +255,24 @@ public class WarmUpTask implements Callable<Map<String,BaseIndexStats>> {
 
          }
 
-         if (log.isInfoEnabled())// FIXME LOG @ INFO w/ TABLE PrintWriter view..
-            log.info("Warmed up: " + indexStats.size() + " indices\n" + indexStats.toString());
+         final long elapsed = System.nanoTime() - begin;
+         
+         if (log.isInfoEnabled()) {
+            /*
+             * Write out warmup statistics (summary and detail).
+             */
+            final StringWriter strw = new StringWriter(statsMap.size()
+                  * Bytes.kilobyte32);
+            strw.append("Warmed up: " + statsMap.size() + " indices in "
+                  + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms using up to "
+                  + nparallel + " threads.\n");
+            final PrintWriter w = new PrintWriter(strw);
+            BaseIndexStats.writeOn(w, statsMap);
+            w.flush();
+            log.info(strw.toString());
+         }
 
-         return Collections.unmodifiableMap(indexStats);
+         return Collections.unmodifiableMap(statsMap);
 
       } finally {
 

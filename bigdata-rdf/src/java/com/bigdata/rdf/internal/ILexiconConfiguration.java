@@ -32,8 +32,10 @@ import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -101,7 +103,16 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      *         can not be represented by an {@link IV}.
      */
     IV createInlineIV(final Value value);
-    
+
+    /**
+     * Inflate the localName portion of an inline URI using its storage delegate.
+     * @param namespace the uris's prefix
+     * @param delegate the storage delegate
+     * @return the inflated localName
+     */
+    String getInlineURILocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate);
+
     /**
      * Create an RDF value from an {@link AbstractInlineExtensionIV}. The
      * "extension" {@link IV} MUST be registered with the {@link Vocabulary}.
