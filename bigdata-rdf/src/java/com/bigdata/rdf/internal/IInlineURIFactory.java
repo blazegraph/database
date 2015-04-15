@@ -25,7 +25,9 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -49,5 +51,14 @@ public interface IInlineURIFactory {
      * Create an inline URIExtensionIV for the supplied URI.
      */
     URIExtensionIV<?> createInlineURIIV(final URI uri);
+
+    /**
+     * Inflate the localName portion of an inline URI using its storage delegate.
+     * @param namespace the uris's prefix
+     * @param delegate the storage delegate
+     * @return the inflated localName
+     */
+    String getLocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate);
     
 }
