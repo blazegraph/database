@@ -54,6 +54,21 @@
    <param-name>queryTimeout</param-name>
    <param-value>0</param-value>
   </context-param>
+  <context-param>
+   <description>When non-zero, the timeout for the warmup period (milliseconds). The warmup period pulls in the non-leaf index pages and reduces the impact of sudden heavy query workloads on the disk and on GC.  The end points are not available during the warmup period.</description>
+   <param-name>warmupTimeout</param-name>
+   <param-value>0</param-value>
+  </context-param>
+  <context-param>
+   <description>A list of the namespaces to be excercised during the warmup period (optional).  When the list is empty, all namespaces will be warmed up.</description>
+   <param-name>warmupNamespaceList</param-name>
+   <param-value></param-value>
+  </context-param>
+  <context-param>
+   <description>The number of parallel threads to use for the warmup period.  At most one thread will be used per index.</description>
+   <param-name>warmupThreadPoolSize</param-name>
+   <param-value>20</param-value>
+  </context-param>
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
   </listener>
