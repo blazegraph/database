@@ -106,8 +106,8 @@ public abstract class InlineURIHandler {
      */
     public String getLocalNameFromDelegate(
             AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-        return getLocalNameFromDelegateDefaultImplementation(delegate);
-        }
+        return delegate.getInlineValue().toString();
+    }
 
     /**
      * Concrete subclasses are responsible for actually creating the inline
@@ -115,13 +115,4 @@ public abstract class InlineURIHandler {
      */
     @SuppressWarnings("rawtypes")
     protected abstract AbstractLiteralIV createInlineIV(final String localName);
-
-    /**
-     * Default implementation of getLocalNameFromDelegate pulled out so it can
-     * be used in the case where the factory can't find a handler.
-     */
-    public static String getLocalNameFromDelegateDefaultImplementation(
-            AbstractLiteralIV<BigdataLiteral, ?> delegate) {
-        return delegate.getInlineValue().toString();
-    }
 }

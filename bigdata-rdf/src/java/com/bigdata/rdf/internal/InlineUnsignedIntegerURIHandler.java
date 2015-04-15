@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
 package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
@@ -21,13 +44,13 @@ public class InlineUnsignedIntegerURIHandler extends InlineURIHandler {
 	private static final BigInteger MAX_UNSIGNED_LONG_AS_BIGINT = new BigInteger(
 			"18446744073709551616");
 
-	public InlineUnsignedIntegerURIHandler(String namespace) {
+	public InlineUnsignedIntegerURIHandler(final String namespace) {
 		super(namespace);
 	}
 
 	@Override
 	@SuppressWarnings("rawtypes")
-	protected AbstractLiteralIV createInlineIV(String localName) {
+	protected AbstractLiteralIV createInlineIV(final String localName) {
 		BigInteger value;
 		try {
 			value = new BigInteger(localName, 10);
@@ -43,28 +66,30 @@ public class InlineUnsignedIntegerURIHandler extends InlineURIHandler {
 		return createInlineIV(value);
 	}
 
-	/**
-	 * Create the smallest AbstractLiteralIV that will fit the provided value.
-	 * 
-	 * @param value
-	 *            a positive integer
-	 */
+    /**
+     * Create the smallest AbstractLiteralIV that will fit the provided value.
+     * Public and static so it can be easily used as a building block for other
+     * InlineURIHandlders.
+     * 
+     * @param value a positive integer
+     */
 	@SuppressWarnings("rawtypes")
-	public static AbstractLiteralIV createInlineIV(BigInteger value) {
+	public static AbstractLiteralIV createInlineIV(final BigInteger value) {
 		if (value.compareTo(MAX_UNSIGNED_LONG_AS_BIGINT) >= 0) {
 			return new XSDIntegerIV(value);
 		}
 		return createInlineIV(value.longValue());
 	}
 
-	/**
-	 * Create the smallest AbstractLiteralIV that will fit the provided value.
-	 * 
-	 * @param value
-	 *            a positive integer
-	 */
-	@SuppressWarnings("rawtypes")
-	public static AbstractLiteralIV createInlineIV(long value) {
+    /**
+     * Create the smallest AbstractLiteralIV that will fit the provided
+     * value.Public and static so it can be easily used as a building block for
+     * other InlineURIHandlders.
+     * 
+     * @param value a positive integer
+     */
+    @SuppressWarnings("rawtypes")
+	public static AbstractLiteralIV createInlineIV(final long value) {
 		if (value < 256L) {
 			return new XSDUnsignedByteIV((byte) (value + Byte.MIN_VALUE));
 		}

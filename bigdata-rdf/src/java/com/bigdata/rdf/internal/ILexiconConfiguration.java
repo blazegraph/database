@@ -109,7 +109,8 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * @param delegate the storage delegate
      * @return the inflated localName
      */
-    String getInlineURILocalNameFromDelegate(URI namespace, AbstractLiteralIV<BigdataLiteral, ?> delegate);
+    String getInlineURILocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate);
 
     /**
      * Create an RDF value from an {@link AbstractInlineExtensionIV}. The
