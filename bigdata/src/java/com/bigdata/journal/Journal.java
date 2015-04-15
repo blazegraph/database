@@ -3947,7 +3947,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     * 
     * @param namespaces
     *           A list of zero or more namespaces to be warmed up (optional).
-    *           When <code>null</code> all namespaces will be warmed up.
+    *           When <code>null</code> or empty, all namespaces will be warmed
+    *           up.
     * 
     * @return A future for the task that is warming up the indices associated
     *         with those namespace(s). The future evaluates to a map from the
@@ -3956,7 +3957,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     * 
     * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
     *      on startup </a>
-    *      
+    * 
     * @see WarmUpTask
     */
    public Future<Map<String, BaseIndexStats>> warmUp(
