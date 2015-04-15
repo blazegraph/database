@@ -576,30 +576,6 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 
 	}
 
-	public void test_DELETE_withPOST_RDFXML() throws Exception {
-		doDeleteWithPostTest(RDFFormat.RDFXML);
-	}
-
-	public void test_DELETE_withPOST_NTRIPLES() throws Exception {
-		doDeleteWithPostTest(RDFFormat.NTRIPLES);
-	}
-
-	public void test_DELETE_withPOST_N3() throws Exception {
-		doDeleteWithPostTest(RDFFormat.N3);
-	}
-
-	public void test_DELETE_withPOST_TURTLE() throws Exception {
-		doDeleteWithPostTest(RDFFormat.TURTLE);
-	}
-
-	public void test_DELETE_withPOST_TRIG() throws Exception {
-		doDeleteWithPostTest(RDFFormat.TRIG);
-	}
-
-	public void test_DELETE_withPOST_TRIX() throws Exception {
-		doDeleteWithPostTest(RDFFormat.TRIX);
-	}
-
 	public void test_GET_CONSTRUCT_RDFXML() throws Exception {
 		doConstructTest("GET", RDFFormat.RDFXML);
 	}
