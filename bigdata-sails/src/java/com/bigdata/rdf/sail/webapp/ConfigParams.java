@@ -133,6 +133,39 @@ public interface ConfigParams {
     long DEFAULT_QUERY_TIMEOUT = 0L;
 
     /**
+    * When non-zero, this specifies the timeout (milliseconds) for a warmup
+    * period when the NSS starts up (warmup is disabled when this is ZERO).
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    */
+    String WARMUP_TIMEOUT = "warmupTimeout";
+
+    long DEFAULT_WARMUP_TIMEOUT = 0L;
+
+    /**
+    * The size of the thread pool used to warmup the journal (default
+    * {@value #DEFAULT_WARMUP_THREAD_POOL_SIZE}).
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    */
+    String WARMUP_THREAD_POOL_SIZE = "warmupThreadPoolSize";
+    
+    int DEFAULT_WARMUP_THREAD_POOL_SIZE = 20;
+    
+    /**
+    * A comma delimited list of namespaces to be processed during the warmup 
+    * procedure (optional). When not specified, ALL namespaces will be processed.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    */
+    String WARMUP_NAMESPACE_LIST = "warmupNamespaceList";
+    
+    String DEFAULT_WARMUP_NAMESPACE_LIST = "";
+    
+    /**
      * A class that extends {@link BigdataRDFServletContextListener}. This
      * offers applications a means to hook the {@link ServletContextListener}
      * methods.
