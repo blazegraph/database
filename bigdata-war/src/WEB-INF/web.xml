@@ -60,7 +60,7 @@
    <param-value>0</param-value>
   </context-param>
   <context-param>
-   <description>A list of the namespaces to be excercised during the warmup period (optional).  When the list is empty, all namespaces will be warmed up.</description>
+   <description>A list of the namespaces to be exercised during the warmup period (optional).  When the list is empty, all namespaces will be warmed up.</description>
    <param-name>warmupNamespaceList</param-name>
    <param-value></param-value>
   </context-param>
