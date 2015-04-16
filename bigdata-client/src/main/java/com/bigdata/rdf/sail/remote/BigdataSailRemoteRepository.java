@@ -80,7 +80,7 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * {@link RemoteRepositoryManager} rather than just a
 	 * {@link RemoteRepository}.
 	 */
-    private final RemoteRepository nss;
+    private final RemoteRepositoryManager remoteRepositoryManager;
 
     /**
      * This exists solely for {@link #getValueFactory()} - the value factory
@@ -91,9 +91,9 @@ public class BigdataSailRemoteRepository implements Repository {
     /**
      * The object used to communicate with that remote repository.
      */
-    public RemoteRepository getRemoteRepository() {
+    public RemoteRepositoryManager getRemoteRepository() {
 		
-		return nss;
+		return remoteRepositoryManager;
 		
 	}
 	
@@ -133,7 +133,7 @@ public class BigdataSailRemoteRepository implements Repository {
 		// Note: Client *might* be AutoCloseable.
 		this.client = HttpClientConfigurator.getInstance().newInstance();
 
-		this.nss = new RemoteRepositoryManager(sparqlEndpointURL, useLBS,
+		this.remoteRepositoryManager = new RemoteRepositoryManager(sparqlEndpointURL, useLBS,
 				client, executor);
 	
 	}
@@ -153,7 +153,15 @@ public class BigdataSailRemoteRepository implements Repository {
 		// use the client on the caller's object.
 		this.client = null;
 
-		this.nss = nss;
+      /**
+       * FIXME *** The RemoteRepositoryManager needs to be available from the
+       * RemoteRepository. This means that the RemoteRepositoryManager can no
+       * longer extend RemoteRepository. Instead, we need to obtain a
+       * RemoteRepository from the RemoteRepositoryManager. There are already
+       * methods for this. We can also add a
+       * getRemoteRepositoryForDefaultNamespace() for convenience.
+       */
+		this.remoteRepositoryManager = (RemoteRepositoryManager) nss;
 		
 	}
 	
@@ -187,11 +195,11 @@ public class BigdataSailRemoteRepository implements Repository {
 			 * here.
 			 */
 
-			assert nss instanceof AutoCloseable;
+			assert remoteRepositoryManager instanceof AutoCloseable;
 
 			try {
 
-				((AutoCloseable) nss).close();
+				((AutoCloseable) remoteRepositoryManager).close();
 
 			} catch (Exception e) {
 

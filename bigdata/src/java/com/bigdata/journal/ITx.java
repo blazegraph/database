@@ -33,7 +33,6 @@ import com.bigdata.service.ITxState;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ITx extends ITxState {
 

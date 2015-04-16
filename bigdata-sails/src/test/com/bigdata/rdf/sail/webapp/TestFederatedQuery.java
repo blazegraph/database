@@ -165,7 +165,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     private static final String PREFIX = "openrdf-service/";
 
     /** The "local" repository. */
-    private RemoteRepository localRepository;
+    private RemoteRepositoryManager localRepository;
     
     @Override
     public void setUp() throws Exception {

@@ -34,7 +34,10 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Namespace;
 import org.openrdf.model.Resource;
@@ -76,6 +79,9 @@ import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager;
+import com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager.IRemoteTx;
+import com.bigdata.rdf.sail.webapp.client.TransactionNotActiveException;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
@@ -90,22 +96,16 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
  * need implemented for your application don't be afraid to reach out and
  * contact us.
  * 
- * TODO Implement buffering of adds and removes so that we can turn off
- * auto-commit.
- * 
  * FIXME (***) Fix all the Query objects (TupleQuery, GraphQuery, BooleanQuery) to
  * support the various possible operations on them, such as setting a binding.
  * 
- * TODO Support baseURIs
- * 
- * @see <a href="http://trac.bigdata.com/ticket/1156"> Read/write tx support in
- *      NSS and BigdataSailRemoteRepositoryConnection </a>
- * 
+ * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
+ *      transactions in the REST API</a>
  */
 public class BigdataSailRemoteRepositoryConnection implements RepositoryConnection {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(BigdataSailRemoteRepositoryConnection.class);
+   private static final transient Logger log = Logger
+         .getLogger(BigdataSailRemoteRepositoryConnection.class);
 
     private final BigdataSailRemoteRepository repo;
 
@@ -849,15 +849,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void setAutoCommit(final boolean autoCommit) throws RepositoryException {
-		
-        if (autoCommit == false)
-            throw new IllegalArgumentException(
-                    "only auto-commit is currently supported");
-
-	}
-
-	@Override
 	public Repository getRepository() {
 		
 		return repo;
@@ -1130,59 +1121,256 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		return repo.getValueFactory();
 	}
 
-   /*
-    * FIXME (***) Implement proper tx semantics. Use remote tx to buffer if
-    * supported (we might have to query for this or just leave it to the user to
-    * prepare() and if the backend does not support full read/write tx then it
-    * returns ITx.UNISOLATED vs a read/write transaction identifier).
-    * 
-    * When the backend is unisolated I am not sure if we need to use local
-    * buffering of complex mutations but definitely flush before read would
-    * cause a commit so it is not really possible to make this correct remotely
-    * without using isolatable indices.
-    * 
-    * (non-Javadoc)
-    * 
-    * @see org.openrdf.repository.RepositoryConnection#close()
+	/**
+	 * <code>true</code> iff the connection is open.
+	 */
+	private final AtomicBoolean open = new AtomicBoolean(true);
+	
+   /**
+    * The current transaction. This is <code>null</code> before {@link #begin()}
+    * is called the first time. It is set to <code>null</code> by both
+    * {@link #rollback()} and {@link #commit()}. If it is non-<code>null</code>
+    * when {@link #close()} is called, then the associated transaction will be
+    * aborted (per the openrdf API all non-committed state is lost on
+    * {@link #close()}).
+    * <p>
+    * Note: The monitor of this object is also used as a synchronization point.
     */
+	private final AtomicReference<IRemoteTx> remoteTx = new AtomicReference<IRemoteTx>();
+	
    @Override
+   public boolean isOpen() throws RepositoryException {
+
+      return open.get();
+      
+   }
+
+   private void assertOpen() throws RepositoryException {
+
+      if (!open.get())
+         throw new RepositoryException("Connection is not open");
+
+   }
+   
+   /**
+    * {@inheritDoc}
+    * <p>
+    * Note: This is deprecated in openrdf since 2.7.x. The semantics are that a
+    * connection without an active transaction is in "auto-commit" mode.
+    */
+   @Deprecated
+   @Override
+   public boolean isAutoCommit() throws RepositoryException {
+
+      /*
+       * A connection is defined as being in auto-commit mode if no transaction
+       * is active.
+       */
+
+      return remoteTx.get() == null;
+
+   }
+
+   /**
+    * {@inheritDoc}
+    * <p>
+    * <p>
+    * Note: This is deprecated in openrdf since 2.7.x. The semantics are that a
+    * connection without an active transaction is in "auto-commit" mode. If
+    * there is an open transaction and auto-commit is disabled, the open
+    * transaction is committed. This is per the openrdf API.
+    */
+   @Deprecated
+   @Override
+   public void setAutoCommit(final boolean autoCommit) throws RepositoryException {
+      synchronized (remoteTx) {
+         if (autoCommit == false && remoteTx.get() == null) {
+            // NOP.
+            return;
+         }
+         if (remoteTx.get() != null) {
+            // Convert the connection to autocommit by committing the tx.
+            commit();
+         }
+      }
+   }
+
+	@Override
    public void close() throws RepositoryException {
-      // noop
+      if (open.compareAndSet(true/* expect */, false/* newValue */)) {
+         /*
+          * The connection was open and is now closed. We submit a runnable
+          * abort the current transaction (if any).
+          * 
+          * Note: The runnable is not run in the callers thread since otherwise
+          * close() will block until it can gain the [remoteTx] monitor.
+          */
+         repo.getRemoteRepository().getExecutor().execute(new Runnable() {
+            @Override
+            public void run() {
+               /*
+                * Note: This invokes the tx.abort() without regard to whether or
+                * not the connection is open (it will be closed since we closed
+                * it before submitting this for execution).
+                */
+               synchronized (remoteTx) {
+                  final IRemoteTx tx = remoteTx.get();
+                  if (tx != null) {
+                     try {
+                        tx.abort();
+                     } catch (RuntimeException e) {
+                        // Log and ignore.
+                        log.error(e, e);
+                     } catch (Exception e) {
+                        // Log and ignore.
+                        log.error(e, e);
+                     } finally {
+                        // Clear the reference since we are closing the conn.
+                        remoteTx.set(null/* newValue */);
+                     }
+                  }
+               }
+            }
+         });
+      }
    }
 
    @Override
-   public boolean isOpen() throws RepositoryException {
-      
-      return true;
-      
+   public boolean isActive() throws UnknownTransactionStateException,
+         RepositoryException {
+      /*
+       * First, do some non-blocking tests. If we can prove that the connection
+       * is not open or that there is no active transaction with a non-blocking
+       * test then we return immediately.
+       */
+      assertOpen();
+      if (remoteTx.get() == null) {
+         // Non-blocking test.
+         return false;
+      }
+      /*
+       * Now grab the lock and test again.
+       */
+      synchronized (remoteTx) {
+         assertOpen();
+         final IRemoteTx tx = remoteTx.get();
+         if (tx == null) {
+            // no transaction is active.
+            return false;
+         }
+         /*
+          * The client has an active transaction.
+          * 
+          * Note: This DOES NOT indicate that the transaction is still active on
+          * the server!
+          */
+         return true;
+      }
+   }
+
+   @Override
+   public void begin() throws RepositoryException {
+      assertOpen(); // non-blocking.
+      synchronized (remoteTx) {
+         assertOpen();
+         if (remoteTx.get() != null)
+            throw new RepositoryException("Active transaction exists");
+         try {
+            remoteTx.set(repo.getRemoteRepository().getTransactionManager()
+                  .createTx(RemoteTransactionManager.UNISOLATED));
+         } catch (Exception e) {
+            throw new RepositoryException(e);
+         }
+      }
+   }
+
+   /**
+    * Begin a read-only transaction. Since all read operations have snapshot
+    * isolation, this is only necessary when multiple read operations need to
+    * read on the same commit point.
+    */
+   public void beginReadOnly() throws RepositoryException {
+      assertOpen(); // non-blocking.
+      synchronized (remoteTx) {
+         assertOpen();
+         if (remoteTx.get() != null)
+            throw new RepositoryException("Active transaction exists");
+         try {
+            remoteTx.set(repo.getRemoteRepository().getTransactionManager()
+                  .createTx(RemoteTransactionManager.READ_COMMITTED));
+         } catch (Exception e) {
+            throw new RepositoryException(e);
+         }
+      }
+   }
+
+   /**
+    * Begin a read-only transaction that reads against the most recent committed
+    * state whose commit timestamp is less than or equal to timestamp.
+    * <p>
+    * Note: Since all read operations have snapshot isolation, this is only
+    * necessary when multiple read operations need to read on the same commit
+    * point.
+    * 
+    * TODO While the ability to do read-only operations against a specified
+    * timestamp without a transaction exists, it is not exposed by this
+    * interface nor can be accomplished using {@link RemoteRepository} since
+    * that interface also lacks mechanisms (e.g.,
+    * prepareTupleQuery(String:query,long:commitTime)) to express this request.
+    */
+   public void beginReadOnly(final long timestamp) throws RepositoryException {
+      if (timestamp <= 0)
+         throw new IllegalArgumentException();
+      assertOpen(); // non-blocking.
+      synchronized (remoteTx) {
+         assertOpen();
+         if (remoteTx.get() != null)
+            throw new RepositoryException("Active transaction exists");
+         try {
+            remoteTx.set(repo.getRemoteRepository().getTransactionManager()
+                  .createTx(timestamp));
+         } catch (Exception e) {
+            throw new RepositoryException(e);
+         }
+      }
    }
 
    @Override
    public void commit() throws RepositoryException {
-      // noop
+      assertOpen(); // non-blocking.
+      synchronized (remoteTx) {
+         assertOpen(); // non-blocking.
+         final IRemoteTx tx = remoteTx.get();
+         if (tx != null) {
+            try {
+               tx.commit();
+               remoteTx.set(null/* newValue */);
+            } catch (TransactionNotActiveException e) {
+               throw new UnknownTransactionStateException(e);
+            } catch (Exception e) {
+               throw new UnknownTransactionStateException(e);
+            }
+         }
+      }
    }
 
    @Override
    public void rollback() throws RepositoryException {
-      // noop
+      assertOpen(); // non-blocking.
+      synchronized (remoteTx) {
+         assertOpen(); // non-blocking.
+         final IRemoteTx tx = remoteTx.get();
+         if (tx != null) {
+            try {
+               tx.abort();
+               remoteTx.set(null/* newValue */);
+            } catch (TransactionNotActiveException e) {
+               throw new UnknownTransactionStateException(e);
+            } catch (Exception e) {
+               throw new UnknownTransactionStateException(e);
+            }
+         }
+      }
    }
-
-    @Override
-    public void begin() throws RepositoryException {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean isActive() 
-            throws UnknownTransactionStateException, RepositoryException {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean isAutoCommit() throws RepositoryException {
-       
-       return true;
-       
-    }
 
 }
