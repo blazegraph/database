@@ -10,9 +10,9 @@
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
-  <artifactId>striterator</artifactId>
+  <artifactId>ctc-striterators</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>striterator</name>
+  <name>ctc-striterators</name>
   <packaging>jar</packaging>
 
   <reporting>
