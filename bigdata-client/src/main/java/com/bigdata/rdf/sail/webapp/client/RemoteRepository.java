@@ -26,6 +26,7 @@ package com.bigdata.rdf.sail.webapp.client;
 import info.aduna.io.IOUtil;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -900,8 +901,13 @@ public class RemoteRepository {
    }
     
     /**
-     * Return a list of contexts in use in a remote quads database.
-     */
+    * Return a list of contexts in use in a remote quads database.
+    * 
+    * FIXME This should be a streaming response for scalability. That will
+    * require us to change the return type for the method. E.g., to something
+    * that implements {@link Closeable}. Callers will then have to invoke
+    * {@link Closeable#close()} to avoid leaking resources.
+    */
     public Collection<Resource> getContexts() throws Exception {
     	
         final ConnectOptions opts = newQueryConnectOptions();
@@ -2413,6 +2419,7 @@ public class RemoteRepository {
              */
             parser.parse(response.getInputStream(), new DefaultHandler2(){
 
+               @Override
                 public void startElement(final String uri,
                         final String localName, final String qName,
                         final Attributes attributes) {

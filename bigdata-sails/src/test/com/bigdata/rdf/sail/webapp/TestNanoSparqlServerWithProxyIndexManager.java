@@ -272,6 +272,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(TestNanoSparqlClient.class);
          suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
          suite.addTestSuite(StressTest_REST_MultiTenancy.class);
+         suite.addTestSuite(Test_REST_TX_API.class); // Transaction management API.
 
          // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
          suite.addTestSuite(TestBigdataSailRemoteRepository.class);

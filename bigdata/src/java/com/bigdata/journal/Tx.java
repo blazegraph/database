@@ -782,11 +782,11 @@ public class Tx implements ITx {
     
     /**
      * Invoked when a writable transaction prepares in order to validate its
-     * write sets (one per isolated index). The default implementation is NOP.
+     * write sets (one per isolated index). 
      * 
      * @return true iff the write sets were validated.
      */
-    protected boolean validateWriteSets() {
+    public boolean validateWriteSets() {
 
         /*
          * for all isolated btrees, if(!validate()) return false;

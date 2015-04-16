@@ -66,6 +66,34 @@ public class RemoteRepositoryManager extends RemoteRepository
      * <code>true</code> iff open.
      */
     private volatile boolean m_closed = false;
+
+    /**
+     * Remote client for the transaction manager API.
+     */
+    private final RemoteTransactionManager transactionManager;
+
+    /**
+    * Return the remote client for the transaction manager API.
+    * 
+    * @since 1.5.2
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
+    *      transactions in the REST API</a>
+    */
+    public RemoteTransactionManager getTransactionManager() {
+       
+       return transactionManager;
+       
+    }
+    
+    /**
+     * The executor for processing http and other client operations.
+     */
+    public Executor getExecutor() {
+       
+       return executor;
+       
+    }
     
     /**
      * The path to the root of the web application (without the trailing "/").
@@ -142,6 +170,8 @@ public class RemoteRepositoryManager extends RemoteRepository
 
         this.baseServiceURL = serviceURL;
 
+        this.transactionManager = new RemoteTransactionManager(this);
+        
     }
 
 // Remove auto client creation option
