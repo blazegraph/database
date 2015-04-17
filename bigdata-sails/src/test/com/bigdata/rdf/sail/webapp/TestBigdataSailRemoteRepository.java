@@ -51,10 +51,12 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
+import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 
 /**
- * Proxied test suite.
- *
+ * Proxied test suite for {@link BigdataSailRemoteRepository} and
+ * {@link BigdataSailRemoteRepositoryConnection}.
+ * 
  * @param <S>
  */
 public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
@@ -87,7 +89,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 		
 		super.setUp();
 		
-        final Repository repo = new BigdataSailRemoteRepository(m_repo);
+        final Repository repo = m_repo.getBigdataSailRemoteRepository();
         
         m_cxn = repo.getConnection();
 		

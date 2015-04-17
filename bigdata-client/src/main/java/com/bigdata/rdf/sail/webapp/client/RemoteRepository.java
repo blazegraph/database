@@ -41,7 +41,6 @@ import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.Request;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -50,6 +49,8 @@ import org.openrdf.model.Value;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.rio.RDFFormat;
+
+import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 
 /**
  * Java API to the Nano Sparql Server.
@@ -81,6 +82,23 @@ public class RemoteRepository extends RemoteRepositoryBase {
     private final RemoteRepositoryManager mgr;
     
     /**
+     * Return the SPARQL end point.
+     */
+    public String getSparqlEndPoint() {
+        
+        return sparqlEndpointURL;
+        
+    }
+        
+    @Override
+    public String toString() {
+
+        return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
+                + ", useLBS=" + mgr.useLBS + "}";
+
+    }
+
+    /**
      * The {@link RemoteRepositoryManager} object use to manage all access to the
      * service backing the {@link #sparqlEndpointURL}.
      */
@@ -89,28 +107,6 @@ public class RemoteRepository extends RemoteRepositoryBase {
        return mgr;
        
     }
-
-//    /**
-//     * 
-//     * @param sparqlEndpointURL
-//     * @param httpClient
-//     * @param executor
-//     * 
-//     * @deprecated This version does not force the caller to decide whether or
-//     *             not the LBS pattern will be used. In general, it should be
-//     *             used if the end point is bigdata. This class is generally,
-//     *             but not always, used with a bigdata end point. The main
-//     *             exception is SPARQL Basic Federated Query. For that use case
-//     *             we can not assume that the end point is bigdata and thus we
-//     *             can not use the LBS prefix.
-//     */
-//    public JettyRemoteRepository(final String sparqlEndpointURL,
-//            final AutoCloseHttpClient httpClient, final Executor executor) {
-//
-//        // FIXME Should default useLBS:=true. it is basically free.
-//        this(sparqlEndpointURL, false/* useLBS */, httpClient, executor);
-//
-//    }
 
     /**
      * Create a connection to a remote repository. A typical invocation looks
@@ -164,23 +160,16 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-	@Override
-    public String toString() {
+   /**
+    * Flyweight method returns a wrapper for the sparql end point associated
+    * with this instance.
+    */
+   public BigdataSailRemoteRepository getBigdataSailRemoteRepository() {
 
-        return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
-                + ", useLBS=" + mgr.useLBS + "}";
+      return new BigdataSailRemoteRepository(this);
 
-    }
-
-    /**
-     * Return the SPARQL end point.
-     */
-    public String getSparqlEndPoint() {
-        
-        return sparqlEndpointURL;
-        
-    }
-        
+   }
+    
     /**
      * Post a GraphML file to the blueprints layer of the remote bigdata instance.
      */
@@ -1371,11 +1360,4 @@ public class RemoteRepository extends RemoteRepositoryBase {
        
     }
         
-    // TODO Protected or private?
-	public Request newRequest(final String uri, final String method) {
-
-		return mgr.newRequest(uri, method);
-
-	}
-
 }
