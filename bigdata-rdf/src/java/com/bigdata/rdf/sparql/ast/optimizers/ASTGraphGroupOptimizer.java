@@ -35,6 +35,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -176,8 +177,6 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
         // The data set node (if any).
         final DatasetNode dataSet = queryRoot.getDataset();
 
-        // TODO The set of graphGroups is unused. Remove from code?
-        final Collection<JoinGroupNode> graphGroups = new LinkedList<JoinGroupNode>();
         {
 
             // WHERE clause for named subqueries.
@@ -188,14 +187,14 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
                     visitGroups(context, dataSet,
                             namedSubquery.getWhereClause(), null/* context */,
-                            graphGroups, namedSubquery);
+                            namedSubquery);
                 }
 
             }
 
             // Top-level WHERE clause.
             visitGroups(context, dataSet, queryRoot.getWhereClause(),
-                    null/* context */, graphGroups, queryRoot);
+                    null/* context */, queryRoot);
 
 
         }
@@ -217,7 +216,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
      * @param dataSet
      * @param group
      * @param graphContext
-     * @param graphGroups
+     * @param parent
      */
     @SuppressWarnings("unchecked")
     private void visitGroups(
@@ -226,7 +225,6 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             final DatasetNode dataSet,//
             final IGroupNode<IGroupMemberNode> group, //
             TermNode graphContext,//
-            final Collection<JoinGroupNode> graphGroups,//
             final ModifiableBOpBase parent//
             ) {
 
@@ -306,8 +304,9 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             }
 
             /**
-             * Handle edge cases GRAPH ?g { }, which require special handling
-             * (if not rewritten, it won't return any results).
+             * Handle edge cases GRAPH ?g { } and GRAPH <uri>, which require
+             * special handling (if not rewritten, they will return wrong
+             * results in some cases).
              */
             if (group.isEmpty() && graphContext.isVariable()) {
 
@@ -325,32 +324,39 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                
             } else if (group.isEmpty() && graphContext.isConstant()) {
                
-               // We preresolve the named graph IVs. If the IV is null, then
-               // we can safely remove the group (it won't yield any result.
-               final IV iv = ((ConstantNode) graphContext).getValue().getIV();
-               if (iv == null || iv.isNullIV()) {
-                  while (parent.removeArg(group)) {
-                     // repeat
-                  }
-               }
-
-               // Otherwise we need to verify that there is one or more stmt in
-               // that named graph. We do that using an ASK subquery.
+               /**
+                *  We need to verify that there is one or more stmt in that
+                *  named graph. We do that using an ASK subquery.
+                *  
+                *  Note that it is *not* safe to drop the whole construct, even
+                *  if we statically detect that the graphContext IV is not in
+                *  the dictionary. As a counter example, consider the query
+                *  
+                *  SELECT * {
+                *    GRAPH <http://uri.not.in.dictionary> { }
+                *  }
+                *  
+                *  The expected result is the empty set, but when removing the
+                *  GRAPH pattern completely, we get SELECT * WHERE {}, which
+                *  gives the empty binding set as result. Catching cases where
+                *  the pattern can be dropped seems not worth the effort, in
+                *  particular considering that the ASK query for the simple
+                *  pattern should be quite efficient anyways.
+                */
                final StatementPatternNode sp = 
                   new StatementPatternNode(
                      VarNode.freshVarNode(),
                      VarNode.freshVarNode(),
                      VarNode.freshVarNode(), 
                      graphContext, Scope.NAMED_CONTEXTS);
-               
+                     
                final SubqueryRoot subquery = new SubqueryRoot(QueryType.ASK);
                final ProjectionNode projection = new ProjectionNode();
                subquery.setProjection(projection);
                subquery.addArg(new JoinGroupNode(sp));
-               group.addChild(sp);
+               group.addChild(sp);                  
                
             }
-            graphGroups.add((JoinGroupNode) group);
 
         }
 
@@ -426,9 +432,11 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             /*
              * Recursion.
              */
-
+            final ModifiableBOpBase modParentOrNull = 
+               group instanceof ModifiableBOpBase ?
+               (ModifiableBOpBase) group : null;
             visitGroups(context, dataSet, (IGroupNode<IGroupMemberNode>) child,
-                    graphContext, graphGroups, (JoinGroupNode)group);
+                    graphContext, modParentOrNull);
 
         }
 
