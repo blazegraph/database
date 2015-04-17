@@ -620,7 +620,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
      * Covering GRAPH ?x {}
      * 
      * @see <a href="http://trac.bigdata.com/ticket/709">
-     * select ?g { Graph ?g {} } incorrec</a> 
+     * select ?g { Graph ?g {} } incorrect</a> 
      * @see <a href="http://trac.bigdata.com/ticket/429">
      * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
      */
