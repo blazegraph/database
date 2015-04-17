@@ -27,17 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.Collection;
-import java.util.LinkedList;
-
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.ModifiableBOpBase;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.constraints.FalseBOp;
 import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -186,15 +179,14 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                         .getNamedSubqueries()) {
 
                     visitGroups(context, dataSet,
-                            namedSubquery.getWhereClause(), null/* context */,
-                            namedSubquery);
+                            namedSubquery.getWhereClause(), null/* context */);
                 }
 
             }
 
             // Top-level WHERE clause.
             visitGroups(context, dataSet, queryRoot.getWhereClause(),
-                    null/* context */, queryRoot);
+                    null/* context */);
 
 
         }
@@ -224,8 +216,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             final IEvaluationContext context,//
             final DatasetNode dataSet,//
             final IGroupNode<IGroupMemberNode> group, //
-            TermNode graphContext,//
-            final ModifiableBOpBase parent//
+            TermNode graphContext//
             ) {
 
         if (group instanceof JoinGroupNode && group.getContext() != null) {
@@ -432,11 +423,8 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             /*
              * Recursion.
              */
-            final ModifiableBOpBase modParentOrNull = 
-               group instanceof ModifiableBOpBase ?
-               (ModifiableBOpBase) group : null;
             visitGroups(context, dataSet, (IGroupNode<IGroupMemberNode>) child,
-                    graphContext, modParentOrNull);
+                    graphContext);
 
         }
 
