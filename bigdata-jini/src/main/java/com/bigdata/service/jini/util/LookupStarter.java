@@ -99,8 +99,8 @@ public class LookupStarter extends Thread {
     private String lookupClasspath = jiniLib+fSep+"reggie.jar";
     private String lookupImplName =
                                 "com.sun.jini.reggie.TransientRegistrarImpl";
-    private String lookupConfig = appHome
-                                  +fSep+"bigdata-jini"+fSep+"src"+fSep+"java"
+    private String lookupConfig = appHome // See #1194
+                                  +fSep+"bigdata-jini"+fSep+"src"+fSep+"main"+fSep+"java"
                                   +fSep+"com"+fSep+"bigdata"+fSep+"service"
                                   +fSep+"jini"+fSep+"util"+fSep+"config"
                                   +fSep+"lookup.config";
