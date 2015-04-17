@@ -628,4 +628,27 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();    
     } 
 
+    /**
+     * @see <a href="http://trac.bigdata.com/ticket/429">
+     * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
+     */
+    public void test_ticket_429a() throws Exception {
+       new TestHelper("ticket_429a",// testURI,
+             "ticket_429a.rq",// queryFileURL
+             "ticket_429.trig",// dataFileURL
+             "ticket_429a.srx"// resultFileURL
+       ).runTest();    
+    } 
+    
+    /**
+     * @see <a href="http://trac.bigdata.com/ticket/429">
+     * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
+     */
+    public void test_ticket_429b() throws Exception {
+       new TestHelper("ticket_429b",// testURI,
+             "ticket_429b.rq",// queryFileURL
+             "ticket_429.trig",// dataFileURL
+             "ticket_429b.srx"// resultFileURL
+       ).runTest();    
+    } 
 }
