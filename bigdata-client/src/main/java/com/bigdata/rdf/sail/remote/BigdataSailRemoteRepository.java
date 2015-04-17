@@ -128,7 +128,8 @@ public class BigdataSailRemoteRepository implements Repository {
 		if (sparqlEndpointURL == null)
 			throw new IllegalArgumentException();
 
-		this.executor = Executors.newCachedThreadPool();
+		// See #1191 (remote connection uses non-daemon thread pool).
+		this.executor = Executors.newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
 
 		// Note: Client *might* be AutoCloseable.
 		this.client = HttpClientConfigurator.getInstance().newInstance();
