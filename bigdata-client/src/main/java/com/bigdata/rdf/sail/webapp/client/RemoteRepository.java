@@ -40,7 +40,6 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
-import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
 import org.openrdf.OpenRDFUtil;
@@ -51,11 +50,6 @@ import org.openrdf.model.Value;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.rio.RDFFormat;
-
-// Note: Do not import. Not part of the bigdata-client.jar
-//
-//import com.bigdata.rdf.sparql.ast.service.RemoteServiceOptions;
-
 
 /**
  * Java API to the Nano Sparql Server.
@@ -72,8 +66,8 @@ import org.openrdf.rio.RDFFormat;
  */
 public class RemoteRepository extends RemoteRepositoryBase {
 
-    private static final transient Logger log = Logger
-            .getLogger(RemoteRepository.class);
+//    private static final transient Logger log = Logger
+//            .getLogger(RemoteRepository.class);
 
     /**
      * The service end point for the default data set.
@@ -239,13 +233,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
         opts.method = "GET";
 
-//        HttpResponse response = null;
-
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-//        checkResponseCode(response = doConnect(opts));
-
-        return mgr.graphResults(opts, null, null);
+        return mgr.graphResults(opts, null/*queryId*/, null/*preparedListener*/);
 
     }
 
