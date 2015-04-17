@@ -371,7 +371,7 @@ public class TestHA1SnapshotPolicy extends AbstractHA3BackupTestCase {
 				// Should have data.
 				assertEquals(
 						100L,
-						countResults(r.prepareTupleQuery(
+						countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery(
 								"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
 
 			}

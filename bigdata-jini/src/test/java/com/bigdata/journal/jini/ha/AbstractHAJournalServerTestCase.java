@@ -659,7 +659,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
             // Run query.
             final RemoteRepositoryManager remoteRepo = getRemoteRepository(haGlue, useLBS, httpClient);
             try {
-	            final TupleQueryResult result = remoteRepo.prepareTupleQuery(query)
+	            final TupleQueryResult result = remoteRepo.getRepositoryForDefaultNamespace().prepareTupleQuery(query)
 	                    .evaluate();
 	
 	            final BindingSet bs = result.next();
@@ -758,7 +758,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
  	           @Override
 	            public void run() {
 	                try {
-	                    repo.size();
+	                    repo.getRepositoryForDefaultNamespace().size();
 	                } catch (Exception e) {
 	                    // KB does not exist.
 	                    fail();

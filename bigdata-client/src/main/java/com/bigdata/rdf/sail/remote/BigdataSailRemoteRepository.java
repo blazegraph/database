@@ -63,15 +63,22 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * in which case it is scoped to the life cycle of this
 	 * {@link BigdataSailRemoteRepository} instance.
 	 */
-    private final ExecutorService executor;
+    private final ExecutorService our_executor;
     
 	/**
 	 * non-<code>null</code> iff the executor is allocated by the constructor,
 	 * in which case it is scoped to the life cycle of this
 	 * {@link BigdataSailRemoteRepository} instance.
 	 */
-	private final HttpClient client;
+	private final HttpClient our_client;
 
+   /**
+    * non-<code>null</code> iff the {@link RemoteRepositoryManager} is allocated
+    * by the constructor, in which case it is scoped to the life cycle of this
+    * {@link BigdataSailRemoteRepository} instance.
+    */
+   private final RemoteRepositoryManager our_mgr;
+   
 	/**
 	 * Always non-<code>null</code>. This is either an object that we have
 	 * created ourselves or one that was passed in by the caller. If we create
@@ -80,7 +87,7 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * {@link RemoteRepositoryManager} rather than just a
 	 * {@link RemoteRepository}.
 	 */
-    private final RemoteRepositoryManager remoteRepositoryManager;
+    private final RemoteRepository remoteRepository;
 
     /**
      * This exists solely for {@link #getValueFactory()} - the value factory
@@ -91,9 +98,9 @@ public class BigdataSailRemoteRepository implements Repository {
     /**
      * The object used to communicate with that remote repository.
      */
-    public RemoteRepositoryManager getRemoteRepository() {
+    public RemoteRepository getRemoteRepository() {
 		
-		return remoteRepositoryManager;
+		return remoteRepository;
 		
 	}
 	
@@ -129,14 +136,17 @@ public class BigdataSailRemoteRepository implements Repository {
 			throw new IllegalArgumentException();
 
 		// See #1191 (remote connection uses non-daemon thread pool).
-		this.executor = Executors.newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+		this.our_executor = Executors.newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
 
 		// Note: Client *might* be AutoCloseable.
-		this.client = HttpClientConfigurator.getInstance().newInstance();
+		this.our_client = HttpClientConfigurator.getInstance().newInstance();
 
-		this.remoteRepositoryManager = new RemoteRepositoryManager(sparqlEndpointURL, useLBS,
-				client, executor);
-	
+		this.our_mgr = new RemoteRepositoryManager(sparqlEndpointURL, useLBS,
+				our_client, our_executor);
+
+      this.remoteRepository = our_mgr.getRepositoryForURL(sparqlEndpointURL,
+            useLBS);
+		
 	}
 
 	/**
@@ -149,20 +159,15 @@ public class BigdataSailRemoteRepository implements Repository {
 			throw new IllegalArgumentException();
 		
 		// use the executor on the caller's object.
-		this.executor = null;
+		this.our_executor = null;
 		
 		// use the client on the caller's object.
-		this.client = null;
+		this.our_client = null;
 
-      /**
-       * FIXME *** The RemoteRepositoryManager needs to be available from the
-       * RemoteRepository. This means that the RemoteRepositoryManager can no
-       * longer extend RemoteRepository. Instead, we need to obtain a
-       * RemoteRepository from the RemoteRepositoryManager. There are already
-       * methods for this. We can also add a
-       * getRemoteRepositoryForDefaultNamespace() for convenience.
-       */
-		this.remoteRepositoryManager = (RemoteRepositoryManager) nss;
+		// use the manager associated with the provided client.
+		this.our_mgr = null;
+		
+		this.remoteRepository = nss;
 		
 	}
 	
@@ -170,43 +175,51 @@ public class BigdataSailRemoteRepository implements Repository {
 	synchronized
 	public void shutDown() throws RepositoryException {
 
-		if (executor != null) {
+		if (our_executor != null) {
 
-			executor.shutdownNow();
+			our_executor.shutdownNow();
 
-			assert client != null;
+			assert our_client != null;
 
-			if (!(client instanceof AutoCloseable)) {
-				/*
+			if (!(our_client instanceof AutoCloseable)) {
+
+			   /*
 				 * The client does not implement AutoCloseable and it we own the
 				 * life cycle of the client (because it was created by our
 				 * constructor). In this case we need to invoke the jetty
 				 * close() method on the client to avoid leaking resources.
 				 */
-				try {
-					client.stop();
+				
+			   try {
+				
+			      our_client.stop();
+			      
 				} catch (Exception e) {
-					throw new RepositoryException(e);
+					
+				   throw new RepositoryException(e);
+				   
 				}
-			}
-
-			/*
-			 * The JettyRemoteRepositoryManager object was create by our
-			 * constructor, so we own its life cycle and will close it down
-			 * here.
-			 */
-
-			assert remoteRepositoryManager instanceof AutoCloseable;
-
-			try {
-
-				((AutoCloseable) remoteRepositoryManager).close();
-
-			} catch (Exception e) {
-
-				throw new RepositoryException(e);
 
 			}
+
+         if (our_mgr != null) {
+
+            /*
+             * The RemoteRepositoryManager object was create by our constructor,
+             * so we own its life cycle and will close it down here.
+             */
+
+            try {
+
+               our_mgr.close();
+
+            } catch (Exception e) {
+
+               throw new RepositoryException(e);
+
+            }
+
+         }
 
 			open = false;
 			

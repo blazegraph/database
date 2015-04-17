@@ -25,12 +25,43 @@ package com.bigdata.rdf.sail.webapp.client;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.http.entity.ByteArrayEntity;
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.HttpRequest;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.http.HttpMethod;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.impl.MapBindingSet;
+import org.openrdf.query.impl.TupleQueryResultImpl;
+import org.openrdf.query.resultio.BooleanQueryResultFormat;
+import org.openrdf.query.resultio.BooleanQueryResultParser;
+import org.openrdf.query.resultio.BooleanQueryResultParserFactory;
+import org.openrdf.query.resultio.BooleanQueryResultParserRegistry;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
+import org.openrdf.query.resultio.TupleQueryResultParser;
+import org.openrdf.query.resultio.TupleQueryResultParserFactory;
+import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.repository.sparql.query.InsertBindingSetCursor;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserFactory;
+import org.openrdf.rio.RDFParserRegistry;
 
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
@@ -46,11 +77,11 @@ import com.bigdata.util.InnerCause;
  * 
  * @author bryan
  */
-public class RemoteRepositoryManager extends RemoteRepository
-		implements AutoCloseable {
+public class RemoteRepositoryManager extends RemoteRepositoryBase implements
+      AutoCloseable {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(JettyRemoteRepositoryManager.class);
+    private static final transient Logger log = Logger
+            .getLogger(RemoteRepositoryManager.class);
     
     /**
      * The path to the root of the web application (without the trailing "/").
@@ -63,14 +94,50 @@ public class RemoteRepositoryManager extends RemoteRepository
     private final String baseServiceURL;
 
     /**
-     * <code>true</code> iff open.
+     * When <code>true</code>, the REST API methods will use the load balancer
+     * aware requestURLs. The load balancer has essentially zero cost when not
+     * using HA, so it is recommended to always specify <code>true</code>. When
+     * <code>false</code>, the REST API methods will NOT use the load balancer
+     * aware requestURLs.
+     * 
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
+     *      HALoadBalancer </a>
      */
-    private volatile boolean m_closed = false;
+    protected final boolean useLBS;
+    
+    /**
+     * The client used for http connections.
+     */
+    protected final HttpClient httpClient;
+
+    /**
+     * Thread pool for processing HTTP responses in background.
+     */
+    protected final Executor executor;
+
+    /**
+     * The maximum requestURL length before the request is converted into a POST
+     * using a <code>application/x-www-form-urlencoded</code> request entity.
+     */
+    private volatile int maxRequestURLLength;
+    
+    /**
+     * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
+     * mutation operation).
+     * 
+     * @see #QUERY_METHOD
+     */
+    private volatile String queryMethod;
 
     /**
      * Remote client for the transaction manager API.
      */
     private final RemoteTransactionManager transactionManager;
+
+    /**
+     * <code>true</code> iff open.
+     */
+    private volatile boolean m_closed = false;
 
     /**
     * Return the remote client for the transaction manager API.
@@ -110,6 +177,70 @@ public class RemoteRepositoryManager extends RemoteRepository
     }
     
     /**
+     * Return the maximum requestURL length before the request is converted into
+     * a POST using a <code>application/x-www-form-urlencoded</code> request
+     * entity.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
+     */
+    public int getMaxRequestURLLength() {
+
+        return maxRequestURLLength;
+        
+    }    
+
+    public void setMaxRequestURLLength(final int newVal) {
+
+        if (newVal <= 0)
+            throw new IllegalArgumentException();
+
+        this.maxRequestURLLength = newVal;
+        
+    }
+
+    /**
+     * Return the HTTP verb that will be used for a QUERY (versus an UPDATE or
+     * other mutation operations) (default {@value #DEFAULT_QUERY_METHOD}). POST can
+     * often handle larger queries than GET due to limits at the HTTP client
+     * layer and will defeat http caching and thus provide a current view of the
+     * committed state of the SPARQL end point when the end point is a
+     * read/write database. However, GET supports HTTP caching and can scale
+     * much better when the SPARQL end point is a read-only resource or a
+     * read-mostly resource where stale reads are acceptable.
+     * 
+     * @see #setQueryMethod(String)
+     */
+    public String getQueryMethod() {
+     
+        return queryMethod;
+        
+    }
+
+    /**
+     * Set the default HTTP verb for QUERY and other idempotant operations.
+     * 
+     * @param method
+     *            The method which may be "POST" or "GET".
+     * 
+     * @see #getQueryMethod()
+     */
+    public void setQueryMethod(final String method) {
+
+        if ("POST".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method)) {
+
+            this.queryMethod = method.toUpperCase();
+
+        } else {
+            
+            throw new IllegalArgumentException();
+            
+        }
+
+    }
+    
+    /**
 	 * 
 	 * @param serviceURL
 	 *            The path to the root of the web application (without the
@@ -140,6 +271,7 @@ public class RemoteRepositoryManager extends RemoteRepository
     }
     
     /**
+	 * Core impl.
 	 * 
 	 * @param serviceURL
 	 *            The path to the root of the web application (without the
@@ -166,24 +298,45 @@ public class RemoteRepositoryManager extends RemoteRepository
             final boolean useLBS, final HttpClient httpClient,
             final Executor executor) {
 
-        super(serviceURL + "/sparql", useLBS, httpClient, executor);
+      if (serviceURL == null)
+         throw new IllegalArgumentException();
+
+      if (httpClient == null)
+         throw new IllegalArgumentException();
+
+      if (httpClient.isStopped() || httpClient.isStopping())
+         throw new IllegalStateException();
+
+      if (executor == null)
+         throw new IllegalArgumentException();
+       
+        //super(serviceURL + "/sparql", useLBS, httpClient, executor);
 
         this.baseServiceURL = serviceURL;
 
+        this.useLBS = useLBS;
+        
+        this.httpClient = httpClient;
+        
+        this.executor = executor;
+
         this.transactionManager = new RemoteTransactionManager(this);
         
+        setMaxRequestURLLength(Integer.parseInt(System.getProperty(
+                MAX_REQUEST_URL_LENGTH,
+                Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
+        
+        setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
+
     }
 
-// Remove auto client creation option
-//    public JettyRemoteRepositoryManager(String serviceURL,
-//    		final Executor executor) {
-//		this(serviceURL, DefaultClient(false), executor);
-//	}
-//
-//    public JettyRemoteRepositoryManager(String serviceURL, boolean useLBS,
-//			ExecutorService executorService) {
-//		this(serviceURL, useLBS, DefaultClient(false), executorService);
-//	}
+    @Override
+    public String toString() {
+
+        return super.toString() + "{baseServiceURL=" + baseServiceURL
+                + ", useLBS=" + useLBS + "}";
+
+    }
     
 	/**
      * Return the base URL for a remote repository (less the /sparql path
@@ -204,7 +357,18 @@ public class RemoteRepositoryManager extends RemoteRepository
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for a data set managed by the remote
+     * Obtain a flyweight {@link RemoteRepository} for the default namespace
+     * associated with the remote service.
+     */
+    public RemoteRepository getRepositoryForDefaultNamespace() {
+     
+      return new RemoteRepository(this,
+            getRepositoryBaseURLForNamespace(DEFAULT_NAMESPACE) + "/sparql");
+
+    }
+    
+    /**
+     * Obtain a flyweight {@link RemoteRepository} for a data set managed by the remote
      * service.
      * 
      * @param namespace
@@ -214,13 +378,13 @@ public class RemoteRepositoryManager extends RemoteRepository
      */
     public RemoteRepository getRepositoryForNamespace(final String namespace) {
 
-        return new RemoteRepository(getRepositoryBaseURLForNamespace(namespace)
-                + "/sparql", useLBS, httpClient, executor);
+        return new RemoteRepository(this, getRepositoryBaseURLForNamespace(namespace)
+                + "/sparql");
         
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
      * SPARQL end point.
      * 
      * @param sparqlEndpointURL
@@ -237,13 +401,12 @@ public class RemoteRepositoryManager extends RemoteRepository
     public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
             final boolean useLBS) {
 
-        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient,
-                executor);
+        return new RemoteRepository(this, sparqlEndpointURL);
 
     }
 
     /**
-     * Obtain a {@link RemoteRepository} for the data set having the specified
+     * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
      * SPARQL end point. The load balancer will be used or not as per the
      * parameters to the {@link RemoteRepositoryManager} constructor.
      * 
@@ -254,7 +417,7 @@ public class RemoteRepositoryManager extends RemoteRepository
      */
     public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
 
-        return new RemoteRepository(sparqlEndpointURL, useLBS, httpClient, executor);
+        return new RemoteRepository(this, sparqlEndpointURL);
 
     }
 
@@ -374,7 +537,6 @@ public class RemoteRepositoryManager extends RemoteRepository
 
         	if (response != null)
         		response.abort();
-            
 
         }
         
@@ -399,7 +561,9 @@ public class RemoteRepositoryManager extends RemoteRepository
     public Properties getRepositoryProperties(final String namespace)
             throws Exception {
 
-        final ConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace)
+       final String sparqlEndpointURL = getRepositoryBaseURLForNamespace(namespace);
+       
+        final ConnectOptions opts = newConnectOptions(sparqlEndpointURL
                 + "/properties");
 
         opts.method = "GET";
@@ -474,5 +638,775 @@ public class RemoteRepositoryManager extends RemoteRepository
 		m_closed = true;
 
 	}
+
+    /**
+     * Connect to a SPARQL end point (GET or POST query only).
+     * 
+     * @param opts
+     *            The connection options.
+     * 
+     * @return The connection.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
+     */
+    public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
+       
+      if (httpClient.isStopped()) {
+         throw new RuntimeException("The client has been stopped");
+      }
+
+        /*
+         * Generate the fully formed and encoded URL.
+         */
+    
+      // The requestURL (w/o URL query parameters).
+      final String requestURL = opts.getRequestURL(getContextPath(), useLBS);
+
+      final StringBuilder urlString = new StringBuilder(requestURL);
+
+      /*
+       * FIXME (***) Why are we using one approach to add the parameters here
+       * and then a different approach if we do a POST? Either one or the other
+       * I think. Try moving this into an else {} block below (if not a POST,
+       * then add query parameters).
+       */
+        ConnectOptions.addQueryParams(urlString, opts.requestParams);
+
+        final boolean isLongRequestURL = urlString.length() > getMaxRequestURLLength();
+
+        if (isLongRequestURL && opts.method.equals("POST")
+                && opts.entity == null) {
+
+            /*
+             * URL is too long. Reset the URL to just the service endpoint and
+             * use application/x-www-form-urlencoded entity instead. Only in
+             * cases where there is not already a request entity (SPARQL query
+             * and SPARQL update).
+             */
+
+            urlString.setLength(0);
+            urlString.append(requestURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+
+        } else if (isLongRequestURL && opts.method.equals("GET")
+                && opts.entity == null) {
+
+            /*
+             * Convert automatically to a POST if the request URL is too long.
+             * 
+             * Note: [opts.entity == null] should always be true for a GET so
+             * this bit is a paranoia check.
+             */
+
+            opts.method = "POST";
+
+            urlString.setLength(0);
+            urlString.append(requestURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+            
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("*** Request ***");
+            log.debug(requestURL);
+            log.debug(opts.method);
+            log.debug("query=" + opts.getRequestParam("query"));
+            log.debug(urlString.toString());
+        }
+
+        Request request = null;
+        try {
+
+            request = (HttpRequest) newRequest(urlString.toString(), opts.method);
+
+            if (opts.requestHeaders != null) {
+
+                for (Map.Entry<String, String> e : opts.requestHeaders
+                        .entrySet()) {
+
+                    request.header(e.getKey(), e.getValue());
+
+                    if (log.isDebugEnabled())
+                        log.debug(e.getKey() + ": " + e.getValue());
+
+                }
+
+            }
+            
+            if (opts.entity != null) {
+
+               final EntityContentProvider cp = new EntityContentProvider(opts.entity);
+
+               request.content(cp, cp.getContentType());
+                
+            }
+         
+         final long queryTimeoutMillis;
+         {
+            final String s = opts
+                  .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
+
+            queryTimeoutMillis = s == null ? -1L : StringUtil.toLong(s);
+         }
+
+         final JettyResponseListener listener = new JettyResponseListener(
+               request, queryTimeoutMillis);
+
+            // Note: Send with a listener is non-blocking.
+            request.send(listener);
+            
+            return listener;
+            
+        } catch (Throwable t) {
+            /*
+             * If something goes wrong, then close the http connection.
+             * Otherwise, the connection will be closed by the caller.
+             */
+            try {
+                
+                if (request != null)
+                    request.abort(t);
+                
+            } catch (Throwable t2) {
+                log.warn(t2); // ignored.
+            }
+            throw new RuntimeException(requestURL + " : " + t, t);
+        }
+
+    }
+
+    Request newRequest(final String uri, final String method) {
+
+      if (httpClient == null)
+         throw new IllegalArgumentException();
+
+      if (httpClient.isStopped())
+         throw new IllegalStateException("The Client has been stopped");
+
+      return httpClient.newRequest(uri).method(getMethod(method));
+
+   }
+ 
+   HttpMethod getMethod(final String method) {
+      if (method.equals("GET")) {
+         return HttpMethod.GET;
+      } else if (method.equals("POST")) {
+         return HttpMethod.POST;
+      } else if (method.equals("DELETE")) {
+         return HttpMethod.DELETE;
+      } else if (method.equals("PUT")) {
+         return HttpMethod.PUT;
+      } else {
+         throw new IllegalArgumentException();
+      }
+   }
+
+   /**
+    * Return the {@link ConnectOptions} which will be used by default for the
+    * SPARQL end point for a QUERY or other idempotent operation.
+    */
+   final protected ConnectOptions newQueryConnectOptions(final String sparqlEndpointURL) {
+
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+
+       opts.method = getQueryMethod();
+       
+       opts.update = false;
+
+       return opts;
+
+   }
+
+   /**
+    * Return the {@link ConnectOptions} which will be used by default for the
+    * SPARQL end point for an UPDATE or other non-idempotant operation.
+    */
+   final protected ConnectOptions newUpdateConnectOptions(final String sparqlEndpointURL) {
+
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+       
+       opts.method = "POST";
+       
+       opts.update = true;
+       
+       return opts;
+
+   }
+   
+//   /**
+//    * Return the {@link ConnectOptions} which will be used by default for the
+//    * SPARQL end point.
+//    */
+//   final protected ConnectOptions newConnectOptions() {
+//   
+//       return mgr.newConnectOptions(sparqlEndpointURL);
+//       
+//   }
+   
+   /**
+    * Return the {@link ConnectOptions} which will be used by default for the
+    * specified service URL.
+    * 
+    * @param serviceURL
+    *            The URL of the service for the request.
+    */
+   ConnectOptions newConnectOptions(final String serviceURL) {
+
+       final ConnectOptions opts = new ConnectOptions(serviceURL);
+
+       return opts;
+
+   }
+
+   /**
+    * Builds a graph from an RDF result set (statements, not binding sets).
+    * 
+    * @param response
+    *            The connection from which to read the results.
+    * 
+    * @return The graph
+    * 
+    * @throws Exception
+    *             If anything goes wrong.
+    */
+   GraphQueryResult graphResults(final ConnectOptions opts,
+           final UUID queryId, final IPreparedQueryListener listener) throws Exception {
+
+     // The listener handling the http response.
+     JettyResponseListener response = null;
+     // Incrementally parse the response in another thread.  
+       BackgroundGraphResult result = null;
+       try {
+
+           response = doConnect(opts);
+
+           checkResponseCode(response);
+           
+           final String baseURI = "";
+
+           final String contentType = response.getContentType();
+
+           if (contentType == null)
+               throw new RuntimeException("Not found: Content-Type");
+           
+           final MiniMime mimeType = new MiniMime(contentType);
+           
+           final RDFFormat format = RDFFormat
+                   .forMIMEType(mimeType.getMimeType());
+
+           if (format == null)
+               throw new IOException(
+                       "Could not identify format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + " : response=" + response.getResponseBody());
+
+           final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
+
+           if (factory == null)
+               throw new RuntimeException(
+                       "RDFParserFactory not found: Content-Type="
+                               + contentType + ", format=" + format);
+
+           final RDFParser parser = factory.getParser();
+           
+           // TODO These options should be configurable using RDFParserOptions.
+           parser.setValueFactory(new ValueFactoryImpl());
+
+           parser.setVerifyData(true);
+
+           parser.setStopAtFirstError(true);
+
+           parser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+           /**
+            * Note: The default charset depends on the MIME Type. The [charset]
+            * MUST be [null] if the MIME Type is binary since this effects
+            * whether a Reader or InputStream will be used to construct and
+            * apply the RDF parser.
+            * 
+            * @see <a href="http://trac.blazegraph.com/ticket/920" > Content
+            *      negotiation orders accept header scores in reverse </a>
+            */
+           Charset charset = format.getCharset();//Charset.forName(UTF8);
+           try {
+              
+              final String encoding = response.getContentEncoding();
+               if (encoding != null)
+                   charset = Charset.forName(encoding);
+           } catch (IllegalCharsetNameException e) {
+               // work around for Joseki-3.2
+               // Content-Type: application/rdf+xml;
+               // charset=application/rdf+xml
+           }
+           
+           final BackgroundGraphResult tmp = new BackgroundGraphResult(
+                   parser, response.getInputStream(), charset, baseURI) {
+              
+              final AtomicBoolean notDone = new AtomicBoolean(true);
+              
+              @Override
+              public boolean hasNext() throws QueryEvaluationException {
+              
+                 final boolean hasNext = super.hasNext();
+                 
+                 if (hasNext == false) {
+                    
+                    notDone.set(false);
+                    
+                 }
+                 
+                 return hasNext;
+                 
+              }
+              
+              @Override
+              public void close() throws QueryEvaluationException {
+                 
+                 try {
+              
+                    super.close();
+              
+                 } finally {
+                    
+                 if (notDone.compareAndSet(true, false)) {
+                    
+                    try {
+                       cancel(queryId);
+                    } catch (Exception ex) {log.warn(ex); }
+                    
+                 }
+                 
+                 if (listener != null) {
+                     listener.closed(queryId);
+                 }
+                 
+                 }
+              
+              };
+              
+           };
+           
+        /*
+         * Note: Asynchronous execution. Typically does not even start
+         * running until after we leave this method!
+         */
+           executor.execute(tmp);
+           
+           // The executor accepted the task for execution (at some point).
+           result = tmp;
+
+           /*
+         * Result will be asynchronously produced.
+         * 
+         * Note: At this point the caller is responsible for calling close()
+         * on this object to clean up the resources associated with this
+         * request.
+         */
+           return result;
+
+       } finally {
+
+           if (response != null && result == null) {
+           /*
+            * This code path only handles errors. We have a response, but
+            * we were not able to generate the asynchronous [result]
+            * object.
+            */
+              response.abort();
+              
+               try {
+              /*
+               * POST back to the server in an attempt to cancel the
+               * request if already executing on the server.
+               */
+                 cancel(queryId);
+               } catch (Exception ex) {log.warn(ex); }
+           
+               if (listener != null) {
+              listener.closed(queryId);
+           }
+        }
+
+       }
+
+   }
+
+   /**
+    * Cancel a query running remotely on the server.
+    * 
+    * @param queryID
+    *             the UUID of the query to cancel
+    */
+   public void cancel(final UUID queryId) throws Exception {
+   
+     if (queryId == null)
+        return;
+     
+       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL);
+
+       opts.addRequestParam("cancelQuery");
+
+       opts.addRequestParam("queryId", queryId.toString());
+
+       JettyResponseListener response = null;
+       try {
+           // Issue request, check response status code.
+           checkResponseCode(response = doConnect(opts));
+       } finally {
+           /*
+            * Ensure that the http response entity is consumed so that the http
+            * connection will be released in a timely fashion.
+            */
+        if (response != null)
+           response.abort();
+           
+       }
+           
+   }
+
+   /**
+    * Extracts the solutions from a SPARQL query.
+    * 
+    * @param response
+    *            The connection from which to read the results.
+    * @param listener
+    *            The listener to notify when the query result has been
+    *            closed (optional).
+    * 
+    * @return The results.
+    * 
+    * @throws Exception
+    *             If anything goes wrong.
+    */
+   public TupleQueryResult tupleResults(final ConnectOptions opts, 
+           final UUID queryId, final IPreparedQueryListener listener)
+           throws Exception {
+
+     // listener handling the http response.
+     JettyResponseListener response = null;
+     // future for parsing that response (in the background).
+     FutureTask<Void> ft = null;
+     // iteration pattern returned to caller. once they hold this they are
+     // responsible for cleaning up the request by calling close().
+     TupleQueryResultImpl tqrImpl = null;
+       try {
+
+           response = doConnect(opts);
+
+           checkResponseCode(response);
+                       
+           final String contentType = response.getContentType();
+   
+           final MiniMime mimeType = new MiniMime(contentType);
+           
+           final TupleQueryResultFormat format = TupleQueryResultFormat
+                   .forMIMEType(mimeType.getMimeType());
+   
+           if (format == null)
+               throw new IOException(
+                       "Could not identify format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + " : response=" + response.getResponseBody());
+
+           final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
+                   .getInstance().get(format);
+
+           if (parserFactory == null)
+               throw new IOException(
+                       "No parser for format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + ", format=" + format + " : response="
+                               + response.getResponseBody());
+
+           final TupleQueryResultParser parser = parserFactory.getParser();
+   
+        final BackgroundTupleResult result = new BackgroundTupleResult(
+              parser, response.getInputStream());
+
+           final MapBindingSet bindings = new MapBindingSet();
+           
+           final InsertBindingSetCursor cursor = 
+               new InsertBindingSetCursor(result, bindings);
+
+           // Wrap as FutureTask so we can cancel.
+           ft = new FutureTask<Void>(result, null/* result */);
+                 
+        /*
+         * Submit task for execution. It will asynchronously consume the
+         * response, pumping solutions into the cursor.
+         * 
+         * Note: Can throw a RejectedExecutionException!
+         */
+        executor.execute(ft);
+
+        /*
+         * Note: This will block until the binding names are received, so it
+         * can not be done until we submit the BackgroundTupleResult for
+         * execution.
+         */
+           final List<String> list = new ArrayList<String>(
+                   result.getBindingNames());
+           
+        /*
+         * The task was accepted by the executor. Wrap with iteration
+         * pattern. Once this object is returned to the caller they are
+         * responsible for calling close() to provide proper error cleanup
+         * of the resources associated with the request.
+         */
+           final TupleQueryResultImpl tmp = new TupleQueryResultImpl(list, cursor) {
+
+              private final AtomicBoolean notDone = new AtomicBoolean(true);
+              
+              @Override
+              public boolean hasNext() throws QueryEvaluationException {
+              
+                 final boolean hasNext = super.hasNext();
+                 
+                 if (hasNext == false) {
+                    
+                    notDone.set(false);
+                    
+                 }
+                 
+                 return hasNext;
+                 
+              }
+              
+              @Override
+              public void handleClose() throws QueryEvaluationException {
+                 
+                 try {
+              
+                 super.handleClose();
+
+              } finally {
+
+                 if (notDone.compareAndSet(true, false)) {
+
+                    try {
+                       cancel(queryId);
+                    } catch (Exception ex) {
+                       log.warn(ex);
+                    }
+
+                 }
+
+                 /*
+                  * Notify the listener.
+                  */
+                 if (listener != null) {
+                    listener.closed(queryId);
+                 }
+
+                 }
+              
+              };
+              
+           };
+           
+        /*
+         * Return the tuple query result listener to the caller. They now
+         * have responsibility for calling close() on that object in order
+         * to close the http connection and release the associated
+         * resources.
+         */
+           return (tqrImpl = tmp);
+           
+       } finally {
+           
+        if (response != null && tqrImpl == null) {
+           /*
+            * Error handling code path. We have an http response listener
+            * but we were not able to setup the tuple query result
+            * listener.
+            */
+           if (ft != null) {
+              /*
+               * We submitted the task to parse the response. Since the
+               * code is not returning normally (tqrImpl:=null) we cancel
+               * the FutureTask for the background parse of that response.
+               */
+              ft.cancel(true/* mayInterruptIfRunning */);
+           }
+           // Abort the http response handling.
+           response.abort();
+           try {
+              /*
+               * POST back to the server to cancel the request in case it
+               * is still running on the server.
+               */
+              cancel(queryId);
+           } catch (Exception ex) {
+              log.warn(ex);
+           }
+           if (listener != null) {
+              listener.closed(queryId);
+           }
+        }
+           
+       }
+
+   }
+   
+   /**
+    * Parse a SPARQL result set for an ASK query.
+    * 
+    * @param response
+    *            The connection from which to read the results.
+    * 
+    * @return <code>true</code> or <code>false</code> depending on what was
+    *         encoded in the SPARQL result set.
+    * 
+    * @throws Exception
+    *             If anything goes wrong, including if the result set does not
+    *             encode a single boolean value.
+    */
+   public boolean booleanResults(final ConnectOptions opts, 
+           final UUID queryId, final IPreparedQueryListener listener) throws Exception {
+
+     JettyResponseListener response = null;
+       Boolean result = null;
+       try {
+
+           response = doConnect(opts);
+
+           checkResponseCode(response);
+           
+           final String contentType = response.getContentType();
+
+           final MiniMime mimeType = new MiniMime(contentType);
+           
+           final BooleanQueryResultFormat format = BooleanQueryResultFormat
+                   .forMIMEType(mimeType.getMimeType());
+
+           if (format == null)
+               throw new IOException(
+                       "Could not identify format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + " : response=" + response.getResponseBody());
+
+           final BooleanQueryResultParserFactory factory = BooleanQueryResultParserRegistry
+                   .getInstance().get(format);
+
+           if (factory == null)
+               throw new RuntimeException("No factory for Content-Type: " + contentType);
+
+           final BooleanQueryResultParser parser = factory.getParser();
+
+           final InputStream is = response.getInputStream();
+        try {
+           result = parser.parse(is);
+           return result;
+        } finally {
+           is.close();
+        }
+
+       } finally {
+
+        if (result == null) {
+           /*
+            * Error handling path. We issued the request, but were not able
+            * to parse out the response.
+            */
+           if (response != null) {
+              // Make sure the response listener is closed.
+              response.abort();
+           }
+              try {
+              /*
+               * POST request to server to cancel query in case it is
+               * still running.
+               */
+              cancel(queryId);
+              } catch (Exception ex) {log.warn(ex); }
+        }
+
+        if (listener != null) {
+            listener.closed(queryId);
+        }
+
+       }
+
+   }
+
+//   /**
+//    * Counts the #of results in a SPARQL result set.
+//    * 
+//    * @param response
+//    *            The connection from which to read the results.
+//    * 
+//    * @return The #of results.
+//    * 
+//    * @throws Exception
+//    *             If anything goes wrong.
+//    */
+//   protected long countResults(final JettyResponseListener response) throws Exception {
+//
+//       try {
+//
+//           final String contentType = response.getContentType();
+//
+//           final MiniMime mimeType = new MiniMime(contentType);
+//           
+//           final TupleQueryResultFormat format = TupleQueryResultFormat
+//                   .forMIMEType(mimeType.getMimeType());
+//
+//           if (format == null)
+//               throw new IOException(
+//                       "Could not identify format for service response: serviceURI="
+//                               + sparqlEndpointURL + ", contentType=" + contentType
+//                               + " : response=" + response.getResponseBody());
+//
+//           final TupleQueryResultParserFactory factory = TupleQueryResultParserRegistry
+//                   .getInstance().get(format);
+//
+//           if (factory == null)
+//               throw new RuntimeException("No factory for Content-Type: " + contentType);
+//
+//           final TupleQueryResultParser parser = factory.getParser();
+//
+//           final AtomicLong nsolutions = new AtomicLong();
+//
+//           parser.setTupleQueryResultHandler(new TupleQueryResultHandlerBase() {
+//               // Indicates the end of a sequence of solutions.
+//              @Override
+//               public void endQueryResult() {
+//                   // connection close is handled in finally{}
+//               }
+//
+//               // Handles a solution.
+//              @Override
+//               public void handleSolution(final BindingSet bset) {
+//                   if (log.isDebugEnabled())
+//                       log.debug(bset.toString());
+//                   nsolutions.incrementAndGet();
+//               }
+//
+//               // Indicates the start of a sequence of Solutions.
+//              @Override
+//               public void startQueryResult(List<String> bindingNames) {
+//               }
+//           });
+//
+//           parser.parse(response.getInputStream());
+//
+//           if (log.isInfoEnabled())
+//               log.info("nsolutions=" + nsolutions);
+//
+//           // done.
+//           return nsolutions.longValue();
+//
+//       } finally {
+//
+//         if (response != null) {
+//            response.abort();
+//         }
+//         
+//       }
+//
+//   }
 
 }

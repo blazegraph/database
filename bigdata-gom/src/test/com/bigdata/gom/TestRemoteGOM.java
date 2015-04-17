@@ -66,7 +66,6 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -244,7 +243,7 @@ public class TestRemoteGOM extends TestCase {
     }
     
 	public void testSimpleDirectData() throws Exception {
-        final IObjectManager om = new NanoSparqlObjectManager(m_repo,
+        final IObjectManager om = new NanoSparqlObjectManager(m_repo.getRepositoryForDefaultNamespace(),
                 m_namespace);
         try {
             final ValueFactory vf = om.getValueFactory();
@@ -287,7 +286,7 @@ public class TestRemoteGOM extends TestCase {
 	}
 
 	public void testSimpleCreate() throws RepositoryException, IOException {
-		final NanoSparqlObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
+		final NanoSparqlObjectManager om = new NanoSparqlObjectManager(m_repo.getRepositoryForDefaultNamespace(), m_namespace);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");
@@ -319,7 +318,7 @@ public class TestRemoteGOM extends TestCase {
      */
     public void testUpdateThroughput() throws RepositoryException, IOException {
 		
-		final IObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
+		final IObjectManager om = new NanoSparqlObjectManager(m_repo.getRepositoryForDefaultNamespace(), m_namespace);
 		final ValueFactory vf = om.getValueFactory();
 
 		final int transCounter = om.beginNativeTransaction();
@@ -374,7 +373,7 @@ public class TestRemoteGOM extends TestCase {
 	}
 
 	public void testSimpleJSON() throws RepositoryException, IOException {
-		final NanoSparqlObjectManager om = new NanoSparqlObjectManager(m_repo, m_namespace);
+		final NanoSparqlObjectManager om = new NanoSparqlObjectManager(m_repo.getRepositoryForDefaultNamespace(), m_namespace);
 		final ValueFactory vf = om.getValueFactory();
 		
 		final URI keyname = vf.createURI("attr:/test#name");

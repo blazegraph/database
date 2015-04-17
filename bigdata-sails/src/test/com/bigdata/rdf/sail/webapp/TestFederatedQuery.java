@@ -164,8 +164,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      */
     private static final String PREFIX = "openrdf-service/";
 
-    /** The "local" repository. */
-    private RemoteRepositoryManager localRepository;
+//    /** The "local" repository object. */
+//    private RemoteRepository localRepository;
     
     @Override
     public void setUp() throws Exception {
@@ -184,7 +184,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         
         p.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
         
-        localRepository = m_repo;
+//        localRepository = m_repo;
         
     }
 
@@ -246,7 +246,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
       try {
          boolean found = true;
          try {
-            final Properties p = m_repo.getRepositoryProperties(ns);
+            final Properties p = m_mgr.getRepositoryProperties(ns);
             assert p != null;
             found = true;
          } catch (HttpException ex) {
@@ -259,13 +259,13 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final Properties p = new Properties(getProperties());
             p.setProperty(RemoteRepositoryManager.OPTION_CREATE_KB_NAMESPACE,
                   ns);
-            m_repo.createRepository(ns, p);
+            m_mgr.createRepository(ns, p);
          }
       } catch (Exception ex) {
          throw new RuntimeException(ex);
       }
 
-      return m_repo.getRepositoryForNamespace(ns);
+      return m_mgr.getRepositoryForNamespace(ns);
         
     }
     
@@ -295,7 +295,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             if (log.isInfoEnabled())
                 log.info("Loading: " + localData + " into local repository");
 
-            loadDataSet(localRepository, localData);
+            loadDataSet(m_repo, localData);
             
         }
 
@@ -378,7 +378,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         qb.append(" } \n");
 
         final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
-            localRepository).getConnection();
+            m_repo).getConnection();
         
         try {
 
@@ -645,7 +645,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             throws Exception {
         
        final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
-             localRepository).getConnection();
+             m_repo).getConnection();
        
         try {
            

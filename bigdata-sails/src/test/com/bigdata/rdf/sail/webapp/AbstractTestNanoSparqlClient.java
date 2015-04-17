@@ -80,6 +80,7 @@ import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
@@ -127,9 +128,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected HttpClient m_client;
 
     /**
-     * The client-API wrapper to the NSS.
+     * The client-API wrapper for the remote service.
      */
-    protected RemoteRepositoryManager m_repo;
+    protected RemoteRepositoryManager m_mgr;
+    
+    /**
+     * The client-API wrapper to the NSS for the configured default namespace.
+     */
+    protected RemoteRepository m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -333,10 +339,15 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
          * webapp when the client requests the root URL.
          */
 
+        // setup http client.
        	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client,
-                getIndexManager().getExecutorService());
+       	// setup manager for service.
+       	m_mgr = new RemoteRepositoryManager(m_serviceURL, m_client,
+               getIndexManager().getExecutorService());
+       	
+       	// setup client for current namespace on service.
+        m_repo = m_mgr.getRepositoryForNamespace(namespace);
 
 		if (log.isInfoEnabled())
 			log.info("Setup Active Threads: " + Thread.activeCount());
@@ -378,10 +389,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        }
 		
 		log.info("Connection Shutdown Check");
-		
-        m_repo.close();
+
+		  m_mgr.close();
+//        m_repo.close();
         m_client.stop();
-        
+
+        m_mgr = null;
         m_repo = null;
         m_client = null;
         
