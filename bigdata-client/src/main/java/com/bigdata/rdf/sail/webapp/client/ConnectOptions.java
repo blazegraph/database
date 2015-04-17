@@ -44,8 +44,79 @@ public class ConnectOptions extends AbstractConnectOptions {
     */
 	public HttpEntity entity = null;
 
-	public ConnectOptions(String serviceURL) {
-		super(serviceURL);
+	private volatile String requestURL;
+
+   /**
+    * Return the effective request URL
+    * 
+    * @param contextPath
+    *           The context path of the web application.
+    * @param useLBS
+    *           When <code>true</code> the load balancer aware paths will be
+    *           used.
+    * 
+    * @return The effective request URL (cached).
+    */
+	public String getRequestURL(final String contextPath, final boolean useLBS) {
+	   
+      if (contextPath == null)
+         throw new IllegalArgumentException();
+	   
+      if (requestURL == null) {
+
+         if (useLBS) {
+            /*
+             * Use the HA load balancer.
+             */
+            // Index of the WebApp ContextPath in the serviceURL.
+            final int startContextPath = serviceURL.indexOf(contextPath);
+            // Index of the last character in the context path.
+            final int endContextPath = startContextPath + contextPath.length();
+            // The base URL (up to and including the context path).
+            final String baseURL = serviceURL.substring(0, endContextPath);
+            // Everything after that baseURL.
+            final String rest = serviceURL.substring(endContextPath);
+            if (update) {
+               // Request should be proxied to the leader.
+               requestURL = baseURL + "/LBS/leader" + rest;
+            } else {
+               // Request should be load balanced over the services.
+               requestURL = baseURL + "/LBS/read" + rest;
+            }
+         } else {
+            // Use the URL as given.
+            requestURL = serviceURL;
+         }
+      }
+	   
+	   return requestURL;
+	   
+	}
+
+   /**
+    * Return the best URL for error reporting purposes. This is the
+    * <code>serviceURL</code> provided to the constructor unless the
+    * {@link #getRequestURL(String, boolean)} has been set, in which case that
+    * is returned instead.
+    */
+	public String getBestRequestURL() {
+	   
+	   String url = requestURL;
+	   
+	   if(url == null) {
+	      
+	      url = serviceURL;
+	      
+	   }
+	   
+	   return url;
+	   
+	}
+	
+	public ConnectOptions(final String serviceURL) {
+
+	   super(serviceURL);
+	   
 	}
 
 }

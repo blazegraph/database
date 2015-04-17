@@ -60,7 +60,6 @@ import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -156,6 +155,7 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
         
     }
 
+    @Override
     public void setUp() throws Exception {
 
         // instantiate a sail and a Sesame repository
@@ -206,12 +206,13 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
         
         m_repo = new RemoteRepositoryManager(m_serviceURL, m_client, m_indexManager.getExecutorService());
         
-        om = new NanoSparqlObjectManager(m_repo,
+        om = new NanoSparqlObjectManager(m_repo.getRepositoryForDefaultNamespace(),
                 m_namespace); 
 
     }
 
     // FIXME This is probably not tearing down the backing file for the journal!
+    @Override
     public void tearDown() throws Exception {
 
         if (log.isInfoEnabled())
@@ -272,6 +273,7 @@ public class RemoteGOMTestCase extends TestCase implements IGOMProxy  {
     /**
      * Utility to load statements from a resource
      */
+    @Override
     public void load(final URL n3, final RDFFormat rdfFormat)
             throws IOException, RDFParseException, RepositoryException {
         final InputStream in = n3.openConnection().getInputStream();

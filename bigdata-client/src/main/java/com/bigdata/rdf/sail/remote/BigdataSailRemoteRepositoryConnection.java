@@ -1205,7 +1205,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
           * Note: The runnable is not run in the callers thread since otherwise
           * close() will block until it can gain the [remoteTx] monitor.
           */
-         repo.getRemoteRepository().getExecutor().execute(new Runnable() {
+         repo.getRemoteRepository().getRemoteRepositoryManager().getExecutor().execute(new Runnable() {
             @Override
             public void run() {
                /*
@@ -1276,7 +1276,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
          try {
-            remoteTx.set(repo.getRemoteRepository().getTransactionManager()
+            remoteTx.set(repo.getRemoteRepository().getRemoteRepositoryManager().getTransactionManager()
                   .createTx(RemoteTransactionManager.UNISOLATED));
          } catch (Exception e) {
             throw new RepositoryException(e);
@@ -1296,7 +1296,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
          try {
-            remoteTx.set(repo.getRemoteRepository().getTransactionManager()
+            remoteTx.set(repo.getRemoteRepository().getRemoteRepositoryManager().getTransactionManager()
                   .createTx(RemoteTransactionManager.READ_COMMITTED));
          } catch (Exception e) {
             throw new RepositoryException(e);
@@ -1327,7 +1327,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
          try {
-            remoteTx.set(repo.getRemoteRepository().getTransactionManager()
+            remoteTx.set(repo.getRemoteRepository().getRemoteRepositoryManager().getTransactionManager()
                   .createTx(timestamp));
          } catch (Exception e) {
             throw new RepositoryException(e);
