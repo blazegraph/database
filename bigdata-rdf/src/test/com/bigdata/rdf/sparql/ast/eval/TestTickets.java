@@ -617,8 +617,12 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     }
     
     /**
+     * Covering GRAPH ?x {}
+     * 
      * @see <a href="http://trac.bigdata.com/ticket/709">
-     * select ?g { Graph ?g {} } incorrec</a>.
+     * select ?g { Graph ?g {} } incorrec</a> 
+     * @see <a href="http://trac.bigdata.com/ticket/429">
+     * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
      */
     public void test_ticket_709() throws Exception {
        new TestHelper("ticket_709",// testURI,
@@ -629,6 +633,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     } 
 
     /**
+     * Covering GRAPH <uri> {} with in dictionary existing and matching URI
+     * 
      * @see <a href="http://trac.bigdata.com/ticket/429">
      * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
      */
@@ -641,6 +647,8 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
     } 
     
     /**
+     * Covering GRAPH <uri> {} with non-existing and (thus) non-matching URI
+     *
      * @see <a href="http://trac.bigdata.com/ticket/429">
      * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
      */
@@ -649,6 +657,20 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_429b.rq",// queryFileURL
              "ticket_429.trig",// dataFileURL
              "ticket_429b.srx"// resultFileURL
+       ).runTest();    
+    } 
+    
+    /**
+     * Covering GRAPH <uri> {} with in dictionary existing but non-matching URI
+     *
+     * @see <a href="http://trac.bigdata.com/ticket/429">
+     * Optimization for GRAPH uri {} and GRAPH ?foo {}</a>.
+     */
+    public void test_ticket_429c() throws Exception {
+       new TestHelper("ticket_429c",// testURI,
+             "ticket_429c.rq",// queryFileURL
+             "ticket_429.trig",// dataFileURL
+             "ticket_429b.srx"// resultFileURL (not matching: reuse 429b)
        ).runTest();    
     } 
 }
