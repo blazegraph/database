@@ -304,12 +304,9 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
       if (httpClient == null)
          throw new IllegalArgumentException();
 
-      if (httpClient.isStopped() || httpClient.isStopping())
-         throw new IllegalStateException();
-
       if (executor == null)
          throw new IllegalArgumentException();
-       
+
         //super(serviceURL + "/sparql", useLBS, httpClient, executor);
 
         this.baseServiceURL = serviceURL;
@@ -320,6 +317,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
         
         this.executor = executor;
 
+        assertHttpClientRunning();
+        
         this.transactionManager = new RemoteTransactionManager(this);
         
         setMaxRequestURLLength(Integer.parseInt(System.getProperty(
@@ -652,10 +651,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      *      for large POST requests </a>
      */
     public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
-       
-      if (httpClient.isStopped()) {
-         throw new RuntimeException("The client has been stopped");
-      }
+
+       assertHttpClientRunning();
 
         /*
          * Generate the fully formed and encoded URL.
@@ -784,13 +781,19 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
       if (httpClient == null)
          throw new IllegalArgumentException();
 
-      if (httpClient.isStopped())
-         throw new IllegalStateException("The Client has been stopped");
+      assertHttpClientRunning();
 
       return httpClient.newRequest(uri).method(getMethod(method));
 
    }
  
+   private void assertHttpClientRunning() {
+
+      if (httpClient.isStopped()||httpClient.isStopping())
+         throw new IllegalStateException("The HTTPClient has been stopped");
+      
+   }
+
    HttpMethod getMethod(final String method) {
       if (method.equals("GET")) {
          return HttpMethod.GET;
@@ -913,7 +916,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
            final RDFParser parser = factory.getParser();
            
-           // TODO These options should be configurable using RDFParserOptions.
+           // TODO See #1055 (Make RDFParserOptions configurable)
            parser.setValueFactory(new ValueFactoryImpl());
 
            parser.setVerifyData(true);

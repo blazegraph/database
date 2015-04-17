@@ -73,7 +73,8 @@ public class Test_REST_ServiceDescription<S extends IIndexManager> extends
 		assertEquals(
 				1,
 				countMatches(g, null/* service */, SD.endpoint,
-						f.createURI(m_serviceURL + "/sparql")));
+						f.createURI(m_repo.getSparqlEndPoint())));
+//		            f.createURI(m_serviceURL + "/sparql")));
 
 		// Verify description includes supported query and update languages.
 		assertEquals(
