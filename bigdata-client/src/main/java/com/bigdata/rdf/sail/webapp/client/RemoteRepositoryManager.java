@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -110,10 +112,24 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     protected final HttpClient httpClient;
 
+   /**
+    * IFF an {@link HttpClient} was allocated by the constructor, then this is
+    * that reference. When non-<code>null</code> this is always the same
+    * reference as {@link #httpClient}.
+    */
+   private final HttpClient our_httpClient;
+
     /**
      * Thread pool for processing HTTP responses in background.
      */
     protected final Executor executor;
+
+    /**
+     * IFF an {@link Executor} was allocated by the constructor, then this is
+     * that reference. When non-<code>null</code> this is always the same
+     * reference as {@link #executor}.
+     */
+    private final ExecutorService our_executor;
 
     /**
      * The maximum requestURL length before the request is converted into a POST
@@ -239,30 +255,70 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
         }
 
     }
+
+   /**
+    * Create a remote client for the specified serviceURL.
+    * 
+    * @param serviceURL
+    *            The path to the root of the web application (without the
+    *            trailing "/"). <code>/sparql</code> will be appended to this
+    *            path to obtain the SPARQL end point for the default data set.
+    */
+   public RemoteRepositoryManager(final String serviceURL) {
+
+      this(serviceURL, false/* useLBS */);
+
+   }
+
+   /**
+    * Create a remote client for the specified serviceURL that optionally use
+    * the load balanced URLs.
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    * @param useLBS
+    *           When <code>true</code>, the REST API methods will use the load
+    *           balancer aware requestURLs. The load balancer has essentially
+    *           zero cost when not using HA, so it is recommended to always
+    *           specify <code>true</code>. When <code>false</code>, the REST API
+    *           methods will NOT use the load balancer aware requestURLs.
+    */
+   public RemoteRepositoryManager(final String serviceURL, final boolean useLBS) {
+
+      this(serviceURL, useLBS, null/* httpClient */, null/* executor */);
+       
+    }
     
     /**
-	 * 
-	 * @param serviceURL
-	 *            The path to the root of the web application (without the
-	 *            trailing "/"). <code>/sparql</code> will be appended to this
-	 *            path to obtain the SPARQL end point for the default data set.
-	 * @param httpClient
-	 *            If the client implements {@link AutoCloseable} then it will be
-	 *            closed by {@link #close()}.
-	 * @param executor
-	 *            The life cycle of this object is owned by the caller.
-	 * 
-	 *            TODO Should this be deprecated since it does not force the
-	 *            caller to choose a value for <code>useLBS</code>?
-	 *            <p>
-	 *            This version does not force the caller to decide whether or
-	 *            not the LBS pattern will be used. In general, it should be
-	 *            used if the end point is bigdata. This class is generally, but
-	 *            not always, used with a bigdata end point. The main exception
-	 *            is SPARQL Basic Federated Query. For that use case we can not
-	 *            assume that the end point is bigdata and thus we can not use
-	 *            the LBS prefix.
-	 */
+    * Create a remote client for the specified serviceURL.
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    * @param httpClient
+    *           If the client implements {@link AutoCloseable} then it will be
+    *           closed by {@link #close()} (optional). When not present, an
+    *           {@link HttpClient} will be allocated and scoped to this
+    *           {@link RemoteRepositoryManager} instance.
+    * @param executor
+    *           An executor used to service http client requests. (optional).
+    *           When not present, an {@link Executor} will be allocated and
+    *           scoped to this {@link RemoteRepositoryManager} instance.
+    * 
+    *           TODO Should this be deprecated since it does not force the
+    *           caller to choose a value for <code>useLBS</code>?
+    *           <p>
+    *           This version does not force the caller to decide whether or not
+    *           the LBS pattern will be used. In general, it should be used if
+    *           the end point is bigdata. This class is generally, but not
+    *           always, used with a bigdata end point. The main exception is
+    *           SPARQL Basic Federated Query. For that use case we can not
+    *           assume that the end point is bigdata and thus we can not use the
+    *           LBS prefix.
+    */
     public RemoteRepositoryManager(final String serviceURL,
             final HttpClient httpClient, final Executor executor) {
 
@@ -271,63 +327,135 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     }
     
     /**
-	 * Core impl.
-	 * 
-	 * @param serviceURL
-	 *            The path to the root of the web application (without the
-	 *            trailing "/"). <code>/sparql</code> will be appended to this
-	 *            path to obtain the SPARQL end point for the default data set.
-	 * @param useLBS
-	 *            When <code>true</code>, the REST API methods will use the load
-	 *            balancer aware requestURLs. The load balancer has essentially
-	 *            zero cost when not using HA, so it is recommended to always
-	 *            specify <code>true</code>. When <code>false</code>, the REST
-	 *            API methods will NOT use the load balancer aware requestURLs.
-	 * @param httpClient
-	 *            If the client implements {@link AutoCloseable} then it will be
-	 *            closed by {@link #close()}.
-	 * @param executor
-	 *            The life cycle of this object is owned by the caller.
-	 * 
-	 *            TODO We could define a constructor that creates the
-	 *            {@link HttpClient} and {@link Executor} and then "autocloses"
-	 *            them. This would simplify some test code, and might help some
-	 *            client application code, but it would not be used internally.
-	 */
-    public RemoteRepositoryManager(final String serviceURL,
-            final boolean useLBS, final HttpClient httpClient,
-            final Executor executor) {
+    * Create a remote client for the specified serviceURL (core impl).
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    * @param useLBS
+    *           When <code>true</code>, the REST API methods will use the load
+    *           balancer aware requestURLs. The load balancer has essentially
+    *           zero cost when not using HA, so it is recommended to always
+    *           specify <code>true</code>. When <code>false</code>, the REST API
+    *           methods will NOT use the load balancer aware requestURLs.
+    * @param httpClient
+    *           If the client implements {@link AutoCloseable} then it will be
+    *           closed by {@link #close()} (optional). When not present, an
+    *           {@link HttpClient} will be allocated and scoped to this
+    *           {@link RemoteRepositoryManager} instance.
+    * @param executor
+    *           An executor used to service http client requests. (optional).
+    *           When not present, an {@link Executor} will be allocated and
+    *           scoped to this {@link RemoteRepositoryManager} instance.
+    */
+   public RemoteRepositoryManager(final String serviceURL,
+         final boolean useLBS, final HttpClient httpClient,
+         final Executor executor) {
 
       if (serviceURL == null)
          throw new IllegalArgumentException();
 
-      if (httpClient == null)
-         throw new IllegalArgumentException();
+      this.baseServiceURL = serviceURL;
 
-      if (executor == null)
-         throw new IllegalArgumentException();
+      this.useLBS = useLBS;
 
-        //super(serviceURL + "/sparql", useLBS, httpClient, executor);
+      if (httpClient == null) {
 
-        this.baseServiceURL = serviceURL;
+         /*
+          * Allocate the HttpClient. It will be closed when this class is
+          * closed.
+          */
+         this.httpClient = our_httpClient = HttpClientConfigurator
+               .getInstance().newInstance();
 
-        this.useLBS = useLBS;
-        
-        this.httpClient = httpClient;
-        
-        this.executor = executor;
+      } else {
 
-        assertHttpClientRunning();
-        
-        this.transactionManager = new RemoteTransactionManager(this);
-        
-        setMaxRequestURLLength(Integer.parseInt(System.getProperty(
-                MAX_REQUEST_URL_LENGTH,
-                Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
-        
-        setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
+         /*
+          * Note: Client *might* be AutoCloseable, in which case we will close
+          * it.
+          */
+         this.httpClient = httpClient;
+         this.our_httpClient = null;
 
-    }
+      }
+
+      if (executor == null) {
+
+         /*
+          * Allocate the executor. It will be shutdown when this class is
+          * closed.
+          * 
+          * See #1191 (remote connection uses non-daemon thread pool).
+          */
+         this.executor = our_executor = Executors
+               .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+
+      } else {
+
+         // We are using the caller's executor. We will not shut it down.
+         this.executor = executor;
+         this.our_executor = null;
+
+      }
+
+      assertHttpClientRunning();
+
+      this.transactionManager = new RemoteTransactionManager(this);
+
+      setMaxRequestURLLength(Integer.parseInt(System.getProperty(
+            MAX_REQUEST_URL_LENGTH,
+            Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
+
+      setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
+
+   }
+
+   @Override
+   public void close() throws Exception {
+
+      if (!m_closed) {
+         // Already closed.
+         return;
+      }
+
+      if (httpClient instanceof AutoCloseable) {
+
+         /*
+          * If the caller passed in an AutoCloseable HttpClient, then we shut it
+          * down now.
+          */
+         ((AutoCloseable) httpClient).close();
+
+      }
+
+      if (our_httpClient != null) {
+
+         /*
+          * This HttpClient was allocated by our constructor. We will shut it
+          * down now (unless it is already stopping or stopped).
+          */
+
+         if (!our_httpClient.isStopping() && !our_httpClient.isStopped()) {
+
+            our_httpClient.stop();
+            
+         }
+
+      }
+      
+      if (our_executor != null) {
+
+         /*
+          * This thread pool was allocated by our constructor. Shut it down now.
+          */
+         our_executor.shutdownNow();
+         
+      }
+
+      m_closed = true;
+
+   }
 
     @Override
     public String toString() {
@@ -361,8 +489,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     public RemoteRepository getRepositoryForDefaultNamespace() {
      
-      return new RemoteRepository(this,
-            getRepositoryBaseURLForNamespace(DEFAULT_NAMESPACE) + "/sparql");
+      return new RemoteRepository(this, baseServiceURL + "/sparql");
+//            getRepositoryBaseURLForNamespace(DEFAULT_NAMESPACE) + "/sparql");
 
     }
     
@@ -620,24 +748,6 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
     }
 
-    @Override
-	public void close() throws Exception {
-
-		if (!m_closed) {
-			// Already closed.
-			return;
-		}
-
-		if (httpClient instanceof AutoCloseable) {
-
-			((AutoCloseable) httpClient).close();
-
-		}
-
-		m_closed = true;
-
-	}
-
     /**
      * Connect to a SPARQL end point (GET or POST query only).
      * 
@@ -776,7 +886,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
     }
 
-    Request newRequest(final String uri, final String method) {
+    public Request newRequest(final String uri, final String method) {
 
       if (httpClient == null)
          throw new IllegalArgumentException();

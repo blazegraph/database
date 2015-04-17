@@ -109,7 +109,6 @@ import org.openrdf.rio.helpers.StatementCollector;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
@@ -377,8 +376,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         qb.append("     ?X a <" + FOAF.PERSON + "> . \n");
         qb.append(" } \n");
 
-        final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
-            m_repo).getConnection();
+        final BigdataSailRemoteRepositoryConnection conn = m_repo.getBigdataSailRemoteRepository().getConnection();
         
         try {
 
@@ -644,8 +642,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final String expectedResultFile, final boolean checkOrder)
             throws Exception {
         
-       final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
-             m_repo).getConnection();
+        final BigdataSailRemoteRepositoryConnection conn = m_repo
+               .getBigdataSailRemoteRepository().getConnection();
        
         try {
            

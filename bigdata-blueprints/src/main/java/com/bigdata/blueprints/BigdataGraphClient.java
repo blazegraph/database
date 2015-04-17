@@ -75,7 +75,7 @@ public class BigdataGraphClient extends BigdataGraph {
 	
 	public BigdataGraphClient(final RemoteRepository repo, 
 			final BlueprintsValueFactory factory) {
-	    this(new BigdataSailRemoteRepository(repo), factory);
+	    this(repo.getBigdataSailRemoteRepository(), factory);
 	}
 	
     public BigdataGraphClient(final BigdataSailRemoteRepository repo) {
