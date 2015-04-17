@@ -27,14 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.Collection;
-import java.util.LinkedList;
-
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.Var;
-import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -45,8 +40,11 @@ import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -147,14 +145,6 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
  * @version $Id: ASTEmptyGroupOptimizer.java 5177 2011-09-12 17:49:44Z
  *          thompsonbry $
  * 
- *          FIXME Semantics for GRAPH ?g {} (and unit test).
- * 
- *          FIXME Semantics for GRAPH <uri> {} (and unit test). We preresolve
- *          the named graph IVs. If the IV is null, then we can prune the tree
- *          (this is related to pruning statement patterns with unknown IVs).
- *          Otherwise we need to verify that there is at least one statement in
- *          that named graph.
- * 
  *          TODO If <code>?g</code> can be statically analyzed as being bound to
  *          a specific constant then we would rewrite <code>?g</code> using
  *          Constant/2 and then handle this as <code>GRAPH uri {}</code>
@@ -180,8 +170,6 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
         // The data set node (if any).
         final DatasetNode dataSet = queryRoot.getDataset();
 
-        // TODO The set of graphGroups is unused. Remove from code?
-        final Collection<JoinGroupNode> graphGroups = new LinkedList<JoinGroupNode>();
         {
 
             // WHERE clause for named subqueries.
@@ -191,16 +179,15 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                         .getNamedSubqueries()) {
 
                     visitGroups(context, dataSet,
-                            namedSubquery.getWhereClause(), null/* context */,
-                            graphGroups);
-
+                            namedSubquery.getWhereClause(), null/* context */);
                 }
 
             }
 
             // Top-level WHERE clause.
             visitGroups(context, dataSet, queryRoot.getWhereClause(),
-                    null/* context */, graphGroups);
+                    null/* context */);
+
 
         }
 
@@ -221,7 +208,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
      * @param dataSet
      * @param group
      * @param graphContext
-     * @param graphGroups
+     * @param parent
      */
     @SuppressWarnings("unchecked")
     private void visitGroups(
@@ -229,8 +216,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             final IEvaluationContext context,//
             final DatasetNode dataSet,//
             final IGroupNode<IGroupMemberNode> group, //
-            TermNode graphContext,//
-            final Collection<JoinGroupNode> graphGroups//
+            TermNode graphContext//
             ) {
 
         if (group instanceof JoinGroupNode && group.getContext() != null) {
@@ -309,26 +295,59 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             }
 
             /**
-             * Handle edge cases GRAPH ?g { }, which require special handling
-             * (if not rewritten, it won't return any results).
+             * Handle edge cases GRAPH ?g { } and GRAPH <uri>, which require
+             * special handling (if not rewritten, they will return wrong
+             * results in some cases).
              */
             if (group.isEmpty() && graphContext.isVariable()) {
 
                // our approach is to wrap around a dummy graph pattern with
                // a distinct term scan annotation
-               final VarNode s = new VarNode((Var<IV>)Var.var());
-               final VarNode p = new VarNode((Var<IV>)Var.var());
-               final VarNode o = new VarNode((Var<IV>)Var.var());
-               
                final StatementPatternNode sp = 
                   new StatementPatternNode(
-                  s, p, o, graphContext, Scope.NAMED_CONTEXTS);
+                     VarNode.freshVarNode(),
+                     VarNode.freshVarNode(),
+                     VarNode.freshVarNode(), 
+                     graphContext, Scope.NAMED_CONTEXTS);
                sp.setDistinctTermScanVar((VarNode)graphContext);
 
                group.addChild(sp);
-            }            
-            
-            graphGroups.add((JoinGroupNode) group);
+               
+            } else if (group.isEmpty() && graphContext.isConstant()) {
+               
+               /**
+                *  We need to verify that there is one or more stmt in that
+                *  named graph. We do that using an ASK subquery.
+                *  
+                *  Note that it is *not* safe to drop the whole construct, even
+                *  if we statically detect that the graphContext IV is not in
+                *  the dictionary. As a counter example, consider the query
+                *  
+                *  SELECT * {
+                *    GRAPH <http://uri.not.in.dictionary> { }
+                *  }
+                *  
+                *  The expected result is the empty set, but when removing the
+                *  GRAPH pattern completely, we get SELECT * WHERE {}, which
+                *  gives the empty binding set as result. Catching cases where
+                *  the pattern can be dropped seems not worth the effort, in
+                *  particular considering that the ASK query for the simple
+                *  pattern should be quite efficient anyways.
+                */
+               final StatementPatternNode sp = 
+                  new StatementPatternNode(
+                     VarNode.freshVarNode(),
+                     VarNode.freshVarNode(),
+                     VarNode.freshVarNode(), 
+                     graphContext, Scope.NAMED_CONTEXTS);
+                     
+               final SubqueryRoot subquery = new SubqueryRoot(QueryType.ASK);
+               final ProjectionNode projection = new ProjectionNode();
+               subquery.setProjection(projection);
+               subquery.addArg(new JoinGroupNode(sp));
+               group.addChild(sp);                  
+               
+            }
 
         }
 
@@ -404,9 +423,8 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
             /*
              * Recursion.
              */
-
             visitGroups(context, dataSet, (IGroupNode<IGroupMemberNode>) child,
-                    graphContext, graphGroups);
+                    graphContext);
 
         }
 
