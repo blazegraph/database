@@ -33,7 +33,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -58,6 +58,12 @@ import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
  * {@link BigdataSailRemoteRepositoryConnection}.
  * 
  * @param <S>
+ * 
+ * FIXME *** Can we run the same repository test suite that we use for embedded
+ * tests?
+ * 
+ * FIXME *** Verify that we are running the full embedded repository test suite,
+ * including the tests for the extended transaction API.
  */
 public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
@@ -164,7 +170,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
           final URI... c//
           ) throws Exception {
 
-		return m_cxn.getStatements(s, p, o, false, c);
+		return m_cxn.getStatements(s, p, o, false/*includeInferred*/, c);
 		
 	}
 
@@ -353,7 +359,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_INSERT_veryLargeLiteral() throws Exception {
 
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
         
         final URI s = new URIImpl("http://www.bigdata.com/");
         final URI p = RDFS.LABEL;
@@ -879,6 +885,11 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 
         assertEquals(0, result);
         
+    }
+    
+    // FIXME *** TX test suite for BigdataSailRemoteRepositoryConnection
+    public void test_tx_01() {
+       fail("write transaction test suite");
     }
     
 

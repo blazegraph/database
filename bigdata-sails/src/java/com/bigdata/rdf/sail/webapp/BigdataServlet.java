@@ -47,6 +47,7 @@ import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.NV;
 
 /**
  * Useful glue for implementing service actions, but does not directly implement
@@ -500,16 +501,25 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     * @param mimeType
     *           The MIME type of the response.
     * @param content
-    *           The content
+    *           The content (optional).
+    * @param headers
+    *           Zero or more headers.
+    * 
     * @throws IOException
     */
    static protected void buildAndCommitResponse(final HttpServletResponse resp,
-         final int status, final String mimeType, final String content)
-         throws IOException {
+         final int status, final String mimeType, final String content,
+         final NV... headers) throws IOException {
 
       resp.setStatus(status);
 
       resp.setContentType(mimeType);
+
+      for (NV nv : headers) {
+         
+         resp.setHeader(nv.getName(), nv.getValue());
+     
+      }
 
       final Writer w = resp.getWriter();
 

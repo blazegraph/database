@@ -23,13 +23,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.StringWriter;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
+import com.bigdata.service.IBigdataFederation;
+import com.bigdata.service.ITxState;
+import com.bigdata.util.InnerCause;
+import com.bigdata.util.NV;
 
 /**
  * Servlet provides a REST interface for managing stand-off read/write
@@ -67,22 +77,31 @@ public class TxServlet extends BigdataRDFServlet {
    static private final transient Logger log = Logger
          .getLogger(TxServlet.class);
 
-//   /**
-//    * The name of the parameter/attribute that contains the SPARQL query.
-//    * <p>
-//    * Note: This can be either a URL query parameter or a servlet request
-//    * attribute. The latter is used to support chaining of a linked data GET as
-//    * a SPARQL DESCRIBE query.
-//    */
-//   static final transient String ATTR_QUERY = "query";
+   /**
+    * The URL query parameter for a PREPARE message.
+    */
+   static final transient String ATTR_PREPARE = "PREPARE";
 
-//   /**
-//    * The name of the URL query parameter which indicates the timestamp against
-//    * which an operation will be carried out.
-//    * 
-//    * @see BigdataRDFServlet#getTimestamp(HttpServletRequest)
-//    */
-//   static final transient String ATTR_TIMESTAMP = "timestamp";
+   /**
+    * The URL query parameter for a COMMIT message.
+    */
+   static final transient String ATTR_COMMIT = "COMMIT";
+
+   /**
+    * The URL query parameter for a ABORT message.
+    */
+   static final transient String ATTR_ABORT = "ABORT";
+
+   /**
+    * The URL query parameter for a STATUS message.
+    */
+   static final transient String ATTR_STATUS = "STATUS";
+
+   /**
+    * The name of the URL query parameter which indicates the timestamp for a
+    * CREATE message.
+    */
+   static final transient String ATTR_TIMESTAMP = QueryServlet.ATTR_TIMESTAMP;
 
    public TxServlet() {
 
@@ -96,22 +115,601 @@ public class TxServlet extends BigdataRDFServlet {
    protected void doPost(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
-      throw new UnsupportedOperationException();
+      if (!isReadable(getServletContext(), req, resp)) {
+
+         // Service must be available.
+         return;
+      }
+
+      if (req.getRequestURI().endsWith("/tx")) {
+
+         // CREATE-TX
+         doCreateTx(req, resp);
+
+         return;
+
+      } else if (req.getParameter(ATTR_PREPARE) != null) {
+
+         doPrepareTx(req, resp);
+
+      } else if (req.getParameter(ATTR_ABORT) != null) {
+
+         doAbortTx(req, resp);
+
+      } else if (req.getParameter(ATTR_COMMIT) != null) {
+
+         doCommitTx(req, resp);
+
+      } else if (req.getParameter(ATTR_STATUS) != null) {
+
+         doStatusTx(req, resp);
+
+      } else {
+
+         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+               MIME_TEXT_HTML, "Unknown transaction management request");
+
+      }
 
    }
 
-   /**
-    * TODO Does it make sense to allow any GET requests? I can not think of a
-    * reason why we would want to allow HTTP caching for transaction management.
-    * Maybe for a list of open transactions? Maybe we can allow GET for the tx
-    * status or list of open transactions if we explicitly disable caching in
-    * the HTTP response headers?
-    */
    @Override
    protected void doGet(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
-      throw new UnsupportedOperationException();
+      if (!isReadable(getServletContext(), req, resp)) {
+
+         // Service must be available.
+         return;
+      }
+
+      if (req.getRequestURI().endsWith("/tx")) {
+
+         // LIST-TX
+         doListTx(req, resp);
+
+         return;
+
+      } else if (req.getParameter(ATTR_STATUS) != null) {
+
+         doStatusTx(req, resp);
+
+      } else {
+
+         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+               MIME_TEXT_HTML, "Unknown transaction management request");
+
+      }
+
+   }
+
+   /** <code>CREATE-TX(?timestamp=...)</code> */
+   private void doCreateTx(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      // Note: This parameter has default values for CREATE-TX.
+      final long timestamp = getTimestamp(req);
+
+      if (timestamp == ITx.UNISOLATED) {
+
+         // read/write transaction.
+
+         if (!isWritable(getServletContext(), req, resp)) {
+            // Service must be writable.
+            return;
+         }
+
+         if (getIndexManager() instanceof IBigdataFederation) {
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+                  MIME_TEXT_HTML,
+                  "Scale-out does not support distributed read/write transactions");
+
+         }
+
+      } else if (timestamp == ITx.READ_COMMITTED) {
+
+         // read-only transaction reading from the lastCommitTime.
+
+      } else if (timestamp > ITx.UNISOLATED) {
+
+         /*
+          * Create a read-only transaction reading from the most recent
+          * committed state whose commit timestamp is less than or equal to
+          * timestamp.
+          */
+
+      } else {
+
+         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+               MIME_TEXT_HTML, "Illegal value: timestamp=" + timestamp);
+
+      }
+
+      try {
+
+         /*
+          * Now that we have validated the request, create the transaction and
+          * report it to the client.
+          */
+
+         final long txId = getBigdataRDFContext().newTx(timestamp);
+
+         final ITx tx = ((Journal) getIndexManager()).getTransactionManager()
+               .getTx(txId);
+
+         // TODO This URL is correct IFF we only allow CREATE-TX at the correct
+         // path.
+         final String txURL = req.getRequestURL().append('/')
+               .append(Long.valueOf(txId)).toString();
+
+         final StringWriter w = new StringWriter();
+
+         final XMLBuilder t = new XMLBuilder(w);
+
+         t.root("tx")//
+               .attr("txId", txId)//
+               .attr("readsOnCommitTime", tx.getReadsOnCommitTime())//
+               .attr("readOnly", tx.isReadOnly())//
+               .attr("aborted", tx.isAborted())//
+               .attr("committed", tx.isCommitted())//
+               .close();
+
+         buildAndCommitResponse(resp, HttpServletResponse.SC_CREATED,
+               MIME_APPLICATION_XML, w.toString(), new NV("Location", txURL));
+
+      } catch (Throwable t) {
+
+         launderThrowable(t, resp, "CREATE-TX");
+
+      }
+
+   }
+
+   /**
+    * Return <code>true</code> iff a transaction identifier was parsed from the
+    * request and otherwise commit a {@link HttpServletResponse#SC_BAD_REQUEST}
+    * response.
+    * <p>
+    * COMMIT-TX, ABORT-TX, PREPARE-TX, and STATUS-TX all need to extract the
+    * transaction identifier from the last component of the path which should be
+    * <code>/tx/txId</code>.
+    * 
+    * @param req
+    *           The request.
+    * @param resp
+    *           The response.
+    * @param ref
+    *           The transaction identifier will be saved in this reference.
+    * @return <code>true</code> if a transaction identifier was extracted. if
+    *         <code>false</code> then no transaction identifier was found and a
+    *         {@link HttpServletResponse#SC_BAD_REQUEST} response was committed.
+    * 
+    * @throws IOException
+    */
+   private final boolean getTxId(final HttpServletRequest req,
+         final HttpServletResponse resp, final AtomicLong ref) throws IOException {
+      
+      /*
+       * The path info follows the servlet and starts with /. So for
+       * "/bigdata/tx/559" this will be "/559". We strip of the leading "/" and
+       * the rest is the transaction identifier.
+       */
+      final String pathInfo = req.getPathInfo();
+      
+      assert pathInfo != null;
+      
+      if (pathInfo.length() < 2) {
+         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+               MIME_TEXT_HTML, "No transaction identifier in path: pathInfo="
+                     + pathInfo);
+         return false;
+      }
+
+      // This should be the transaction identifier.
+      final String s = pathInfo.substring(1/* beginIndex */);
+
+      /*
+       * Validate the transaction identifier syntactically.
+       */
+      for (int i = 0; i < s.length(); i++) {
+         if (!Character.isDigit(s.charAt(i)) && s.charAt(i) != '-') {
+            buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+                  MIME_TEXT_HTML,
+                  "Transaction identifier is not numeric: pathInfo=" + pathInfo);
+            return false;
+         }
+      }
+
+      final long txId = Long.valueOf(s);
+      
+      ref.set(txId);
+      
+      return true;
+
+   }
+   
+   /**
+    * ABORT-TX(txId)
+    */
+   private void doAbortTx(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      final AtomicLong txId = new AtomicLong();
+
+      if (!getTxId(req, resp, txId))
+         return;
+
+      try {
+
+         if (getIndexManager() instanceof IBigdataFederation) {
+
+            ((IBigdataFederation<?>) getIndexManager()).getTransactionService()
+                  .abort(txId.get());
+
+         } else {
+
+            // On the journal we can lookup the Tx.
+            final ITx tx = ((Journal) getIndexManager())
+                  .getTransactionManager().getTx(txId.get());
+
+            if (tx == null) {
+
+               // No such transaction.
+               buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                     MIME_TEXT_PLAIN, "ABORT-TX: Transaction not found: txId="
+                           + txId);
+               return;
+
+            }
+
+            if (!tx.isEmptyWriteSet()) {
+               // Dirty tx. Must be leader.
+               if (!isWritable(getServletContext(), req, resp)) {
+                  // Service must be writable.
+                  return;
+               }
+            }
+
+            ((Journal) getIndexManager()).abort(txId.get());
+
+         }
+
+         buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
+               MIME_TEXT_PLAIN, "Aborted: " + txId);
+
+      } catch (Throwable t) {
+
+         if (InnerCause.isInnerCause(t, IllegalStateException.class)) {
+            
+            /*
+             * TODO This is pretty diagnostic for the Journal. For scale-out
+             * there could be other root causes that might throw the same
+             * exception. We could make this 100% diagnostic by subclassing
+             * IllegalStateException and throwing a typed
+             * TransactionNotFoundException. At which point this condition could
+             * be pushed down inside of launderThrowabler()
+             */
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                  MIME_TEXT_PLAIN, "ABORT-TX: Transaction not found: txId="
+                        + txId);
+
+            return;
+            
+         }
+
+         // some other error.
+         launderThrowable(t, resp, "ABORT-TX:: txId=" + txId);
+         
+      }
+
+   }
+
+   /**
+    * COMMIT-TX(txId)
+    */
+   private void doCommitTx(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+      
+      final AtomicLong txId = new AtomicLong();
+
+      if (!getTxId(req, resp, txId))
+         return;
+
+      try {
+
+         if (getIndexManager() instanceof IBigdataFederation) {
+
+            ((IBigdataFederation<?>) getIndexManager()).getTransactionService()
+                  .commit(txId.get());
+
+         } else {
+
+            // On the journal we can lookup the Tx.
+            final ITx tx = ((Journal) getIndexManager())
+                  .getTransactionManager().getTx(txId.get());
+
+            if (tx == null) {
+
+               // No such transaction.
+               buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                     MIME_TEXT_PLAIN, "COMMIT-TX: Transaction not found: txId="
+                           + txId);
+               return;
+
+            }
+
+            if (!tx.isEmptyWriteSet()) {
+               // Dirty tx. Must be leader.
+               if (!isWritable(getServletContext(), req, resp)) {
+                  // Service must be writable.
+                  return;
+               }
+            }
+
+            ((Journal) getIndexManager()).commit(txId.get());
+
+         }
+         
+         buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
+               MIME_TEXT_PLAIN, "Committed: " + txId);
+
+      } catch (Throwable t) {
+
+         if (InnerCause.isInnerCause(t, IllegalStateException.class)) {
+            
+            /*
+             * TODO This is pretty diagnostic for the Journal. For scale-out
+             * there could be other root causes that might throw the same
+             * exception. We could make this 100% diagnostic by subclassing
+             * IllegalStateException and throwing a typed
+             * TransactionNotFoundException. At which point this condition could
+             * be pushed down inside of launderThrowabler()
+             */
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                  MIME_TEXT_PLAIN, "COMMIT-TX: Transaction not found: txId="
+                        + txId);
+
+            return;
+            
+         }
+
+         // some other error.
+         launderThrowable(t, resp, "COMMIT-TX:: txId=" + txId);
+         
+      }
+
+   }
+
+   /**
+    * <code>PREPARE-TX(txId)</code>
+    * 
+    * FIXME Test suite for this at the Journal level. Make sure that there are
+    * no undesired side-effects from validation. For example, the writeSet of
+    * the tx is modified by validation if a conflict is resolved. Is that
+    * modification Ok if we do not go ahead and commit? Should it be rolled
+    * back? Can we have additional writes on the tx and reconcile additional
+    * conflicts in another PREPARE or a COMMIT?
+    */
+   private void doPrepareTx(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      final long begin = System.nanoTime();
+
+      final AtomicLong txId = new AtomicLong();
+
+      if (!getTxId(req, resp, txId))
+         return;
+
+      final boolean ok;
+      try {
+
+         if (getIndexManager() instanceof IBigdataFederation) {
+
+            // Scale-out does not have read/write transactions. This is a NOP.
+            ok = true;
+
+         } else {
+
+            // On the journal we can lookup the Tx.
+            final ITx tx = ((Journal) getIndexManager())
+                  .getTransactionManager().getTx(txId.get());
+
+            if (tx == null) {
+
+               // No such transaction.
+               buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                     MIME_TEXT_PLAIN,
+                     "PREPARE-TX: Transaction not found: txId=" + txId);
+
+               return;
+
+            }
+
+            if (!tx.isEmptyWriteSet()) {
+               // Dirty tx. Must be leader.
+               if (!isWritable(getServletContext(), req, resp)) {
+                  // Service must be writable.
+                  return;
+               }
+            }
+
+            ok = ((Journal) getIndexManager()).prepare(txId.get());
+
+         }
+
+         final long elapsed = System.nanoTime() - begin;
+
+         buildAndCommitBooleanResponse(resp, ok,
+               TimeUnit.NANOSECONDS.toMillis(elapsed));
+
+      } catch (Throwable t) {
+
+         if (InnerCause.isInnerCause(t, IllegalStateException.class)) {
+
+            /*
+             * TODO This is pretty diagnostic for the Journal. For scale-out
+             * there could be other root causes that might throw the same
+             * exception. We could make this 100% diagnostic by subclassing
+             * IllegalStateException and throwing a typed
+             * TransactionNotFoundException. At which point this condition could
+             * be pushed down inside of launderThrowabler()
+             */
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                  MIME_TEXT_PLAIN, "PREPARE-TX: Transaction not found: txId="
+                        + txId);
+
+            return;
+
+         }
+
+         // some other error.
+         launderThrowable(t, resp, "PREPARE-TX:: txId=" + txId);
+
+      }
+
+   }
+
+   /**
+    * <code>STATUS-TX</code>
+    * 
+    * TODO IFF GET sure that caching is disabled for this!
+    */
+   private void doStatusTx(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      final long begin = System.nanoTime();
+
+      final AtomicLong txId = new AtomicLong();
+
+      if (!getTxId(req, resp, txId))
+         return;
+
+      try {
+
+         if (getIndexManager() instanceof IBigdataFederation) {
+
+            // Scale-out does not have read/write transactions. This is a NOP.
+
+         } else {
+
+            // On the journal we can lookup the Tx.
+            final ITx tx = ((Journal) getIndexManager())
+                  .getTransactionManager().getTx(txId.get());
+
+            if (tx == null) {
+
+               // No such transaction.
+               buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                     MIME_TEXT_PLAIN,
+                     "STATUS-TX: Transaction not found: txId=" + txId);
+
+               return;
+
+            }
+
+            final StringWriter w = new StringWriter();
+
+            final XMLBuilder t = new XMLBuilder(w);
+
+            t.root("tx")//
+                  .attr("txId", txId)//
+                  .attr("readsOnCommitTime", tx.getReadsOnCommitTime())//
+                  .attr("readOnly", tx.isReadOnly())//
+                  .attr("aborted", tx.isAborted())//
+                  .attr("committed", tx.isCommitted())//
+                  .close();
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
+                  MIME_APPLICATION_XML, w.toString());
+
+         }
+
+      } catch (Throwable t) {
+
+         if (InnerCause.isInnerCause(t, IllegalStateException.class)) {
+
+            /*
+             * TODO This is pretty diagnostic for the Journal. For scale-out
+             * there could be other root causes that might throw the same
+             * exception. We could make this 100% diagnostic by subclassing
+             * IllegalStateException and throwing a typed
+             * TransactionNotFoundException. At which point this condition could
+             * be pushed down inside of launderThrowabler()
+             */
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                  MIME_TEXT_PLAIN, "STATUS-TX: Transaction not found: txId="
+                        + txId);
+
+            return;
+
+         }
+
+         // some other error.
+         launderThrowable(t, resp, "PREPARE-TX:: txId=" + txId);
+
+      }
+
+   }
+
+   /**
+    * <code>LIST-TX</code>
+    */
+   private void doListTx(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      final ITxState[] a;
+      if (getIndexManager() instanceof IBigdataFederation) {
+
+         // NOP
+         a = new ITxState[] {};
+
+      } else {
+
+         // The Journal will self-report the active transactions.
+         a = ((Journal) getIndexManager()).getTransactionManager()
+               .getActiveTx();
+
+      }
+
+      final StringWriter w = new StringWriter();
+
+      final XMLBuilder t = new XMLBuilder(w);
+
+      final Node root = t.root("transactions");
+      
+      for (ITxState tx : a) {
+
+         root.node("tx")//
+               .attr("txId", tx.getStartTimestamp())//
+               .attr("readsOnCommitTime", tx.getReadsOnCommitTime())//
+               .attr("readOnly", tx.isReadOnly())//
+               .attr("aborted", tx.isAborted())//
+               .attr("committed", tx.isCommitted())//
+               .close();
+
+      }
+
+      /*
+       * TODO What is an appropriate cache strategy here?
+       */
+      buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
+            MIME_APPLICATION_XML, w.toString(), //
+            // disable caching.
+            new NV("Cache-Control", "no-cache")
+            /*
+             * Sets the cache behavior -- the data should be good for up to 60
+             * seconds unless you change the query parameters. These cache
+             * control parameters SHOULD indicate that the response is valid for
+             * 60 seconds, that the client must revalidate, and that the
+             * response is cachable even if the client was authenticated.
+             */
+//            new NV("Cache-Control", "max-age=60, must-revalidate, public")//
+      );
 
    }
 
