@@ -121,7 +121,6 @@ import com.bigdata.service.IDataService;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ITransactionService extends ITimestampService {
 

@@ -83,86 +83,6 @@ public class RemoteTransactionManager {
       
    }
 
-   /**
-    * Interface for blazegraph transactions on the client.
-    * 
-    * @author bryan
-    * 
-    * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
-    *      transactions in the REST API</a>
-    */
-   public static interface IRemoteTx {
-
-      /**
-       * The transaction identifier. Negative values are read/write transaction
-       * identifiers. Positive values are read-only transaction identifiers.
-       * 
-       * @see com.bigdata.journal.ITx
-       * @see com.bigdata.journal.TimestampUtility
-       */
-      long getTxId();
-      
-      /**
-       * The commit point on which the transaction is reading.
-       */
-      long getReadsOnCommitTime();
-
-      /**
-       * Return <code>true</code> if the transaction is read-only (does not
-       * permit mutation operations).
-       */
-      boolean isReadOnly();
-      
-      /**
-       * Return <code>true</code> iff the client believes that transaction is
-       * active (it exists and has not been aborted nor committed). Note that
-       * the transaction may have been aborted on the server, in which case the
-       * client will not know this until it tries to {@link #prepare()},
-       * {@link #abort()}, or {@link #commit()}.
-       * 
-       * @throws Exception 
-       */
-      boolean isActive() throws Exception;
-
-      /**
-       * Return true if the write set of the transaction passes validation at
-       * the time that the server processes this request. If a transaction fails
-       * validation then {@link #commit()} will fail for that transaction. If it
-       * passes validation, then {@link #commit()} is not known to fail at this
-       * time.
-       * <p>
-       * Note: transactions always validate during {@link #commit()}. Invoking
-       * this method explicitly is discouraged since it just adds overhead
-       * unless you are actually going to gain something from the information.
-       * 
-       * @throws Exception 
-       */
-      boolean prepare() throws TransactionNotActiveException, Exception;
-
-      /**
-       * Aborts a read/write transaction (discarding its write set) -or-
-       * deactivates a read-only transaction.
-       * <p>
-       * Note: You MUST always either {@link #abort()} or {@link #commit()} a
-       * read-only transaction in order to release the resources on the server!
-       * 
-       * @throws Exception 
-       */
-      void abort() throws TransactionNotActiveException, Exception;
-      
-      /**
-       * Prepares and commits a read/write transaction -or- deactivates a
-       * read-only transaction.
-       * <p>
-       * Note: You MUST always either {@link #abort()} or {@link #commit()} a
-       * read-only transaction in order to release the resources on the server!
-       * 
-       * @throws Exception 
-       */
-      void commit() throws TransactionNotActiveException, Exception;
-      
-   }
-   
    private class RemoteTx implements IRemoteTx {
 
       /**
@@ -190,7 +110,7 @@ public class RemoteTransactionManager {
       private Object lock = this;
       
       RemoteTx(final long txId, final long readsOnCommitTime) {
-         if (txId < -1L) {
+         if (txId == -1L) {
             // This is the symbolic constant for a READ_COMMITTED operation. It
             // is not a transaction identifier.
             throw new IllegalArgumentException();
@@ -242,15 +162,15 @@ public class RemoteTransactionManager {
       // TODO Expose STATUS-TX result.
 //      @Override
       public boolean isActive() throws Exception {
-         if (!active.get()) {
-            // Known to be inactive.
-            return false;
-         }
-         synchronized (lock) {
-            // Ask the server and update our flag state.
-            final boolean isActive = statusTx(txId);
-            active.set(isActive);
-         }
+//         if (!active.get()) {
+//            // Known to be inactive.
+//            return false;
+//         }
+//         synchronized (lock) {
+//            // Ask the server and update our flag state.
+//            final boolean isActive = statusTx(txId);
+//            active.set(isActive);
+//         }
          return active.get();
       }
 

@@ -33,8 +33,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.GraphImpl;
-import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -445,7 +444,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	 */
 	public void test_INSERT_veryLargeLiteral() throws Exception {
 
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
 		final URI s = new URIImpl("http://www.bigdata.com/");
 		final URI p = RDFS.LABEL;
@@ -666,7 +665,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 		{
 
 			// The expected results.
-			final Graph expected = new GraphImpl();
+			final Graph expected = new LinkedHashModel();
 			{
 				// expected.add(new StatementImpl(mike, RDF.TYPE, person));
 				expected.add(new StatementImpl(bryan, likes, rdfs));
@@ -682,7 +681,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 		 */
 		final byte[] data;
 		{
-			final Graph g = new GraphImpl();
+			final Graph g = new LinkedHashModel();
 
 			// The new data.
 			g.add(new StatementImpl(bryan, likes, rdf));
@@ -725,7 +724,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 			{
 
 				// The expected results.
-            final Graph expected = new GraphImpl();
+            final Graph expected = new LinkedHashModel();
 
             assertSameGraph(expected, m_repo.prepareGraphQuery(deleteQueryStr));
 
@@ -748,7 +747,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 						"}";
 
 				// The expected results.
-				final Graph expected = new GraphImpl();
+				final Graph expected = new LinkedHashModel();
 
 				expected.add(new StatementImpl(mike, likes, rdf));
 				expected.add(new StatementImpl(bryan, likes, rdf));
@@ -832,7 +831,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 		{
 
 			// The expected results.
-			final Graph expected = new GraphImpl();
+			final Graph expected = new LinkedHashModel();
 			{
 				// expected.add(new StatementImpl(mike, RDF.TYPE, person));
 				expected.add(new StatementImpl(bryan, likes, rdfs));
@@ -858,7 +857,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 		 */
 		final byte[] data;
 		{
-			final Graph g = new GraphImpl();
+			final Graph g = new LinkedHashModel();
 
 			// The new data.
 			g.add(new StatementImpl(bryan, likes, rdf));
@@ -911,7 +910,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 						"}";
 
 				// The expected results.
-				final Graph expected = new GraphImpl();
+				final Graph expected = new LinkedHashModel();
 
 				assertSameGraph(expected, m_repo.prepareGraphQuery(queryStr2));
 
@@ -934,7 +933,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 						"}";
 
 				// The expected results.
-				final Graph expected = new GraphImpl();
+				final Graph expected = new LinkedHashModel();
 
 				expected.add(new StatementImpl(mike, likes, rdf));
 				expected.add(new StatementImpl(bryan, likes, rdf));

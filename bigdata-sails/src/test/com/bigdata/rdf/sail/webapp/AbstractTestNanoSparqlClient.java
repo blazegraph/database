@@ -50,7 +50,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -628,7 +628,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
      try {
 
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
 
         while (result.hasNext()) {
 
@@ -653,7 +653,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
   static protected Graph asGraph(final GraphQueryResult result) throws Exception {
 
      try {
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
 
         while (result.hasNext()) {
 
@@ -734,7 +734,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected Graph genNTRIPLES2(final int ntriples)
 			throws RDFHandlerException {
 
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
 		final ValueFactory f = new ValueFactoryImpl();
 
@@ -999,7 +999,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             r.close();
         }
         
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
         
         g.addAll(rdfHandler.getStatements());
 
@@ -1137,7 +1137,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person);
          g.add(mike, likes, rdf);
          g.add(mike, RDFS.LABEL, label1);
@@ -1149,7 +1149,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
       }
 
         // The expected results.
-        final Graph expected = new GraphImpl();
+        final Graph expected = new LinkedHashModel();
         {
             expected.add(new StatementImpl(mike, likes, rdf));
             expected.add(new StatementImpl(mike, RDF.TYPE, person));
@@ -1192,7 +1192,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person);
          g.add(mike, likes, rdf);
          g.add(mike, RDFS.LABEL, label1);
@@ -1224,7 +1224,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person, c1, c2, c3);
          g.add(mike, likes, rdf, c1, c2, c3);
          g.add(mike, RDFS.LABEL, label1, c1, c2, c3);
@@ -1245,7 +1245,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final URI person = new URIImpl(BD.NAMESPACE + "Person");
 
         // The expected results.
-        final Graph expected = new GraphImpl();
+        final Graph expected = new LinkedHashModel();
         {
 //            expected.add(new StatementImpl(mike, likes, rdf));
             expected.add(new StatementImpl(mike, RDF.TYPE, person));

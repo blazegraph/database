@@ -269,7 +269,11 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(TestNanoSparqlClient.class);
          suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
          suite.addTestSuite(StressTest_REST_MultiTenancy.class);
-         suite.addTestSuite(Test_REST_TX_API.class); // Transaction management API.
+
+         // Transaction management API.
+         suite.addTestSuite(Test_REST_TX_API.class);
+         suite.addTestSuite(Test_REST_TX_API.NoReadWriteTx.class); // without isolatable indices.
+         suite.addTestSuite(Test_REST_TX_API.ReadWriteTx.class); // with isolatable indices.
 
          /*
           * BigdataSailRemoteRepository(Connection) test suite (openrdf

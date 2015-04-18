@@ -36,6 +36,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -85,7 +86,6 @@ import com.bigdata.service.IDataService;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  * @todo javadoc update for temporary stores (shared temporary journals) and
  *       concurrency limits (concurrent operations on the same transaction with
@@ -217,7 +217,7 @@ public class Tx implements ITx {
         
     }
     
-    private RunState runState;
+   private final AtomicReference<RunState> runState = new AtomicReference<RunState>();
 
 //    /**
 //     * A temporary store used to hold write sets for read-write transactions. It
@@ -317,7 +317,7 @@ public class Tx implements ITx {
         this.readsOnCommitTime = readsOnCommitTime == ITx.UNISOLATED ? 1
                 : readsOnCommitTime;
 
-        this.runState = RunState.Active;
+        this.runState.set(RunState.Active);
 
         // pre-compute the hash code for the transaction.
         this.hashCode = Long.valueOf(startTime).hashCode();
@@ -350,20 +350,21 @@ public class Tx implements ITx {
         if (newval == null)
             throw new IllegalArgumentException();
         
-        if (!runState.isTransitionAllowed(newval)) {
+        if (!runState.get().isTransitionAllowed(newval)) {
 
             throw new IllegalStateException("runState=" + runState
                     + ", newValue=" + newval);
 
         }
 
-        this.runState = newval;
+        this.runState.set(newval);
         
     }
     
     /**
      * The hash code is based on the {@link #getStartTimestamp()}.
      */
+    @Override
     final public int hashCode() {
         
         return hashCode;
@@ -381,7 +382,8 @@ public class Tx implements ITx {
         return this == o || (o != null && startTime == o.getStartTimestamp());
         
     }
-    
+
+    @Override
     final public long getStartTimestamp() {
         
         return startTime;
@@ -416,6 +418,7 @@ public class Tx implements ITx {
     /**
      * Returns a string representation of the transaction start time.
      */
+    @Override
     final public String toString() {
         
         /*
@@ -428,49 +431,91 @@ public class Tx implements ITx {
                 + readsOnCommitTime + ",runState=" + runState + "}";
         
     }
-    
+
+   /**
+    * {@inheritDoc}
+    * <p>
+    * Note: The value is valid as of the instant that the run state is
+    * inspected. The caller must hold a lock if they want to act based on
+    * non-final run states.
+    */
+    @Override
     final public boolean isActive() {
         
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
+//        if(!lock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
 
-        return runState == RunState.Active;
+        return runState.get() == RunState.Active;
         
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The value is valid as of the instant that the run state is
+     * inspected. The caller must hold a lock if they want to act based on
+     * non-final run states.
+     */
+    @Override
     final public boolean isPrepared() {
         
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
+//        if(!lock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
 
-        return runState == RunState.Prepared;
+        return runState.get() == RunState.Prepared;
         
     }
     
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The value is valid as of the instant that the run state is
+     * inspected. The caller must hold a lock if they want to act based on
+     * non-final run states.
+     */
+    @Override
     final public boolean isComplete() {
         
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
+//        if(!lock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
         
-        return runState == RunState.Committed || runState == RunState.Aborted;
+       final RunState runState = this.runState.get();
+
+       return runState == RunState.Committed || runState == RunState.Aborted;
         
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The value is valid as of the instant that the run state is
+     * inspected. The caller must hold a lock if they want to act based on
+     * non-final run states.
+     */
+    @Override
     final public boolean isCommitted() {
 
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
+//        if(!lock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
 
-        return runState == RunState.Committed;
+        return runState.get() == RunState.Committed;
         
     }
  
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note: The value is valid as of the instant that the run state is
+     * inspected. The caller must hold a lock if they want to act based on
+     * non-final run states.
+     */
+    @Override
     final public boolean isAborted() {
 
-        if(!lock.isHeldByCurrentThread())
-            throw new IllegalMonitorStateException();
+//        if(!lock.isHeldByCurrentThread())
+//            throw new IllegalMonitorStateException();
 
-        return runState == RunState.Aborted;
+        return runState.get() == RunState.Aborted;
         
     }
 
@@ -865,6 +910,7 @@ public class Tx implements ITx {
             
         }
         
+        @Override
         public Void call() throws Exception {
 
             if(log.isInfoEnabled())
@@ -1015,6 +1061,7 @@ public class Tx implements ITx {
      * @exception IllegalStateException
      *                if the transaction is not active.
      */
+    @Override
     public ILocalBTreeView getIndex(final String name) {
 
         if (name == null)
@@ -1154,6 +1201,7 @@ public class Tx implements ITx {
 
     }
 
+    @Override
     final public boolean isEmptyWriteSet() {
 
         if (readOnly)
@@ -1189,6 +1237,7 @@ public class Tx implements ITx {
 
     }
 
+    @Override
     final public String[] getDirtyResource() {
 
         if (readOnly)
