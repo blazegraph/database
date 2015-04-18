@@ -201,5 +201,12 @@ public class VarNode extends TermNode {
                 ;
 
     }
+    
+    /**
+     * @return a varnode containing a fresh (uniquely distinct) variable
+     */
+    public static VarNode freshVarNode() {
+       return new VarNode((Var<IV>)Var.var());
+    }
 	
 }
