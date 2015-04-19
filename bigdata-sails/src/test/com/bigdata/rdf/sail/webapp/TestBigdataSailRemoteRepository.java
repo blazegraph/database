@@ -887,10 +887,9 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         
     }
     
-    // FIXME *** TX test suite for BigdataSailRemoteRepositoryConnection
-    public void test_tx_01() {
-       fail("write transaction test suite");
-    }
-    
+//    // FIXME *** TX test suite for BigdataSailRemoteRepositoryConnection
+//    public void test_tx_01() {
+//       fail("write transaction test suite");
+//    }
 
 }
