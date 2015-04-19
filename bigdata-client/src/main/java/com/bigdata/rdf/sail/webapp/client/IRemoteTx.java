@@ -30,38 +30,16 @@ package com.bigdata.rdf.sail.webapp.client;
  * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
  *      transactions in the REST API</a>
  */
-public interface IRemoteTx {
+public interface IRemoteTx extends IRemoteTxState0 {
 
-   /**
-    * The transaction identifier. Negative values are read/write transaction
-    * identifiers. Positive values are read-only transaction identifiers.
-    * 
-    * @see com.bigdata.journal.ITx
-    * @see com.bigdata.journal.TimestampUtility
-    */
-   long getTxId();
-   
-   /**
-    * The commit point on which the transaction is reading.
-    */
-   long getReadsOnCommitTime();
-
-   /**
-    * Return <code>true</code> if the transaction is read-only (does not
-    * permit mutation operations).
-    */
-   boolean isReadOnly();
-   
    /**
     * Return <code>true</code> iff the client believes that transaction is
     * active (it exists and has not been aborted nor committed). Note that
     * the transaction may have been aborted on the server, in which case the
     * client will not know this until it tries to {@link #prepare()},
     * {@link #abort()}, or {@link #commit()}.
-    * 
-    * @throws Exception 
     */
-   boolean isActive() throws Exception;
+   boolean isActive();
 
    /**
     * Return true if the write set of the transaction passes validation at
@@ -74,9 +52,10 @@ public interface IRemoteTx {
     * this method explicitly is discouraged since it just adds overhead
     * unless you are actually going to gain something from the information.
     * 
-    * @throws Exception 
+    * @throws RemoteTransactionValidationException
+    *            if the transaction was not found on the server.
     */
-   boolean prepare() throws TransactionNotActiveException, Exception;
+   boolean prepare() throws RemoteTransactionNotFoundException;
 
    /**
     * Aborts a read/write transaction (discarding its write set) -or-
@@ -85,9 +64,10 @@ public interface IRemoteTx {
     * Note: You MUST always either {@link #abort()} or {@link #commit()} a
     * read-only transaction in order to release the resources on the server!
     * 
-    * @throws Exception 
+    * @throws RemoteTransactionValidationException
+    *            if the transaction was not found on the server.
     */
-   void abort() throws TransactionNotActiveException, Exception;
+   void abort() throws RemoteTransactionNotFoundException;
    
    /**
     * Prepares and commits a read/write transaction -or- deactivates a
@@ -96,8 +76,11 @@ public interface IRemoteTx {
     * Note: You MUST always either {@link #abort()} or {@link #commit()} a
     * read-only transaction in order to release the resources on the server!
     * 
-    * @throws Exception 
+    * @throws RemoteTransactionValidationException
+    *            if the transaction was not found on the server.
+    * @throws RemoteTransactionValidationException
+    *            if the transaction exists but could not be validated.
     */
-   void commit() throws TransactionNotActiveException, Exception;
+   void commit() throws RemoteTransactionNotFoundException;
    
 }

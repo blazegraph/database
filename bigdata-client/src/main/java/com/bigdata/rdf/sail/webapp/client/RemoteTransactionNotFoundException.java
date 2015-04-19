@@ -23,25 +23,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.webapp.client;
 
+
 /**
  * Exception thrown if a transaction is not active in a context where it needs
  * to be active for some operation to take place.
  * 
  * @author bryan
- * 
- *         TODO Make sure that we have consistent exceptions for both client
- *         local knowledge that a transaction is not valid and server based
- *         knowledge that a transaction is not valid.
  */
-public class TransactionNotActiveException extends RuntimeException {
+public class RemoteTransactionNotFoundException extends RuntimeException {
 
    /**
     * 
     */
    private static final long serialVersionUID = 1L;
 
-   public TransactionNotActiveException(final String message) {
-      super(message);
+   public RemoteTransactionNotFoundException(final long txId,
+         final String serviceURL) {
+
+      super("txId=" + txId + ", serviceURL=" + serviceURL);
+
    }
 
 }

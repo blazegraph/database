@@ -45,7 +45,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
@@ -81,7 +81,7 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager;
-import com.bigdata.rdf.sail.webapp.client.TransactionNotActiveException;
+import com.bigdata.rdf.sail.webapp.client.RemoteTransactionNotFoundException;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
@@ -647,7 +647,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             final Iteration<? extends Statement, E> stmts, final Resource... c)
             throws RepositoryException, E {
 		
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
 		while (stmts.hasNext()) {
 		
@@ -679,7 +679,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 //		log.warn("single statement updates not recommended");
 		
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
 		g.add(stmt);
 		
@@ -777,7 +777,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             final Iteration<? extends Statement, E> stmts, final Resource... c)
             throws RepositoryException, E {
 
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
       while (stmts.hasNext()) {
 
@@ -801,7 +801,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 //		log.warn("single statement updates not recommended");
 		
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 	
 		g.add(stmt);
 		
@@ -1276,9 +1276,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
          try {
-            remoteTx.set(repo.getRemoteRepository().getRemoteRepositoryManager().getTransactionManager()
+            remoteTx.set(repo.getRemoteRepository()
+                  .getRemoteRepositoryManager().getTransactionManager()
                   .createTx(RemoteTransactionManager.UNISOLATED));
-         } catch (Exception e) {
+         } catch (RuntimeException e) {
             throw new RepositoryException(e);
          }
       }
@@ -1296,9 +1297,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
          try {
-            remoteTx.set(repo.getRemoteRepository().getRemoteRepositoryManager().getTransactionManager()
+            remoteTx.set(repo.getRemoteRepository()
+                  .getRemoteRepositoryManager().getTransactionManager()
                   .createTx(RemoteTransactionManager.READ_COMMITTED));
-         } catch (Exception e) {
+         } catch (RuntimeException e) {
             throw new RepositoryException(e);
          }
       }
@@ -1327,9 +1329,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
          if (remoteTx.get() != null)
             throw new RepositoryException("Active transaction exists");
          try {
-            remoteTx.set(repo.getRemoteRepository().getRemoteRepositoryManager().getTransactionManager()
+            remoteTx.set(repo.getRemoteRepository()
+                  .getRemoteRepositoryManager().getTransactionManager()
                   .createTx(timestamp));
-         } catch (Exception e) {
+         } catch (RuntimeException e) {
             throw new RepositoryException(e);
          }
       }
@@ -1345,9 +1348,9 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             try {
                tx.commit();
                remoteTx.set(null/* newValue */);
-            } catch (TransactionNotActiveException e) {
+            } catch (RemoteTransactionNotFoundException e) {
                throw new UnknownTransactionStateException(e);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                throw new UnknownTransactionStateException(e);
             }
          }
@@ -1364,7 +1367,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             try {
                tx.abort();
                remoteTx.set(null/* newValue */);
-            } catch (TransactionNotActiveException e) {
+            } catch (RemoteTransactionNotFoundException e) {
                throw new UnknownTransactionStateException(e);
             } catch (Exception e) {
                throw new UnknownTransactionStateException(e);
