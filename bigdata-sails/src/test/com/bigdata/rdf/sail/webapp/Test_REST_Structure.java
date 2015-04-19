@@ -383,7 +383,7 @@ public class Test_REST_Structure<S extends IIndexManager> extends
       Request request = null;
       try {
 
-         request = m_repo.newRequest(urlString.toString(),
+         request = m_repo.getRemoteRepositoryManager().newRequest(urlString.toString(),
                opts.method);
 
          if (opts.requestHeaders != null) {

@@ -144,7 +144,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 				// Should be empty.
 				assertEquals(
 						0L,
-						countResults(repo.prepareTupleQuery(
+						countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 								"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
 			} finally {
 				repo.close();
@@ -273,7 +273,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 						// Should be empty.
 						assertEquals(
 								0L,
-								countResults(repo.prepareTupleQuery(
+								countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 										"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
 					} finally {
 						repo.close();
@@ -385,7 +385,7 @@ public class TestHA2JournalServer extends AbstractHA3JournalServerTestCase {
 						// Should be empty.
 						assertEquals(
 								0L,
-								countResults(repo.prepareTupleQuery(
+								countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 										"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
 					} finally {
 						repo.close();

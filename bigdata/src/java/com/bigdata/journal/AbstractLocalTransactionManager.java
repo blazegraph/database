@@ -10,6 +10,7 @@ import com.bigdata.counters.Instrument;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.service.ITxState;
 
 /**
  * Manages the client side of a transaction either for a standalone
@@ -17,7 +18,6 @@ import com.bigdata.service.IDataService;
  * {@link IBigdataFederation}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 abstract public class AbstractLocalTransactionManager implements
         ILocalTransactionManager {
@@ -47,6 +47,13 @@ abstract public class AbstractLocalTransactionManager implements
      */
     final private ConcurrentHashMap<Long, Tx> activeTx = new ConcurrentHashMap<Long, Tx>();
 
+    @Override
+    public ITxState[] getActiveTx() {
+       
+      return activeTx.values().toArray(new ITxState[] {});
+       
+    }
+    
     /**
      * Notify the journal that a new transaction is being activated (starting on
      * the journal).

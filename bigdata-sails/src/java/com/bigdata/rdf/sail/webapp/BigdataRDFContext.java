@@ -2561,31 +2561,31 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	}
 	
-	/*
-	 * 
-	 */
-//	/**
-//	 * Commit a transaction obtained by {@link #newTx(long)}
-//	 * 
-//	 * @param tx
-//	 *            The transaction identifier.
-//	 */
-//	public void commitTx(final long tx) {
-//
-//	    if (getIndexManager() instanceof IJournal) {
-//
-//            final ITransactionService txs = ((IJournal) getIndexManager())
-//                    .getLocalTransactionManager().getTransactionService();
-//
-//            try {
-//                txs.commit(tx);
-//            } catch (IOException e) {
-//                // Note: Local operation. Will not throw IOException.
-//                throw new RuntimeException(e);
-//            }
-//
-//        }
-//
-//    }
+   /**
+    * Commit a transaction obtained by {@link #newTx(long)}
+    * 
+    * @param tx
+    *           The transaction identifier.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
+    *      transactions in the REST API</a>
+    */
+   public void commitTx(final long tx) {
+
+      if (getIndexManager() instanceof IJournal) {
+
+         final ITransactionService txs = ((IJournal) getIndexManager())
+               .getLocalTransactionManager().getTransactionService();
+
+         try {
+            txs.commit(tx);
+         } catch (IOException e) {
+            // Note: Local operation. Will not throw IOException.
+            throw new RuntimeException(e);
+         }
+
+      }
+
+   }
 	
 }

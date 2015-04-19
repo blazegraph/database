@@ -29,6 +29,9 @@ import org.junit.Test;
 
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 
+/**
+ * Test suite for the {@link BigdataSailFactory}.
+ */
 public class BigdataSailFactoryTest extends TestCase {
 
 	//The correctly normalized value for the remote repository
