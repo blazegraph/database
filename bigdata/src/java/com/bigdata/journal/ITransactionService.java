@@ -167,7 +167,7 @@ public interface ITransactionService extends ITimestampService {
 //    * @throws IllegalStateException
 //    *             if the requested timestamp is greater than
 //    *             {@link #getLastCommitTime()}.
-    public long newTx(long timestamp) throws IOException;
+    long newTx(long timestamp) throws IOException;
     
     /**
      * Request commit of the transaction write set. Committing a read-only
@@ -204,7 +204,7 @@ public interface ITransactionService extends ITimestampService {
      * @throws IOException
      *             RMI errors.
      */
-    public long commit(long tx) throws ValidationError, IOException;
+    long commit(long tx) throws ValidationError, IOException;
 
     /**
      * Request abort of the transaction write set.
@@ -217,7 +217,7 @@ public interface ITransactionService extends ITimestampService {
      * @throws IOException
      *             RMI errors.
      */
-    public void abort(long tx) throws IOException;
+    void abort(long tx) throws IOException;
     
     /**
      * Notify the {@link ITransactionService} that a commit has been performed
@@ -234,7 +234,7 @@ public interface ITransactionService extends ITimestampService {
      * 
      * @throws IOException
      */
-    public void notifyCommit(long commitTime) throws IOException;
+    void notifyCommit(long commitTime) throws IOException;
 
     /**
      * Return the last commitTime reported to the {@link ITransactionService}.
@@ -243,7 +243,7 @@ public interface ITransactionService extends ITimestampService {
      * 
      * @throws IOException
      */
-    public long getLastCommitTime() throws IOException;
+    long getLastCommitTime() throws IOException;
 
     /**
      * Return the timestamp whose historical data MAY be released. This time is
@@ -260,6 +260,6 @@ public interface ITransactionService extends ITimestampService {
      * released. (Consequently, the first commit point GT the releaseTime is the
      * earliest visible commit point.)
      */
-    public long getReleaseTime() throws IOException;
+    long getReleaseTime() throws IOException;
     
 }

@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.ValidationError;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.service.IBigdataFederation;
@@ -186,6 +187,8 @@ public class TxServlet extends BigdataRDFServlet {
    /** <code>CREATE-TX(?timestamp=...)</code> */
    private void doCreateTx(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
+      
+      final long beginNanos = System.nanoTime();
 
       // Note: This parameter has default values for CREATE-TX.
       final long timestamp = getTimestamp(req);
@@ -224,6 +227,8 @@ public class TxServlet extends BigdataRDFServlet {
          buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
                MIME_TEXT_HTML, "Illegal value: timestamp=" + timestamp);
 
+         return;
+         
       }
 
       try {
@@ -235,25 +240,25 @@ public class TxServlet extends BigdataRDFServlet {
 
          final long txId = getBigdataRDFContext().newTx(timestamp);
 
-         final ITx tx = ((Journal) getIndexManager()).getTransactionManager()
-               .getTx(txId);
-
          // TODO This URL is correct IFF we only allow CREATE-TX at the correct
          // path.
          final String txURL = req.getRequestURL().append('/')
                .append(Long.valueOf(txId)).toString();
 
+         final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+               .nanoTime() - beginNanos);
+         
          final StringWriter w = new StringWriter();
 
          final XMLBuilder t = new XMLBuilder(w);
 
-         t.root("tx")//
-               .attr("txId", txId)//
-               .attr("readsOnCommitTime", tx.getReadsOnCommitTime())//
-               .attr("readOnly", tx.isReadOnly())//
-               .attr("aborted", tx.isAborted())//
-               .attr("committed", tx.isCommitted())//
-               .close();
+         final Node root = t.root("response");
+
+         root.attr("elapsed", elapsedMillis);
+         
+         addTx(root, txId, getReadsOnCommitTimeOrNull(txId));
+         
+         root.close();
 
          buildAndCommitResponse(resp, HttpServletResponse.SC_CREATED,
                MIME_APPLICATION_XML, w.toString(), new NV("Location", txURL));
@@ -267,74 +272,13 @@ public class TxServlet extends BigdataRDFServlet {
    }
 
    /**
-    * Return <code>true</code> iff a transaction identifier was parsed from the
-    * request and otherwise commit a {@link HttpServletResponse#SC_BAD_REQUEST}
-    * response.
-    * <p>
-    * COMMIT-TX, ABORT-TX, PREPARE-TX, and STATUS-TX all need to extract the
-    * transaction identifier from the last component of the path which should be
-    * <code>/tx/txId</code>.
-    * 
-    * @param req
-    *           The request.
-    * @param resp
-    *           The response.
-    * @param ref
-    *           The transaction identifier will be saved in this reference.
-    * @return <code>true</code> if a transaction identifier was extracted. if
-    *         <code>false</code> then no transaction identifier was found and a
-    *         {@link HttpServletResponse#SC_BAD_REQUEST} response was committed.
-    * 
-    * @throws IOException
-    */
-   private final boolean getTxId(final HttpServletRequest req,
-         final HttpServletResponse resp, final AtomicLong ref) throws IOException {
-      
-      /*
-       * The path info follows the servlet and starts with /. So for
-       * "/bigdata/tx/559" this will be "/559". We strip of the leading "/" and
-       * the rest is the transaction identifier.
-       */
-      final String pathInfo = req.getPathInfo();
-      
-      assert pathInfo != null;
-      
-      if (pathInfo.length() < 2) {
-         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
-               MIME_TEXT_HTML, "No transaction identifier in path: pathInfo="
-                     + pathInfo);
-         return false;
-      }
-
-      // This should be the transaction identifier.
-      final String s = pathInfo.substring(1/* beginIndex */);
-
-      /*
-       * Validate the transaction identifier syntactically.
-       */
-      for (int i = 0; i < s.length(); i++) {
-         if (!Character.isDigit(s.charAt(i)) && s.charAt(i) != '-') {
-            buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
-                  MIME_TEXT_HTML,
-                  "Transaction identifier is not numeric: pathInfo=" + pathInfo);
-            return false;
-         }
-      }
-
-      final long txId = Long.valueOf(s);
-      
-      ref.set(txId);
-      
-      return true;
-
-   }
-   
-   /**
     * ABORT-TX(txId)
     */
    private void doAbortTx(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
+      final long beginNanos = System.nanoTime();
+      
       final AtomicLong txId = new AtomicLong();
 
       if (!getTxId(req, resp, txId))
@@ -375,8 +319,23 @@ public class TxServlet extends BigdataRDFServlet {
 
          }
 
+         final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+               .nanoTime() - beginNanos);
+
+         final StringWriter w = new StringWriter();
+
+         final XMLBuilder t = new XMLBuilder(w);
+
+         final Node root = t.root("response");
+
+         root.attr("elapsed", elapsedMillis);
+
+         addTx(root, txId.get(), getReadsOnCommitTimeOrNull(txId.get()));
+
+         root.close();
+
          buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
-               MIME_TEXT_PLAIN, "Aborted: " + txId);
+               MIME_APPLICATION_XML, w.toString());
 
       } catch (Throwable t) {
 
@@ -411,6 +370,8 @@ public class TxServlet extends BigdataRDFServlet {
     */
    private void doCommitTx(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
+
+      final long beginNanos = System.nanoTime();
       
       final AtomicLong txId = new AtomicLong();
 
@@ -451,14 +412,64 @@ public class TxServlet extends BigdataRDFServlet {
             ((Journal) getIndexManager()).commit(txId.get());
 
          }
-         
+
+         final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+               .nanoTime() - beginNanos);
+
+         final StringWriter w = new StringWriter();
+
+         final XMLBuilder t = new XMLBuilder(w);
+
+         final Node root = t.root("response");
+
+         root.attr("elapsed", elapsedMillis);
+
+         addTx(root, txId.get(), getReadsOnCommitTimeOrNull(txId.get()));
+
+         root.close();
+
          buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
-               MIME_TEXT_PLAIN, "Committed: " + txId);
+               MIME_APPLICATION_XML, w.toString());
 
-      } catch (Throwable t) {
+      } catch (Throwable e) {
 
-         if (InnerCause.isInnerCause(t, IllegalStateException.class)) {
-            
+         if (InnerCause.isInnerCause(e, ValidationError.class)) {
+
+            /*
+             * The transaction could not be validated. The client needs to redo
+             * the transaction.
+             * 
+             * Note: The 409 (CONFLICT) status code does deal with cases of
+             * resource conflict. However, in the case of our transactions API
+             * the resource is the transaction and there is no ability to "redo"
+             * the *same* transaction (same transaction identifier, same
+             * transaction resource) *unless* we also discard the write set of
+             * the transaction when validation fails (just during a commit or
+             * any time PREPARE is invoked?)
+             */
+
+            final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+                  .nanoTime() - beginNanos);
+
+            final StringWriter w = new StringWriter();
+
+            final XMLBuilder t = new XMLBuilder(w);
+
+            final Node root = t.root("response");
+
+            root.attr("elapsed", elapsedMillis);
+
+            addTx(root, txId.get(), getReadsOnCommitTimeOrNull(txId.get()));
+
+            root.close();
+
+            buildAndCommitResponse(resp, HttpServletResponse.SC_CONFLICT,
+                  MIME_APPLICATION_XML, w.toString());
+
+            return;
+
+         } else if (InnerCause.isInnerCause(e, IllegalStateException.class)) {
+
             /*
              * TODO This is pretty diagnostic for the Journal. For scale-out
              * there could be other root causes that might throw the same
@@ -473,12 +484,12 @@ public class TxServlet extends BigdataRDFServlet {
                         + txId);
 
             return;
-            
+
          }
 
          // some other error.
-         launderThrowable(t, resp, "COMMIT-TX:: txId=" + txId);
-         
+         launderThrowable(e, resp, "COMMIT-TX:: txId=" + txId);
+
       }
 
    }
@@ -496,7 +507,7 @@ public class TxServlet extends BigdataRDFServlet {
    private void doPrepareTx(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
-      final long begin = System.nanoTime();
+      final long beginNanos = System.nanoTime();
 
       final AtomicLong txId = new AtomicLong();
 
@@ -540,10 +551,27 @@ public class TxServlet extends BigdataRDFServlet {
 
          }
 
-         final long elapsed = System.nanoTime() - begin;
+         final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+               .nanoTime() - beginNanos);
 
-         buildAndCommitBooleanResponse(resp, ok,
-               TimeUnit.NANOSECONDS.toMillis(elapsed));
+         final StringWriter w = new StringWriter();
+
+         final XMLBuilder t = new XMLBuilder(w);
+
+         final Node root = t.root("response");
+
+         root.attr("elapsed", elapsedMillis);
+
+         addTx(root, txId.get(), getReadsOnCommitTimeOrNull(txId.get()));
+
+         root.close();
+
+         // Either OK (200) or CONFLICT (409).
+         final int statusCode = ok ? HttpServletResponse.SC_OK
+               : HttpServletResponse.SC_CONFLICT;
+
+         buildAndCommitResponse(resp, statusCode, MIME_APPLICATION_XML,
+               w.toString());
 
       } catch (Throwable t) {
 
@@ -575,14 +603,12 @@ public class TxServlet extends BigdataRDFServlet {
 
    /**
     * <code>STATUS-TX</code>
-    * 
-    * TODO IFF GET sure that caching is disabled for this!
     */
    private void doStatusTx(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
-      final long begin = System.nanoTime();
-
+      final long beginNanos = System.nanoTime();
+      
       final AtomicLong txId = new AtomicLong();
 
       if (!getTxId(req, resp, txId))
@@ -592,8 +618,17 @@ public class TxServlet extends BigdataRDFServlet {
 
          if (getIndexManager() instanceof IBigdataFederation) {
 
-            // Scale-out does not have read/write transactions. This is a NOP.
+            /*
+             * Scale-out does not let us resolve the transaction status.
+             * 
+             * TODO This could be exposed on the ITransactionService easily
+             * enough.
+             */
+            buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
+                  MIME_TEXT_PLAIN, "Scale-out does not support STATUS-TX");
 
+            return;
+            
          } else {
 
             // On the journal we can lookup the Tx.
@@ -602,29 +637,36 @@ public class TxServlet extends BigdataRDFServlet {
 
             if (tx == null) {
 
-               // No such transaction.
-               buildAndCommitResponse(resp, HttpServletResponse.SC_NOT_FOUND,
-                     MIME_TEXT_PLAIN,
-                     "STATUS-TX: Transaction not found: txId=" + txId);
+               // 404 (GONE). No such transaction (definitive).
+               buildAndCommitResponse(resp, HttpServletResponse.SC_GONE,
+                     MIME_TEXT_PLAIN, "STATUS-TX: Transaction not found: txId="
+                           + txId);
 
                return;
 
             }
 
+            final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System
+                  .nanoTime() - beginNanos);
+
             final StringWriter w = new StringWriter();
 
             final XMLBuilder t = new XMLBuilder(w);
 
-            t.root("tx")//
-                  .attr("txId", txId)//
-                  .attr("readsOnCommitTime", tx.getReadsOnCommitTime())//
-                  .attr("readOnly", tx.isReadOnly())//
-                  .attr("aborted", tx.isAborted())//
-                  .attr("committed", tx.isCommitted())//
-                  .close();
+            final Node root = t.root("response");
+
+            root.attr("elapsed", elapsedMillis);
+
+            addTx(root, txId.get(), getReadsOnCommitTimeOrNull(txId.get()));
+
+            root.close();
 
             buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
-                  MIME_APPLICATION_XML, w.toString());
+                  MIME_APPLICATION_XML, w.toString(),//
+                  // disable caching (if GET)
+                  new NV("Cache-Control", "no-cache"));
+
+            return;
 
          }
 
@@ -680,19 +722,15 @@ public class TxServlet extends BigdataRDFServlet {
 
       final XMLBuilder t = new XMLBuilder(w);
 
-      final Node root = t.root("transactions");
+      final Node root = t.root("response");
       
       for (ITxState tx : a) {
 
-         root.node("tx")//
-               .attr("txId", tx.getStartTimestamp())//
-               .attr("readsOnCommitTime", tx.getReadsOnCommitTime())//
-               .attr("readOnly", tx.isReadOnly())//
-               .attr("aborted", tx.isAborted())//
-               .attr("committed", tx.isCommitted())//
-               .close();
-
+         addTx(root, tx);
+         
       }
+
+      root.close();
 
       /*
        * TODO What is an appropriate cache strategy here?
@@ -712,5 +750,191 @@ public class TxServlet extends BigdataRDFServlet {
       );
 
    }
+
+   /**
+    * Return <code>true</code> iff a transaction identifier was parsed from the
+    * request and otherwise commit a {@link HttpServletResponse#SC_BAD_REQUEST}
+    * response.
+    * <p>
+    * COMMIT-TX, ABORT-TX, PREPARE-TX, and STATUS-TX all need to extract the
+    * transaction identifier from the last component of the path which should be
+    * <code>/tx/txId</code>.
+    * 
+    * @param req
+    *           The request.
+    * @param resp
+    *           The response.
+    * @param ref
+    *           The transaction identifier will be saved in this reference.
+    * @return <code>true</code> if a transaction identifier was extracted. if
+    *         <code>false</code> then no transaction identifier was found and a
+    *         {@link HttpServletResponse#SC_BAD_REQUEST} response was committed.
+    * 
+    * @throws IOException
+    */
+   private final boolean getTxId(final HttpServletRequest req,
+         final HttpServletResponse resp, final AtomicLong ref)
+         throws IOException {
+     
+      /*
+       * The path info follows the servlet and starts with /. So for
+       * "/bigdata/tx/559" this will be "/559". We strip of the leading "/" and
+       * the rest is the transaction identifier.
+       */
+      final String pathInfo = req.getPathInfo();
+      
+      assert pathInfo != null;
+      
+      if (pathInfo.length() < 2) {
+         buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+               MIME_TEXT_HTML, "No transaction identifier in path: pathInfo="
+                     + pathInfo);
+         return false;
+      }
+
+      // This should be the transaction identifier.
+      final String s = pathInfo.substring(1/* beginIndex */);
+
+      /*
+       * Validate the transaction identifier syntactically.
+       */
+      for (int i = 0; i < s.length(); i++) {
+         if (!Character.isDigit(s.charAt(i)) && s.charAt(i) != '-') {
+            buildAndCommitResponse(resp, HttpServletResponse.SC_BAD_REQUEST,
+                  MIME_TEXT_HTML,
+                  "Transaction identifier is not numeric: pathInfo=" + pathInfo);
+            return false;
+         }
+      }
+
+      final long txId = Long.valueOf(s);
+      
+      ref.set(txId);
+      
+      return true;
+
+   }
+   
+   /**
+    * Return the readsOnCommitTime associated with a transaction -or-
+    * <code>null</code> if the transaction is no longer active or if the backend
+    * is the scale-out architecture.
+    * 
+    * @param txId
+    *           The transaction identifier.
+    * 
+    * @return The readsOnCommitTime if it is available and otherwise
+    *         <code>null</code>.
+    * 
+    *         TODO This information is not available in scale-out. See <a
+    *         href="http://trac.bigdata.com/ticket/#266" > Refactor native long
+    *         tx id to thin object. </a>
+    */
+   private Long getReadsOnCommitTimeOrNull(final long txId) {
+
+      if (getIndexManager() instanceof IBigdataFederation) {
+         return null;
+      }
+
+      final ITxState tx = ((Journal) getIndexManager())
+            .getLocalTransactionManager().getTx(txId);
+
+      if (tx == null) {
+
+         // Gone.
+         return null;
+
+      }
+
+      return tx.getReadsOnCommitTime();
+      
+   }
+   
+   private static void addTx(final Node parent, final ITxState tx)
+         throws IOException {
+
+      addTx(parent, tx.getStartTimestamp(), tx.getReadsOnCommitTime());
+
+   }
+
+   private static void addTx(final Node parent, final long txId,
+         final Long readsOnCommitTime) throws IOException {
+
+      if (txId == ITx.UNISOLATED) {
+         // Not a transaction identifier.
+         throw new IllegalArgumentException();
+      }
+
+      if (txId == ITx.READ_COMMITTED) {
+         // Not a transaction identifier.
+         throw new IllegalArgumentException();
+      }
+
+      /*
+       * Note: Since the scale-out architecture does not allow us to "GET" the
+       * status of a transaction, we can not readily obtain the ITxState object
+       * in scale-out. Therefore we rely on the txId to decide whether the tx is
+       * read-only (GT ZERO) or read-write (LT -1). The cases of 0L (UNISOALTED)
+       * and -1L (READ_COMMITTED) are handled above as they are not valid txIds.
+       */
+      final boolean readOnly = txId > 0;
+
+      final Node t = parent.node("tx");
+
+      t.attr("txId", txId);
+      
+      if (readsOnCommitTime != null) {
+
+         // Note: Not available in scale-out.
+         t.attr("readsOnCommitTime", readsOnCommitTime);
+         
+      }
+      
+      t.attr("readOnly", readOnly);
+      
+      t.close();
+
+   }
+   
+//   /**
+//    * Report a tuple containing the transaction identifier, a boolean response,
+//    * and elapsed time back to the user agent. The response is an XML document
+//    * as follows.
+//    * 
+//    * <pre>
+//    * <data txId="txId" result="true|false" milliseconds="elapsed"/>
+//    * </pre>
+//    * 
+//    * where <i>txId</i> is either the transaction identifier; <br/>
+//    * where <i>result</i> is either "true" or "false"; <br/>
+//    * where <i>elapsed</i> is the elapsed time in milliseconds for the request.
+//    * 
+//    * @param resp
+//    *           The response.
+//    * @param statusCode
+//    *           The HTTP status code that will be associated with the response.
+//    * @param txId
+//    *           The transaction identifier.
+//    * @param result
+//    *           The outcome of the request.
+//    * @param elapsed
+//    *           The elapsed time (milliseconds).
+//    * 
+//    * @throws IOException
+//    */
+//   static protected void buildAndCommitTxBooleanResponse(
+//         final HttpServletResponse resp, final int statusCode, final long txId,
+//         final boolean result, final long elapsed) throws IOException {
+//
+//      final StringWriter w = new StringWriter();
+//
+//      final XMLBuilder t = new XMLBuilder(w);
+//
+//      t.root("data").attr("txId", txId).attr("result", result)
+//            .attr("milliseconds", elapsed).close();
+//
+//      buildAndCommitResponse(resp, statusCode, MIME_APPLICATION_XML, w.toString());
+//
+//   }
 
 }
