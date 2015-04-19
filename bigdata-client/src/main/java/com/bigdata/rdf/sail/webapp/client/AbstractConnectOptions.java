@@ -144,7 +144,10 @@ public class AbstractConnectOptions implements IMimeTypes {
     
     public AbstractConnectOptions(final String serviceURL) {
 
-        this.serviceURL = serviceURL;
+      if (serviceURL == null)
+         throw new IllegalArgumentException();
+
+      this.serviceURL = serviceURL;
 
     }
 
