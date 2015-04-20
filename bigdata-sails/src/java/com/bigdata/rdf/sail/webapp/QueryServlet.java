@@ -48,7 +48,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -326,7 +326,7 @@ public class QueryServlet extends BigdataRDFServlet {
              * TODO Resolve the SD class name and ctor via a configuration
              * property for extensible descriptions.
              */
-            final Graph g = new GraphImpl();
+            final Graph g = new LinkedHashModel();
             {
 
                 final SD sd = new SD(g, tripleStore, serviceURI);
