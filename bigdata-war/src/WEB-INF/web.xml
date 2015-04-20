@@ -86,9 +86,17 @@
    <servlet-name>Multi-Tenancy API</servlet-name>
    <display-name>Multi-Tenancy API</display-name>
    <description>The REST API for managing multiple KBs in a single Journal
-   or Fedetation.
+   or Federation.
    </description>
    <servlet-class>com.bigdata.rdf.sail.webapp.MultiTenancyServlet</servlet-class>
+   <async-supported>true</async-supported>
+  </servlet>
+  <servlet>
+   <servlet-name>Transaction Management API</servlet-name>
+   <display-name>Transaction Management API</display-name>
+   <description>The REST API for managing transactions for a Journal.
+   </description>
+   <servlet-class>com.bigdata.rdf.sail.webapp.TxServlet</servlet-class>
    <async-supported>true</async-supported>
   </servlet>
   <servlet>
@@ -129,6 +137,15 @@
   <servlet-mapping>
   <servlet-name>Multi-Tenancy API</servlet-name>
   <url-pattern>/namespace/*</url-pattern>
+  </servlet-mapping>
+  <!-- Mappings for the TX API. -->
+  <servlet-mapping>
+  <servlet-name>Transaction Management API</servlet-name>
+  <url-pattern>/tx</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+  <servlet-name>Transaction Management API</servlet-name>
+  <url-pattern>/tx/*</url-pattern>
   </servlet-mapping>
   <!-- Mapping for the status page. -->
   <servlet-mapping>

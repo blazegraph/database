@@ -311,7 +311,7 @@ public class Example2 implements Callable<Void> {
             repo = new RemoteRepositoryManager(
             		serviceURL, client, executor);
 
-            final IObjectManager om = new NanoSparqlObjectManager(repo,
+            final IObjectManager om = new NanoSparqlObjectManager(repo.getRepositoryForDefaultNamespace(),
                     namespace);
 
             new Example2(om).call();
