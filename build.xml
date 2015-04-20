@@ -2039,9 +2039,11 @@ ${postInstallMessage}</echo>
         <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
           <exclude name="**/*.java" />
         </fileset>
+<!--
         <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
           <exclude name="**/*.java" />
         </fileset>
+-->
         <fileset dir="${bigdata.dir}/bigdata-gom/src/test">
           <exclude name="**/*.java" />
         </fileset>
