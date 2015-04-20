@@ -33,7 +33,6 @@ import com.bigdata.service.ITxState;
  * </p>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ITx extends ITxState {
 
@@ -80,151 +79,12 @@ public interface ITx extends ITxState {
      * lastCommitTime for the {@link IIndexStore}.
      */
     public static final long READ_COMMITTED = -1L;
-    
-//    /**
-//     * The start time for the transaction as assigned by a centralized
-//     * transaction manager service. Transaction start times are unique and also
-//     * serve as transaction identifiers. Note that this is NOT the time at which
-//     * a transaction begins executing on a specific journal as the same
-//     * transaction may start at different moments on different journals and
-//     * typically will only start on some journals rather than all.
-//     * 
-//     * @return The transaction start time.
-//     * 
-//     * @todo rename since the sign indicates read-only vs read-write?
-//     */
-//    public long getStartTimestamp();
-//
-//    /**
-//     * The timestamp of the commit point against which this transaction is
-//     * reading.
-//     * <p>
-//     * Note: This is not currently available on a cluster. In that context, we
-//     * wind up with the same timestamp for {@link #startTime} and
-//     * {@link #readsOnCommitTime} which causes cache pollution for things which
-//     * cache based on {@link #readsOnCommitTime}.
-//     * 
-//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/266">
-//     *      Refactor native long tx id to thin object</a>
-//     * 
-//     * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/546" > Add
-//     *      cache for access to historical index views on the Journal by name
-//     *      and commitTime. </a>
-//     */
-//    public long getReadsOnCommitTime();
-    
-//    /**
-//     * Return the timestamp assigned to this transaction by a centralized
-//     * transaction manager service during its prepare+commit protocol. This
-//     * timestamp is written into the tuples modified by the transaction when
-//     * they are merged down onto the unisolated indices. Write-write conflicts
-//     * for transactions are detected (during validation) based on those revision
-//     * timestamps.
-//     * 
-//     * @return The revision timestamp assigned to this transaction.
-//     * 
-//     * @exception UnsupportedOperationException
-//     *                unless the transaction is writable.
-//     * 
-//     * @exception IllegalStateException
-//     *                if the transaction is writable but has not yet prepared (
-//     *                the commit time is assigned when the transaction is
-//     *                prepared).
-//     */
-//    public long getRevisionTimestamp();
-    
-//    public void prepare(long revisionTime);
-
-//    /**
-//     * Merge down the write set of a transaction that has already been
-//     * {@link #prepare(long)}d onto the unisolated indices. The caller MUST
-//     * hold an exclusive lock on at least the unisolated indices on which this
-//     * operation will write. For a distributed transaction, the caller MUST hold
-//     * a lock on the {@link WriteExecutorService} for each {@link IDataService}
-//     * on which the transaction has written before invoking either
-//     * {@link #prepare(long)} or this method.
-//     * 
-//     * @param revisionTime
-//     *            The revision time assigned by a centralized transaction
-//     *            manager service -or- ZERO (0L) IFF the transaction is
-//     *            read-only.
-//     * 
-//     * @throws IllegalStateException
-//     *             If the transaction has not {@link #prepare(long) prepared}.
-//     *             If the transaction is not already complete, then it is
-//     *             aborted.
-//     * 
-//     * FIXME Since this no longer commits the backing store it must not change
-//     * the state from {@link RunState#Prepared} to {@link RunState#Committed}.
-//     * Instead, {@link #prepare(long)} and {@link #mergeDown()} should be
-//     * combined into a single {@link #prepare(long)} method and the caller must
-//     * be responsible for handshaking with the {@link ILocalTransactionManager}
-//     * and this interface to make sure that the state of the {@link ITx} is
-//     * update to reflect success or failure (or that the {@link ITx} is just
-//     * removed from the {@link ILocalTransactionManager}'s tables so that its
-//     * state is no longer visible).
-//     * 
-//     * @todo also note that merely letting the {@link ITx} become weakly
-//     *       reachable is enough for it to release its resources, including any
-//     *       temporary store.
-//     */
-//    public void mergeDown(final long revisionTime);
-
-//    /**
-//     * Abort the transaction.
-//     * 
-//     * @throws IllegalStateException
-//     *             if the transaction is already complete.
-//     */
-//    public void abort();
 
     /**
      * When true, the transaction has an empty write set.
      */
-    public boolean isEmptyWriteSet();
+    boolean isEmptyWriteSet();
     
-//    /**
-//     * A transaction is "active" when it is created and remains active until it
-//     * prepares or aborts.  An active transaction accepts READ, WRITE, DELETE,
-//     * PREPARE and ABORT requests.
-//     * 
-//     * @return True iff the transaction is active.
-//     */
-//    public boolean isActive();
-//
-//    /**
-//     * A transaction is "prepared" once it has been successfully validated and
-//     * has fulfilled its pre-commit contract for a multi-stage commit protocol.
-//     * An prepared transaction accepts COMMIT and ABORT requests.
-//     * 
-//     * @return True iff the transaction is prepared to commit.
-//     */
-//    public boolean isPrepared();
-//
-//    /**
-//     * A transaction is "complete" once has either committed or aborted. A
-//     * completed transaction does not accept any requests.
-//     * 
-//     * @return True iff the transaction is completed.
-//     */
-//    public boolean isComplete();
-//
-//    /**
-//     * A transaction is "committed" iff it has successfully committed. A
-//     * committed transaction does not accept any requests.
-//     * 
-//     * @return True iff the transaction is committed.
-//     */
-//    public boolean isCommitted();
-//
-//    /**
-//     * A transaction is "aborted" iff it has successfully aborted. An aborted
-//     * transaction does not accept any requests.
-//     * 
-//     * @return True iff the transaction is aborted.
-//     */
-//    public boolean isAborted();
-
     /**
      * Return an isolated view onto a named index. The index will be isolated at
      * the same level as this transaction. Changes on the index will be made
@@ -235,7 +95,7 @@ public interface ITx extends ITxState {
      * the index will not permit writes.
      * <p>
      * During {@link #prepare(long)}, the write set of each
-     * {@link IsolatedFusedView} will be validated against the then current commited
+     * {@link IsolatedFusedView} will be validated against the then current committed
      * state of the named index.
      * <p>
      * During {@link #mergeDown()}, the validated write sets will be merged down
@@ -253,13 +113,13 @@ public interface ITx extends ITxState {
      * @exception IllegalStateException
      *                if the transaction is not active.
      */
-    public ILocalBTreeView getIndex(String name);
+    ILocalBTreeView getIndex(String name);
     
     /**
      * Return an array of the resource(s) (the named indices) on which the
      * transaction has written (the isolated index(s) that absorbed the writes
      * for the transaction).
      */
-    public String[] getDirtyResource();
+    String[] getDirtyResource();
     
 }

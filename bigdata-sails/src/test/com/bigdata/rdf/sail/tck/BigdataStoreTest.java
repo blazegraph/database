@@ -33,8 +33,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sail.tck;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import info.aduna.iteration.CloseableIteration;
 import info.aduna.iteration.Iteration;
 import info.aduna.iteration.Iterations;
@@ -52,13 +50,10 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.query.impl.EmptyBindingSet;
 import org.openrdf.query.impl.MapBindingSet;
-import org.openrdf.query.parser.ParsedTupleQuery;
-import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.sail.RDFStoreTest;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
@@ -76,8 +71,10 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.LocalTripleStore;
 
+/**
+ * @openrdf test suite extenstion/override.
+ */
 public class BigdataStoreTest extends RDFStoreTest {
 
     private static final Logger log = Logger.getLogger(BigdataStoreTest.class);
@@ -224,7 +221,7 @@ public class BigdataStoreTest extends RDFStoreTest {
 	 * class has been overridden since bigdata has stronger semantics for
 	 * transactional isolation.
 	 * 
-	 * Also modified to use SPARQL istead of SeRQL.
+	 * Also modified to use SPARQL instead of SeRQL.
 	 */
     @Override
     public void testDualConnections()
@@ -380,6 +377,7 @@ public class BigdataStoreTest extends RDFStoreTest {
     /**
      * Modified to test SPARQL instead of Serql.
      */
+   @Override
 	public void testAddData()
 		throws Exception
 	{
@@ -434,6 +432,7 @@ public class BigdataStoreTest extends RDFStoreTest {
     /**
      * Modified to test SPARQL instead of Serql.
      */
+	@Override
 	public void testAddWhileQuerying()
 		throws Exception
 	{
@@ -487,6 +486,7 @@ public class BigdataStoreTest extends RDFStoreTest {
     /**
      * Modified to test SPARQL instead of Serql.
      */
+	@Override
 	public void testRemoveAndClear()
 		throws Exception
 	{
@@ -525,6 +525,7 @@ public class BigdataStoreTest extends RDFStoreTest {
     /**
      * Modified to test SPARQL instead of Serql.
      */
+	@Override
 	public void testQueryBindings()
 		throws Exception
 	{

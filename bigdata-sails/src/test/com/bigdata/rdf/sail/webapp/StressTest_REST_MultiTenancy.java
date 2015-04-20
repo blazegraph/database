@@ -147,7 +147,7 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
                properties.put("com.bigdata.rdf.sail.namespace", namespace);
                try {
                   log.warn(String.format("Create namespace %s...", namespace));
-                  m_repo.createRepository(namespace, properties);
+                  m_mgr.createRepository(namespace, properties);
                   log.warn(String.format("Create namespace %s done", namespace));
                   latch.countDown();
                } catch (final Exception e) {
@@ -176,7 +176,7 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
                   }
                   log.warn(String.format(
                         "Loading package into %s namespace...", namespace));
-                  m_repo.getRepositoryForNamespace(namespace).add(
+                  m_mgr.getRepositoryForNamespace(namespace).add(
                         new RemoteRepository.AddOp(stmts));
                   log.warn(String.format(
                         "Loading package into %s namespace done", namespace));
@@ -198,7 +198,7 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
             public void run() {
                try {
                   log.warn("Get namespace list...");
-                  m_repo.getRepositoryDescriptions().close();
+                  m_mgr.getRepositoryDescriptions().close();
                   log.warn("Get namespace list done");
                } catch (final Exception e) {
                   log.error("Failed to get namespace list:", e);
@@ -221,7 +221,7 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
                               namespaceCount.get() - 1);
                   log.warn(String.format("Execute SPARQL on %s namespace...",
                         namespace));
-                  m_repo.getRepositoryForNamespace(namespace)
+                  m_mgr.getRepositoryForNamespace(namespace)
                         .prepareTupleQuery("SELECT * {?s ?p ?o} LIMIT 100")
                         .evaluate().close();
                   log.warn(String.format("Execute SPARQL on %s namespace done",
@@ -255,7 +255,7 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
 
       log.info("Cleanup namespaces...");
       for (int i = 0; i < namespaceCount.get(); i++) {
-         m_repo.deleteRepository("n" + i);
+         m_mgr.deleteRepository("n" + i);
       }
 
    }

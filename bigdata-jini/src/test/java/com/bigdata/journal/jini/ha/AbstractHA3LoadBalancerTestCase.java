@@ -195,7 +195,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	
 	            // Should be empty.
 	            assertEquals(0L,
-	                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+	                    countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery("SELECT * {?a ?b ?c}")
 	                            .evaluate()));
 	
 	        }
@@ -211,7 +211,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 	
 	            // Should be empty.
 	            assertEquals(0L,
-	                    countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+	                    countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery("SELECT * {?a ?b ?c}")
 	                            .evaluate()));
 	
 	        }
@@ -305,7 +305,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 			assertNotSame(0L, getCountStar(serverA, false/* useLBS */));
 
 			// delete everything using leader.
-			reposLBS[0].remove(new RemoveOp(null, null, null));
+			reposLBS[0].getRepositoryForDefaultNamespace().remove(new RemoveOp(null, null, null));
 
 			// Verify everything is gone on the leader.
 			awaitHAStatus(serverA, HAStatusEnum.Leader);
@@ -389,7 +389,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
 			assertNotSame(0L, getCountStar(serverA, false/* useLBS */));
 
 			// delete everything using 1st follower
-			reposLBS[1].remove(new RemoveOp(null, null, null));
+			reposLBS[1].getRepositoryForDefaultNamespace().remove(new RemoveOp(null, null, null));
 
 			// Verify everything is gone on the leader.
 			awaitHAStatus(serverA, HAStatusEnum.Leader);
@@ -547,7 +547,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
          final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
                useLoadBalancer, httpClient);
          try {
-            repo.prepareUpdate(updateStr).evaluate();
+            repo.getRepositoryForDefaultNamespace().prepareUpdate(updateStr).evaluate();
          } finally {
             repo.close();
          }
@@ -569,7 +569,7 @@ abstract public class AbstractHA3LoadBalancerTestCase extends
       final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
             useLoadBalancer, httpClient);
       try {
-         repo.prepareUpdate(updateStr).evaluate();
+         repo.getRepositoryForDefaultNamespace().prepareUpdate(updateStr).evaluate();
       } finally {
          repo.close();
       }

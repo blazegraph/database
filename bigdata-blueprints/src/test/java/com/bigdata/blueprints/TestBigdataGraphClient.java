@@ -139,7 +139,7 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 	            }
 	            
 				final BigdataSailNSSWrapper nss = testSails.get(key);
-				final BigdataGraph graph = new BigdataGraphClient(nss.m_repo);
+				final BigdataGraph graph = new BigdataGraphClient(nss.m_repo.getRepositoryForDefaultNamespace());
 				
 				return graph;
 			} catch (Exception ex) {

@@ -205,7 +205,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
         final Map<Resource, VoidSummary> summaries = new LinkedHashMap<Resource, VoidSummary>();
 
         // Do the discovery.
-        final Graph g = RemoteRepository.asGraph(m_repo
+        final Graph g = RemoteRepository.asGraph(m_mgr
                 .getRepositoryDescriptions());
 
         final Statement[] a = getMatches(g, null/* dataset */, RDF.TYPE,
@@ -284,7 +284,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
      */
     public void test_getRepositoryProperties01() throws Exception {
 
-        final Properties p = m_repo.getRepositoryProperties(namespace);
+        final Properties p = m_mgr.getRepositoryProperties(namespace);
 
 //        log.error(p.toString());
         
@@ -363,7 +363,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
     	
     	{
     		// ensure default namespace is ready
-    		m_repo.getRepositoryProperties(namespace);
+    		m_mgr.getRepositoryProperties(namespace);
     		log.warn("Got properties for " + namespace);
     	}
 
@@ -374,7 +374,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
         { // verify does not exist.
             try {
-                m_repo.getRepositoryProperties(namespace2);
+                m_mgr.getRepositoryProperties(namespace2);
                 fail("Should not exist: " + namespace2);
             } catch (HttpException ex) {
                 // Expected status code.
@@ -382,10 +382,10 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             }
         }
         
-        m_repo.createRepository(namespace2, properties);
+        m_mgr.createRepository(namespace2, properties);
 
         { // verify exists.
-            final Properties p = m_repo.getRepositoryProperties(namespace2);
+            final Properties p = m_mgr.getRepositoryProperties(namespace2);
             assertNotNull(p);
             
             log.warn("Found properties for namespace " + namespace2);
@@ -396,7 +396,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
          * already exists.
          */
 		try {
-			m_repo.createRepository(namespace2, properties);
+			m_mgr.createRepository(namespace2, properties);
 
 			fail("Expecting: " + HttpServletResponse.SC_CONFLICT);
 		} catch (HttpException ex) {
@@ -460,7 +460,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 /*final*/ Properties p = null;
                 try {
                     log.warn("Fetching properties " + ns);
-                	p = m_repo.getRepositoryProperties(ns);
+                	p = m_mgr.getRepositoryProperties(ns);
                 } catch (Throwable t) {
                 	log.warn("Couldn't get properties for " + ns, t); // to help see failure in log!
                 	fail("Couldn't get the properties", t);
@@ -469,7 +469,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
                 log.warn("Found schema for " + ns);                
              }
 
-            final RemoteRepository tmp = m_repo.getRepositoryForNamespace(ns);
+            final RemoteRepository tmp = m_mgr.getRepositoryForNamespace(ns);
 
             {
                 // GET the Service Description for the data set.
@@ -512,7 +512,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
              * service description, sparql query & update, etc).
              */
             {
-                m_repo.deleteRepository(ns);
+                m_mgr.deleteRepository(ns);
                 
                 log.warn("Removing repository: " + ns);
                 
@@ -536,7 +536,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
             // Properties now fails.
             {
                 try {
-                    m_repo.getRepositoryProperties(ns);
+                    m_mgr.getRepositoryProperties(ns);
                     
                     fail("Expecting " + BigdataServlet.HTTP_NOTFOUND);
                 } catch (HttpException ex) {

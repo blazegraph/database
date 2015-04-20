@@ -25,31 +25,47 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.remote;
 
 import java.io.File;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
 
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
- * An implementation of Sesame's {@link Repository} that wraps a bigdata
- * {@link RemoteRepository}. This provides SAIL API based client access to
- * a bigdata remote NanoSparqlServer.
- * <p>
- * This implementation operates only in auto-commit mode (each mutation
- * operation results in a commit on the server).
- * <p>
- * This implementation also throws UnsupportedOperationExceptions all over the
- * place due to incompatibilities with our own remoting interface. If there is
- * something important that you need implemented for your application don't be
- * afraid to reach out and contact us.
+ * An fully compliant implementation of Sesame's {@link Repository} that wraps
+ * the blazegraph remote API. Additional functionality is available using the
+ * blazegraph {@link RemoteRepositoryManager}. The proper incantation to create
+ * an instance of this class is:
+ * 
+ * <pre>
+ * // Create client for the remote service.
+ * final RemoteRepositoryManager mgr = new RemoteRepositoryManager(serviceURL);
+ * try {
+ *    // Obtain a Sesame Repository for the default sparql endpoint on that
+ *    // service.
+ *    final Repository repo = mgr.getRepositoryForDefaultNamespace()
+ *          .getBigdataSailRemoteRepository();
+ *    try {
+ *       doWork(repo);
+ *    } finally {
+ *       repo.close();
+ *    }
+ * } finally {
+ *    mgr.close();
+ * }
+ * </pre>
+ * 
+ * This pattern makes it possible to:
+ * <ul>
+ * <li>Obtain {@link BigdataSailRemoteRepository} objects for different sparql
+ * end points on the same blazegraph server.</li>
+ * <li>Those {@link BigdataSailRemoteRepository} objects are flyweight.</li>
+ * <li>The {@link RemoteRepositoryManager} can be used to access additional
+ * interfaces, including the multi-tenancy API and the transaction API.</li>
+ * </ul>
  */
 public class BigdataSailRemoteRepository implements Repository {
 
@@ -58,20 +74,13 @@ public class BigdataSailRemoteRepository implements Repository {
 	 */
 	private volatile boolean open = true;
 	
-	/**
-	 * non-<code>null</code> iff the executor is allocated by the constructor,
-	 * in which case it is scoped to the life cycle of this
-	 * {@link BigdataSailRemoteRepository} instance.
-	 */
-    private final ExecutorService executor;
-    
-	/**
-	 * non-<code>null</code> iff the executor is allocated by the constructor,
-	 * in which case it is scoped to the life cycle of this
-	 * {@link BigdataSailRemoteRepository} instance.
-	 */
-	private final HttpClient client;
-
+   /**
+    * non-<code>null</code> iff the {@link RemoteRepositoryManager} is allocated
+    * by the constructor, in which case it is scoped to the life cycle of this
+    * {@link BigdataSailRemoteRepository} instance.
+    */
+   private final RemoteRepositoryManager our_mgr;
+   
 	/**
 	 * Always non-<code>null</code>. This is either an object that we have
 	 * created ourselves or one that was passed in by the caller. If we create
@@ -80,130 +89,113 @@ public class BigdataSailRemoteRepository implements Repository {
 	 * {@link RemoteRepositoryManager} rather than just a
 	 * {@link RemoteRepository}.
 	 */
-    private final RemoteRepository nss;
+    private final RemoteRepository remoteRepository;
 
     /**
      * This exists solely for {@link #getValueFactory()} - the value factory
      * is not used inside of this class.
      */
-    private final ValueFactory valueFactory = new ValueFactoryImpl();
+    private final ValueFactory valueFactory = ValueFactoryImpl.getInstance();
     
     /**
      * The object used to communicate with that remote repository.
      */
     public RemoteRepository getRemoteRepository() {
 		
-		return nss;
+		return remoteRepository;
 		
 	}
 	
-	/**
-	 * Ctor that simply specifies an endpoint and lets this class manage the
-	 * ClientConnectionManager for the HTTP client and the manage the
-	 * ExecutorService. More convenient, but does not account for whether or not
-	 * to use the LBS.
-	 * 
-	 * @param sparqlEndpointURL
-	 *            The SPARQL end point URL
-	 */
+   /**
+    * Constructor that simply specifies an endpoint. This class will internally
+    * allocate a {@link RemoteRepositoryManager} that is scoped to the life
+    * cycle of this class. The allocated {@link RemoteRepositoryManager} will be
+    * closed when this {@link BigdataSailRemoteRepository} is closed.
+    * <p>
+    * Note: This constructor pattern is NOT flyweight.
+    * 
+    * @param sparqlEndpointURL
+    *           The SPARQL end point URL
+    */
 	public BigdataSailRemoteRepository(final String sparqlEndpointURL) {
 
 		this(sparqlEndpointURL, true/* useLBS */);
 
 	}
 
-	/**
-	 * Ctor that simply specifies an endpoint and lets this class manage the
-	 * ClientConnectionManager for the HTTP client and the manage the
-	 * ExecutorService.
-	 * 
-	 * @param sparqlEndpointURL
-	 *            The SPARQL end point URL
-	 * @param useLBS
-	 *            <code>true</code> iff the LBS pattern should be used.
-	 */
+   /**
+    * Constructor that simply specifies an endpoint. This class will internally
+    * allocate a {@link RemoteRepositoryManager} that is scoped to the life
+    * cycle of this class. The allocated {@link RemoteRepositoryManager} will be
+    * closed when this {@link BigdataSailRemoteRepository} is closed.
+    * <p>
+    * Note: This constructor pattern is NOT flyweight.
+    * 
+    * @param sparqlEndpointURL
+    *           The SPARQL end point URL
+    * @param useLBS
+    *           <code>true</code> iff the LBS pattern should be used.
+    */
 	public BigdataSailRemoteRepository(final String sparqlEndpointURL,
 			final boolean useLBS) {
 
 		if (sparqlEndpointURL == null)
 			throw new IllegalArgumentException();
 
-		this.executor = Executors.newCachedThreadPool();
+		/*
+		 * Allocate a RemoteRepositoryManager. This is NOT a flyweight operation.
+		 * 
+		 */
+		this.our_mgr = new RemoteRepositoryManager(sparqlEndpointURL, useLBS);
 
-		// Note: Client *might* be AutoCloseable.
-		this.client = HttpClientConfigurator.getInstance().newInstance();
-
-		this.nss = new RemoteRepositoryManager(sparqlEndpointURL, useLBS,
-				client, executor);
-	
+      this.remoteRepository = our_mgr.getRepositoryForURL(sparqlEndpointURL,
+            useLBS);
+		
 	}
 
-	/**
-	 * Ctor that allows the caller to manage the ClientConnectionManager for 
-	 * the HTTP client and the manage the ExecutorService. More flexible.  
-	 */
-	public BigdataSailRemoteRepository(final RemoteRepository nss) {
+   /**
+    * Flyweight constructor wraps the blazegraph remote client for a SPARQL
+    * endpoint as an openrdf {@link Repository}.
+    * 
+    * @see RemoteRepository#getBigdataSailRemoteRepository()
+    */
+	public BigdataSailRemoteRepository(final RemoteRepository repo) {
 
-		if (nss == null)
+		if (repo == null)
 			throw new IllegalArgumentException();
 		
-		// use the executor on the caller's object.
-		this.executor = null;
+		// use the manager associated with the provided client.
+		this.our_mgr = null;
 		
-		// use the client on the caller's object.
-		this.client = null;
-
-		this.nss = nss;
+		this.remoteRepository = repo;
 		
 	}
 	
 	@Override
-	synchronized
-	public void shutDown() throws RepositoryException {
+   synchronized public void shutDown() throws RepositoryException {
 
-		if (executor != null) {
+      if (our_mgr != null) {
 
-			executor.shutdownNow();
+         /*
+          * The RemoteRepositoryManager object was create by our constructor, so
+          * we own its life cycle and will close it down here.
+          */
 
-			assert client != null;
+         try {
 
-			if (!(client instanceof AutoCloseable)) {
-				/*
-				 * The client does not implement AutoCloseable and it we own the
-				 * life cycle of the client (because it was created by our
-				 * constructor). In this case we need to invoke the jetty
-				 * close() method on the client to avoid leaking resources.
-				 */
-				try {
-					client.stop();
-				} catch (Exception e) {
-					throw new RepositoryException(e);
-				}
-			}
+            our_mgr.close();
 
-			/*
-			 * The JettyRemoteRepositoryManager object was create by our
-			 * constructor, so we own its life cycle and will close it down
-			 * here.
-			 */
+         } catch (Exception e) {
 
-			assert nss instanceof AutoCloseable;
+            throw new RepositoryException(e);
 
-			try {
+         }
 
-				((AutoCloseable) nss).close();
+      }
 
-			} catch (Exception e) {
+      open = false;
 
-				throw new RepositoryException(e);
-
-			}
-
-			open = false;
-			
-		}
-		
-	}
+   }
 
 	@Override
 	public BigdataSailRemoteRepositoryConnection getConnection() 

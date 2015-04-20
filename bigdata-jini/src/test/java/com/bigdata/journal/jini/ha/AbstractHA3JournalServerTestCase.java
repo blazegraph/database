@@ -69,7 +69,6 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.ZooKeeper.States;
 import org.apache.zookeeper.data.ACL;
-import org.eclipse.jetty.client.HttpClient;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
@@ -99,7 +98,6 @@ import com.bigdata.quorum.zk.ZKQuorumClient;
 import com.bigdata.quorum.zk.ZKQuorumImpl;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
-import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
@@ -2899,7 +2897,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
                 useLoadBalancer, httpClient);
         try {
-           repo.prepareUpdate(updateStr).evaluate();
+           repo.getRepositoryForDefaultNamespace().prepareUpdate(updateStr).evaluate();
         } finally {
         	   repo.close();
         }
@@ -2927,7 +2925,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
             final RemoteRepositoryManager repo = getRemoteRepository(haGlue,
                   httpClient);
             try {
-               repo.prepareUpdate(updateStr).evaluate();
+               repo.getRepositoryForDefaultNamespace().prepareUpdate(updateStr).evaluate();
             } finally {
                repo.close();
             }
@@ -2953,7 +2951,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
         try {
            final RemoteRepositoryManager repo = getRemoteRepository(haGlue, httpClient);
         	try {
-        		repo.prepareTupleQuery(queryStr).evaluate();
+        		repo.getRepositoryForDefaultNamespace().prepareTupleQuery(queryStr).evaluate();
         	} finally {
         		repo.close();
         	}
