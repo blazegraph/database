@@ -279,7 +279,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
           * BigdataSailRemoteRepository(Connection) test suite (openrdf
           * compliant client).
           */
-         suite.addTestSuite(TestBigdataSailRemoteRepository.class);
+         suite.addTestSuite(TestBigdataSailRemoteRepository.class); // without isolatable indices.
+         suite.addTestSuite(TestBigdataSailRemoteRepository.ReadWriteTx.class); // with isolatable indices.
 
          // Insert tests from trac issues
          suite.addTestSuite(TestInsertFilterFalse727.class);

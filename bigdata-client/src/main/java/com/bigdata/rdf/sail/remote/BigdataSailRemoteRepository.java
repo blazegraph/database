@@ -29,6 +29,7 @@ import java.io.File;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -66,6 +67,19 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  * <li>The {@link RemoteRepositoryManager} can be used to access additional
  * interfaces, including the multi-tenancy API and the transaction API.</li>
  * </ul>
+ * 
+ * <h2>Transactions</h2>
+ * 
+ * The database supports read/write transactions since 1.5.2. Transaction
+ * manager is at the database layer, not the {@link Repository} or
+ * {@link RepositoryConnection}. Therefore a namespace DOES NOT need to be
+ * configured for isolatable indices in order to create and manipulate
+ * transactions, but it DOES need to be configured with isolatable indices in
+ * order for you to WRITE on the namespace using a transaction.
+ * 
+ * @see com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager
+ * @see com.bigdata.rdf.sail.BigdataSail.Options#ISOLATABLE_INDICES
+ * @see BigdataSailRemoteRepositoryConnection
  */
 public class BigdataSailRemoteRepository implements Repository {
 

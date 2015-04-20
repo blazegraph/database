@@ -85,22 +85,29 @@ import com.bigdata.rdf.sail.webapp.client.RemoteTransactionNotFoundException;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
- * bigdata RemoteRepository. This provides SAIL API based client access to a
- * bigdata remote NanoSparqlServer.
- * <p>
+ * bigdata {@link RemoteRepository}. This provides SAIL API based client access
+ * to a bigdata remote NanoSparqlServer.
  * 
- * This implementation operates only in auto-commit mode (each mutation
- * operation results in a commit on the server). It also throws
- * UnsupportedOperationExceptions all over the place due to incompatibilities
- * with our own remoting interface. If there is something important that you
- * need implemented for your application don't be afraid to reach out and
- * contact us.
+ * <h2>Transactions</h2>
  * 
- * FIXME (***) Fix all the Query objects (TupleQuery, GraphQuery, BooleanQuery) to
- * support the various possible operations on them, such as setting a binding.
+ * The database supports read/write transactions since 1.5.2. Transaction
+ * manager is at the database layer, not the {@link Repository} or
+ * {@link RepositoryConnection}. Therefore a namespace DOES NOT need to be
+ * configured for isolatable indices in order to create and manipulate
+ * transactions, but it DOES need to be configured with isolatable indices in
+ * order for you to WRITE on the namespace using a transaction.
  * 
+ * @see com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager
+ * @see com.bigdata.rdf.sail.BigdataSail.Options#ISOLATABLE_INDICES
  * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
  *      transactions in the REST API</a>
+ * @see <a href="http://trac.bigdata.com/ticket/698">
+ *      BigdataSailRemoteRepositoryConnection should implement interface methods
+ *      </a>
+ * 
+ *      FIXME (***) #698 Fix all the Query objects (TupleQuery, GraphQuery,
+ *      BooleanQuery) to support the various possible operations on them, such
+ *      as setting a binding.
  */
 public class BigdataSailRemoteRepositoryConnection implements RepositoryConnection {
 
