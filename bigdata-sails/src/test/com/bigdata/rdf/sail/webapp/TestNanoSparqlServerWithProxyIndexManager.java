@@ -284,6 +284,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          // Insert tests from trac issues
          suite.addTestSuite(TestInsertFilterFalse727.class);
          suite.addTestSuite(TestCBD731.class);
+         suite.addTestSuite(Test_Ticket_605.class);
 
          suite.addTestSuite(TestService794.class);
 
