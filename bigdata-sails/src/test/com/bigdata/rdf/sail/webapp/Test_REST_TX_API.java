@@ -150,9 +150,10 @@ public class Test_REST_TX_API<S extends IIndexManager> extends
     * Create an unisolated transaction and commit it. This should be a NOP since
     * nothing is written on the database.
     * 
-    * TODO Create an unisolated transaction, write on the transaction, commit the
-    * transaction and verify that we can read back the write set after the
-    * commit.
+    * TODO Create an unisolated transaction, write on the transaction, commit
+    * the transaction and verify that we can read back the write set after the
+    * commit. Note that we can only write on the resulting transaction if the
+    * namespace supports isolatable indices.
     */
    public void test_CREATE_TX_UNISOLATED_02() throws Exception {
 
