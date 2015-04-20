@@ -123,7 +123,8 @@ public class TestReificationDoneRightParser extends
 					.createURI("http://example.com/sybase"));
 
 			{
-				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
 				expected.setPrefixDecls(prefixDecls);
 				prefixDecls.put("", "http://example.com/");
 				prefixDecls.put("dc", "http://purl.org/dc/elements/1.1/");
@@ -270,10 +271,13 @@ public class TestReificationDoneRightParser extends
 					.createURI("http://example.com/sybase"));
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
-                expected.setPrefixDecls(prefixDecls);
-                prefixDecls.put("", "http://example.com/");
-                prefixDecls.put("dc", "http://purl.org/dc/elements/1.1/");
+               final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+             prefixDecls.put("", "http://example.com/");
+               expected.setPrefixDecls(prefixDecls);
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+//                expected.setPrefixDecls(prefixDecls);
+//                prefixDecls.put("", "http://example.com/");
+//                prefixDecls.put("dc", "http://purl.org/dc/elements/1.1/");
             }
 
             final ProjectionNode projection = new ProjectionNode();
@@ -361,7 +365,8 @@ public class TestReificationDoneRightParser extends
 					.createURI("http://example.com/d"));
 
 			{
-				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
 				expected.setPrefixDecls(prefixDecls);
 				prefixDecls.put("", "http://example.com/");
 			}
@@ -449,7 +454,8 @@ public class TestReificationDoneRightParser extends
 					.createURI("http://example.com/d"));
 
 			{
-				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
 				expected.setPrefixDecls(prefixDecls);
 				prefixDecls.put("", "http://example.com/");
 			}
@@ -543,7 +549,8 @@ public class TestReificationDoneRightParser extends
 					.createURI("http://example.com/e"));
 
 			{
-				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+            final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//				final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
 				expected.setPrefixDecls(prefixDecls);
 				prefixDecls.put("", "http://example.com/");
 			}
@@ -625,7 +632,8 @@ public class TestReificationDoneRightParser extends
             final VarNode sid = new VarNode("-sid-1");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+               final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.com/");
             }
@@ -707,7 +715,8 @@ public class TestReificationDoneRightParser extends
             final VarNode sid = new VarNode("-sid-1");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+               final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.com/");
             }
@@ -791,7 +800,8 @@ public class TestReificationDoneRightParser extends
             final VarNode sid = new VarNode("sid");
 
             {
-                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
+               final Map<String, String> prefixDecls = new LinkedHashMap<String, String>(PrefixDeclProcessor.defaultDecls);
+//                final Map<String, String> prefixDecls = new LinkedHashMap<String, String>();
                 expected.setPrefixDecls(prefixDecls);
                 prefixDecls.put("", "http://example.com/");
             }
