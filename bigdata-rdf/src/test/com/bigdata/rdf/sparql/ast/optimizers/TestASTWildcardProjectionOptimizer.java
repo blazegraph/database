@@ -40,6 +40,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 
@@ -47,7 +48,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * Unit tests for {@link ASTWildcardProjectionOptimizer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestASTWildcardProjectionOptimizer extends
         AbstractASTEvaluationTestCase {
@@ -339,5 +339,108 @@ public class TestASTWildcardProjectionOptimizer extends
         assertSameAST(expected, actual);
 
     }
+
+   /**
+    * <pre>
+    * SELECT * 
+    *   JoinGroupNode {
+    *     SELECT (*) {
+    *       JoinGroupNode {
+    *         StatementPatternNode(VarNode(s), ConstantNode(TermId(2U)[http://example/p]), VarNode(o), DEFAULT_CONTEXTS)
+    *       }
+    *     }
+    *    StatementPatternNode(VarNode(s), ConstantNode(TermId(3U)[http://example/q]), VarNode(x), DEFAULT_CONTEXTS)
+    *   }
+    * </pre>
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/757" > Wildcard projection
+    *      was not rewritten. </a>
+    */
+   public void test_wildcard_nestedSubquery() {
+
+      /*
+       * Note: DO NOT share structures in this test!!!!
+       */
+      final IBindingSet[] bsets = new IBindingSet[] {};
+
+      @SuppressWarnings("rawtypes")
+      final IV p = makeIV(new URIImpl("http://example/p"));
+
+      @SuppressWarnings("rawtypes")
+      final IV q = makeIV(new URIImpl("http://example/q"));
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection1 = new ProjectionNode();
+         given.setProjection(projection1);
+         projection1.addProjectionVar(new VarNode("*"));
+
+         final JoinGroupNode whereClause1 = new JoinGroupNode();
+         given.setWhereClause(whereClause1);
+
+         final SubqueryRoot subSelect = new SubqueryRoot(QueryType.SELECT);
+         {
+            final ProjectionNode projection2 = new ProjectionNode();
+            subSelect.setProjection(projection2);
+            projection2.addProjectionVar(new VarNode("*"));
+            final JoinGroupNode whereClause2 = new JoinGroupNode();
+            subSelect.setWhereClause(whereClause2);
+            whereClause2.addChild(new StatementPatternNode(new VarNode("s"),
+                  new ConstantNode(p), new VarNode("o"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS));
+         }
+
+         whereClause1.addChild(subSelect);
+
+         whereClause1.addChild(new StatementPatternNode(new VarNode("s"),
+               new ConstantNode(q), new VarNode("x"), null/* c */,
+               Scope.DEFAULT_CONTEXTS));
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection1 = new ProjectionNode();
+         expected.setProjection(projection1);
+         projection1.addProjectionVar(new VarNode("s"));
+         projection1.addProjectionVar(new VarNode("o"));
+         projection1.addProjectionVar(new VarNode("x"));
+
+         final JoinGroupNode whereClause1 = new JoinGroupNode();
+         expected.setWhereClause(whereClause1);
+
+         final SubqueryRoot subSelect = new SubqueryRoot(QueryType.SELECT);
+         {
+            final ProjectionNode projection2 = new ProjectionNode();
+            subSelect.setProjection(projection2);
+            projection2.addProjectionVar(new VarNode("s"));
+            projection2.addProjectionVar(new VarNode("o"));
+            final JoinGroupNode whereClause2 = new JoinGroupNode();
+            subSelect.setWhereClause(whereClause2);
+            whereClause2.addChild(new StatementPatternNode(new VarNode("s"),
+                  new ConstantNode(p), new VarNode("o"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS));
+         }
+
+         whereClause1.addChild(subSelect);
+
+         whereClause1.addChild(new StatementPatternNode(new VarNode("s"),
+               new ConstantNode(q), new VarNode("x"), null/* c */,
+               Scope.DEFAULT_CONTEXTS));
+
+      }
+
+      final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
+
+      final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+            given/* queryNode */, bsets);
+
+      assertSameAST(expected, actual);
+
+   }
 
 }
