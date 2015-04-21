@@ -270,12 +270,47 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     }
 
    /**
-    * Create a remote client for the specified serviceURL.
+    * Create a manager that is not aware of a specific blazegraph backend. This
+    * constructor is intended for patterns where a sparql end point is available
+    * but the top-level serviceURL for blazegraph is either not visible or not
+    * known:
+    * 
+    * <pre>
+    * new RemoteRepositoryManager().getRepositoryForURL(sparqlEndpointURL)
+    * </pre>
+    * 
+    * The same pattern MAY be used to perform SPARQL QUERY or SPARQL UPDATE
+    * operations against non-blazegraph sparql end points.
+    */
+   public RemoteRepositoryManager() {
+
+      this("http://localhost/no-service-URL");
+      
+    }
+    
+   /**
+    * Create a manager client for the specified serviceURL. The serviceURL has
+    * the typical form
+    * 
+    * <pre>
+    * http://host:port/bigdata
+    * </pre>
+    * 
+    * The serviceURL can be used to obtain sparql end point URLs for:
+    * <dl>
+    * <dt>The default namespace</dt>
+    * <dd>http://host:port/bigdata/sparql</dd>
+    * <dt>The XYZ namespace</dt>
+    * <dd>http://host:port/bigdata/namespace/XYZ/sparql</dd>
+    * </dl>
+    * 
+    * The serviceURL can also be used to access the multi-tenancy API and the
+    * transaction management API.  See the wiki for more details.
     * 
     * @param serviceURL
-    *            The path to the root of the web application (without the
-    *            trailing "/"). <code>/sparql</code> will be appended to this
-    *            path to obtain the SPARQL end point for the default data set.
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
     */
    public RemoteRepositoryManager(final String serviceURL) {
 
