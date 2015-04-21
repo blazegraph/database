@@ -47,17 +47,14 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
-//import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 
 /**
  * Test suite for {@link StatementBuffer}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  *          TODO Parameterize with {@link IStatementBufferFactory} and use to
  *          test other implementations as well? If not, then port tests so that
