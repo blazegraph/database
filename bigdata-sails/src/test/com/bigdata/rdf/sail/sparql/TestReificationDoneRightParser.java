@@ -29,21 +29,35 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Resource;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.rdf.model.BigdataResource;
+import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sail.sparql.ast.ParseException;
 import com.bigdata.rdf.sail.sparql.ast.TokenMgrError;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.InsertData;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.NoVocabulary;
 
 /**
  * Test suite for the proposed standardization of "reification done right".
@@ -52,8 +66,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  *      right)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestGroupGraphPatternBuilder.java 5064 2011-08-21 22:50:55Z
- *          thompsonbry $
  * 
  *          TODO When triple pattern reference is nested within a GRAPH ?g {}
  *          clause (verify that the graph context is inherited correctly).
@@ -77,9 +89,41 @@ public class TestReificationDoneRightParser extends
      */
     public TestReificationDoneRightParser(String name) {
         super(name);
-    }
+   }
 
-    
+   @Override
+   protected Properties getProperties() {
+
+      final Properties properties = new Properties();
+
+      /*
+       * Use triples for this test suite since we do not support RDR in quads
+       * mode at this time.
+       */
+      properties.setProperty(AbstractTripleStore.Options.QUADS, "false");
+
+      /*
+       * Example RDR for this test suite.
+       */
+      properties.setProperty(AbstractTripleStore.Options.STATEMENT_IDENTIFIERS,
+            "true");
+
+      // override the default vocabulary.
+      properties.setProperty(AbstractTripleStore.Options.VOCABULARY_CLASS,
+            NoVocabulary.class.getName());
+
+      // turn off axioms.
+      properties.setProperty(AbstractTripleStore.Options.AXIOMS_CLASS,
+            NoAxioms.class.getName());
+
+      // Note: No persistence.
+      properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
+            BufferMode.Transient.toString());
+
+      return properties;
+
+   }
+
     /**
 	 * Unit test for a triple reference pattern using an explicit BIND().
 	 * 
@@ -837,6 +881,78 @@ public class TestReificationDoneRightParser extends
         }
 
         final QueryRoot actual = parse(sparql, baseURI);
+
+        assertSameAST(sparql, expected, actual);
+
+    }
+
+    /**
+    * <pre>
+    * INSERT DATA {
+    *   <:s> <:p> "d" .
+    *   <<<:s> <:p> "d">> <:order> 5 .
+    * }
+    * </pre>
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1201" > RDFnot parsed in
+    *      SPARQL UPDATE </a>
+    * 
+    *      TODO Write DELETE DATA test case for RDR as well.
+    */
+    public void test_update_insert_data_RDR() throws MalformedQueryException,
+            TokenMgrError, ParseException {
+
+      final String sparql = "PREFIX : <http://example/>\n"//
+            + "INSERT DATA {\n"//
+            + "   <:s> <:p> \"d\" . \n"//
+            + "   << <:s> <:p> \"d\" >> <:order> 5 . \n"//
+            + "}";
+
+        final UpdateRoot expected = new UpdateRoot();
+        {
+
+            final InsertData op = new InsertData();
+
+            expected.addChild(op);
+
+            final BigdataURI s = valueFactory.createURI("http://example/s");
+            final BigdataURI p = valueFactory.createURI("http://example/p");
+            final BigdataURI order = valueFactory.createURI("http://example/order");
+            final BigdataLiteral d = valueFactory.createLiteral("d");
+            final BigdataLiteral five = valueFactory.createLiteral(5);
+
+         /*
+          * TODO The following is my proposal for how this should be
+          * represented. However, the SPARQLUpdateDataBlockParser needs to be
+          * forked and modified to support RDR before this test case can be
+          * finalized. These expected values are just my a priori expectation
+          * for what the output of the SPARQLUpdateDataBlockParser will be.
+          */
+            
+            // SP(:s :p d) as ?sid1) .
+            final BigdataStatement s1 = valueFactory.createStatement(//
+                  (BigdataResource)s,//
+                  (BigdataURI)p,//
+                  (BigdataValue)d, //
+                  null,
+                  StatementEnum.Explicit);
+            final IV sid1 = s1.getStatementIdentifier();
+
+            // SP(?sid, :p, 5).
+            final BigdataStatement s2 = valueFactory.createStatement(//
+                  (Resource)sid1, //
+                  (BigdataURI)order, //
+                  (BigdataValue) five, //
+                  null,//
+                  StatementEnum.Explicit);
+            final BigdataStatement[] data = new BigdataStatement[] { //
+                  s1, s2
+            };
+            op.setData(data);
+            
+        }
+        
+        final UpdateRoot actual = parseUpdate(sparql, baseURI);
 
         assertSameAST(sparql, expected, actual);
 
