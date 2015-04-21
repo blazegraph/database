@@ -60,8 +60,6 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
  * @see https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestBigdataExprBuilder.java 5073 2011-08-23 00:33:54Z
- *          thompsonbry $
  */
 public class TestUpdateExprBuilder2 extends AbstractBigdataExprBuilderTestCase {
 
