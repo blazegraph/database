@@ -192,6 +192,19 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
         
     }
     
+   /**
+    * Return <code>true</code> iff the REST API methods will use the load
+    * balancer aware requestURLs. The load balancer has essentially zero cost
+    * when not using HA, so it is recommended to always specify
+    * <code>true</code>. When <code>false</code>, the REST API methods will NOT
+    * use the load balancer aware requestURLs.
+    */
+    public boolean getUseLBS() {
+
+       return useLBS;
+       
+    }
+    
     /**
      * Return the maximum requestURL length before the request is converted into
      * a POST using a <code>application/x-www-form-urlencoded</code> request
@@ -266,6 +279,12 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     */
    public RemoteRepositoryManager(final String serviceURL) {
 
+      /*
+       * TODO Why is useLBS:=false? Is there a problem when it is true and we
+       * are not actually using an HA deployment? E.g., single server deployment
+       * under a non-jetty servlet container where the LoadBalancerServlet is
+       * not deployed?
+       */
       this(serviceURL, false/* useLBS */);
 
    }
@@ -489,8 +508,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     public RemoteRepository getRepositoryForDefaultNamespace() {
      
-      return new RemoteRepository(this, baseServiceURL + "/sparql");
-//            getRepositoryBaseURLForNamespace(DEFAULT_NAMESPACE) + "/sparql");
+      return getRepositoryForURL(baseServiceURL + "/sparql");
 
     }
     
@@ -505,32 +523,33 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     public RemoteRepository getRepositoryForNamespace(final String namespace) {
 
-        return new RemoteRepository(this, getRepositoryBaseURLForNamespace(namespace)
-                + "/sparql");
+      return getRepositoryForURL(getRepositoryBaseURLForNamespace(namespace)
+            + "/sparql");
         
     }
 
-    /**
-     * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
-     * SPARQL end point.
-     * 
-     * @param sparqlEndpointURL
-     *            The URL of the SPARQL end point.
-     * @param useLBS
-     *            When <code>true</code>, the REST API methods will use the load
-     *            balancer aware requestURLs. The load balancer has essentially
-     *            zero cost when not using HA, so it is recommended to always
-     *            specify <code>true</code>. When <code>false</code>, the REST
-     *            API methods will NOT use the load balancer aware requestURLs.
-     * 
-     * @return An interface which may be used to talk to that data set.
-     */
-    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
-            final boolean useLBS) {
-
-        return new RemoteRepository(this, sparqlEndpointURL);
-
-    }
+//    /**
+//     * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
+//     * SPARQL end point.
+//     * 
+//     * @param sparqlEndpointURL
+//     *            The URL of the SPARQL end point.
+//     * @param useLBS
+//     *            When <code>true</code>, the REST API methods will use the load
+//     *            balancer aware requestURLs. The load balancer has essentially
+//     *            zero cost when not using HA, so it is recommended to always
+//     *            specify <code>true</code>. When <code>false</code>, the REST
+//     *            API methods will NOT use the load balancer aware requestURLs.
+//     * 
+//     * @return An interface which may be used to talk to that data set.
+//     */
+//    @Deprecated // The useLBS property is on the RemoteRepositoryManager and is ignored by this method.
+//    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+//            final boolean useLBS) {
+//
+//        return new RemoteRepository(this, sparqlEndpointURL);
+//
+//    }
 
     /**
      * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
@@ -544,9 +563,29 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
 
-        return new RemoteRepository(this, sparqlEndpointURL);
+        return getRepositoryForURL(sparqlEndpointURL, null/*timestamp*/);
 
     }
+
+    /**
+    * Obtain a flyweight {@link RemoteRepository} for the data set having the
+    * specified SPARQL end point. The load balancer will be used or not as per
+    * the parameters to the {@link RemoteRepositoryManager} constructor.
+    * 
+    * @param sparqlEndpointURL
+    *           The URL of the SPARQL end point.
+    * @param timestamp
+    *           The timestamp that will be added to all requests for the
+    *           sparqlEndPoint (optional). 
+    *           
+    * @return An interface which may be used to talk to that data set.
+    */
+   public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+         final IRemoteTx tx) {
+
+      return new RemoteRepository(this, sparqlEndpointURL, tx);
+
+   }
 
     /**
      * Obtain a <a href="http://vocab.deri.ie/void/"> VoID </a> description of
@@ -650,7 +689,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     public void deleteRepository(final String namespace) throws Exception {
 
-        final ConnectOptions opts = newConnectOptions(getRepositoryBaseURLForNamespace(namespace));
+        final ConnectOptions opts = newConnectOptions(
+               getRepositoryBaseURLForNamespace(namespace), null/* txId */);
 
         opts.method = "DELETE";
 
@@ -688,10 +728,10 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     public Properties getRepositoryProperties(final String namespace)
             throws Exception {
 
-       final String sparqlEndpointURL = getRepositoryBaseURLForNamespace(namespace);
+        final String sparqlEndpointURL = getRepositoryBaseURLForNamespace(namespace);
        
         final ConnectOptions opts = newConnectOptions(sparqlEndpointURL
-                + "/properties");
+            + "/properties", null/* txId */);
 
         opts.method = "GET";
 
@@ -769,7 +809,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
          */
     
       // The requestURL (w/o URL query parameters).
-      final String requestURL = opts.getRequestURL(getContextPath(), useLBS);
+      final String requestURL = opts.getRequestURL(getContextPath(), getUseLBS());
 
       final StringBuilder urlString = new StringBuilder(requestURL);
 
@@ -921,10 +961,16 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
    /**
     * Return the {@link ConnectOptions} which will be used by default for the
     * SPARQL end point for a QUERY or other idempotent operation.
+    * 
+    * @param sparqlEndpointURL
+    *           The SPARQL end point.
+    * @param tx
+    *           A transaction that will isolate the operation (optional).
     */
-   final protected ConnectOptions newQueryConnectOptions(final String sparqlEndpointURL) {
+   final protected ConnectOptions newQueryConnectOptions(
+         final String sparqlEndpointURL, final IRemoteTx tx) {
 
-       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, tx);
 
        opts.method = getQueryMethod();
        
@@ -937,15 +983,21 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
    /**
     * Return the {@link ConnectOptions} which will be used by default for the
     * SPARQL end point for an UPDATE or other non-idempotant operation.
+    * 
+    * @param sparqlEndpointURL
+    *           The SPARQL end point.
+    * @param tx
+    *           A transaction that will isolate the operation (optional).
     */
-   final protected ConnectOptions newUpdateConnectOptions(final String sparqlEndpointURL) {
+   final protected ConnectOptions newUpdateConnectOptions(
+         final String sparqlEndpointURL, final IRemoteTx tx) {
 
-       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL);
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, tx);
        
        opts.method = "POST";
        
        opts.update = true;
-       
+
        return opts;
 
    }
@@ -963,15 +1015,75 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
    /**
     * Return the {@link ConnectOptions} which will be used by default for the
     * specified service URL.
+    * <p>
+    * There are three cases:
+    * <dl>
+    * <dt>
+    * The operation is not isolated by a transaction</dt>
+    * <dd>This will return a {@link RemoteRepository} that DOES NOT specify a
+    * timestamp to be used for read or write operations. For read operations,
+    * this will cause it to use the default view of the namespace (as configured
+    * on the server) and that will always be non-blocking (either reading
+    * against the then current lastCommitTime on the database or reading against
+    * an explicit read lock). For write operations, this will cause it to use
+    * the UNISOLATED view of the namespace.</dd>
+    * <dt>
+    * The operation is isolated by a read/write transaction</dt>
+    * <dd>This will return a {@link RemoteRepository} which specifies the
+    * transaction identifier (txId) for both read and write operations. This
+    * ensures that they both have the same view of the write set of the
+    * transaction (we can not use the readsOnCommitTime for read operations
+    * because writes on the transaction are not visible unless we use the txId).
+    * </dd>
+    * <dt>
+    * The operation is isolated by a read-only transaction</dt>
+    * <dd>This will return a {@link RemoteRepository} which use the
+    * readsOnCommitTime for the transaction. This provides snapshot isolation
+    * without any overhead and is also compatible with HA (where the transaction
+    * management is performed on the leader and the followers are not be aware
+    * of the txIds)</dd>
+    * </dl>
     * 
     * @param serviceURL
-    *            The URL of the service for the request.
+    *           The URL of the service for the request.
+    * @param tx
+    *           A transaction that will isolate the operation (optional).
     */
-   ConnectOptions newConnectOptions(final String serviceURL) {
+   ConnectOptions newConnectOptions(final String serviceURL, final IRemoteTx tx) {
+   
+      final ConnectOptions opts = new ConnectOptions(serviceURL);
 
-       final ConnectOptions opts = new ConnectOptions(serviceURL);
+      if (tx != null) {
 
-       return opts;
+         /*
+          * Some kind of transaction.
+          */
+
+         if (tx.isReadOnly()) {
+
+            /*
+             * A read-only transaction.
+             * 
+             * FIXME This will not work for scale-out. We need to specify the
+             * txId itself.
+             */
+            opts.addRequestParam("timestamp",
+                  Long.toString(tx.getReadsOnCommitTime()));
+
+         } else {
+
+            /*
+             * A read/write transaction. We must use the txId to have the
+             * correct isolation.
+             */
+
+            opts.addRequestParam("timestamp", Long.toString(tx.getTxId()));
+
+         }
+
+      }
+       
+      return opts;
 
    }
 
@@ -1158,7 +1270,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      if (queryId == null)
         return;
      
-       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL);
+       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL, null/* txId */);
 
        opts.addRequestParam("cancelQuery");
 

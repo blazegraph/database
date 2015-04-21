@@ -131,42 +131,22 @@ public class BigdataSailRemoteRepository implements Repository {
     * @param sparqlEndpointURL
     *           The SPARQL end point URL
     */
+    @Deprecated // This is broken because the sparqlEndpointURL is not the serviceURL and that is what the RRM expects/needs.
 	public BigdataSailRemoteRepository(final String sparqlEndpointURL) {
 
-		this(sparqlEndpointURL, true/* useLBS */);
+       if (sparqlEndpointURL == null)
+          throw new IllegalArgumentException();
 
-	}
+       /*
+        * Allocate a RemoteRepositoryManager. This is NOT a flyweight operation.
+        * 
+        */
+       this.our_mgr = new RemoteRepositoryManager(sparqlEndpointURL, false/*useLBS*/);
 
-   /**
-    * Constructor that simply specifies an endpoint. This class will internally
-    * allocate a {@link RemoteRepositoryManager} that is scoped to the life
-    * cycle of this class. The allocated {@link RemoteRepositoryManager} will be
-    * closed when this {@link BigdataSailRemoteRepository} is closed.
-    * <p>
-    * Note: This constructor pattern is NOT flyweight.
-    * 
-    * @param sparqlEndpointURL
-    *           The SPARQL end point URL
-    * @param useLBS
-    *           <code>true</code> iff the LBS pattern should be used.
-    */
-	public BigdataSailRemoteRepository(final String sparqlEndpointURL,
-			final boolean useLBS) {
+       this.remoteRepository = our_mgr.getRepositoryForURL(sparqlEndpointURL);
 
-		if (sparqlEndpointURL == null)
-			throw new IllegalArgumentException();
-
-		/*
-		 * Allocate a RemoteRepositoryManager. This is NOT a flyweight operation.
-		 * 
-		 */
-		this.our_mgr = new RemoteRepositoryManager(sparqlEndpointURL, useLBS);
-
-      this.remoteRepository = our_mgr.getRepositoryForURL(sparqlEndpointURL,
-            useLBS);
-		
-	}
-
+    }
+    
    /**
     * Flyweight constructor wraps the blazegraph remote client for a SPARQL
     * endpoint as an openrdf {@link Repository}.

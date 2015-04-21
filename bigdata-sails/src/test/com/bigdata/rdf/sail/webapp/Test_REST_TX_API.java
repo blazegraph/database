@@ -252,7 +252,7 @@ public class Test_REST_TX_API<S extends IIndexManager> extends
     * just whether or not the namespace will allow an operation that is isolated
     * by a read/write transaction.
     */
-   public class NoReadWriteTx<S extends IIndexManager> extends
+   public static class NoReadWriteTx<S extends IIndexManager> extends
          Test_REST_TX_API<S> {
 
       @Override
@@ -291,7 +291,7 @@ public class Test_REST_TX_API<S extends IIndexManager> extends
     * just whether or not the namespace will allow an operation that is isolated
     * by a read/write transaction.
     */
-   public class ReadWriteTx<S extends IIndexManager> extends
+   public static class ReadWriteTx<S extends IIndexManager> extends
          Test_REST_TX_API<S> {
 
       @Override
@@ -314,7 +314,8 @@ public class Test_REST_TX_API<S extends IIndexManager> extends
          super(name);
 
       }
-
+      
+      // FIXME Write tests.
       public void test_TX_STUFF() {
          
       }

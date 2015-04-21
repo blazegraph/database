@@ -70,16 +70,22 @@ public class RemoteRepository extends RemoteRepositoryBase {
 //    private static final transient Logger log = Logger
 //            .getLogger(RemoteRepository.class);
 
-    /**
-     * The service end point for the default data set.
-     */
-    protected final String sparqlEndpointURL;
-
    /**
     * The {@link RemoteRepositoryManager} object use to manage all access to the
     * service backing the {@link #sparqlEndpointURL}.
     */
     private final RemoteRepositoryManager mgr;
+    
+    /**
+     * The service end point for the default data set.
+     */
+    private final String sparqlEndpointURL;
+
+    /**
+    * When non-<code>null</code> the operations against the
+    * {@link #sparqlEndpointURL} will be isolated by the transaction.
+    */
+    private final IRemoteTx tx;
     
     /**
      * Return the SPARQL end point.
@@ -93,8 +99,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
     @Override
     public String toString() {
 
-        return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
-                + ", useLBS=" + mgr.useLBS + "}";
+      return super.toString() + "{sparqlEndpoint=" + sparqlEndpointURL
+            + ", mgr=" + getRemoteRepositoryManager()
+            + (tx == null ? "" : ", tx=" + tx) + "}";
 
     }
 
@@ -109,44 +116,22 @@ public class RemoteRepository extends RemoteRepositoryBase {
     }
 
     /**
-     * Create a connection to a remote repository. A typical invocation looks
-     * like:
+     * Create a connection to a remote repository. This can be used with any
+     * SPARQL end point as long as you restrict yourself to SPARQL QUERY or
+     * SPARQL UPDATE.  The other methods can only be used with a blazegraph
+     * backend.
      * 
-     * <pre>
-     * cm = ...
-     * executor = ...
-     * new RemoteRepository(serviceURL, new DefaultHttpClient(cm), executor);
-     * </pre>
-     * <p>
-     * Note: You SHOULD reuse the backing {@link ClientConnectionManager} for
-     * the {@link HttpClient}. It generally relies on a thread pool and the life
-     * cycle of the {@link ClientConnectionManager} needs to be properly
-     * managed. Some hooks for this are listed below.
-     * <p>
-     * Note: You SHOULD reuse an existing thread pool {@link Executor} and the
-     * life cycle of that {@link Executor} needs to be properly managed. Again,
-     * see below for some hooks.
-     * 
+     * @param mgr
      * @param sparqlEndpointURL
-     *            The SPARQL http end point for the data set.
-     * @param useLBS
-     *            When <code>true</code>, the REST API methods will use the load
-     *            balancer aware requestURLs. The load balancer has essentially
-     *            zero cost when not using HA, so it is recommended to always
-     *            specify <code>true</code>. When <code>false</code>, the REST
-     *            API methods will NOT use the load balancer aware requestURLs.
-     * @param httpClient
-     *            The {@link HttpClient}.
-     * @param executor
-     *            The thread pool for processing HTTP responses. The life cycle
-     *            of this object is owned by the caller.
+     *            The SPARQL end point.
      * 
      * @see RemoteRepositoryManager
      * @see HttpClientConfigurator
      * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
      *      HALoadBalancer </a>
      */
-    RemoteRepository(final RemoteRepositoryManager mgr, final String sparqlEndpointURL) {
+   RemoteRepository(final RemoteRepositoryManager mgr,
+         final String sparqlEndpointURL, final IRemoteTx tx) {
 
        if (mgr == null)
           throw new IllegalArgumentException();
@@ -157,6 +142,8 @@ public class RemoteRepository extends RemoteRepositoryBase {
         this.mgr = mgr;
         
         this.sparqlEndpointURL = sparqlEndpointURL;
+        
+        this.tx = tx;
         
     }
 
@@ -175,7 +162,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long postGraphML(final String path) throws Exception {
         
-        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, tx);
 
         opts.addRequestParam("blueprints");
 
@@ -218,7 +205,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public GraphQueryResult getServiceDescription() throws Exception {
 
-        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL);
+        // TODO Unit test when isolated by a transaction. The server is already
+        // creating a tx for this so it might hit a fence post.
+        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL,tx);
 
         opts.method = "GET";
 
@@ -238,7 +227,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedTupleQuery prepareTupleQuery(final String query)
             throws Exception {
 
-        return new TupleQuery(mgr.newQueryConnectOptions(sparqlEndpointURL), UUID.randomUUID(), query);
+        return new TupleQuery(mgr.newQueryConnectOptions(sparqlEndpointURL,tx), UUID.randomUUID(), query);
 
     }
 
@@ -253,7 +242,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedGraphQuery prepareGraphQuery(final String query)
             throws Exception {
 
-        return new GraphQuery(mgr.newQueryConnectOptions(sparqlEndpointURL), UUID.randomUUID(), query);
+        return new GraphQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(), query);
 
     }
 
@@ -268,7 +257,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedBooleanQuery prepareBooleanQuery(final String query)
             throws Exception {
 
-        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL), UUID.randomUUID(), query);
+        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(), query);
 
     }
 
@@ -285,7 +274,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedSparqlUpdate prepareUpdate(final String updateStr)
             throws Exception {
 
-        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL), UUID.randomUUID(),
+        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(),
                 updateStr);
 
     }
@@ -453,7 +442,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
          /*
           * This is the new code path that optimizes the effort by the server.
           */
-         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL);
+         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
 
          opts.addRequestParam("HASSTMT");
          opts.addRequestParam("includeInferred",
@@ -577,7 +566,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
          throw new IllegalArgumentException();
       }
 
-      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL);
+      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
 
         opts.addRequestParam("ESTCARD");
         if (exact) {
@@ -638,7 +627,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     */
     public Collection<Resource> getContexts() throws Exception {
     	
-        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
 
         opts.addRequestParam("CONTEXTS");
 
@@ -673,7 +662,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long add(final AddOp add) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
         
         add.prepareForWire();
         
@@ -730,7 +719,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     */
     public long remove(final RemoveOp remove) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
         
         remove.prepareForWire();
             
@@ -824,7 +813,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long update(final RemoveOp remove, final AddOp add) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL);
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
         
         remove.prepareForWire();
         add.prepareForWire();

@@ -80,6 +80,7 @@ import com.bigdata.rdf.sail.webapp.client.IRemoteTx;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteTransactionNotFoundException;
 
@@ -124,6 +125,37 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
     }
 
    /**
+    * Return a {@link RemoteRepository} for this connection.
+    * 
+    * @see RemoteRepositoryManager#new
+    */
+   protected RemoteRepository getRepositoryForConnection() {
+
+      final IRemoteTx tx = remoteTx.get();
+
+      if (tx != null) {
+
+         /*
+          * Return a RemoteRepository that will use a view that is consistent
+          * with an isolated view of the transaction.
+          */
+         final RemoteRepository rtmp = repo.getRemoteRepository();
+         final String sparqlEndpointURL = rtmp.getSparqlEndPoint();
+         final RemoteRepositoryManager rmgr = rtmp.getRemoteRepositoryManager();
+         
+         return rmgr.getRepositoryForURL(sparqlEndpointURL, tx);
+
+      }
+
+      /*
+       * The returned repository does not add the &timestamp= URL query
+       * parameter.
+       */
+      return repo.getRemoteRepository();
+
+   }
+    
+   /**
     * Report the fast range count (aka ESTCARD) associated with the specified
     * access path.
     */
@@ -133,7 +165,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 		try {
 		
-			final RemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = getRepositoryForConnection();
 	
 			return remote.rangeCount(s, p, o, c);
 			
