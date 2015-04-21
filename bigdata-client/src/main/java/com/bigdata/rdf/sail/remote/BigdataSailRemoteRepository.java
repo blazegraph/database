@@ -29,6 +29,7 @@ import java.io.File;
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.Repository;
+import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -66,6 +67,19 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  * <li>The {@link RemoteRepositoryManager} can be used to access additional
  * interfaces, including the multi-tenancy API and the transaction API.</li>
  * </ul>
+ * 
+ * <h2>Transactions</h2>
+ * 
+ * The database supports read/write transactions since 1.5.2. Transaction
+ * manager is at the database layer, not the {@link Repository} or
+ * {@link RepositoryConnection}. Therefore a namespace DOES NOT need to be
+ * configured for isolatable indices in order to create and manipulate
+ * transactions, but it DOES need to be configured with isolatable indices in
+ * order for you to WRITE on the namespace using a transaction.
+ * 
+ * @see com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager
+ * @see com.bigdata.rdf.sail.BigdataSail.Options#ISOLATABLE_INDICES
+ * @see BigdataSailRemoteRepositoryConnection
  */
 public class BigdataSailRemoteRepository implements Repository {
 
@@ -117,42 +131,22 @@ public class BigdataSailRemoteRepository implements Repository {
     * @param sparqlEndpointURL
     *           The SPARQL end point URL
     */
+    @Deprecated // This is broken because the sparqlEndpointURL is not the serviceURL and that is what the RRM expects/needs.
 	public BigdataSailRemoteRepository(final String sparqlEndpointURL) {
 
-		this(sparqlEndpointURL, true/* useLBS */);
+       if (sparqlEndpointURL == null)
+          throw new IllegalArgumentException();
 
-	}
+       /*
+        * Allocate a RemoteRepositoryManager. This is NOT a flyweight operation.
+        * 
+        */
+       this.our_mgr = new RemoteRepositoryManager(sparqlEndpointURL, false/*useLBS*/);
 
-   /**
-    * Constructor that simply specifies an endpoint. This class will internally
-    * allocate a {@link RemoteRepositoryManager} that is scoped to the life
-    * cycle of this class. The allocated {@link RemoteRepositoryManager} will be
-    * closed when this {@link BigdataSailRemoteRepository} is closed.
-    * <p>
-    * Note: This constructor pattern is NOT flyweight.
-    * 
-    * @param sparqlEndpointURL
-    *           The SPARQL end point URL
-    * @param useLBS
-    *           <code>true</code> iff the LBS pattern should be used.
-    */
-	public BigdataSailRemoteRepository(final String sparqlEndpointURL,
-			final boolean useLBS) {
+       this.remoteRepository = our_mgr.getRepositoryForURL(sparqlEndpointURL);
 
-		if (sparqlEndpointURL == null)
-			throw new IllegalArgumentException();
-
-		/*
-		 * Allocate a RemoteRepositoryManager. This is NOT a flyweight operation.
-		 * 
-		 */
-		this.our_mgr = new RemoteRepositoryManager(sparqlEndpointURL, useLBS);
-
-      this.remoteRepository = our_mgr.getRepositoryForURL(sparqlEndpointURL,
-            useLBS);
-		
-	}
-
+    }
+    
    /**
     * Flyweight constructor wraps the blazegraph remote client for a SPARQL
     * endpoint as an openrdf {@link Repository}.
