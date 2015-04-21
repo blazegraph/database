@@ -59,7 +59,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * Base class for AST visitor impls.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @openrdf
  */
 public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
@@ -72,6 +71,15 @@ public abstract class BigdataASTVisitorBase extends ASTVisitorBase {
 
     }
 
+    /**
+     * Return <code>true</code> iff the KB is in an RDR enabled mode.
+     */
+    protected boolean getStatementIdentifiers() {
+       
+       return context.tripleStore.getStatementIdentifiers();
+       
+    }
+    
     /**
      * Return the depth of the node in the parse tree. The depth is ZERO (0) if
      * the node does not have a parent.
