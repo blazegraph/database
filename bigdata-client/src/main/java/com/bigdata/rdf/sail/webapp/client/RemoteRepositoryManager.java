@@ -465,6 +465,23 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
    }
 
+//   FIXME Should we be doing this? Are we leaking HttpClient or Executor resources otherwise?
+//   /**
+//    * {@inheritDoc}
+//    * <p>
+//    * Ensure resource is closed.
+//    * 
+//    * @see AutoCloseable
+//    */
+//   @Override
+//   protected void finalize() throws Throwable {
+//
+//      close();
+//      
+//      super.finalize();
+//      
+//   }
+   
    @Override
    public void close() throws Exception {
 
