@@ -800,7 +800,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 						// Should be empty.
 						assertEquals(
 								0L,
-								countResults(repo.prepareTupleQuery(
+								countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 										"SELECT * {?a ?b ?c} LIMIT 10")
 										.evaluate()));
 					} finally {
@@ -896,7 +896,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 						// Should be empty.
 						assertEquals(
 								0L,
-								countResults(repo.prepareTupleQuery(
+								countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 										"SELECT * {?a ?b ?c} LIMIT 10")
 										.evaluate()));
 					} finally {
@@ -1104,7 +1104,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 						// Should be empty.
 						assertEquals(
 								0L,
-								countResults(repo.prepareTupleQuery(
+								countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 										"SELECT * {?a ?b ?c} LIMIT 10")
 										.evaluate()));
 					} finally {
@@ -1201,7 +1201,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 						// Should be empty.
 						assertEquals(
 								0L,
-								countResults(repo.prepareTupleQuery(
+								countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 										"SELECT * {?a ?b ?c} LIMIT 10")
 										.evaluate()));
 					} finally {
@@ -1296,7 +1296,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 					// Should be empty.
 					assertEquals(
 							0L,
-							countResults(repo.prepareTupleQuery(
+							countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 									"SELECT * {?a ?b ?c} LIMIT 10").evaluate()));
 				} finally {
 					repo.close();
@@ -1717,7 +1717,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
 				try {
 					assertEquals(
 							1L,
-							countResults(repo.prepareTupleQuery(
+							countResults(repo.getRepositoryForDefaultNamespace().prepareTupleQuery(
 									"SELECT (count(*) as ?count) {?a ?b ?c}")
 									.evaluate()));
 				} finally {

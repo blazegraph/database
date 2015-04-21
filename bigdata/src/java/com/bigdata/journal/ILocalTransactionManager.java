@@ -28,14 +28,16 @@
 
 package com.bigdata.journal;
 
+import java.util.Set;
+
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.service.ITxState;
 
 /**
  * Interface for managing local transaction state (the client side of the
  * {@link ITransactionService}).
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface ILocalTransactionManager extends
         /* ITransactionManager, */IServiceShutdown {
@@ -44,7 +46,7 @@ public interface ILocalTransactionManager extends
      * The server side of the transaction manager (possibly remote, in which
      * case this may require the service to be discovered).
      */
-    public ITransactionService getTransactionService();
+    ITransactionService getTransactionService();
     
     /**
      * Return the local state for a transaction.
@@ -56,7 +58,7 @@ public interface ILocalTransactionManager extends
      *         <code>null</code> if the start time is not mapped to either an
      *         active or prepared transaction.
      */
-    public ITx getTx(final long tx);
+    ITx getTx(final long tx);
     
     /**
      * Return the next timestamp from the {@link ITransactionService}.
@@ -73,7 +75,7 @@ public interface ILocalTransactionManager extends
      * 
      * @see ITimestampService#nextTimestamp()
      */
-    public long nextTimestamp();
+    long nextTimestamp();
 
     /**
      * Notify the global transaction manager that a commit has been performed
@@ -86,6 +88,11 @@ public interface ILocalTransactionManager extends
      * 
      * @see ITransactionService#notifyCommit(long)
      */
-    public void notifyCommit(long commitTime);
+    void notifyCommit(long commitTime);
 
+    /**
+     * Return a snapshot of the active transactions. 
+     */
+    ITxState[] getActiveTx();
+    
 }

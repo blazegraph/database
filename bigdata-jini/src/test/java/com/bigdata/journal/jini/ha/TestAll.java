@@ -39,7 +39,6 @@ import com.bigdata.journal.Journal;
  * {@link Journal}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll extends TestCase {
 
@@ -115,10 +114,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHAJournalServerOverride.class); 
 
         // Test suite for concurrent writers and group commit. See #1136
-        // FIXME Enable these for the #1136 branch. Disabled in master for release.
         suite.addTestSuite(TestHA1GroupCommit.class);
         suite.addTestSuite(TestHA3GroupCommit.class);
 
+        // FIXME TX TEST SUITE & TX TEST SUITE WITH LBS. See #1156 and #1189.
+        
         // The HA load balancer test suite.
         suite.addTest(TestAll_LBS.suite());
         

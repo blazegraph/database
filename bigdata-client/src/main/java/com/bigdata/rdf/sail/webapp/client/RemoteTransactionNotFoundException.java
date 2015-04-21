@@ -1,4 +1,5 @@
 /**
+
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
@@ -19,47 +20,28 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
-/*
- * Created on Nov 7, 2007
  */
+package com.bigdata.rdf.sail.webapp.client;
 
-package com.bigdata.rdf.sail.remote;
-
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /**
- * Test suite.
+ * Exception thrown if a transaction is not active in a context where it needs
+ * to be active for some operation to take place.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author bryan
  */
-public class TestAll extends TestCase {
+public class RemoteTransactionNotFoundException extends RuntimeException {
 
-    /**
-     * 
-     */
-    public TestAll() {
-        super();
-    }
+   /**
+    * 
+    */
+   private static final long serialVersionUID = 1L;
 
-    /**
-     * @param arg0
-     */
-    public TestAll(String arg0) {
-        super(arg0);
-    }
+   public RemoteTransactionNotFoundException(final long txId,
+         final String serviceURL) {
 
-    public static Test suite() {
+      super("txId=" + txId + ", serviceURL=" + serviceURL);
 
-        final TestSuite suite = new TestSuite("openrdf remote client wrapper");
+   }
 
-        //BigdataSailFactory
-        suite.addTestSuite(BigdataSailFactoryTest.class);
-        
-        return suite;
-
-    }
-    
 }

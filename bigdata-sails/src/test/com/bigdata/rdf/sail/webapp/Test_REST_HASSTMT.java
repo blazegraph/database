@@ -48,7 +48,8 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
  * 
  *      FIXME *** Cover the quads mode APs.
  * 
- *      TODO Should test GET as well as POST.
+ * TODO Should test GET as well as POST (this requires that we configured the
+ * client differently).
  */
 public class Test_REST_HASSTMT<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
