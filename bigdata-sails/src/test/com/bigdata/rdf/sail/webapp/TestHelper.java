@@ -1,16 +1,14 @@
 package com.bigdata.rdf.sail.webapp;
 
-import java.net.URISyntaxException;
-
 import junit.framework.TestCase;
 
 import org.openrdf.model.Resource;
 import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Helper class to debug the NSS by issuing commands that we can not issue
@@ -20,40 +18,55 @@ import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
  */
 public class TestHelper extends TestCase {
 
-    static public void main(final String[] args) throws URISyntaxException,
-            RepositoryException {
+   /**
+    * 
+    * @param args
+    * @throws Exception
+    */
+   static public void main(final String[] args) throws Exception {
 
-        if (args.length != 1) {
+      if (args.length != 1) {
 
-            System.err.println("usage: SPARQL-Endpoint-URL");
+         System.err.println("usage: SPARQL-Endpoint-URL");
 
-            System.exit(1);
+         System.exit(1);
 
-        }
+      }
 
-        final String sparqlEndpointURL = args[0];
+      final String sparqlEndpointURL = args[0];
 
-        final BigdataSailRemoteRepository repo = new BigdataSailRemoteRepository(
-                sparqlEndpointURL);
+      final RemoteRepositoryManager mgr = new RemoteRepositoryManager(
+            "localhost:8080"/* serviceURLIsIngored */);
 
-        RepositoryConnection cxn = null;
-        try {
-            
-            cxn = (RepositoryConnection) repo.getConnection();
+      try {
+
+         final BigdataSailRemoteRepository repo = mgr.getRepositoryForURL(
+               sparqlEndpointURL).getBigdataSailRemoteRepository();
+
+         RepositoryConnection cxn = null;
+         try {
+
+            cxn = repo.getConnection();
 
             cxn.remove(null/* s */, RDF.TYPE, FOAF.PERSON, (Resource[]) null/* c */);
 
-        } finally {
+         } finally {
 
             if (cxn != null) {
-                cxn.close();
-                cxn = null;
+               cxn.close();
+               cxn = null;
             }
 
             repo.shutDown();
 
-        }
+         }
 
-    }
+      } finally {
+
+         mgr.close();
+
+      }
+
+   }
 
 }

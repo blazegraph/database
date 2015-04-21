@@ -105,7 +105,8 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 //            );
 
       return ProxySuiteHelper.suiteWhenStandalone(TestBigdataSailRemoteRepository.ReadWriteTx.class,
-            "test.*", TestMode.quads
+//            "test.*", TestMode.quads
+            "test_tx_begin_addStatement_commit.*", TestMode.quads
 //            , TestMode.sids
 //            , TestMode.triples
             );
@@ -1026,7 +1027,57 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
        * @throws MalformedQueryException
        * @throws UpdateExecutionException
        */
-      public void test_tx_begin_write_commit() throws RepositoryException,
+      public void test_tx_begin_addStatement_commit() throws RepositoryException,
+            MalformedQueryException, UpdateExecutionException {
+
+         assertFalse(cxn.isActive());
+
+         cxn.begin();
+
+         assertTrue(cxn.isActive());
+
+         final URI a = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "a");
+         final URI b = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "b");
+         final URI c = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "c");
+         
+         assertFalse(cxn.hasStatement(a, b, c, true/* includeInferred */));
+         
+         // Add to default graph.
+         cxn.add(cxn.getValueFactory().createStatement(a,b,c));
+         
+         // visible inside of the connection.
+         assertTrue(cxn.hasStatement(a, b, c, true/* includeInferred */));
+
+         // not visible from a new connection.
+         {
+            final BigdataSailRemoteRepositoryConnection cxn2 = repo
+                  .getConnection();
+            try {
+               assertTrue(cxn2 != cxn);
+               // cxn2.begin();
+               assertFalse(cxn2.hasStatement(a, b, c, true/* includeInferred */));
+            } finally {
+               cxn2.close();
+            }
+         }
+       
+         cxn.commit();
+
+         assertFalse(cxn.isActive());
+
+      }
+
+      /**
+       * Basic test creates a read/write connection, issues begin(), and then
+       * issues commit() on the connection.
+       * 
+       * TODO Test where we abort the connection. Verify write set is discarded.
+       * 
+       * @throws RepositoryException
+       * @throws MalformedQueryException
+       * @throws UpdateExecutionException
+       */
+      public void test_tx_begin_UPDATE_commit() throws RepositoryException,
             MalformedQueryException, UpdateExecutionException {
 
          assertFalse(cxn.isActive());

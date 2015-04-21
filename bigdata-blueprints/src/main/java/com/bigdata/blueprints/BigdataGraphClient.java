@@ -98,8 +98,12 @@ public class BigdataGraphClient extends BigdataGraph {
     }
     
     /**
-     * Get a {@link BigdataSailRemoteRepositoryConnection}.
-     */
+    * Get a {@link BigdataSailRemoteRepositoryConnection}.
+    * 
+    * TODO Review this now that we support read/write tx for
+    * BigdataSailRemoteRepositoryConnection (if namespace uses
+    * ISOLATABLE_INDICES).
+    */
 	@Override
 	protected BigdataSailRemoteRepositoryConnection getWriteConnection() throws Exception {
 	    if (cxn == null) {
@@ -109,9 +113,13 @@ public class BigdataGraphClient extends BigdataGraph {
 	}
 	
     /**
-     * Get a {@link BigdataSailRemoteRepositoryConnection}. No difference in
-     * connection for remote clients.
-     */
+    * Get a {@link BigdataSailRemoteRepositoryConnection}. No difference in
+    * connection for remote clients.
+    * 
+    * TODO Review this now that we support read/write tx for
+    * BigdataSailRemoteRepositoryConnection (if namespace uses
+    * ISOLATABLE_INDICES).
+    */
 	@Override
     protected BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
         return getWriteConnection();
