@@ -87,7 +87,7 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.rdf.load.TestAll.suite() );
 
         // test RDF graph mining/analytics
-        suite.addTest(com.bigdata.rdf.graph.TestAll.suite());
+//        suite.addTest(com.bigdata.rdf.graph.TestAll.suite()); // Note: This is in its own maven project.
         suite.addTest(com.bigdata.rdf.graph.impl.bd.TestAll.suite());
 
         return suite;

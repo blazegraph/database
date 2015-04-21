@@ -30,22 +30,15 @@ package com.bigdata.rdf.sail.tck;
 import java.util.Properties;
 
 import org.openrdf.query.Dataset;
-import org.openrdf.repository.Repository;
-import org.openrdf.repository.dataset.DatasetRepository;
 
 import com.bigdata.journal.Journal;
-import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.sail.BigdataSailRepository;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 
 /**
  * Test harness for running the SPARQL test suites against a {@link Journal}
  * using full read/write transaction support.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: BigdataEmbeddedFederationSparqlTest.java 4455 2011-05-05
- *          19:24:03Z thompsonbry $
  */
 public class BigdataSparqlFullRWTxTest extends BigdataSparqlTest {
 

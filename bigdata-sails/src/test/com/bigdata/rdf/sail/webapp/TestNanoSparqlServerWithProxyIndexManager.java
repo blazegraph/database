@@ -43,10 +43,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.rawstore.Bytes;
-import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
@@ -268,16 +265,26 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          }
          suite.addTestSuite(Test_REST_ServiceDescription.class);
          suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
+         suite.addTestSuite(Test_REST_DELETE_WITH_BODY.class);
          suite.addTestSuite(TestNanoSparqlClient.class);
          suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
          suite.addTestSuite(StressTest_REST_MultiTenancy.class);
 
-         // BigdataSailRemoteRepository test (nano sparql server client-wrapper)
+         // Transaction management API.
+         suite.addTestSuite(Test_REST_TX_API.class);
+         suite.addTestSuite(Test_REST_TX_API.NoReadWriteTx.class); // without isolatable indices.
+         suite.addTestSuite(Test_REST_TX_API.ReadWriteTx.class); // with isolatable indices.
+
+         /*
+          * BigdataSailRemoteRepository(Connection) test suite (openrdf
+          * compliant client).
+          */
          suite.addTestSuite(TestBigdataSailRemoteRepository.class);
 
          // Insert tests from trac issues
          suite.addTestSuite(TestInsertFilterFalse727.class);
          suite.addTestSuite(TestCBD731.class);
+         suite.addTestSuite(Test_Ticket_605.class);
 
          suite.addTestSuite(TestService794.class);
 

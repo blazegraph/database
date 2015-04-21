@@ -380,7 +380,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 				// Should be empty.
 				assertEquals(0L,
-						countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+						countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery("SELECT * {?a ?b ?c}")
 								.evaluate()));
 
 			}
@@ -406,7 +406,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				// Should have data.
 				assertEquals(
 						100L,
-						countResults(r.prepareTupleQuery(
+						countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery(
 								"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
 
 			}
@@ -435,7 +435,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				// Verify quorum is still valid.
 				quorum.assertQuorum(token);
 
-				repos[0].prepareUpdate("DROP ALL").evaluate();
+				repos[0].getRepositoryForDefaultNamespace().prepareUpdate("DROP ALL").evaluate();
 
 			}
 
@@ -448,7 +448,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 				// Should be empty.
 				assertEquals(
 						0L,
-						countResults(r.prepareTupleQuery(
+						countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery(
 								"SELECT * {?a ?b ?c} LIMIT 100").evaluate()));
 
 			}
@@ -1015,7 +1015,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 							final RemoteRepositoryManager repo = getRemoteRepository(leader, httpClient);
 				        	try {
-				        		repo.prepareUpdate(
+				        		repo.getRepositoryForDefaultNamespace().prepareUpdate(
 										updateStr).evaluate();
 								log.info("COMPLETED TRANSACTION " + count);
 				        	} finally {
@@ -2241,7 +2241,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 							final String updateStr = sb.toString();
 
-							remoteRepo.prepareUpdate(updateStr).evaluate();
+							remoteRepo.getRepositoryForDefaultNamespace().prepareUpdate(updateStr).evaluate();
 
 							if (log.isInfoEnabled())
 								log.info("COMPLETED TRANSACTION " + n);
@@ -2333,7 +2333,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 							quorum.assertQuorum(token);
 
 							// Run query.
-							final long nresults = countResults(remoteRepo
+							final long nresults = countResults(remoteRepo.getRepositoryForDefaultNamespace()
 									.prepareTupleQuery(query).evaluate());
 
 							queryCount++;
@@ -3541,7 +3541,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 				// Should be empty.
 				assertEquals(0L,
-						countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+						countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery("SELECT * {?a ?b ?c}")
 								.evaluate()));
 
 			}
@@ -3560,7 +3560,7 @@ public class TestHA3JournalServer extends AbstractHA3JournalServerTestCase {
 
 				// Should be empty.
 				assertEquals(0L,
-						countResults(r.prepareTupleQuery("SELECT * {?a ?b ?c}")
+						countResults(r.getRepositoryForDefaultNamespace().prepareTupleQuery("SELECT * {?a ?b ?c}")
 								.evaluate()));
 
 			}

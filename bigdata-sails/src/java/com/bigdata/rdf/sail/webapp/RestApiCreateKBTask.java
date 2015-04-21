@@ -30,6 +30,7 @@ import javax.servlet.http.HttpServletResponse;
 import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.NV;
 
 /**
  * Extended to report the correct HTTP response to the client.
@@ -73,8 +74,34 @@ class RestApiCreateKBTask extends AbstractDelegateRestApiTask<Void> {
        * Note: The response code is defined as 201 (Created) since 1.3.2.
        */
 
+      /**
+       * Generate the absolute location of the new resource.
+       * 
+       * @see <a href="http://trac.bigdata.com/ticket/1187"> CREATE DATA SET
+       *      does not report Location header </a>
+       */
+      final String locationURI;
+      {
+         // Obtain the reconstructed request URI.
+         final StringBuffer sb = req.getRequestURL();
+         if (sb.charAt(sb.length() - 1) != '/') {
+            // Add trailing '/' iff not present.
+            sb.append('/');
+         }
+         // append the name of the newly created namespace.
+         sb.append(namespace);
+         /*
+          * append /sparql to get the SPARQL end point. This end point may be
+          * used for query, update, service description, etc.
+          */
+         sb.append("/sparql");
+         locationURI = sb.toString();
+      }
+
       buildResponse(HttpServletResponse.SC_CREATED,
-            MultiTenancyServlet.MIME_TEXT_PLAIN, "CREATED: " + namespace);
+            MultiTenancyServlet.MIME_TEXT_PLAIN, "CREATED: " + namespace,
+            new NV("Location", locationURI)
+            );
 
       return null;
 

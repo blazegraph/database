@@ -35,7 +35,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.model.Graph;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
+import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
@@ -489,7 +490,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
         try {
             
-            final Graph g = new GraphImpl();
+            final Graph g = new LinkedHashModel();
 
             if (describeDefaultNamespace) {
 
@@ -554,7 +555,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
             
         }
 
-        final BNode aDataSet = g.getValueFactory().createBNode();
+        final BNode aDataSet = ValueFactoryImpl.getInstance().createBNode();
         
         // Figure out the service end point(s).
         final String[] serviceURI = getServiceURIs(getServletContext(), req);

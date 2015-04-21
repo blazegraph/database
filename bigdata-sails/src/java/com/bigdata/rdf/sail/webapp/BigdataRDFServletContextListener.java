@@ -36,8 +36,14 @@ import java.net.URL;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
@@ -48,6 +54,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.Banner;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.cache.SynchronizedHardReferenceQueueWithTimeout;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSetAccess;
@@ -57,6 +64,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
+import com.bigdata.journal.WarmUpTask;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.CreateKBTask;
@@ -397,7 +405,7 @@ public class BigdataRDFServletContextListener implements
             final String s = getInitParameter( ConfigParams.QUERY_TIMEOUT);
 
             queryTimeout = s == null ? ConfigParams.DEFAULT_QUERY_TIMEOUT
-                    : Integer.valueOf(s);
+                    : Long.valueOf(s);
 
             if (queryTimeout < 0) {
 
@@ -408,6 +416,26 @@ public class BigdataRDFServletContextListener implements
 
             if (log.isInfoEnabled())
                 log.info(ConfigParams.QUERY_TIMEOUT + "=" + queryTimeout);
+
+        }
+
+        final long warmupTimeoutMillis;
+        {
+
+            final String s = getInitParameter( ConfigParams.WARMUP_TIMEOUT);
+
+            warmupTimeoutMillis = s == null ? ConfigParams.DEFAULT_WARMUP_TIMEOUT
+                    : Long.valueOf(s);
+
+            if (warmupTimeoutMillis < 0) {
+
+                throw new RuntimeException(ConfigParams.WARMUP_TIMEOUT
+                        + " : Must be non-negative, not: " + s);
+
+            }
+
+            if (log.isInfoEnabled())
+                log.info(ConfigParams.WARMUP_TIMEOUT + "=" + warmupTimeoutMillis);
 
         }
 
@@ -425,6 +453,112 @@ public class BigdataRDFServletContextListener implements
         context.setAttribute(BigdataRDFServlet.ATTRIBUTE_RDF_CONTEXT,
                 rdfContext);
 
+      if (indexManager instanceof Journal && warmupTimeoutMillis > 0L) {
+
+         // Note: null -or- empty => ALL namespaces.
+         final List<String> warmupNamespaceList = new LinkedList<String>();
+         {
+
+            String s = getInitParameter(ConfigParams.WARMUP_NAMESPACE_LIST);
+
+            if (s == null) {
+
+               s = ConfigParams.DEFAULT_WARMUP_NAMESPACE_LIST;
+
+            }
+
+            if (s != null) {
+
+               final String[] a = s.split(",");
+
+               for (String t : a) {
+
+                  t = t.trim();
+
+                  if (t.isEmpty())
+                     continue;
+
+                  warmupNamespaceList.add(t);
+
+               }
+
+            }
+
+            if (log.isInfoEnabled())
+               log.info(ConfigParams.WARMUP_NAMESPACE_LIST + "="
+                     + warmupNamespaceList);
+
+         }
+
+         final int warmupThreadPoolSize;
+         {
+
+            final String s = getInitParameter(ConfigParams.WARMUP_THREAD_POOL_SIZE);
+
+            warmupThreadPoolSize = s == null ? ConfigParams.DEFAULT_WARMUP_THREAD_POOL_SIZE
+                  : Integer.valueOf(s);
+
+            if (warmupThreadPoolSize <= 0) {
+
+               throw new RuntimeException(ConfigParams.WARMUP_THREAD_POOL_SIZE
+                     + " : Must be positive, not: " + s);
+
+            }
+
+            if (log.isInfoEnabled())
+               log.info(ConfigParams.WARMUP_THREAD_POOL_SIZE + "="
+                     + warmupThreadPoolSize);
+
+         }
+
+         /*
+          * Note: The [timestamp] will be READ_COMMITTED or the read lock as
+          * specified above.
+          */
+
+         // Parameters that should not be messed with.
+         final boolean visitLeaves = false; // Only materialize non-leaf pages.
+
+         log.warn("Warming up the journal: namespaces="
+               + (warmupNamespaceList == null || warmupNamespaceList.isEmpty() ? "ALL"
+                     : warmupNamespaceList) + ", warmupTheads="
+               + warmupThreadPoolSize + ", timeout="
+               + TimeUnit.MILLISECONDS.toSeconds(warmupTimeoutMillis) + "s");
+
+         // Submit the warmup procedure.
+         final Future<Map<String, BaseIndexStats>> ft = indexManager
+               .getExecutorService().submit(
+                     new WarmUpTask(((Journal) indexManager),
+                           warmupNamespaceList, timestamp,
+                           warmupThreadPoolSize, visitLeaves));
+
+         try {
+            // Await the warmup procedure termination.
+            final Map<String, BaseIndexStats> statsMap = ft.get(
+                  warmupTimeoutMillis, TimeUnit.MILLISECONDS);
+         } catch (ExecutionException e1) {
+            /*
+             * Abnormal termination.
+             */
+            throw new RuntimeException("Warmup failure: " + e1, e1);
+         } catch (InterruptedException e1) {
+            /*
+             * This thread was interrupted. This probably indicates shutdown of
+             * the container.
+             */
+            throw new RuntimeException(e1);
+         } catch (TimeoutException e1) {
+            /*
+             * Ignore expected exception. The warmup procedure has reached its
+             * timeout. This is fine.
+             */
+            if (log.isInfoEnabled())
+               log.info("Warmup terminated by timeout.");
+            // fall through.
+         }
+
+      }
+        
 //        // Initialize the SPARQL cache.
 //        context.setAttribute(BigdataServlet.ATTRIBUTE_SPARQL_CACHE,
 //                new SparqlCache(new MemoryManager(DirectBufferPool.INSTANCE)));

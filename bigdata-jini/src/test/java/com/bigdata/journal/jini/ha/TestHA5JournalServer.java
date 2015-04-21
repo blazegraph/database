@@ -625,7 +625,7 @@ public class TestHA5JournalServer extends AbstractHA5JournalServerTestCase {
 
 							final RemoteRepositoryManager repo = getRemoteRepository(leader, httpClient);
 				        	try {
-				        		repo.prepareUpdate(
+				        		repo.getRepositoryForDefaultNamespace().prepareUpdate(
 										updateStr).evaluate();
 								log.warn("COMPLETED TRANSACTION " + count);
 				        	} finally {

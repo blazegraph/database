@@ -25,7 +25,9 @@ package com.bigdata.rdf.internal;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -46,4 +48,10 @@ public class NoInlineURIFactory implements IInlineURIFactory {
         return null;
     }
 
+    @Override
+    public String getLocalNameFromDelegate(URI namespace,
+            AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+        throw new UnsupportedOperationException(
+                "Since there can't be inlined URIs this should never be attempted.");
+    }
 }
