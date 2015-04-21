@@ -34,6 +34,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Blazegraph specific {@link SailRepository} implementation class.
+ * 
+ * @see BigdataSailRepositoryConnection
  */
 public class BigdataSailRepository extends SailRepository {
    

@@ -76,6 +76,11 @@ public class RemoteTransactionManager {
 
    final private RemoteRepositoryManager mgr;
 
+   /**
+    * Flyweight constructor for stateless transaction manager client.
+    * 
+    * @param remoteRepositoryManager
+    */
    public RemoteTransactionManager(
          final RemoteRepositoryManager remoteRepositoryManager) {
 

@@ -35,6 +35,7 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.axioms.OwlAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
  * Helper class to create a bigdata instance.
@@ -89,38 +90,47 @@ public class BigdataSailFactory {
     }
     
     /**
-     * Connect to a remote bigdata instance.
-     */
-    public static BigdataSailRemoteRepository connect(final String host, final int port) {
-        
-        return connect("http://"+host+":"+port);
+    * Connect to a remote bigdata instance.
+    * 
+    * FIXME This does not parameterize the value of the ContextPath. See
+    * {@link BigdataStatics#getContextPath()}.
+    */
+   public static BigdataSailRemoteRepository connect(final String host,
+         final int port) {
+     
+       return connect("http://" + host + ":" + port + "/bigdata"); 
         
     }
     
     /**
 	 * Connect to a remote bigdata instance.
 	 * 
+     * @param sparqlEndpointURL
+     *            The URL of the SPARQL end point.
+	 * 
 	 * FIXME This does not support the HA load balancer pattern. See #1148.
 	 * 
 	 * FIXME This does not parameterize the value of the ContextPath. See
 	 * {@link BigdataStatics#getContextPath()}.
+	 * 
+	 * FIXME This MIGHT leak HttpClient or Executor resources.
 	 */
-	public static BigdataSailRemoteRepository connect(
-			final String serviceEndpoint) {
+   public static BigdataSailRemoteRepository connect(
+			final String sparqlEndpointURL) {
 
-		return new BigdataSailRemoteRepository(
-				normalizeEndpoint(serviceEndpoint));
+      return new RemoteRepositoryManager().getRepositoryForURL(
+            sparqlEndpointURL).getBigdataSailRemoteRepository();
 
 	}
 	
    /**
-    * 
     * Convenience method to allow the testing of the URL normalization
     * functionality.
     * 
     * @see <a href="http://trac.blazegraph.com/ticket/1139">
     *      BigdataSailFactory.connect() </a>
     */
+   @Deprecated // We are getting rid of this, right?
 	public static String testServiceEndpointUrl(final String serviceEndpoint)
 	{
 		return normalizeEndpoint(serviceEndpoint);
@@ -130,6 +140,7 @@ public class BigdataSailFactory {
 	 * Massage the service endpoint to ensure that it ends with
 	 * </code>/bigdata</code>
 	 */
+   @Deprecated // We are getting rid of this, right?
     static private String normalizeEndpoint(final String serviceEndpoint) {
 
         if (serviceEndpoint.endsWith("/sparql")) {
