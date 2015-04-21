@@ -2560,8 +2560,8 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.rdf.sail.webapp.TestAll" todir="${test.results.dir}" unless="testName" />
 
         <test name="com.bigdata.gom.TestAll" todir="${test.results.dir}" unless="testName" />
-
-        <test name="com.bigdata.blueprints.TestAll" todir="${test.results.dir}" unless="testName" />
+<!-- mavenized
+        <test name="com.bigdata.blueprints.TestAll" todir="${test.results.dir}" unless="testName" /> -->
 
 <!-- All tests.
         <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />

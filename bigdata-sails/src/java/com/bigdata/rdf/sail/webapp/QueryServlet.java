@@ -48,7 +48,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.PipelineOp;
@@ -59,9 +59,11 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.journal.ITransactionService;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.PartitionLocator;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
@@ -140,12 +142,38 @@ public class QueryServlet extends BigdataRDFServlet {
      */
     static final transient String ATTR_UUID = "uuid";
 
-    /**
-     * The name of the URL query parameter which indicates the timestamp against
-     * which an operation will be carried out.
-     * 
-     * @see BigdataRDFServlet#getTimestamp(HttpServletRequest)
-     */
+   /**
+    * The name of the URL query parameter which is any of:
+    * <dl>
+    * <dt>{@value ITx#UNISOLATED}</dt>
+    * <dd>A unisolated operation (iff the operation is a mutation - query is
+    * always against a read-only snapshot). See {@link ITx#UNISOLATED}.</dd>
+    * <dt>{@value ITx#READ_COMMITTED}</dt>
+    * <dd>A read-only operation with snapshot isolation semantics against the
+    * most recent commit point. See {@link ITx#READ_COMMITTED}</dd>
+    * <dt>timestamp</dt>
+    * <dd>The operation will be executed again the most recent committed state
+    * whose commit timestamp is less than or equal to <i>timestamp</i>.</dd>
+    * <dt>transaction</dt>
+    * <dd>The operation will be isolated by the transaction. The namespace MUST
+    * support isolatable indices. See
+    * {@link BigdataSail.Options#ISOLATABLE_INDICES}.</dd>
+    * </dl>
+    * <p>
+    * When not specified, the default for read-only operations is determined by
+    * {@link SparqlEndpointConfig#timestamp} and will generally be either
+    * {@link ITx#READ_COMMITTED} or a specific commit time that has been pinned
+    * by the server using {@link ConfigParams#READ_LOCK}. The default for
+    * mutation operations is {@link ITx#UNISOLATED} if the namespace does not
+    * support isolatable indices and a read/write transaction scoped to the
+    * operation otherwise.
+    * 
+    * @see TxServlet
+    * @see ITransactionService#newTx(long)
+    * @see BigdataRDFServlet#getTimestamp(HttpServletRequest)
+    * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
+    *      transactions in the REST API</a>
+    */
     static final transient String ATTR_TIMESTAMP = "timestamp";
     
 //    /**
@@ -298,7 +326,7 @@ public class QueryServlet extends BigdataRDFServlet {
              * TODO Resolve the SD class name and ctor via a configuration
              * property for extensible descriptions.
              */
-            final Graph g = new GraphImpl();
+            final Graph g = new LinkedHashModel();
             {
 
                 final SD sd = new SD(g, tripleStore, serviceURI);

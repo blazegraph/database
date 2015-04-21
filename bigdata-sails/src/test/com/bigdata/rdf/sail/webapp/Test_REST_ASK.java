@@ -34,6 +34,9 @@ import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
  * Proxied test suite.
  *
  * @param <S>
+ * 
+ * TODO Should test GET as well as POST (this requires that we configured the
+ * client differently).
  */
 public class Test_REST_ASK<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
