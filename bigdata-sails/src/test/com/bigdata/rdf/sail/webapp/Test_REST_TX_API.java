@@ -265,6 +265,16 @@ public class Test_REST_TX_API<S extends IIndexManager> extends
 
       }
       
+      public NoReadWriteTx() {
+
+      }
+
+      public NoReadWriteTx(final String name) {
+
+         super(name);
+
+      }
+      
       // FIXME Write tests.
       public void test_TX_STUFF() {
          
@@ -291,6 +301,16 @@ public class Test_REST_TX_API<S extends IIndexManager> extends
          p.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
 
          return p;
+
+      }
+
+      public ReadWriteTx() {
+
+      }
+
+      public ReadWriteTx(final String name) {
+
+         super(name);
 
       }
 
