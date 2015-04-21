@@ -58,7 +58,6 @@ import cutthecrap.utils.striterators.Striterator;
  * parent query.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
@@ -83,8 +82,21 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             for (NamedSubqueryRoot subqueryRoot : queryRoot
                     .getNamedSubqueries()) {
 
-                rewriteProjection(sa, subqueryRoot);
+               @SuppressWarnings("unchecked")
+               final Iterator<QueryBase> itr = (Iterator<QueryBase>) new Striterator(
+                       BOpUtility.postOrderIteratorWithAnnotations((BOp) subqueryRoot
+                               .getWhereClause())).addTypeFilter(QueryBase.class);
 
+               while (itr.hasNext()) {
+
+                   final QueryBase queryBase = itr.next();
+
+                   rewriteProjection(sa, queryBase);
+
+               }
+
+             rewriteProjection(sa, subqueryRoot);
+               
             }
 
         }
@@ -94,12 +106,15 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
          * 
          * Bottom up visitation so we can get rewrite the projections of
          * subqueries before we rewrite the projections of the parent query.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/757" > Wildcard projection
+         * was not rewritten. </a>
          */
         if (queryRoot.getWhereClause() != null) {
             
             @SuppressWarnings("unchecked")
             final Iterator<QueryBase> itr = (Iterator<QueryBase>) new Striterator(
-                    BOpUtility.postOrderIterator((BOp) queryRoot
+                    BOpUtility.postOrderIteratorWithAnnotations((BOp) queryRoot
                             .getWhereClause())).addTypeFilter(QueryBase.class);
 
             while (itr.hasNext()) {
