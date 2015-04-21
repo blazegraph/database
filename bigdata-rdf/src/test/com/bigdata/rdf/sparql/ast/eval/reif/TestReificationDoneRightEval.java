@@ -517,6 +517,42 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
                 ).runTest();
 
     }
+    
+    // TODO: this test case is actually failing, not sure whether it should
+    // succeed or not
+    /**
+     * Test loading of RDR triples from file ttl file containing standard
+     * reification that contains three unordered reified triples, with query
+     * specified in Standard RDF Reification.
+     * 
+     * @throws Exception
+     */
+    public void test_reificationDoneRight_05a() throws Exception {
+
+       new TestHelper("reif/rdr-05a", // testURI,
+               "reif/rdr-05a.rq",// queryFileURL
+               "reif/rdr-05.ttl",// dataFileURL
+               "reif/rdr-05.srx"// resultFileURL
+               ).runTest();
+
+   }
+    
+    /**
+     * Test loading of RDR triples from file ttl file containing standard
+     * reification that contains three unordered reified triples, with query
+     * specified in RDR.
+     * 
+     * @throws Exception
+     */
+    public void test_reificationDoneRight_05b() throws Exception {
+
+       new TestHelper("reif/rdr-05b", // testURI,
+               "reif/rdr-05b.rq",// queryFileURL
+               "reif/rdr-05.ttl",// dataFileURL
+               "reif/rdr-05.srx"// resultFileURL
+               ).runTest();
+
+   }
 
     @Override
     public Properties getProperties() {

@@ -77,8 +77,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * {@link ParsedQuery} or {@link ParsedUpdate}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: BigdataSPARQLParser.java 4793 2011-06-24 17:29:25Z thompsonbry
- *          $
  * @openrdf
  */
 public class Bigdata2ASTSPARQLParser implements QueryParser {
@@ -141,6 +139,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @return An object which aligns the {@link ASTContainer} with the
      *         {@link ParsedQuery} interface.
      */
+    @Override
     public BigdataParsedQuery parseQuery(final String queryStr,
             final String baseURI) throws MalformedQueryException {
 
@@ -154,6 +153,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
      *      SPARQL 1.1 Update </a>
      */
+    @Override
     public ParsedUpdate parseUpdate(final String updateStr, final String baseURI)
             throws MalformedQueryException {
 

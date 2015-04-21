@@ -59,11 +59,11 @@ public class BigdataStatementImpl implements BigdataStatement {
      */
     private static final long serialVersionUID = 6739949195958368365L;
 
-    protected final BigdataResource s;
-    protected final BigdataURI p;
-    protected final BigdataValue o;
-    protected final BigdataResource c;
-    protected IV sid = null;
+    private final BigdataResource s;
+    private final BigdataURI p;
+    private final BigdataValue o;
+    private final BigdataResource c;
+    private IV sid = null;
     private StatementEnum type;
     private boolean userFlag;
     private transient boolean override = false;
@@ -105,42 +105,49 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
 
+    @Override
     final public BigdataResource getSubject() {
 
         return s;
         
     }
     
+    @Override
     final public BigdataURI getPredicate() {
 
         return p;
         
     }
 
+    @Override
     final public BigdataValue getObject() {
      
         return o;
         
     }
 
+    @Override
     final public BigdataResource getContext() {
         
         return c;
         
     }
     
+    @Override
     final public boolean hasStatementType() {
         
         return type != null;
         
     }
 
+    @Override
     final public StatementEnum getStatementType() {
         
         return type;
         
     }
  
+    @Override
     final public void setStatementType(final StatementEnum type) {
         
         if (type == null) {
@@ -159,36 +166,42 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
     
+    @Override
     final public void setUserFlag(boolean userFlag) {
     
         this.userFlag = userFlag;
         
     }
 
+    @Override
     final public boolean isAxiom() {
         
         return StatementEnum.Axiom == type;
         
     }
     
+    @Override
     final public boolean isInferred() {
         
         return StatementEnum.Inferred == type;
         
     }
         
+    @Override
     final public boolean isExplicit() {
         
         return StatementEnum.Explicit == type;
         
     }
     
+    @Override
     final public boolean getUserFlag() {
         
         return userFlag;
         
     }
 
+    @Override
     public boolean equals(final Object o) {
     
         return equals((Statement)o);
@@ -212,6 +225,7 @@ public class BigdataStatementImpl implements BigdataStatement {
      * Note: implementation per Statement interface, which does not consider the
      * context position.
      */
+    @Override
     final public int hashCode() {
         
         if (hash == 0) {
@@ -225,6 +239,7 @@ public class BigdataStatementImpl implements BigdataStatement {
     }
     private int hash = 0;
     
+    @Override
     public String toString() {
         
         return "<" + s + ", " + p + ", " + o + (c == null ? "" : ", " + c)
@@ -233,24 +248,28 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
 
+    @Override
     final public IV s() {
 
         return s.getIV();
         
     }
 
+    @Override
     final public IV p() {
         
         return p.getIV();
         
     }
 
+    @Override
     final public IV o() {
         
         return o.getIV();
         
     }
     
+    @Override
     final public IV c() {
 
         if (c == null)
@@ -260,6 +279,7 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
 
+    @Override
     public IV get(final int index) {
 
         switch (index) {
@@ -277,6 +297,7 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
     
+    @Override
     final public boolean isFullyBound() {
         
         return s() != null && p() != null && o() != null;
@@ -305,6 +326,7 @@ public class BigdataStatementImpl implements BigdataStatement {
 //
 //    }
 
+    @Override
     public final IV getStatementIdentifier() {
 
 //        if (!hasStatementIdentifier())
@@ -323,6 +345,7 @@ public class BigdataStatementImpl implements BigdataStatement {
 
     }
     
+    @Override
     final public boolean hasStatementIdentifier() {
         
 //        return c != null && c.getIV().isStatement();
@@ -331,12 +354,14 @@ public class BigdataStatementImpl implements BigdataStatement {
         
     }
 
+    @Override
     public final boolean isOverride() {
         
         return override;
         
     }
 
+    @Override
     public final void setOverride(final boolean override) {
         
         this.override = override;
@@ -347,24 +372,28 @@ public class BigdataStatementImpl implements BigdataStatement {
      * Note: this implementation is equivalent to {@link #toString()} since the
      * {@link Value}s are already resolved.
      */
+    @Override
     public String toString(final IRawTripleStore storeIsIgnored) {
         
         return toString();
         
     }
     
+    @Override
     public boolean isModified() {
         
         return modified != ModifiedEnum.NONE;
         
     }
 
+    @Override
     public void setModified(final ModifiedEnum modified) {
 
         this.modified = modified;
 
     }
-    
+
+    @Override
     public ModifiedEnum getModified() {
         
         return modified;
