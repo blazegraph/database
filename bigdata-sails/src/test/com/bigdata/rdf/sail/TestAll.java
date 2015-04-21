@@ -101,9 +101,6 @@ public class TestAll extends TestCase {
         // NanoSparqlServer
         suite.addTest(com.bigdata.rdf.sail.webapp.TestAll.suite());
         
-        // openrdf remote client wrapper. See #1152.
-        suite.addTest(com.bigdata.rdf.sail.remote.TestAll.suite());
-
         /* FIXME Restore:: quad store in scale-out.
          * 
          * @see https://sourceforge.net/apps/trac/bigdata/ticket/196 (Journal Leaks Memory)

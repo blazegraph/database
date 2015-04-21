@@ -50,7 +50,7 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -80,6 +80,7 @@ import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
@@ -127,9 +128,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected HttpClient m_client;
 
     /**
-     * The client-API wrapper to the NSS.
+     * The client-API wrapper for the remote service.
      */
-    protected RemoteRepositoryManager m_repo;
+    protected RemoteRepositoryManager m_mgr;
+    
+    /**
+     * The client-API wrapper to the NSS for the configured default namespace.
+     */
+    protected RemoteRepository m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -333,10 +339,15 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
          * webapp when the client requests the root URL.
          */
 
+        // setup http client.
        	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client,
-                getIndexManager().getExecutorService());
+       	// setup manager for service.
+       	m_mgr = new RemoteRepositoryManager(m_serviceURL, m_client,
+               getIndexManager().getExecutorService());
+       	
+       	// setup client for current namespace on service.
+        m_repo = m_mgr.getRepositoryForNamespace(namespace);
 
 		if (log.isInfoEnabled())
 			log.info("Setup Active Threads: " + Thread.activeCount());
@@ -378,10 +389,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        }
 		
 		log.info("Connection Shutdown Check");
-		
-        m_repo.close();
+
+		  m_mgr.close();
+//        m_repo.close();
         m_client.stop();
-        
+
+        m_mgr = null;
         m_repo = null;
         m_client = null;
         
@@ -615,7 +628,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
      try {
 
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
 
         while (result.hasNext()) {
 
@@ -640,7 +653,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
   static protected Graph asGraph(final GraphQueryResult result) throws Exception {
 
      try {
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
 
         while (result.hasNext()) {
 
@@ -721,7 +734,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected Graph genNTRIPLES2(final int ntriples)
 			throws RDFHandlerException {
 
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
 		final ValueFactory f = new ValueFactoryImpl();
 
@@ -781,7 +794,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
     }
 
-    protected long countAll() throws Exception {
+   /**
+    * @deprecated This is going around REST API. It can be written to that API
+    *             with the added support for ESTCARD exact:=true.
+    *             
+    * @see #getExactSize()
+    */
+   protected long countAll() throws Exception {
     	
     	return getSail().getDatabase().getExplicitStatementCount(null);
     	
@@ -795,6 +814,21 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     	
     }
     
+   /**
+    * Return the exact number of statements in the repository.
+    * 
+    * @deprecated This is going around REST API. It can be written to that API
+    *             with the added support for ESTCARD exact:=true.
+    * 
+    * @see #countAll()
+    */
+   @Deprecated
+   protected long getExactSize() {
+
+       return getSail().getDatabase().getStatementCount(true/* true */);
+
+   }
+
     /**
      * Test helps PUTs some data, verifies that it is visible, DELETEs the data,
      * and then verifies that it is gone.
@@ -804,22 +838,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      */
     protected void doDeleteWithPostTest(final RDFFormat format) throws Exception {
 
-//        final String queryStr = "select * where {?s ?p ?o}";
-
-//        final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "POST";
-
         doInsertWithBodyTest("POST", 23, /*requestPath,*/ format);
 
-//        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(23, countAll());
 
         doDeleteWithBody(/*requestPath,*/ 23, format);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(0, countAll());
         
     }
@@ -974,7 +999,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             r.close();
         }
         
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
         
         g.addAll(rdfHandler.getStatements());
 
@@ -1112,7 +1137,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person);
          g.add(mike, likes, rdf);
          g.add(mike, RDFS.LABEL, label1);
@@ -1124,7 +1149,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
       }
 
         // The expected results.
-        final Graph expected = new GraphImpl();
+        final Graph expected = new LinkedHashModel();
         {
             expected.add(new StatementImpl(mike, likes, rdf));
             expected.add(new StatementImpl(mike, RDF.TYPE, person));
@@ -1167,7 +1192,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person);
          g.add(mike, likes, rdf);
          g.add(mike, RDFS.LABEL, label1);
@@ -1199,7 +1224,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person, c1, c2, c3);
          g.add(mike, likes, rdf, c1, c2, c3);
          g.add(mike, RDFS.LABEL, label1, c1, c2, c3);
@@ -1220,7 +1245,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final URI person = new URIImpl(BD.NAMESPACE + "Person");
 
         // The expected results.
-        final Graph expected = new GraphImpl();
+        final Graph expected = new LinkedHashModel();
         {
 //            expected.add(new StatementImpl(mike, likes, rdf));
             expected.add(new StatementImpl(mike, RDF.TYPE, person));
@@ -1251,17 +1276,4 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     
     }
     
-    /**
-    * Return the exact number of statements in the repository.
-    * 
-    * @deprecated This is going around REST API. It can be written to that API
-    *             with the added support for ESTCARD exact:=true.
-    */
-    @Deprecated
-    protected long getExactSize() {
-
-        return getSail().getDatabase().getStatementCount(true/* true */);
-
-    }
-
 }

@@ -83,6 +83,7 @@ import com.bigdata.ha.msg.HANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
+import com.bigdata.journal.JournalTransactionService.ValidateWriteSetTask;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
@@ -3249,6 +3250,55 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
+    /**
+    * Validate the write set for a transaction. This operation is not required.
+    * Validation will be performed during commit processing for a transaction
+    * regardless.
+    * 
+    * @param txId
+    *           The transaction identifier.
+    * 
+    * @return <code>true</code> iff the write set of the transaction could be
+    *         validated.
+    * 
+    * @throws TransactionNotFoundException
+    *            if no such transaction exists.
+    */
+   final public boolean prepare(final long txId) {
+
+      final Tx localState = getLocalTransactionManager().getTx(txId);
+
+      if (localState == null)
+         throw new TransactionNotFoundException(txId);
+
+      if (localState.isReadOnly()) {
+         // Trivally validated.
+         return true;
+      }
+
+      try {
+
+         final AbstractTask<Boolean> task = new ValidateWriteSetTask(
+               concurrencyManager, getLocalTransactionManager(), localState);
+
+         /*
+          * Submit the task and wait for the result.
+          * 
+          * Note: This task MUST go through the ConcurrencyManager to obtain its
+          * locks.
+          */
+         final boolean ok = concurrencyManager.submit(task).get();
+
+         return ok;
+
+      } catch (Exception ex) {
+
+         throw new RuntimeException(ex);
+
+      }
+
+   }
+    
 //    /**
 //     * @deprecated This method in particular should be hidden from the
 //     *             {@link Journal} as it exposes the {@link ITx} which really
@@ -3947,7 +3997,8 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     * 
     * @param namespaces
     *           A list of zero or more namespaces to be warmed up (optional).
-    *           When <code>null</code> all namespaces will be warmed up.
+    *           When <code>null</code> or empty, all namespaces will be warmed
+    *           up.
     * 
     * @return A future for the task that is warming up the indices associated
     *         with those namespace(s). The future evaluates to a map from the
@@ -3956,7 +4007,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     * 
     * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
     *      on startup </a>
-    *      
+    * 
     * @see WarmUpTask
     */
    public Future<Map<String, BaseIndexStats>> warmUp(

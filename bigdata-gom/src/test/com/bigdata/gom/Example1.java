@@ -13,7 +13,6 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.gom.gpo.IGPO;
 import com.bigdata.gom.om.IObjectManager;
 import com.bigdata.gom.om.NanoSparqlObjectManager;
-import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
@@ -107,7 +106,7 @@ public class Example1 implements Callable<Void> {
             repo = new RemoteRepositoryManager(
             		serviceURL, client, executor);
 
-            final IObjectManager om = new NanoSparqlObjectManager(repo,
+            final IObjectManager om = new NanoSparqlObjectManager(repo.getRepositoryForDefaultNamespace(),
                     namespace);
 
             new Example1(om).call();

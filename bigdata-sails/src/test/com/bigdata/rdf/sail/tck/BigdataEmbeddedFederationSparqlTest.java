@@ -41,7 +41,6 @@ import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
 import org.openrdf.query.parser.sparql.manifest.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryException;
-import org.openrdf.repository.dataset.DatasetRepository;
 
 import com.bigdata.btree.keys.CollatorEnum;
 import com.bigdata.btree.keys.StrengthEnum;
@@ -293,7 +292,9 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
             
         }
 
-        return new DatasetRepository(new BigdataSailRepository(sail));
+        // See #1196 (Enable BigdataEmbeddedFederationSparqlTest tests in CI)
+//        return new DatasetRepository(new BigdataSailRepository(sail));
+        return new BigdataSailRepository(sail);
 
     }
 

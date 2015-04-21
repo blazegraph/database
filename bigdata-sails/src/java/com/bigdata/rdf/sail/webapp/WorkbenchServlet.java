@@ -29,7 +29,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFParser;
@@ -128,7 +128,7 @@ public class WorkbenchServlet extends BigdataRDFServlet {
 //        final String s= IOUtil.readString(req.getInputStream());
 //        System.err.println(s);
         
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
         
         try {
         

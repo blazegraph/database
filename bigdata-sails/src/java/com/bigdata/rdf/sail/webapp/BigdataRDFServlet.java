@@ -512,7 +512,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
       t.root("data").attr("result", result).attr("milliseconds", elapsed)
             .close();
 
-      buildAndCommitResponse(resp, HTTP_OK, MIME_APPLICATION_XML, w.toString());
+      buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
+            MIME_APPLICATION_XML, w.toString());
 
    }
        

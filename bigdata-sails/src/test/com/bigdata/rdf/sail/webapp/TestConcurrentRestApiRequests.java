@@ -175,7 +175,7 @@ public class TestConcurrentRestApiRequests<S extends IIndexManager> extends
 		 * See TestConcurrentJournal for the original version of this code.
 		 */
 		doConcurrentClientTest(//
-				m_repo,// MultiTenancy API client
+				m_repo.getRemoteRepositoryManager(),// MultiTenancy API client
 				30, TimeUnit.SECONDS,// timeout
 				5, // #of concurrent requests
 				20, // #of namespaces

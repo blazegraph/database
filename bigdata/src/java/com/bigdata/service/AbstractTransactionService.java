@@ -776,7 +776,7 @@ abstract public class AbstractTransactionService extends AbstractService
     protected final ReentrantLock lock = new ReentrantLock();
     
     /**
-     * Signalled by {@link #deactivateTx(TxState)} and based on {@link #lock}.
+     * Signaled by {@link #deactivateTx(TxState)} and based on {@link #lock}.
      */
     protected final Condition txDeactivate = lock.newCondition();
 
