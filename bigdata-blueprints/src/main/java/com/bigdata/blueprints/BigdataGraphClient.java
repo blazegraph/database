@@ -24,6 +24,7 @@ package com.bigdata.blueprints;
 
 import java.util.Properties;
 
+import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
@@ -59,14 +60,32 @@ public class BigdataGraphClient extends BigdataGraph {
 	final BigdataSailRemoteRepository repo;
 	
 	transient BigdataSailRemoteRepositoryConnection cxn;
-	
-    public BigdataGraphClient(final String bigdataEndpoint) {
-        this(bigdataEndpoint, BigdataRDFFactory.INSTANCE);
-    }
-    
-    public BigdataGraphClient(final String bigdataEndpoint, 
+
+   /**
+    * 
+    * @param sparqlEndpointURL
+    *           The URL of the SPARQL end point. This will be used to read and
+    *           write on the graph using the blueprints API.
+    */
+   public BigdataGraphClient(final String sparqlEndpointURL) {
+     
+      this(sparqlEndpointURL, BigdataRDFFactory.INSTANCE);
+      
+   }
+
+   /**
+    * 
+    * @param sparqlEndpointURL
+    *           The URL of the SPARQL end point. This will be used to read and
+    *           write on the graph using the blueprints API.
+    * @param factory
+    *           The {@link BlueprintsValueFactory}.
+    */
+    public BigdataGraphClient(final String sparqlEndpointURL, 
             final BlueprintsValueFactory factory) {
-        this(new BigdataSailRemoteRepository(bigdataEndpoint), factory);
+
+       this(BigdataSailFactory.connect(sparqlEndpointURL), factory);
+       
     }
 	
 	public BigdataGraphClient(final RemoteRepository repo) {
@@ -82,12 +101,25 @@ public class BigdataGraphClient extends BigdataGraph {
         this(repo, BigdataRDFFactory.INSTANCE);
     }
     
-    public BigdataGraphClient(final BigdataSailRemoteRepository repo, 
-            final BlueprintsValueFactory factory) {
-        super(factory, props);
-        
-        this.repo = repo;
-    }
+   /**
+    * Core implementation.
+    * 
+    * @param repo
+    *           The {@link BigdataSailRemoteRepository} for the desired graph.
+    * @param factory
+    *           The {@link BlueprintsValueFactory}.
+    */
+   public BigdataGraphClient(final BigdataSailRemoteRepository repo,
+         final BlueprintsValueFactory factory) {
+
+      super(factory, props);
+
+      if (repo == null)
+         throw new IllegalArgumentException();
+
+      this.repo = repo;
+
+   }
     
     /**
      * Post a GraphML file to the remote server. (Bulk-upload operation.)

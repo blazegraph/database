@@ -24,8 +24,7 @@ package com.bigdata.blueprints;
 
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
-
+import com.bigdata.BigdataStatics;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 
@@ -38,30 +37,42 @@ import com.bigdata.rdf.sail.remote.BigdataSailFactory;
  */
 public class BigdataGraphFactory  {
 
-    protected static final transient Logger log = Logger.getLogger(BigdataGraphFactory.class);
-    
-    /**
-     * Connect to a remote bigdata instance.
-     */
-    public static BigdataGraph connect(final String host, final int port) {
-        return connect("http://"+host+":"+port);
+//    private static final transient Logger log = Logger.getLogger(BigdataGraphFactory.class);
+
+   /**
+    * Connect to a remote bigdata instance.
+    * 
+    * FIXME This does not parameterize the value of the ContextPath. See
+    * {@link BigdataStatics#getContextPath()}.
+    */
+   public static BigdataGraph connect(final String host, final int port) {
+
+      return connect("http://" + host + ":" + port + "/bigdata");
+
     }
     
     /**
      * Connect to a remote bigdata instance.
+     * 
+     * @param sparqlEndpointURL
+     *            The URL of the SPARQL end point. This will be used to read and
+     *            write on the graph using the blueprints API.
      */
-    public static BigdataGraph connect(final String serviceEndpoint) {
-        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
-            return new BigdataGraphClient(serviceEndpoint);
-        } else if (serviceEndpoint.endsWith("/bigdata/")) {
-            return new BigdataGraphClient(serviceEndpoint + "sparql");
-        } else if (serviceEndpoint.endsWith("/bigdata")) {
-            return new BigdataGraphClient(serviceEndpoint + "/sparql");
-        } else if (serviceEndpoint.endsWith("/")) {
-            return new BigdataGraphClient(serviceEndpoint + "bigdata/sparql");
-        } else {
-            return new BigdataGraphClient(serviceEndpoint + "/bigdata/sparql");
-        }
+    public static BigdataGraph connect(final String sparqlEndpointURL) {
+       
+       return new BigdataGraphClient(BigdataSailFactory.connect(sparqlEndpointURL));
+       
+//        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
+//            return new BigdataGraphClient(serviceEndpoint);
+//        } else if (serviceEndpoint.endsWith("/bigdata/")) {
+//            return new BigdataGraphClient(serviceEndpoint + "sparql");
+//        } else if (serviceEndpoint.endsWith("/bigdata")) {
+//            return new BigdataGraphClient(serviceEndpoint + "/sparql");
+//        } else if (serviceEndpoint.endsWith("/")) {
+//            return new BigdataGraphClient(serviceEndpoint + "bigdata/sparql");
+//        } else {
+//            return new BigdataGraphClient(serviceEndpoint + "/bigdata/sparql");
+//        }
     }
 
     /**
