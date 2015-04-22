@@ -31,7 +31,6 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
