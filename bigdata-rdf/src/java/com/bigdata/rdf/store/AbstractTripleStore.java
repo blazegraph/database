@@ -125,6 +125,7 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sail.RDRHistory;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
@@ -325,6 +326,13 @@ abstract public class AbstractTripleStore extends
     final private boolean bottomUpEvaluation;
     
     /**
+     * The {@link RDRHistory} class.
+     * 
+     * @see Options#RDR_HISTORY_CLASS
+     */
+    final private Class<? extends RDRHistory> rdrHistoryClass;
+    
+    /**
      * Return an instance of the class that is used to compute the closure of
      * the database.
      */
@@ -342,6 +350,39 @@ abstract public class AbstractTripleStore extends
             throw new RuntimeException(e);
 
         }
+        
+    }
+    
+    /**
+     * Return an instance of the {@link RDRHistory} class.
+     */
+    public RDRHistory getRDRHistoryInstance() {
+
+        if (!isRDRHistory()) {
+            throw new RuntimeException("rdr history not enabled");
+        }
+        
+        try {
+
+            final Constructor<? extends RDRHistory> ctor = rdrHistoryClass
+                    .getConstructor(new Class[] { AbstractTripleStore.class });
+
+            return ctor.newInstance(this);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+
+        }
+        
+    }
+    
+    /**
+     * Return true if the RDR history feature is enabled (experimental).
+     */
+    public boolean isRDRHistory() {
+        
+        return rdrHistoryClass != null;
         
     }
     
@@ -1222,6 +1263,12 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_INLINE_URI_FACTORY_CLASS = InlineURIFactory.class
                 .getName();
 
+        /**
+         * The name of the {@link RDRHistory} class.  Null by default.
+         */
+        String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".rdrHistoryClass";
+
     }
 
     protected Class determineAxiomClass() {
@@ -1446,7 +1493,41 @@ abstract public class AbstractTripleStore extends
         
         this.bottomUpEvaluation = Boolean.valueOf(getProperty(
                 Options.BOTTOM_UP_EVALUATION,
-                Options.DEFAULT_BOTTOM_UP_EVALUATION)); 
+                Options.DEFAULT_BOTTOM_UP_EVALUATION));
+        
+        { // RDR History class
+            
+            final String className = getProperty(Options.RDR_HISTORY_CLASS, null);
+            
+            if (className != null) {
+                
+                if (!statementIdentifiers) {
+                    throw new RuntimeException("statement identifiers must be enabled for RDR history");
+                }
+                
+                final Class cls;
+                try {
+                    cls = Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException("Bad option: "
+                            + Options.RDR_HISTORY_CLASS, e);
+                }
+    
+                if (!RDRHistory.class.isAssignableFrom(cls)) {
+                    throw new RuntimeException(Options.RDR_HISTORY_CLASS
+                            + ": Must extend: "
+                            + RDRHistory.class.getName());
+                }
+                
+                rdrHistoryClass = cls;
+                
+            } else {
+            
+                rdrHistoryClass = null;
+                
+            }
+            
+        }
         
         /*
          * Setup namespace mapping for serialization utility methods.
@@ -4192,16 +4273,20 @@ abstract public class AbstractTripleStore extends
     public IChunkedOrderedIterator<ISPO> computeClosureForStatementIdentifiers(
             IChunkedOrderedIterator<ISPO> src) {
      
-        if (true) {
-            return src;
-        }
-        
-        if(!statementIdentifiers) {
+        if (!statementIdentifiers) {
             
             // There will be no statement identifiers unless they were enabled.
             
             return src;
             
+        }
+        
+        /*
+         * If RDR history is enabled we don't want to remove non-grounded
+         * sids.
+         */
+        if (rdrHistoryClass != null) {
+            return src;
         }
         
         final Properties properties = getProperties();

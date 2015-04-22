@@ -1512,6 +1512,16 @@ public class BigdataSail extends SailBase implements Sail {
             // new writable connection.
             conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
                     .startConn();
+            
+            /*
+             * Add the RDRHistory class if that feature is enabled.
+             */
+            if (database.isRDRHistory()) {
+                final RDRHistory history = database.getRDRHistoryInstance();
+                history.init();
+                conn.addChangeLog(history);
+            }
+            
         } catch(DatasetNotFoundException ex) {
             /*
              * This exception should not be thrown for the UNISOLATED connection
@@ -3515,6 +3525,10 @@ public class BigdataSail extends SailBase implements Sail {
                 rollback();
             }
             
+            if (changeLog != null) {
+                changeLog.close();
+            }
+
             try {
                 // notify the SailBase that the connection is no longer in use.
                 BigdataSail.this.connectionClosed(this);
@@ -4248,7 +4262,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         /*
 		 * These methods are new with openrdf 2.7. Bigdata uses either
-		 * MVCC (full read-write tx) or simply a single writer on the live
+		 * MVCC(full read-write tx) or simply a single writer on the live
 		 * indices (unisolated). The latter has more throughput.
 		 * 
 		 * FIXME Use the MVCC semantics in bigdata do use a prepare()/commit()
