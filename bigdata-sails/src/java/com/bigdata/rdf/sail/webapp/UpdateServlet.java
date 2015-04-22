@@ -112,16 +112,6 @@ public class UpdateServlet extends BigdataRDFServlet {
 	 * process deleting the statements. This is done while it is holding the
 	 * unisolated connection which prevents concurrent modifications. Therefore
 	 * the entire <code>SELECT + DELETE</code> operation is ACID.
-	 * 
-     * FIXME GROUP COMMIT : Again, a pattern where a query is run to produce
-     * solutions that are then deleted from the database. Can we rewrite this to
-     * be a SPARQL UPDATE? (DELETE WHERE). Note that the ACID semantics of this
-     * operation would be broken by group commit since other tasks could have
-     * updated the KB since the lastCommitTime and been checkpointed and hence
-     * be visible to an unisolated operation without there being an intervening
-     * commit point. [I think that this is resolved by taking the unisolated
-     * connection first and then taking the read-only lastCommitTime connection
-     * view, which is what the code now does.]
 	 */
     private void doUpdateWithQuery(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
@@ -329,7 +319,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
         
-				conn = getUnisolatedConnection();
+				conn = getConnection();
 
 				{
 
@@ -551,7 +541,7 @@ public class UpdateServlet extends BigdataRDFServlet {
          boolean success = false;
          try {
 
-            conn = getUnisolatedConnection();
+            conn = getConnection();
 
             {
 
@@ -885,7 +875,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
         
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 if (remove != null) {
 

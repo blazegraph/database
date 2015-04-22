@@ -88,6 +88,7 @@ import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.TupleExpr;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
+import org.openrdf.repository.RepositoryException;
 import org.openrdf.sail.NotifyingSailConnection;
 import org.openrdf.sail.Sail;
 import org.openrdf.sail.SailConnection;
@@ -144,7 +145,6 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
-import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
@@ -244,7 +244,6 @@ import cutthecrap.utils.striterators.Striterator;
  *       your Sail class.)
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class BigdataSail extends SailBase implements Sail {
 
@@ -435,21 +434,20 @@ public class BigdataSail extends SailBase implements Sail {
     private static final Logger txLog = Logger.getLogger("com.bigdata.txLog");
 
     /**
-     * Sesame has the notion of a "null" graph which we use for the quad store
-     * mode. Any time you insert a statement into a quad store and the context
-     * position is not specified, it is actually inserted into this "null"
-     * graph. If SPARQL <code>DATASET</code> is not specified, then all contexts
-     * are queried and you will see statements from the "null" graph as well as
-     * from any other context.
-     * {@link BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)}
-     * will return statements from the "null" graph if the context is either
-     * unbound or is an array whose sole element is <code>null</code>.
-     * 
-     * @see BigdataSailConnection#addStatement(Resource, URI, Value,
-     *      Resource...)
-     * @see BigdataSailConnection#getStatements(Resource, URI, Value, boolean,
-     *      Resource...)
-     */
+    * Sesame has the notion of a "null" graph which we use for the quad store
+    * mode. Any time you insert a statement into a quad store and the context
+    * position is not specified, it is actually inserted into this "null" graph.
+    * If SPARQL <code>DATASET</code> is not specified, then all contexts are
+    * queried and you will see statements from the "null" graph as well as from
+    * any other context.
+    * {@link BigdataSailConnection#getStatements(Resource, URI, Value, boolean, Resource...)}
+    * will return statements from the "null" graph if the context is either
+    * unbound or is an array whose sole element is <code>null</code>.
+    * 
+    * @see BigdataSailConnection#addStatement(Resource, URI, Value, Resource...)
+    * @see BigdataSailConnection#getStatements(Resource, URI, Value, boolean,
+    *      Resource...)
+    */
     public static final transient URI NULL_GRAPH = BD.NULL_GRAPH;
 
     final protected AbstractTripleStore database;
@@ -476,10 +474,22 @@ public class BigdataSail extends SailBase implements Sail {
      * 
      * @see AbstractTripleStore.Options#QUADS
      */
-    public boolean isQuads() {
+    final public boolean isQuads() {
 
         return quads;
         
+    }
+    
+    /**
+     * Return <code>true</code> iff the SAIL is using a namespace that has been
+     * configured to support isolatable indices.
+     * 
+     * @see Options#ISOLATABLE_INDICES
+     */
+    final public boolean isIsolatable() {
+       
+       return isolatable;
+       
     }
 
     /**
@@ -896,12 +906,12 @@ public class BigdataSail extends SailBase implements Sail {
                 BigdataSail.Options.DEFAULT_AXIOMS_CLASS).equals(
                         NoAxioms.class.getName());
         
-        final boolean noVocab = properties.getProperty(
-                BigdataSail.Options.VOCABULARY_CLASS,
-                BigdataSail.Options.DEFAULT_VOCABULARY_CLASS).equals(
-                        NoVocabulary.class.getName());
+//        final boolean noVocab = properties.getProperty(
+//                BigdataSail.Options.VOCABULARY_CLASS,
+//                BigdataSail.Options.DEFAULT_VOCABULARY_CLASS).equals(
+//                        NoVocabulary.class.getName());
         
-        // check for problematic propery combinations
+        // check for problematic property combinations
         if (isolatable && !quadsMode) {
             
             if (tm) {
@@ -922,14 +932,14 @@ public class BigdataSail extends SailBase implements Sail {
                 
             }
             
-            if (!noVocab) {
-                
-                throw new UnsupportedOperationException(
-                        "Cannot use transactions with a vocabulary class. " +
-                        "Set option " + Options.VOCABULARY_CLASS + 
-                        " = " + NoVocabulary.class.getName());
-                
-            }
+//            if (!noVocab) {
+//                
+//                throw new UnsupportedOperationException(
+//                        "Cannot use transactions with a vocabulary class. " +
+//                        "Set option " + Options.VOCABULARY_CLASS + 
+//                        " = " + NoVocabulary.class.getName());
+//                
+//            }
 
             if (justify) {
                 
@@ -1549,7 +1559,7 @@ public class BigdataSail extends SailBase implements Sail {
      * This view is safe for concurrent readers and will not update if there are
      * concurrent writes.
      * 
-     * @param commitTime
+     * @param timestamp
      *            The commit point.
      * 
      * @return The view.
@@ -1774,6 +1784,7 @@ public class BigdataSail extends SailBase implements Sail {
          */
         private final AtomicBoolean rollbackRequired = new AtomicBoolean(false);
 
+        @Override
         public String toString() {
         	
             return getClass().getName() + "{timestamp="
@@ -2289,6 +2300,7 @@ public class BigdataSail extends SailBase implements Sail {
          * added or removed, it is possible that a statement remains entailed in
          * the database regardless of its removal.
          */
+        @Override
         synchronized public void addConnectionListener(
                 final SailConnectionListener listener) {
 
@@ -2316,6 +2328,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        @Override
         synchronized public void removeConnectionListener(
                 final SailConnectionListener listener) {
 
@@ -2412,6 +2425,7 @@ public class BigdataSail extends SailBase implements Sail {
          * direction is actually backed by a Map object - the other uses a scan.
          */
         
+        @Override
         public void setNamespace(final String prefix, final String namespace)
                 throws SailException {
 
@@ -2428,6 +2442,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        @Override
         public String getNamespace(final String prefix) {
             
             if (prefix == null) // per Sesame TCK behavior
@@ -2438,6 +2453,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
+        @Override
         public void removeNamespace(final String prefix) {
             
             if (prefix == null) // per Sesame TCK behavior
@@ -2448,6 +2464,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        @Override
         public void clearNamespaces() {
             
 //            database.clearNamespaces();
@@ -2455,6 +2472,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
         
+        @Override
         public NamespaceIterator getNamespaces() {
 
             /*
@@ -2533,6 +2551,7 @@ public class BigdataSail extends SailBase implements Sail {
          * 
          * @see BigdataSail#NULL_GRAPH
          */
+        @Override
         public void addStatement(final Resource s, final URI p, final Value o,
                 final Resource... contexts) throws SailException {
 
@@ -2621,6 +2640,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         }
 
+        @Override
         public synchronized void clear(final Resource... contexts) throws SailException {
 
             OpenRDFUtil.verifyContextNotNull(contexts);
@@ -2741,9 +2761,12 @@ public class BigdataSail extends SailBase implements Sail {
          * given for the total number of statements in the database, explicit
          * and inferred.  In exact size mode, the entire index will be visited
          * and materialized and each explicit statement will be counted.
+         * <p>
+         * {@inheritDoc}
          * 
          * @see Options#EXACT_SIZE
          */
+        @Override
         public long size(final Resource... contexts) throws SailException {
             
             return size(exactSize, contexts);
@@ -2849,6 +2872,7 @@ public class BigdataSail extends SailBase implements Sail {
             
         }
 
+        @Override
         public void removeStatements(final Resource s, final URI p,
                 final Value o, final Resource... contexts) throws SailException {
 
@@ -3843,6 +3867,114 @@ public class BigdataSail extends SailBase implements Sail {
 //            
 //        }
 
+      /**
+       * Return <code>true</code> iff a statement exists matching the supplied
+       * constraints.
+       * <p>
+       * This code path is optimized for cases where isolatable indices are not
+       * in use and where inferences can not appear.
+       * 
+       * @param s
+       * @param p
+       * @param o
+       * @param includeInferred
+       * @param contexts
+       * @return
+       * @throws SailException
+       * 
+       * @see <a href="http://trac.bigdata.com/ticket/1178" > Optimize
+       *      hasStatement() </a>
+       */
+       public boolean hasStatement(final Resource s, final URI p, final Value o,
+              final boolean includeInferred, final Resource... contexts)
+              throws RepositoryException, SailException {
+
+        final AbstractTripleStore tripleStore = getTripleStore();
+
+         /*
+          * Figure out whether or not we can use a fast range count to answer
+          * the request.
+          */
+        final boolean fastRangeCountOk;
+        if (isIsolatable()) {
+           /*
+            * The indices are isolatable. This means that fast range counts are
+            * not exact. Therefore we have to scan the index.
+            */
+           fastRangeCountOk = false;
+        } else {
+           /*
+            * The indices are not isolatable so fast range counts are exact.
+            */
+           if (includeInferred) {
+              /*
+               * Inferences are being counted so a fast range count will be
+               * correct.
+               */
+              fastRangeCountOk = true;
+           } else if (tripleStore.getAxioms().getClass() == NoAxioms.class) {
+              /*
+               * Inferences are not being maintained so a fast range count will be
+               * exact.
+               */
+              fastRangeCountOk = true;
+           } else {
+              fastRangeCountOk = false;
+           }
+        }
+
+         if (fastRangeCountOk) {
+
+            if (contexts.length == 0) {
+
+               // Operates on all contexts.
+               return tripleStore.hasStatement(s, p, o, (Resource) null/* c */);
+
+            } else if (contexts.length == 1 && contexts[0] == null) {
+
+               /*
+                * Operate on just the nullGraph, or on the sole graph if not in
+                * quads mode.
+                */
+
+               return tripleStore.hasStatement(s, p, o, quads ? NULL_GRAPH
+                     : null/* c */);
+
+            } else {
+
+               boolean found = false;
+
+               for (Resource c : contexts) {
+
+                  found = tripleStore.hasStatement(s, p, o,
+                        (c == null && quads) ? NULL_GRAPH : c);
+
+                  if (found)
+                     return true;
+
+               }
+
+            }
+
+         }
+
+         /*
+          * Run a statement iterator and terminate it once we have at least once
+          * matching statement.
+          * 
+          * TODO This could still be optimized by not materializing the RDF
+          * Values.
+          */
+         final CloseableIteration<? extends Statement, SailException> itr = getStatements(
+               s, p, o, includeInferred, contexts);
+         try {
+            return itr.hasNext();
+         } finally {
+            itr.close();
+         }
+
+      }
+        
         /**
          * Computes the closure of the triple store for RDF(S)+ entailments.
          * <p>
@@ -4119,7 +4251,7 @@ public class BigdataSail extends SailBase implements Sail {
 		 * MVCC (full read-write tx) or simply a single writer on the live
 		 * indices (unisolated). The latter has more throughput.
 		 * 
-		 * TODO The MVCC semantics in bigdata do use a prepare()/commit()
+		 * FIXME Use the MVCC semantics in bigdata do use a prepare()/commit()
 		 * pattern and have the notion of active and inactive transactions. This
 		 * transaction statement metadata could be exposed to the SailConnection
 		 * for the BigdataSailReadOnlyConnection and BigdataSailRWConnection,

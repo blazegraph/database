@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.htree;
 
-import org.apache.log4j.Level;
-
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -42,7 +40,6 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
  * Unit tests for {@link HTree}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * 
  *          TODO Work through a detailed example in which we have an elided
  *          bucket page or directory page because nothing has been inserted into

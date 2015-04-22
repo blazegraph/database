@@ -212,6 +212,7 @@ public class IsolatedFusedView extends FusedView {
      * @throws UnsupportedOperationException
      *             always
      */
+    @Override
     final public ICounter getCounter() {
         
         throw new UnsupportedOperationException();
@@ -221,9 +222,10 @@ public class IsolatedFusedView extends FusedView {
     /**
      * Write an entry for the key on the write set.
      */
+    @Override
     public byte[] insert(final byte[] key, final byte[] val) {
 
-        final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
+        final Tuple<?> tuple = lookup(key, getMutableBTree().getLookupTuple());
 
         if (tuple == null) {
             
@@ -268,9 +270,10 @@ public class IsolatedFusedView extends FusedView {
     /**
      * Write a deleted entry for the key on the write set.
      */
+    @Override
     public byte[] remove(byte[] key) {
 
-        final Tuple tuple = lookup(key, getMutableBTree().getLookupTuple());
+        final Tuple<?> tuple = lookup(key, getMutableBTree().getLookupTuple());
         
         if (tuple == null) {
             
@@ -457,11 +460,11 @@ public class IsolatedFusedView extends FusedView {
          * Note: the iterator is chosen carefully in order to visit the IValue
          * objects and see both deleted and undeleted entries.
          */
-        final ITupleIterator itr = writeSet.rangeIterator(null, null,
+        final ITupleIterator<?> itr = writeSet.rangeIterator(null, null,
                 0/* capacity */, ALL /* flags */, null);
 
         // tuple for reading from the groundState index.
-        final Tuple groundStateTuple = new Tuple(
+        final Tuple<?> groundStateTuple = new Tuple(
                 ((ILocalBTreeView)groundState).getMutableBTree(),
 //                (groundState instanceof AbstractBTree ? (AbstractBTree) groundState
 //                        : ((FusedView) groundState).getSources()[0]), 
@@ -470,13 +473,13 @@ public class IsolatedFusedView extends FusedView {
         while (itr.hasNext()) {
 
             // The index entry in the transaction's write set.
-            final ITuple txEntry = itr.next();
+            final ITuple<?> txEntry = itr.next();
 
             // The key for that index entry.
             final byte[] key = txEntry.getKey();
 
             // Lookup the entry in the global scope.
-            final ITuple baseEntry; //= groundState.lookup(key, groundStateTuple);
+            final ITuple<?> baseEntry; //= groundState.lookup(key, groundStateTuple);
             
             if(groundState instanceof AbstractBTree) {
                 
@@ -586,13 +589,13 @@ public class IsolatedFusedView extends FusedView {
              * value does NOT matter.
              */
 
-            final ITupleIterator tmpItr = tmp.rangeIterator(null, null,
+            final ITupleIterator<?> tmpItr = tmp.rangeIterator(null, null,
                     0/* capacity */,
                     IRangeQuery.DEFAULT | IRangeQuery.DELETED, null/* filter */);
 
             while (tmpItr.hasNext()) {
 
-                final ITuple tuple = tmpItr.next();
+                final ITuple<?> tuple = tmpItr.next();
                 
                 if(tuple.isDeletedVersion()) {
                 
@@ -610,7 +613,7 @@ public class IsolatedFusedView extends FusedView {
 
         }
 
-        // validation suceeded.
+        // validation succeeded.
 
         return true;
 

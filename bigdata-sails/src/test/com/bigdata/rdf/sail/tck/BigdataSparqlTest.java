@@ -29,7 +29,6 @@ package com.bigdata.rdf.sail.tck;
 
 import info.aduna.io.IOUtil;
 import info.aduna.iteration.Iterations;
-import info.aduna.text.StringUtil;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -65,7 +64,6 @@ import org.openrdf.query.parser.sparql.manifest.ManifestTest;
 import org.openrdf.query.parser.sparql.manifest.SPARQL11ManifestTest;
 import org.openrdf.query.parser.sparql.manifest.SPARQLQueryTest;
 import org.openrdf.repository.Repository;
-import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.dataset.DatasetRepository;
 import org.openrdf.repository.sail.SailRepository;
@@ -503,7 +501,6 @@ graph ?g {
     static TestSuite filterOutTests(final TestSuite suite1, final String name) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
-        @SuppressWarnings("unchecked")
         final Enumeration<Test> e = suite1.tests();
         while (e.hasMoreElements()) {
             final Test aTest = e.nextElement();
@@ -523,7 +520,6 @@ graph ?g {
     static TestSuite filterOutTests(final TestSuite suite1, final Collection<String> testURIs) {
 
         final TestSuite suite2 = new TestSuite(suite1.getName());
-        @SuppressWarnings("unchecked")
         final Enumeration<Test> e = suite1.tests();
         while (e.hasMoreElements()) {
             final Test aTest = e.nextElement();
@@ -860,7 +856,6 @@ graph ?g {
     static SPARQLQueryTest getSingleTest(final TestSuite suite,
             final String testURI) throws RuntimeException {
     
-        @SuppressWarnings("unchecked")
         final Enumeration<Test> e1 = suite.tests();
         while (e1.hasMoreElements()) {
             final Test aTest = e1.nextElement();
@@ -888,6 +883,7 @@ graph ?g {
 
         final SPARQLQueryTest.Factory factory = new SPARQLQueryTest.Factory() {
 
+           @Override
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality) {
@@ -896,7 +892,8 @@ graph ?g {
                         resultFileURL, dataSet, laxCardinality, true/* checkOrder */);
 
             }
-            
+
+            @Override
             public SPARQLQueryTest createSPARQLQueryTest(String testURI,
                     String name, String queryFileURL, String resultFileURL,
                     Dataset dataSet, boolean laxCardinality, boolean checkOrder) {
@@ -904,6 +901,7 @@ graph ?g {
                 return new BigdataSparqlTest(testURI, name, queryFileURL,
                         resultFileURL, dataSet, laxCardinality, checkOrder) {
 
+                   @Override
                     protected Properties getProperties() {
 
                         final Properties p = new Properties(
@@ -1203,6 +1201,7 @@ graph ?g {
     protected BigdataSailRepositoryConnection getQueryConnection(
             Repository dataRep) throws Exception {
 
+//        // See #1196 (Enable BigdataEmbeddedFederationSparqlTest tests in CI)
 //        return ((BigdataSailRepository) ((DatasetRepository) dataRep)
 //                .getDelegate()).getReadOnlyConnection();
 
@@ -1211,6 +1210,7 @@ graph ?g {
 
     }
 
+    @Override
     protected void uploadDataset(Dataset dataset)
         throws Exception
     {
@@ -1417,6 +1417,7 @@ graph ?g {
             */
         }
 
+        @Override
         protected final void compareGraphs(Set<Statement> queryResult, Set<Statement> expectedResult)
             throws Exception
         {

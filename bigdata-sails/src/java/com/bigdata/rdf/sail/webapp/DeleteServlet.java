@@ -221,7 +221,7 @@ public class DeleteServlet extends BigdataRDFServlet {
          boolean success = false;
          try {
 
-            conn = getUnisolatedConnection();
+            conn = getConnection();
 
             {
 
@@ -390,7 +390,7 @@ public class DeleteServlet extends BigdataRDFServlet {
          boolean success = false;
          try {
 
-            conn = getUnisolatedConnection();
+            conn = getConnection();
 
             {
 
@@ -649,7 +649,7 @@ public class DeleteServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 final RDFParser rdfParser = rdfParserFactory.getParser();
 
@@ -839,8 +839,8 @@ public class DeleteServlet extends BigdataRDFServlet {
             s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
             p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
             o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
-//            c = EncodeDecodeValue.decodeResource(req.getParameter("c"));
-        	c = EncodeDecodeValue.decodeResources(req.getParameterValues("c"));
+            c = decodeContexts(req, "c");
+//            c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
         } catch (IllegalArgumentException ex) {
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                     ex.getLocalizedMessage());
@@ -849,7 +849,7 @@ public class DeleteServlet extends BigdataRDFServlet {
         
         if (log.isInfoEnabled())
             log.info("DELETE-WITH-ACCESS-PATH: (s=" + s + ", p=" + p + ", o="
-                    + o + ", c=" + c + ")");
+                    + o + ", c=" + Arrays.toString(c) + ")");
 
         try {
 
@@ -861,7 +861,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
             BigdataRDFServlet.launderThrowable(t, resp,
                     "DELETE-WITH-ACCESS-PATH: (s=" + s + ",p=" + p + ",o=" + o
-                            + ",c=" + c + ")");
+                            + ",c=" + Arrays.toString(c) + ")");
 
         }
 
@@ -917,7 +917,7 @@ public class DeleteServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 // Remove all statements matching that access path.
                 // final long nmodified = conn.getSailConnection()

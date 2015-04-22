@@ -2668,11 +2668,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
              */
 
             if (resourceManager instanceof IJournal) {
-
-                /*
-                 * This code path supports any type of index (BTree, HTree,
-                 * etc).
-                 */
+   
+               /*
+                * This code path supports any type of index (BTree, HTree, etc).
+                * 
+                * Note: It does NOT support ILocalBTreeView (e.g., FusedView,
+                * IsolatedFusedView).
+                */
 
                 return ((IJournal) resourceManager).getIndexLocal(name,
                         commitTime);
@@ -2695,6 +2697,23 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             
         @Override
         public IIndex getIndex(final String name, final long timestamp) {
+
+           if(TimestampUtility.isReadWriteTx(timestamp)) {
+              
+               /*
+                * This code path supports read/write transactions. The interface
+                * returned for a read/write transaction is an ILocalBTreeView and
+                * will be an IsolatableFusedView (extends FusedView). These classes
+                * do not implement ICheckpointProtocol. Therefore we can not
+                * delegate this method to getIndexLocal() which returns an
+                * ICheckpointProtocol instance.
+                * 
+                * See #1156 (Read/write tx support in REST API).
+                */
+
+               return resourceManager.getIndex(name, timestamp);
+              
+           }
 
             return (IIndex) getIndexLocal(name, timestamp);
             

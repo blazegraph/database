@@ -19,10 +19,13 @@
  */
 package org.openrdf.query.parser.sparql.manifest;
 
+import info.aduna.io.IOUtil;
+import info.aduna.iteration.Iterations;
+import info.aduna.text.StringUtil;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.StringReader;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,14 +36,6 @@ import java.util.Set;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import info.aduna.io.IOUtil;
-import info.aduna.iteration.Iterations;
-import info.aduna.text.StringUtil;
-
-import org.apache.commons.io.IOUtils;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -79,6 +74,8 @@ import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.BasicParserSettings;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.sail.memory.MemoryStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A SPARQL query test suite, created by reading in a W3C working-group style

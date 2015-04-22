@@ -59,8 +59,6 @@ import cutthecrap.utils.striterators.Striterator;
 class DirectoryPage extends AbstractPage implements IDirectoryData {
     
     private static final Logger log = Logger.getLogger(DirectoryPage.class);
-
-	static int createdPages = 0;
 	
     /**
      * The depth of a bucket page which overflows is always <i>addressBits</i>.
@@ -440,44 +438,50 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
     }
 
-    private AbstractPage checkLazyChild(int index) {
-        AbstractPage child;
-        synchronized (childRefs) {
+    private AbstractPage checkLazyChild(final int index) {
 
-            /*
-             * Note: we need to synchronize on here to ensure visibility for
-             * childRefs[index] (in case it was updated in another thread).
-             */
-            final Reference<AbstractPage> childRef = childRefs[index];
+      final AbstractPage child;
+      synchronized (childRefs) {
 
-            child = childRef == null ? null : childRef.get();
+         /*
+          * Note: we need to synchronize on here to ensure visibility for
+          * childRefs[index] (in case it was updated in another thread).
+          */
+         final Reference<AbstractPage> childRef = childRefs[index];
 
-            if (child != null) {
+         child = childRef == null ? null : childRef.get();
 
-                // Already materialized.
-        		htree.touch(child);
-        		
-                return child;
+         if (child != null) {
 
-            }
+            // Already materialized.
+            htree.touch(child);
 
-        }
-        
-        // Check for lazy BucketPage creation
-        if (getChildAddr(index) == IRawStore.NULL) {
-        	final DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
+            return child;
 
-        	return copy.setLazyChild(index);
-        }
-        
-		return null;
-	}
+         }
+
+      }
+
+      // Check for lazy BucketPage creation
+      if (getChildAddr(index) == IRawStore.NULL) {
+
+         final DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
+
+         return copy.setLazyChild(index);
+         
+      }
+
+      return null;
+
+    }
     
     private BucketPage setLazyChild(final int index) {
-    	final DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
-    	assert copy == this;
 
-    	assert childRefs[index] == null;
+       final DirectoryPage copy = (DirectoryPage) copyOnWrite(IRawStore.NULL);
+    	
+       assert copy == this;
+
+     	assert childRefs[index] == null;
     	
     	final BucketPage lazyChild = new BucketPage((HTree) htree, htree.addressBits);
     	lazyChild.parent = (Reference<DirectoryPage>) self;
@@ -896,8 +900,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		data = new MutableDirectoryPageData(overflowKey, htree.addressBits,
 				htree.versionTimestamps);
 
-		createdPages++;
-
 	}
 
 	/**
@@ -917,8 +919,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		this.data = data;
 
         childRefs = new Reference[(1 << htree.addressBits)];
-
-		createdPages++;
 
 	}
 
@@ -952,8 +952,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 			final long triggeredByChildId) {
 
         super(src);
-
-		createdPages++;
 
         assert !src.isDirty();
 
@@ -1131,7 +1129,7 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 	/**
 	 * Iterator visits the direct child nodes in the external key ordering.
 	 */
-	private Iterator<AbstractPage> childIterator() {
+	Iterator<AbstractPage> childIterator() {
 
 		return new ChildIterator();
 
@@ -1608,22 +1606,47 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 
 	}
 
-	@Override
-    public void dumpPages(final HTreePageStats stats) {
+   /**
+    * {@inheritDoc}
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    */
+   @Override
+   public void dumpPages(final boolean recursive, final boolean visitLeaves,
+         final HTreePageStats stats) {
 
-        stats.visit(htree, this);
+      stats.visit(htree, this);
 
-        final Iterator<AbstractPage> itr = childIterator();
+      if (!recursive)
+         return;
 
-        while (itr.hasNext()) {
+      // materialize children.
+      final Iterator<AbstractPage> itr = childIterator();
 
-            final AbstractPage child = itr.next();
+      while (itr.hasNext()) {
 
-            child.dumpPages(stats);
+         final AbstractPage child = itr.next();
 
-        }
+         if (!visitLeaves && child instanceof BucketPage) {
 
-    }
+            /*
+             * Note: This always reads the child and then filters out leaves.
+             * 
+             * Note: It might not be possible to lift this constraint into the
+             * childIterator() due to the HTree design (per Martyn's
+             * recollection).
+             */
+            continue;
+            
+         }
+
+         // recursion into children.
+         child.dumpPages(recursive, visitLeaves, stats);
+
+      }
+
+   }
 
 	/**
 	 * Utility method formats the {@link IDirectoryData}.
@@ -1887,32 +1910,6 @@ class DirectoryPage extends AbstractPage implements IDirectoryData {
 		return firstSlot;
     	
     }
-
-    /**
-     * Move to test suite.
-     */
-    @Deprecated
-	int activeBucketPages() {
-		int ret = 0;
-		final Iterator<AbstractPage> children = childIterator();
-		while (children.hasNext()) {
-			ret += children.next().activeBucketPages();
-		}
-		return ret;
-	}
-
-    /**
-     * Move to test suite.
-     */
-    @Deprecated
-	int activeDirectoryPages() {
-		int ret = 1;
-		final Iterator<AbstractPage> children = childIterator();
-		while (children.hasNext()) {
-			ret += children.next().activeDirectoryPages();
-		}
-		return ret;
-	}
 
 	void _addLevel(final BucketPage bucketPage) {
 		assert !isReadOnly();

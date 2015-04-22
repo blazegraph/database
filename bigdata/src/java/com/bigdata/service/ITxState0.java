@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.service;
 
-
 /**
  * Immutable state for a transaction.
  * 
@@ -47,7 +46,7 @@ public interface ITxState0 {
      *      hence it can not be directly interpreted as a commitTime? (e.g.,
      *      getTxId()).
      */
-    public long getStartTimestamp();
+    long getStartTimestamp();
 
     /**
      * The timestamp of the commit point against which this transaction is
@@ -65,6 +64,6 @@ public interface ITxState0 {
      *      cache for access to historical index views on the Journal by name
      *      and commitTime. </a>
      */
-    public long getReadsOnCommitTime();
+    long getReadsOnCommitTime();
     
  }

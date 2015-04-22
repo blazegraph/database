@@ -121,7 +121,7 @@ public class BlueprintsServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
                 
                 final BigdataGraphBulkLoad graph = new BigdataGraphBulkLoad(conn);
 

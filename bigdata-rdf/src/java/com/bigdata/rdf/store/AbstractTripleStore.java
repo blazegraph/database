@@ -139,8 +139,8 @@ import com.bigdata.rdf.spo.SPOTupleSerializer;
 import com.bigdata.rdf.spo.StatementWriter;
 import com.bigdata.rdf.spo.XXXCShardSplitHandler;
 import com.bigdata.rdf.vocab.BaseVocabulary;
-import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
+import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.rdf.vocab.Vocabulary;
 import com.bigdata.rdf.vocab.VocabularyDecl;
 import com.bigdata.relation.AbstractResource;
@@ -2070,6 +2070,7 @@ abstract public class AbstractTripleStore extends
 //        return getLexiconRelation().getSearchEngine();
 //    }
     
+    @Override
     final public long getNamedGraphCount() {
 
         if(!isQuads())
@@ -2092,18 +2093,21 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long getStatementCount() {
 
         return getStatementCount(null/* c */, false/* exact */);
 
     }
 
+    @Override
     final public long getStatementCount(final boolean exact) {
 
         return getStatementCount(null/*c*/, exact);
 
     }
 
+    @Override
     final public long getStatementCount(final Resource c) {
 
         return getStatementCount(c, false/* exact */);
@@ -2115,6 +2119,7 @@ abstract public class AbstractTripleStore extends
      * <p>
      * Core implementation.
      */
+    @Override
     final public long getStatementCount(final Resource c, final boolean exact) {
 
         if (exact) {
@@ -2416,6 +2421,7 @@ abstract public class AbstractTripleStore extends
         
     }
         
+    @Override
     public void addTerms(final BigdataValue[] terms) {
 
         getLexiconRelation().addTerms( terms, terms.length, false/*readOnly*/);
@@ -2428,6 +2434,7 @@ abstract public class AbstractTripleStore extends
 
     private volatile InferenceEngine inferenceEngine = null;
 
+    @Override
     final public InferenceEngine getInferenceEngine() {
 
         synchronized (this) {
@@ -2446,6 +2453,7 @@ abstract public class AbstractTripleStore extends
 
     private WeakReference<DataLoader> dataLoaderRef = null;
 
+    @Override
     final public DataLoader getDataLoader() {
 
         synchronized (this) {
@@ -2471,12 +2479,14 @@ abstract public class AbstractTripleStore extends
      * Sesame integration.
      */
 
+    @Override
     final public void addStatement(final Resource s, final URI p, final Value o) {
         
         addStatement(s, p, o, null);
 
     }
 
+    @Override
     final public void addStatement(final Resource s, final URI p,
             final Value o, final Resource c) {
 
@@ -2623,6 +2633,7 @@ abstract public class AbstractTripleStore extends
      * This method is extremely inefficient for scale-out as it does one RMI per
      * request!
      */
+    @Override
     final public boolean hasStatement(final Resource s, final URI p,
             final Value o) {
 
@@ -2637,6 +2648,7 @@ abstract public class AbstractTripleStore extends
      * RMIs per request (one for each Value and one or more for the statement
      * indices)!
      */
+    @Override
     final public boolean hasStatement(Resource s, URI p, Value o, Resource c) {
 
         /*
@@ -2703,6 +2715,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long removeStatements(final Resource s, final URI p,
             final Value o) {
 
@@ -2710,6 +2723,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public long removeStatements(final Resource s, final URI p,
             final Value o, final Resource c) {
 
@@ -2724,6 +2738,7 @@ abstract public class AbstractTripleStore extends
         
     }
 
+    @Override
     final public BigdataStatement getStatement(final Resource s, final URI p,
             final Value o) {
 
@@ -2731,6 +2746,7 @@ abstract public class AbstractTripleStore extends
         
     }
 
+    @Override
     final public BigdataStatement getStatement(final Resource s, final URI p,
             final Value o, final Resource c) {
 
@@ -2760,6 +2776,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public BigdataStatementIterator getStatements(final Resource s,
             final URI p, final Value o) {
 
@@ -2767,6 +2784,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public BigdataStatementIterator getStatements(final Resource s,
             final URI p, final Value o, final Resource c) {
 
@@ -2802,12 +2820,14 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     final public BigdataValue asValue(final Value value) {
 
         return getValueFactory().asValue(value);
 
     }
 
+    @Override
     public BigdataStatement asStatement(final ISPO spo) {
 
         /*
@@ -2846,6 +2866,7 @@ abstract public class AbstractTripleStore extends
         
     }
 
+    @Override
     public BigdataStatementIterator asStatementIterator(
             final IChunkedOrderedIterator<ISPO> src) {
 
@@ -2854,6 +2875,7 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    @Override
     public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
             final Value o) {
 
@@ -2868,6 +2890,7 @@ abstract public class AbstractTripleStore extends
         
     }
     
+    @Override
     final public IAccessPath<ISPO> getAccessPath(final Resource s, final URI p,
             final Value o, Resource c) {
 

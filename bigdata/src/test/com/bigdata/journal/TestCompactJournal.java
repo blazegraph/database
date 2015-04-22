@@ -43,7 +43,6 @@ import com.bigdata.btree.keys.KV;
  * Test suite for {@link Journal#compact(java.io.File)}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestCompactJournal extends ProxyTestCase<Journal> {
 
@@ -69,43 +68,46 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    public void test_emptyJournal() throws IOException, InterruptedException,
-            ExecutionException {
+   public void test_emptyJournal() throws IOException, InterruptedException,
+         ExecutionException {
 
-        final File out = File.createTempFile(getName(), Options.JNL);
+      final File out = File.createTempFile(getName(), Options.JNL);
 
-        out.deleteOnExit();
-        
-        final Journal src = getStore(getProperties());
-        
-        try {
-            
+      try {
+
+         final Journal src = getStore(getProperties());
+
+         try {
+
             try {
-                // create task.
-                final Future<Journal> f = src.compact(out);
-                // obtain new journal (expected to fail).
-                final Journal newJournal = f.get();
-                try {
-                    // destroy new journal if succeeded (clean up).
-                    newJournal.destroy();
-                } finally {
-                    // notify test error.
-                    fail("Expecting " + IllegalArgumentException.class);
-                }
-            } catch(IllegalArgumentException ex) {
-                // log expected exception.
-                log.info("Ignoring expected exception: "+ex);
+               // create task.
+               final Future<Journal> f = src.compact(out);
+               // obtain new journal (expected to fail).
+               final Journal newJournal = f.get();
+               try {
+                  // destroy new journal if succeeded (clean up).
+                  newJournal.destroy();
+               } finally {
+                  // notify test error.
+                  fail("Expecting " + IllegalArgumentException.class);
+               }
+            } catch (IllegalArgumentException ex) {
+               // log expected exception.
+               log.info("Ignoring expected exception: " + ex);
             }
-            
-        } finally {
-            
+
+         } finally {
+
             src.destroy();
-            
-            out.delete();
-            
-        }
-        
-    }
+
+         }
+      } finally {
+
+         out.delete();
+
+      }
+
+   }
     
     /**
      * Test of a journal on which a single index has been register (and the
@@ -118,19 +120,19 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
     public void test_journal_oneIndexNoData() throws IOException,
             InterruptedException, ExecutionException {
 
-        final File out = File.createTempFile(getName(), Options.JNL);
+      final File out = File.createTempFile(getName(), Options.JNL);
 
-        out.deleteOnExit();
+      try {
 
-        final Journal src = getStore(getProperties());
+         final Journal src = getStore(getProperties());
 
-        try {
+         try {
 
             // register an index and commit the journal.
             final String NAME = "testIndex";
-            src.registerIndex(new IndexMetadata(NAME,UUID.randomUUID()));
+            src.registerIndex(new IndexMetadata(NAME, UUID.randomUUID()));
             src.commit();
-            
+
             final Future<Journal> f = src.compact(out);
 
             final Journal newJournal = f.get();
@@ -138,26 +140,30 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
             // verify state
             try {
 
-                // verify index exists.
-                assertNotNull(newJournal.getIndex(NAME));
+               // verify index exists.
+               assertNotNull(newJournal.getIndex(NAME));
 
-                // verify data is the same.
-                AbstractBTreeTestCase.assertSameBTree(src.getIndex(NAME),
-                        newJournal.getIndex(NAME));
+               // verify data is the same.
+               AbstractBTreeTestCase.assertSameBTree(src.getIndex(NAME),
+                     newJournal.getIndex(NAME));
 
             } finally {
 
-                newJournal.destroy();
+               newJournal.destroy();
 
-           }
+            }
 
-        } finally {
+         } finally {
 
             src.destroy();
 
-            out.delete();
+         }
 
-        }
+      } finally {
+
+         out.delete();
+
+      }
 
     }
 
@@ -172,26 +178,27 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
     public void test_journal_oneIndexRandomData() throws IOException,
             InterruptedException, ExecutionException {
 
-        final File out = File.createTempFile(getName(), Options.JNL);
+      final File out = File.createTempFile(getName(), Options.JNL);
 
-        out.deleteOnExit();
+      try {
 
-        final Journal src = getStore(getProperties());
+         final Journal src = getStore(getProperties());
 
-        try {
+         try {
 
             // register an index and commit the journal.
             final String NAME = "testIndex";
-            src.registerIndex(new IndexMetadata(NAME,UUID.randomUUID()));
+            src.registerIndex(new IndexMetadata(NAME, UUID.randomUUID()));
             {
-                BTree ndx = src.getIndex(NAME);
-                KV[] a = AbstractBTreeTestCase.getRandomKeyValues(1000/* ntuples */);
-                for (KV kv : a) {
-                   ndx.insert(kv.key, kv.val);
+               BTree ndx = src.getIndex(NAME);
+               KV[] a = AbstractBTreeTestCase
+                     .getRandomKeyValues(1000/* ntuples */);
+               for (KV kv : a) {
+                  ndx.insert(kv.key, kv.val);
                }
             }
             src.commit();
-            
+
             Future<Journal> f = src.compact(out);
 
             Journal newJournal = f.get();
@@ -199,23 +206,28 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
             // verify state
             try {
 
-                // verify index exists.
-                assertNotNull(newJournal.getIndex(NAME));
+               // verify index exists.
+               assertNotNull(newJournal.getIndex(NAME));
 
-                // verify data is the same.
-                AbstractBTreeTestCase.assertSameBTree(src.getIndex(NAME), newJournal.getIndex(NAME));
-                
+               // verify data is the same.
+               AbstractBTreeTestCase.assertSameBTree(src.getIndex(NAME),
+                     newJournal.getIndex(NAME));
+
             } finally {
-                newJournal.destroy();
+               newJournal.destroy();
             }
 
-        } finally {
+         } finally {
 
             src.destroy();
 
-            out.delete();
+         }
 
-        }
+      } finally {
+
+         out.delete();
+
+      }
 
     }
 
@@ -230,94 +242,97 @@ public class TestCompactJournal extends ProxyTestCase<Journal> {
     public void test_journal_manyIndicesRandomData() throws IOException,
             InterruptedException, ExecutionException {
 
-        final File out = File.createTempFile(getName(), Options.JNL);
+      final File out = File.createTempFile(getName(), Options.JNL);
 
-        out.deleteOnExit();
+      try {
 
-        final Journal src = getStore(getProperties());
+         final Journal src = getStore(getProperties());
 
-        final String PREFIX = "testIndex#";
-        final int NUM_INDICES = 20;
+         final String PREFIX = "testIndex#";
+         final int NUM_INDICES = 20;
 
-        for(int i=0; i<NUM_INDICES; i++) {
+         for (int i = 0; i < NUM_INDICES; i++) {
 
             // register an index
             final String name = PREFIX + i;
-            
+
             src.registerIndex(new IndexMetadata(name, UUID.randomUUID()));
             {
-                
-                // lookup the index.
-                final BTree ndx = src.getIndex(name);
-                
-                // #of tuples to write.
-                final int ntuples = r.nextInt(10000);
-                
-                // generate random data.
-                final KV[] a = AbstractBTreeTestCase
-                        .getRandomKeyValues(ntuples);
-                
-                // write tuples (in random order)
-                for (KV kv : a) {
 
-                    ndx.insert(kv.key, kv.val);
-                    
-                    if (r.nextInt(100) < 10) {
-                        
-                        // randomly increment the counter (10% of the time).
-                        ndx.getCounter().incrementAndGet();
-                        
-                    }
-                    
-                }
-                
+               // lookup the index.
+               final BTree ndx = src.getIndex(name);
+
+               // #of tuples to write.
+               final int ntuples = r.nextInt(10000);
+
+               // generate random data.
+               final KV[] a = AbstractBTreeTestCase.getRandomKeyValues(ntuples);
+
+               // write tuples (in random order)
+               for (KV kv : a) {
+
+                  ndx.insert(kv.key, kv.val);
+
+                  if (r.nextInt(100) < 10) {
+
+                     // randomly increment the counter (10% of the time).
+                     ndx.getCounter().incrementAndGet();
+
+                  }
+
+               }
+
             }
-            
-        }
-        
-        // commit the journal (!)
-        src.commit();
-        
-        try {
 
-            Future<Journal> f = src.compact(out);
+         }
 
-            Journal newJournal = f.get();
+         // commit the journal (!)
+         src.commit();
+
+         try {
+
+            final Future<Journal> f = src.compact(out);
+
+            final Journal newJournal = f.get();
 
             // verify state
             try {
 
-                for (int i = 0; i < NUM_INDICES; i++) {
+               for (int i = 0; i < NUM_INDICES; i++) {
 
-                    final String name = PREFIX + i;
+                  final String name = PREFIX + i;
 
-                    // verify index exists.
-                    assertNotNull(newJournal.getIndex(name));
+                  // verify index exists.
+                  assertNotNull(newJournal.getIndex(name));
 
-                    // verify data is the same.
-                    AbstractBTreeTestCase.assertSameBTree(src.getIndex(name),
-                            newJournal.getIndex(name));
+                  // verify data is the same.
+                  AbstractBTreeTestCase.assertSameBTree(src.getIndex(name),
+                        newJournal.getIndex(name));
 
-                    // and verify the counter was correctly propagated.
-                    assertEquals(src.getIndex(name).getCounter().get(),
-                            newJournal.getIndex(name).getCounter().get());
-                    
-                }
-                
+                  // and verify the counter was correctly propagated.
+                  assertEquals(src.getIndex(name).getCounter().get(),
+                        newJournal.getIndex(name).getCounter().get());
+
+               }
+
             } finally {
-                
-                newJournal.destroy();
-                
+
+               newJournal.destroy();
+
             }
 
-        } finally {
+         } finally {
 
             src.destroy();
 
-            out.delete();
+         }
+         
+      } finally {
 
-        }
+         out.delete();
 
-    }
+      }
+
+   }
 
 }

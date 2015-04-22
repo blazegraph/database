@@ -77,7 +77,6 @@ import com.bigdata.util.InnerCause;
  *      </a>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DumpJournal {
 
@@ -672,8 +671,12 @@ public class DumpJournal {
     }
     
     /**
-     * Dump metadata about each named index as of the specified commit record.
-     */
+    * Dump metadata about each named index as of the specified commit record.
+    * 
+    * @param dumpPages
+    *           When <code>true</code>, the index pages will be recursively
+    *           scanned to collect statistics about the index.
+    */
     private void dumpNamedIndicesMetadata(final PrintWriter out,
             final List<String> namespaces, final ICommitRecord commitRecord,
             final boolean dumpPages, final boolean dumpIndices,
@@ -760,7 +763,8 @@ public class DumpJournal {
              */
             {
 
-                final BaseIndexStats stats = ndx.dumpPages(dumpPages);
+               final BaseIndexStats stats = ndx.dumpPages(
+                     dumpPages/* recursive */, dumpPages/* visitLeaves */);
 
                 out.println("\t" + stats);
 
@@ -784,53 +788,55 @@ public class DumpJournal {
 
         } // while(itr) (next index)
 
-        {
-
-            /*
-             * Write out the header.
-             */
-            boolean first = true;
-
-            for (Map.Entry<String, BaseIndexStats> e : pageStats.entrySet()) {
-
-                final String name = e.getKey();
-
-                final BaseIndexStats stats = e.getValue();
-
-                if (stats == null) {
-
-                    /*
-                     * Something for which we did not extract the PageStats.
-                     */
-
-                    final ICheckpointProtocol tmp = journal
-                            .getIndexWithCommitRecord(name, commitRecord);
-
-                    out.println("name: " + name + ", class="
-                            + tmp.getClass() + ", checkpoint="
-                            + tmp.getCheckpoint());
-
-                    continue;
-                    
-                }
-
-                if (first) {
-
-                    out.println(stats.getHeaderRow());
-
-                    first = false;
-
-                }
-                
-                /*
-                 * Write out the stats for this index.
-                 */
-
-                out.println(stats.getDataRow());
-
-            }
-
-        }
+        // Write out the statistics table.
+        BaseIndexStats.writeOn(out, pageStats);
+//        {
+//
+//            /*
+//             * Write out the header.
+//             */
+//            boolean first = true;
+//
+//            for (Map.Entry<String, BaseIndexStats> e : pageStats.entrySet()) {
+//
+//                final String name = e.getKey();
+//
+//                final BaseIndexStats stats = e.getValue();
+//
+//                if (stats == null) {
+//
+//                    /*
+//                     * Something for which we did not extract the PageStats.
+//                     */
+//
+//                    final ICheckpointProtocol tmp = journal
+//                            .getIndexWithCommitRecord(name, commitRecord);
+//
+//                    out.println("name: " + name + ", class="
+//                            + tmp.getClass() + ", checkpoint="
+//                            + tmp.getCheckpoint());
+//
+//                    continue;
+//                    
+//                }
+//
+//                if (first) {
+//
+//                    out.println(stats.getHeaderRow());
+//
+//                    first = false;
+//
+//                }
+//                
+//                /*
+//                 * Write out the stats for this index.
+//                 */
+//
+//                out.println(stats.getDataRow());
+//
+//            }
+//
+//        }
         
     } // dumpNamedIndicesMetadata
 
