@@ -51,7 +51,7 @@ public class BigdataStatics {
 
     /**
      * The name of an environment variable whose value will be used as the
-     * canoncial host name for the host running this JVM. This information is
+     * canonical host name for the host running this JVM. This information is
      * used by the {@link com.bigdata.counters.AbstractStatisticsCollector},
      * which is responsible for obtaining and reporting the canonical hostname
      * for the {@link Banner} and other purposes.
