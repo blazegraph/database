@@ -24,8 +24,6 @@ package com.bigdata.blueprints;
 
 import org.junit.Test;
 
-import com.bigdata.rdf.sail.webapp.ProxySuiteHelper;
-import com.bigdata.rdf.sail.webapp.health.TestNSSHealthCheck;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
