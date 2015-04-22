@@ -116,7 +116,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
    /**
     * The repository under test.
     */
-   protected BigdataSailRemoteRepository repo;
+   protected BigdataSailRemoteRepository repo = null;
 
    /**
     * A connection obtained by {@link #setUp()} from {@link #repo}. This
@@ -146,6 +146,9 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 
       }
 
+      // See #1207 (Memory leak in CI).
+      repo = null;
+      
       super.tearDown();
 
    }
