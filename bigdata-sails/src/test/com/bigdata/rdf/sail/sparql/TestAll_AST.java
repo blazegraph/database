@@ -34,7 +34,6 @@ import junit.framework.TestSuite;
  * Test suite.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestAll_AST extends TestCase {
 
@@ -67,15 +66,16 @@ public class TestAll_AST extends TestCase {
 		 */
 		suite.addTestSuite(TestTriplePatternBuilder.class);
 
-        /**
-         * Test suite for the proposed standardization of
-         * "reification done right".
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/526">
-         *      Reification done right </a>
-         */
-		if (false) // TODO Integrate into CI.  See #1138 Why is RDR parser test suite disabled?
-			suite.addTestSuite(TestReificationDoneRightParser.class);
+      /**
+       * Test suite for the proposed standardization of
+       * "reification done right".
+       * 
+       * @see <a href="http://trac.bigdata.com/ticket/526"> Reification done
+       *      right </a>
+       * @see <a href="http://trac.bigdata.com/ticket/1138" > Why is RDR parser
+       *      test suite disabled? </a>
+       */
+		suite.addTestSuite(TestReificationDoneRightParser.class);
 
         /*
          * Test suite for group graph patterns (join groups, unions, optional,

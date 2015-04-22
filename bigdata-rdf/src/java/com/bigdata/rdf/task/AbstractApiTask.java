@@ -265,21 +265,24 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
     }
 
     /**
-	 * Return an UNISOLATED connection.
-	 * 
-	 * @return The UNISOLATED connection.
-	 * 
-	 * @throws SailException
-	 * @throws RepositoryException
-	 * @throws DatasetNotFoundException
-	 *             if the specified namespace does not exist.
-	 */
-    protected BigdataSailRepositoryConnection getUnisolatedConnection()
+    * Return a connection for the namespace. If the task is associated with
+    * either a read/write transaction or an {@link ITx#UNISOLATED} view of the
+    * indices, the connection may be used to read or write on the namespace.
+    * Otherwise the connection will be read-only.
+    * 
+    * @return The connection.
+    * 
+    * @throws SailException
+    * @throws RepositoryException
+    * @throws DatasetNotFoundException
+    *            if the specified namespace does not exist.
+    */
+    protected BigdataSailRepositoryConnection getConnection()
             throws SailException, RepositoryException {
 
         // resolve the default namespace.
         final AbstractTripleStore tripleStore = (AbstractTripleStore) getIndexManager()
-                .getResourceLocator().locate(namespace, ITx.UNISOLATED);
+                .getResourceLocator().locate(namespace, timestamp);
 
         if (tripleStore == null) {
 
@@ -296,7 +299,8 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
         repo.initialize();
 
         final BigdataSailRepositoryConnection conn = (BigdataSailRepositoryConnection) repo
-                .getUnisolatedConnection();
+              .getConnection();
+//                .getUnisolatedConnection();
 
         conn.setAutoCommit(false);
 
