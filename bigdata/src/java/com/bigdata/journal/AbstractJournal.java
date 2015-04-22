@@ -4236,16 +4236,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
     /**
-     * Method verifies that the commit time strictly advances on the local store
-     * by checking against the current root block.
-     * 
-     * @param commitTime
-     *            The proposed commit time.
-     * 
-     * @throws IllegalArgumentException
-     *             if the <i>commitTime</i> is LTE the value reported by
-     *             {@link IRootBlockView#getLastCommitTime()}.
-     */
+    * Method verifies that the commit time strictly advances on the local store
+    * by checking against the current root block.
+    * 
+    * @param currentCommitTime
+    * @param priorCommitTime
+    * 
+    * @throws IllegalArgumentException
+    *            if the <i>commitTime</i> is LTE the value reported by
+    *            {@link IRootBlockView#getLastCommitTime()}.
+    */
     static protected void assertPriorCommitTimeAdvances(
             final long currentCommitTime, final long priorCommitTime) {
 

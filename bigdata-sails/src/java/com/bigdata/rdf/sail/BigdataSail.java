@@ -1559,7 +1559,7 @@ public class BigdataSail extends SailBase implements Sail {
      * This view is safe for concurrent readers and will not update if there are
      * concurrent writes.
      * 
-     * @param commitTime
+     * @param timestamp
      *            The commit point.
      * 
      * @return The view.
