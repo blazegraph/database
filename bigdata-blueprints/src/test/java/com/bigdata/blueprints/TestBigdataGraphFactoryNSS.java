@@ -19,74 +19,65 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 package com.bigdata.blueprints;
+
 
 import org.junit.Test;
 
-import com.bigdata.rdf.sail.webapp.AbstractTestNanoSparqlServer;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
-//FIXME:  Update for embedded NSS for future task.
-public class TestBigdataGraphFactoryNSS extends AbstractTestNanoSparqlServer {
-//public class TestBigdataGraphClientConnect extends TestCase {
-	
+public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient  {
+
 	private String serviceURL = "http://localhost:9999/bigdata";
-	
-	public TestBigdataGraphFactoryNSS()
-	{
+
+	public TestBigdataGraphFactoryNSS() {
 		super();
 	}
 
-	public void setUp() 
-	throws Exception
-	{
+	public void setUp() throws Exception {
 		super.setUp();
-		//Create a default namespace for testing
-		super.createNamespace("kb");
-		this.serviceURL = super.getServiceURL();
+		serviceURL = super.getServiceURL();
 	}
-	
 
 	@Test
 	public void testBigdataGraphConnectServiceURL() {
-		//FIXME:  This should start an embedded NSS and test against that. 
-		//For now, you must start run "ant start-blazegraph".  Then
+		// FIXME: This should start an embedded NSS and test against that.
+		// For now, you must start run "ant start-blazegraph". Then
 		final String testURL = serviceURL + "/";
 
 		System.err.println("Connecting to Remote Repository at " + testURL);
 
-		//log.info("Connecting to Remote Repository at " + testURL);
+		// log.info("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
-		
+
 		boolean hadException = false;
-		
+
 		try {
 			testBigdataGraph(testGraph);
-		}catch (Exception e)
-		{
+		} catch (Exception e) {
 			hadException = true;
 		}
-		
-		if(!hadException)
+
+		if (!hadException)
 			fail("This test should not work.");
 	}
 
 	public void testBigdataGraphConnectSparqlEndpoint() {
-		//FIXME:  This should start an embedded NSS and test against that. 
-		//For now, you must start run "ant start-blazegraph".  Then
-		//final String testURL = this.getServiceUrl();
+		// FIXME: This should start an embedded NSS and test against that.
+		// For now, you must start run "ant start-blazegraph". Then
+		// final String testURL = this.getServiceUrl();
 		final String testURL = serviceURL + "/sparql";
 
 		System.err.println("Connecting to Remote Repository at " + testURL);
 
-		//log.info("Connecting to Remote Repository at " + testURL);
+		// log.info("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
-		
+
 		try {
 			testBigdataGraph(testGraph);
 		} catch (Exception e) {
@@ -95,48 +86,42 @@ public class TestBigdataGraphFactoryNSS extends AbstractTestNanoSparqlServer {
 	}
 
 	public void testBigdataGraphConnectSparqlEndpointWithNamespace() {
-		//FIXME:  This should start an embedded NSS and test against that. 
-		//For now, you must start run "ant start-blazegraph".  Then
-		//final String testURL = this.getServiceUrl();
-		final String testURL = serviceURL + "/namespace/kb/sparql";
+		// FIXME: This should start an embedded NSS and test against that.
+		// For now, you must start run "ant start-blazegraph". Then
+		// final String testURL = this.getServiceUrl();
+		final String testURL = serviceURL + "/namespace/" + super.getNamespace() + "/sparql";
 
 		System.err.println("Connecting to Remote Repository at " + testURL);
 
-		//log.info("Connecting to Remote Repository at " + testURL);
+		// log.info("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
-		
+
 		try {
 			testBigdataGraph(testGraph);
 		} catch (Exception e) {
-			
+
 			fail(e.toString());
 		}
 	}
 
 	public void testBigdataGraphConnectHostPort() {
-		//FIXME:  This should start an embedded NSS and test against that. 
-		//For now, you must start run "ant start-blazegraph".  Then
-		//final String testURL = this.getServiceUrl();
-		final String testURL = serviceURL + "/kb/sparql";
+		// FIXME: This should start an embedded NSS and test against that.
+		// For now, you must start run "ant start-blazegraph". Then
+		// final String testURL = this.getServiceUrl();
 
-		System.err.println("Connecting to Remote Repository at " + testURL);
+		// log.info("Connecting to Remote Repository at " + testURL);
 
-		//log.info("Connecting to Remote Repository at " + testURL);
+		BigdataGraph testGraph = BigdataGraphFactory.connect("localhost", super.getPort());
 
-		BigdataGraph testGraph = BigdataGraphFactory.connect("localhost",9999);
-		
 		try {
 			testBigdataGraph(testGraph);
 		} catch (Exception e) {
 			fail(e.toString());
 		}
 	}
-		
-		
-	protected void testBigdataGraph(BigdataGraph testGraph)
-		throws Exception
-	{
+
+	protected void testBigdataGraph(BigdataGraph testGraph) throws Exception {
 
 		final String example = "graph-example-1.xml";
 
@@ -149,7 +134,7 @@ public class TestBigdataGraphFactoryNSS extends AbstractTestNanoSparqlServer {
 		for (Edge e : testGraph.getEdges()) {
 			System.err.println(e);
 		}
-		
+
 		testGraph.shutdown();
 
 	}
