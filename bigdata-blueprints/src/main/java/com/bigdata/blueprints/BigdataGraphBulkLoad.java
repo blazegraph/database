@@ -353,6 +353,10 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 	public void transactionAborted() {
 	}
 
+    @Override
+    public void close() {
+    }
+
 	public long getMutationCountTotal() {
 		return mutationCountTotal;
 	}

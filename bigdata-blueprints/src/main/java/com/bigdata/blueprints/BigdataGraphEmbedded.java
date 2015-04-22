@@ -401,6 +401,10 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         }
     }
     
+    @Override
+    public void close() {
+    }
+
     /**
      * Materialize and notify listeners of the remove events.
      */

@@ -1586,6 +1586,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 @Override
                 public void transactionAborted() {
                 }
+                
+                @Override
+                public void close() {
+                }
+
             });
 
             // Prepare the UPDATE request.

@@ -220,6 +220,14 @@ public class DescribeServiceFactory implements CustomServiceFactory {
         }
 
         /**
+         * See {@link IChangeLog#close()}.
+         */
+        @Override
+        public void close() {
+            reset();
+        }
+
+        /**
          * Incremental flush (vectored cache invalidation notices).
          */
         private void flush() {

@@ -123,20 +123,6 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final URI dt = lit.getDatatype();
         
-        if (dt == null)
-            throw new IllegalArgumentException();
-        
-        BigdataURI resolvedDT = null;
-        for (BigdataURI val : datatypes.values()) {
-            // Note: URI.stringValue() is efficient....
-            if (val.stringValue().equals(dt.stringValue())) {
-                resolvedDT = val;
-            }
-        }
-        
-        if (resolvedDT == null)
-            throw new IllegalArgumentException();
-        
         final String s = value.stringValue();
         
         final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(s);
@@ -160,8 +146,28 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
          * Returns the current time as UTC milliseconds from the epoch
          */
         final long l = gc.getTimeInMillis();
-
-        final AbstractLiteralIV delegate = new XSDNumericIV(l);
+        
+        return createIV(l, dt);
+        
+    }
+    
+    public LiteralExtensionIV createIV(final long timestamp, final URI dt) {
+        
+        if (dt == null)
+            throw new IllegalArgumentException();
+        
+        BigdataURI resolvedDT = null;
+        for (BigdataURI val : datatypes.values()) {
+            // Note: URI.stringValue() is efficient....
+            if (val.stringValue().equals(dt.stringValue())) {
+                resolvedDT = val;
+            }
+        }
+        
+        if (resolvedDT == null)
+            throw new IllegalArgumentException();
+        
+        final AbstractLiteralIV delegate = new XSDNumericIV(timestamp);
 
         return new LiteralExtensionIV(delegate, resolvedDT.getIV());
         

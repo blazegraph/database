@@ -537,6 +537,18 @@ public abstract class BigdataGraph implements Graph {
                 cxn.add(uri, prop, val);
             }
             
+    /*
+     * Add a bnode representing the array object ["a", "b", "c", "a"].
+     * 
+     * <s> <p> "a" .
+     * <s> <p> "b" .
+     * <s> <p> "c" .
+     * << <s> <p> "a" >> <order> "1"^^xsd:int .
+     * << <s> <p> "b" >> <order> "2"^^xsd:int .
+     * << <s> <p> "c" >> <order> "3"^^xsd:int .
+     * << <s> <p> "a" >> <order> "4"^^xsd:int .
+     */
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
