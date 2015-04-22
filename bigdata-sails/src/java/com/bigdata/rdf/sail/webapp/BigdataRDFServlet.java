@@ -345,11 +345,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * times as reported by {@link IAtomicStore#commit()} or by a distributed
      * data loader (for scale-out).
      * 
-     * @todo the configured timestamp should only be used for the default
-     *       namespace (or it should be configured for each graph explicitly, or
-     *       we should bundle the (namespace,timestamp) together as a single
-     *       object).
-     * 
      * @see QueryServlet#ATTR_TIMESTAMP;
      */
     protected long getTimestamp(final HttpServletRequest req) {
