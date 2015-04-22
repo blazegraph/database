@@ -44,10 +44,15 @@ public class BigdataGraphFactory  {
     * 
     * FIXME This does not parameterize the value of the ContextPath. See
     * {@link BigdataStatics#getContextPath()}.
+    * 
+    * @deprecated
+    * As of version 1.5.2, you should use one of the connect methods with a sparqlEndpointURL.
+    * See {@linkplain http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer#Active_URLs} 
     */
    public static BigdataGraph connect(final String host, final int port) {
 
-      return connect("http://" + host + ":" + port + "/bigdata");
+	  //Assume the default KB to make the SPARQL Endpoint
+      return connect("http://" + host + ":" + port + "/bigdata/sparql");
 
     }
     
