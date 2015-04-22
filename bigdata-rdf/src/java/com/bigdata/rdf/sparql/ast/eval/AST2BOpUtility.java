@@ -929,7 +929,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final boolean isBigdata = serviceCall.getServiceOptions()
                     .isBigdataNativeService();
 
-            isMaterialize = !isBigdata;
+            /*
+             * In case we are dealing with a run last service, we also need
+             * to use variable bindings inside, so materialization is required
+             * here as well.
+             */
+            isMaterialize = !isBigdata ||
+                serviceCall.getServiceOptions().isRunLast();
+            
 
         } else {
 

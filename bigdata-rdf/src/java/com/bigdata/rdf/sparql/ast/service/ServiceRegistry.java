@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -13,6 +14,7 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.FulltextSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
@@ -22,6 +24,7 @@ import com.bigdata.rdf.sparql.ast.service.history.HistoryServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
+import com.bigdata.rdf.store.FTS;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 
@@ -80,6 +83,9 @@ public class ServiceRegistry {
 
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
+        
+        // Add the external Solr search service
+        add(FTS.SEARCH, new FulltextSearchServiceFactory());
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());

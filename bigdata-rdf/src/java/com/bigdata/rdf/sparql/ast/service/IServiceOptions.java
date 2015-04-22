@@ -79,6 +79,17 @@ public interface IServiceOptions {
     boolean isRunFirst();
 
     /**
+     * Return <code>true</code> iff the service end point is one which should
+     * always be run as late as possible within the join group (default
+     * <code>false</code>).
+     * <p>
+     * Note: This might be used for complex services that receive variables as
+     * input, whenever we want to make sure that the variables are bound when
+     * executing the service.
+     */
+    boolean isRunLast();
+
+    /**
      * Return <code>true</code> if the remote service is known to be a bigdata
      * service that exposes the HA load balancer servlet (default
      * <code>false</code>). The default may be overridden iff the end point is

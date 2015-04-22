@@ -337,10 +337,15 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
          * pipeline generation) needs to be deferred until we actually evaluate
          * the join graph (at least for the RTO).
          */
+        
+        // remember services that need to be run last
+        final List<ServiceNode> runLastServices = new LinkedList<ServiceNode>();
+        
         { // begin required joins.
 
             /*
-             * Run some service calls first (or as early as possible).
+             * Run some service calls first (or as early as possible) and
+             * schedule service calls to be run last
              */
             {
 
@@ -358,12 +363,24 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
                         final ServiceFactory f = ServiceRegistry.getInstance()
                                 .get(serviceURI);
 
-                        if (f != null && f.getServiceOptions().isRunFirst()) {
+                        if (f!=null) {
+                           
+                           if (f.getServiceOptions().isRunFirst()) {
 
-                            ordered.add(n);
+                              ordered.add(n);
 
-                            sitr.remove();
+                              sitr.remove();
 
+                           } else if (f.getServiceOptions().isRunLast()) {
+   
+                              // the servicesToRunLast will be added in the end
+                              // of this method
+                              runLastServices.add(n); 
+                              
+                              sitr.remove();
+                              
+                           }
+                           
                         }
 
                     }
@@ -516,7 +533,8 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
 
             /*
              * Run remaining service calls (those with a variable
-             * service ref).
+             * service ref that have not been scheduled as run first or run
+             * last).
              */
             for (ServiceNode n : serviceNodes) {
 
@@ -645,6 +663,16 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
             
             ordered.add(n);
             
+        }
+        
+        
+        /*
+         * In the end, append services that are scheduled to be run last 
+         */
+        for (ServiceNode n : runLastServices) {
+           
+           ordered.add(n);
+           
         }
 
         final int arity = joinGroup.arity();
