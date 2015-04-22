@@ -1,3 +1,25 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail;
 
 import java.util.Properties;
@@ -11,9 +33,7 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
-import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -74,23 +94,18 @@ public class RDRHistory implements IChangeLog {
     /**
      * IV for the "added" term.
      */
-    private IV added = null;
+    private IV<?,?> added = null;
     
     /**
      * IV for the "removed" term.
      */
-    private IV removed = null;
+    private IV<?,?> removed = null;
     
     /**
      * Dummy timestamp to use as change events come in.  Will be replaced by
      * actual commit time when the transaction is committed.
      */
-    private IV nullTime = null;
-    
-    /**
-     * The IV for the xsd:dateTime datatype.
-     */
-    private IV xsdDateTime = null;
+    private IV<?,?> nullTime = null;
     
     public RDRHistory(final AbstractTripleStore database) {
         
@@ -111,10 +126,9 @@ public class RDRHistory implements IChangeLog {
         try {
             
             final IV<?,?>[] ivs = resolveTerms(
-                    new URI[] { added(), removed(), XSD.DATETIME });
+                    new URI[] { added(), removed() });
             added = ivs[0];
             removed = ivs[1];
-            xsdDateTime = ivs[2];
             
             nullTime = new XSDNumericIV(0l);
             
@@ -222,6 +236,10 @@ public class RDRHistory implements IChangeLog {
     @Override
     public void changeEvent(final IChangeRecord record) {
 
+        if (log.isTraceEnabled()) {
+            log.trace(record);
+        }
+        
         /*
          * Avoid recursion.  We do not keep history of the history.
          */
@@ -257,10 +275,14 @@ public class RDRHistory implements IChangeLog {
          */
         final ISPO spo = new SPO(sid, p, nullTime, StatementEnum.Explicit);
         
+        if (log.isTraceEnabled()) {
+            log.trace(spo);
+        }
+        
         /*
          * Drop it on the buffer.
          */
-//        getOrCreateBuffer().add(spo);
+        getOrCreateBuffer().add(spo);
         
     }
     
@@ -282,14 +304,16 @@ public class RDRHistory implements IChangeLog {
      */
     protected Buffer getOrCreateBuffer() {
         
-        if (log.isInfoEnabled()) {
-            log.info("starting rdr history");
-        }
-        
         if (buffer == null) {
+            
+            if (log.isInfoEnabled()) {
+                log.info("starting rdr history");
+            }
+            
             tempStore = newTempTripleStore();
             buffer = new Buffer();
         }
+        
         return buffer;
         
     }
@@ -316,6 +340,10 @@ public class RDRHistory implements IChangeLog {
     @Override
     public void transactionCommited(final long commitTime) {
         
+        if (log.isDebugEnabled()) {
+            log.debug("commit time: " + commitTime);
+        }
+        
         if (buffer == null) {
             /*
              * Nothing written to the buffer.
@@ -326,6 +354,11 @@ public class RDRHistory implements IChangeLog {
         try {
             
             buffer.flush();
+            
+            if (log.isDebugEnabled()) {
+                log.debug("# of stmts: " + buffer.counter);
+            }
+            
             if (buffer.counter == 0) {
                 /*
                  * Nothing written to the temp store.
@@ -333,6 +366,9 @@ public class RDRHistory implements IChangeLog {
                 return;
             }
             
+            /*
+             * This will create an inline IV for the commit time.
+             */
             final IV<?,?> timestamp = database.addTerm(
                     database.getValueFactory().createXSDDateTime(commitTime));
             
