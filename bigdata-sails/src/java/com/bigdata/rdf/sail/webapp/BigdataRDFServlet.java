@@ -117,6 +117,13 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	public static final String OUTPUT_FORMAT_JSON_SHORT = "json";
 	
 	public static final String OUTPUT_FORMAT_XML_SHORT = "xml";
+	
+	/*
+	 * There are cases when a default namespace exists, but has not been
+	 * selected that the workbench will pass the name "undefined".
+	 */
+	public static final String UNDEFINED_WORKBENCH_NAMESPACE = "undefined";
+
 
     /**
      * 
@@ -426,6 +433,17 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
+        
+        /*
+         * Handle the case where the Workbench sends undefined in the query string.
+         * This will not affect a user explicitly using the namespace named
+         * undefined. beebs@users.sourceforge.net 
+         */
+       	if(this.UNDEFINED_WORKBENCH_NAMESPACE.equals(namespace))
+       	{
+            namespace = getConfig(getServletContext()).namespace;
+       	}
+        
         return namespace;
     }
 
