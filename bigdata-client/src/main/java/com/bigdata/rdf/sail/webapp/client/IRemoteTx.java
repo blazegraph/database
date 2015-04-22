@@ -82,5 +82,5 @@ public interface IRemoteTx extends IRemoteTxState0 {
     *            if the transaction exists but could not be validated.
     */
    void commit() throws RemoteTransactionNotFoundException;
-   
+ 
 }
