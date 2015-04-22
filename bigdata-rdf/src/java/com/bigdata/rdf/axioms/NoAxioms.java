@@ -27,12 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.axioms;
 
-
 /**
  * An empty axiom model.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class NoAxioms extends BaseAxioms {
 
@@ -56,18 +54,21 @@ public class NoAxioms extends BaseAxioms {
         
     }
     
+    @Override
     final public boolean isNone() {
         
         return true;
         
     }
 
+    @Override
     final public boolean isRdfSchema() {
         
         return false;
         
     }
     
+    @Override
     final public boolean isOwlSameAs() {
         
         return false;

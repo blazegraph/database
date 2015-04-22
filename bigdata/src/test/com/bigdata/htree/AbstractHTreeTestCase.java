@@ -46,7 +46,6 @@ import com.bigdata.btree.NoEvictionListener;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
-import com.bigdata.btree.raba.codec.FrontCodedRabaCoder.DefaultFrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoderDupKeys;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
@@ -875,5 +874,70 @@ public class AbstractHTreeTestCase extends TestCase2 {
 //        assertFalse("Not expecting more tuples", actualItr.hasNext());
 //        
 //    }
+
+//   /**
+//    * Moved to test suite - requires scans.
+//    * 
+//    * Note: This is only used for an informational message by a stress test. It
+//    * could easily be replaced by dumpPages() which is part of the standard API
+//    * and which is more efficient (a single scan versus two scans).
+//    */
+//   public String getPageInfo(final HTree htree) {
+//      return "Created Pages for " + htree.getAddressBits() + " addressBits"
+//            + ",  directory pages: " + activeDirectoryPages(htree) + " of "
+//            + DirectoryPage.createdPages + ", bucket pages: "
+//            + activeBucketPages(htree) + " of " + BucketPage.createdPages;
+//   }
+//
+//   /**
+//    * Moved to test suite - requires scans.
+//    */
+//   private final int activeBucketPages(final HTree htree) {
+//      return activeBucketPages(htree.getRoot());
+//   }
+//
+//   /**
+//    * Moved to test suite - requires scans.
+//    */
+//   private final int activeDirectoryPages(final HTree htree) {
+//      return activeDirectoryPages(htree.getRoot());
+//   }
+//
+//   /**
+//    * Moved to test suite - requires scans.
+//    */
+//   private int activeBucketPages(final DirectoryPage directoryPage) {
+//      int ret = 0;
+//      final Iterator<AbstractPage> children = directoryPage.childIterator();
+//      while (children.hasNext()) {
+//         final AbstractPage childPage = children.next();
+//         if (childPage.isLeaf()) {
+//            // A bucket page.
+//            ret += 1;
+//         } else {
+//            // Recursion.
+//            activeBucketPages((DirectoryPage) childPage);
+//         }
+//      }
+//      return ret;
+//   }
+//
+//   /**
+//    * Moved to test suite - requires scans.
+//    */
+//   private int activeDirectoryPages(final DirectoryPage directoryPage) {
+//      int ret = 1;
+//      final Iterator<AbstractPage> children = directoryPage.childIterator();
+//      while (children.hasNext()) {
+//         final AbstractPage childPage = children.next();
+//         if (childPage.isLeaf()) {
+//            // Ignore leaves.
+//            continue;
+//         }
+//         // recursion.
+//         ret += activeDirectoryPages((DirectoryPage) childPage);
+//      }
+//      return ret;
+//   }
 
 }

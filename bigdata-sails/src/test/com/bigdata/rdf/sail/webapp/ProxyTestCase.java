@@ -40,9 +40,13 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.query.GraphQueryResult;
+import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.journal.AbstractJournalTestCase;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 
 /**
  * <p>
@@ -232,48 +236,6 @@ public abstract class ProxyTestCase<S extends IIndexManager>
     @Override
     public S getIndexManager() {
         return getOurDelegate().getIndexManager();
-    }
-
-    /**
-     * Count matches of the triple pattern.
-     */
-    static protected int countMatches(final Graph g, final Resource s,
-            final URI p, final Value o) {
-
-        int n = 0;
-
-        final Iterator<Statement> itr = g.match(s, p, o);
-
-        while (itr.hasNext()) {
-
-            itr.next();
-            
-            n++;
-
-        }
-
-        return n;
-
-    }
-
-    /**
-     * Return the statements matching the triple pattern.
-     */
-    static protected Statement[] getMatches(final Graph g, final Resource s,
-            final URI p, final Value o) {
-
-        final List<Statement> out = new LinkedList<Statement>();
-
-        final Iterator<Statement> itr = g.match(s, p, o);
-
-        while (itr.hasNext()) {
-
-            out.add(itr.next());
-
-        }
-
-        return out.toArray(new Statement[out.size()]);
-
     }
 
 }

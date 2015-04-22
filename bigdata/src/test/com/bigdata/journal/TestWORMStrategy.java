@@ -111,7 +111,7 @@ public class TestWORMStrategy extends AbstractJournalTestCase {
 
         properties.setProperty(Options.BUFFER_MODE, BufferMode.DiskWORM.toString());
 
-        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
+//        properties.setProperty(Options.CREATE_TEMP_FILE, "true");
 
         properties.setProperty(Options.DELETE_ON_EXIT, "true");
 

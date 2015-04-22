@@ -41,6 +41,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.util.NV;
 
 /**
  * Abstract base class for REST API methods. This class is compatible with a
@@ -278,6 +279,8 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
     *           The MIME type of the response.
     * @param content
     *           The content
+    * @param headers
+    *           Zero or more headers to be included in the response.
     * 
     * @throws IOException
     * 
@@ -288,7 +291,7 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
     *            an {@link AbstractRestApiTask}.
     */
    protected void buildResponse(final int status, final String mimeType,
-         final String content) throws IOException {
+         final String content,final NV...headers) throws IOException {
 
       if (status < 200 || status >= 300)
          throw new AssertionError(
@@ -301,6 +304,12 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
        resp.setStatus(status);
 
        resp.setContentType(mimeType);
+       
+       for (NV nv : headers) {
+  
+          resp.setHeader(nv.getName(), nv.getValue());
+      
+       }
 
        final Writer w = resp.getWriter();
 

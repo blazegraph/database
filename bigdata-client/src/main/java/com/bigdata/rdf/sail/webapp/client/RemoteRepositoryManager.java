@@ -1,0 +1,1689 @@
+/**
+Copyright (C) SYSTAP, LLC 2014.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+
+package com.bigdata.rdf.sail.webapp.client;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.log4j.Logger;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.HttpRequest;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.http.HttpMethod;
+import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.TupleQueryResult;
+import org.openrdf.query.impl.MapBindingSet;
+import org.openrdf.query.impl.TupleQueryResultImpl;
+import org.openrdf.query.resultio.BooleanQueryResultFormat;
+import org.openrdf.query.resultio.BooleanQueryResultParser;
+import org.openrdf.query.resultio.BooleanQueryResultParserFactory;
+import org.openrdf.query.resultio.BooleanQueryResultParserRegistry;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
+import org.openrdf.query.resultio.TupleQueryResultParser;
+import org.openrdf.query.resultio.TupleQueryResultParserFactory;
+import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
+import org.openrdf.repository.sparql.query.InsertBindingSetCursor;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFParser;
+import org.openrdf.rio.RDFParserFactory;
+import org.openrdf.rio.RDFParserRegistry;
+
+import com.bigdata.rdf.properties.PropertiesFormat;
+import com.bigdata.rdf.properties.PropertiesParser;
+import com.bigdata.rdf.properties.PropertiesParserFactory;
+import com.bigdata.rdf.properties.PropertiesParserRegistry;
+import com.bigdata.rdf.properties.PropertiesWriter;
+import com.bigdata.rdf.properties.PropertiesWriterRegistry;
+import com.bigdata.util.InnerCause;
+
+/**
+ * A manager for connections to one or more REST API / SPARQL end points for the
+ * same bigdata service.
+ * 
+ * @author bryan
+ */
+public class RemoteRepositoryManager extends RemoteRepositoryBase implements
+      AutoCloseable {
+
+    private static final transient Logger log = Logger
+            .getLogger(RemoteRepositoryManager.class);
+    
+    /**
+     * The path to the root of the web application (without the trailing "/").
+     * <p>
+     * Note: This SHOULD NOT be the SPARQL end point URL. The NanoSparqlServer
+     * has a wider interface. This should be the base URL of that interface. The
+     * SPARQL end point URL for the default data set is formed by appending
+     * <code>/sparql</code>.
+     */
+    private final String baseServiceURL;
+
+    /**
+     * When <code>true</code>, the REST API methods will use the load balancer
+     * aware requestURLs. The load balancer has essentially zero cost when not
+     * using HA, so it is recommended to always specify <code>true</code>. When
+     * <code>false</code>, the REST API methods will NOT use the load balancer
+     * aware requestURLs.
+     * 
+     * @see <a href="http://wiki.blazegraph.com/wiki/index.php/HALoadBalancer">
+     *      HALoadBalancer </a>
+     */
+    protected final boolean useLBS;
+    
+    /**
+     * The client used for http connections.
+     */
+    protected final HttpClient httpClient;
+
+   /**
+    * IFF an {@link HttpClient} was allocated by the constructor, then this is
+    * that reference. When non-<code>null</code> this is always the same
+    * reference as {@link #httpClient}.
+    */
+   private final HttpClient our_httpClient;
+
+    /**
+     * Thread pool for processing HTTP responses in background.
+     */
+    protected final Executor executor;
+
+    /**
+     * IFF an {@link Executor} was allocated by the constructor, then this is
+     * that reference. When non-<code>null</code> this is always the same
+     * reference as {@link #executor}.
+     */
+    private final ExecutorService our_executor;
+
+    /**
+     * The maximum requestURL length before the request is converted into a POST
+     * using a <code>application/x-www-form-urlencoded</code> request entity.
+     */
+    private volatile int maxRequestURLLength;
+    
+    /**
+     * The HTTP verb that will be used for a QUERY (versus a UPDATE or other
+     * mutation operation).
+     * 
+     * @see #QUERY_METHOD
+     */
+    private volatile String queryMethod;
+
+    /**
+     * Remote client for the transaction manager API.
+     */
+    private final RemoteTransactionManager transactionManager;
+
+    /**
+     * <code>true</code> iff open.
+     */
+    private volatile boolean m_closed = false;
+
+    /**
+    * Return the remote client for the transaction manager API.
+    * 
+    * @since 1.5.2
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
+    *      transactions in the REST API</a>
+    */
+    public RemoteTransactionManager getTransactionManager() {
+       
+       return transactionManager;
+       
+    }
+    
+    /**
+     * The executor for processing http and other client operations.
+     */
+    public Executor getExecutor() {
+       
+       return executor;
+       
+    }
+    
+    /**
+     * The path to the root of the web application (without the trailing "/").
+     * <p>
+     * Note: This SHOULD NOT be the SPARQL end point URL. The NanoSparqlServer
+     * has a wider interface. This should be the base URL of that interface. The
+     * SPARQL end point URL for the default data set is formed by appending
+     * <code>/sparql</code>.
+     */
+    public String getBaseServiceURL() {
+        
+        return baseServiceURL;
+        
+    }
+    
+   /**
+    * Return <code>true</code> iff the REST API methods will use the load
+    * balancer aware requestURLs. The load balancer has essentially zero cost
+    * when not using HA, so it is recommended to always specify
+    * <code>true</code>. When <code>false</code>, the REST API methods will NOT
+    * use the load balancer aware requestURLs.
+    */
+    public boolean getUseLBS() {
+
+       return useLBS;
+       
+    }
+    
+    /**
+     * Return the maximum requestURL length before the request is converted into
+     * a POST using a <code>application/x-www-form-urlencoded</code> request
+     * entity.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
+     */
+    public int getMaxRequestURLLength() {
+
+        return maxRequestURLLength;
+        
+    }    
+
+    public void setMaxRequestURLLength(final int newVal) {
+
+        if (newVal <= 0)
+            throw new IllegalArgumentException();
+
+        this.maxRequestURLLength = newVal;
+        
+    }
+
+    /**
+     * Return the HTTP verb that will be used for a QUERY (versus an UPDATE or
+     * other mutation operations) (default {@value #DEFAULT_QUERY_METHOD}). POST can
+     * often handle larger queries than GET due to limits at the HTTP client
+     * layer and will defeat http caching and thus provide a current view of the
+     * committed state of the SPARQL end point when the end point is a
+     * read/write database. However, GET supports HTTP caching and can scale
+     * much better when the SPARQL end point is a read-only resource or a
+     * read-mostly resource where stale reads are acceptable.
+     * 
+     * @see #setQueryMethod(String)
+     */
+    public String getQueryMethod() {
+     
+        return queryMethod;
+        
+    }
+
+    /**
+     * Set the default HTTP verb for QUERY and other idempotant operations.
+     * 
+     * @param method
+     *            The method which may be "POST" or "GET".
+     * 
+     * @see #getQueryMethod()
+     */
+    public void setQueryMethod(final String method) {
+
+        if ("POST".equalsIgnoreCase(method) || "GET".equalsIgnoreCase(method)) {
+
+            this.queryMethod = method.toUpperCase();
+
+        } else {
+            
+            throw new IllegalArgumentException();
+            
+        }
+
+    }
+
+   /**
+    * Create a manager that is not aware of a specific blazegraph backend. This
+    * constructor is intended for patterns where a sparql end point is available
+    * but the top-level serviceURL for blazegraph is either not visible or not
+    * known:
+    * 
+    * <pre>
+    * new RemoteRepositoryManager().getRepositoryForURL(sparqlEndpointURL)
+    * </pre>
+    * 
+    * The same pattern MAY be used to perform SPARQL QUERY or SPARQL UPDATE
+    * operations against non-blazegraph sparql end points.
+    */
+   public RemoteRepositoryManager() {
+
+      this("http://localhost/no-service-URL");
+      
+    }
+    
+   /**
+    * Create a manager client for the specified serviceURL. The serviceURL has
+    * the typical form
+    * 
+    * <pre>
+    * http://host:port/bigdata
+    * </pre>
+    * 
+    * The serviceURL can be used to obtain sparql end point URLs for:
+    * <dl>
+    * <dt>The default namespace</dt>
+    * <dd>http://host:port/bigdata/sparql</dd>
+    * <dt>The XYZ namespace</dt>
+    * <dd>http://host:port/bigdata/namespace/XYZ/sparql</dd>
+    * </dl>
+    * 
+    * The serviceURL can also be used to access the multi-tenancy API and the
+    * transaction management API.  See the wiki for more details.
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    */
+   public RemoteRepositoryManager(final String serviceURL) {
+
+      /*
+       * TODO Why is useLBS:=false? Is there a problem when it is true and we
+       * are not actually using an HA deployment? E.g., single server deployment
+       * under a non-jetty servlet container where the LoadBalancerServlet is
+       * not deployed?
+       */
+      this(serviceURL, false/* useLBS */);
+
+   }
+
+   /**
+    * Create a remote client for the specified serviceURL that optionally use
+    * the load balanced URLs.
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    * @param useLBS
+    *           When <code>true</code>, the REST API methods will use the load
+    *           balancer aware requestURLs. The load balancer has essentially
+    *           zero cost when not using HA, so it is recommended to always
+    *           specify <code>true</code>. When <code>false</code>, the REST API
+    *           methods will NOT use the load balancer aware requestURLs.
+    */
+   public RemoteRepositoryManager(final String serviceURL, final boolean useLBS) {
+
+      this(serviceURL, useLBS, null/* httpClient */, null/* executor */);
+       
+    }
+    
+    /**
+    * Create a remote client for the specified serviceURL.
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    * @param httpClient
+    *           If the client implements {@link AutoCloseable} then it will be
+    *           closed by {@link #close()} (optional). When not present, an
+    *           {@link HttpClient} will be allocated and scoped to this
+    *           {@link RemoteRepositoryManager} instance.
+    * @param executor
+    *           An executor used to service http client requests. (optional).
+    *           When not present, an {@link Executor} will be allocated and
+    *           scoped to this {@link RemoteRepositoryManager} instance.
+    * 
+    *           TODO Should this be deprecated since it does not force the
+    *           caller to choose a value for <code>useLBS</code>?
+    *           <p>
+    *           This version does not force the caller to decide whether or not
+    *           the LBS pattern will be used. In general, it should be used if
+    *           the end point is bigdata. This class is generally, but not
+    *           always, used with a bigdata end point. The main exception is
+    *           SPARQL Basic Federated Query. For that use case we can not
+    *           assume that the end point is bigdata and thus we can not use the
+    *           LBS prefix.
+    */
+    public RemoteRepositoryManager(final String serviceURL,
+            final HttpClient httpClient, final Executor executor) {
+
+        this(serviceURL, false/* useLBS */, httpClient, executor);
+
+    }
+    
+    /**
+    * Create a remote client for the specified serviceURL (core impl).
+    * 
+    * @param serviceURL
+    *           The path to the root of the web application (without the
+    *           trailing "/"). <code>/sparql</code> will be appended to this
+    *           path to obtain the SPARQL end point for the default data set.
+    * @param useLBS
+    *           When <code>true</code>, the REST API methods will use the load
+    *           balancer aware requestURLs. The load balancer has essentially
+    *           zero cost when not using HA, so it is recommended to always
+    *           specify <code>true</code>. When <code>false</code>, the REST API
+    *           methods will NOT use the load balancer aware requestURLs.
+    * @param httpClient
+    *           If the client implements {@link AutoCloseable} then it will be
+    *           closed by {@link #close()} (optional). When not present, an
+    *           {@link HttpClient} will be allocated and scoped to this
+    *           {@link RemoteRepositoryManager} instance.
+    * @param executor
+    *           An executor used to service http client requests. (optional).
+    *           When not present, an {@link Executor} will be allocated and
+    *           scoped to this {@link RemoteRepositoryManager} instance.
+    */
+   public RemoteRepositoryManager(final String serviceURL,
+         final boolean useLBS, final HttpClient httpClient,
+         final Executor executor) {
+
+      if (serviceURL == null)
+         throw new IllegalArgumentException();
+
+      this.baseServiceURL = serviceURL;
+
+      this.useLBS = useLBS;
+
+      if (httpClient == null) {
+
+         /*
+          * Allocate the HttpClient. It will be closed when this class is
+          * closed.
+          */
+         this.httpClient = our_httpClient = HttpClientConfigurator
+               .getInstance().newInstance();
+
+      } else {
+
+         /*
+          * Note: Client *might* be AutoCloseable, in which case we will close
+          * it.
+          */
+         this.httpClient = httpClient;
+         this.our_httpClient = null;
+
+      }
+
+      if (executor == null) {
+
+         /*
+          * Allocate the executor. It will be shutdown when this class is
+          * closed.
+          * 
+          * See #1191 (remote connection uses non-daemon thread pool).
+          */
+         this.executor = our_executor = Executors
+               .newCachedThreadPool(DaemonThreadFactory.defaultThreadFactory());
+
+      } else {
+
+         // We are using the caller's executor. We will not shut it down.
+         this.executor = executor;
+         this.our_executor = null;
+
+      }
+
+      assertHttpClientRunning();
+
+      this.transactionManager = new RemoteTransactionManager(this);
+
+      setMaxRequestURLLength(Integer.parseInt(System.getProperty(
+            MAX_REQUEST_URL_LENGTH,
+            Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
+
+      setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
+
+   }
+
+//   FIXME Should we be doing this? Are we leaking HttpClient or Executor resources otherwise?
+//   /**
+//    * {@inheritDoc}
+//    * <p>
+//    * Ensure resource is closed.
+//    * 
+//    * @see AutoCloseable
+//    */
+//   @Override
+//   protected void finalize() throws Throwable {
+//
+//      close();
+//      
+//      super.finalize();
+//      
+//   }
+   
+   @Override
+   public void close() throws Exception {
+
+      if (!m_closed) {
+         // Already closed.
+         return;
+      }
+
+      if (httpClient instanceof AutoCloseable) {
+
+         /*
+          * If the caller passed in an AutoCloseable HttpClient, then we shut it
+          * down now.
+          */
+         ((AutoCloseable) httpClient).close();
+
+      }
+
+      if (our_httpClient != null) {
+
+         /*
+          * This HttpClient was allocated by our constructor. We will shut it
+          * down now (unless it is already stopping or stopped).
+          */
+
+         if (!our_httpClient.isStopping() && !our_httpClient.isStopped()) {
+
+            our_httpClient.stop();
+            
+         }
+
+      }
+      
+      if (our_executor != null) {
+
+         /*
+          * This thread pool was allocated by our constructor. Shut it down now.
+          */
+         our_executor.shutdownNow();
+         
+      }
+
+      m_closed = true;
+
+   }
+
+    @Override
+    public String toString() {
+
+        return super.toString() + "{baseServiceURL=" + baseServiceURL
+                + ", useLBS=" + useLBS + "}";
+
+    }
+    
+	/**
+     * Return the base URL for a remote repository (less the /sparql path
+     * component).
+     * 
+     * @param namespace
+     *            The namespace.
+     *            
+     * @return The base URL.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
+     *      Missing URL encoding in RemoteRepositoryManager </a>
+     */
+    protected String getRepositoryBaseURLForNamespace(final String namespace) {
+    
+        return baseServiceURL + "/namespace/"
+                + ConnectOptions.urlEncode(namespace);
+    }
+
+    /**
+     * Obtain a flyweight {@link RemoteRepository} for the default namespace
+     * associated with the remote service.
+     */
+    public RemoteRepository getRepositoryForDefaultNamespace() {
+     
+      return getRepositoryForURL(baseServiceURL + "/sparql");
+
+    }
+    
+    /**
+     * Obtain a flyweight {@link RemoteRepository} for a data set managed by the remote
+     * service.
+     * 
+     * @param namespace
+     *            The name of the data set (its bigdata namespace).
+     *            
+     * @return An interface which may be used to talk to that data set.
+     */
+    public RemoteRepository getRepositoryForNamespace(final String namespace) {
+
+      return getRepositoryForURL(getRepositoryBaseURLForNamespace(namespace)
+            + "/sparql");
+        
+    }
+
+//    /**
+//     * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
+//     * SPARQL end point.
+//     * 
+//     * @param sparqlEndpointURL
+//     *            The URL of the SPARQL end point.
+//     * @param useLBS
+//     *            When <code>true</code>, the REST API methods will use the load
+//     *            balancer aware requestURLs. The load balancer has essentially
+//     *            zero cost when not using HA, so it is recommended to always
+//     *            specify <code>true</code>. When <code>false</code>, the REST
+//     *            API methods will NOT use the load balancer aware requestURLs.
+//     * 
+//     * @return An interface which may be used to talk to that data set.
+//     */
+//    @Deprecated // The useLBS property is on the RemoteRepositoryManager and is ignored by this method.
+//    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+//            final boolean useLBS) {
+//
+//        return new RemoteRepository(this, sparqlEndpointURL);
+//
+//    }
+
+    /**
+     * Obtain a flyweight {@link RemoteRepository} for the data set having the specified
+     * SPARQL end point. The load balancer will be used or not as per the
+     * parameters to the {@link RemoteRepositoryManager} constructor.
+     * 
+     * @param sparqlEndpointURL
+     *            The URL of the SPARQL end point.
+     * 
+     * @return An interface which may be used to talk to that data set.
+     */
+    public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL) {
+
+        return getRepositoryForURL(sparqlEndpointURL, null/*timestamp*/);
+
+    }
+
+    /**
+    * Obtain a flyweight {@link RemoteRepository} for the data set having the
+    * specified SPARQL end point. The load balancer will be used or not as per
+    * the parameters to the {@link RemoteRepositoryManager} constructor.
+    * 
+    * @param sparqlEndpointURL
+    *           The URL of the SPARQL end point.
+    * @param timestamp
+    *           The timestamp that will be added to all requests for the
+    *           sparqlEndPoint (optional). 
+    *           
+    * @return An interface which may be used to talk to that data set.
+    */
+   public RemoteRepository getRepositoryForURL(final String sparqlEndpointURL,
+         final IRemoteTx tx) {
+
+      return new RemoteRepository(this, sparqlEndpointURL, tx);
+
+   }
+
+    /**
+     * Obtain a <a href="http://vocab.deri.ie/void/"> VoID </a> description of
+     * the configured KBs. Each KB has its own namespace and corresponds to a
+     * VoID "data set".
+     * <p>
+     * Note: This method uses an HTTP GET and hence can be cached by the server.
+     * 
+     * @return A <a href="http://vocab.deri.ie/void/"> VoID </a> description of
+     *         the configured KBs.
+     * 
+     * @throws Exception
+     */
+    public GraphQueryResult getRepositoryDescriptions() throws Exception {
+
+        final ConnectOptions opts = new ConnectOptions(baseServiceURL + "/namespace");
+        
+        opts.method = "GET";
+
+//        HttpResponse response = null;
+//        GraphQueryResult result = null;
+        
+        opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
+
+        return graphResults(opts, null/* queryId */, null /*listener*/);
+    }
+
+    /**
+     * Create a new KB instance.
+     * 
+     * @param namespace
+     *            The namespace of the KB instance.
+     * @param properties
+     *            The configuration properties for that KB instance.
+     *            
+     * @throws Exception 
+     */
+    public void createRepository(final String namespace,
+            final Properties properties) throws Exception {
+
+        if (namespace == null)
+            throw new IllegalArgumentException();
+        if (properties == null)
+            throw new IllegalArgumentException();
+        if (properties.getProperty(OPTION_CREATE_KB_NAMESPACE) == null)
+            throw new IllegalArgumentException("Property not defined: "
+                    + OPTION_CREATE_KB_NAMESPACE);
+
+//        final ConnectOptions opts = new ConnectOptions(baseServiceURL
+//                + "/namespace", httpClient);
+
+        final ConnectOptions opts = new ConnectOptions(baseServiceURL
+                + "/namespace");
+
+        opts.method = "POST";
+
+        JettyResponseListener response = null;
+
+        // Setup the request entity.
+        {
+
+            final PropertiesFormat format = PropertiesFormat.XML;
+            
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            
+            final PropertiesWriter writer = PropertiesWriterRegistry
+                    .getInstance().get(format).getWriter(baos);
+
+            writer.write(properties);
+            
+            final byte[] data = baos.toByteArray();
+            
+            final ByteArrayEntity entity = new ByteArrayEntity(data);
+
+            entity.setContentType(format.getDefaultMIMEType());
+
+            opts.entity = entity;
+        
+        }
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+        } finally {
+        	if (response != null)
+        		response.abort();
+
+        }
+        
+    }
+
+    /**
+     * Create a new KB instance.
+     * 
+     * @param namespace
+     *            The namespace of the KB instance.
+     * @param properties
+     *            The configuration properties for that KB instance.
+     *            
+     * @throws Exception 
+     */
+    public void deleteRepository(final String namespace) throws Exception {
+
+        final ConnectOptions opts = newConnectOptions(
+               getRepositoryBaseURLForNamespace(namespace), null/* txId */);
+
+        opts.method = "DELETE";
+
+        JettyResponseListener response = null;
+
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+        } finally {
+
+        	if (response != null)
+        		response.abort();
+
+        }
+        
+    }
+
+    /**
+     * Return the effective configuration properties for the named data set.
+     * <p>
+     * Note: While it is possible to change some configuration options are a
+     * data set has been created, many aspects of a "data set" configuration are
+     * "baked in" when the data set is created and can not be changed. For this
+     * reason, no general purpose mechanism is being offered to change the
+     * properties for a configured data set instance.
+     * 
+     * @param namespace
+     *            The name of the data set.
+     * 
+     * @return The effective configuration properties for that named data set.
+     * 
+     * @throws Exception
+     */
+    public Properties getRepositoryProperties(final String namespace)
+            throws Exception {
+
+        final String sparqlEndpointURL = getRepositoryBaseURLForNamespace(namespace);
+       
+        final ConnectOptions opts = newConnectOptions(sparqlEndpointURL
+            + "/properties", null/* txId */);
+
+        opts.method = "GET";
+
+        JettyResponseListener response = null;
+
+        opts.setAcceptHeader(ConnectOptions.MIME_PROPERTIES_XML);
+        boolean consumeNeeded = true;
+        try {
+
+            checkResponseCode(response = doConnect(opts));
+
+            final String contentType = response.getContentType();
+
+            if (contentType == null)
+                throw new RuntimeException("Not found: Content-Type");
+
+            final MiniMime mimeType = new MiniMime(contentType);
+
+            final PropertiesFormat format = PropertiesFormat
+                    .forMIMEType(mimeType.getMimeType());
+
+            if (format == null)
+                throw new IOException(
+                        "Could not identify format for service response: serviceURI="
+                                + sparqlEndpointURL + ", contentType="
+                                + contentType + " : response="
+                                + response.getResponseBody());
+
+            final PropertiesParserFactory factory = PropertiesParserRegistry
+                    .getInstance().get(format);
+
+            if (factory == null)
+                throw new RuntimeException(
+                        "ParserFactory not found: Content-Type=" + contentType
+                                + ", format=" + format);
+
+            final PropertiesParser parser = factory.getParser();
+
+            final Properties properties = parser.parse(response.getInputStream());
+
+            consumeNeeded = false;
+            
+            return properties;
+        } catch (Exception e) {
+            consumeNeeded = !InnerCause.isInnerCause(e,
+                    HttpException.class);
+        	throw e;
+        } finally {
+
+        	if (response != null && consumeNeeded)
+        		response.abort();
+            
+        }
+
+    }
+
+    /**
+     * Connect to a SPARQL end point (GET or POST query only).
+     * 
+     * @param opts
+     *            The connection options.
+     * 
+     * @return The connection.
+     * 
+     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/619">
+     *      RemoteRepository class should use application/x-www-form-urlencoded
+     *      for large POST requests </a>
+     */
+    public JettyResponseListener doConnect(final ConnectOptions opts) throws Exception {
+
+       assertHttpClientRunning();
+
+        /*
+         * Generate the fully formed and encoded URL.
+         */
+    
+      // The requestURL (w/o URL query parameters).
+      final String requestURL = opts.getRequestURL(getContextPath(), getUseLBS());
+
+      final StringBuilder urlString = new StringBuilder(requestURL);
+
+      /*
+       * FIXME (***) Why are we using one approach to add the parameters here
+       * and then a different approach if we do a POST? Either one or the other
+       * I think. Try moving this into an else {} block below (if not a POST,
+       * then add query parameters).
+       */
+        ConnectOptions.addQueryParams(urlString, opts.requestParams);
+
+        final boolean isLongRequestURL = urlString.length() > getMaxRequestURLLength();
+
+        if (isLongRequestURL && opts.method.equals("POST")
+                && opts.entity == null) {
+
+            /*
+             * URL is too long. Reset the URL to just the service endpoint and
+             * use application/x-www-form-urlencoded entity instead. Only in
+             * cases where there is not already a request entity (SPARQL query
+             * and SPARQL update).
+             */
+
+            urlString.setLength(0);
+            urlString.append(requestURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+
+        } else if (isLongRequestURL && opts.method.equals("GET")
+                && opts.entity == null) {
+
+            /*
+             * Convert automatically to a POST if the request URL is too long.
+             * 
+             * Note: [opts.entity == null] should always be true for a GET so
+             * this bit is a paranoia check.
+             */
+
+            opts.method = "POST";
+
+            urlString.setLength(0);
+            urlString.append(requestURL);
+
+            opts.entity = ConnectOptions.getFormEntity(opts.requestParams);
+            
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug("*** Request ***");
+            log.debug(requestURL);
+            log.debug(opts.method);
+            log.debug("query=" + opts.getRequestParam("query"));
+            log.debug(urlString.toString());
+        }
+
+        Request request = null;
+        try {
+
+            request = (HttpRequest) newRequest(urlString.toString(), opts.method);
+
+            if (opts.requestHeaders != null) {
+
+                for (Map.Entry<String, String> e : opts.requestHeaders
+                        .entrySet()) {
+
+                    request.header(e.getKey(), e.getValue());
+
+                    if (log.isDebugEnabled())
+                        log.debug(e.getKey() + ": " + e.getValue());
+
+                }
+
+            }
+            
+            if (opts.entity != null) {
+
+               final EntityContentProvider cp = new EntityContentProvider(opts.entity);
+
+               request.content(cp, cp.getContentType());
+                
+            }
+         
+         final long queryTimeoutMillis;
+         {
+            final String s = opts
+                  .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
+
+            queryTimeoutMillis = s == null ? -1L : StringUtil.toLong(s);
+         }
+
+         final JettyResponseListener listener = new JettyResponseListener(
+               request, queryTimeoutMillis);
+
+            // Note: Send with a listener is non-blocking.
+            request.send(listener);
+            
+            return listener;
+            
+        } catch (Throwable t) {
+            /*
+             * If something goes wrong, then close the http connection.
+             * Otherwise, the connection will be closed by the caller.
+             */
+            try {
+                
+                if (request != null)
+                    request.abort(t);
+                
+            } catch (Throwable t2) {
+                log.warn(t2); // ignored.
+            }
+            throw new RuntimeException(requestURL + " : " + t, t);
+        }
+
+    }
+
+    public Request newRequest(final String uri, final String method) {
+
+      if (httpClient == null)
+         throw new IllegalArgumentException();
+
+      assertHttpClientRunning();
+
+      return httpClient.newRequest(uri).method(getMethod(method));
+
+   }
+ 
+   private void assertHttpClientRunning() {
+
+      if (httpClient.isStopped()||httpClient.isStopping())
+         throw new IllegalStateException("The HTTPClient has been stopped");
+      
+   }
+
+   HttpMethod getMethod(final String method) {
+      if (method.equals("GET")) {
+         return HttpMethod.GET;
+      } else if (method.equals("POST")) {
+         return HttpMethod.POST;
+      } else if (method.equals("DELETE")) {
+         return HttpMethod.DELETE;
+      } else if (method.equals("PUT")) {
+         return HttpMethod.PUT;
+      } else {
+         throw new IllegalArgumentException();
+      }
+   }
+
+   /**
+    * Return the {@link ConnectOptions} which will be used by default for the
+    * SPARQL end point for a QUERY or other idempotent operation.
+    * 
+    * @param sparqlEndpointURL
+    *           The SPARQL end point.
+    * @param tx
+    *           A transaction that will isolate the operation (optional).
+    */
+   final protected ConnectOptions newQueryConnectOptions(
+         final String sparqlEndpointURL, final IRemoteTx tx) {
+
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, tx);
+
+       opts.method = getQueryMethod();
+       
+       opts.update = false;
+
+       return opts;
+
+   }
+
+   /**
+    * Return the {@link ConnectOptions} which will be used by default for the
+    * SPARQL end point for an UPDATE or other non-idempotant operation.
+    * 
+    * @param sparqlEndpointURL
+    *           The SPARQL end point.
+    * @param tx
+    *           A transaction that will isolate the operation (optional).
+    */
+   final protected ConnectOptions newUpdateConnectOptions(
+         final String sparqlEndpointURL, final IRemoteTx tx) {
+
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, tx);
+       
+       opts.method = "POST";
+       
+       opts.update = true;
+
+       return opts;
+
+   }
+   
+//   /**
+//    * Return the {@link ConnectOptions} which will be used by default for the
+//    * SPARQL end point.
+//    */
+//   final protected ConnectOptions newConnectOptions() {
+//   
+//       return mgr.newConnectOptions(sparqlEndpointURL);
+//       
+//   }
+   
+   /**
+    * Return the {@link ConnectOptions} which will be used by default for the
+    * specified service URL.
+    * <p>
+    * There are three cases:
+    * <dl>
+    * <dt>
+    * The operation is not isolated by a transaction</dt>
+    * <dd>This will return a {@link RemoteRepository} that DOES NOT specify a
+    * timestamp to be used for read or write operations. For read operations,
+    * this will cause it to use the default view of the namespace (as configured
+    * on the server) and that will always be non-blocking (either reading
+    * against the then current lastCommitTime on the database or reading against
+    * an explicit read lock). For write operations, this will cause it to use
+    * the UNISOLATED view of the namespace.</dd>
+    * <dt>
+    * The operation is isolated by a read/write transaction</dt>
+    * <dd>This will return a {@link RemoteRepository} which specifies the
+    * transaction identifier (txId) for both read and write operations. This
+    * ensures that they both have the same view of the write set of the
+    * transaction (we can not use the readsOnCommitTime for read operations
+    * because writes on the transaction are not visible unless we use the txId).
+    * </dd>
+    * <dt>
+    * The operation is isolated by a read-only transaction</dt>
+    * <dd>This will return a {@link RemoteRepository} which use the
+    * readsOnCommitTime for the transaction. This provides snapshot isolation
+    * without any overhead and is also compatible with HA (where the transaction
+    * management is performed on the leader and the followers are not be aware
+    * of the txIds)</dd>
+    * </dl>
+    * 
+    * @param serviceURL
+    *           The URL of the service for the request.
+    * @param tx
+    *           A transaction that will isolate the operation (optional).
+    */
+   ConnectOptions newConnectOptions(final String serviceURL, final IRemoteTx tx) {
+   
+      final ConnectOptions opts = new ConnectOptions(serviceURL);
+
+      if (tx != null) {
+
+         /*
+          * Some kind of transaction.
+          */
+
+         if (tx.isReadOnly()) {
+
+            /*
+             * A read-only transaction.
+             * 
+             * FIXME This will not work for scale-out. We need to specify the
+             * txId itself.
+             */
+            opts.addRequestParam("timestamp",
+                  Long.toString(tx.getReadsOnCommitTime()));
+
+         } else {
+
+            /*
+             * A read/write transaction. We must use the txId to have the
+             * correct isolation.
+             */
+
+            opts.addRequestParam("timestamp", Long.toString(tx.getTxId()));
+
+         }
+
+      }
+       
+      return opts;
+
+   }
+
+   /**
+    * Builds a graph from an RDF result set (statements, not binding sets).
+    * 
+    * @param response
+    *            The connection from which to read the results.
+    * 
+    * @return The graph
+    * 
+    * @throws Exception
+    *             If anything goes wrong.
+    */
+   GraphQueryResult graphResults(final ConnectOptions opts,
+           final UUID queryId, final IPreparedQueryListener listener) throws Exception {
+
+     // The listener handling the http response.
+     JettyResponseListener response = null;
+     // Incrementally parse the response in another thread.  
+       BackgroundGraphResult result = null;
+       try {
+
+           response = doConnect(opts);
+
+           checkResponseCode(response);
+           
+           final String baseURI = "";
+
+           final String contentType = response.getContentType();
+
+           if (contentType == null)
+               throw new RuntimeException("Not found: Content-Type");
+           
+           final MiniMime mimeType = new MiniMime(contentType);
+           
+           final RDFFormat format = RDFFormat
+                   .forMIMEType(mimeType.getMimeType());
+
+           if (format == null)
+               throw new IOException(
+                       "Could not identify format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + " : response=" + response.getResponseBody());
+
+           final RDFParserFactory factory = RDFParserRegistry.getInstance().get(format);
+
+           if (factory == null)
+               throw new RuntimeException(
+                       "RDFParserFactory not found: Content-Type="
+                               + contentType + ", format=" + format);
+
+           final RDFParser parser = factory.getParser();
+           
+           // TODO See #1055 (Make RDFParserOptions configurable)
+           parser.setValueFactory(new ValueFactoryImpl());
+
+           parser.setVerifyData(true);
+
+           parser.setStopAtFirstError(true);
+
+           parser.setDatatypeHandling(RDFParser.DatatypeHandling.IGNORE);
+           /**
+            * Note: The default charset depends on the MIME Type. The [charset]
+            * MUST be [null] if the MIME Type is binary since this effects
+            * whether a Reader or InputStream will be used to construct and
+            * apply the RDF parser.
+            * 
+            * @see <a href="http://trac.blazegraph.com/ticket/920" > Content
+            *      negotiation orders accept header scores in reverse </a>
+            */
+           Charset charset = format.getCharset();//Charset.forName(UTF8);
+           try {
+              
+              final String encoding = response.getContentEncoding();
+               if (encoding != null)
+                   charset = Charset.forName(encoding);
+           } catch (IllegalCharsetNameException e) {
+               // work around for Joseki-3.2
+               // Content-Type: application/rdf+xml;
+               // charset=application/rdf+xml
+           }
+           
+           final BackgroundGraphResult tmp = new BackgroundGraphResult(
+                   parser, response.getInputStream(), charset, baseURI) {
+              
+              final AtomicBoolean notDone = new AtomicBoolean(true);
+              
+              @Override
+              public boolean hasNext() throws QueryEvaluationException {
+              
+                 final boolean hasNext = super.hasNext();
+                 
+                 if (hasNext == false) {
+                    
+                    notDone.set(false);
+                    
+                 }
+                 
+                 return hasNext;
+                 
+              }
+              
+              @Override
+              public void close() throws QueryEvaluationException {
+                 
+                 try {
+              
+                    super.close();
+              
+                 } finally {
+                    
+                 if (notDone.compareAndSet(true, false)) {
+                    
+                    try {
+                       cancel(queryId);
+                    } catch (Exception ex) {log.warn(ex); }
+                    
+                 }
+                 
+                 if (listener != null) {
+                     listener.closed(queryId);
+                 }
+                 
+                 }
+              
+              };
+              
+           };
+           
+        /*
+         * Note: Asynchronous execution. Typically does not even start
+         * running until after we leave this method!
+         */
+           executor.execute(tmp);
+           
+           // The executor accepted the task for execution (at some point).
+           result = tmp;
+
+           /*
+         * Result will be asynchronously produced.
+         * 
+         * Note: At this point the caller is responsible for calling close()
+         * on this object to clean up the resources associated with this
+         * request.
+         */
+           return result;
+
+       } finally {
+
+           if (response != null && result == null) {
+           /*
+            * This code path only handles errors. We have a response, but
+            * we were not able to generate the asynchronous [result]
+            * object.
+            */
+              response.abort();
+              
+               try {
+              /*
+               * POST back to the server in an attempt to cancel the
+               * request if already executing on the server.
+               */
+                 cancel(queryId);
+               } catch (Exception ex) {log.warn(ex); }
+           
+               if (listener != null) {
+              listener.closed(queryId);
+           }
+        }
+
+       }
+
+   }
+
+   /**
+    * Cancel a query running remotely on the server.
+    * 
+    * @param queryID
+    *             the UUID of the query to cancel
+    */
+   public void cancel(final UUID queryId) throws Exception {
+   
+     if (queryId == null)
+        return;
+     
+       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL, null/* txId */);
+
+       opts.addRequestParam("cancelQuery");
+
+       opts.addRequestParam("queryId", queryId.toString());
+
+       JettyResponseListener response = null;
+       try {
+           // Issue request, check response status code.
+           checkResponseCode(response = doConnect(opts));
+       } finally {
+           /*
+            * Ensure that the http response entity is consumed so that the http
+            * connection will be released in a timely fashion.
+            */
+        if (response != null)
+           response.abort();
+           
+       }
+           
+   }
+
+   /**
+    * Extracts the solutions from a SPARQL query.
+    * 
+    * @param response
+    *            The connection from which to read the results.
+    * @param listener
+    *            The listener to notify when the query result has been
+    *            closed (optional).
+    * 
+    * @return The results.
+    * 
+    * @throws Exception
+    *             If anything goes wrong.
+    */
+   public TupleQueryResult tupleResults(final ConnectOptions opts, 
+           final UUID queryId, final IPreparedQueryListener listener)
+           throws Exception {
+
+     // listener handling the http response.
+     JettyResponseListener response = null;
+     // future for parsing that response (in the background).
+     FutureTask<Void> ft = null;
+     // iteration pattern returned to caller. once they hold this they are
+     // responsible for cleaning up the request by calling close().
+     TupleQueryResultImpl tqrImpl = null;
+       try {
+
+           response = doConnect(opts);
+
+           checkResponseCode(response);
+                       
+           final String contentType = response.getContentType();
+   
+           final MiniMime mimeType = new MiniMime(contentType);
+           
+           final TupleQueryResultFormat format = TupleQueryResultFormat
+                   .forMIMEType(mimeType.getMimeType());
+   
+           if (format == null)
+               throw new IOException(
+                       "Could not identify format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + " : response=" + response.getResponseBody());
+
+           final TupleQueryResultParserFactory parserFactory = TupleQueryResultParserRegistry
+                   .getInstance().get(format);
+
+           if (parserFactory == null)
+               throw new IOException(
+                       "No parser for format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + ", format=" + format + " : response="
+                               + response.getResponseBody());
+
+           final TupleQueryResultParser parser = parserFactory.getParser();
+   
+        final BackgroundTupleResult result = new BackgroundTupleResult(
+              parser, response.getInputStream());
+
+           final MapBindingSet bindings = new MapBindingSet();
+           
+           final InsertBindingSetCursor cursor = 
+               new InsertBindingSetCursor(result, bindings);
+
+           // Wrap as FutureTask so we can cancel.
+           ft = new FutureTask<Void>(result, null/* result */);
+                 
+        /*
+         * Submit task for execution. It will asynchronously consume the
+         * response, pumping solutions into the cursor.
+         * 
+         * Note: Can throw a RejectedExecutionException!
+         */
+        executor.execute(ft);
+
+        /*
+         * Note: This will block until the binding names are received, so it
+         * can not be done until we submit the BackgroundTupleResult for
+         * execution.
+         */
+           final List<String> list = new ArrayList<String>(
+                   result.getBindingNames());
+           
+        /*
+         * The task was accepted by the executor. Wrap with iteration
+         * pattern. Once this object is returned to the caller they are
+         * responsible for calling close() to provide proper error cleanup
+         * of the resources associated with the request.
+         */
+           final TupleQueryResultImpl tmp = new TupleQueryResultImpl(list, cursor) {
+
+              private final AtomicBoolean notDone = new AtomicBoolean(true);
+              
+              @Override
+              public boolean hasNext() throws QueryEvaluationException {
+              
+                 final boolean hasNext = super.hasNext();
+                 
+                 if (hasNext == false) {
+                    
+                    notDone.set(false);
+                    
+                 }
+                 
+                 return hasNext;
+                 
+              }
+              
+              @Override
+              public void handleClose() throws QueryEvaluationException {
+                 
+                 try {
+              
+                 super.handleClose();
+
+              } finally {
+
+                 if (notDone.compareAndSet(true, false)) {
+
+                    try {
+                       cancel(queryId);
+                    } catch (Exception ex) {
+                       log.warn(ex);
+                    }
+
+                 }
+
+                 /*
+                  * Notify the listener.
+                  */
+                 if (listener != null) {
+                    listener.closed(queryId);
+                 }
+
+                 }
+              
+              };
+              
+           };
+           
+        /*
+         * Return the tuple query result listener to the caller. They now
+         * have responsibility for calling close() on that object in order
+         * to close the http connection and release the associated
+         * resources.
+         */
+           return (tqrImpl = tmp);
+           
+       } finally {
+           
+        if (response != null && tqrImpl == null) {
+           /*
+            * Error handling code path. We have an http response listener
+            * but we were not able to setup the tuple query result
+            * listener.
+            */
+           if (ft != null) {
+              /*
+               * We submitted the task to parse the response. Since the
+               * code is not returning normally (tqrImpl:=null) we cancel
+               * the FutureTask for the background parse of that response.
+               */
+              ft.cancel(true/* mayInterruptIfRunning */);
+           }
+           // Abort the http response handling.
+           response.abort();
+           try {
+              /*
+               * POST back to the server to cancel the request in case it
+               * is still running on the server.
+               */
+              cancel(queryId);
+           } catch (Exception ex) {
+              log.warn(ex);
+           }
+           if (listener != null) {
+              listener.closed(queryId);
+           }
+        }
+           
+       }
+
+   }
+   
+   /**
+    * Parse a SPARQL result set for an ASK query.
+    * 
+    * @param response
+    *            The connection from which to read the results.
+    * 
+    * @return <code>true</code> or <code>false</code> depending on what was
+    *         encoded in the SPARQL result set.
+    * 
+    * @throws Exception
+    *             If anything goes wrong, including if the result set does not
+    *             encode a single boolean value.
+    */
+   public boolean booleanResults(final ConnectOptions opts, 
+           final UUID queryId, final IPreparedQueryListener listener) throws Exception {
+
+     JettyResponseListener response = null;
+       Boolean result = null;
+       try {
+
+           response = doConnect(opts);
+
+           checkResponseCode(response);
+           
+           final String contentType = response.getContentType();
+
+           final MiniMime mimeType = new MiniMime(contentType);
+           
+           final BooleanQueryResultFormat format = BooleanQueryResultFormat
+                   .forMIMEType(mimeType.getMimeType());
+
+           if (format == null)
+               throw new IOException(
+                       "Could not identify format for service response: serviceURI="
+                               + opts.getBestRequestURL() + ", contentType=" + contentType
+                               + " : response=" + response.getResponseBody());
+
+           final BooleanQueryResultParserFactory factory = BooleanQueryResultParserRegistry
+                   .getInstance().get(format);
+
+           if (factory == null)
+               throw new RuntimeException("No factory for Content-Type: " + contentType);
+
+           final BooleanQueryResultParser parser = factory.getParser();
+
+           final InputStream is = response.getInputStream();
+        try {
+           result = parser.parse(is);
+           return result;
+        } finally {
+           is.close();
+        }
+
+       } finally {
+
+        if (result == null) {
+           /*
+            * Error handling path. We issued the request, but were not able
+            * to parse out the response.
+            */
+           if (response != null) {
+              // Make sure the response listener is closed.
+              response.abort();
+           }
+              try {
+              /*
+               * POST request to server to cancel query in case it is
+               * still running.
+               */
+              cancel(queryId);
+              } catch (Exception ex) {log.warn(ex); }
+        }
+
+        if (listener != null) {
+            listener.closed(queryId);
+        }
+
+       }
+
+   }
+
+//   /**
+//    * Counts the #of results in a SPARQL result set.
+//    * 
+//    * @param response
+//    *            The connection from which to read the results.
+//    * 
+//    * @return The #of results.
+//    * 
+//    * @throws Exception
+//    *             If anything goes wrong.
+//    */
+//   protected long countResults(final JettyResponseListener response) throws Exception {
+//
+//       try {
+//
+//           final String contentType = response.getContentType();
+//
+//           final MiniMime mimeType = new MiniMime(contentType);
+//           
+//           final TupleQueryResultFormat format = TupleQueryResultFormat
+//                   .forMIMEType(mimeType.getMimeType());
+//
+//           if (format == null)
+//               throw new IOException(
+//                       "Could not identify format for service response: serviceURI="
+//                               + sparqlEndpointURL + ", contentType=" + contentType
+//                               + " : response=" + response.getResponseBody());
+//
+//           final TupleQueryResultParserFactory factory = TupleQueryResultParserRegistry
+//                   .getInstance().get(format);
+//
+//           if (factory == null)
+//               throw new RuntimeException("No factory for Content-Type: " + contentType);
+//
+//           final TupleQueryResultParser parser = factory.getParser();
+//
+//           final AtomicLong nsolutions = new AtomicLong();
+//
+//           parser.setTupleQueryResultHandler(new TupleQueryResultHandlerBase() {
+//               // Indicates the end of a sequence of solutions.
+//              @Override
+//               public void endQueryResult() {
+//                   // connection close is handled in finally{}
+//               }
+//
+//               // Handles a solution.
+//              @Override
+//               public void handleSolution(final BindingSet bset) {
+//                   if (log.isDebugEnabled())
+//                       log.debug(bset.toString());
+//                   nsolutions.incrementAndGet();
+//               }
+//
+//               // Indicates the start of a sequence of Solutions.
+//              @Override
+//               public void startQueryResult(List<String> bindingNames) {
+//               }
+//           });
+//
+//           parser.parse(response.getInputStream());
+//
+//           if (log.isInfoEnabled())
+//               log.info("nsolutions=" + nsolutions);
+//
+//           // done.
+//           return nsolutions.longValue();
+//
+//       } finally {
+//
+//         if (response != null) {
+//            response.abort();
+//         }
+//         
+//       }
+//
+//   }
+
+}

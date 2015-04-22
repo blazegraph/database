@@ -32,26 +32,25 @@ import java.io.Reader;
 import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
@@ -60,6 +59,7 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
+import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -81,6 +81,7 @@ import com.bigdata.rdf.sail.DestroyKBTask;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
@@ -128,9 +129,14 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected HttpClient m_client;
 
     /**
-     * The client-API wrapper to the NSS.
+     * The client-API wrapper for the remote service.
      */
-    protected RemoteRepositoryManager m_repo;
+    protected RemoteRepositoryManager m_mgr;
+    
+    /**
+     * The client-API wrapper to the NSS for the configured default namespace.
+     */
+    protected RemoteRepository m_repo;
 
     /**
      * The effective {@link NanoSparqlServer} http end point (including the
@@ -334,10 +340,15 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
          * webapp when the client requests the root URL.
          */
 
+        // setup http client.
        	m_client = HttpClientConfigurator.getInstance().newInstance();
         
-        m_repo = new RemoteRepositoryManager(m_serviceURL, m_client,
-                getIndexManager().getExecutorService());
+       	// setup manager for service.
+       	m_mgr = new RemoteRepositoryManager(m_serviceURL, m_client,
+               getIndexManager().getExecutorService());
+       	
+       	// setup client for current namespace on service.
+        m_repo = m_mgr.getRepositoryForNamespace(namespace);
 
 		if (log.isInfoEnabled())
 			log.info("Setup Active Threads: " + Thread.activeCount());
@@ -379,10 +390,12 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //        }
 		
 		log.info("Connection Shutdown Check");
-		
-        m_repo.close();
+
+		  m_mgr.close();
+//        m_repo.close();
         m_client.stop();
-        
+
+        m_mgr = null;
         m_repo = null;
         m_client = null;
         
@@ -450,52 +463,234 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 	 * @throws Exception
 	 *             If anything goes wrong.
 	 */
-	protected long countResults(final TupleQueryResult result) throws Exception {
+   static protected long countResults(final TupleQueryResult result)
+         throws Exception {
 
-    	long count = 0;
-    	
-    	while(result.hasNext()) {
-    		
-    		result.next();
-    		
-    		count++;
-    		
-    	}
-    	
-    	result.close();
-    	
-    	return count;
+      try {
+
+         long count = 0;
+
+         while (result.hasNext()) {
+
+            result.next();
+
+            count++;
+
+         }
+
+         return count;
+
+      } finally {
+
+         result.close();
+
+      }
+
+   }
+
+   /**
+    * Counts the #of results in a SPARQL result set.
+    * 
+    * @param result
+    *           The connection from which to read the results.
+    * 
+    * @return The #of results.
+    * 
+    * @throws Exception
+    *            If anything goes wrong.
+    */
+   static protected long countResults(final GraphQueryResult result)
+         throws Exception {
+
+      try {
+
+         long count = 0;
+
+         while (result.hasNext()) {
+
+            result.next();
+
+            count++;
+
+         }
+
+         return count;
+         
+      } finally {
+
+         result.close();
+
+      }
     	
 	}
 
-	/**
-	 * Counts the #of results in a SPARQL result set.
-	 * 
-	 * @param result
-	 *            The connection from which to read the results.
-	 * 
-	 * @return The #of results.
-	 * 
-	 * @throws Exception
-	 *             If anything goes wrong.
-	 */
-	protected long countResults(final GraphQueryResult result) throws Exception {
+   /**
+    * Count matches of the triple pattern.
+    */
+   static protected int countMatches(final Graph g, final Resource s,
+           final URI p, final Value o) {
 
-    	long count = 0;
-    	
-    	while(result.hasNext()) {
-    		
-    		result.next();
-    		
-    		count++;
-    		
-    	}
-    	
-    	result.close();
-    	
-    	return count;
-    	
-	}
+       int n = 0;
+
+       final Iterator<Statement> itr = g.match(s, p, o);
+
+       while (itr.hasNext()) {
+
+           itr.next();
+           
+           n++;
+
+       }
+
+       return n;
+
+   }
+
+   /**
+    * Return the statements matching the triple pattern.
+    */
+   static protected Statement[] getMatches(final Graph g, final Resource s,
+           final URI p, final Value o) {
+
+       final List<Statement> out = new LinkedList<Statement>();
+
+       final Iterator<Statement> itr = g.match(s, p, o);
+
+       while (itr.hasNext()) {
+
+           out.add(itr.next());
+
+       }
+
+       return out.toArray(new Statement[out.size()]);
+
+   }
+
+   /**
+    * Compare two graphs for equality.
+    * <p>
+    * Note: This is not very efficient if the {@link Graph} implementations are
+    * not indexed.
+    * <p>
+    * Note: This does not handle equality testing with blank nodes (it does not
+    * test for isomorphic graphs).
+    * 
+    * @param expected
+    * @param actual
+    * @throws Exception
+    */
+  static protected void assertSameGraph(final Graph expected,
+        final IPreparedGraphQuery actual) throws Exception {
+
+     assertSameGraph(expected, asGraph(actual));
+
+  }
+
+  /**
+   * Compare two graphs for equality.
+   * <p>
+   * Note: This is not very efficient if the {@link Graph} implementations are
+   * not indexed.
+   * <p>
+   * Note: This does not handle equality testing with blank nodes (it does not
+   * test for isomorphic graphs).
+   * 
+   * @param expected
+   * @param actual
+   */
+  static protected void assertSameGraph(final Graph expected, final Graph actual) {
+
+     for (Statement s : expected) {
+
+        if (!actual.contains(s))
+           fail("Expecting: " + s);
+
+     }
+
+        assertEquals("size", expected.size(), actual.size());
+
+    }
+
+  /**
+   * Preferred version executes the {@link IPreparedGraphQuery} and ensures
+   * that the {@link GraphQueryResult} is closed.
+   * 
+   * @param preparedQuery
+   *           The prepared query.
+   * 
+   * @return The resulting graph.
+   * 
+   * @throws Exception
+   */
+  static protected Graph asGraph(final IPreparedGraphQuery preparedQuery)
+        throws Exception {
+
+     final GraphQueryResult result = preparedQuery.evaluate();
+
+     try {
+
+        final Graph g = new LinkedHashModel();
+
+        while (result.hasNext()) {
+
+           g.add(result.next());
+
+        }
+
+        return g;
+
+     } finally {
+
+        result.close();
+
+     }
+
+  }
+
+  /**
+   * @deprecated by {@link #asGraph(IPreparedGraphQuery)} which can ensure that
+   *             the {@link GraphQueryResult} is closed.
+   */
+  static protected Graph asGraph(final GraphQueryResult result) throws Exception {
+
+     try {
+        final Graph g = new LinkedHashModel();
+
+        while (result.hasNext()) {
+
+           g.add(result.next());
+
+        }
+
+        return g;
+     } finally {
+        result.close();
+     }
+
+  }
+
+  /**
+   * Return the #of solutions in a result set.
+   * 
+   * @param result
+   *           The result set.
+   * 
+   * @return The #of solutions.
+   */
+  static protected long countResults(final RepositoryResult<Statement> result)
+        throws Exception {
+
+     try {
+        long i;
+        for (i = 0; result.hasNext(); i++) {
+           result.next();
+        }
+        return i;
+     } finally {
+        result.close();
+     }
+
+  }
 
     /**
      * Generates some statements and serializes them using the specified
@@ -540,7 +735,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     protected Graph genNTRIPLES2(final int ntriples)
 			throws RDFHandlerException {
 
-		final Graph g = new GraphImpl();
+		final Graph g = new LinkedHashModel();
 
 		final ValueFactory f = new ValueFactoryImpl();
 
@@ -600,7 +795,13 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         
     }
 
-    protected long countAll() throws Exception {
+   /**
+    * @deprecated This is going around REST API. It can be written to that API
+    *             with the added support for ESTCARD exact:=true.
+    *             
+    * @see #getExactSize()
+    */
+   protected long countAll() throws Exception {
     	
     	return getSail().getDatabase().getExplicitStatementCount(null);
     	
@@ -614,6 +815,21 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     	
     }
     
+   /**
+    * Return the exact number of statements in the repository.
+    * 
+    * @deprecated This is going around REST API. It can be written to that API
+    *             with the added support for ESTCARD exact:=true.
+    * 
+    * @see #countAll()
+    */
+   @Deprecated
+   protected long getExactSize() {
+
+       return getSail().getDatabase().getStatementCount(true/* true */);
+
+   }
+
     /**
      * Test helps PUTs some data, verifies that it is visible, DELETEs the data,
      * and then verifies that it is gone.
@@ -623,61 +839,20 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      */
     protected void doDeleteWithPostTest(final RDFFormat format) throws Exception {
 
-//        final String queryStr = "select * where {?s ?p ?o}";
-
-//        final QueryOptions opts = new QueryOptions();
-//        opts.serviceURL = m_serviceURL;
-//        opts.queryStr = queryStr;
-//        opts.method = "POST";
-
         doInsertWithBodyTest("POST", 23, /*requestPath,*/ format);
 
-//        assertEquals(23, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(23, countAll());
 
         doDeleteWithBody(/*requestPath,*/ 23, format);
 
         // No solutions (assuming a told triple kb or quads kb w/o axioms).
-//        assertEquals(0, countResults(doSparqlQuery(opts, requestPath)));
         assertEquals(0, countAll());
         
     }
 
 	protected long doDeleteWithQuery(/*final String servlet, */final String query) throws Exception {
 		
-//		HttpURLConnection conn = null;
-//		try {
-//
-//			final URL url = new URL(m_serviceURL + servlet + "?query="
-//					+ URLEncoder.encode(query, "UTF-8"));
-//			conn = (HttpURLConnection) url.openConnection();
-//			conn.setRequestMethod("DELETE");
-//			conn.setDoOutput(true);
-//			conn.setDoInput(true);
-//			conn.setUseCaches(false);
-//			conn.setReadTimeout(0);
-//
-//			conn.connect();
-//
-//			if (log.isInfoEnabled())
-//				log.info(conn.getResponseMessage());
-//
-//			final int rc = conn.getResponseCode();
-//			
-//			if (rc < 200 || rc >= 300) {
-//				throw new IOException(conn.getResponseMessage());
-//			}
-//
-//		} catch (Throwable t) {
-//			// clean up the connection resources
-//			if (conn != null)
-//				conn.disconnect();
-//			throw new RuntimeException(t);
-//		}
-		
-//		final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-		
-		final RemoveOp remove = new RemoveOp(query);
+	   final RemoveOp remove = new RemoveOp(query);
 		
 		return m_repo.remove(remove);
 		
@@ -691,61 +866,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             final URI... c//
             ) throws Exception {
     	
-//        HttpURLConnection conn = null;
-//        try {
-//
-//            final LinkedHashMap<String, String[]> requestParams = new LinkedHashMap<String, String[]>();
-//
-//            if (s != null)
-//                requestParams.put("s",
-//                        new String[] { EncodeDecodeValue.encodeValue(s) });
-//            
-//            if (p != null)
-//                requestParams.put("p",
-//                        new String[] { EncodeDecodeValue.encodeValue(p) });
-//            
-//            if (o != null)
-//                requestParams.put("o",
-//                        new String[] { EncodeDecodeValue.encodeValue(o) });
-//            
-//            if (c != null)
-//                requestParams.put("c",
-//                        new String[] { EncodeDecodeValue.encodeValue(c) });
-//
-//            final StringBuilder urlString = new StringBuilder();
-//            urlString.append(m_serviceURL).append(servlet);
-//            addQueryParams(urlString, requestParams);
-//
-//            final URL url = new URL(urlString.toString());
-//            conn = (HttpURLConnection) url.openConnection();
-//            conn.setRequestMethod("DELETE");
-//            conn.setDoOutput(false);
-//            conn.setDoInput(true);
-//            conn.setUseCaches(false);
-//            conn.setReadTimeout(0);
-//
-//            conn.connect();
-//
-////            if (log.isInfoEnabled())
-////                log.info(conn.getResponseMessage());
-//
-//            final int rc = conn.getResponseCode();
-//            
-//            if (rc < 200 || rc >= 300) {
-//                throw new IOException(conn.getResponseMessage());
-//            }
-//
-//            return getMutationResult(conn);
-//            
-//        } catch (Throwable t) {
-//            // clean up the connection resources
-//            if (conn != null)
-//                conn.disconnect();
-//            throw new RuntimeException(t);
-//        }
-    	
-//    	final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-    	
     	final RemoveOp remove = new RemoveOp(s, p, o, c);
     	
     	return m_repo.remove(remove);
@@ -756,55 +876,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             /* final String servlet, */final int ntriples,
             final RDFFormat format) throws Exception {
 
-//        HttpURLConnection conn = null;
-//		try {
-//
-//            final URL url = new URL(m_serviceURL + servlet + "?delete");
-//            conn = (HttpURLConnection) url.openConnection();
-//            conn.setRequestMethod("POST");
-//			conn.setDoOutput(true);
-//			conn.setDoInput(true);
-//			conn.setUseCaches(false);
-//			conn.setReadTimeout(0);
-//
-//            conn
-//                    .setRequestProperty("Content-Type", format
-//                            .getDefaultMIMEType());
-
             final byte[] data = genNTRIPLES(ntriples, format);
 			
-//            conn.setRequestProperty("Content-Length", ""
-//                    + Integer.toString(data.length));
-//
-//			final OutputStream os = conn.getOutputStream();
-//			try {
-//			    os.write(data);
-//				os.flush();
-//			} finally {
-//				os.close();
-//			}
-//
-//			if (log.isInfoEnabled())
-//				log.info(conn.getResponseMessage());
-//
-//			final int rc = conn.getResponseCode();
-//			
-//			if (rc < 200 || rc >= 300) {
-//				throw new IOException(conn.getResponseMessage());
-//			}
-//
-//		} catch (Throwable t) {
-//			// clean up the connection resources
-//			if (conn != null)
-//				conn.disconnect();
-//			throw new RuntimeException(t);
-//		}
-//
-//        // Verify the mutation count.
-//        assertEquals(ntriples, getMutationResult(conn).mutationCount);
-
-//            final RemoteRepository repo = new RemoteRepository(m_serviceURL);
-            
             final RemoveOp remove = new RemoveOp(data, format);
             
             assertEquals(ntriples, m_repo.remove(remove));
@@ -927,7 +1000,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
             r.close();
         }
         
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
         
         g.addAll(rdfHandler.getStatements());
 
@@ -1009,60 +1082,6 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 
         final byte[] wireData = writeOnBuffer(rdfFormat, g);
 
-//        HttpURLConnection conn = null;
-//        try {
-//
-//            final URL url = new URL(m_serviceURL
-//                    + servlet
-//                    + (defaultContext == null ? ""
-//                            : ("?context-uri=" + URLEncoder.encode(
-//                                    defaultContext.stringValue(), "UTF-8"))));
-//            conn = (HttpURLConnection) url.openConnection();
-//            conn.setRequestMethod(method);
-//            conn.setDoOutput(true);
-//            conn.setDoInput(true);
-//            conn.setUseCaches(false);
-//            conn.setReadTimeout(0);
-//
-//            conn.setRequestProperty("Content-Type",
-//                    rdfFormat.getDefaultMIMEType());
-//
-//            final byte[] data = wireData;
-//
-//            conn.setRequestProperty("Content-Length",
-//                    Integer.toString(data.length));
-//
-//            final OutputStream os = conn.getOutputStream();
-//            try {
-//                os.write(data);
-//                os.flush();
-//            } finally {
-//                os.close();
-//            }
-//            // conn.connect();
-//
-//            final int rc = conn.getResponseCode();
-//
-//            if (log.isInfoEnabled()) {
-//                log.info("*** RESPONSE: " + rc + " for " + method);
-//                // log.info("*** RESPONSE: " + getResponseBody(conn));
-//            }
-//
-//            if (rc < 200 || rc >= 300) {
-//
-//                throw new IOException(conn.getResponseMessage());
-//
-//            }
-//
-//            return getMutationResult(conn);
-//
-//        } catch (Throwable t) {
-//            // clean up the connection resources
-//            if (conn != null)
-//                conn.disconnect();
-//            throw new RuntimeException(t);
-//        }
-
 //        final RemoteRepository repo = new RemoteRepository(m_serviceURL);
         final AddOp add = new AddOp(wireData, rdfFormat);
         if (defaultContext != null)
@@ -1119,7 +1138,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person);
          g.add(mike, likes, rdf);
          g.add(mike, RDFS.LABEL, label1);
@@ -1131,7 +1150,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
       }
 
         // The expected results.
-        final Graph expected = new GraphImpl();
+        final Graph expected = new LinkedHashModel();
         {
             expected.add(new StatementImpl(mike, likes, rdf));
             expected.add(new StatementImpl(mike, RDF.TYPE, person));
@@ -1174,7 +1193,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person);
          g.add(mike, likes, rdf);
          g.add(mike, RDFS.LABEL, label1);
@@ -1206,7 +1225,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final Literal label2 = new LiteralImpl("Bryan");
 
       {
-         final Graph g = new GraphImpl();
+         final Graph g = new LinkedHashModel();
          g.add(mike, RDF.TYPE, person, c1, c2, c3);
          g.add(mike, likes, rdf, c1, c2, c3);
          g.add(mike, RDFS.LABEL, label1, c1, c2, c3);
@@ -1227,7 +1246,7 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
         final URI person = new URIImpl(BD.NAMESPACE + "Person");
 
         // The expected results.
-        final Graph expected = new GraphImpl();
+        final Graph expected = new LinkedHashModel();
         {
 //            expected.add(new StatementImpl(mike, likes, rdf));
             expected.add(new StatementImpl(mike, RDF.TYPE, person));
@@ -1258,216 +1277,4 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
     
     }
     
-   protected void assertSameGraph(final Graph expected,
-         final IPreparedGraphQuery actual) throws Exception {
-
-      assertSameGraph(expected, asGraph(actual));
-
-    }
-    
-    /**
-     * Compare two graphs for equality.
-     * <p>
-     * Note: This is not very efficient if the {@link Graph} implementations are
-     * not indexed.
-     * <p>
-     * Note: This does not handle equality testing with blank nodes (it does not
-     * test for isomorphic graphs).
-     * 
-     * @param expected
-     * @param actual
-     */
-    protected void assertSameGraph(final Graph expected, final Graph actual) {
-
-        for (Statement s : expected) {
-
-            if (!actual.contains(s))
-                fail("Expecting: " + s);
-
-        }
-
-        assertEquals("size", expected.size(), actual.size());
-
-    }
-
-    /**
-    * Preferred version executes the {@link IPreparedGraphQuery} and ensures
-    * that the {@link GraphQueryResult} is closed.
-    * 
-    * @param preparedQuery
-    *           The prepared query.
-    * 
-    * @return The resulting graph.
-    * 
-    * @throws Exception
-    */
-    protected Graph asGraph(final IPreparedGraphQuery preparedQuery) throws Exception {
-
-       final GraphQueryResult result = preparedQuery.evaluate();
-       
-       try {
-          
-          final Graph g = new GraphImpl();
-
-          while (result.hasNext()) {
-
-             g.add(result.next());
-
-          }
-
-          return g;
-          
-       } finally {
-          
-          result.close();
-          
-       }
-       
-    }
-
-   /**
-    * @deprecated by {@link #asGraph(IPreparedGraphQuery)} which can ensure that
-    *             the {@link GraphQueryResult} is closed.
-    */
-   protected Graph asGraph(final GraphQueryResult result) throws Exception {
-
-      try {
-         final Graph g = new GraphImpl();
-
-         while (result.hasNext()) {
-
-            g.add(result.next());
-
-         }
-
-         return g;
-      } finally {
-         result.close();
-      }
-
-    }
-
-    /**
-     * Return the #of solutions in a result set.
-     * 
-     * @param result
-     *            The result set.
-     *            
-     * @return The #of solutions.
-     */
-    protected long countResults(final RepositoryResult<Statement> result)
-            throws Exception {
-
-		try {
-			long i;
-			for (i = 0; result.hasNext(); i++) {
-				result.next();
-			}
-			return i;
-		} finally {
-			result.close();
-		}
-
-    }
-
-    /**
-     * Return the exact number of statements in the repository.
-     */
-    protected long getExactSize() {
-
-        return getSail().getDatabase().getStatementCount(true/* true */);
-
-    }
-
-    protected void doStressDescribeTest(final String method, final RDFFormat format, final int tasks, final int threads, final int statements)
-            throws Exception {
-        
-        final URI person = new URIImpl(BD.NAMESPACE + "Person");
-        final URI likes = new URIImpl(BD.NAMESPACE + "likes");
-        final URI rdf = new URIImpl(BD.NAMESPACE + "RDF");
-        final URI rdfs = new URIImpl(BD.NAMESPACE + "RDFS");
-
-        {
-           // create a large number of mikes and bryans
-           final Graph g = new GraphImpl();
-           for (int n = 0; n < statements; n++) {
-               final URI miken = new URIImpl(BD.NAMESPACE + "Mike#" + n);
-               final URI bryann = new URIImpl(BD.NAMESPACE + "Bryan#" + n);
-               final Literal nameMiken = new LiteralImpl("Mike#" + n);
-               final Literal nameBryann = new LiteralImpl("Bryan#" + n);
-              g.add(miken, RDF.TYPE, person);
-              g.add(miken, likes, rdf);
-              g.add(miken, RDFS.LABEL, nameMiken);
-              g.add(bryann, RDF.TYPE, person);
-              g.add(bryann, likes, rdfs);
-              g.add(bryann, RDFS.LABEL, nameBryann);
-           }
-
-           m_repo.add(new AddOp(g));
-           
-        }
-        
-        // The expected results.
-        // Run the query and verify the results.
-        {
-            
-        	final String queryStr =
-                "prefix bd: <"+BD.NAMESPACE+"> " +//
-                "prefix rdf: <"+RDF.NAMESPACE+"> " +//
-                "prefix rdfs: <"+RDFS.NAMESPACE+"> " +//
-                "DESCRIBE ?x " +//
-                "WHERE { " +//
-                "  ?x rdf:type bd:Person . " +//
-                "  ?x bd:likes bd:RDF " +//
-                "}";
-
-        	final AtomicInteger errorCount = new AtomicInteger();
-        	final Callable<Void> task = new Callable<Void>() {
-
-				@Override
-				public Void call() throws Exception {
-					try {
-
-					      final Graph actual = asGraph(m_repo.prepareGraphQuery(queryStr));
-			
-			            assertTrue(!actual.isEmpty());
-			            
-						return null;
-					} catch (Exception e) {
-						log.warn("Call failure", e);
-						
-						errorCount.incrementAndGet();
-						
-						throw e;
-					}
-				}
-        		
-        	};
-        	
-        	final int threadCount = Thread.activeCount();
-        	
-        	final ExecutorService exec = Executors.newFixedThreadPool(threads);
-        	for (int r = 0; r < tasks; r++) {
-        		exec.submit(task);
-        	}
-        	exec.shutdown();
-        	exec.awaitTermination(2000, TimeUnit.SECONDS);
-        	// force shutdown
-        	exec.shutdownNow();
-        	
-        	int loops = 20;
-        	while (Thread.activeCount() > threadCount && --loops > 0) {
-        		Thread.sleep(500);
-            	if (log.isTraceEnabled())
-            		log.trace("Extra threads: " + (Thread.activeCount() - threadCount));
-        	}
-            
-        	if (log.isInfoEnabled())
-        		log.info("Return with extra threads: " + (Thread.activeCount() - threadCount));
-    		
-        	assertTrue(errorCount.get() == 0);
-        }
-
-    }
-
 }

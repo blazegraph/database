@@ -62,6 +62,7 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BTreeCounters;
+import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -82,6 +83,7 @@ import com.bigdata.ha.msg.HANotifyReleaseTimeResponse;
 import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
+import com.bigdata.journal.JournalTransactionService.ValidateWriteSetTask;
 import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
@@ -123,7 +125,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     /**
      * Logger.
      */
-    private static final Logger log = Logger.getLogger(Journal.class);
+    static final Logger log = Logger.getLogger(Journal.class);
 
     /**
      * @see http://sourceforge.net/apps/trac/bigdata/ticket/443 (Logger for
@@ -2840,7 +2842,47 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
     }
 
-    @Override
+   /**
+    * Submit a task that will take a snapshot of the journal and return the
+    * {@link Future} for that task. The snapshot is taken on a temporary file.
+    * Iff the snapshot is successful, the temporary file is renamed to the
+    * application determined file. Thus all snapshots are either valid or are
+    * were not written. A snapshot of an empty journal is not permitted. Also,
+    * the backing store MUST implement the {@link IHABufferStrategy}.
+    * <p>
+    * Note: This method supports application controlled snapshots and is
+    * primarily intended for non-HA deployments. HA has an integrated snapshot
+    * and transaction log mechanism which is preferred in HA deployments and
+    * also provides the ability for an application to take snapshots on demand.
+    * 
+    * @param snapshotFactory
+    *           The factory that will provide the name of the file on which the
+    *           snapshot will be written.
+    * 
+    * @return The {@link Future} for the snapshot.
+    * 
+    * @throws UnsupportedOperationException
+    *            if the backing store does not implement the
+    *            {@link IHABufferStrategy} interface.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1172"> Online backup for
+    *      Journal </a>
+    * @since 1.5.2
+    */
+   public Future<ISnapshotResult> snapshot(
+         final ISnapshotFactory snapshotFactory) {
+
+      if (!(getBufferStrategy() instanceof IHABufferStrategy)) {
+      
+         throw new UnsupportedOperationException();
+         
+      }
+
+      return executorService.submit(new SnapshotTask(this, snapshotFactory));
+
+   }
+
+   @Override
 	public void dropIndex(final String name) {
 
 		final BTreeCounters btreeCounters = getIndexCounters(name);
@@ -3208,6 +3250,55 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
     }
 
+    /**
+    * Validate the write set for a transaction. This operation is not required.
+    * Validation will be performed during commit processing for a transaction
+    * regardless.
+    * 
+    * @param txId
+    *           The transaction identifier.
+    * 
+    * @return <code>true</code> iff the write set of the transaction could be
+    *         validated.
+    * 
+    * @throws TransactionNotFoundException
+    *            if no such transaction exists.
+    */
+   final public boolean prepare(final long txId) {
+
+      final Tx localState = getLocalTransactionManager().getTx(txId);
+
+      if (localState == null)
+         throw new TransactionNotFoundException(txId);
+
+      if (localState.isReadOnly()) {
+         // Trivally validated.
+         return true;
+      }
+
+      try {
+
+         final AbstractTask<Boolean> task = new ValidateWriteSetTask(
+               concurrencyManager, getLocalTransactionManager(), localState);
+
+         /*
+          * Submit the task and wait for the result.
+          * 
+          * Note: This task MUST go through the ConcurrencyManager to obtain its
+          * locks.
+          */
+         final boolean ok = concurrencyManager.submit(task).get();
+
+         return ok;
+
+      } catch (Exception ex) {
+
+         throw new RuntimeException(ex);
+
+      }
+
+   }
+    
 //    /**
 //     * @deprecated This method in particular should be hidden from the
 //     *             {@link Journal} as it exposes the {@link ITx} which really
@@ -3897,6 +3988,50 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
     }
     private final LatchedExecutor readService;
 
+    /*
+     * Warm-up Journal.
+     */
+
+   /**
+    * Warmup the indicated namespaces.
+    * 
+    * @param namespaces
+    *           A list of zero or more namespaces to be warmed up (optional).
+    *           When <code>null</code> or empty, all namespaces will be warmed
+    *           up.
+    * 
+    * @return A future for the task that is warming up the indices associated
+    *         with those namespace(s). The future evaluates to a map from the
+    *         name of the index to the statistics collected for that index
+    *         during the warmup procedure.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    * 
+    * @see WarmUpTask
+    */
+   public Future<Map<String, BaseIndexStats>> warmUp(
+         final List<String> namespaces) {
+
+      /*
+       * The indices will be scanned with one thread per index. This parameter
+       * determines the #of such scans that will execute in parallel. Since the
+       * thread will block on any IO, you need a modestly large number of
+       * threads here to enqueue enough disk reads to drive enough IOPs for an
+       * efficient disk scan.
+       */
+      final int nparallel = 20;
+      
+      final FutureTask<Map<String, BaseIndexStats>> ft = new FutureTask<Map<String, BaseIndexStats>>(
+            new WarmUpTask(this, namespaces, ITx.READ_COMMITTED/* timestamp */,
+                  nparallel, false/* visitLeaves */));
+
+      getExecutorService().submit(ft);
+
+      return ft;
+
+   }
+   
     /**
      * This task runs once starts an (optional)
      * {@link AbstractStatisticsCollector} and an (optional) httpd service.

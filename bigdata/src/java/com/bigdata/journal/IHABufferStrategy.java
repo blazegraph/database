@@ -52,7 +52,6 @@ import com.bigdata.quorum.QuorumException;
  * A highly available {@link IBufferStrategy}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IHABufferStrategy extends IBufferStrategy {
 
