@@ -1,61 +1,65 @@
-package com.bigdata.rdf.sail.webapp;
-
+package com.bigdata.blueprints;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
+import junit.framework.TestCase;
+
+import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.sail.DestroyKBTask;
+import com.bigdata.rdf.sail.webapp.ConfigParams;
+import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
-import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
 
-import junit.framework.TestCase2;
+/**
+ * Unit tests for the {@link NanoSparqlServer} with a focus on the ability to
+ * override the init parameters, the default http port, etc. This test suite is
+ * written without the proxy mechanisms to make this easier to debug.
+ * 
+ * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ */
+public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 
-public abstract class AbstractTestNanoSparqlServer extends TestCase2 {
+    protected static final transient Logger log = Logger.getLogger(AbstractTestNSSBlueprintsClient.class);
 
-	private Server m_fixture;
+    private Server m_fixture;
 	protected String namespace;
 	protected Journal m_indexManager;
 	private String m_rootURL;
 	private String m_serviceURL;
 	private RemoteRepositoryManager m_repo;
 	private HttpClient m_client;
-
-	public AbstractTestNanoSparqlServer() {
-		super();
-	}
-
-	public AbstractTestNanoSparqlServer(String name) {
-		super(name);
-	}
-
-	public String getServiceURL() {
+	private int m_port;
+	
+	public String getServiceURL()
+	{
 		return m_serviceURL;
 	}
-
-	public void createNamespace(String namespace, Properties properties) {
-		try {
-			properties.setProperty(RemoteRepositoryDecls.OPTION_CREATE_KB_NAMESPACE, namespace);
-			m_repo.createRepository(namespace, properties);
-		} catch (Exception e) {
-			log.info(e.toString());
-		}
+	
+	public String getNamespace()
+	{
+		return namespace;
 	}
-
-	public void createNamespace(String namespace) {
-		createNamespace(namespace,getTripleStoreProperties());
+	
+	public int getPort()
+	{
+		return m_port;
 	}
 
 	protected Properties getTripleStoreProperties() {
@@ -104,7 +108,7 @@ public abstract class AbstractTestNanoSparqlServer extends TestCase2 {
 	
 	            initParams.put(ConfigParams.NAMESPACE, namespace);
 	
-	            initParams.put(ConfigParams.CREATE, "false");
+	            initParams.put(ConfigParams.CREATE, "true");
 	            
 	        }
 	
@@ -124,7 +128,7 @@ public abstract class AbstractTestNanoSparqlServer extends TestCase2 {
 	//
 	//        }
 	
-	        final int port = NanoSparqlServer.getLocalPort(m_fixture);
+	        m_port = NanoSparqlServer.getLocalPort(m_fixture);
 	
 	        // log.info("Getting host address");
 	
@@ -137,10 +141,10 @@ public abstract class AbstractTestNanoSparqlServer extends TestCase2 {
 	
 	        }
 	
-	        m_rootURL = new URL("http", hostAddr, port, ""/* contextPath */
+	        m_rootURL = new URL("http", hostAddr, m_port, ""/* contextPath */
 	        ).toExternalForm();
 	
-	        m_serviceURL = new URL("http", hostAddr, port,
+	        m_serviceURL = new URL("http", hostAddr, m_port,
 	                BigdataStatics.getContextPath()).toExternalForm();
 	
 	        if (log.isInfoEnabled())
