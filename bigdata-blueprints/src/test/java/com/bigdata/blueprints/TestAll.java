@@ -63,6 +63,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphEmbedded.class);
         suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphClient.class);
         suite.addTestSuite(com.bigdata.blueprints.TestPathConstraints.class);
+        suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphClientNSS.class);
+        suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphFactoryNSS.class);
         
         return suite;
         
