@@ -80,27 +80,35 @@ import com.bigdata.rdf.sail.webapp.client.IRemoteTx;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.RemoveOp;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteTransactionNotFoundException;
 
 /**
  * An implementation of Sesame's RepositoryConnection interface that wraps a
- * bigdata RemoteRepository. This provides SAIL API based client access to a
- * bigdata remote NanoSparqlServer.
- * <p>
+ * bigdata {@link RemoteRepository}. This provides SAIL API based client access
+ * to a bigdata remote NanoSparqlServer.
  * 
- * This implementation operates only in auto-commit mode (each mutation
- * operation results in a commit on the server). It also throws
- * UnsupportedOperationExceptions all over the place due to incompatibilities
- * with our own remoting interface. If there is something important that you
- * need implemented for your application don't be afraid to reach out and
- * contact us.
+ * <h2>Transactions</h2>
  * 
- * FIXME (***) Fix all the Query objects (TupleQuery, GraphQuery, BooleanQuery) to
- * support the various possible operations on them, such as setting a binding.
+ * The database supports read/write transactions since 1.5.2. Transaction
+ * manager is at the database layer, not the {@link Repository} or
+ * {@link RepositoryConnection}. Therefore a namespace DOES NOT need to be
+ * configured for isolatable indices in order to create and manipulate
+ * transactions, but it DOES need to be configured with isolatable indices in
+ * order for you to WRITE on the namespace using a transaction.
  * 
+ * @see com.bigdata.rdf.sail.webapp.client.RemoteTransactionManager
+ * @see com.bigdata.rdf.sail.BigdataSail.Options#ISOLATABLE_INDICES
  * @see <a href="http://trac.bigdata.com/ticket/1156"> Support read/write
  *      transactions in the REST API</a>
+ * @see <a href="http://trac.bigdata.com/ticket/698">
+ *      BigdataSailRemoteRepositoryConnection should implement interface methods
+ *      </a>
+ * 
+ *      FIXME (***) #698 Fix all the Query objects (TupleQuery, GraphQuery,
+ *      BooleanQuery) to support the various possible operations on them, such
+ *      as setting a binding.
  */
 public class BigdataSailRemoteRepositoryConnection implements RepositoryConnection {
 
@@ -117,6 +125,37 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
     }
 
    /**
+    * Return a {@link RemoteRepository} for this connection.
+    * 
+    * @see RemoteRepositoryManager#new
+    */
+   protected RemoteRepository getRepositoryForConnection() {
+
+      final IRemoteTx tx = remoteTx.get();
+
+      if (tx != null) {
+
+         /*
+          * Return a RemoteRepository that will use a view that is consistent
+          * with an isolated view of the transaction.
+          */
+         final RemoteRepository rtmp = repo.getRemoteRepository();
+         final String sparqlEndpointURL = rtmp.getSparqlEndPoint();
+         final RemoteRepositoryManager rmgr = rtmp.getRemoteRepositoryManager();
+         
+         return rmgr.getRepositoryForURL(sparqlEndpointURL, tx);
+
+      }
+
+      /*
+       * The returned repository does not add the &timestamp= URL query
+       * parameter.
+       */
+      return repo.getRemoteRepository();
+
+   }
+    
+   /**
     * Report the fast range count (aka ESTCARD) associated with the specified
     * access path.
     */
@@ -126,7 +165,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 		try {
 		
-			final RemoteRepository remote = repo.getRemoteRepository();
+			final RemoteRepository remote = getRepositoryForConnection();
 	
 			return remote.rangeCount(s, p, o, c);
 			

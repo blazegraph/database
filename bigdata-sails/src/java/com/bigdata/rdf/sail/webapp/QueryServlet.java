@@ -450,7 +450,7 @@ public class QueryServlet extends BigdataRDFServlet {
 			boolean success = false;
 			try {
 
-				conn = getUnisolatedConnection();
+				conn = getConnection();
 
 				{
 

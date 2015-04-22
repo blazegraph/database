@@ -319,7 +319,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
         
-				conn = getUnisolatedConnection();
+				conn = getConnection();
 
 				{
 
@@ -541,7 +541,7 @@ public class UpdateServlet extends BigdataRDFServlet {
          boolean success = false;
          try {
 
-            conn = getUnisolatedConnection();
+            conn = getConnection();
 
             {
 
@@ -875,7 +875,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
         
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 if (remove != null) {
 

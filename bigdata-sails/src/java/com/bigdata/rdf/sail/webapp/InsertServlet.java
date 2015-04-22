@@ -272,7 +272,7 @@ public class InsertServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 /**
                  * There is a request body, so let's try and parse it.
@@ -454,7 +454,7 @@ public class InsertServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 final AtomicLong nmodified = new AtomicLong(0L);
 

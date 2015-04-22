@@ -221,7 +221,7 @@ public class DeleteServlet extends BigdataRDFServlet {
          boolean success = false;
          try {
 
-            conn = getUnisolatedConnection();
+            conn = getConnection();
 
             {
 
@@ -390,7 +390,7 @@ public class DeleteServlet extends BigdataRDFServlet {
          boolean success = false;
          try {
 
-            conn = getUnisolatedConnection();
+            conn = getConnection();
 
             {
 
@@ -649,7 +649,7 @@ public class DeleteServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 final RDFParser rdfParser = rdfParserFactory.getParser();
 
@@ -917,7 +917,7 @@ public class DeleteServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 // Remove all statements matching that access path.
                 // final long nmodified = conn.getSailConnection()
