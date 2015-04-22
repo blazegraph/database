@@ -44,10 +44,15 @@ public class BigdataGraphFactory  {
     * 
     * FIXME This does not parameterize the value of the ContextPath. See
     * {@link BigdataStatics#getContextPath()}.
+    * 
+    * @deprecated
+    * As of version 1.5.2, you should use one of the connect methods with a sparqlEndpointURL.
+    * See {@linkplain http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer#Active_URLs} 
     */
    public static BigdataGraph connect(final String host, final int port) {
 
-      return connect("http://" + host + ":" + port + "/bigdata");
+	  //Assume the default KB to make the SPARQL Endpoint
+      return connect("http://" + host + ":" + port + "/bigdata/sparql");
 
     }
     
@@ -58,21 +63,13 @@ public class BigdataGraphFactory  {
      *            The URL of the SPARQL end point. This will be used to read and
      *            write on the graph using the blueprints API.
      */
+
     public static BigdataGraph connect(final String sparqlEndpointURL) {
+
+    	//Ticket #1182:  centralize rewriting in the SAIL factory.
        
        return new BigdataGraphClient(BigdataSailFactory.connect(sparqlEndpointURL));
        
-//        if (serviceEndpoint.endsWith("/bigdata/sparql")) {
-//            return new BigdataGraphClient(serviceEndpoint);
-//        } else if (serviceEndpoint.endsWith("/bigdata/")) {
-//            return new BigdataGraphClient(serviceEndpoint + "sparql");
-//        } else if (serviceEndpoint.endsWith("/bigdata")) {
-//            return new BigdataGraphClient(serviceEndpoint + "/sparql");
-//        } else if (serviceEndpoint.endsWith("/")) {
-//            return new BigdataGraphClient(serviceEndpoint + "bigdata/sparql");
-//        } else {
-//            return new BigdataGraphClient(serviceEndpoint + "/bigdata/sparql");
-//        }
     }
 
     /**
