@@ -1310,18 +1310,25 @@ public class PipelineJoin<E> extends PipelineOp implements
 			 * 
 			 * @param tasks
 			 *            The tasks.
-			 */
-			protected void reorderTasks(final AccessPathTask[] tasks) {
+          * @see <a href="http://trac.bigdata.com/ticket/1192" >
+          * RDR query fails with ArrayIndexOutOfBoundsException </a>
+          */
+         protected void reorderTasks(final AccessPathTask[] tasks) {
 
-				// @todo layered access paths do not expose a fromKey.
-				if (tasks[0].accessPath instanceof AccessPath<?>) {
+            if (tasks.length == 0) {
+               // See #1192.
+               return;
+            }
+            
+            // @todo layered access paths do not expose a fromKey.
+            if (tasks[0].accessPath instanceof AccessPath<?>) {
 
-					// reorder the tasks.
-					Arrays.sort(tasks);
+               // reorder the tasks.
+               Arrays.sort(tasks);
 
-				}
+            }
 
-			}
+         }
 
 			/**
 			 * Either execute the tasks in the caller's thread or schedule them

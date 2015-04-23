@@ -31,11 +31,11 @@
 	     encoding="${javac.encoding}"
 	     	>
 	      	<classpath refid="test.classpath"/>
-			<src path="${junit-ext.dir}/src/test" />
+			<src path="${junit-ext.dir}/src/test/java" />
 		</javac>
 		<!-- copy resources. -->
 		<copy toDir="${build.dir}/test">
-			<fileset dir="${junit-ext.dir}/src/test">
+			<fileset dir="${junit-ext.dir}/src/test/java">
 				<exclude name="**/*.java" />
 			</fileset>
 		</copy>
@@ -85,14 +85,14 @@
 	     	>
 			<!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
 			<!-- target="${javac.target}" source="${javac.source}" -->
-			<src path="${junit-ext.dir}/src/java" />
+			<src path="${junit-ext.dir}/src/main/java" />
 			<!-- Do not include the unit tests 
-            <src path="${junit-ext.dir}/src/test"/>
+            <src path="${junit-ext.dir}/src/test/java"/>
             -->
 		</javac>
 		<!-- copy resources. -->
 		<copy toDir="${build.dir}/classes">
-			<fileset dir="${junit-ext.dir}/src/java">
+			<fileset dir="${junit-ext.dir}/src/main/java">
 				<exclude name="**/*.java" />
 				<exclude name="**/package.html" />
 			</fileset>
@@ -115,7 +115,7 @@
 			windowtitle="junit-ext"
 			classpathref="build.classpath">
 			<arg value="-J-Xmx1000m"/>
-			<packageset dir="${junit-ext.dir}/src/java" />
+			<packageset dir="${junit-ext.dir}/src/main/java" />
 			<doctitle>
 				<![CDATA[<h1>junit-ext</h1>]]></doctitle>
 		<bottom>

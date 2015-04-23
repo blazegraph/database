@@ -122,6 +122,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestSparqlUpdate.class,
 		      "test.*",
+//		      "testMoveFromDefault",
 //				"testStressInsertWhereGraph",
 //				"testInsertWhereGraph",
 				new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[]{

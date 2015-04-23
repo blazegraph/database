@@ -109,7 +109,6 @@ import org.openrdf.rio.helpers.StatementCollector;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
-import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.webapp.client.HttpException;
@@ -164,8 +163,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      */
     private static final String PREFIX = "openrdf-service/";
 
-    /** The "local" repository. */
-    private RemoteRepository localRepository;
+//    /** The "local" repository object. */
+//    private RemoteRepository localRepository;
     
     @Override
     public void setUp() throws Exception {
@@ -184,7 +183,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         
         p.setProperty(com.bigdata.journal.Options.CREATE_TEMP_FILE, "true");
         
-        localRepository = m_repo;
+//        localRepository = m_repo;
         
     }
 
@@ -246,7 +245,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
       try {
          boolean found = true;
          try {
-            final Properties p = m_repo.getRepositoryProperties(ns);
+            final Properties p = m_mgr.getRepositoryProperties(ns);
             assert p != null;
             found = true;
          } catch (HttpException ex) {
@@ -259,13 +258,13 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final Properties p = new Properties(getProperties());
             p.setProperty(RemoteRepositoryManager.OPTION_CREATE_KB_NAMESPACE,
                   ns);
-            m_repo.createRepository(ns, p);
+            m_mgr.createRepository(ns, p);
          }
       } catch (Exception ex) {
          throw new RuntimeException(ex);
       }
 
-      return m_repo.getRepositoryForNamespace(ns);
+      return m_mgr.getRepositoryForNamespace(ns);
         
     }
     
@@ -295,7 +294,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             if (log.isInfoEnabled())
                 log.info("Loading: " + localData + " into local repository");
 
-            loadDataSet(localRepository, localData);
+            loadDataSet(m_repo, localData);
             
         }
 
@@ -377,8 +376,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         qb.append("     ?X a <" + FOAF.PERSON + "> . \n");
         qb.append(" } \n");
 
-        final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
-            localRepository).getConnection();
+        final BigdataSailRemoteRepositoryConnection conn = m_repo.getBigdataSailRemoteRepository().getConnection();
         
         try {
 
@@ -503,13 +501,13 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     }
     
 //  @Test
-    public void test6() throws Exception {      
+    public void test6() throws Exception { //     fail("FIXME RESTORE"); // FIXME RESTORE
         prepareTest(null, Arrays.asList(PREFIX+"data06endpoint1.ttl"));
         execute(PREFIX+"service06.rq", PREFIX+"service06.srx", false);          
     }
     
 //  @Test
-    public void test7() throws Exception {      
+    public void test7() throws Exception { //     fail("FIXME RESTORE");// FIXME RESTORE
         // clears the repository and adds new data + execute
         prepareTest(PREFIX+"data07.ttl", Collections.<String>emptyList());
         execute(PREFIX+"service07.rq", PREFIX+"service07.srx", false);          
@@ -644,8 +642,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final String expectedResultFile, final boolean checkOrder)
             throws Exception {
         
-       final BigdataSailRemoteRepositoryConnection conn = new BigdataSailRemoteRepository(
-             localRepository).getConnection();
+        final BigdataSailRemoteRepositoryConnection conn = m_repo
+               .getBigdataSailRemoteRepository().getConnection();
        
         try {
            

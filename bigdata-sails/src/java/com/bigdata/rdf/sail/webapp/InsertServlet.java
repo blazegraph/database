@@ -207,11 +207,9 @@ public class InsertServlet extends BigdataRDFServlet {
             
         } catch (Throwable t) {
 
-         BigdataRDFServlet.launderThrowable(
-               t,
-               resp,
-               "INSERT-WITH-BODY: baseURI=" + baseURI + ", "
-                     + BigdataRDFContext.CONTEXT_URI + "="
+         BigdataRDFServlet.launderThrowable(t, resp,
+               "INSERT-WITH-BODY: baseURI=" + baseURI + ", Content-Type="
+                     + contentType + ", " + BigdataRDFContext.CONTEXT_URI + "="
                      + Arrays.toString(defaultContext));
 
         }
@@ -274,7 +272,7 @@ public class InsertServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 /**
                  * There is a request body, so let's try and parse it.
@@ -456,7 +454,7 @@ public class InsertServlet extends BigdataRDFServlet {
             boolean success = false;
             try {
 
-                conn = getUnisolatedConnection();
+                conn = getConnection();
 
                 final AtomicLong nmodified = new AtomicLong(0L);
 

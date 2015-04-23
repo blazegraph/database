@@ -215,7 +215,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
 	/**
 	 * Return the bits from the key which are relevant to the current directory
-	 * page (varient for unsigned byte[] keys). This depends on the
+	 * page (variant for unsigned byte[] keys). This depends on the
 	 * <i>prefixLength</i> to be ignored, the <i>globalDepth</i> of this
 	 * directory page, and the key.
 	 * 
@@ -445,6 +445,7 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
 
     }
 
+    @Override
     public void delete() throws IllegalStateException {
 
 		if (deleted) {
@@ -800,15 +801,10 @@ abstract class AbstractPage extends PO implements // IAbstractNode?,
      */
 	abstract boolean isClean();
     
-    /** @deprecated Move to a test helper based on a striterator pattern. */
-    abstract int activeBucketPages();
-    /** @deprecated Move to a test helper based on a striterator pattern. */
-    abstract int activeDirectoryPages();
-
     abstract public int removeAll(final byte[] key);
 
     abstract public byte[] removeFirst(final byte[] key);
     
-    abstract public void dumpPages(final HTreePageStats stats);
+    abstract public void dumpPages(final boolean recursive, final boolean visitLeaves, final HTreePageStats stats);
 
 }

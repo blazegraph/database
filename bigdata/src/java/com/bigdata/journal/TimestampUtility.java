@@ -32,7 +32,6 @@ package com.bigdata.journal;
  * Some static helper methods for timestamps.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TimestampUtility {
 

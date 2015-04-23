@@ -44,11 +44,7 @@ See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=ReleaseGuide
 for information on publishing maven releases and snapshots for bigdata and its
 dependencies.
 
--->
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd"
-         >
+--><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
@@ -96,7 +92,7 @@ dependencies.
       <dsiutils.version>1.0.6-020610</dsiutils.version>
       <lgplutils.version>1.0.7-270114</lgplutils.version>
       <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
-      <jackson.version>2.2.3</jackson.version>
+      <jackson.version>2.3.1</jackson.version>
       <blueprints.version>2.5.0</blueprints.version>
       <jettison.version>1.3.3</jettison.version>
       <rexster.version>2.5.0</rexster.version>
@@ -384,6 +380,21 @@ mvn deploy:deploy-file \
            <artifactId>dsi-utils</artifactId>
            <version>${dsiutils.version}</version>
        </dependency>
+       <!-- 
+       <dependency>
+mvn deploy:deploy-file \
+   -DgroupId=org.cognitiveweb \
+   -DartifactId=cweb-junit-ext \
+   -Dversion=1.1-b3-dev \
+   -Dpackaging=jar \
+   -DrepositoryId=bigdata.releases \
+   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
+   -Dfile=bigdata/lib/junit-ext-1.1-b3-dev.jar
+      <groupId>org.CognitiveWeb</groupId>
+         <artifactId>cweb-junit-ext</artifactId>
+         <version>1.1-b3-dev</version>
+       </dependency>
+        -->
        <dependency>
        <!-- 
 mvn deploy:deploy-file \
@@ -488,10 +499,15 @@ mvn deploy:deploy-file \
       </dependency>
 		<dependency>
 			<groupId>javax.servlet</groupId>
-			<artifactId>servlet-api</artifactId>
+			<artifactId>javax.servlet-api</artifactId>
 			<version>${servlet-version}</version>
          <scope>provided</scope>
 		</dependency>
 		-->
    </dependencies>
+<!--
+  <modules>
+    <module>bigdata-client</module>
+  </modules>
+-->
 </project>

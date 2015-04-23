@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
+import java.util.Set;
 import java.util.TimeZone;
 
 import org.openrdf.model.URI;
@@ -31,8 +32,10 @@ import org.openrdf.model.Value;
 
 import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -100,7 +103,16 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      *         can not be represented by an {@link IV}.
      */
     IV createInlineIV(final Value value);
-    
+
+    /**
+     * Inflate the localName portion of an inline URI using its storage delegate.
+     * @param namespace the uris's prefix
+     * @param delegate the storage delegate
+     * @return the inflated localName
+     */
+    String getInlineURILocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate);
+
     /**
      * Create an RDF value from an {@link AbstractInlineExtensionIV}. The
      * "extension" {@link IV} MUST be registered with the {@link Vocabulary}.
@@ -139,5 +151,11 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Return the value factory for the lexicon.
      */
     BigdataValueFactory getValueFactory();
+    
+    /**
+     * Should the specified datatype be included in the text index (even though
+     * it is an inline datatype, for example IPv4).
+     */
+    boolean isInlineDatatypeToTextIndex(URI datatype);
 
 }

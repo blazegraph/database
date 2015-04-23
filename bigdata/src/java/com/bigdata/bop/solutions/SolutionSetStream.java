@@ -87,26 +87,32 @@ public final class SolutionSetStream extends Stream implements
             
         }
         
+        @Override
         public long getSolutionSetSize() {
             return delegate.getSolutionSetSize();
         }
 
+        @Override
         public Set<IVariable<?>> getUsedVars() {
             return delegate.getUsedVars();
         }
 
+        @Override
         public Set<IVariable<?>> getAlwaysBound() {
             return delegate.getAlwaysBound();
         }
 
+        @Override
         public Set<IVariable<?>> getNotAlwaysBound() {
             return delegate.getNotAlwaysBound();
         }
 
+        @Override
         public Set<IVariable<?>> getMaterialized() {
             return delegate.getMaterialized();
         }
 
+        @Override
         public Map<IVariable<?>, IConstant<?>> getConstants() {
             return delegate.getConstants();
         }
@@ -190,6 +196,7 @@ public final class SolutionSetStream extends Stream implements
 	 * 
 	 * @return The {@link ISolutionSetStats}.
 	 */
+    @Override
     public ISolutionSetStats getStats() {
 
         /*
@@ -218,7 +225,8 @@ public final class SolutionSetStream extends Stream implements
         return getCheckpoint().getBloomFilterAddr();
 
     }
-    
+
+    @Override
     public ICloseableIterator<IBindingSet[]> get() {
 
         if (rootAddr == IRawStore.NULL)
@@ -237,6 +245,7 @@ public final class SolutionSetStream extends Stream implements
 
     }
 
+    @Override
     public void put(final ICloseableIterator<IBindingSet[]> src2) {
 
         if (src2 == null)
@@ -460,8 +469,11 @@ public final class SolutionSetStream extends Stream implements
     }
 
     @Override
-    public BaseIndexStats dumpPages(final boolean recursive) {
-        return new BaseIndexStats(this);
+    public BaseIndexStats dumpPages(final boolean recursive,
+         final boolean visitLeaves) {
+
+       return new BaseIndexStats(this);
+       
     }
 
     /*

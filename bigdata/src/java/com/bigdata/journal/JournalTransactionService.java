@@ -383,7 +383,7 @@ abstract public class JournalTransactionService extends
      * could cause a deadlock if there is a task ahead of you in the queue for
      * the same tx!
      * <p>
-     * NOte: DO NOT use this task for a distributed transaction (one with writes
+     * Note: DO NOT use this task for a distributed transaction (one with writes
      * on more than one {@link DataService}) since it will fail to obtain a
      * coherent commit time for the transaction as a whole.
      * 
@@ -406,9 +406,6 @@ abstract public class JournalTransactionService extends
 
             if (localTransactionManager == null)
                 throw new IllegalArgumentException();
-        
-//            if (state == null)
-//                throw new IllegalArgumentException();
             
             this.localTransactionManager = localTransactionManager;
             
@@ -444,6 +441,64 @@ abstract public class JournalTransactionService extends
             }
 
             return null;
+            
+        }
+
+    }
+
+   /**
+    * This task is an UNISOLATED operation that validates a transaction known to
+    * have non-empty write sets.
+    * <p>
+    * Note: DO NOT {@link Tx#lock} while you submit this task as it could cause
+    * a deadlock if there is a task ahead of you in the queue for the same tx!
+    * <p>
+    * Note: DO NOT use this task for a distributed transaction (one with writes
+    * on more than one {@link DataService}) since it will fail to obtain a
+    * coherent commit time for the transaction as a whole.
+    * 
+    * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan
+    *         Thompson</a>
+    */
+    public static class ValidateWriteSetTask extends AbstractTask<Boolean> {
+
+        /**
+         * The transaction that is being validated.
+         */
+        private final Tx state;
+
+        public ValidateWriteSetTask(final IConcurrencyManager concurrencyManager,
+                final ILocalTransactionManager localTransactionManager,
+                final Tx state) {
+
+            super(concurrencyManager, ITx.UNISOLATED, state.getDirtyResource());
+
+            if (localTransactionManager == null)
+                throw new IllegalArgumentException();
+            
+            this.state = state;
+
+        }
+
+        @Override
+        public Boolean doTask() throws Exception {
+
+            /*
+             * Lock out other operations on this tx.
+             */
+
+            state.lock.lockInterruptibly();
+
+            try {
+
+                // Note: throws ValidationError.
+               return state.validateWriteSets();
+
+            } finally {
+
+                state.lock.unlock();
+
+            }
             
         }
 
