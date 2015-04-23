@@ -62,7 +62,8 @@ public class TestBigdataGraphClientInMemorySail extends AbstractTestBigdataGraph
     protected GraphTest newBigdataGraphTest() {
         return new BigdataGraphTest();
     }
-    
+  /* 
+   //Currently there is not transaction support in the remote client.
     public void testTransactionalGraphTestSuite() throws Exception {
         final GraphTest test = newBigdataGraphTest();
         test.stopWatch();
@@ -70,7 +71,7 @@ public class TestBigdataGraphClientInMemorySail extends AbstractTestBigdataGraph
         GraphTest.printTestPerformance("TransactionalGraphTestSuite",
                 test.stopWatch());
     }
-    
+   */
 //    public void testAddVertexProperties() throws Exception {
 //        final BigdataGraphTest test = new BigdataGraphTest();
 //        test.stopWatch();
