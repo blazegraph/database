@@ -173,7 +173,7 @@ public class RDRHistory implements IChangeLog {
     /**
      * Helper method to resolve added and removed terms.
      */
-    private IV<?,?>[] resolveTerms(final URI[] terms) throws Exception {
+    protected IV<?,?>[] resolveTerms(final URI[] terms) throws Exception {
         
         final BigdataValueFactory vf = database.getValueFactory();
         
