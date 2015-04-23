@@ -34,6 +34,36 @@
           <serviceDebug>false</serviceDebug>
         </configuration>
       </plugin>
+      <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+  	       <id>start-zookeeper</id>
+	       <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>process-resources</phase>
+               <configuration>
+                 <target>
+                   <ant antfile="build.xml" target="startZookeeper"/>
+                 </target>
+               </configuration>
+             </execution>
+             <execution>
+  	       <id>stop-zookeeper</id>
+	       <goals>
+		<goal>package</goal>
+	       </goals>
+               <phase>run</phase>
+               <configuration>
+                 <target>
+                   <ant antfile="build.xml" target="stopZookeeper"/>
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+         </plugin>
     </plugins>
   </build>
 
