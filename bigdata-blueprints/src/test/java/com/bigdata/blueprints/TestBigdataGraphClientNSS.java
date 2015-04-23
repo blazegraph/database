@@ -52,7 +52,7 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 
 	@Test
 	public void testBigdataGraphConnectServiceURL() {
-
+		
 		final String testURL = serviceURL + "/";
 
 		log.info("Connecting to Remote Repository at " + testURL);
