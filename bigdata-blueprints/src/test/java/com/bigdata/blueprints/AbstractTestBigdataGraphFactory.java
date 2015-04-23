@@ -153,6 +153,8 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 	 */
 	@Test
 	public void testGraphFactoryCreateNew() throws Exception {
+		
+		System.err.println("Testing Graph Creation.");
 
 		int loadCount = 0;
 
