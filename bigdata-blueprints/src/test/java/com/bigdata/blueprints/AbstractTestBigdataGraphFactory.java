@@ -19,13 +19,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*/
+ */
 package com.bigdata.blueprints;
-
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+
+import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 import org.junit.Test;
@@ -34,30 +34,55 @@ import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
-public class TestBigdataGraphEmbedded {
-	
-    protected static final transient Logger log = Logger.getLogger(AbstractTestNSSBlueprintsClient.class);
+public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
-
-	private final String testJnl = "testJournal" + System.currentTimeMillis()
+	protected static final transient Logger log = Logger
+			.getLogger(AbstractTestNSSBlueprintsClient.class);
+	protected final String testJnl = "testJournal" + System.currentTimeMillis()
 			+ ".jnl";
-	private final String testData = "graph-example-1.xml";
+	protected final String testData = "graph-example-1.xml";
+
+	public AbstractTestBigdataGraphFactory() {
+		super();
+	}
+
+	public AbstractTestBigdataGraphFactory(String name) {
+		super(name);
+	}
+
+	/**
+	 * Add test specific method to generate a new graph from a file.
+	 * 
+	 * @return
+	 */
+	protected abstract BigdataGraph getNewGraph(String file) throws Exception;
+
+	/**
+	 * Add test-specific method to load a graph from the file.
+	 * 
+	 * @param file
+	 * @return
+	 */
+	protected abstract BigdataGraph loadGraph(String file) throws Exception;
 
 	protected void loadTestGraph(BigdataGraph graph, String resource)
 			throws IOException {
-		GraphMLReader.inputGraph(graph, TestBigdataGraphEmbedded.class
-				.getResourceAsStream(resource));
+		GraphMLReader
+				.inputGraph(graph, TestBigdataGraphFactoryFile.class
+						.getResourceAsStream(resource));
 
 	}
-	
-	public void tearDown()
-	{
+
+	public void tearDown() throws Exception {
 		File f = new File(testJnl);
 		f.deleteOnExit();
 	}
 
 	protected int vertexEdgeCount(BigdataGraph graph) {
 		int v_e_cnt = 0;
+
+		if (graph == null)
+			return 0;
 
 		for (@SuppressWarnings("unused")
 		Vertex v : graph.getVertices()) {
@@ -91,11 +116,24 @@ public class TestBigdataGraphEmbedded {
 
 	}
 
+	protected void deleteFile(String file) {
+		File f = new File(file);
+		f.delete();
+	}
+
 	protected boolean evaluateFilePostconditions(String file) {
 
 		File f = new File(file);
+		boolean retval = false;
+		
+		if (this instanceof AbstractTestNSSBlueprintsClient)
+		{
+			//This check is not relevant for NSS test cases.
+			retval = true;
+		} else
+			retval = f.exists();
 
-		return f.exists();
+		return retval;
 	}
 
 	/**
@@ -112,31 +150,51 @@ public class TestBigdataGraphEmbedded {
 		{
 			// The file should not exist.
 			assert (evaluatePreconditions(testJnl));
-			BigdataGraph graph = BigdataGraphFactory.create(testJnl);
+			BigdataGraph graph = getNewGraph(testJnl);
 
 			loadTestGraph(graph, testData);
 
-			loadCount = vertexEdgeCount(graph);
+			try {
+				loadCount = vertexEdgeCount(graph);
+			} catch (Exception E) {
+				loadCount = 0;
+				log.warn(E.toString());
+			}
+
+			System.err.println("Total Edge and Vertex Count: " + loadCount);
 
 			// The file should exist.
 			assert (evaluateFilePostconditions(testJnl));
 
 			graph.shutdown();
 		}
-		
-		{
 
-			BigdataGraph graph = BigdataGraphFactory.open(testJnl, false);
+		openAndCheckGraphCount(testJnl, loadCount);
 
-			int veCnt = vertexEdgeCount(graph); 
-			
-			//We should have the same total number
-			assert(veCnt == loadCount);
-			
-			graph.shutdown();
-		}
+		deleteFile(testJnl);
 
-		fail("Not yet implemented");
 	}
 
+	/**
+	 * Open an existing journal and validate the count equals the loadCount
+	 * parameter. Tests that the graph is persisted to disk.
+	 * 
+	 * @param file
+	 * @param loadCount
+	 * @throws Exception
+	 */
+	protected void openAndCheckGraphCount(String file, int loadCount)
+			throws Exception {
+			
+				BigdataGraph graph = loadGraph(file);
+			
+				int veCnt = vertexEdgeCount(graph);
+			
+				System.err.println("Total Edge and Vertex Count: " + veCnt);
+			
+				// We should have the same total number
+				assert (veCnt == loadCount);
+			
+				graph.shutdown();
+			}
 }
