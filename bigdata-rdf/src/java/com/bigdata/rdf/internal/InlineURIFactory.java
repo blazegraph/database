@@ -23,12 +23,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import org.openrdf.model.URI;
 
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.URIExtensionIV;
+import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.vocab.Vocabulary;
 
 /**
@@ -37,9 +41,9 @@ import com.bigdata.rdf.vocab.Vocabulary;
  * ({@link InlineUUIDURIHandler}.
  */
 public class InlineURIFactory implements IInlineURIFactory {
-
     private final List<InlineURIHandler> handlers = 
             new LinkedList<InlineURIHandler>();
+	private final Map<String, InlineURIHandler> handlersByNamespace = new HashMap<>();
     
     /**
      * By default, handle IPv4 and UUID.
@@ -51,6 +55,7 @@ public class InlineURIFactory implements IInlineURIFactory {
     
     protected void addHandler(final InlineURIHandler handler) {
         this.handlers.add(handler);
+        handlersByNamespace.put(handler.getNamespace(), handler);
     }
 
     public void init(final Vocabulary vocab) {
@@ -58,10 +63,10 @@ public class InlineURIFactory implements IInlineURIFactory {
             handler.init(vocab);
         }
     }
-    
+
     @Override
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public URIExtensionIV createInlineURIIV(URI uri) {
+    public URIExtensionIV createInlineURIIV(final URI uri) {
         for (InlineURIHandler handler : handlers) {
             final URIExtensionIV iv = handler.createInlineIV(uri);
             if (iv != null) {
@@ -71,4 +76,15 @@ public class InlineURIFactory implements IInlineURIFactory {
         return null;
     }
 
+    @Override
+    public String getLocalNameFromDelegate(final URI namespace,
+            final AbstractLiteralIV<BigdataLiteral, ?> delegate) {
+        InlineURIHandler handler = handlersByNamespace.get(
+                namespace.stringValue());
+        if (handler == null) {
+            throw new IllegalArgumentException("Can't resolve uri handler for \"" + namespace
+                    + "\".  Maybe its be deregistered?");
+        }
+        return handler.getLocalNameFromDelegate(delegate);
+    }
 }

@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
@@ -74,8 +75,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
  * Test suite for {@link UpdateExprBuilder}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestBigdataExprBuilder.java 5073 2011-08-23 00:33:54Z
- *          thompsonbry $
  */
 public class TestUpdateExprBuilder extends AbstractBigdataExprBuilderTestCase {
 

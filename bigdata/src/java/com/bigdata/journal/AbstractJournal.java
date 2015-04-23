@@ -4236,16 +4236,16 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 	}
 
     /**
-     * Method verifies that the commit time strictly advances on the local store
-     * by checking against the current root block.
-     * 
-     * @param commitTime
-     *            The proposed commit time.
-     * 
-     * @throws IllegalArgumentException
-     *             if the <i>commitTime</i> is LTE the value reported by
-     *             {@link IRootBlockView#getLastCommitTime()}.
-     */
+    * Method verifies that the commit time strictly advances on the local store
+    * by checking against the current root block.
+    * 
+    * @param currentCommitTime
+    * @param priorCommitTime
+    * 
+    * @throws IllegalArgumentException
+    *            if the <i>commitTime</i> is LTE the value reported by
+    *            {@link IRootBlockView#getLastCommitTime()}.
+    */
     static protected void assertPriorCommitTimeAdvances(
             final long currentCommitTime, final long priorCommitTime) {
 
@@ -5927,7 +5927,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         }
 
     }
-
+    
 	/*
 	 * IAddressManager
 	 */
@@ -6926,9 +6926,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			
 			// clone rootblocks
 			final ByteBuffer rb0 = bs.readRootBlock(true/*is rb0*/);
-			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK0, rb0.array());
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK0, BytesUtil.toArray(rb0));
 			final ByteBuffer rb1 = bs.readRootBlock(false/*is rb0*/);
-			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK1, rb1.array());
+			tm.put((long) FileMetadata.OFFSET_ROOT_BLOCK1, BytesUtil.toArray(rb1));
 			
 			// return last commitCounter
             final IRootBlockView rbv0 = new RootBlockView(true/* rootBlock0 */, rb0, checker);            

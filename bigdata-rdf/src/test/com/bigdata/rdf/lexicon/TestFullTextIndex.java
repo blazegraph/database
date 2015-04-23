@@ -40,6 +40,7 @@ import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.lexicon.ITextIndexer.FullTextQuery;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -124,15 +125,34 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
 
     }
 
+    private void assertExpectedHits(final AbstractTripleStore store,
+            final String query, final boolean prefixMatch, 
+            final BigdataValue[] expected) {
+        
+        assertExpectedHits(store, query, null, prefixMatch, .4f/* minCosine */,
+                expected);
+
+    }
+
     @SuppressWarnings("unchecked")
     private void assertExpectedHits(final AbstractTripleStore store,
             final String query, final String languageCode,
+            final float minCosine, final BigdataValue[] expected) {
+        
+        assertExpectedHits(store, query, languageCode, false, minCosine,
+                expected);
+        
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertExpectedHits(final AbstractTripleStore store,
+            final String query, final String languageCode, final boolean prefixMatch,
             final float minCosine, final BigdataValue[] expected) {
 
         final Hiterator hitr = store.getLexiconRelation().getSearchEngine()
                 .search(new FullTextQuery(
                 		query, languageCode, 
-                		false,// prefixMatch
+                		prefixMatch,
                 		null,// regex,
                         false,// matchAllTerms
                         false, // matchExact
@@ -402,6 +422,9 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                     
                     f.createLiteral("http://www.bigdata.com/mangy/yellow/cat",
                             f.asValue(XMLSchema.ANYURI)),//
+                            
+                    f.createLiteral("10.128.1.2",
+                            f.asValue(XSD.IPV4)),//
             };
 
             store.addTerms(terms);
@@ -423,6 +446,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                             f.asValue(XMLSchema.ANYURI))//
                     });
             
+            assertExpectedHits(store, "10.128.", true,
+//                  0f, // minCosine,
+                    new BigdataValue[] {//
+                    f.createLiteral("10.128.1.2",
+                            f.asValue(XSD.IPV4)),//
+                  });
+          
             if(store.isStable()) {
                 
                 store.commit();
@@ -445,6 +475,13 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
                                 f.asValue(XMLSchema.ANYURI))//
                         });
                 
+                assertExpectedHits(store, "10.128.", true,
+//                      0f, // minCosine,
+                        new BigdataValue[] {//
+                        f.createLiteral("10.128.1.2",
+                                f.asValue(XSD.IPV4)),//
+                      });
+              
             }
             
         } finally {

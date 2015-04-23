@@ -45,7 +45,7 @@ import com.bigdata.journal.Name2Addr.Entry;
  *         that do not implement {@link ICheckpointProtocol} ({@link FusedView},
  *         {@link ReadCommittedView}). 
  *         
- * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/585" > GIST </a>
+ * @see <a href="http://trac.bigdata.com/ticket/585" > GIST </a>
   */
 public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
         ISimpleIndexAccess, IReadWriteLockManager {
@@ -249,15 +249,21 @@ public interface ICheckpointProtocol extends ICommitter, ICounterSetAccess,
     public boolean isOpen();
 
     /**
-     * Reports statistics for the index.
-     * 
-     * @param recursive
-     *            When <code>true</code>, also collects statistics on the pages
-     *            (nodes and leaves) using a low-level approach.
-     * 
-     * @return Some interesting statistics about the index (and optionally the
-     *         pages in that index) which the caller can print out.
-     */
-    BaseIndexStats dumpPages(boolean recursive);
-    
+    * Reports statistics for the index.
+    * 
+    * @param recursive
+    *           When <code>true</code>, also collects statistics on the pages
+    *           (nodes and leaves) using a low-level approach.
+    * @param visitLeaves
+    *           When <code>true</code> and <code>recursive:=true</code> then the
+    *           leaves of the index are also visited.
+    * 
+    * @return Some interesting statistics about the index (and optionally the
+    *         pages in that index) which the caller can print out.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
+    *      on startup </a>
+    */
+   BaseIndexStats dumpPages(boolean recursive, final boolean visitLeaves);
+
 }

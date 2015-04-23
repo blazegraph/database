@@ -30,7 +30,6 @@ import java.util.concurrent.ThreadFactory;
  * A thread factory that configures the thread as a daemon thread.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class DaemonThreadFactory implements ThreadFactory {
 
@@ -87,6 +86,7 @@ public class DaemonThreadFactory implements ThreadFactory {
         
     }
     
+    @Override
     public Thread newThread(final Runnable r) {
         
         final Thread t = delegate.newThread( r );

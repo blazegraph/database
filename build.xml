@@ -233,19 +233,26 @@ public class BuildInfo {
             >
             <!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
             <src path="${bigdata.dir}/bigdata/src/java" />
-            <src path="${bigdata.dir}/bigdata-jini/src/java" />
-         <src path="${bigdata.dir}/bigdata-rdf/src/java" />
+            <src path="${bigdata.dir}/bigdata-client/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-jini/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-rdf/src/java" />
             <src path="${bigdata.dir}/bigdata-sails/src/java" />
-            <src path="${bigdata.dir}/bigdata-blueprints/src/java" />
-         <src path="${bigdata.dir}/bigdata-gom/src/java" />
-         <src path="${bigdata.dir}/bigdata-ganglia/src/java" />
-         <src path="${bigdata.dir}/bigdata-gas/src/java" />
-            <src path="${bigdata.dir}/ctc-striterators/src/java" />
-            <!-- Do not include the unit tests @todo conditionally include?
+            <src path="${bigdata.dir}/bigdata-blueprints/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-gom/src/java" />
+            <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
+            <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
             <src path="${bigdata.dir}/bigdata/src/test"/>
-            <src path="${bigdata.dir}/bigdata-jini/src/test"/>
+            <src path="${bigdata.dir}/bigdata-client/src/test/java"/>
+            <src path="${bigdata.dir}/bigdata-jini/src/test/java"/>
             <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
             <src path="${bigdata.dir}/bigdata-sails/src/test"/>
+            <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
+            <src path="${bigdata.dir}/bigdata-gas/src/test/resources" />
+            <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
+            <src path="${bigdata.dir}/bigdata-gom/src/test" />
+            <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
+            <!-- Do not include the unit tests @todo conditionally include?
             -->
             <compilerarg value="-version" />
         </javac>
@@ -256,7 +263,17 @@ public class BuildInfo {
                 <exclude name="**/package.html" />
                 <exclude name="**/BytesUtil.c" />
             </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-jini/src/java">
+         <!-- Added for test classes -->
+            <fileset dir="${bigdata.dir}/bigdata/src/test">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+                <exclude name="**/BytesUtil.c" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-client/src/main/java">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java">
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
@@ -268,7 +285,15 @@ public class BuildInfo {
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/java">
+            <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/main/java">
+                <exclude name="**/*.java" />
+                <exclude name="**/package.html" />
+            </fileset>
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
                 <exclude name="**/*.java" />
                 <exclude name="**/package.html" />
             </fileset>
@@ -276,7 +301,11 @@ public class BuildInfo {
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
          </fileset>
-         <fileset dir="${bigdata.dir}/bigdata-gas/src/java">
+         <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java">
+            <exclude name="**/*.java" />
+            <exclude name="**/package.html" />
+         </fileset>
+         <fileset dir="${bigdata.dir}/bigdata-gas/src/test/java">
             <exclude name="**/*.java" />
             <exclude name="**/package.html" />
          </fileset>
@@ -315,16 +344,17 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata/src/java" />
             <fileset dir="${bigdata.dir}/bigdata/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
-            <fileset dir="${bigdata.dir}/bigdata-gas/src/java" />
-            <fileset dir="${bigdata.dir}/bigdata-jini/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
+            <fileset dir="${bigdata.dir}/bigdata-client/src/main/java" />
+            <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-sails/src/java" />
-            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-sails/src/samples" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
-            <fileset dir="${bigdata.dir}/ctc-striterators/src/java" />
+            <fileset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
         </jar>
     </target>
 
@@ -333,7 +363,8 @@ public class BuildInfo {
          See 'bundleJar'. -->
     <target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
         <jar destfile="${build.dir}/${version}.jar">
-            <fileset dir="${build.dir}/classes" excludes="test/**" />
+            <!-- <fileset dir="${build.dir}/classes" excludes="test/**" /> -->
+            <fileset dir="${build.dir}/classes" />
             <!-- Copy the copyright top-level NOTICE file. -->
             <fileset file="${bigdata.dir}/NOTICE"/>
             <!-- Copy the copyright top-level LICENSE file. -->
@@ -376,10 +407,11 @@ public class BuildInfo {
                 <attribute name="Bundle-Description" value="Bigdata Source" />
             </manifest>
             <fileset dir="bigdata/src/java" />
-            <fileset dir="bigdata-jini/src/java" />
-         <fileset dir="bigdata-rdf/src/java" />
+            <fileset dir="bigdata-client/src/main/java" />
+            <fileset dir="bigdata-jini/src/main/java" />
+            <fileset dir="bigdata-rdf/src/java" />
             <fileset dir="bigdata-sails/src/java" />
-            <fileset dir="bigdata-blueprints/src/java" />
+            <fileset dir="bigdata-blueprints/src/main/java" />
          <fileset dir="bigdata-gom/src/java" />
         </jar>
         <bnd output="${build.dir}/bundles/com.bigata-${osgi.version}.jar" classpath="${build.dir}/classes" eclipse="false" failok="false" exceptions="true" files="${basedir}/osgi/bigdata.bnd" />
@@ -416,16 +448,17 @@ public class BuildInfo {
          <arg value="-quiet" />
          <packageset dir="${bigdata.dir}/bigdata/src/java" />
          <packageset dir="${bigdata.dir}/bigdata/src/samples" />
-         <packageset dir="${bigdata.dir}/bigdata-jini/src/java" />
+         <packageset dir="${bigdata.dir}/bigdata-client/src/main/java" />
+         <packageset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
-         <packageset dir="${bigdata.dir}/bigdata-blueprints/src/java" />
+         <packageset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-gom/src/samples" />
-         <packageset dir="${bigdata.dir}/bigdata-gas/src/java" />
-         <packageset dir="${bigdata.dir}/ctc-striterators/src/java" />
+         <packageset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
+         <packageset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
          <doctitle>
                 <![CDATA[<h1>bigdata&#174; v${build.ver}</h1>]]></doctitle>
          <bottom>
@@ -442,7 +475,7 @@ jQuery(document).ready(function(){
 (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
 m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
 })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-ga('create', 'UA-50971023-1', 'bigdata.com');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
 ga('send', 'pageview');
 </script>
 ]]></bottom>
@@ -1219,7 +1252,8 @@ ${postInstallMessage}</echo>
 
       <!-- Stage service-specific logging config file -->
 
-      <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/java/com/bigdata" />
+      <property name="bigdata-jini.root" location="${bigdata-jini.dir}/src/main/java/com/bigdata" />
+      <property name="bigdata-jini.resource.root" location="${bigdata-jini.dir}/src/test/resources/com/bigdata" />
 
       <copy file="${bigdata-jini.root}/disco/config/disco.config"
             todir="${dist.bin.config}" />
@@ -1511,6 +1545,9 @@ substitutions.
       <copy toDir="${build.dir}/bigdata/src">
         <fileset dir="${bigdata.dir}/bigdata/src" />
       </copy>
+      <copy toDir="${build.dir}/bigdata-client/src">
+        <fileset dir="${bigdata.dir}/bigdata-client/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-jini/src">
         <fileset dir="${bigdata.dir}/bigdata-jini/src" />
       </copy>
@@ -1613,6 +1650,7 @@ substitutions.
           <include name="**/LEGAL/*" />
 
           <include name="bigdata/src/**" />
+          <include name="bigdata-client/src/**" />
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
           <include name="bigdata-sails/src/**" />
@@ -1944,12 +1982,13 @@ ${postInstallMessage}</echo>
         >
 
         <src path="${bigdata.dir}/bigdata/src/test" />
-        <src path="${bigdata.dir}/bigdata-jini/src/test" />
+        <src path="${bigdata.dir}/bigdata-client/src/test/java" />
+        <src path="${bigdata.dir}/bigdata-jini/src/test/java" />
         <src path="${bigdata.dir}/bigdata-rdf/src/test" />
         <src path="${bigdata.dir}/bigdata-sails/src/test" />
-        <src path="${bigdata.dir}/bigdata-blueprints/src/test" />
+        <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
-        <src path="${bigdata.dir}/bigdata-gas/src/test" />
+        <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
         <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
 <!--
@@ -2000,13 +2039,16 @@ ${postInstallMessage}</echo>
         <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
           <exclude name="**/*.java" />
         </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test">
+        <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
           <exclude name="**/*.java" />
         </fileset>
         <fileset dir="${bigdata.dir}/bigdata-gom/src/test">
           <exclude name="**/*.java" />
         </fileset>
-        <fileset dir="${bigdata.dir}/bigdata-jini/src/test">
+        <fileset dir="${bigdata.dir}/bigdata-client/src/test/java">
+          <exclude name="**/*.java" />
+        </fileset>
+        <fileset dir="${bigdata.dir}/bigdata-jini/src/test/java">
           <exclude name="**/*.java" />
         </fileset>
         
@@ -2475,8 +2517,8 @@ ${postInstallMessage}</echo>
         <test name="${testName}" todir="${test.results.dir}" if="testName" />
 
         <!-- Test suites to run when -DtestName is not set -->
-
-        <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" />
+<!-- mavenized.
+        <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" /> -->
         <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.io.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.net.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -2499,9 +2541,9 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.bop.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.relation.rule.eval.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.mdi.TestAll" todir="${test.results.dir}" unless="testName" />
-<!--      	
+<!-- enabled until moved into maven scale-out project. hopefully will not run out of CI resources now that jini is in its own project. -->
         <test name="com.bigdata.service.TestAll" todir="${test.results.dir}" unless="testName" />
--->        
+
         <test name="com.bigdata.bop.fed.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.sparse.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -2510,15 +2552,16 @@ ${postInstallMessage}</echo>
         -->
 
         <!-- See https://sourceforge.net/apps/trac/bigdata/ticket/53 -->
-        <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" />
+<!-- mavenized.
+        <test name="com.bigdata.jini.TestAll" todir="${test.results.dir}" unless="testName" /> -->
 
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.webapp.TestAll" todir="${test.results.dir}" unless="testName" />
 
         <test name="com.bigdata.gom.TestAll" todir="${test.results.dir}" unless="testName" />
-
-        <test name="com.bigdata.blueprints.TestAll" todir="${test.results.dir}" unless="testName" />
+<!-- mavenized
+        <test name="com.bigdata.blueprints.TestAll" todir="${test.results.dir}" unless="testName" /> -->
 
 <!-- All tests.
         <test name="com.bigdata.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -2854,7 +2897,7 @@ ${postInstallMessage}</echo>
             </fileset>
         </copy>
         <copy toDir="${build.dir}/rexster-server-2.5.0/config/"
-        	  file="${bigdata.dir}/bigdata-blueprints/src/resources/rexster.xml"
+        	  file="${bigdata.dir}/bigdata-blueprints/src/test/resources/rexster.xml"
         	  overwrite="true"/>
         <chmod file="${build.dir}/rexster-server-2.5.0/bin/rexster.sh" perm="+x"/>
         <echo>Rexster installation complete.

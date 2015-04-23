@@ -24,6 +24,7 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
 import java.net.URL;
+import java.util.Properties;
 
 import junit.framework.Test;
 
@@ -33,93 +34,161 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.DC;
+import org.openrdf.model.vocabulary.FOAF;
 import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQuery;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
-import org.openrdf.repository.Repository;
+import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
+import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 
 /**
- * Proxied test suite.
- *
+ * Proxied test suite for {@link BigdataSailRemoteRepository} and
+ * {@link BigdataSailRemoteRepositoryConnection}.
+ * <p>
+ * Note: There are two versions of the test suite. One with isolatable indices
+ * enabled and one without. A namespace DOES NOT need to be configured for
+ * isolatable indices in order to create and manipulate transactions, but it
+ * DOES need to be configured with isolatable indices in order for you to WRITE
+ * on the namespace using a transaction.
+ * 
  * @param <S>
+ * 
+ *           FIXME *** Can we run the same repository test suite that we use for
+ *           embedded tests? (BigdataSparqlTest). This would mean having a test
+ *           suite class so we can use it from another maven project.
+ *           
+ *           FIXME *** com.bigdata.rdf.sail.webapp.TestSparqlUpdate runs against
+ *           the com.bigdata.rdf.sail.webapp.client.RemoteRepository. It could
+ *           run against the {@link BigdataSailRemoteRepository}.
+ * 
+ *           FIXME *** Verify that we are running the full embedded repository
+ *           test suite, including the tests for the extended transaction API.
  */
 public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
-        AbstractTestNanoSparqlClient<S> {
+      AbstractTestNanoSparqlClient<S> {
 
-    public TestBigdataSailRemoteRepository() {
+   public TestBigdataSailRemoteRepository() {
 
-    }
+   }
 
-	public TestBigdataSailRemoteRepository(final String name) {
+   public TestBigdataSailRemoteRepository(final String name) {
 
-		super(name);
+      super(name);
 
-	}
+   }
 
    public static Test suite() {
 
-      return ProxySuiteHelper.suiteWhenStandalone(TestBigdataSailRemoteRepository.class,
-                "test.*", TestMode.quads
-//                , TestMode.sids
-//                , TestMode.triples
-                );
+//      return ProxySuiteHelper.suiteWhenStandalone(TestBigdataSailRemoteRepository.class,
+//            "test.*", TestMode.quads
+////            , TestMode.sids
+////            , TestMode.triples
+//            );
+
+      return ProxySuiteHelper.suiteWhenStandalone(TestBigdataSailRemoteRepository.ReadWriteTx.class,
+//            "test.*", TestMode.quads
+            "test_tx_begin_addStatement_commit.*", TestMode.quads
+//            , TestMode.sids
+//            , TestMode.triples
+            );
        
    }
 
-   private RepositoryConnection m_cxn = null;
+   /**
+    * The repository under test.
+    */
+   protected BigdataSailRemoteRepository repo = null;
+
+   /**
+    * A connection obtained by {@link #setUp()} from {@link #repo}. This
+    * connection will be closed when the fixture is torn down.
+    */
+   protected BigdataSailRemoteRepositoryConnection cxn = null;
 	
-	@Override
-	public void setUp() throws Exception {
-		
-		super.setUp();
-		
-        final Repository repo = new BigdataSailRemoteRepository(m_repo);
-        
-        m_cxn = repo.getConnection();
-		
-	}
-	
-	@Override
-	public void tearDown() throws Exception {
-	    
-        if (m_cxn != null) {
+   @Override
+   public void setUp() throws Exception {
 
-            m_cxn.close();
+      super.setUp();
 
-            m_cxn = null;
+      repo = m_repo.getBigdataSailRemoteRepository();
 
-        }
+      cxn = repo.getConnection();
 
-	    super.tearDown();
-	    
-	}
-	
-	@Override
+   }
+
+   @Override
+   public void tearDown() throws Exception {
+
+      if (cxn != null) {
+
+         cxn.close();
+
+         cxn = null;
+
+      }
+
+      // See #1207 (Memory leak in CI).
+      repo = null;
+      
+      super.tearDown();
+
+   }
+
+   /**
+    * The URI for the default prefix (":") in SPARQL QUERY and UPDATE requests.
+    */
+   protected static final String DEFAULT_PREFIX = "http://bigdata.com/";
+   
+   /**
+    * A bunch of namespace declarations to be used by the tests.
+    * @return
+    */
+   protected String getNamespaceDeclarations() {
+
+      final StringBuilder declarations = new StringBuilder();
+      declarations.append("PREFIX : <" + DEFAULT_PREFIX + "> \n");
+      declarations.append("PREFIX rdf: <" + RDF.NAMESPACE + "> \n");
+      declarations.append("PREFIX rdfs: <" + RDFS.NAMESPACE + "> \n");
+      declarations.append("PREFIX foaf: <" + FOAF.NAMESPACE + "> \n");
+      declarations.append("PREFIX xsd: <" + XMLSchema.NAMESPACE + "> \n");
+      declarations.append("PREFIX dc: <" + DC.NAMESPACE + "> \n");
+      declarations.append("PREFIX ex: <" + "http://example.org/" + "> \n");
+      declarations.append("\n");
+
+      return declarations.toString();
+   }
+
+   @Override
     protected void doInsertWithBodyTest(final String method, final int ntriples,
             /*final String servlet,*/ final RDFFormat format) throws Exception {
 
         final Graph g = genNTRIPLES2(ntriples);
-        m_cxn.add(g);
+        cxn.add(g);
         assertEquals(ntriples, getExactSize());
         
 		// Verify the expected #of statements in the store.
 		{
 			final String queryStr = "select * where {?s ?p ?o}";
-			final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+			final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
 			assertEquals(ntriples, countResults(query.evaluate()));
 		}
 
@@ -132,7 +201,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 		
 		final long start = getExactSize();
 		
-		m_cxn.add(g, defaultContext != null ? new Resource[] { defaultContext } : new Resource[0]);
+		cxn.add(g, defaultContext != null ? new Resource[] { defaultContext } : new Resource[0]);
 		
 		return getExactSize() - start;
 		
@@ -149,7 +218,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 
 		final long start = getExactSize();
 		
-		m_cxn.remove(s, p, o, c);
+		cxn.remove(s, p, o, c);
 		
 		return start - getExactSize();
 		
@@ -162,7 +231,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
           final URI... c//
           ) throws Exception {
 
-		return m_cxn.getStatements(s, p, o, false, c);
+		return cxn.getStatements(s, p, o, false/*includeInferred*/, c);
 		
 	}
 
@@ -173,7 +242,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         
         final String queryStr = "ASK where {?s ?p ?o}";
         
-        final BooleanQuery query = m_cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
+        final BooleanQuery query = cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
         assertEquals(false, query.evaluate());
         
     }
@@ -186,7 +255,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 
 		final String queryStr = "select * where {?s ?p ?o}";
 
-        final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
 		assertEquals(0, countResults(query.evaluate()));
 
 
@@ -200,7 +269,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
 
         final String queryStr = "select * where {?s ?p ?o} X {}";
 
-        final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
         
         try {
 		
@@ -281,7 +350,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         // Verify that the data were inserted into the appropriate context.
         {
         	final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
-        	final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        	final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
     		assertEquals(7, countResults(query.evaluate()));
         }
 
@@ -296,14 +365,14 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         {
         	final File file = new File(packagePath
                     + "insert_triples_with_defaultContext.ttl");
-        	m_cxn.add(file, "", RDFFormat.TURTLE, new URIImpl("http://example.org"));
+        	cxn.add(file, "", RDFFormat.TURTLE, new URIImpl("http://example.org"));
             assertEquals(7, getExactSize());
         }
 
         // Verify that the data were inserted into the appropriate context.
         {
             final String queryStr = "select * { GRAPH <http://example.org> {?s ?p ?p} }";
-        	final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        	final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
             assertEquals(7, countResults(query.evaluate()));
         }
         
@@ -321,7 +390,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         // Verify nothing in the KB.
         {
             final String queryStr = "ASK where {?s ?p ?o}";
-        	final BooleanQuery query = m_cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
+        	final BooleanQuery query = cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
             assertEquals(false, query.evaluate());
         }
 
@@ -331,7 +400,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         // Load the resource into the KB.
         {
         	final URL url = new URL("file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/quads.nq");
-        	m_cxn.add(url, "", RDFFormat.NQUADS);
+        	cxn.add(url, "", RDFFormat.NQUADS);
             assertEquals(7, getExactSize());
         }
 
@@ -340,7 +409,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
          */
         {
             final String queryStr = "SELECT * where {?s ?p ?o}";
-        	final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        	final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
             assertEquals(expectedStatementCount, countResults(query.evaluate()));
         }
 
@@ -351,7 +420,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
      */
     public void test_INSERT_veryLargeLiteral() throws Exception {
 
-        final Graph g = new GraphImpl();
+        final Graph g = new LinkedHashModel();
         
         final URI s = new URIImpl("http://www.bigdata.com/");
         final URI p = RDFS.LABEL;
@@ -368,7 +437,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         final Graph g2;
         {
             final String queryStr = "DESCRIBE <" + s.stringValue() + ">";
-            final GraphQuery query = m_cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+            final GraphQuery query = cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
             g2 = asGraph(query.evaluate());
             
         }
@@ -388,7 +457,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         {
             final String queryStr = "ASK where {?s ?p ?o}";
             
-            final BooleanQuery query = m_cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
+            final BooleanQuery query = cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
             assertEquals(false, query.evaluate());
             
         }
@@ -398,7 +467,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         
         // Load the resource into the KB.
         {
-            m_cxn.add(new URL("file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf"), "", RDFFormat.RDFXML);
+            cxn.add(new URL("file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf"), "", RDFFormat.RDFXML);
             assertEquals(expectedStatementCount, getExactSize());
         }
 
@@ -408,7 +477,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         {
             final String queryStr = "SELECT * where {?s ?p ?o}";
 
-            final TupleQuery query = m_cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+            final TupleQuery query = cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
             assertEquals(expectedStatementCount, countResults(query.evaluate()));
         }
 
@@ -425,7 +494,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         doInsertbyURL("POST", packagePath
                 + "test_estcard.trig");
         
-        final RepositoryResult<Resource> contexts = m_cxn.getContextIDs();
+        final RepositoryResult<Resource> contexts = cxn.getContextIDs();
         
         int size = 0;
         while (contexts.hasNext()) {
@@ -879,5 +948,183 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         
     }
     
+    /**
+     * Basic test creates a read/write connection, issues begin(), and then
+     * issues rollback() on the connection.
+     */
+    public void test_tx_begin_rollback() throws RepositoryException {
+
+       assertFalse(cxn.isActive());
+
+       cxn.begin();
+       
+       assertTrue(cxn.isActive());
+       
+       cxn.rollback();
+       
+       assertFalse(cxn.isActive());
+       
+    }
+
+    /**
+     * Basic test creates a read/write connection, issues begin(), and then
+     * issues commit() on the connection.
+     */
+    public void test_tx_begin_commit() throws RepositoryException {
+
+       assertFalse(cxn.isActive());
+
+       cxn.begin();
+       
+       assertTrue(cxn.isActive());
+       
+       cxn.commit();
+       
+       assertFalse(cxn.isActive());
+       
+    }
+
+   /**
+    * An *extension* of the test suite that uses a namespace that is configured
+    * to support read/write transactions.
+    * <p>
+    * Note: This does not change whether or not a transaction may be created,
+    * just whether or not the namespace will allow an operation that is isolated
+    * by a read/write transaction.
+    */
+   static public class ReadWriteTx<S extends IIndexManager> extends
+         TestBigdataSailRemoteRepository<S> {
+
+      public ReadWriteTx() {
+
+      }
+
+      public ReadWriteTx(final String name) {
+
+         super(name);
+
+      }
+
+      /**
+       * Enable isolatable indices for so we can have concurrent read/write
+       * transactions in the {@link RepositoryConnection}.
+       */
+      @Override
+      public Properties getProperties() {
+
+         final Properties p = new Properties(super.getProperties());
+
+         p.setProperty(BigdataSail.Options.ISOLATABLE_INDICES, "true");
+
+         return p;
+
+      }
+
+      /**
+       * Basic test creates a read/write connection, issues begin(), and then
+       * issues commit() on the connection.
+       * 
+       * TODO Test where we abort the connection. Verify write set is discarded.
+       * 
+       * @throws RepositoryException
+       * @throws MalformedQueryException
+       * @throws UpdateExecutionException
+       */
+      public void test_tx_begin_addStatement_commit() throws RepositoryException,
+            MalformedQueryException, UpdateExecutionException {
+         
+if(true) return; // FIXME TEST DISABLED
+
+         assertFalse(cxn.isActive());
+
+         cxn.begin();
+
+         assertTrue(cxn.isActive());
+
+         final URI a = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "a");
+         final URI b = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "b");
+         final URI c = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "c");
+         
+         assertFalse(cxn.hasStatement(a, b, c, true/* includeInferred */));
+         
+         // Add to default graph.
+         cxn.add(cxn.getValueFactory().createStatement(a,b,c));
+         
+         // visible inside of the connection.
+         assertTrue(cxn.hasStatement(a, b, c, true/* includeInferred */));
+
+         // not visible from a new connection.
+         {
+            final BigdataSailRemoteRepositoryConnection cxn2 = repo
+                  .getConnection();
+            try {
+               assertTrue(cxn2 != cxn);
+               // cxn2.begin();
+               assertFalse(cxn2.hasStatement(a, b, c, true/* includeInferred */));
+            } finally {
+               cxn2.close();
+            }
+         }
+       
+         cxn.commit();
+
+         assertFalse(cxn.isActive());
+
+      }
+
+      /**
+       * Basic test creates a read/write connection, issues begin(), and then
+       * issues commit() on the connection.
+       * 
+       * TODO Test where we abort the connection. Verify write set is discarded.
+       * 
+       * @throws RepositoryException
+       * @throws MalformedQueryException
+       * @throws UpdateExecutionException
+       */
+      public void test_tx_begin_UPDATE_commit() throws RepositoryException,
+            MalformedQueryException, UpdateExecutionException {
+
+if(true) return; // FIXME TEST DISABLED
+
+         assertFalse(cxn.isActive());
+
+         cxn.begin();
+
+         assertTrue(cxn.isActive());
+
+         final URI a = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "a");
+         final URI b = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "b");
+         final URI c = cxn.getValueFactory().createURI(DEFAULT_PREFIX + "c");
+         
+         assertFalse(cxn.hasStatement(a, b, c, true/* includeInferred */));
+         
+         cxn.prepareUpdate(QueryLanguage.SPARQL,
+               getNamespaceDeclarations() + "INSERT DATA { :a :b :c }").execute();
+
+         // visible inside of the connection.
+         assertTrue(cxn.hasStatement(a, b, c, true/* includeInferred */));
+
+         // not visible from a new connection.
+         {
+            final BigdataSailRemoteRepositoryConnection cxn2 = repo
+                  .getConnection();
+            try {
+               assertTrue(cxn2 != cxn);
+               // cxn2.begin();
+               assertFalse(cxn2.hasStatement(a, b, c, true/* includeInferred */));
+            } finally {
+               cxn2.close();
+            }
+         }
+       
+         cxn.commit();
+
+         assertFalse(cxn.isActive());
+
+      }
+
+
+   }
 
 }

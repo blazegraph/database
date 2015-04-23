@@ -345,11 +345,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * times as reported by {@link IAtomicStore#commit()} or by a distributed
      * data loader (for scale-out).
      * 
-     * @todo the configured timestamp should only be used for the default
-     *       namespace (or it should be configured for each graph explicitly, or
-     *       we should bundle the (namespace,timestamp) together as a single
-     *       object).
-     * 
      * @see QueryServlet#ATTR_TIMESTAMP;
      */
     protected long getTimestamp(final HttpServletRequest req) {
@@ -481,6 +476,42 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     }
         
+   /**
+    * Report an boolean response and elapsed time back to the user agent. The
+    * response is an XML document as follows.
+    * 
+    * <pre>
+    * <data result="true|false" milliseconds="elapsed"/>
+    * </pre>
+    * 
+    * where <i>result</i> is either "true" or "false"; <br/>
+    * where <i>elapsed</i> is the elapsed time in milliseconds for the request.
+    * 
+    * @param resp
+    *           The response.
+    * @param result
+    *           The outcome of the request.
+    * @param elapsed
+    *           The elapsed time (milliseconds).
+    * 
+    * @throws IOException
+    */
+  static protected void buildAndCommitBooleanResponse(
+        final HttpServletResponse resp, final boolean result,
+        final long elapsed) throws IOException {
+
+      final StringWriter w = new StringWriter();
+
+      final XMLBuilder t = new XMLBuilder(w);
+
+      t.root("data").attr("result", result).attr("milliseconds", elapsed)
+            .close();
+
+      buildAndCommitResponse(resp, HttpServletResponse.SC_OK,
+            MIME_APPLICATION_XML, w.toString());
+
+   }
+       
     /**
      * Send an RDF Graph as a response using content negotiation.
      * 

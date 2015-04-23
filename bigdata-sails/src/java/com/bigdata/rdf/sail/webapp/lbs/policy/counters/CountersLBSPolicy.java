@@ -38,6 +38,7 @@ import javax.servlet.ServletException;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.http.HttpMethod;
 
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -360,8 +361,10 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
         Request request = null;
         try {
 
-            request = RemoteRepository.newRequest(httpClient, urlString.toString(),
-                    opts.method);
+//            request = RemoteRepository.newRequest(httpClient, urlString.toString(),
+//                    opts.method);
+            request = httpClient.newRequest(urlString.toString()).method(
+                  HttpMethod.GET);
 
             if (opts.requestHeaders != null) {
 

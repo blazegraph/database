@@ -64,7 +64,6 @@ import com.bigdata.rdf.vocab.NoVocabulary;
  * Abstract base class for tests of the {@link BigdataExprBuilder} and friends.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
@@ -98,6 +97,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
 
     protected BigdataASTContext context;
 
+    @Override
     protected void setUp() throws Exception {
         
         tripleStore = getStore(getProperties());
@@ -110,6 +110,7 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
         
     }
 
+    @Override
     protected void tearDown() throws Exception {
         
         baseURI = null;
