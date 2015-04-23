@@ -126,4 +126,22 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 
 	}
 
+	@Override
+	protected BigdataGraph getNewGraph(String file) throws Exception {
+		
+		final String testURL = serviceURL + "/sparql";
+
+		System.err.println("Connecting to Remote Repository at " + testURL);
+
+		// log.info("Connecting to Remote Repository at " + testURL);
+
+		return new BigdataGraphClient(testURL);
+	}
+
+	@Override
+	protected BigdataGraph loadGraph(String file) throws Exception {
+		
+		return getNewGraph(file);
+	}
+
 }
