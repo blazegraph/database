@@ -31,8 +31,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -250,6 +248,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
       private final long lowerBound, upperBound;
       private final UnsynchronizedArrayBuffer<IBindingSet> out;
       private IDistinctFilter distinctVarFilter;
+      private final  Set<IVariable<?>> varsToRetain;
       private Set<IVariable<?>> projectInVars;
 
       public ArbitraryLengthPathTask(final ArbitraryLengthPathOp controllerOp,
@@ -319,7 +318,7 @@ public class ArbitraryLengthPathOp extends PipelineOp {
           * ArbitraryLengthPath operator as defined by the W3C returns distinct
           * solutions only.
           */
-         final Set<IVariable<?>> varsToRetain = new LinkedHashSet<IVariable<?>>();
+         varsToRetain = new LinkedHashSet<IVariable<?>>();
          if (leftVar != null)
             varsToRetain.add(leftVar);
          if (rightVar != null)
@@ -608,7 +607,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                         }
                         
                         for (IVariable<?> anonymousVar : anonymousVars) {
-                            if (!projectInVars.contains(anonymousVar)) {
+                            if (!projectInVars.contains(anonymousVar) &&
+                                  !varsToRetain.contains(anonymousVar)) {
                                 input.clear(anonymousVar);
                             }
                         }
