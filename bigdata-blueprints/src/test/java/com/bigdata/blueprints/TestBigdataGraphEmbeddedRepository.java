@@ -23,13 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.blueprints;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Properties;
 
-import junit.framework.TestCase;
-
-import org.apache.log4j.Logger;
-import org.junit.Test;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -39,10 +34,14 @@ import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory.Option;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
-import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.Vertex;
-import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
+/**
+ * Class to test BigdataGraphEmbedded creation using a SailRepository for client
+ * test suite coverage.
+ * 
+ * @author beebs
+ *
+ */
 public class TestBigdataGraphEmbeddedRepository extends
 		AbstractTestBigdataGraphFactory {
 
@@ -109,8 +108,8 @@ public class TestBigdataGraphEmbeddedRepository extends
 		try {
 			repo.initialize();
 		} catch (RepositoryException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+			log.warn(e.toString());
 		}
 
 		return repo;

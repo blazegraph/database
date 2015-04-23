@@ -22,7 +22,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.blueprints;
 
-
+/**
+ * Class to test BigdataGraphFactory against file creation for client test
+ * suite coverage.
+ * 
+ * @author beebs
+ *
+ */
 public class TestBigdataGraphFactoryFile extends AbstractTestBigdataGraphFactory {
 
 	@Override
