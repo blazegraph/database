@@ -2573,12 +2573,22 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * We project in everything that might help in binding the variables
          * of the ALP node.
          */
+        final Set<IVariable<?>> alpUsedVars = alpNode.getUsedVars();
+        
         final Set<IVariable<?>> projectInVars = ctx.sa.getMaybeIncomingBindings(
               alpNode, new LinkedHashSet<IVariable<?>>());
-        projectInVars.retainAll(alpVars);
+//        projectInVars.retainAll(alpVars);
+        projectInVars.retainAll(alpUsedVars);
         IVariable<?>[] projectInVarsArr =
               projectInVars.toArray(new IVariable<?>[projectInVars.size()]);
 
+        
+        if (log.isDebugEnabled()) {
+            log.debug(alpNode.getUsedVars());
+            log.debug(ctx.sa.getMaybeIncomingBindings(
+              alpNode, new LinkedHashSet<IVariable<?>>()));
+            log.debug(projectInVars);
+        }
         
         /**
          * Set up a named solution set associated with a hash index operation.
@@ -2654,6 +2664,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
     			new NV(ArbitraryLengthPathOp.Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
     			new NV(ArbitraryLengthPathOp.Annotations.LOWER_BOUND, alpNode.lowerBound()),
     			new NV(ArbitraryLengthPathOp.Annotations.UPPER_BOUND, alpNode.upperBound()),
+                new NV(ArbitraryLengthPathOp.Annotations.PROJECT_IN_VARS, projectInVarsArr),
     			new NV(Predicate.Annotations.BOP_ID, ctx.nextId()),//
     			new NV(BOp.Annotations.EVALUATION_CONTEXT,
     			       BOpEvaluationContext.CONTROLLER)//
