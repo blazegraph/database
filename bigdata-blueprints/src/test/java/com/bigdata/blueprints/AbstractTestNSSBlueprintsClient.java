@@ -28,16 +28,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-import junit.framework.TestCase;
-
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.WebAppContext;
 
 import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.CreateKBTask;
@@ -46,7 +42,6 @@ import com.bigdata.rdf.sail.webapp.ConfigParams;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
-import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
 
@@ -119,9 +114,6 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	        // Properties for the KB instance.  
 	        final Properties tripleStoreProperties = this.getTripleStoreProperties();
 	
-	        // Create the triple store instance.
-	//        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
-	//                namespace, tripleStoreProperties);
 	         AbstractApiTask.submitApiTask(m_indexManager,
 	               new CreateKBTask(namespace, tripleStoreProperties)).get();
 	
@@ -141,19 +133,9 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	
 	        m_fixture.start();
 	
-	//        final WebAppContext wac = NanoSparqlServer.getWebApp(m_fixture);
-	//
-	//        wac.start();
-	//
-	//        for (Map.Entry<String, String> e : initParams.entrySet()) {
-	//
-	//            wac.setInitParameter(e.getKey(), e.getValue());
-	//
-	//        }
-	
 	        m_port = NanoSparqlServer.getLocalPort(m_fixture);
 	
-	        // log.info("Getting host address");
+	        log.info("Getting host address");
 	
 	        final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
 	                true/* loopbackOk */);
@@ -185,7 +167,6 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	@Override
 	public void tearDown() throws Exception {
 	
-	        // if (log.isInfoEnabled())
 	        log.warn("tearing down test: " + getName());
 	
 	        if (m_fixture != null) {
@@ -198,7 +179,6 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	
 	        if (m_indexManager != null && namespace != null) {
 	           
-	//            dropTripleStore(m_indexManager, namespace);
 	           AbstractApiTask.submitApiTask(m_indexManager,
 	               new DestroyKBTask(namespace)).get();
 	

@@ -34,6 +34,15 @@ import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
+/**
+ * Abstract Test class for Blueprints client test coverage.  Creates a new KB,
+ * Loads a Graph, closes it, re-opens, and validates the same number of edges and
+ * vertices exist.  Implementations do this for the different client connection
+ * and persistence methods, i.e. BigdataGraphClient, BigdataGraphEmbedded, etc.
+ * 
+ * @author beebs
+ *
+ */
 public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
 	protected static final transient Logger log = Logger
