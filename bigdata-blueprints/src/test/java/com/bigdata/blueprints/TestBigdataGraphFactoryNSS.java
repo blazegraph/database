@@ -54,7 +54,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 		final String testURL = serviceURL + "/";
 
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
 
@@ -74,9 +74,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 		final String testURL = serviceURL + "/sparql";
 
-		System.err.println("Connecting to Remote Repository at " + testURL);
-
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
 
@@ -91,7 +89,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 		final String testURL = serviceURL + "/namespace/" + super.getNamespace() + "/sparql";
 
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
 
@@ -122,10 +120,10 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 				.getResourceAsStream(example));
 
 		for (Vertex v : testGraph.getVertices()) {
-			System.err.println(v);
+			testPrint(v);
 		}
 		for (Edge e : testGraph.getEdges()) {
-			System.err.println(e);
+			testPrint(e);
 		}
 
 		testGraph.shutdown();
