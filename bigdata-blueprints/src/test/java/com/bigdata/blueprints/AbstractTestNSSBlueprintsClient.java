@@ -98,7 +98,8 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	@Override
 	public void setUp() throws Exception {
 	
-	        log.warn("Setting up test:" + getName());
+			if(log.isInfoEnabled())
+				log.info("Setting up test:" + getName());
 	        
 	        final Properties journalProperties = new Properties();
 	        {
@@ -113,7 +114,7 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	        
 	        // Properties for the KB instance.  
 	        final Properties tripleStoreProperties = this.getTripleStoreProperties();
-	
+	        // Create the triple store instance.
 	         AbstractApiTask.submitApiTask(m_indexManager,
 	               new CreateKBTask(namespace, tripleStoreProperties)).get();
 	
@@ -134,8 +135,6 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	        m_fixture.start();
 	
 	        m_port = NanoSparqlServer.getLocalPort(m_fixture);
-	
-	        log.info("Getting host address");
 	
 	        final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
 	                true/* loopbackOk */);
@@ -167,7 +166,8 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	@Override
 	public void tearDown() throws Exception {
 	
-	        log.warn("tearing down test: " + getName());
+	        if (log.isInfoEnabled())
+	        	log.info("tearing down test: " + getName());
 	
 	        if (m_fixture != null) {
 	
@@ -195,7 +195,8 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	        
 	        m_client.stop();
 	        
-	        log.info("tear down done");
+	        if(log.isInfoEnabled())
+	        	log.info("tear down done");
 	
 	        super.tearDown();
 	

@@ -24,8 +24,6 @@ package com.bigdata.blueprints;
 
 import org.junit.Test;
 
-import com.bigdata.rdf.sail.webapp.ProxySuiteHelper;
-import com.bigdata.rdf.sail.webapp.health.TestNSSHealthCheck;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
@@ -50,12 +48,16 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 		serviceURL = super.getServiceURL();
 	}
 
+	/**
+	 * This test validates that connecting to a serviceURL does not
+	 * work.
+	 */
 	@Test
 	public void testBigdataGraphConnectServiceURL() {
-		
+	
 		final String testURL = serviceURL + "/";
 
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = new BigdataGraphClient(testURL);
 
@@ -75,7 +77,7 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 
 		final String testURL = serviceURL + "/sparql";
 
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = new BigdataGraphClient(testURL);
 
@@ -90,7 +92,7 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 
 		final String testURL = serviceURL + "/namespace/" + super.getNamespace() + "/sparql";
 
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = new BigdataGraphClient(testURL);
 
@@ -110,10 +112,10 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 				.getResourceAsStream(example));
 
 		for (Vertex v : testGraph.getVertices()) {
-			log.info(v.toString());
+			testPrint(v);
 		}
 		for (Edge e : testGraph.getEdges()) {
-			log.info(e.toString());
+			testPrint(e);
 		}
 
 		testGraph.shutdown();
