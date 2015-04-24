@@ -1,6 +1,12 @@
 <project name="bigdata-jini" default="bundleJar" basedir=".">
 
     <property file="testServices.properties" />
+    <property environment="env"/>
+    <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+    </condition>
+    <echo message="TEST_ZOOKEEPER_HOME=${env.TEST_ZOOKEEPER_HOME}"/>
+    <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
 
 <!-- Note: It appears to be necessary to spawn the script which starts -->
     <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
