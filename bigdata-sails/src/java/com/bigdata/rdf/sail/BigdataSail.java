@@ -1515,12 +1515,14 @@ public class BigdataSail extends SailBase implements Sail {
             
             /*
              * Add the RDRHistory class if that feature is enabled.
+             * 
+             * This happens via RDRHistoryServiceFactory.startConnection() now.
              */
-            if (database.isRDRHistory()) {
-                final RDRHistory history = database.getRDRHistoryInstance();
-                history.init();
-                conn.addChangeLog(history);
-            }
+//            if (database.isRDRHistory()) {
+//                final RDRHistory history = database.getRDRHistoryInstance();
+//                history.init();
+//                conn.addChangeLog(history);
+//            }
             
         } catch(DatasetNotFoundException ex) {
             /*
