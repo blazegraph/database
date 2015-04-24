@@ -52,7 +52,8 @@ public class BigdataGraphFactory  {
    public static BigdataGraph connect(final String host, final int port) {
 
 	  //Assume the default KB to make the SPARQL Endpoint
-      return connect("http://" + host + ":" + port + "/bigdata/sparql");
+	  //FIXME:  the /bigdata reference should be parameterized
+      return connect("http://" + host + ":" + port + "/bigdata" + "/sparql");
 
     }
     
