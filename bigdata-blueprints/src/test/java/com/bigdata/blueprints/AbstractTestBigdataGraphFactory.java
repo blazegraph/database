@@ -35,20 +35,30 @@ import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
- * Abstract Test class for Blueprints client test coverage.  Creates a new KB,
- * Loads a Graph, closes it, re-opens, and validates the same number of edges and
- * vertices exist.  Implementations do this for the different client connection
- * and persistence methods, i.e. BigdataGraphClient, BigdataGraphEmbedded, etc.
+ * Abstract Test class for Blueprints client test coverage. Creates a new KB,
+ * Loads a Graph, closes it, re-opens, and validates the same number of edges
+ * and vertices exist. Implementations do this for the different client
+ * connection and persistence methods, i.e. BigdataGraphClient,
+ * BigdataGraphEmbedded, etc.
  * 
  * @author beebs
- *
+ * 
  */
 public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
 	protected static final transient Logger log = Logger
-			.getLogger(AbstractTestNSSBlueprintsClient.class);
-	protected final String testJnl = "testJournal" + System.currentTimeMillis()
+			.getLogger(AbstractTestBigdataGraphFactory.class);
+
+	public static void testPrint(Object message) {
+		assert (message != null);
+
+		if (log.isInfoEnabled())
+			log.info(message.toString());
+	}
+
+	protected final String testJnl = "testJournal-" + System.currentTimeMillis()
 			+ ".jnl";
+
 	protected final String testData = "graph-example-1.xml";
 
 	public AbstractTestBigdataGraphFactory() {
@@ -84,7 +94,7 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
 	public void tearDown() throws Exception {
 		File f = new File(testJnl);
-		f.deleteOnExit();
+		f.delete();
 	}
 
 	protected int vertexEdgeCount(BigdataGraph graph) {
@@ -134,10 +144,9 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
 		File f = new File(file);
 		boolean retval = false;
-		
-		if (this instanceof AbstractTestNSSBlueprintsClient)
-		{
-			//This check is not relevant for NSS test cases.
+
+		if (this instanceof AbstractTestNSSBlueprintsClient) {
+			// This check is not relevant for NSS test cases.
 			retval = true;
 		} else
 			retval = f.exists();
@@ -153,8 +162,8 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 	 */
 	@Test
 	public void testGraphFactoryCreateNew() throws Exception {
-		
-		System.err.println("Testing Graph Creation.");
+
+		testPrint("Testing Graph Creation.");
 
 		int loadCount = 0;
 
@@ -172,7 +181,8 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 				log.warn(E.toString());
 			}
 
-			System.err.println("Total Edge and Vertex Count: " + loadCount);
+			testPrint("Total Edge and Vertex Count: " + loadCount);
+
 
 			// The file should exist.
 			assert (evaluateFilePostconditions(testJnl));
@@ -196,16 +206,17 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 	 */
 	protected void openAndCheckGraphCount(String file, int loadCount)
 			throws Exception {
-			
-				BigdataGraph graph = loadGraph(file);
-			
-				int veCnt = vertexEdgeCount(graph);
-			
-				System.err.println("Total Edge and Vertex Count: " + veCnt);
-			
-				// We should have the same total number
-				assert (veCnt == loadCount);
-			
-				graph.shutdown();
-			}
+
+		BigdataGraph graph = loadGraph(file);
+
+		int veCnt = vertexEdgeCount(graph);
+
+		testPrint("Total Edge and Vertex Count: " + veCnt);
+
+		// We should have the same total number
+		assert (veCnt == loadCount);
+
+		graph.shutdown();
+	}
+	
 }

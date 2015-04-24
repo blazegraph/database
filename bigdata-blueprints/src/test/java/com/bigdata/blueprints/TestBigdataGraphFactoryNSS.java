@@ -38,21 +38,19 @@ import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
  */
 public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient  {
 
-	private String serviceURL = "http://localhost:9999/bigdata";
-
 	public TestBigdataGraphFactoryNSS() {
 		super();
 	}
 
 	public void setUp() throws Exception {
 		super.setUp();
-		serviceURL = super.getServiceURL();
+		super.getServiceURL();
 	}
 
 	@Test
 	public void testBigdataGraphConnectServiceURL() {
 
-		final String testURL = serviceURL + "/";
+		final String testURL = getServiceURL() + "/";
 
 		testPrint("Connecting to Remote Repository at " + testURL);
 
@@ -72,7 +70,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 	public void testBigdataGraphConnectSparqlEndpoint() {
 
-		final String testURL = serviceURL + "/sparql";
+		final String testURL = getServiceURL() + "/sparql";
 
 		testPrint("Connecting to Remote Repository at " + testURL);
 
@@ -87,7 +85,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 	public void testBigdataGraphConnectSparqlEndpointWithNamespace() {
 
-		final String testURL = serviceURL + "/namespace/" + super.getNamespace() + "/sparql";
+		final String testURL = getServiceURL() + "/namespace/" + super.getNamespace() + "/sparql";
 
 		testPrint("Connecting to Remote Repository at " + testURL);
 
@@ -133,7 +131,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 	@Override
 	protected BigdataGraph getNewGraph(String file) throws Exception {
 		
-		final String testURL = serviceURL + "/sparql";
+		final String testURL = getServiceURL() + "/sparql";
 
 		log.info("Connecting to Remote Repository at " + testURL);
 

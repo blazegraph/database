@@ -34,7 +34,7 @@ public class TestBigdataGraphFactoryFile extends AbstractTestBigdataGraphFactory
 	@Override
 	protected BigdataGraph getNewGraph(String file) throws Exception {
 
-		return BigdataGraphFactory.create(testJnl);
+		return BigdataGraphFactory.create(file);
 
 	}
 
