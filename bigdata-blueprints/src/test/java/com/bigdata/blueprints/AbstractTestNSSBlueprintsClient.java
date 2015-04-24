@@ -31,6 +31,7 @@ import java.util.UUID;
 import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.Priority;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
@@ -103,7 +104,8 @@ public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 	@Override
 	public void setUp() throws Exception {
 	
-	        log.warn("Setting up test:" + getName());
+			if(log.isInfoEnabled())
+				log.info("Setting up test:" + getName());
 	        
 	        final Properties journalProperties = new Properties();
 	        {
@@ -120,8 +122,6 @@ public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 	        final Properties tripleStoreProperties = this.getTripleStoreProperties();
 	
 	        // Create the triple store instance.
-	//        final AbstractTripleStore tripleStore = createTripleStore(m_indexManager,
-	//                namespace, tripleStoreProperties);
 	         AbstractApiTask.submitApiTask(m_indexManager,
 	               new CreateKBTask(namespace, tripleStoreProperties)).get();
 	
@@ -141,19 +141,7 @@ public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 	
 	        m_fixture.start();
 	
-	//        final WebAppContext wac = NanoSparqlServer.getWebApp(m_fixture);
-	//
-	//        wac.start();
-	//
-	//        for (Map.Entry<String, String> e : initParams.entrySet()) {
-	//
-	//            wac.setInitParameter(e.getKey(), e.getValue());
-	//
-	//        }
-	
 	        m_port = NanoSparqlServer.getLocalPort(m_fixture);
-	
-	        // log.info("Getting host address");
 	
 	        final String hostAddr = NicUtil.getIpAddress("default.nic", "default",
 	                true/* loopbackOk */);
@@ -185,8 +173,8 @@ public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 	@Override
 	public void tearDown() throws Exception {
 	
-	        // if (log.isInfoEnabled())
-	        log.warn("tearing down test: " + getName());
+	        if (log.isInfoEnabled())
+	        	log.info("tearing down test: " + getName());
 	
 	        if (m_fixture != null) {
 	
@@ -198,7 +186,6 @@ public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 	
 	        if (m_indexManager != null && namespace != null) {
 	           
-	//            dropTripleStore(m_indexManager, namespace);
 	           AbstractApiTask.submitApiTask(m_indexManager,
 	               new DestroyKBTask(namespace)).get();
 	
@@ -215,10 +202,19 @@ public abstract class AbstractTestNSSBlueprintsClient extends TestCase{
 	        
 	        m_client.stop();
 	        
-	        log.info("tear down done");
+	        if(log.isInfoEnabled())
+	        	log.info("tear down done");
 	
 	        super.tearDown();
 	
 	    }
+	
+	public static void testPrint(Object message)
+	{
+		assert(message != null);
+
+		if(log.isInfoEnabled())
+			log.info(message.toString());
+	}
 
 }
