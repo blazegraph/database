@@ -23,13 +23,13 @@
         <version>2.0</version>
         <configuration>
           <port>5464</port>
-          <dir>C:/</dir>
+          <dir>.</dir>
           <securityPolicy>policy.all</securityPolicy>
           <loggingManager>com.sun.jini.logging.LogManager</loggingManager>
-          <serviceConfig>myservice.config</serviceConfig>
+          <serviceConfig>src/test/resources/startAll.config</serviceConfig>
           <serverHost>127.0.0.1</serverHost>
           <codebaseHost>127.0.0.1</codebaseHost>
-          <jiniHome>C:/Java/Jini/jini2_1</jiniHome>
+          <jiniHome>./jini2_1</jiniHome>
           <securityDebug>true</securityDebug>
           <serviceDebug>false</serviceDebug>
         </configuration>
