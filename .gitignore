@@ -23,6 +23,7 @@
 /com.bigdata.rdf.stress.LoadClosureAndQueryTest.*.csv
 /DIST.*.tgz
 /REL.*.tgz
+/target
 
 # /bigdata/
 /bigdata/bin
