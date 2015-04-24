@@ -1837,7 +1837,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
             // log4j configuration.
             copyFile(new File(
-                    "bigdata/src/resources/logging/log4j-dev.properties"),
+                    "src/test/resources/logging/log4j-dev.properties"),
                     new File(serviceDir, "log4j-" + name + ".properties"),
                     false/* append */);
 
@@ -1848,7 +1848,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
             // java logging configuration.
             copyFile(new File(
-                    "bigdata/src/resources/logging/logging.properties"),
+                    "src/test/resources/logging/logging.properties"),
                     new File(serviceDir, "logging-" + name + ".properties"),
                     false/* append */);
 
