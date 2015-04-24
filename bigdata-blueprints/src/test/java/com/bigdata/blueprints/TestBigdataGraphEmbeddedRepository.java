@@ -109,7 +109,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			repo.initialize();
 		} catch (RepositoryException e) {
 			e.printStackTrace();
-			log.warn(e.toString());
+			testPrint(e.toString());
 		}
 
 		return repo;
