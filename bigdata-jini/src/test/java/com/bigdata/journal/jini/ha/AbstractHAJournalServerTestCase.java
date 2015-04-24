@@ -115,7 +115,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     /**
      * Path to the config files.
      */
-    static final protected String SRC_PATH = "bigdata-jini/src/test/resources/com/bigdata/journal/jini/ha/";
+    static final protected String SRC_PATH = "src/test/resources/com/bigdata/journal/jini/ha/";
 
     /**
      * Path to the directory in which the service directories exist. The
