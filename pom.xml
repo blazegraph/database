@@ -81,6 +81,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -90,6 +93,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -99,6 +105,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -108,6 +117,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -117,6 +129,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -126,6 +141,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -135,6 +153,9 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
         <resource>
@@ -144,6 +165,21 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-war/src</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
             </includes>
         </resource>
        </resources>
