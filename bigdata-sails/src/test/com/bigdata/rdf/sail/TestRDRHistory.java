@@ -33,6 +33,9 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.repository.RepositoryResult;
 
 import com.bigdata.rdf.axioms.NoAxioms;
@@ -235,6 +238,142 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 stmts.close();
             }
             
+        } finally {
+            if (cxn != null)
+                cxn.close();
+            
+            sail.__tearDownUnitTest();
+        }
+    }
+    
+    /**
+     * Test the SPARQL service integration.
+     */
+    public void testHistoryService() throws Exception {
+
+        BigdataSailRepositoryConnection cxn = null;
+
+        final BigdataSail sail = getSail(getProperties());
+
+        try {
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+
+            {
+                final String sparql =
+                        "insert { " +
+                        "  ?s <:p> \"foo\" . " +
+                        "} where { " +
+                        "  values (?s) { " +
+                        "    (<:s1>) " +
+                        "    (<:s2>) " +
+                        "  } " +
+                        "}";
+                
+                cxn.prepareUpdate(QueryLanguage.SPARQL, sparql).execute();
+                cxn.commit();
+            }
+            
+            {
+                final String sparql =
+                        "delete { " +
+                        "  ?s <:p> ?o . " +
+                        "} insert { " +
+                        "  ?s <:p> \"bar\" . " +
+                        "} where { " +
+                        "  ?s <:p> ?o . " +
+//                        "  values (?s) { " +
+//                        "    (<:s1>) " +
+//                        "  } " +
+                        "}";
+                
+                cxn.prepareUpdate(QueryLanguage.SPARQL, sparql).execute();
+                cxn.commit();
+            }
+            
+            if (log.isInfoEnabled()) {
+                log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
+            }
+            
+            assertTrue(cxn.size() == 8);
+            
+            {
+                final String sparql =
+                    "select ?s ?p ?o ?action ?time \n" +
+                    "where { \n" +
+                    "  service bd:history { \n" +
+                    "    << ?s ?p ?o >> ?action ?time . \n" +
+                    "  } \n" +
+                    "  values (?s) { \n" +
+                    "    (<:s1>) \n" +
+                    "  } \n" +
+                    "}";
+                
+                final TupleQueryResult result =
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+                
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet bs = result.next();
+                    i++;
+                    if (log.isDebugEnabled()) {
+                        log.debug(bs);
+                    }
+                }
+                
+                assertTrue(i == 3);
+            }
+
+            {
+                final String sparql =
+                    "select ?s ?p ?o ?action ?time \n" +
+                    "where { \n" +
+                    "  service bd:history { \n" +
+                    "    << ?s ?p ?o >> ?action ?time . \n" +
+                    "  } \n" +
+                    "}";
+                
+                final TupleQueryResult result =
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+                
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet bs = result.next();
+                    i++;
+                    if (log.isDebugEnabled()) {
+                        log.debug(bs);
+                    }
+                }
+                
+                assertTrue(i == 6);
+            }
+
+            {
+                final String sparql =
+                    "select ?s ?p ?o ?action ?time \n" +
+                    "where { \n" +
+                    "  service bd:history { \n" +
+                    "    << ?s <:p> ?o >> <:removed> ?time . \n" +
+                    "  } \n" +
+                    "}";
+                
+                final TupleQueryResult result =
+                        cxn.prepareTupleQuery(QueryLanguage.SPARQL, sparql).evaluate();
+                
+                int i = 0;
+                while (result.hasNext()) {
+                    final BindingSet bs = result.next();
+                    i++;
+                    if (log.isDebugEnabled()) {
+                        log.debug(bs);
+                    }
+                }
+                
+                assertTrue(i == 2);
+            }
+
         } finally {
             if (cxn != null)
                 cxn.close();

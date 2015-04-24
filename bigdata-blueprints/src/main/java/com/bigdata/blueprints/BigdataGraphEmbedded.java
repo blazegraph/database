@@ -27,9 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
+import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit;
@@ -258,6 +256,12 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      */
     @Override
     public void changeEvent(final IChangeRecord record) {
+        /*
+         * Watch out for history change events.
+         */
+        if (record.getStatement().getSubject() instanceof BNode) {
+            return;
+        }
         /*
          * Adds come in already materialized. Removes do not. Batch and
          * materialize at commit or abort notification.

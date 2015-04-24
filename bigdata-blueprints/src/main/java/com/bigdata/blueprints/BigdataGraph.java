@@ -36,11 +36,13 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFException;
+import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.StatementImpl;
+import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQueryResult;
@@ -64,6 +66,12 @@ import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.ICloseableIterator;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A base class for a Blueprints wrapper around a bigdata back-end.
@@ -1378,7 +1386,8 @@ public abstract class BigdataGraph implements Graph {
 	/**
 	 * Project a subgraph using a SPARQL query.
 	 */
-	public CloseableIterator<BigdataGraphAtom> project(final String queryStr) 
+    @SuppressWarnings("unchecked")
+    public ICloseableIterator<BigdataGraphAtom> project(final String queryStr) 
 	        throws Exception {
 	    
         final RepositoryConnection cxn = readFromWriteConnection ? 
@@ -1399,55 +1408,70 @@ public abstract class BigdataGraph implements Graph {
         }
         
         final GraphQueryResult result = query.evaluate();
+
+        final IStriterator sitr = new Striterator(new WrappedResult(
+                result, readFromWriteConnection ? null : cxn
+                ));
         
-        return new CloseableIterator<BigdataGraphAtom>() {
-
+        sitr.addFilter(new Filter() {
+            private static final long serialVersionUID = 1L;
             @Override
-            public boolean hasNext() {
-                try {
-                    return result.hasNext();
-                } catch (QueryEvaluationException e) {
-                    throw new RuntimeException(e);
-                }
+            public boolean isValid(final Object e) {
+                final Statement stmt = (Statement) e;
+                // do not project history
+                return stmt.getSubject() instanceof URI;
             }
-
+        });
+        
+        sitr.addFilter(new Resolver() {
+            private static final long serialVersionUID = 1L;
             @Override
-            public BigdataGraphAtom next() {
-                try {
-                    return toGraphAtom(result.next());
-                } catch (QueryEvaluationException e) {
-                    throw new RuntimeException(e);
-                }
+            protected Object resolve(final Object e) {
+                final Statement stmt = (Statement) e;
+                return toGraphAtom(stmt);
             }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-            
-            @Override
-            public void close() {
-                try {
-                    result.close();
-                } catch (QueryEvaluationException e) { 
-                    log.warn("Could not close result");
-                }
-                try {
-                    if (!readFromWriteConnection) {
-                        cxn.close();
-                    }
-                } catch (RepositoryException e) {
-                    log.warn("Could not close connection");
-                }
-            }
-
+        });
+        
+        return (ICloseableIterator<BigdataGraphAtom>) sitr;
+//        {
+//
 //            @Override
-//            protected void finalize() throws Throwable {
-//                super.finalize();
-//                System.err.println("closed: " + closed);
+//            public BigdataGraphAtom next() {
+//                try {
+//                    return toGraphAtom(result.next());
+//                } catch (QueryEvaluationException e) {
+//                    throw new RuntimeException(e);
+//                }
 //            }
-            
-        };
+//
+//            @Override
+//            public void remove() {
+//                throw new UnsupportedOperationException();
+//            }
+//            
+//            @Override
+//            public void close() {
+//                try {
+//                    result.close();
+//                } catch (QueryEvaluationException e) { 
+//                    log.warn("Could not close result");
+//                }
+//                try {
+//                    if (!readFromWriteConnection) {
+//                        cxn.close();
+//                    }
+//                } catch (RepositoryException e) {
+//                    log.warn("Could not close connection");
+//                }
+//            }
+//
+////            @Override
+////            protected void finalize() throws Throwable {
+////                super.finalize();
+////                System.err.println("closed: " + closed);
+////            }
+//            
+//        };
 
 	}
 	
@@ -1580,7 +1604,7 @@ public abstract class BigdataGraph implements Graph {
                 } else if (val instanceof URI) {
                     o = factory.fromURI((URI) val);
                 } else {
-                    throw new RuntimeException("bnodes not legal: " + val);
+                    continue;
                 }
                 
                 bindings.put(key, o);
@@ -1685,15 +1709,74 @@ public abstract class BigdataGraph implements Graph {
         
     }
     
-    /**
-     * You MUST close this iterator when finished with it.
-     */
-    public static interface CloseableIterator<T> extends Iterator<T> {
+//    /**
+//     * You MUST close this iterator when finished with it.
+//     */
+//    public static interface CloseableIterator<T> extends Iterator<T> {
+//        
+//        /**
+//         * Release any resources associated with this iterator.
+//         */
+//        void close();
+//        
+//    }
+    
+    public static class WrappedResult<E> implements ICloseableIterator<E> {
         
-        /**
-         * Release any resources associated with this iterator.
-         */
-        void close();
+        private final CloseableIteration<E,?> it;
+        
+        private final RepositoryConnection cxn;
+        
+        public WrappedResult(final CloseableIteration<E,?> it, 
+                final RepositoryConnection cxn) {
+            this.it = it;
+            this.cxn = cxn;
+        }
+
+        @Override
+        public boolean hasNext() {
+            try {
+                return it.hasNext();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        @Override
+        public E next() {
+            try {
+                return (E) it.next();
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public void close() {
+            try {
+                it.close();
+            } catch (Exception e) {
+                log.warn("Could not close result");
+            }
+            if (cxn != null) {
+                try {
+                    cxn.close();
+                } catch (RepositoryException e) {
+                    log.warn("Could not close connection");
+                }
+            }
+        }
+        
+//        @Override
+//        protected void finalize() throws Throwable {
+//            super.finalize();
+//            System.err.println("closed: " + closed);
+//        }
         
     }
     

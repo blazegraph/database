@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
@@ -124,4 +126,27 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
         setProperty(Annotations.PROJECT_IN_VARS, projectInVars);
     }
     
+    /**
+     * Return the nodes of the supplied type.  Uses isAssignableFrom to 
+     * determine whether the node is an instance of the supplied type.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> List<T> getChildren(final Class<T> type) {
+        
+        final List<T> children = new LinkedList<T>();
+        
+        for (IQueryNode node : this) {
+            
+            if (type.isAssignableFrom(node.getClass())) {
+                
+                children.add((T) node);
+                
+            }
+            
+        }
+        
+        return children;
+        
+    }
+
 }

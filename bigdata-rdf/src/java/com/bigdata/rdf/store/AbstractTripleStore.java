@@ -359,7 +359,7 @@ abstract public class AbstractTripleStore extends
     public RDRHistory getRDRHistoryInstance() {
 
         if (!isRDRHistory()) {
-            throw new RuntimeException("rdr history not enabled");
+            throw new RuntimeException("RDR history not enabled");
         }
         
         try {
