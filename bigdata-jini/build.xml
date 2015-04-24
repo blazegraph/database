@@ -5,8 +5,25 @@
     <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
        <isset property="env.TEST_ZOOKEEPER_HOME" />
     </condition>
-    <echo message="TEST_ZOOKEEPER_HOME=${env.TEST_ZOOKEEPER_HOME}"/>
-    <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+    <exec executable="hostname"
+        outputproperty="this.hostname">
+     </exec>
+    <property name = "default.nic" value = "${default.nic}"/>
+    <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
+    <property name="app.home" value ="."/>
+    <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
+
+
+    <path id="jini.classpath">
+        <fileset dir="${test.codebase.dir}">
+            <include name="**/*.jar" />
+        </fileset>
+        <dirset dir=".">
+	    <include name="${maven.class.dir}"/>
+  	</dirset>
+    </path>
+
+
 
 <!-- Note: It appears to be necessary to spawn the script which starts -->
     <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
@@ -14,9 +31,9 @@
     <!-- However, this change appears to result in zookeeper not running   -->
     <!-- so I have backed it out for now.                                  -->
     <target name="startZookeeper">
+
         <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
-        <echo>bin/zkServer.(sh|cmd) start
-</echo>
+        <echo>bin/zkServer.(sh|cmd) start</echo>
         <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
             <arg value="start"/>
         </exec>
@@ -34,8 +51,7 @@
 
     <target name="stopZookeeper">
     <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
-    <echo>bin/zkServer.(sh|cmd) stop
-    </echo>
+    <echo>bin/zkServer.(sh|cmd) stop</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
         <arg value="stop"/>
     </exec>
@@ -69,7 +85,6 @@
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
       <property name="java.net.preferIPv4Stack" value="true" />
-      <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
           <echo message="Starting test services."/>
 	  <antcall target="getMavenDependencies"/>
           <antcall target="startZookeeper"/>
@@ -78,9 +93,9 @@
     </target>
 
     <target name="startHttpd">
-      <echo>java -jar src/test/resources/lib/classserver.jar -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
+      <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 </echo>
-      <java jar="${dist.lib}/classserver.jar"
+      <java jar="${dependency.dir}/${classserver.jar}"
             fork="true"
             spawn="true">
         <arg value="-verbose" />
@@ -91,8 +106,9 @@
     </target>
 
     <target name="stopHttpd">
-      <echo>java -jar ${dist.lib}/classserver.jar -port ${test.codebase.port} -dir ${test.codebase.dir} -stop </echo>
-      <java jar="${dist.lib}/classserver.jar"
+      <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
+	</echo>
+      <java jar="${dependency.dir}/${classserver.jar}"
             fork="true"
             failonerror="true">
         <arg line="-port ${test.codebase.port}" />
@@ -102,12 +118,17 @@
     </target>
 
      <target name="startLookup">
-      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -cp src/test/resources/lib-dl/browser-dl.jar:src/test/resources/lib-dl/group-dl.jar:src/test/resources/lib-dl/jsk-dl.jar:src/test/resources/lib-dl/phoenix-dl.jar:src/test/resources/lib-dl/reggie-dl.jar:src/test/resources/lib-dl/sdm-dl.jar:. com.bigdata.service.jini.util.LookupStarter
+       <antcall target="getMavenDependencies"/>
+
+       <!-- Emit the property to the ant console -->
+       <echo message="Classpath = ${jiniclasspath}"/>
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -Dbigdata.lookup.config=${lookup.config} -Dreggie.jar=${reggie.jar} -Dreggie-dl.jar=${reggie-dl.jar} -Djsk-dl.jar=${jsk-dl.jar} com.bigdata.service.jini.util.LookupStarter
 </echo>
       <echo>
 </echo>
 
       <java classname="com.bigdata.service.jini.util.LookupStarter"
+	    classpathref="jini.classpath"
             fork="true"
             spawn="true">
         <sysproperty key="app.home" value="${app.home}" />
@@ -120,19 +141,25 @@
         <sysproperty key="codebase.port" value="${test.codebase.port}" />
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
+<!-- Need to determine where this value is set. 
         <sysproperty key="default.nic" value="${default.nic}" />
-        <sysproperty key="cp" value="src/test/resources/lib-dl/browser-dl.jar:src/test/resources/lib-dl/group-dl.jar:src/test/resources/lib-dl/jsk-dl.jar:src/test/resources/lib-dl/phoenix-dl.jar:src/test/resources/lib-dl/reggie-dl.jar:src/test/resources/lib-dl/sdm-dl.jar:." />
+-->
+        <sysproperty key="bigdata.lookup.config" value="${lookup.config}" />
+	<sysproperty key="reggie.jar" value="${reggie.jar}"/>
+	<sysproperty key="reggie-dl.jar" value="${reggie-dl.jar}"/>
+	<sysproperty key="jsk-dl.jar" value="${jsk-dl.jar}"/>
       </java>
     </target>
 
     <target name="stopLookup">
-      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Dlog4j.configuration=${log4j.configuration} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -jar ${bigdata-test.lib}/lookupstarter.jar -stop
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -Dbigdata.lookup.config=${lookup.config} -Dreggie.jar=${reggie.jar} -Dreggie-dl.jar=${reggie-dl.jar} -Djsk-dl.jar=${jsk-dl.jar} com.bigdata.service.jini.util.LookupStarter stop
 </echo>
       <echo>
 </echo>
-      <java jar="${bigdata-test.lib}/lookupstarter.jar"
+      <java classname="com.bigdata.service.jini.util.LookupStarter"
             fork="true"
             failonerror="true">
+        <classpath refid="jini.classpath" />
         <sysproperty key="app.home" value="${app.home}" />
         <sysproperty key="jini.lib" value="${dist.lib}" />
         <sysproperty key="jini.lib.dl" value="${dist.lib.dl}" />
