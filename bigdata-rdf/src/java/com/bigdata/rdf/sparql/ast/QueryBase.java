@@ -193,18 +193,21 @@ abstract public class QueryBase extends QueryNodeBase implements
         
     }
     
+    @Override
     public void setProjection(final ProjectionNode projection) {
 
         setProperty(Annotations.PROJECTION, projection);
 
     }
 
+    @Override
     public ProjectionNode getProjection() {
 
         return (ProjectionNode) getProperty(Annotations.PROJECTION);
 
     }
     
+    @Override
     public Set<IVariable<?>> getProjectedVars(final Set<IVariable<?>> vars) {
         
         final ProjectionNode tmp = getProjection();
@@ -259,6 +262,7 @@ abstract public class QueryBase extends QueryNodeBase implements
 
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public GraphPatternGroup<IGroupMemberNode> getGraphPattern() {
      
@@ -266,6 +270,7 @@ abstract public class QueryBase extends QueryNodeBase implements
         
     }
 
+    @Override
     public void setGraphPattern(
             final GraphPatternGroup<IGroupMemberNode> graphPattern) {
 
@@ -465,6 +470,7 @@ abstract public class QueryBase extends QueryNodeBase implements
 
     }
     
+    @Override
 	public String toString(final int indent) {
 		
 	    final String s = indent(indent);
