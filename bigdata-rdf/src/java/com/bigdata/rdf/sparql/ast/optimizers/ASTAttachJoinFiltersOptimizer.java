@@ -36,6 +36,7 @@ import java.util.Set;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
+import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -124,7 +125,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
         /*
          * Recursion.
          */
-        for(IGroupMemberNode child : group) {
+        for (IGroupMemberNode child : group) {
 
             if (child instanceof GraphPatternGroup<?>) {
             
@@ -135,6 +136,11 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
                 
                 attachJoinFilters(context, sa,
                         ((SubqueryRoot) child).getWhereClause());
+                
+            } else if (child instanceof ArbitraryLengthPathNode) {
+                
+                attachJoinFilters(context, sa,
+                        ((ArbitraryLengthPathNode) child).subgroup());
                 
             }
             
