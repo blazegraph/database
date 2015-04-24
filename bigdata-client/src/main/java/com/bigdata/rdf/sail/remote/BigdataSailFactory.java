@@ -300,13 +300,14 @@ public class BigdataSailFactory {
     }
     
     /**
-     * Create a new bigdata instance using the specified options.  Since no
-     * journal file is specified this must be an in-memory instance.
+     * Create a new bigdata instance using the specified options and filename.  
      */
     public static BigdataSail createSail(final String file, 
             final Option... args) {
-        
-        return createSail(new Properties(), null, args);
+    
+    	//Ticket #1185: BigdataGraphFactory create not working. 
+    	
+        return createSail(new Properties(), file, args);
         
     }
     
