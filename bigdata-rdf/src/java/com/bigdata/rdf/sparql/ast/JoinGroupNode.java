@@ -67,6 +67,28 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
     
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
+     * <p>
+     * <strong>Note: There is a nasty potential for a conflict here.  This constructor is part
+     * of the deep copy semantics.  The <code>JoinGroupNode(IGroupMemberNode child)</code<
+     * constructor adds a child to a node (which also sets the parent of the child to the
+     * node). However, this DEEP COPY constructor DOES NOT set the parent reference!!!
+     * </strong>
+     * This means that the following code DOES NOT create a nested structure of a JoinGroupNode in a JoinGroupNode.
+     * <pre>
+     * new JoinGroupNode(new JoinGroupNode); // COPY CONSTRUCTOR PATTERN.
+     * </pre>
+     * Instead you MUST do this incrementally
+     * <pre>
+     * final JoinGroupNode parent = new JoinGroupNode();
+     * parent.addChild(new JoinGroupNode());
+     * </pre>
+     * and if you need to add things to the child, then the pattern becomes:
+     * <pre>
+     * final JoinGroupNode parent = new JoinGroupNode();
+     * final JoinGroupNode child1 = new JoinGroupNode()
+     * parent.addChild(child1);
+     * child1.addChild(...);
+     * </pre>
      */
     public JoinGroupNode(final JoinGroupNode op) {
 
