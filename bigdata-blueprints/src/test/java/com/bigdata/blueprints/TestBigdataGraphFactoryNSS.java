@@ -44,13 +44,10 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 	@Test
 	public void testBigdataGraphConnectServiceURL() {
-		// FIXME: This should start an embedded NSS and test against that.
-		// For now, you must start run "ant start-blazegraph". Then
+
 		final String testURL = serviceURL + "/";
 
-		System.err.println("Connecting to Remote Repository at " + testURL);
-
-		// log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
 
@@ -67,14 +64,10 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 	}
 
 	public void testBigdataGraphConnectSparqlEndpoint() {
-		// FIXME: This should start an embedded NSS and test against that.
-		// For now, you must start run "ant start-blazegraph". Then
-		// final String testURL = this.getServiceUrl();
+
 		final String testURL = serviceURL + "/sparql";
 
-		System.err.println("Connecting to Remote Repository at " + testURL);
-
-		// log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
 
@@ -86,14 +79,10 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 	}
 
 	public void testBigdataGraphConnectSparqlEndpointWithNamespace() {
-		// FIXME: This should start an embedded NSS and test against that.
-		// For now, you must start run "ant start-blazegraph". Then
-		// final String testURL = this.getServiceUrl();
+
 		final String testURL = serviceURL + "/namespace/" + super.getNamespace() + "/sparql";
 
-		System.err.println("Connecting to Remote Repository at " + testURL);
-
-		// log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect(testURL);
 
@@ -106,11 +95,6 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 	}
 
 	public void testBigdataGraphConnectHostPort() {
-		// FIXME: This should start an embedded NSS and test against that.
-		// For now, you must start run "ant start-blazegraph". Then
-		// final String testURL = this.getServiceUrl();
-
-		// log.info("Connecting to Remote Repository at " + testURL);
 
 		BigdataGraph testGraph = BigdataGraphFactory.connect("localhost", super.getPort());
 
@@ -129,10 +113,10 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 				.getResourceAsStream(example));
 
 		for (Vertex v : testGraph.getVertices()) {
-			System.err.println(v);
+			testPrint(v);
 		}
 		for (Edge e : testGraph.getEdges()) {
-			System.err.println(e);
+			testPrint(e);
 		}
 
 		testGraph.shutdown();
