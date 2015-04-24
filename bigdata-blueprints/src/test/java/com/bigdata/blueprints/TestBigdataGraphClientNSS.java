@@ -124,7 +124,7 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 		
 		final String testURL = getServiceURL() + "/sparql";
 
-		log.info("Connecting to Remote Repository at " + testURL);
+		testPrint("Connecting to Remote Repository at " + testURL);
 
 		return new BigdataGraphClient(testURL);
 	}
