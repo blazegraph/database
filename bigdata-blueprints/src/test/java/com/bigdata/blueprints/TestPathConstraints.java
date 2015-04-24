@@ -133,4 +133,120 @@ public class TestPathConstraints extends TestCase {
         
     }
 
+    public void testPathFilters() throws Exception {
+        
+        final Properties props = new Properties();
+        props.setProperty(BigdataGraph.Options.LAX_EDGES, "true");
+        
+        final BigdataGraphEmbedded graph = (BigdataGraphEmbedded)
+                BigdataGraphFactory.create(
+                        SimpleBlueprintsValueFactory.INSTANCE, props);
+        
+        try {
+            
+            for (int i = 0; i < 5; i++) {
+                graph.addVertex(""+i);
+                if (i > 0) {
+                    final PartialVertex from = new PartialVertex(""+(i-1));
+                    final PartialVertex to = new PartialVertex(""+i);
+                    final PartialVertex edge = new PartialVertex((i-1)+""+i);
+                    final PartialVertex foo = new PartialVertex("test:foo");
+                    final Edge e = graph.addEdge((i-1)+""+i, from, to, "foo");
+                    graph.addEdge("test:foo", from, to, null);
+                    graph.addEdge(SimpleBlueprintsValueFactory.TYPE.toString(), edge, foo, null);
+                    e.setProperty("some:prop", i);
+                }
+            }
+            graph.commit();
+            
+            if (log.isDebugEnabled()) {
+                log.debug("\n"+graph.dumpStore());
+            }
+            
+            { // path filter
+                
+                final String queryStr =
+                        "select * " +
+                        "where { " +
+                        "  service bd:alp { " +
+                        "    <id:0> ?eid ?to . " +
+                        "    hint:Prior hint:alp.pathExpr \"true\" . " +
+                        "    ?eid <bigdata:type> <test:foo> . " +
+                        "    ?eid <some:prop> ?val . " +
+                        "    filter(?val < 3) . " +
+                        "    hint:Group hint:alp.lowerBound 0 . " +
+                        "    hint:Group hint:alp.upperBound 100 . " + 
+                        "  } " +
+                        "}";
+
+//                showOptimizedAST(graph, queryStr);
+                
+                final BigdataSelection selection = graph.select(queryStr);
+                if (log.isDebugEnabled()) {
+                    for (Bindings bs : selection.getBindings()) {
+                        log.debug(bs.toString());
+                    }
+                }
+                assertTrue(selection.getBindings().size() == 3);
+                
+            }
+            
+            { // path filter + incoming bindings
+                
+                /*
+                 * This tests whether vars used by the service are projected
+                 * in correctly.
+                 */
+                final String queryStr =
+                        "select * " +
+                        "where { " +
+                        "  service bd:alp { " +
+                        "    <id:0> ?eid ?to . " +
+                        "    hint:Prior hint:alp.pathExpr \"true\" . " +
+                        "    ?eid <bigdata:type> <test:foo> . " +
+                        "    ?eid <some:prop> ?val . " +
+                        "    filter(?val < ?max) . " +
+                        "    hint:Group hint:alp.lowerBound 0 . " +
+                        "    hint:Group hint:alp.upperBound 100 . " + 
+                        "  } " +
+                        "  values (?max) { " +
+                        "    (3) " + 
+                        "  } " +
+                        "}";
+                
+//              showOptimizedAST(graph, queryStr);
+                
+                final BigdataSelection selection = graph.select(queryStr);
+                if (log.isDebugEnabled()) {
+                    for (Bindings bs : selection.getBindings()) {
+                        log.debug(bs.toString());
+                    }
+                }
+                assertTrue(selection.getBindings().size() == 3);
+                
+            }
+            
+        } finally {
+            graph.shutdown();
+        }
+        
+    }
+    
+    private void showOptimizedAST(final BigdataGraphEmbedded graph, 
+            final String queryStr) throws Exception {
+        
+        final BigdataSailRepositoryConnection cxn = graph.getReadConnection();
+        try {
+            final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
+                    .prepareQuery(QueryLanguage.SPARQL, queryStr);
+            final QueryRoot optimized = query.optimize();
+            if (log.isDebugEnabled()) {
+                log.debug("optimized:\n" + optimized);
+            }
+        } finally {
+            cxn.close();
+        }
+
+    }
+
 }
