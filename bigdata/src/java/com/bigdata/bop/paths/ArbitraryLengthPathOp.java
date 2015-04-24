@@ -27,11 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.paths;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -164,6 +163,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
         String UPPER_BOUND =  Annotations.class.getName() + ".upperBound";
         
         /**
+         * The vars projected into this ALP op.
+         */
+        String PROJECT_IN_VARS =  Annotations.class.getName() + ".projectInVars";
+        
+        /**
          * The initial capacity of the {@link ConcurrentHashMap} used to impose 
          * the distinct filter (required to avoid duplicates).
          * 
@@ -219,6 +223,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
         getRequiredProperty(Annotations.UPPER_BOUND);
 
+        getRequiredProperty(Annotations.PROJECT_IN_VARS);
+
     }
     
     public ArbitraryLengthPathOp(final BOp[] args, NV... annotations) {
@@ -242,6 +248,8 @@ public class ArbitraryLengthPathOp extends PipelineOp {
       private final long lowerBound, upperBound;
       private final UnsynchronizedArrayBuffer<IBindingSet> out;
       private IDistinctFilter distinctVarFilter;
+      private final  Set<IVariable<?>> varsToRetain;
+      private Set<IVariable<?>> projectInVars;
 
       public ArbitraryLengthPathTask(final ArbitraryLengthPathOp controllerOp,
             final BOpContext<IBindingSet> context) {
@@ -291,6 +299,11 @@ public class ArbitraryLengthPathOp extends PipelineOp {
 
          this.upperBound = (Long) controllerOp
                .getProperty(Annotations.UPPER_BOUND);
+         
+         this.projectInVars = new LinkedHashSet<IVariable<?>>();
+         this.projectInVars.addAll(Arrays.asList(
+                 (IVariable<?>[]) controllerOp
+                 .getProperty(Annotations.PROJECT_IN_VARS)));
 
          /*
           * buffer forms chunks which get flushed onto the sink.
@@ -305,11 +318,12 @@ public class ArbitraryLengthPathOp extends PipelineOp {
           * ArbitraryLengthPath operator as defined by the W3C returns distinct
           * solutions only.
           */
-         final List<IVariable<?>> varsToRetain = new LinkedList<IVariable<?>>();
+         varsToRetain = new LinkedHashSet<IVariable<?>>();
          if (leftVar != null)
             varsToRetain.add(leftVar);
          if (rightVar != null)
             varsToRetain.add(rightVar);
+         varsToRetain.addAll(projectInVars);
          final IVariable<?>[] varsToRetainList = varsToRetain
                .toArray(new IVariable<?>[varsToRetain.size()]);
 
@@ -593,7 +607,10 @@ public class ArbitraryLengthPathOp extends PipelineOp {
                         }
                         
                         for (IVariable<?> anonymousVar : anonymousVars) {
-                           input.clear(anonymousVar);
+                            if (!projectInVars.contains(anonymousVar) &&
+                                  !varsToRetain.contains(anonymousVar)) {
+                                input.clear(anonymousVar);
+                            }
                         }
 
                         nextRoundInput.add(input);
