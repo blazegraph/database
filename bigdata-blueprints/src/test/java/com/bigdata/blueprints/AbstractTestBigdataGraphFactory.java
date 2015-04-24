@@ -46,7 +46,7 @@ import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
  */
 public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
-	protected static final transient Logger log = Logger
+	private static final transient Logger log = Logger
 			.getLogger(AbstractTestBigdataGraphFactory.class);
 
 	public static void testPrint(Object message) {
