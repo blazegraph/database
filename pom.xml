@@ -532,6 +532,13 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-jini</artifactId>
+       <version>1.0-SNAPSHOT</version>
+       <type>test-jar</type>
+       <scope>test</scope>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
        <version>1.0-SNAPSHOT</version>
      </dependency>
