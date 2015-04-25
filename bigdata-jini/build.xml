@@ -5,6 +5,9 @@
     <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
        <isset property="env.TEST_ZOOKEEPER_HOME" />
     </condition>
+    <condition property="mvn.home" value="${env.MAVEN_HOME}" else="">
+       <isset property="env.MAVEN_HOME" />
+    </condition>
     <exec executable="hostname"
         outputproperty="this.hostname">
      </exec>
@@ -43,7 +46,7 @@
     </target>
 
     <target name = "getMavenDependencies">
-	<exec executable="mvn" logerror="true" dir = ".">
+	<exec executable="${mvn.home}/bin/mvn" logerror="true" dir = ".">
 	    <arg value = "dependency:copy-dependencies"/>
 	</exec>
     </target>
