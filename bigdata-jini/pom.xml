@@ -17,23 +17,25 @@
 
   <build>
     <plugins>
+<!--
         <plugin>
         <groupId>jini</groupId>
         <artifactId>maven-jini-plugin</artifactId>
         <version>2.0</version>
         <configuration>
           <port>5464</port>
-          <dir>C:/</dir>
+          <dir>.</dir>
           <securityPolicy>policy.all</securityPolicy>
           <loggingManager>com.sun.jini.logging.LogManager</loggingManager>
-          <serviceConfig>myservice.config</serviceConfig>
+          <serviceConfig>src/test/resources/startAll.config</serviceConfig>
           <serverHost>127.0.0.1</serverHost>
           <codebaseHost>127.0.0.1</codebaseHost>
-          <jiniHome>C:/Java/Jini/jini2_1</jiniHome>
+          <jiniHome>./jini2_1</jiniHome>
           <securityDebug>true</securityDebug>
           <serviceDebug>false</serviceDebug>
         </configuration>
       </plugin>
+-->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -46,7 +48,63 @@
           </execution>
         </executions>
       </plugin>
-   </plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <executions>
+           <!-- Associate the read-project-properties goal with the initialize phase, to read the properties file. -->
+          <execution>
+            <phase>initialize</phase>
+            <goals>
+              <goal>read-project-properties</goal>
+            </goals>
+            <configuration>
+              <files>
+                <file>testServices.properties</file>
+              </files>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <argLine>-Djava.security.manager -Djava.security.policy=${java.security.policy}</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+  	       <id>start-zookeeper</id>
+	       <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>process-test-resources</phase>
+               <configuration>
+                 <target>
+                   <ant antfile="build.xml" target="startZookeeper"/>
+                 </target>
+               </configuration>
+             </execution>
+             <execution>
+  	       <id>stop-zookeeper</id>
+	       <goals>
+		<goal>run</goal>
+	       </goals>
+               <phase>test</phase>
+               <configuration>
+                 <target>
+                   <ant antfile="build.xml" target="stopZookeeper"/>
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+         </plugin>
+    </plugins>
   </build>
 
   <reporting>
@@ -132,12 +190,15 @@ ga('send', 'pageview');
       <artifactId>jetty-webapp</artifactId>
       <version>${jetty.version}</version>
     </dependency>
+<!--
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-core</artifactId>
-        <version>2.1</version>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
+-->
+    <!-- this is the only version in maven central -->
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-ext</artifactId>
@@ -147,107 +208,105 @@ ga('send', 'pageview');
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jsk-lib</artifactId>
-        <version>2.1</version>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jsk-platform</artifactId>
-        <version>2.1</version>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jsk-resources</artifactId>
-        <version>2.1</version>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>destroy</artifactId>
-        <version>2.1</version>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo</artifactId>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>group</artifactId>
-        <version>2.1</version>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mahalo-dl</artifactId>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>sun-util</artifactId>
-        <version>2.1</version>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler</artifactId>
+        <version>2.2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
-        <groupId>com.sun.jini</groupId>
+        <groupId>org.apache.river</groupId>
+        <artifactId>fiddler-dl</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>reggie-dl</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>mercury-dl</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>outrigger-dl</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>norm-dl</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>start</artifactId>
+        <version>2.2.1</version>
+        <type>jar</type>
+    </dependency>
+    <!-- There is no artifact in maven central for tools 2.2.1 -->
+    <dependency>
+        <groupId>org.apache.river</groupId>
         <artifactId>tools</artifactId>
-        <version>2.1</version>
+        <version>2.2.2</version>
         <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>checkconfigurationfile</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>checkser</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>classdep</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>classserver</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>computedigest</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>computehttpmdcodebase</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>envcheck</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>jarwrapper</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <!-- End Jini Service Dependencies -->
-    <!-- Jini starter kit -->
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>jini-starterkit</artifactId>
-        <version>2.1</version>
-        <type>zip</type>
-    </dependency>
-    <!-- Jini starter kit service configuration files -->
-    <dependency>
-        <groupId>com.sun.jini</groupId>
-        <artifactId>jini-start-examples</artifactId>
-        <version>2.1</version>
-        <type>zip</type>
     </dependency>
     <dependency>
        <!-- log4j is the primary logger for bigdata. -->

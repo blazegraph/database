@@ -1,0 +1,170 @@
+<?xml version="1.0"?>
+<!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "http://www.eclipse.org/jetty/configure.dtd">
+<!-- See http://www.eclipse.org/jetty/documentation/current/ -->
+<!-- See http://wiki.eclipse.org/Jetty/Reference/jetty.xml_syntax -->
+<Configure id="Server" class="org.eclipse.jetty.server.Server">
+
+    <!-- =========================================================== -->
+    <!-- Configure the Server Thread Pool.                           -->
+    <!-- The server holds a common thread pool which is used by      -->
+    <!-- default as the executor used by all connectors and servlet  -->
+    <!-- dispatches.                                                 -->
+    <!--                                                             -->
+    <!-- Configuring a fixed thread pool is vital to controlling the -->
+    <!-- maximal memory footprint of the server and is a key tuning  -->
+    <!-- parameter for tuning.  In an application that rarely blocks -->
+    <!-- then maximal threads may be close to the number of 5*CPUs.  -->
+    <!-- In an application that frequently blocks, then maximal      -->
+    <!-- threads should be set as high as possible given the memory  -->
+    <!-- available.                                                  -->
+    <!--                                                             -->
+    <!-- Consult the javadoc of o.e.j.util.thread.QueuedThreadPool   -->
+    <!-- for all configuration that may be set here.                 -->
+    <!-- =========================================================== -->
+    <Arg name="threadpool"><New id="threadpool" class="org.eclipse.jetty.util.thread.QueuedThreadPool"/></Arg>
+    <Get name="ThreadPool">
+      <Set name="minThreads" type="int"><Property name="jetty.threads.min" default="10"/></Set>
+      <Set name="maxThreads" type="int"><Property name="jetty.threads.max" default="64"/></Set>
+      <Set name="idleTimeout" type="int"><Property name="jetty.threads.timeout" default="60000"/></Set>
+      <Set name="detailedDump">false</Set>
+    </Get>
+
+   <!-- =========================================================== -->
+   <!-- Get the platform mbean server                               -->
+   <!-- =========================================================== -->
+   <Call id="MBeanServer" class="java.lang.management.ManagementFactory"
+     name="getPlatformMBeanServer" />
+   
+   <!-- =========================================================== -->
+   <!-- Initialize the Jetty MBean container                        -->
+   <!-- =========================================================== -->
+   <!-- Note: This breaks CI if it is enabled
+   <Call name="addBean">
+     <Arg>
+       <New id="MBeanContainer" class="org.eclipse.jetty.jmx.MBeanContainer">
+         <Arg>
+           <Ref refid="MBeanServer" />
+         </Arg>
+       </New>
+     </Arg>
+   </Call>-->
+   
+   <!-- Add the static log to the MBean server. 
+   <Call name="addBean">
+     <Arg>
+       <New class="org.eclipse.jetty.util.log.Log" />
+     </Arg>
+   </Call>-->
+
+   <!-- For remote MBean access (optional)  
+   <New id="ConnectorServer" class="org.eclipse.jetty.jmx.ConnectorServer">
+     <Arg>
+       <New class="javax.management.remote.JMXServiceURL">
+         <Arg type="java.lang.String">rmi</Arg>
+         <Arg type="java.lang.String" />
+         <Arg type="java.lang.Integer"><SystemProperty name="jetty.jmxrmiport" default="1090"/></Arg>
+         <Arg type="java.lang.String">/jndi/rmi://<SystemProperty name="jetty.jmxrmihost" default="localhost"/>:<SystemProperty name="jetty.jmxrmiport" default="1099"/>/jmxrmi</Arg>
+       </New>
+     </Arg>
+     <Arg>org.eclipse.jetty.jmx:name=rmiconnectorserver</Arg>
+     <Call name="start" />
+   </New>-->
+ 
+    <!-- =========================================================== -->
+    <!-- Http Configuration.                                         -->
+    <!-- This is a common configuration instance used by all         -->
+    <!-- connectors that can carry HTTP semantics (HTTP, HTTPS, SPDY)-->
+    <!-- It configures the non wire protocol aspects of the HTTP     -->
+    <!-- semantic.                                                   -->
+    <!--                                                             -->
+    <!-- Consult the javadoc of o.e.j.server.HttpConfiguration       -->
+    <!-- for all configuration that may be set here.                 -->
+    <!-- =========================================================== -->
+    <New id="httpConfig" class="org.eclipse.jetty.server.HttpConfiguration">
+      <Set name="secureScheme">https</Set>
+      <Set name="securePort"><Property name="jetty.secure.port" default="8443" /></Set>
+      <Set name="outputBufferSize"><Property name="jetty.output.buffer.size" default="32768" /></Set>
+      <Set name="requestHeaderSize"><Property name="jetty.request.header.size" default="8192" /></Set>
+      <Set name="responseHeaderSize"><Property name="jetty.response.header.size" default="8192" /></Set>
+      <Set name="sendServerVersion"><Property name="jetty.send.server.version" default="true" /></Set>
+      <Set name="sendDateHeader"><Property name="jetty.send.date.header" default="false" /></Set>
+      <Set name="headerCacheSize">512</Set>
+      <!-- Uncomment to enable handling of X-Forwarded- style headers
+      <Call name="addCustomizer">
+        <Arg><New class="org.eclipse.jetty.server.ForwardedRequestCustomizer"/></Arg>
+      </Call>
+      -->
+    </New>
+    
+    <!-- Configure the HTTP endpoint.                                -->
+    <Call name="addConnector">
+       <Arg>
+         <New class="org.eclipse.jetty.server.ServerConnector">
+           <Arg name="server"><Ref refid="Server" /></Arg>
+           <Arg name="factories">
+             <Array type="org.eclipse.jetty.server.ConnectionFactory">
+               <Item>
+                 <New class="org.eclipse.jetty.server.HttpConnectionFactory">
+                   <Arg name="config"><Ref refid="httpConfig" /></Arg>
+                 </New>
+               </Item>
+             </Array>
+           </Arg>
+           <Set name="host"><SystemProperty name="jetty.host" /></Set>
+           <Set name="port"><SystemProperty name="jetty.port" default="8080" /></Set>
+           <Set name="idleTimeout"><SystemProperty name="http.timeout" default="30000"/></Set>
+         </New>
+       </Arg>
+     </Call>
+
+    <!-- =========================================================== -->
+    <!-- Set handler Collection Structure                            --> 
+    <!-- =========================================================== -->
+    <Set name="handler">
+      <New id="Handlers" class="org.eclipse.jetty.server.handler.HandlerCollection">
+        <Set name="handlers">
+         <Array type="org.eclipse.jetty.server.Handler">
+           <Item>
+             <New id="Contexts" class="org.eclipse.jetty.server.handler.ContextHandlerCollection">
+                   <Call name="addHandler">
+                      <Arg>
+                        <!-- This is the redirect from root to /bigdata -->
+                        <New id="moved" class="org.eclipse.jetty.server.handler.MovedContextHandler">
+              <Set name="contextPath">/</Set>
+              <Set name="newContextURL">/bigdata</Set>
+              <Set name="permanent">true</Set>
+              <Set name="discardPathInfo">false</Set>
+              <Set name="discardQuery">false</Set>
+                        </New>
+                    </Arg>
+                  </Call>
+                  <Call name="addHandler">
+                    <Arg>
+                        <!-- This is the bigdata web application. -->
+                        <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
+                         <Set name="war"><SystemProperty name="jetty.resourceBase" default="bigdata-war/src"/></Set>
+                         <Set name="contextPath">/bigdata</Set>
+                         <Set name="descriptor">WEB-INF/web.xml</Set>
+                         <Set name="parentLoaderPriority">true</Set>
+                         <Set name="extractWAR">false</Set>
+                         <Set name="overrideDescriptor"><SystemProperty name="jetty.overrideWebXml" default="bigdata-war/src/WEB-INF/override-web.xml"/></Set>
+                         <Set name="maxFormContentSize">10485760</Set>
+                        </New>
+                    </Arg>
+                  </Call>
+             </New>
+           </Item>
+         </Array>
+        </Set>
+      </New>
+    </Set>
+      
+    <!-- =========================================================== -->
+    <!-- extra server options                                        -->
+    <!-- =========================================================== -->
+    <Set name="stopAtShutdown">true</Set>
+    <Set name="stopTimeout">5000</Set>
+    <Set name="dumpAfterStart"><Property name="jetty.dump.start" default="false"/></Set>
+    <Set name="dumpBeforeStop"><Property name="jetty.dump.stop" default="false"/></Set>
+
+</Configure>

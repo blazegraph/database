@@ -76,7 +76,7 @@ dependencies.
       <!--                                                            -->
       <bigdata.version>1.5.1-SNAPSHOT</bigdata.version>
       <icu.version>4.8</icu.version>
-      <zookeeper.version>3.4.5</zookeeper.version>
+      <zookeeper.version>3.4.6</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
       <slf4j.version>1.6.1</slf4j.version>
       <jetty.version>9.2.3.v20140905</jetty.version>
