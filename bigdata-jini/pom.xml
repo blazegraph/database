@@ -321,6 +321,11 @@ ga('send', 'pageview');
         <type>jar</type>
     </dependency>
     <dependency>
+	<groupId>com.sun.jini</groupId>
+	<artifactId>sun-util</artifactId>
+	<version>2.1</version>
+    </dependency>
+    <dependency>
        <!-- log4j is the primary logger for bigdata. -->
        <groupId>log4j</groupId>
        <artifactId>log4j</artifactId>
