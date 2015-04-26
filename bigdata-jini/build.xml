@@ -11,7 +11,9 @@
     <exec executable="hostname"
         outputproperty="this.hostname">
      </exec>
-    <property name = "default.nic" value = "${default.nic}"/>
+    <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
+       <isset property="env.DEFAULT_NIC" />
+    </condition>
     <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
     <property name="app.home" value ="."/>
     <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
@@ -124,7 +126,9 @@
        <antcall target="getMavenDependencies"/>
 
        <!-- Emit the property to the ant console -->
-       <echo message="Classpath = ${jiniclasspath}"/>
+       <property name="print_classpath" value = "${jini.classpath}"/>
+       <echo message="Classpath = ${jini.classpath}"/>
+       <echo>${print_classpath}</echo>
       <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -Dbigdata.lookup.config=${lookup.config} -Dreggie.jar=${reggie.jar} -Dreggie-dl.jar=${reggie-dl.jar} -Djsk-dl.jar=${jsk-dl.jar} com.bigdata.service.jini.util.LookupStarter
 </echo>
       <echo>
