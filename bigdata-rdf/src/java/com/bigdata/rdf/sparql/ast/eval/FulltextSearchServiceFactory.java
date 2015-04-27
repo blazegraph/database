@@ -28,8 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -37,8 +41,6 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.impl.ValueFactoryImpl;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -48,10 +50,10 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.lexicon.IFulltextSearch.SolrSearchQuery;
+import com.bigdata.rdf.lexicon.IFulltextSearch;
+import com.bigdata.rdf.lexicon.IFulltextSearch.FulltextSearchQuery;
 import com.bigdata.rdf.lexicon.SolrFulltextSearchImpl;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
@@ -65,18 +67,19 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
-import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
+import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.FTS;
-import com.bigdata.search.IHit;
-import com.bigdata.search.IFulltextSearchHit;
+import com.bigdata.rdf.store.FTS.EndpointType;
+import com.bigdata.rdf.store.FTS.TargetType;
 import com.bigdata.search.FulltextSearchHit;
 import com.bigdata.search.FulltextSearchHiterator;
+import com.bigdata.search.IFulltextSearchHit;
+import com.bigdata.search.IHit;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -102,7 +105,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
         
         serviceOptions = new BigdataNativeServiceOptions();
         
-        serviceOptions.setRunLast(true); // override default
+        serviceOptions.setRunFirst(true);
+
     }
     
     @Override
@@ -112,7 +116,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
         
     }
     
-    public BigdataServiceCall create(final ServiceCallCreateParams params) {
+    public MockIVReturningServiceCall create(final ServiceCallCreateParams params) {
 
         if (params == null)
             throw new IllegalArgumentException();
@@ -207,6 +211,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                  * Some search predicate.
                  */
 
+                
                 if (!ASTFulltextSearchOptimizer.searchUris.contains(uri))
                     throw new RuntimeException("Unknown search predicate: "
                             + uri);
@@ -250,7 +255,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
     }
 
     /**
-     * Validate the search. There must be exactly one {@link BD#SEARCH}
+     * Validate the search. There must be exactly one {@link FTS#SEARCH}
      * predicate. There should not be duplicates of any of the search predicates
      * for a given searchVar.
      */
@@ -271,6 +276,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             // all input variables must have been bound and point to literals
             if (uri.equals(FTS.SEARCH) ||
                 uri.equals(FTS.ENDPOINT) ||
+                uri.equals(FTS.ENDPOINT_TYPE) ||
                 uri.equals(FTS.PARAMS) ||
                 uri.equals(FTS.TARGET_TYPE) ||
                 uri.equals(FTS.TIMEOUT)) {
@@ -335,18 +341,18 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
      * is not a {@link Serializable} object. It MUST run on the query
      * controller.
      */
-    private static class ExternalServiceSearchCall implements BigdataServiceCall {
+    private static class ExternalServiceSearchCall implements MockIVReturningServiceCall { 
 
         private final AbstractTripleStore store;
         private final IServiceOptions serviceOptions;
-        private final Literal query;
-        private final Literal endpoint;
-        private final Literal endpointType;
-        private final Literal params;
-        private final Literal fieldType;
-        private final Literal searchTimeosut;
+        private final TermNode query;
+        private final TermNode endpoint;
+        private final TermNode endpointType;
+        private final TermNode params;
+        private final TermNode targetType;
+        private final TermNode searchTimeout;
         
-        private final IVariable<?>[] vars;
+        private final IVariable<IV>[] vars;
         
         public ExternalServiceSearchCall(
                 final AbstractTripleStore store,
@@ -369,49 +375,46 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             this.store = store;
             
             this.serviceOptions = serviceOptions;
-            
+
             /*
              * Unpack the "search" magic predicate:
-             * 
              * [?searchVar solr:search objValue]
              */
             final StatementPatternNode sp =
                statementPatterns.get(FTS.SEARCH);
+            query = sp.o();
 
-            query = (Literal) sp.o().getValue();
-            
             /*
              * Unpack the search service request parameters.
              */
-
-            Literal endpoint = null;
-            Literal endpointType = null;
-            Literal params = null;
-            Literal fieldType = null;
-            Literal searchTimeosut = null;
             IVariable<?> score = null;
             IVariable<?> snippet = null;
-
+            TermNode endpoint = null;
+            TermNode endpointType = null;
+            TermNode params = null;
+            TermNode targetType = null;
+            TermNode searchTimeout = null;
+            
+            /*
+             * Unpack the remaining magic predicates
+             */
             for (StatementPatternNode meta : statementPatterns.values()) {
 
                 final URI p = (URI) meta.p().getValue();
 
-                final Literal oVal = meta.o().isConstant() ? (Literal) meta.o()
-                        .getValue() : null;
-
-                final IVariable<?> oVar = meta.o().isVariable() ? (IVariable<?>) meta
-                        .o().getValueExpression() : null;
+                final IVariable<?> oVar = meta.o().isVariable() ?
+                      (IVariable<?>) meta.o().getValueExpression() : null;
 
                 if (FTS.ENDPOINT.equals(p)) {
-                   endpoint = oVal;
+                    endpoint = meta.o();
                 } else if (FTS.ENDPOINT_TYPE.equals(p)) {
-                      endpointType = oVal;
+                    endpointType = meta.o();
                 } else if (FTS.PARAMS.equals(p)) {
-                    params = oVal;
+                    params = meta.o();
                 } else if (FTS.TARGET_TYPE.equals(p)) {
-                    fieldType = oVal;
+                    targetType = meta.o();
                 } else if (FTS.TIMEOUT.equals(p)) {
-                    searchTimeosut = oVal;
+                    searchTimeout = meta.o();
                 } else if (FTS.SCORE.equals(p)) {
                     score = oVar;
                 } else if (FTS.SNIPPET.equals(p)) {
@@ -419,173 +422,34 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                 } 
             }
 
+            final Var<?> dummyScoreVar = Var.var();
+            final Var<?> dummySnippetVar = Var.var();
+            dummyScoreVar.setAnonymous(true);
+            dummySnippetVar.setAnonymous(true);
+            
             this.vars = new IVariable[] {//
                   searchVar,//
-	               score == null ? Var.var() : score,// must be non-null.
-	               snippet == null ? Var.var() : snippet // must be non-null.
+	               score == null ? dummyScoreVar : score,// must be non-null.
+	               snippet == null ? dummySnippetVar : snippet // must be non-null.
 	         };
 
             this.endpoint = endpoint;
             this.endpointType = endpointType;
             this.params = params;
-            this.fieldType = fieldType;
-            this.searchTimeosut = searchTimeosut;
+            this.targetType = targetType;
+            this.searchTimeout = searchTimeout;
 
         }
 
         @SuppressWarnings({ "rawtypes", "unchecked" })
-        private FulltextSearchHiterator<IFulltextSearchHit<?>> 
-           getSolrSearchResultIterator(IBindingSet[] bindingsClause) {
+        private FulltextSearchMultiHiterator<IFulltextSearchHit<?>> 
+           getSolrSearchResultIterator(IBindingSet[] bsList) {
 
-           
-           /*
-           final ITextIndexer<IHit> textIndex = (ITextIndexer) 
-	    				store.getLexiconRelation().getSearchEngine();
-        	
-            if (textIndex == null)
-                throw new UnsupportedOperationException("No free text index?");
-
-            String s = query.getLabel();
-            final boolean prefixMatch;
-            if (s.indexOf('*') >= 0) {
-                prefixMatch = true;
-                s = s.replaceAll("\\*", "");
-            } else {
-                prefixMatch = false;
-            }
-            */
-           // TODO: merge in bindings and pass in variables (rather than
-           // hardcoded strings below)
-            
-            SolrFulltextSearchImpl si = new SolrFulltextSearchImpl();
-            SolrSearchQuery sq = new SolrSearchQuery("query", "params", "endpoint");
-            return (FulltextSearchHiterator) si.search(sq);
+           return new FulltextSearchMultiHiterator(bsList, query,
+                 endpoint, endpointType, params, targetType, searchTimeout);
         
         }
-
-        /**
-         * {@inheritDoc}
-         * 
-         * FIXME The bindingsClause is ignored. If someone were to bind the
-         * subject, rank, or relevance variables then we would to notice that
-         * here.  We would also have to produce one solution for each binding
-         * set input to the service.
-         */
-        @Override
-        public ICloseableIterator<IBindingSet> call(
-                final IBindingSet[] bindingsClause) {
-
-
-           /*
-            if (bindingsClause.length > 1) {
-
-
-                throw new UnsupportedOperationException();
-
-            }
-
-            if (bindingsClause.length == 1 && !bindingsClause[0].isEmpty()) {
-
-
-//                throw new UnsupportedOperationException();
-
-            }
-            */
-         	return new HitConverter(getSolrSearchResultIterator(bindingsClause));
-
-        }
-            
-        /**
-         * Converts {@link FulltextSearchHit}s into {@link IBindingSet}
-         */
-        private class HitConverter implements ICloseableIterator<IBindingSet> {
-            
-            private final FulltextSearchHiterator<IFulltextSearchHit<?>> src;
-
-            private IFulltextSearchHit<?> current = null;
-            private boolean open = true;
-            
-            public HitConverter(final FulltextSearchHiterator<IFulltextSearchHit<?>> src) {
-                
-                this.src = src;
-                
-            }
-            
-            public void close() {
-                if (open) {
-                    open = false;
-                }
-            }
-
-            public boolean hasNext() {
-                if (!open)
-                    return false;
-                if (current != null)
-                    return true;
-                while (src.hasNext()) {
-                    current = src.next();
-                    return true;
-                }
-                return current != null;
-            }
-
-            public IBindingSet next() {
-
-                if (!hasNext())
-                    throw new NoSuchElementException();
-                
-                final IFulltextSearchHit<?> tmp = current;
-                
-                current = null;
-                
-                return newBindingSet(tmp);
-                
-            }
-
-            /**
-             * Convert an {@link IHit} into an {@link IBindingSet}.
-             */
-            // TODO: verify if this is inline with the variable order,
-            // do we also need to pass in the URI nodes?!
-            private IBindingSet newBindingSet(final IFulltextSearchHit<?> hit) {
-                
-               // TODO: replace dummy.ns
-                BigdataValueFactory vf = 
-                   BigdataValueFactoryImpl.getInstance(
-                      store.getLexiconRelation().getNamespace());
-                
-                BigdataLiteral litSnippet = vf.createLiteral(hit.getSnippet());
-
-                BigdataLiteral uriRes = vf.createLiteral(hit.getRes());
-
-                @SuppressWarnings({ "unchecked", "rawtypes" })
-                final IConstant<?>[] vals = 
-                   new IConstant[] {
-                      new Constant(new Constant(DummyConstantNode.toDummyIV((BigdataValue)uriRes))),  // uriIv
-                      new Constant(new XSDNumericIV(hit.getScore())), 
-                      new Constant(new Constant(DummyConstantNode.toDummyIV((BigdataValue)litSnippet)))                      
-                };
-            
-                final ListBindingSet bs = new ListBindingSet(vars, vals);
-                
-                if (log.isTraceEnabled()) {
-                	log.trace(bs);
-                	log.trace(query.getClass());
-                	log.trace(((BigdataLiteral) query).getIV());
-                	log.trace(((BigdataLiteral) query).getIV().getClass());
-                }
-                
-                return bs;
-                
-            }
-
-            public void remove() {
-                
-                throw new UnsupportedOperationException();
-                
-            }
-
-        } // class HitConverter
+        
 
         @Override
         public IServiceOptions getServiceOptions() {
@@ -593,7 +457,446 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             return serviceOptions;
             
         }
+
+    @Override
+    public ICloseableIterator<IBindingSet> call(IBindingSet[] incomingBs) {
+       
+       final FulltextSearchMultiHiterator<IFulltextSearchHit<?>> hiterator =
+           getSolrSearchResultIterator(incomingBs);
+       
+       return new FulltextSearchHitConverter(hiterator);
+
+    }
+
+
+   /**
+      * Converts {@link FulltextSearchHit}s into {@link IBindingSet}
+      */
+     private class FulltextSearchHitConverter 
+     implements ICloseableIterator<IBindingSet> {
+         
+         private final FulltextSearchMultiHiterator<IFulltextSearchHit<?>> src;
+         
+         private IFulltextSearchHit<?> current = null;
+         private boolean open = true;
+         
+         public FulltextSearchHitConverter(
+               final FulltextSearchMultiHiterator<IFulltextSearchHit<?>> src) {
+             
+             this.src = src;
+             
+         }
+         
+         public void close() {
+             if (open) {
+                 open = false;
+             }
+         }
+   
+         public boolean hasNext() {
+             if (!open)
+                 return false;
+             if (current != null)
+                 return true;
+             while (src.hasNext()) {
+                 current = src.next();
+                 return true;
+             }
+             return current != null;
+         }
+   
+         public IBindingSet next() {
+   
+             if (!hasNext())
+                 throw new NoSuchElementException();
+             
+             final IFulltextSearchHit<?> tmp = current;
+             
+             current = null;
+             
+             return newBindingSet(tmp);
+             
+         }
+   
+         /**
+          * Convert an {@link IHit} into an {@link IBindingSet}.
+          */
+         private IBindingSet newBindingSet(final IFulltextSearchHit<?> hit) {
+             
+             BigdataValueFactory vf = 
+                BigdataValueFactoryImpl.getInstance(
+                   store.getLexiconRelation().getNamespace());
+             
+             BigdataLiteral litSnippet = vf.createLiteral(hit.getSnippet());
+   
+             /**
+              * The targetType determines the type to which we cast the
+              * results.
+              */
+             final BigdataValue val;
+             switch (hit.getTargetType()) {
+             case LITERAL:
+                val = vf.createLiteral(hit.getRes());
+                break;
+             case URI:
+             default: 
+                val = vf.createURI(hit.getRes());
+                break;
+             }
+   
+   
+             @SuppressWarnings({ "unchecked", "rawtypes" })
+             final IConstant<?>[] vals = 
+                new IConstant[] {
+                   new Constant(new Constant(DummyConstantNode.toDummyIV(val))),
+                   new Constant(new XSDNumericIV(hit.getScore())), 
+                   new Constant(new Constant(DummyConstantNode.toDummyIV((BigdataValue)litSnippet)))                      
+             };
+   
+             final ListBindingSet bs = new ListBindingSet(vars, vals);
+             final IBindingSet baseBs = hit.getIncomingBindings();
+             final Iterator<IVariable> varIt = baseBs.vars();
+             while (varIt.hasNext()) {
+                final IVariable var = varIt.next();
+                if (bs.isBound(var)) {
+                   throw new RuntimeException(
+                       "Illegal use of search service. Variable ?" + var + 
+                       " must not be bound from outside. If you need to join"
+                       + " on the variable, you may try nesting the"
+                       + " SERVICE in a WITH block and join outside.");
+                }
+                bs.set(var, baseBs.get(var));
+             }
+             
+             if (log.isTraceEnabled()) {
+             	log.trace(bs);
+             	log.trace(query.getClass());
+             	log.trace(((BigdataLiteral) query).getIV());
+             	log.trace(((BigdataLiteral) query).getIV().getClass());
+             }
+             
+             return bs;
+             
+         }
+   
+         public void remove() {
+             
+             throw new UnsupportedOperationException();
+             
+         }
+   
+     } // class HitConverter
+
+
+   @Override
+   public List<IVariable<IV>> getMockVariables() {
+      
+      List<IVariable<IV>> externalVars = new LinkedList<IVariable<IV>>();
+      for (int i=0; i<vars.length; i++) {
+         
+         if (!vars[i].isAnonymous()) {
+            
+            externalVars.add(vars[i]);
+            
+         }
+      }
+
+      return externalVars;
+   }
+
+
         
+    }
+    
+    /**
+     * Wrapper around {@link FulltextSearchHiterator}, delegating requests for
+     * multiple binding sets to the latter one.
+     */
+    public static class FulltextSearchMultiHiterator<A extends IFulltextSearchHit> {
+
+       final IBindingSet[] bindingSet;
+       final TermNode query;
+       final TermNode endpoint;
+       final TermNode endpointType;
+       final TermNode params ;
+       final TermNode targetType;
+       final TermNode searchTimeout;
+       
+       
+        int nextBindingSetItr = 0;
+       
+        FulltextSearchHiterator<IFulltextSearchHit> curDelegate;
+       
+        public FulltextSearchMultiHiterator(final IBindingSet[] bindingSet,
+              final TermNode query, final TermNode endpoint,
+              final TermNode endpointType, final TermNode params,
+              final TermNode targetType, final TermNode searchTimeout) {
+           
+           this.query = query;
+           this.bindingSet = bindingSet;
+           this.endpoint = endpoint;
+           this.endpointType = endpointType;
+           this.params = params;
+           this.targetType = targetType;
+           this.searchTimeout = searchTimeout;
+           
+           init();
+
+        }
+      
+      
+      /**
+       * Checks whether there are more results available.
+       * 
+       * @return
+       */
+      public boolean hasNext() {
+
+         /*
+          * Delegate will be set to null once all binding sets have
+          * been processed
+          */
+         if (curDelegate==null) {
+            
+            return false;
+            
+         }
+         
+         /*
+          * If there is a delegate set, ask him if there are results
+          */
+         if (curDelegate.hasNext()) {
+
+            return true;
+         
+         } else {
+         
+            // if not, we set the next delegate
+            if (nextDelegate()) { // in case there is one ...
+            
+               return hasNext(); // go into recursion
+            
+            }
+         }
+         
+
+         return false; // fallback
+      }
+      
+      public A next() {
+         
+         if (curDelegate==null) {
+            
+            return null; // no more results
+
+         }
+         
+         if (curDelegate.hasNext()) {
+            
+            return (A)curDelegate.next();
+            
+         } else {
+            
+            if (nextDelegate()) {
+               
+               return next();
+            }
+         }
+         
+         return null; // reached the end
+         
+      }
+      
+      /**
+       * @return true if a new delegate has been set successfully, false otherwise
+       */
+      private boolean nextDelegate() {
+         
+         if (bindingSet==null || nextBindingSetItr>=bindingSet.length) {
+            curDelegate = null;
+            return false;
+         }
+
+         IBindingSet bs = bindingSet[nextBindingSetItr++];
+         final String query = resolveQuery(bs);
+         final String endpoint = resolveEndpoint(bs);
+         final EndpointType endpointType = resolveEndpointType(bs);
+         final String params = resolveParams(bs);
+         final TargetType targetType = resolveTargetType(bs);
+         final Long searchTimeout =  resolveSearchTimeout(bs);
+
+        /*
+         * Though we currently, we only support Solr, here we might easily
+         * hook in other implementations based on the magic predicate
+         */
+         final IFulltextSearch ftSearch;
+         switch (endpointType) {
+
+         case SOLR:
+         default:
+            ftSearch = new SolrFulltextSearchImpl();
+            break;
+         }
+       
+         FulltextSearchQuery sq = 
+             new FulltextSearchQuery(
+                 query, params, endpoint, searchTimeout, bs, targetType);
+         curDelegate = (FulltextSearchHiterator) ftSearch.search(sq);
+         
+         return true;
+      }
+      
+      private void init() {
+         nextDelegate();
+      }
+      
+      private String resolveQuery(IBindingSet bs) {
+         
+         String queryStr = resolveAsString(query, bs);
+         
+         if (queryStr==null || queryStr.isEmpty()) {
+             throw new RuntimeException("Query string null or empty.");
+         }
+         
+         return queryStr;
+         
+      }
+
+      private TargetType resolveTargetType(IBindingSet bs) {
+
+         String targetTypeStr = resolveAsString(targetType, bs);
+         
+         if (targetTypeStr!=null) {
+            
+             try {
+
+                 return TargetType.valueOf(targetTypeStr);
+ 
+             } catch (IllegalArgumentException e) {
+                
+                // illegal, ignore and proceed
+                if (log.isDebugEnabled()) {
+                   log.warn("Illegal target type: " + targetTypeStr);
+                }
+                
+             }
+         }
+         
+         return FTS.DEFAULT_TARGET_TYPE; // fallback
+         
+      }
+
+      private Long resolveSearchTimeout(IBindingSet bs) {
+
+         String searchTimeoutStr = resolveAsString(searchTimeout, bs);
+         
+         if (searchTimeoutStr!=null) {
+            
+             try {
+
+                 return Long.valueOf(searchTimeoutStr);
+ 
+             } catch (NumberFormatException e) {
+                
+                // illegal, ignore and proceed
+                if (log.isDebugEnabled()) {
+                   log.warn("Illegal timeout string: " + searchTimeoutStr);
+                }
+                
+             }
+         }
+         
+         return FTS.DEFAULT_TIMEOUT; // fallback
+      }
+
+      private String resolveParams(IBindingSet bs) {
+         
+         return resolveAsString(params, bs);
+         
+      }
+
+      /**
+       * Resolves the endpoint type, which is either a constant or a variable
+       * to be looked up in the binding set.
+       */
+      private EndpointType resolveEndpointType(IBindingSet bs) {
+         
+         String endpointTypeStr = resolveAsString(endpointType, bs);
+         
+         if (endpointTypeStr!=null) {
+            
+             try {
+
+                 return EndpointType.valueOf(endpointTypeStr);
+ 
+             } catch (IllegalArgumentException e) {
+                
+                // illegal, ignore and proceed
+                if (log.isDebugEnabled()) {
+                   log.warn("Illegal endpoint type: " + endpointTypeStr);
+                }
+                
+             }
+         }
+         
+         return FTS.DEFAULT_ENDPOINT_TYPE; // fallback
+         
+      }
+
+      /**
+       * Resolves the endpoint, which is either a constant or a variable
+       * to be looked up in the binding set.
+       */
+      private String resolveEndpoint(IBindingSet bs) {
+         
+          String endpointStr = resolveAsString(endpoint, bs);
+          if (endpointStr==null || endpointStr.isEmpty()) {
+             
+             throw new RuntimeException(
+                "External fulltext search endpoint null or empty.");
+             
+          } 
+          
+          return endpointStr;
+      }
+      
+      private String resolveAsString(TermNode termNode, IBindingSet bs) {
+         
+         if (termNode==null) { // term node not set explicitly
+            return null;
+         }
+         
+         if (termNode.isConstant()) {
+            
+            final Literal lit = (Literal)termNode.getValue();
+            return lit==null ? null : lit.stringValue();
+            
+         } else {
+            
+            if (bs==null) {
+               return null; // shouldn't happen, but just in case...
+            }
+            
+            final IVariable<?> var = 
+                (IVariable<?>)termNode.getValueExpression();
+            if (bs.isBound(var)) {
+               IConstant<?> c = bs.get(var);
+               if (c==null || c.get()==null || 
+                     !(c.get() instanceof TermId<?>)) {
+                  return null;
+               }
+               
+               TermId<?> cAsTerm = (TermId<?>) c.get();
+               return cAsTerm.stringValue();
+               
+            } else {
+               throw new RuntimeException(
+                  "FTS service variable not bound at execution time: " + var);
+            }
+         }
+     }
+
+       
     }
 
 }

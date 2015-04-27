@@ -29,10 +29,10 @@ package com.bigdata.rdf.lexicon;
 
 import java.io.Serializable;
 
-import com.bigdata.search.Hiterator;
-import com.bigdata.search.IHit;
-import com.bigdata.search.IFulltextSearchHit;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.store.FTS.TargetType;
 import com.bigdata.search.FulltextSearchHiterator;
+import com.bigdata.search.IFulltextSearchHit;
 
 /**
  * Abstraction for search interface against external Solr index.
@@ -43,26 +43,29 @@ import com.bigdata.search.FulltextSearchHiterator;
 public interface IFulltextSearch<A extends IFulltextSearchHit> {
    
 	/**
-	 * Submit a seach query against the Solr Index
+	 * Submit a search query against the Solr Index
 	 * 
 	 * @param query
 	 *            The query.
 	 * 
 	 * @return The result set.
 	 */
-    public FulltextSearchHiterator<A> search(final SolrSearchQuery query);
+    public FulltextSearchHiterator<A> search(final FulltextSearchQuery query);
 
 //    public int count(final ExternalSolrSearchQuery query);
 
     
-    public static class SolrSearchQuery implements Serializable {
+    public static class FulltextSearchQuery implements Serializable {
 
       private static final long serialVersionUID = -2509557655519603130L;
       
       final String query;
 		final String params;
 		final String endpoint;
-
+      final Long searchTimeout;
+      final IBindingSet incomingBindings;
+      final TargetType targetType;
+      
 		/**
 		 * Constructor 
 		 * 
@@ -70,13 +73,17 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
 		 * @param params the parameters to be passed to Solr
 		 * @param endpoint the endpoint to which to submit the query
 		 */
-      public SolrSearchQuery(
-         final String query, final String params, final String endpoint) {
+      public FulltextSearchQuery(
+         final String query, final String params, final String endpoint,
+         final Long searchTimeout, final IBindingSet incomingBindings, 
+         final TargetType targetType) {
          
-         // TODO sanity check, e.g. endpoint and query must be set
-         this.query = query==null ? "" : query;
-         this.params = params==null ? "" : params;
-         this.endpoint = endpoint==null ? "" : endpoint;
+         this.query = query;
+         this.params = params;
+         this.endpoint = endpoint;
+         this.searchTimeout = searchTimeout;
+         this.incomingBindings = incomingBindings;
+         this.targetType = targetType;
          
       }
 
@@ -101,6 +108,27 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       public String getEndpoint() {
          return endpoint;
       }
+            
+      /**
+       * @return the search timeout
+       */
+      public Long getSearchTimeout() {
+         return searchTimeout;
+      }
+      
+      /**
+       * @return the underlying binding set
+       */
+      public IBindingSet getIncomingBindings() {
+         return incomingBindings;
+      }
+      
+      /**
+       * @return the target type for conversion
+       */
+      public TargetType getTargetType() {
+         return targetType;
+      }
 
 		/* (non-Javadoc)
 		 * @see java.lang.Object#hashCode()
@@ -113,6 +141,8 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
          result = prime * result + ((query == null) ? 0 : query.hashCode());
          result = prime * result + ((params == null) ? 0 : params.hashCode());
          result = prime * result + ((endpoint == null) ? 0 : endpoint.hashCode());
+         result = prime * result + ((searchTimeout == null) ? 0 : searchTimeout.hashCode());
+         result = prime * result + ((targetType == null) ? 0 : targetType.hashCode());
          
 			return result;
 		}
@@ -128,17 +158,33 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			SolrSearchQuery other = (SolrSearchQuery) obj;
+			FulltextSearchQuery other = (FulltextSearchQuery) obj;
 			
-         if (!query.equals(other.query))
+			if ((query==null && other.query!=null) ||
+			    (query!=null && other.query==null) ||
+			    !query.equals(other.query))
             return false;
          
-         if (!params.equals(other.params))
+         if ((params==null && other.params!=null) ||
+             (params!=null && other.params==null) ||
+             !params.equals(other.params))
             return false;
          
-         if (!endpoint.equals(other.endpoint))
+         if ((endpoint==null && other.endpoint!=null) ||
+             (endpoint!=null && other.endpoint==null) ||
+             !endpoint.equals(other.endpoint))
+            return false;
+
+         if ((searchTimeout==null && other.searchTimeout!=null) ||
+             (searchTimeout!=null && other.searchTimeout==null) ||
+             !searchTimeout.equals(other.searchTimeout))
             return false;
          
+         if ((targetType==null && other.targetType!=null) ||
+               (targetType!=null && other.targetType==null) ||
+               !targetType.equals(other.targetType))
+              return false;
+
 			return true;
 		}
 

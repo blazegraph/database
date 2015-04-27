@@ -33,7 +33,6 @@ package com.bigdata.rdf.sparql.ast.service;
 abstract public class ServiceOptionsBase implements IServiceOptions {
 
     private boolean isRunFirst = false;
-    private boolean isRunLast = false;
     private boolean useLBS = false;
 
     @Override
@@ -41,26 +40,9 @@ abstract public class ServiceOptionsBase implements IServiceOptions {
         return isRunFirst;
     }
 
-    @Override
-    public boolean isRunLast() {
-        return isRunLast;
-    }
-
     public void setRunFirst(final boolean newValue) {
         this.isRunFirst = newValue;
-        // reset isRunLast: we can't run first and last at the same time        
-        if (isRunFirst) {
-           isRunLast = false;
-        }
     }
-    
-    public void setRunLast(final boolean newValue) {
-       this.isRunLast = newValue;
-       // reset isRunFirst: we can't run first and last at the same time
-       if (isRunLast) {
-          isRunFirst = false;
-       }
-   }
 
     @Override
     public boolean isBigdataLBS() {
