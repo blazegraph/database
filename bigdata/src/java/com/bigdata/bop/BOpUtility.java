@@ -340,37 +340,60 @@ public class BOpUtility {
     @SuppressWarnings("unchecked")
     public static Iterator<BOp> postOrderIteratorWithAnnotations(final BOp op) {
        
-        return new Striterator(postOrderIterator(op)).addFilter(new Expander(){
+        // visit the node's operator annotations.
+        final Striterator itr = new Striterator(
+                annotationOpIterator(op));
 
+        itr.append(op.argIterator());
+        
+        // expand each operator annotation with a post-order traversal.
+        itr.addFilter(new Expander() {
             private static final long serialVersionUID = 1L;
 
             @Override
-            protected Iterator<BOp> expand(final Object arg0) {
-
-                final BOp op = (BOp)arg0;
-
-                // visit the node's operator annotations.
-                final Striterator itr = new Striterator(
-                        annotationOpIterator(op));
-
-                // expand each operator annotation with a post-order traversal.
-                itr.addFilter(new Expander() {
-                    private static final long serialVersionUID = 1L;
-
-                    @Override
-                    protected Iterator<BOp> expand(final Object ann) {
-                        return postOrderIteratorWithAnnotations((BOp) ann);
-                    }
-                    
-                });
-                
-                // visit the node.
-                itr.append(new SingleValueIterator<BOp>(op));
-
-                return itr;
+            protected Iterator<BOp> expand(final Object ann) {
+                return postOrderIteratorWithAnnotations((BOp) ann);
             }
             
         });
+        
+        // visit the node.
+        itr.append(new SingleValueIterator<BOp>(op));
+
+        
+        return itr;
+        
+//        return new Striterator(postOrderIterator(op)).addFilter(new Expander(){
+//
+//            private static final long serialVersionUID = 1L;
+//
+//            @Override
+//            protected Iterator<BOp> expand(final Object arg0) {
+//
+//                final BOp op = (BOp)arg0;
+//
+//                // visit the node's operator annotations.
+//                final Striterator itr = new Striterator(
+//                        annotationOpIterator(op));
+//
+//                // expand each operator annotation with a post-order traversal.
+//                itr.addFilter(new Expander() {
+//                    private static final long serialVersionUID = 1L;
+//
+//                    @Override
+//                    protected Iterator<BOp> expand(final Object ann) {
+//                        return postOrderIteratorWithAnnotations((BOp) ann);
+//                    }
+//                    
+//                });
+//                
+//                // visit the node.
+//                itr.append(new SingleValueIterator<BOp>(op));
+//
+//                return itr;
+//            }
+//            
+//        });
         
     }
 
