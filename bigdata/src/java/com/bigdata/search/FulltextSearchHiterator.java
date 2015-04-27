@@ -3,7 +3,7 @@ package com.bigdata.search;
 import java.util.Iterator;
 
 /**
- * Visits search results in order of decreasing relevance.
+ * Visits external fulltext index search results in order of decreasing relevance.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
@@ -57,15 +57,9 @@ implements Iterator<A> {
 
     public String toString() {
         
-        return "ExternalSearchHiterator{nhits=" + hits.length + "} : "
+        return "FulltextSearchHiterator{nhits=" + hits.length + "} : "
                 + hits;
         
-    }
-    
-    public int size() {
-    	
-    	return hits.length;
-    	
     }
     
 }

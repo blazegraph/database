@@ -47,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -198,6 +199,7 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
      * 
      * 11. Assignments
      * 12. Post-conditionals
+     *     
      * </pre> 
      * Most of this logic was lifted out of {@link AST2BOpUtility}.
      * <p>
@@ -338,9 +340,6 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
          * the join graph (at least for the RTO).
          */
         
-        // remember services that need to be run last
-        final List<ServiceNode> runLastServices = new LinkedList<ServiceNode>();
-        
         { // begin required joins.
 
             /*
@@ -363,23 +362,21 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
                         final ServiceFactory f = ServiceRegistry.getInstance()
                                 .get(serviceURI);
 
+                        
                         if (f!=null) {
                            
+                           /**
+                            * Queue services in the beginning or in the end.
+                            * Note that the query hint can be used to override
+                            * the service defaults.
+                            */
                            if (f.getServiceOptions().isRunFirst()) {
 
                               ordered.add(n);
 
                               sitr.remove();
-
-                           } else if (f.getServiceOptions().isRunLast()) {
-   
-                              // the servicesToRunLast will be added in the end
-                              // of this method
-                              runLastServices.add(n); 
                               
-                              sitr.remove();
-                              
-                           }
+                           } 
                            
                         }
 
@@ -665,16 +662,6 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
             
         }
         
-        
-        /*
-         * In the end, append services that are scheduled to be run last 
-         */
-        for (ServiceNode n : runLastServices) {
-           
-           ordered.add(n);
-           
-        }
-
         final int arity = joinGroup.arity();
 
         if (ordered.size() != arity) {

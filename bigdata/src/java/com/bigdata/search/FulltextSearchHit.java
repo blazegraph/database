@@ -1,29 +1,34 @@
 package com.bigdata.search;
 
-import org.apache.log4j.Logger;
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.store.FTS.TargetType;
+
 
 /**
- * Metadata about a search result.
+ * Metadata about a search result against an external fulltext index.
  * 
- * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
 public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSearchHit<V>,
         Comparable<FulltextSearchHit<V>> {
 
-   final private static transient Logger log = Logger
-         .getLogger(FulltextSearchHit.class);
+   protected final String res;
+   protected final double score;
+   protected final String snippet;
+   protected final IBindingSet incomingBindings;
+   protected final TargetType targetType;
 
-   protected String res;
    
-   protected double score;
-
-   protected String snippet;
-
-   public FulltextSearchHit(final String res, final double score, final String snippet) {
+   
+   public FulltextSearchHit(
+         final String res, final double score, final String snippet,
+         final IBindingSet incomingBindings, final TargetType targetType) {
       this.res = res;
       this.score = score;
       this.snippet = snippet;
+      this.incomingBindings = incomingBindings;
+      this.targetType = targetType;
    }
 
    public String toString() {
@@ -60,6 +65,16 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
    @Override
    public String getSnippet() {
       return snippet;
+   }
+
+   @Override
+   public IBindingSet getIncomingBindings() {
+      return incomingBindings;
+   }
+   
+   @Override
+   public TargetType getTargetType() {
+      return targetType;
    }
 
 }
