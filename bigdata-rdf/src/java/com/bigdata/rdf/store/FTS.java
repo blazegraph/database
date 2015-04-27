@@ -57,7 +57,9 @@ import org.openrdf.model.impl.URIImpl;
  * SELECT ?res ?score ?snippet WHERE {
  *   ?res fts:search "blue !red".
  *   ?res fts:endpoint  "http://my.external.solr.endpoint:5656" .
+ *   ?res fts:endpointType  "Solr" .
  *   ?res fts:params "defType=dismax&bf=uses^50" .
+ *   ?res fts:targetType  "URI" .
  *   ?res fts:score ?score .
  *   ?res fts:snippet ?snippet . 
  * }
@@ -65,6 +67,21 @@ import org.openrdf.model.impl.URIImpl;
  * 
  * The query returns the result matches (converted to URIs), including the
  * score and sample snippets for the matches.
+ * 
+ * Here's another example using a SERVICE keyword directly: 
+ * 
+ * <pre>
+ * PREFIX fts: <http://www.bigdata.com/rdf/fts#>
+ * SELECT *
+ * WHERE {
+ *   ?res rdfs:label ?label .
+ *   SERVICE <http://www.bigdata.com/rdf/fts#search> {
+ *     ?res fts:search "blue !red".
+ *     ?res fts:endpoint  "http://my.external.solr.endpoint:5656" .
+ *   }
+ *   hint:Prior hint:runLast "true" .
+ * }
+ * 
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
