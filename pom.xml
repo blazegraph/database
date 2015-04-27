@@ -218,6 +218,77 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <version>1.9.1</version>
         <executions>
           <execution>
+            <id>add-test-resource</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-resource</goal>
+            </goals>
+            <configuration>
+              <resources>
+ 		<resource>
+                 <directory>bigdata/src/test</directory>
+                  <includes>
+                   <include>**/*.properties</include>
+                   <include>**/*.xml</include>
+                   <include>**/*.txt</include>
+                   <include>**/*.ttl</include>
+                   <include>**/*.rq</include>
+                   <include>**/*.srx</include>
+                   <include>**/*.trig</include>
+               </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-rdf/src/test</directory>
+                   <includes>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-sails/src/test</directory>
+                   <includes>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-gom/src/test</directory>
+                   <includes>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-war/src</directory>
+                   <includes>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+              </resources>
+            </configuration>
+          </execution> 
+          <execution>
             <id>add-source</id>
             <phase>generate-sources</phase>
             <goals>
@@ -507,6 +578,13 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
        <version>1.0-SNAPSHOT</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-client</artifactId>
+       <version>1.0-SNAPSHOT</version>
+       <type>test-jar</type>
+       <scope>test</scope>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
