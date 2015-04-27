@@ -1832,7 +1832,10 @@ public abstract class AbstractHA3JournalServerTestCase extends
                     throw new IOException("Could not create directory: "
                             + webAppDir);
                 }
-                copyFiles(new File("bigdata-war/src"), webAppDir);
+                //FIXME:  This should be refactored to pick up the sources 
+                //from the maven depdency.  
+                //TODO: Refactor once bidata-war is a maven artifact
+                copyFiles(new File("src/test/resources/bigdata-war/"), webAppDir);
             }
 
             // log4j configuration.
