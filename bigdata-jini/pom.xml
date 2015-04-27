@@ -86,7 +86,7 @@
                <phase>process-test-resources</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="startZookeeper"/>
+                   <ant antfile="build.xml" target="startTestServices"/>
                  </target>
                </configuration>
              </execution>
@@ -98,7 +98,7 @@
                <phase>test</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="stopZookeeper"/>
+                   <ant antfile="build.xml" target="stopTestServices"/>
                  </target>
                </configuration>
              </execution>
