@@ -127,6 +127,9 @@ dependencies.
           <includes>
             <include>**/TestAll.java</include>
           </includes>
+          <excludes>
+            <exclude>com/bigdata/TestAll.java</exclude>
+          </exclude>
         </configuration>
       </plugin>
     </plugins>
