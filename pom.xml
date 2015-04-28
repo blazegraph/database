@@ -137,6 +137,7 @@ dependencies.
         <resource>
             <directory>bigdata-rdf/src/test</directory>
             <includes>
+                <include>**/*.n3</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
@@ -149,6 +150,7 @@ dependencies.
         <resource>
             <directory>bigdata-sails/src/test</directory>
             <includes>
+                <include>**/*.n3</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
@@ -161,6 +163,7 @@ dependencies.
         <resource>
             <directory>bigdata-gom/src/test</directory>
             <includes>
+                <include>**/*.n3</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
@@ -232,6 +235,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
  		<resource>
                  <directory>bigdata/src/test</directory>
                   <includes>
+                   <include>**/*.n3</include>
                    <include>**/*.properties</include>
                    <include>**/*.xml</include>
                    <include>**/*.txt</include>
@@ -244,6 +248,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                <resource>
                    <directory>bigdata-rdf/src/test</directory>
                    <includes>
+                       <include>**/*.n3</include>
                        <include>**/*.properties</include>
                        <include>**/*.xml</include>
                        <include>**/*.txt</include>
@@ -256,6 +261,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                <resource>
                    <directory>bigdata-sails/src/test</directory>
                    <includes>
+                       <include>**/*.n3</include>
                        <include>**/*.properties</include>
                        <include>**/*.xml</include>
                        <include>**/*.txt</include>
@@ -268,6 +274,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                <resource>
                    <directory>bigdata-gom/src/test</directory>
                    <includes>
+                       <include>**/*.n3</include>
                        <include>**/*.properties</include>
                        <include>**/*.xml</include>
                        <include>**/*.txt</include>
@@ -280,6 +287,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                <resource>
                    <directory>bigdata-war/src</directory>
                    <includes>
+                       <include>**/*.n3</include>
                        <include>**/*.properties</include>
                        <include>**/*.xml</include>
                        <include>**/*.txt</include>
