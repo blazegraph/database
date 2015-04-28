@@ -132,10 +132,10 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             store, serviceNode.getGraphPattern());
 
       if (map == null)
-         throw new RuntimeException("Not a search request.");
+         throw new FulltextSearchException("Not a search request.");
 
       if (map.size() != 1)
-         throw new RuntimeException(
+         throw new FulltextSearchException(
                "Multiple search requests may not be combined.");
 
       final Map.Entry<IVariable<?>, Map<URI, StatementPatternNode>> e = map
@@ -178,7 +178,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          if (child instanceof GroupNodeBase<?>) {
 
-            throw new RuntimeException("Nested groups are not allowed.");
+            throw new FulltextSearchException("Nested groups are not allowed.");
 
          }
 
@@ -189,24 +189,24 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             final TermNode p = sp.p();
 
             if (!p.isConstant())
-               throw new RuntimeException("Expecting search predicate: " + sp);
+               throw new FulltextSearchException("Expecting search predicate: " + sp);
 
             final URI uri = (URI) ((ConstantNode) p).getValue();
 
             if (!uri.stringValue().startsWith(FTS.NAMESPACE))
-               throw new RuntimeException("Expecting search predicate: " + sp);
+               throw new FulltextSearchException("Expecting search predicate: " + sp);
 
             /*
              * Some search predicate.
              */
 
             if (!ASTFulltextSearchOptimizer.searchUris.contains(uri))
-               throw new RuntimeException("Unknown search predicate: " + uri);
+               throw new FulltextSearchException("Unknown search predicate: " + uri);
 
             final TermNode s = sp.s();
 
             if (!s.isVariable())
-               throw new RuntimeException(
+               throw new FulltextSearchException(
                      "Subject of search predicate is constant: " + sp);
 
             final IVariable<?> searchVar = ((VarNode) s).getValueExpression();
@@ -256,9 +256,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          final URI uri = (URI) (sp.p()).getValue();
 
          if (!uris.add(uri))
-            throw new RuntimeException(
-                  "Search predicate appears multiple times for same search variable: predicate="
-                        + uri + ", searchVar=" + searchVar);
+            throw new FulltextSearchException(
+                  "Search predicate appears multiple times for same search"
+                  + "variable: predicate=" + uri + ", searchVar=" + searchVar);
 
          // all input variables must have been bound and point to literals
          if (uri.equals(FTS.SEARCH) || uri.equals(FTS.ENDPOINT)
@@ -281,7 +281,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       }
 
       if (!uris.contains(FTS.SEARCH)) {
-         throw new RuntimeException("Required search predicate not found: "
+         throw new FulltextSearchException("Required search predicate not found: "
                + FTS.SEARCH + " for searchVar=" + searchVar);
       }
 
@@ -538,7 +538,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                final IVariable var = varIt.next();
 
                if (bs.isBound(var)) {
-                  throw new RuntimeException(
+                  throw new FulltextSearchException(
                         "Illegal use of search service. Variable ?"
                               + var
                               + " must not be bound from outside. If you need to "
@@ -735,7 +735,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          if (queryStr == null || queryStr.isEmpty()) {
 
-            throw new RuntimeException("Query string null or empty.");
+            throw new FulltextSearchException("Search string null or empty.");
 
          }
 
@@ -758,7 +758,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
                return TargetType.valueOf(targetTypeStr);
 
-            } catch (RuntimeException e) {
+            } catch (Exception e) {
 
                // illegal, ignore and proceed
                if (log.isDebugEnabled()) {
@@ -792,7 +792,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
                // illegal, ignore and proceed
                if (log.isInfoEnabled()) {
-                  log.info("Illegal timeout string: " + searchTimeoutStr);
+                  log.info("Illegal timeout string: " + searchTimeoutStr +
+                        " -> will be ignored, using default.");
+
                }
 
             }
@@ -834,11 +836,12 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
                return EndpointType.valueOf(endpointTypeStr);
 
-            } catch (IllegalArgumentException e) {
+            } catch (Exception e) {
 
                // illegal, ignore and proceed
                if (log.isDebugEnabled()) {
-                  log.warn("Illegal endpoint type: " + endpointTypeStr);
+                  log.warn("Illegal endpoint type: " + endpointTypeStr + 
+                        " -> will be ignored, using default.");
                }
 
             }
@@ -868,7 +871,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          } else {
 
-            throw new RuntimeException(
+            throw new FulltextSearchException(
                   "External fulltext search endpoint null or empty.");
 
          }
@@ -905,8 +908,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                return cAsTerm.stringValue();
 
             } else {
-               throw new RuntimeException(
-                     "FTS service variable not bound at execution time: " + var);
+               throw new FulltextSearchException(
+                     "Fulltext search variable unbound at runtime: " + var);
             }
          }
       }

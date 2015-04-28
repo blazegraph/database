@@ -40,6 +40,7 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
+import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.fts.FulltextSearchHit;
 import com.bigdata.service.fts.FulltextSearchHiterator;
 import com.bigdata.service.fts.IFulltextSearch;
@@ -81,13 +82,14 @@ public class SolrFulltextSearchImpl implements
 
          } catch (Exception e) {
 
-            throw new RuntimeException("Error execution fulltext search: " + e);
+            throw new FulltextSearchException("Error execution fulltext search: " + e);
          }
       }
 
       return new FulltextSearchHiterator<FulltextSearchHit>(
             new FulltextSearchHit[] {});
             */
+      
    }
 
    private FulltextSearchHit[] queryIndex(FulltextSearchQuery query)
@@ -132,14 +134,14 @@ public class SolrFulltextSearchImpl implements
 
          if (response == null) {
 
-            throw new RuntimeException("No response from fulltext service");
+            throw new FulltextSearchException("No response from fulltext service");
 
          }
 
          final int statusCode = response.getStatusLine().getStatusCode();
          if (statusCode != 200) {
 
-            throw new RuntimeException("Status code != 200 received from "
+            throw new FulltextSearchException("Status code != 200 received from "
                   + "external fulltext service: " + statusCode);
 
          }
@@ -152,7 +154,7 @@ public class SolrFulltextSearchImpl implements
 
       } catch (IOException e) {
 
-         throw new RuntimeException("Error submitting the keyword search"
+         throw new FulltextSearchException("Error submitting the keyword search"
                + " to the external service: " + e.getMessage());
 
       }
