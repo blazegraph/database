@@ -1122,7 +1122,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
          */
  
         final String s = "file:"
-                + new File("bigdata-rdf/src/resources/data/foaf/", string)
+                + new File("src/test/resources/data/foaf/", string)
                         .getAbsolutePath();
 
         return s;
