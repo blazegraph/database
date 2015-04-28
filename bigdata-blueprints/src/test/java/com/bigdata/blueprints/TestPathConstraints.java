@@ -7,11 +7,12 @@ import junit.framework.TestCase;
 import org.apache.log4j.Logger;
 import org.openrdf.query.QueryLanguage;
 
-import com.bigdata.blueprints.BigdataSelection.Bindings;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.tinkerpop.blueprints.Edge;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 public class TestPathConstraints extends TestCase {
 
@@ -77,14 +78,21 @@ public class TestPathConstraints extends TestCase {
 //                }
     
                 for (int i = 1; i < 5; i++) {
-                    final BigdataSelection selection = 
+                    final ICloseableIterator<BigdataBindingSet> selection = 
                             graph.select(queryStr.replace("?upper", ""+i));
-                    if (log.isDebugEnabled()) {
-                        for (Bindings bs : selection.getBindings()) {
-                            log.debug(bs.toString());
+                    try {
+                        int n = 0;
+                        while (selection.hasNext()) {
+                            final BigdataBindingSet bbs = selection.next();
+                            if (log.isDebugEnabled()) {
+                                log.debug(bbs);
+                            }
+                            n++;
                         }
+                        assertTrue(n == i);
+                    } finally {
+                        selection.close();
                     }
-                    assertTrue(selection.getBindings().size() == i);
                 }
                 
             }
@@ -116,13 +124,20 @@ public class TestPathConstraints extends TestCase {
 //                    cxn.close();
 //                }
     
-                final BigdataSelection selection = graph.select(queryStr);
-                if (log.isDebugEnabled()) {
-                    for (Bindings bs : selection.getBindings()) {
-                        log.debug(bs.toString());
+                final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
                     }
+                    assertTrue(n == 3);
+                } finally {
+                    selection.close();
                 }
-                assertTrue(selection.getBindings().size() == 3);
                 
             }
             
@@ -181,13 +196,20 @@ public class TestPathConstraints extends TestCase {
 
 //                showOptimizedAST(graph, queryStr);
                 
-                final BigdataSelection selection = graph.select(queryStr);
-                if (log.isDebugEnabled()) {
-                    for (Bindings bs : selection.getBindings()) {
-                        log.debug(bs.toString());
+                final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
                     }
+                    assertTrue(n == 3);
+                } finally {
+                    selection.close();
                 }
-                assertTrue(selection.getBindings().size() == 3);
                 
             }
             
@@ -216,13 +238,20 @@ public class TestPathConstraints extends TestCase {
                 
 //              showOptimizedAST(graph, queryStr);
                 
-                final BigdataSelection selection = graph.select(queryStr);
-                if (log.isDebugEnabled()) {
-                    for (Bindings bs : selection.getBindings()) {
-                        log.debug(bs.toString());
+                final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
                     }
+                    assertTrue(n == 3);
+                } finally {
+                    selection.close();
                 }
-                assertTrue(selection.getBindings().size() == 3);
                 
             }
             

@@ -4682,6 +4682,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
         }
         
+        if (queryHints != null && Boolean.parseBoolean(queryHints.getProperty(
+                QueryHints.HISTORY, "false"))) {
+            
+            anns.add(new NV(SPOPredicate.Annotations.INCLUDE_HISTORY, true));
+            
+        }
+        
         if (!database.isQuads()) {
             /*
              * Either triple store mode or provenance mode.

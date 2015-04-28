@@ -82,16 +82,6 @@ public class DefaultBlueprintsValueFactory implements BlueprintsValueFactory {
     public final URI LABEL;
 
     /**
-     * URI used to mark an atom as added in the history.
-     */
-    public final URI ADDED;
-    
-    /**
-     * URI used to mark an atom as removed in the history.
-     */
-    public final URI REMOVED;
-
-    /**
      * The Sesame value factory for URIs and Literals.
      */
 	protected final ValueFactory vf;
@@ -101,11 +91,10 @@ public class DefaultBlueprintsValueFactory implements BlueprintsValueFactory {
      */
     public DefaultBlueprintsValueFactory(final String graphNamespace,
             final String vertexNamespace, final String edgeNamespace,
-            final URI type, final URI vertex, final URI edge, final URI label,
-            final URI added, final URI removed) {
+            final URI type, final URI vertex, final URI edge, final URI label) {
         
         this(new ValueFactoryImpl(), graphNamespace, vertexNamespace,
-                edgeNamespace, type, vertex, edge, label, added, removed);
+                edgeNamespace, type, vertex, edge, label);
         
     }
 
@@ -115,7 +104,7 @@ public class DefaultBlueprintsValueFactory implements BlueprintsValueFactory {
     public DefaultBlueprintsValueFactory(final ValueFactory vf,
             final String graphNamespace, final String vertexNamespace,
             final String edgeNamespace, final URI type, final URI vertex,
-            final URI edge, final URI label, final URI added, final URI removed) {
+            final URI edge, final URI label) {
 	    
 		this.vf = vf;
 		this.GRAPH_NAMESPACE = graphNamespace;
@@ -125,8 +114,6 @@ public class DefaultBlueprintsValueFactory implements BlueprintsValueFactory {
 		this.VERTEX = vertex;
 		this.EDGE = edge;
 		this.LABEL = label;
-		this.ADDED = added;
-		this.REMOVED = removed;
 		
 	}
 	
@@ -148,16 +135,6 @@ public class DefaultBlueprintsValueFactory implements BlueprintsValueFactory {
     @Override
     public URI getLabelURI() {
         return LABEL;
-    }
-
-    @Override
-    public URI getAddedURI() {
-        return ADDED;
-    }
-
-    @Override
-    public URI getRemovedURI() {
-        return REMOVED;
     }
 
 	/**

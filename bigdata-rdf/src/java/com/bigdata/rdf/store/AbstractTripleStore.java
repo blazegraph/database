@@ -3289,6 +3289,7 @@ abstract public class AbstractTripleStore extends
 //                                keyOrder),//
                         new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
                                ElementFilter.newInstance(filter)),//
+                        new NV(SPOPredicate.Annotations.INCLUDE_HISTORY, true),
                         }));
 //        final SPOPredicate p = new SPOPredicate(//
 //                new String[] { r.getNamespace() },//
@@ -3606,7 +3607,17 @@ abstract public class AbstractTripleStore extends
             final boolean inferred, final boolean axioms,
             final boolean justifications) {
 
-        return dumpStore(resolveTerms, explicit, inferred, axioms,
+        return dumpStore(resolveTerms, explicit, inferred, axioms, true,
+                justifications, getSPORelation().getPrimaryKeyOrder());
+
+    }
+ 
+    final public StringBuilder dumpStore(
+            final AbstractTripleStore resolveTerms, final boolean explicit,
+            final boolean inferred, final boolean axioms,
+            final boolean history, final boolean justifications) {
+
+        return dumpStore(resolveTerms, explicit, inferred, axioms, history,
                 justifications, getSPORelation().getPrimaryKeyOrder());
 
     }
@@ -3632,7 +3643,7 @@ abstract public class AbstractTripleStore extends
      */
     public StringBuilder dumpStore(
             final AbstractTripleStore resolveTerms, final boolean explicit,
-            final boolean inferred, final boolean axioms,
+            final boolean inferred, final boolean axioms, final boolean history,
             final boolean justifications, final IKeyOrder<ISPO> keyOrder) {
 
         final StringBuilder sb = new StringBuilder();
@@ -3642,6 +3653,7 @@ abstract public class AbstractTripleStore extends
         long nexplicit = 0;
         long ninferred = 0;
         long naxioms = 0;
+        long nhistory = 0;
 
         {
 
@@ -3677,6 +3689,13 @@ abstract public class AbstractTripleStore extends
                     case Axiom:
                         naxioms++;
                         if (!axioms)
+                            continue;
+                        else
+                            break;
+
+                    case History:
+                        nhistory++;
+                        if (!history)
                             continue;
                         else
                             break;
@@ -3728,7 +3747,8 @@ abstract public class AbstractTripleStore extends
 
         sb.append("dumpStore: #statements=" + nstmts + ", #explicit="
                 + nexplicit + ", #inferred=" + ninferred + ", #axioms="
-                + naxioms + (justifications ? ", #just=" + njust : ""));
+                + naxioms + ", #history=" + nhistory 
+                + (justifications ? ", #just=" + njust : ""));
 
         return sb;
         

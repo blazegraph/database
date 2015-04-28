@@ -25,15 +25,11 @@ public class SimpleBlueprintsValueFactory extends DefaultBlueprintsValueFactory 
     
     public static final URI LABEL = new URIImpl("bigdata:label");
     
-    public static final URI ADDED = new URIImpl("bigdata:added");
-    
-    public static final URI REMOVED = new URIImpl("bigdata:removed");
-    
     public static final SimpleBlueprintsValueFactory INSTANCE =
             new SimpleBlueprintsValueFactory();
     
     public SimpleBlueprintsValueFactory() {
-        super(ID, ID, ID, TYPE, VERTEX, EDGE, LABEL, ADDED, REMOVED);
+        super(ID, ID, ID, TYPE, VERTEX, EDGE, LABEL);
     }
 
     /**

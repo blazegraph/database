@@ -30,8 +30,7 @@ import java.util.Properties;
 import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
 
-import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit;
-import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit.Action;
+import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
