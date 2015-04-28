@@ -71,6 +71,12 @@
           <antcall target="stopHttpd" />
     </target>
 
+    <target name="preTestPreparation">
+        <delete dir="${HATest.dir}" quiet="true" />
+        <mkdir dir="${HATest.dir}" />
+	<antcall target = "startTestServices"/>
+    </target>
+
     <target name="startTestServices" depends="getMavenDependencies" unless="${skipTestServices}">
       <property name="test.codebase.port" value="23333" />
       <property name="test.codebase.dir" value="${dist.lib.dl}" />
@@ -176,6 +182,18 @@
         <sysproperty key="default.nic" value="${default.nic}" />
         <arg value="-stop" />
       </java>
+    </target>
+
+    <target name = "postTestCleanup">
+	<antcall target="stopTestServices"/>
+	<antcall target="testReportArchive"/>
+    </target>
+    <target name = "testReportArchive">
+	<!-- Archive the generated HTML report. -->
+        <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/surefire-reports" compression="gzip"/>
+
+        <!-- Archive the HA test suite output logs. -->
+        <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HATest.dir}" compression="gzip"/>
     </target>
 
 </project>

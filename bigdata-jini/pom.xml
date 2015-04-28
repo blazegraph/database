@@ -72,7 +72,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.18.1</version>
         <configuration>
-         <argLine>-Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime}</argLine>
+         <argLine>-Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration}</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -87,7 +87,7 @@
                <phase>process-test-resources</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="startTestServices"/>
+                   <ant antfile="build.xml" target="preTestPreparation"/>
                  </target>
                </configuration>
              </execution>
@@ -99,7 +99,7 @@
                <phase>test</phase>
                <configuration>
                  <target>
-                   <ant antfile="build.xml" target="stopTestServices"/>
+                   <ant antfile="build.xml" target="postTestCleanup"/>
                  </target>
                </configuration>
              </execution>
