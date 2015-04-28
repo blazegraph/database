@@ -281,8 +281,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       }
 
       if (!uris.contains(FTS.SEARCH)) {
-         throw new FulltextSearchException("Required search predicate not found: "
-               + FTS.SEARCH + " for searchVar=" + searchVar);
+         throw new FulltextSearchException(
+               FulltextSearchException.NO_QUERY_SPECIFIED);
       }
 
    }
@@ -735,7 +735,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          if (queryStr == null || queryStr.isEmpty()) {
 
-            throw new FulltextSearchException("Search string null or empty.");
+            throw new FulltextSearchException(
+                  FulltextSearchException.NO_QUERY_SPECIFIED);
 
          }
 
@@ -872,7 +873,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          } else {
 
             throw new FulltextSearchException(
-                  "External fulltext search endpoint null or empty.");
+                  FulltextSearchException.NO_ENDPOINT_SPECIFIED);
 
          }
 

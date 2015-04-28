@@ -36,6 +36,12 @@ public class FulltextSearchException extends RuntimeException {
 
    private static final long serialVersionUID = 3998203140318128777L;
 
+   public final static String NO_QUERY_SPECIFIED =
+         "Search string not specified or empty";
+
+   public final static String NO_ENDPOINT_SPECIFIED = 
+         "Endpoint not specified or empty";
+
    public FulltextSearchException(String s) {
       super(s);
    }
