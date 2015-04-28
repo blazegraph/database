@@ -52,7 +52,6 @@ import cutthecrap.utils.striterators.Striterator;
 /**
  * 
  */
-@Deprecated
 public class RDRHistoryServiceFactory implements CustomServiceFactory {
 
     static private transient final Logger log = Logger
@@ -89,26 +88,28 @@ public class RDRHistoryServiceFactory implements CustomServiceFactory {
     @Override
     public ServiceCall<?> create(final ServiceCallCreateParams params) {
 
-        if (params == null)
-            throw new IllegalArgumentException();
+//        if (params == null)
+//            throw new IllegalArgumentException();
+//
+//        final AbstractTripleStore store = params.getTripleStore();
+//
+//        if (store == null)
+//            throw new IllegalArgumentException();
+//
+//        final ServiceNode serviceNode = params.getServiceNode();
+//
+//        if (serviceNode == null)
+//            throw new IllegalArgumentException();
+//
+//        final GraphPatternGroup<IGroupMemberNode> group =
+//                serviceNode.getGraphPattern();
+//        
+//        verifyGroup(group);
+//        
+//        return new RDRHistoryServiceCall(store, getServiceOptions(), group);
 
-        final AbstractTripleStore store = params.getTripleStore();
-
-        if (store == null)
-            throw new IllegalArgumentException();
-
-        final ServiceNode serviceNode = params.getServiceNode();
-
-        if (serviceNode == null)
-            throw new IllegalArgumentException();
-
-        final GraphPatternGroup<IGroupMemberNode> group =
-                serviceNode.getGraphPattern();
+        throw new RuntimeException("deprecated");
         
-        verifyGroup(group);
-        
-        return new RDRHistoryServiceCall(store, getServiceOptions(), group);
-
     }
     
     /**
