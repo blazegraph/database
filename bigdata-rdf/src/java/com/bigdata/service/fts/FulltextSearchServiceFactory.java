@@ -31,7 +31,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -45,7 +44,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.config.Configuration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -263,7 +261,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          // all input variables must have been bound and point to literals
          if (uri.equals(FTS.SEARCH) || uri.equals(FTS.ENDPOINT)
                || uri.equals(FTS.ENDPOINT_TYPE) || uri.equals(FTS.PARAMS)
-               || uri.equals(FTS.TARGET_TYPE) || uri.equals(FTS.TIMEOUT)) {
+               || uri.equals(FTS.TARGET_TYPE) || uri.equals(FTS.SEARCH_FIELD)
+               || uri.equals(FTS.SCORE_FIELD) || uri.equals(FTS.SNIPPET_FIELD)
+               || uri.equals(FTS.TIMEOUT)) {
 
             assertObjectIsLiteralOrVariable(sp);
 
@@ -332,6 +332,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       private final TermNode params;
       private final TermNode targetType;
       private final TermNode searchTimeout;
+      private final TermNode searchField;
+      private final TermNode scoreField;
+      private final TermNode snippetField;
 
       private final IVariable<IV>[] vars;
 
@@ -373,6 +376,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          TermNode params = null;
          TermNode targetType = null;
          TermNode searchTimeout = null;
+         TermNode searchField = null;
+         TermNode scoreField = null;
+         TermNode snippetField = null;
 
          /*
           * Unpack the remaining magic predicates
@@ -394,11 +400,18 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                targetType = meta.o();
             } else if (FTS.TIMEOUT.equals(p)) {
                searchTimeout = meta.o();
+            } else if (FTS.SEARCH_FIELD.equals(p)) {
+               searchField = meta.o();
+            } else if (FTS.SNIPPET_FIELD.equals(p)) {
+               snippetField = meta.o();
+            } else if (FTS.SCORE_FIELD.equals(p)) {
+               scoreField = meta.o();
             } else if (FTS.SCORE.equals(p)) {
                score = oVar;
             } else if (FTS.SNIPPET.equals(p)) {
                snippet = oVar;
             }
+            
          }
 
          final Var<?> dummyScoreVar = Var.var();
@@ -417,6 +430,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.params = params;
          this.targetType = targetType;
          this.searchTimeout = searchTimeout;
+         this.searchField = searchField;
+         this.scoreField = scoreField;
+         this.snippetField = snippetField;
 
       }
 
@@ -425,7 +441,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             IBindingSet[] bsList) {
 
          return new FulltextSearchMultiHiterator(bsList, query, endpoint,
-               endpointType, params, targetType, searchTimeout);
+               endpointType, params, searchField, scoreField, snippetField, 
+               targetType, searchTimeout);
 
       }
 
@@ -506,9 +523,6 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             final BigdataValueFactory vf = BigdataValueFactoryImpl
                   .getInstance(store.getLexiconRelation().getNamespace());
 
-            final BigdataLiteral litSnippet = vf
-                  .createLiteral(hit.getSnippet());
-
             /**
              * The targetType determines the type to which we cast results
              */
@@ -523,14 +537,24 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                break;
             }
 
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            final IConstant<?>[] vals = new IConstant[] {
-                  new Constant(new Constant(DummyConstantNode.toDummyIV(val))),
-                  new Constant(new XSDNumericIV(hit.getScore())),
-                  new Constant(new Constant(
-                        DummyConstantNode.toDummyIV((BigdataValue) litSnippet))) };
+            IBindingSet bs = new ListBindingSet();
 
-            final ListBindingSet bs = new ListBindingSet(vars, vals);
+            bs.set(vars[0], new Constant(DummyConstantNode.toDummyIV(val)));
+            
+            if (hit.getScore()!=null) {
+               bs.set(vars[1], new Constant(new XSDNumericIV(hit.getScore())));
+            }
+            
+            if (hit.getSnippet()!=null) {
+               
+               final BigdataLiteral litSnippet = 
+                  vf.createLiteral(hit.getSnippet());
+               bs.set(vars[2], 
+                  new Constant(new Constant(
+                     DummyConstantNode.toDummyIV(
+                        (BigdataValue) litSnippet))));
+            }
+            
             final IBindingSet baseBs = hit.getIncomingBindings();
             final Iterator<IVariable> varIt = baseBs.vars();
             while (varIt.hasNext()) {
@@ -601,6 +625,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       final TermNode params;
       final TermNode targetType;
       final TermNode searchTimeout;
+      final TermNode searchField;
+      final TermNode scoreField;
+      final TermNode snippetField;
 
       int nextBindingSetItr = 0;
 
@@ -609,7 +636,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       public FulltextSearchMultiHiterator(final IBindingSet[] bindingSet,
             final TermNode query, final TermNode endpoint,
             final TermNode endpointType, final TermNode params,
-            final TermNode targetType, final TermNode searchTimeout) {
+            final TermNode searchField, final TermNode scoreField, 
+            final TermNode snippetField, final TermNode targetType, 
+            final TermNode searchTimeout) {
 
          this.query = query;
          this.bindingSet = bindingSet;
@@ -618,6 +647,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.params = params;
          this.targetType = targetType;
          this.searchTimeout = searchTimeout;
+         this.searchField = searchField;
+         this.scoreField = scoreField;
+         this.snippetField = snippetField;
 
          init();
 
@@ -701,7 +733,10 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          final EndpointType endpointType = resolveEndpointType(bs);
          final String params = resolveParams(bs);
          final TargetType targetType = resolveTargetType(bs);
-         final Long searchTimeout = resolveSearchTimeout(bs);
+         final Integer searchTimeout = resolveSearchTimeout(bs);
+         final String searchField = resolveSearchField(bs);
+         final String scoreField = resolveScoreField(bs);
+         final String snippetField = resolveSnippetField(bs);
 
          /*
           * Though we currently, we only support Solr, here we might easily hook
@@ -716,8 +751,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             break;
          }
 
-         FulltextSearchQuery sq = new FulltextSearchQuery(query, params,
-               endpoint, searchTimeout, bs, targetType);
+         FulltextSearchQuery sq = new FulltextSearchQuery(
+               query, params, endpoint, searchTimeout, searchField,
+               scoreField, snippetField, bs, targetType);
          curDelegate = (FulltextSearchHiterator) ftSearch.search(sq);
 
          return true;
@@ -774,7 +810,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
       }
 
-      private Long resolveSearchTimeout(IBindingSet bs) {
+      private Integer resolveSearchTimeout(IBindingSet bs) {
 
          String searchTimeoutStr = resolveAsString(searchTimeout, bs);
 
@@ -787,7 +823,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
             try {
 
-               return Long.valueOf(searchTimeoutStr);
+               return Integer.valueOf(searchTimeoutStr);
 
             } catch (NumberFormatException e) {
 
@@ -876,6 +912,60 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                   FulltextSearchException.NO_ENDPOINT_SPECIFIED);
 
          }
+
+      }
+      
+      /**
+       * Resolves the search field, which is either a constant or a variable
+       * to be looked up in the binding set.
+       */
+      private String resolveSearchField(IBindingSet bs) {
+
+         String searchFieldStr = resolveAsString(searchField, bs);
+         
+         // try override with system default, if not set
+         if (searchFieldStr==null || searchFieldStr.isEmpty()) {
+            searchFieldStr = getProperty(FTS.Options.FTS_SEARCH_FIELD);
+         }
+         
+         return searchFieldStr==null || searchFieldStr.isEmpty() ?
+            FTS.Options.DEFAULT_SEARCH_FIELD : searchFieldStr;
+
+      }
+      
+      /**
+       * Resolves the search field, which is either a constant or a variable
+       * to be looked up in the binding set.
+       */
+      private String resolveScoreField(IBindingSet bs) {
+
+         String scoreFieldStr = resolveAsString(scoreField, bs);
+         
+         // try override with system default, if not set
+         if (scoreFieldStr==null || scoreFieldStr.isEmpty()) {
+            scoreFieldStr = getProperty(FTS.Options.FTS_SCORE_FIELD);
+         }
+         
+         return scoreFieldStr==null || scoreFieldStr.isEmpty() ?
+            FTS.Options.DEFAULT_SCORE_FIELD : scoreFieldStr;
+
+      }
+      
+      /**
+       * Resolves the search field, which is either a constant or a variable
+       * to be looked up in the binding set.
+       */
+      private String resolveSnippetField(IBindingSet bs) {
+
+         String snippetFieldStr = resolveAsString(snippetField, bs);
+         
+         // try override with system default, if not set
+         if (snippetFieldStr==null || snippetFieldStr.isEmpty()) {
+            snippetFieldStr = getProperty(FTS.Options.FTS_SNIPPET_FIELD);
+         }
+         
+         return snippetFieldStr==null || snippetFieldStr.isEmpty() ?
+            FTS.Options.DEFAULT_SNIPPET_FIELD : snippetFieldStr;
 
       }
 

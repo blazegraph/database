@@ -37,7 +37,7 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
         Comparable<FulltextSearchHit<V>> {
 
    protected final String res;
-   protected final double score;
+   protected final Double score;
    protected final String snippet;
    protected final IBindingSet incomingBindings;
    protected final TargetType targetType;
@@ -45,7 +45,7 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
    
    
    public FulltextSearchHit(
-         final String res, final double score, final String snippet,
+         final String res, final Double score, final String snippet,
          final IBindingSet incomingBindings, final TargetType targetType) {
       this.res = res;
       this.score = score;
@@ -56,7 +56,7 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
 
    public String toString() {
 
-      return "SolrSearchHit{score=" + score + ",snippet=" + snippet + "}";
+      return "FulltextSearchHit{res=" + res + ",score=" + score + ",snippet=" + snippet + "}";
 
    }
 
@@ -66,6 +66,17 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
     */
    public int compareTo(final FulltextSearchHit<V> o) {
 
+      if (score==null) {
+         if (o.score==null) {
+            return 0;
+         } else {
+            return 1;
+         }
+      } else if (o.score==null) {
+         
+         return -1;
+      }
+      
       if (score < o.score)
          return 1;
       else if (score > o.score)
@@ -81,7 +92,7 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
    }
 
    @Override
-   public double getScore() {
+   public Double getScore() {
       return score;
    }
 
