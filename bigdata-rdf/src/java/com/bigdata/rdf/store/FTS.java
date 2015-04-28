@@ -136,7 +136,6 @@ public interface FTS {
     */
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
     
-   // TODO: implementation and documentation for default Solr endpoint
    /**
     * Magic predicate used to specify the Solr endpoint to be queried. If not
     * provided, the default endpoint as specified in the configuration is used.

@@ -915,7 +915,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         // true if we need to materialize variables before running the SERVICE.
         final boolean isMaterialize;
         // variables that are generated inside the service and may carry mock IVs
-        Set<IVariable<IV>> varsToMockResolve = new HashSet<IVariable<IV>>();
+        final Set<IVariable<IV>> varsToMockResolve = new HashSet<IVariable<IV>>();
         if(serviceRef instanceof IConstant) {
 
             final BigdataURI serviceURI = ServiceCallUtility
