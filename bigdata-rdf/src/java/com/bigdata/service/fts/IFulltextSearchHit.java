@@ -1,4 +1,4 @@
-/*
+/**
 
  Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
@@ -22,15 +22,10 @@
  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
  */
-/*
- * Created on Apr 2, 2008
- */
-
-package com.bigdata.search;
+package com.bigdata.service.fts;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.store.FTS;
-import com.bigdata.rdf.store.FTS.TargetType;
+import com.bigdata.service.fts.FTS.TargetType;
 
 /**
  * Metadata about a fulltext search result (against an external service).

@@ -1,4 +1,4 @@
-/*
+/**
 
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
@@ -22,14 +22,12 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
-/*
- * Created on Apr 12, 2008
- */
-
-package com.bigdata.rdf.store;
+package com.bigdata.service.fts;
 
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
+
+import com.bigdata.rdf.store.BDS;
 
 
 /**

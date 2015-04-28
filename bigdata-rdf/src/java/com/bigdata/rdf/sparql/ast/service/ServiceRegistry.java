@@ -14,7 +14,6 @@ import org.openrdf.model.impl.URIImpl;
 import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
-import com.bigdata.rdf.sparql.ast.eval.FulltextSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
@@ -24,7 +23,8 @@ import com.bigdata.rdf.sparql.ast.service.history.HistoryServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
-import com.bigdata.rdf.store.FTS;
+import com.bigdata.service.fts.FTS;
+import com.bigdata.service.fts.FulltextSearchServiceFactory;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 

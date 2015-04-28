@@ -21,11 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*
- * Created on Jun 3, 2010
- */
-
-package com.bigdata.rdf.lexicon;
+package com.bigdata.service.fts.impl;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -44,8 +40,10 @@ import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 
-import com.bigdata.search.FulltextSearchHit;
-import com.bigdata.search.FulltextSearchHiterator;
+import com.bigdata.service.fts.FulltextSearchHit;
+import com.bigdata.service.fts.FulltextSearchHiterator;
+import com.bigdata.service.fts.IFulltextSearch;
+import com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery;
 
 /**
  * Implementation based on the built-in keyword search capabilities for bigdata.
@@ -62,7 +60,7 @@ public class SolrFulltextSearchImpl implements
 
    @Override
    public FulltextSearchHiterator<FulltextSearchHit> search(
-         com.bigdata.rdf.lexicon.IFulltextSearch.FulltextSearchQuery query) {
+         com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery query) {
 
       // TODO: remove for production:
       FulltextSearchHit hit1 = new FulltextSearchHit(

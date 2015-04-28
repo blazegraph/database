@@ -21,18 +21,12 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*
- * Created on Jun 3, 2010
- */
-
-package com.bigdata.rdf.lexicon;
+package com.bigdata.service.fts;
 
 import java.io.Serializable;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.store.FTS.TargetType;
-import com.bigdata.search.FulltextSearchHiterator;
-import com.bigdata.search.IFulltextSearchHit;
+import com.bigdata.service.fts.FTS.TargetType;
 
 /**
  * Abstraction for search interface against external Solr index.

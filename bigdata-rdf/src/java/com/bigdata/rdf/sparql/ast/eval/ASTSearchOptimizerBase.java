@@ -55,7 +55,7 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.FTS;
+import com.bigdata.service.fts.FTS;
 
 /**
  * Translate {@link FTS#SEARCH} and related magic predicates into a

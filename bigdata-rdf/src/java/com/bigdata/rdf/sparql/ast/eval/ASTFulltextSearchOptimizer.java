@@ -34,7 +34,7 @@ import java.util.Set;
 import org.openrdf.model.URI;
 
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.FTS;
+import com.bigdata.service.fts.FTS;
 
 /**
  * Translate {@link FTS#SEARCH} and related magic predicates into a
@@ -56,7 +56,7 @@ import com.bigdata.rdf.store.FTS;
  */
 public class ASTFulltextSearchOptimizer extends ASTSearchOptimizerBase {
 
-    static final Set<URI> searchUris;
+    static public final Set<URI> searchUris;
    
     static {
       
