@@ -1,6 +1,5 @@
 package com.bigdata.rdf.sail;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -51,7 +50,9 @@ import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
+ * 
  */
+@Deprecated
 public class RDRHistoryServiceFactory implements CustomServiceFactory {
 
     static private transient final Logger log = Logger
