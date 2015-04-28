@@ -46,20 +46,20 @@ import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
  */
-public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
+public class TestBigdataGraphEmbeddedTransactional extends AbstractTestBigdataGraph {
 
-    protected static final transient Logger log = Logger.getLogger(TestBigdataGraphEmbedded.class);
+    protected static final transient Logger log = Logger.getLogger(TestBigdataGraphEmbeddedTransactional.class);
     
     /**
      * 
      */
-    public TestBigdataGraphEmbedded() {
+    public TestBigdataGraphEmbeddedTransactional() {
     }
 
     /**
      * @param name
      */
-    public TestBigdataGraphEmbedded(String name) {
+    public TestBigdataGraphEmbeddedTransactional(String name) {
         super(name);
     }
 
@@ -108,16 +108,19 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 //                graph.commit();
                 
                 for (Vertex v : graph.getVertices()) {
-                    System.err.println(v);
+                    if(log.isInfoEnabled())
+                    	log.info(v);
                 }
 
-                System.err.println("\n"+((BigdataSailRepositoryConnection)
+                if(log.isInfoEnabled())
+                	log.info("\n"+((BigdataSailRepositoryConnection)
                         graph.getWriteConnection()).getTripleStore().dumpStore());
                 
                 if (graph.getFeatures().supportsStringProperty) {
                     v1.setProperty("key1", "value1");
                     graph.commit();
-                    System.err.println("\n"+((BigdataSailRepositoryConnection)
+                    if(log.isInfoEnabled())
+                       log.info("\n"+((BigdataSailRepositoryConnection)
                             graph.getWriteConnection()).getTripleStore().dumpStore());
                     assertEquals("value1", v1.getProperty("key1"));
                 }
@@ -182,9 +185,11 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 	        for (Method method : testSuite.getClass().getDeclaredMethods()) {
 	            if (method.getName().startsWith("test")) {
 	                if (exclude.contains(method.getName())) {
-	                    System.out.println("Skipping test " + method.getName() + ".");
+	                	if(log.isInfoEnabled())
+	                		log.info("Skipping test " + method.getName() + ".");
 	                } else {
-    	                System.out.println("Testing " + method.getName() + "...");
+	                	if(log.isInfoEnabled())
+	                		log.info("Testing " + method.getName() + "...");
     	                try {
     		                method.invoke(testSuite);
     	                } catch (Exception ex) {
@@ -269,6 +274,30 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
 		
     	
     }
+    
+    protected static void printVerticesEdges(BigdataGraph graph, String message)
+    {
+            if(log.isInfoEnabled())
+            {
+            	log.info(message);
+            	log.info("graph:");
+            }
+            
+            for (Vertex v : graph.getVertices()) {
+               
+            	if(log.isInfoEnabled())
+            		log.info(v);
+                
+            }
+            
+            for (Edge e : graph.getEdges()) {
+               
+            	if(log.isInfoEnabled())
+            		log.info(e);
+                
+            }
+    	
+    }
 
     public static final void main(final String[] args) throws Exception {
 
@@ -276,22 +305,9 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
             
             final BigdataGraph graph = BigdataGraphFactory.create();
             
-            GraphMLReader.inputGraph(graph, TestBigdataGraphEmbedded.class.getResourceAsStream("graph-example-1.xml"));
+            GraphMLReader.inputGraph(graph, TestBigdataGraphEmbeddedTransactional.class.getResourceAsStream("graph-example-1.xml"));
             
-            System.err.println("data loaded (in-memory).");
-            System.err.println("graph:");
-            
-            for (Vertex v : graph.getVertices()) {
-                
-                System.err.println(v);
-                
-            }
-            
-            for (Edge e : graph.getEdges()) {
-                
-                System.err.println(e);
-                
-            }
+            printVerticesEdges(graph,"data loaded (in-memory)");
             
             graph.shutdown();
             
@@ -303,22 +319,9 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
             
             final BigdataGraph graph = BigdataGraphFactory.open(jnl.getAbsolutePath(), true);
             
-            GraphMLReader.inputGraph(graph, TestBigdataGraphEmbedded.class.getResourceAsStream("graph-example-1.xml"));
+            GraphMLReader.inputGraph(graph, TestBigdataGraphEmbeddedTransactional.class.getResourceAsStream("graph-example-1.xml"));
             
-            System.err.println("data loaded (persistent).");
-            System.err.println("graph:");
-            
-            for (Vertex v : graph.getVertices()) {
-                
-                System.err.println(v);
-                
-            }
-            
-            for (Edge e : graph.getEdges()) {
-                
-                System.err.println(e);
-                
-            }
+            printVerticesEdges(graph,"data loaded (persistent)");
             
             graph.shutdown();
             
@@ -328,20 +331,7 @@ public class TestBigdataGraphEmbedded extends AbstractTestBigdataGraph {
             
             final BigdataGraph graph = BigdataGraphFactory.open(jnl.getAbsolutePath(), true);
             
-            System.err.println("persistent graph re-opened.");
-            System.err.println("graph:");
-            
-            for (Vertex v : graph.getVertices()) {
-                
-                System.err.println(v);
-                
-            }
-            
-            for (Edge e : graph.getEdges()) {
-                
-                System.err.println(e);
-                
-            }
+            printVerticesEdges(graph,"persistent graph re-opened");
             
             graph.shutdown();
             
