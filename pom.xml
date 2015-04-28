@@ -212,10 +212,43 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <version>2.18.1</version>
         <configuration>
           <includes>
-            <include>**/TestAll.java</include>
-          </includes>
-          <excludes>
-	    <exclude>com/bigdata/TestAll.java</exclude>
+     	    <include>com/bigdata/cache/TestAll.java</include>
+            <include>com/bigdata/io/TestAll.java</include>
+            <include>com/bigdata/net/TestAll.java</include>
+            <include>com/bigdata/config/TestAll.java</include>
+            <include>com/bigdata/util/TestAll.java</include>
+            <include>com/bigdata/util/concurrent/TestAll.java</include>
+            <include>com/bigdata/striterator/TestAll.java</include>
+            <include>com/bigdata/counters/TestAll.java</include>
+            <include>com/bigdata/rawstore/TestAll.java</include>
+            <include>com/bigdata/btree/TestAll.java</include>
+            <include>com/bigdata/htree/TestAll.java</include>
+            <include>com/bigdata/concurrent/TestAll.java</include>
+            <include>com/bigdata/quorum/TestAll.java</include>
+            <include>com/bigdata/ha/TestAll.java</include>
+            <include>com/bigdata/io/writecache/TestAll.java</include>
+            <include>com/bigdata/journal/TestAll.java</include>
+            <include>com/bigdata/rwstore/TestAll.java</include>
+            <include>com/bigdata/resources/TestAll.java</include>
+            <include>com/bigdata/relation/TestAll.java</include>
+            <include>com/bigdata/bop/TestAll.java</include>
+            <include>com/bigdata/relation/rule/eval/TestAll.java</include>
+            <include>com/bigdata/mdi/TestAll.java</include>
+    <!-- enabled until moved into maven scale-out project/ hopefully will not run out of CI resources now that jini is in its own project/ -->
+            <include>com/bigdata/service/TestAll.java</include>
+            <include>com/bigdata/bop/fed/TestAll.java</include>
+            <include>com/bigdata/sparse/TestAll.java</include>
+            <include>com/bigdata/search/TestAll.java</include>
+            <!-- not suppported yet/
+            <include>com/bigdata/bfs/TestAll.java</include>
+            -->
+            <include>com/bigdata/rdf/TestAll.java</include>
+            <include>com/bigdata/rdf/sail/TestAll.java</include>
+            <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
+            <include>com/bigdata/gom/TestAll.java</include>
+           </includes>
+           <excludes>
+    	    <exclude>com/bigdata/TestAll.java</exclude>
 	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
 	  </excludes>
         </configuration>
