@@ -71,7 +71,7 @@
           <antcall target="stopHttpd" />
     </target>
 
-    <target name="startTestServices" unless="${skipTestServices}">
+    <target name="startTestServices" depends="getMavenDependencies" unless="${skipTestServices}">
       <property name="test.codebase.port" value="23333" />
       <property name="test.codebase.dir" value="${dist.lib.dl}" />
       <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar" />
@@ -91,13 +91,12 @@
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
       <property name="java.net.preferIPv4Stack" value="true" />
           <echo message="Starting test services."/>
-	  <antcall target="getMavenDependencies"/>
           <antcall target="startZookeeper"/>
           <antcall target="startHttpd"/>
           <antcall target="startLookup"/>
     </target>
 
-    <target name="startHttpd">
+    <target name="startHttpd" depends = "getMavenDependencies">
       <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 </echo>
       <java jar="${dependency.dir}/${classserver.jar}"
@@ -110,7 +109,7 @@
       </java>
     </target>
 
-    <target name="stopHttpd">
+    <target name="stopHttpd" depends = "getMavenDependencies">
       <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 	</echo>
       <java jar="${dependency.dir}/${classserver.jar}"
@@ -122,8 +121,7 @@
       </java>
     </target>
 
-     <target name="startLookup">
-       <antcall target="getMavenDependencies"/>
+     <target name="startLookup" depends = "getMavenDependencies">
 
        <!-- Emit the property to the ant console -->
        <property name="print_classpath" value = "${jini.classpath}"/>
@@ -148,9 +146,7 @@
         <sysproperty key="codebase.port" value="${test.codebase.port}" />
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
-<!-- Need to determine where this value is set. 
         <sysproperty key="default.nic" value="${default.nic}" />
--->
         <sysproperty key="bigdata.lookup.config" value="${lookup.config}" />
 	<sysproperty key="reggie.jar" value="${reggie.jar}"/>
 	<sysproperty key="reggie-dl.jar" value="${reggie-dl.jar}"/>
@@ -158,7 +154,7 @@
       </java>
     </target>
 
-    <target name="stopLookup">
+    <target name="stopLookup" depends = "getMavenDependencies">
       <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -Dbigdata.lookup.config=${lookup.config} -Dreggie.jar=${reggie.jar} -Dreggie-dl.jar=${reggie-dl.jar} -Djsk-dl.jar=${jsk-dl.jar} com.bigdata.service.jini.util.LookupStarter stop
 </echo>
       <echo>
