@@ -45,7 +45,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.store.FTS;
+import com.bigdata.service.fts.FTS;
 
 /**
  * Test suite for {@link ASTFulltextSearchOptimizer}.

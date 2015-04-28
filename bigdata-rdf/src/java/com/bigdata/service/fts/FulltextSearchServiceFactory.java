@@ -21,11 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*
- * Created on Sep 9, 2011
- */
-
-package com.bigdata.rdf.sparql.ast.eval;
+package com.bigdata.service.fts;
 
 import java.io.Serializable;
 import java.util.Iterator;
@@ -53,9 +49,6 @@ import com.bigdata.config.Configuration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
-import com.bigdata.rdf.lexicon.IFulltextSearch;
-import com.bigdata.rdf.lexicon.IFulltextSearch.FulltextSearchQuery;
-import com.bigdata.rdf.lexicon.SolrFulltextSearchImpl;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
@@ -67,6 +60,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
@@ -74,13 +68,11 @@ import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.store.FTS;
-import com.bigdata.rdf.store.FTS.EndpointType;
-import com.bigdata.rdf.store.FTS.TargetType;
-import com.bigdata.search.FulltextSearchHit;
-import com.bigdata.search.FulltextSearchHiterator;
-import com.bigdata.search.IFulltextSearchHit;
 import com.bigdata.search.IHit;
+import com.bigdata.service.fts.FTS.EndpointType;
+import com.bigdata.service.fts.FTS.TargetType;
+import com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery;
+import com.bigdata.service.fts.impl.SolrFulltextSearchImpl;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
