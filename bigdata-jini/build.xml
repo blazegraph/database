@@ -28,9 +28,7 @@
   	</dirset>
     </path>
 
-
-
-<!-- Note: It appears to be necessary to spawn the script which starts -->
+    <!-- Note: It appears to be necessary to spawn the script which starts -->
     <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
     <!-- though it will start without being spawned under others (OSX).    -->
     <!-- However, this change appears to result in zookeeper not running   -->
