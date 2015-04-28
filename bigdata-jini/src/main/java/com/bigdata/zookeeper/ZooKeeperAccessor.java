@@ -378,7 +378,7 @@ public class ZooKeeperAccessor {
         private boolean connected = false;
         @Override
         public void process(final WatchedEvent e) {
-            System.err.println("event: "+e);
+//            System.err.println("event: "+e);
             // FIXME Does not verify that event is for the current ZK client.
             if(!open) return; // FIXME blocks view of events after a close().
 
