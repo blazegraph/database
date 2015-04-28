@@ -365,18 +365,18 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
                         
                         if (f!=null) {
                            
-                           /**
-                            * Queue services in the beginning or in the end.
-                            * Note that the query hint can be used to override
-                            * the service defaults.
-                            */
-                           if (f.getServiceOptions().isRunFirst()) {
+                            /**
+                             * Queue services in the beginning or in the end.
+                             * Note that the query hint can be used to override
+                             * the service defaults.
+                             */
+                            if (f.getServiceOptions().isRunFirst()) {
 
-                              ordered.add(n);
+                                ordered.add(n);
 
-                              sitr.remove();
+                                sitr.remove();
                               
-                           } 
+                            } 
                            
                         }
 

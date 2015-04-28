@@ -3,63 +3,63 @@ package com.bigdata.search;
 import java.util.Iterator;
 
 /**
- * Visits external fulltext index search results in order of decreasing relevance.
+ * Visits external fulltext index search results in order of decreasing
+ * relevance.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class FulltextSearchHiterator<A extends IFulltextSearchHit>
-implements Iterator<A> {
+public class FulltextSearchHiterator<A extends IFulltextSearchHit> implements
+      Iterator<A> {
 
-	/**
-	 * The index into the array of hits wrapped by this iterator.
-	 */
-	private int rank = 0;
-	
-	/**
-	 * The array of hits wrapped by this iterator.
-	 */
-	private final A[] hits;
-	
-	/**
-	 * 
-	 * @param hits
-	 */
-	public FulltextSearchHiterator(final A[] hits) {
+   /**
+    * The index into the array of hits wrapped by this iterator.
+    */
+   private int rank = 0;
 
-		if (hits == null)
-			throw new IllegalArgumentException();
+   /**
+    * The array of hits wrapped by this iterator.
+    */
+   private final A[] hits;
 
-		this.hits = hits;
+   /**
+    * 
+    * @param hits
+    */
+   public FulltextSearchHiterator(final A[] hits) {
 
-	}
-	
-	public boolean hasNext() {
-		
-		return rank < hits.length;
-		
-	}
-	
-	public A next() {
-		
-		return hits[rank++];
-		
-	}
-	
-    /**
-     * @throws UnsupportedOperationException
-     */
-    public void remove() {
-        
-        throw new UnsupportedOperationException();
-        
-    }
+      if (hits == null)
+         throw new IllegalArgumentException();
 
-    public String toString() {
-        
-        return "FulltextSearchHiterator{nhits=" + hits.length + "} : "
-                + hits;
-        
-    }
-    
+      this.hits = hits;
+
+   }
+
+   public boolean hasNext() {
+
+      return rank < hits.length;
+
+   }
+
+   public A next() {
+
+      return hits[rank++];
+
+   }
+
+   /**
+    * @throws UnsupportedOperationException
+    */
+   public void remove() {
+
+      throw new UnsupportedOperationException();
+
+   }
+
+   public String toString() {
+
+      return "FulltextSearchHiterator{nhits=" + hits.length + "} : " + hits;
+
+   }
+
 }
