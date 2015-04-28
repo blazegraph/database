@@ -131,7 +131,6 @@
 </echo>
       <echo>
 </echo>
-
       <java classname="com.bigdata.service.jini.util.LookupStarter"
 	    classpathref="jini.classpath"
             fork="true"
@@ -145,6 +144,8 @@
         <sysproperty key="log4j.configuration" value="${log4j.configuration}" />
         <sysproperty key="codebase.port" value="${test.codebase.port}" />
         <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
+        <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+        <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
         <sysproperty key="default.nic" value="${default.nic}" />
         <sysproperty key="bigdata.lookup.config" value="${lookup.config}" />
@@ -159,10 +160,14 @@
 </echo>
       <echo>
 </echo>
+      <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+      <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
       <java classname="com.bigdata.service.jini.util.LookupStarter"
             fork="true"
             failonerror="true">
         <classpath refid="jini.classpath" />
+        <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+        <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
         <sysproperty key="app.home" value="${app.home}" />
         <sysproperty key="jini.lib" value="${dist.lib}" />
         <sysproperty key="jini.lib.dl" value="${dist.lib.dl}" />

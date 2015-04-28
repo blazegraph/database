@@ -72,7 +72,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.18.1</version>
         <configuration>
-          <argLine>-Djava.security.manager -Djava.security.policy=${java.security.policy}</argLine>
+         <argLine>-Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime}</argLine>
         </configuration>
       </plugin>
       <plugin>
