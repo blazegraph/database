@@ -210,6 +210,10 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
           <includes>
             <include>**/TestAll.java</include>
           </includes>
+          <excludes>
+	    <exclude>com/bigdata/TestAll.java</exclude>
+	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
+	  </excludes>
         </configuration>
       </plugin>
       <plugin>
@@ -603,6 +607,8 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
+<!--
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
