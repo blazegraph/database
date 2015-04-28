@@ -129,7 +129,7 @@ dependencies.
           </includes>
           <excludes>
             <exclude>com/bigdata/TestAll.java</exclude>
-          </exclude>
+          </excludes>
         </configuration>
       </plugin>
     </plugins>
