@@ -160,8 +160,6 @@
 </echo>
       <echo>
 </echo>
-      <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
-      <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
       <java classname="com.bigdata.service.jini.util.LookupStarter"
             fork="true"
             failonerror="true">
