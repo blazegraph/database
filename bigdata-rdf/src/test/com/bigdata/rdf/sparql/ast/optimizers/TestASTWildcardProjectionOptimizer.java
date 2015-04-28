@@ -27,18 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.Collections;
+
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
+import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.FunctionNode;
+import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -443,4 +449,268 @@ public class TestASTWildcardProjectionOptimizer extends
 
    }
 
+   /**
+    * Given the query:
+    * 
+    * <pre>
+    * SELECT (COUNT(*) as ?c) {
+    *   SELECT * {
+    *     SELECT * { ?s ?p ?o }
+    *   } LIMIT 21 OFFSET 0
+    * }
+    * </pre>
+    * 
+    * We obtain the following AST:
+    * 
+    * <pre>
+    * QueryType: SELECT
+    * includeInferred=true
+    * SELECT ( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(*))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2006/sparql-functions#count, valueExpr=com.bigdata.bop.rdf.aggregate.COUNT(*)] AS VarNode(c) )
+    *   JoinGroupNode {
+    *     JoinGroupNode {
+    *       QueryType: SELECT
+    *       SELECT * 
+    *         JoinGroupNode {
+    *           JoinGroupNode {
+    *             QueryType: SELECT
+    *             SELECT * 
+    *               JoinGroupNode {
+    *                 StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
+    *               }
+    *             
+    *           }
+    *         }
+    *       slice(limit=21)
+    *       
+    *     }
+    *   }
+    * </pre>
+    * 
+    * This is the current AST as rewritten:
+    * 
+    * <pre>
+    * QueryType: SELECT
+    * includeInferred=true
+    * SELECT ( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(*))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2006/sparql-functions#count, valueExpr=com.bigdata.bop.rdf.aggregate.COUNT(*)] AS VarNode(c) )
+    *   JoinGroupNode {
+    *     JoinGroupNode {
+    *       QueryType: SELECT
+    *       SELECT * #  ==> SELECT ?s ?p ?o
+    *         JoinGroupNode {
+    *           JoinGroupNode {
+    *             QueryType: SELECT
+    *             SELECT * #  ==> SELECT ?s ?p ?o
+    *               JoinGroupNode {
+    *                 StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
+    *               }
+    *             
+    *           }
+    *         }
+    *       slice(limit=21)
+    *       
+    *     }
+    *   }
+    * </pre>
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/757" > Wildcard projection
+    *      was not rewritten. </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1210" >
+    *      BOpUtility.postOrderIteratorWithAnnotations() is has wrong visitation
+    *      order. </a>
+    */
+   public void test_wildcardProjectionOptimizer03() {
+
+      /*
+     * Note: DO NOT share structures in this test!!!!
+     */
+      final IBindingSet[] bsets = new IBindingSet[] {};
+
+      /**
+       * The source AST.
+       * 
+       * <pre>
+       * QueryType: SELECT
+       * includeInferred=true
+       * SELECT ( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(*))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2006/sparql-functions#count, valueExpr=com.bigdata.bop.rdf.aggregate.COUNT(*)] AS VarNode(c) )
+       *   JoinGroupNode {
+       *     JoinGroupNode {
+       *       QueryType: SELECT // [sliceQuery]
+       *       SELECT * 
+       *         JoinGroupNode {
+       *           JoinGroupNode {
+       *             QueryType: SELECT // [selectQuery]
+       *             SELECT *
+       *               JoinGroupNode {
+       *                 StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
+       *               }
+       *             
+       *           }
+       *         }
+       *       slice(limit=21)
+       *     }
+       *   }
+       * </pre>
+       */
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+         /**
+          * Top level query.
+          * 
+          * <pre>
+          * QueryType: SELECT
+          * includeInferred=true
+          * SELECT ( com.bigdata.rdf.sparql.ast.FunctionNode(VarNode(*))[ FunctionNode.scalarVals=null, FunctionNode.functionURI=http://www.w3.org/2006/sparql-functions#count, valueExpr=com.bigdata.bop.rdf.aggregate.COUNT(*)] AS VarNode(c) )
+          *   JoinGroupNode {
+          *     JoinGroupNode {
+          *       // [sliceQuery]
+          *          // [selectQuery]
+          *     }
+          *   }
+          * </pre>
+          */
+         final SubqueryRoot sliceQuery = new SubqueryRoot(QueryType.SELECT); // subquery
+         final SubqueryRoot selectQuery = new SubqueryRoot(QueryType.SELECT); // inner most subquery
+          {
+             given.setIncludeInferred(true);          
+
+             final FunctionNode countNode = new FunctionNode(
+                     FunctionRegistry.COUNT,
+                     Collections.<String, Object> emptyMap(),
+                     new VarNode("*"));
+   
+             final ProjectionNode countProjection = new ProjectionNode();
+             given.setProjection(countProjection);
+             countProjection.addProjectionExpression(new AssignmentNode(new VarNode("c"), countNode));
+   
+             final JoinGroupNode whereClause = new JoinGroupNode();
+             given.setWhereClause(whereClause);
+
+             final JoinGroupNode childJoinGroup = new JoinGroupNode();
+             whereClause.addChild(childJoinGroup);
+             childJoinGroup.addChild(sliceQuery);
+          }
+
+          /**
+          * <pre>
+          *       QueryType: SELECT // [sliceQuery]
+          *       SELECT * 
+          *         JoinGroupNode {
+          *           JoinGroupNode {
+          *             // [selectQuery]
+          *           }
+          *         }
+          *       slice(limit=21)
+          * </pre>
+          */
+          {
+              final ProjectionNode p = new ProjectionNode();
+              sliceQuery.setProjection(p);
+              p.addProjectionVar(new VarNode("*"));
+              
+              final JoinGroupNode whereClause = new JoinGroupNode();
+              sliceQuery.setWhereClause(whereClause);
+
+              final JoinGroupNode childJoinGroup = new JoinGroupNode();
+              whereClause.addChild(childJoinGroup);
+              childJoinGroup.addChild(selectQuery); // Doubly nested.
+
+              sliceQuery.setSlice(new SliceNode(0L/* offset */, 21L/* limit */));
+          }
+
+         /**
+          * <pre>
+          *             QueryType: SELECT // selectQuery
+          *             SELECT * 
+          *               JoinGroupNode {
+          *                 StatementPatternNode(VarNode(s), VarNode(p), VarNode(o)) [scope=DEFAULT_CONTEXTS]
+          *               }
+          * </pre>
+          */
+          {
+              final ProjectionNode p = new ProjectionNode();
+              selectQuery.setProjection(p);
+              p.addProjectionVar(new VarNode("*"));
+
+              final JoinGroupNode whereClause = new JoinGroupNode();
+              selectQuery.setWhereClause(whereClause);
+              whereClause.addChild(new StatementPatternNode(new VarNode("s"), new VarNode("p"), new VarNode("o"), null, Scope.DEFAULT_CONTEXTS));
+          }
+
+      }
+//System.err.println("given AST::\n"+given.toString());
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+         /*
+          * Top level query.
+          */
+         final SubqueryRoot sliceQuery = new SubqueryRoot(QueryType.SELECT); // subquery
+         final SubqueryRoot selectQuery = new SubqueryRoot(QueryType.SELECT); // inner most subquery
+          {
+             expected.setIncludeInferred(true);          
+
+             final FunctionNode countNode = new FunctionNode(
+                     FunctionRegistry.COUNT,
+                     Collections.<String, Object> emptyMap(),
+                     new VarNode("*"));
+   
+             final ProjectionNode countProjection = new ProjectionNode();
+             expected.setProjection(countProjection);
+             countProjection.addProjectionExpression(new AssignmentNode(new VarNode("c"), countNode));
+   
+             final JoinGroupNode whereClause = new JoinGroupNode();
+             expected.setWhereClause(whereClause);
+
+             final JoinGroupNode childJoinGroup = new JoinGroupNode();
+             whereClause.addChild(childJoinGroup);
+             childJoinGroup.addChild(sliceQuery);
+          }
+
+         /*
+          * [sliceQuery]
+          */
+          {
+              final ProjectionNode p = new ProjectionNode();
+              sliceQuery.setProjection(p);
+//              p.addProjectionVar(new VarNode("*"));
+              p.addProjectionVar(new VarNode("s"));
+              p.addProjectionVar(new VarNode("p"));
+              p.addProjectionVar(new VarNode("o"));
+              
+              final JoinGroupNode whereClause = new JoinGroupNode();
+              sliceQuery.setWhereClause(whereClause);
+
+              final JoinGroupNode childJoinGroup = new JoinGroupNode();
+              whereClause.addChild(childJoinGroup);
+              childJoinGroup.addChild(selectQuery); // Doubly nested.
+
+              sliceQuery.setSlice(new SliceNode(0L/* offset */, 21L/* limit */));
+          }
+
+         /*
+          * [selectQuery]
+          */
+          {
+              final ProjectionNode p = new ProjectionNode();
+              selectQuery.setProjection(p);
+//              p.addProjectionVar(new VarNode("*"));
+              p.addProjectionVar(new VarNode("s"));
+              p.addProjectionVar(new VarNode("p"));
+              p.addProjectionVar(new VarNode("o"));
+
+              final JoinGroupNode whereClause = new JoinGroupNode();
+              selectQuery.setWhereClause(whereClause);
+              whereClause.addChild(new StatementPatternNode(new VarNode("s"), new VarNode("p"), new VarNode("o"), null, Scope.DEFAULT_CONTEXTS));
+          }
+      }
+
+      final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
+
+      final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
+              given/* queryNode */, bsets);
+
+      assertSameAST(expected, actual);
+
+  }
+   
 }

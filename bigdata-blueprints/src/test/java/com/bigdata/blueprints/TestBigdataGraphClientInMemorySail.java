@@ -33,6 +33,7 @@ import com.bigdata.rdf.sail.webapp.BigdataSailNSSWrapper;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Graph;
 import com.tinkerpop.blueprints.TestSuite;
+import com.tinkerpop.blueprints.TransactionalGraphTestSuite;
 import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.impls.GraphTest;
 
@@ -40,20 +41,20 @@ import com.tinkerpop.blueprints.impls.GraphTest;
  * Blueprints test suite for a client communicating with the server over the
  * REST API.
  */
-public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
+public class TestBigdataGraphClientInMemorySail extends AbstractTestBigdataGraph {
 
-    private static final transient Logger log = Logger.getLogger(TestBigdataGraphClient.class);
+    private static final transient Logger log = Logger.getLogger(TestBigdataGraphClientInMemorySail.class);
     
     /**
      * 
      */
-    public TestBigdataGraphClient() {
+    public TestBigdataGraphClientInMemorySail() {
     }
 
     /**
      * @param name
      */
-    public TestBigdataGraphClient(String name) {
+    public TestBigdataGraphClientInMemorySail(String name) {
         super(name);
     }
 
@@ -61,7 +62,16 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
     protected GraphTest newBigdataGraphTest() {
         return new BigdataGraphTest();
     }
-    
+  /* 
+   //Currently there is not transaction support in the remote client.
+    public void testTransactionalGraphTestSuite() throws Exception {
+        final GraphTest test = newBigdataGraphTest();
+        test.stopWatch();
+        test.doTestSuite(new TransactionalGraphTestSuite(test));
+        GraphTest.printTestPerformance("TransactionalGraphTestSuite",
+                test.stopWatch());
+    }
+   */
 //    public void testAddVertexProperties() throws Exception {
 //        final BigdataGraphTest test = new BigdataGraphTest();
 //        test.stopWatch();
@@ -171,19 +181,21 @@ public class TestBigdataGraphClient extends AbstractTestBigdataGraph {
 
     public static final void main(final String[] args) throws Exception {
         
-        final String url = "http://localhost:9999/bigdata/";
+        final String url = "http://localhost:9999/bigdata/sparql";
         
         final BigdataGraph graph = BigdataGraphFactory.connect(url);
         
         for (Vertex v : graph.getVertices()) {
             
-            System.err.println(v);
+            if(log.isInfoEnabled())
+            	log.info(v);
             
         }
         
         for (Edge e : graph.getEdges()) {
             
-            System.err.println(e);
+            if(log.isInfoEnabled())
+            	log.info(e);
             
         }
         
