@@ -35,6 +35,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -48,6 +49,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.config.Configuration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -156,7 +158,6 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       /*
        * Create and return the ServiceCall object which will execute this query.
        */
-
       return new ExternalServiceSearchCall(store, searchVar, statementPatterns,
             getServiceOptions());
 
@@ -754,13 +755,18 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          String targetTypeStr = resolveAsString(targetType, bs);
 
-         if (targetTypeStr != null) {
+         // try override with system default, if not set
+         if (targetTypeStr==null || targetTypeStr.isEmpty()) {
+            targetTypeStr = getProperty(FTS.Options.FTS_TARGET_TYPE);
+         }
+                  
+         if (targetTypeStr != null && !targetTypeStr.isEmpty()) {
 
             try {
 
                return TargetType.valueOf(targetTypeStr);
 
-            } catch (IllegalArgumentException e) {
+            } catch (RuntimeException e) {
 
                // illegal, ignore and proceed
                if (log.isDebugEnabled()) {
@@ -771,7 +777,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          }
 
-         return FTS.DEFAULT_TARGET_TYPE; // fallback
+         return FTS.Options.DEFAULT_TARGET_TYPE; // fallback
 
       }
 
@@ -779,7 +785,12 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          String searchTimeoutStr = resolveAsString(searchTimeout, bs);
 
-         if (searchTimeoutStr != null) {
+         // try override with system default, if not set
+         if (searchTimeoutStr==null) {
+            searchTimeoutStr = getProperty(FTS.Options.FTS_TIMEOUT);
+         }
+         
+         if (searchTimeoutStr != null && !searchTimeoutStr.isEmpty()) {
 
             try {
 
@@ -795,12 +806,20 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             }
          }
 
-         return FTS.DEFAULT_TIMEOUT; // fallback
+         return FTS.Options.DEFAULT_TIMEOUT; // fallback
       }
 
       private String resolveParams(IBindingSet bs) {
 
-         return resolveAsString(params, bs);
+         String paramStr = resolveAsString(params, bs);
+         
+         // try override with system default, if not set
+         if (paramStr==null) { // allow for paramStr being empty string override
+            paramStr = getProperty(FTS.Options.FTS_PARAMS);
+         }
+         
+         return paramStr==null || paramStr.isEmpty() ?
+            FTS.Options.DEFAULT_PARAMS : paramStr;
 
       }
 
@@ -812,7 +831,12 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          String endpointTypeStr = resolveAsString(endpointType, bs);
 
-         if (endpointTypeStr != null) {
+         // try override with system default, if not set
+         if (endpointTypeStr==null) {
+            endpointTypeStr = getProperty(FTS.Options.FTS_ENDPOINT_TYPE);
+         }
+         
+         if (endpointTypeStr != null && !endpointTypeStr.isEmpty()) {
 
             try {
 
@@ -828,7 +852,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             }
          }
 
-         return FTS.DEFAULT_ENDPOINT_TYPE; // fallback
+         return FTS.Options.DEFAULT_ENDPOINT_TYPE; // fallback
 
       }
 
@@ -839,14 +863,24 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       private String resolveEndpoint(IBindingSet bs) {
 
          String endpointStr = resolveAsString(endpoint, bs);
-         if (endpointStr == null || endpointStr.isEmpty()) {
+         
+         // try override with system default, if not set
+         if (endpointStr==null || endpointStr.isEmpty()) {
+            endpointStr = getProperty(FTS.Options.FTS_ENDPOINT);
+         }
+         
+         
+         if (endpointStr != null && !endpointStr.isEmpty()) {
+
+            return endpointStr;
+
+         } else {
 
             throw new RuntimeException(
                   "External fulltext search endpoint null or empty.");
 
          }
 
-         return endpointStr;
       }
 
       private String resolveAsString(TermNode termNode, IBindingSet bs) {
@@ -883,6 +917,13 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                      "FTS service variable not bound at execution time: " + var);
             }
          }
+      }
+      
+      public String getProperty(String property) {
+         
+          // TODO: this should read from the configuration file as well
+          return System.getProperty(property, null);
+          
       }
 
    }

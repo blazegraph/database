@@ -36,10 +36,6 @@ import org.openrdf.model.URI;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.FTS;
 
-// TODO: some of the logics here is duplicated, we may want to introduce a
-// common base class with the standard bigdata search optimzer. In fact, we
-// only changed (i) the namespace BDS -> SolrSearch and (ii) the list of
-// magic predicates.
 /**
  * Translate {@link FTS#SEARCH} and related magic predicates into a
  * {@link ServiceNode} which will invoke the bigdata search engine.

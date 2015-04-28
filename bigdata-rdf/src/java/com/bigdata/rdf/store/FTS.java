@@ -88,6 +88,62 @@ import org.openrdf.model.impl.URIImpl;
  */
 public interface FTS {
 
+   
+   public interface Options {
+      
+      /**
+       * Option that may be set to specify a default for {@link FTS#ENDPOINT},
+       * to be used in fulltext search whenever the {@link FTS#ENDPOINT} is
+       * left unspecified. When not set, the {@link FTS#ENDPOINT} is
+       * mandatory in FTS SERVICE queries; when set, the vocabulary
+       * {@link FTS#ENDPOINT} may be used to override the default.
+       */
+      String FTS_ENDPOINT = FTS.class.getName() + ".defaultEndpoint"; 
+
+      
+      /**
+       * Option that may be set to specify a default for {@link FTS#ENDPOINT_TYPE},
+       * to be used in fulltext search whenever the {@link FTS#ENDPOINT_TYPE} is
+       * left unspecified. When set, the vocabulary
+       * {@link FTS#ENDPOINT_TYPE} may be used to override the default.
+       */
+      String FTS_ENDPOINT_TYPE = FTS.class.getName() + ".defaultEndpointType";
+      
+      EndpointType DEFAULT_ENDPOINT_TYPE = EndpointType.SOLR;
+
+      /**
+       * Option that may be set to specify a default for {@link FTS#TARGET_TYPE},
+       * to be used in fulltext search whenever the {@link FTS#TARGET_TYPE} is
+       * left unspecified. When set, the vocabulary
+       * {@link FTS#TARGET_TYPE} may be used to override the default.
+       */
+      String FTS_TARGET_TYPE = FTS.class.getName() + ".defaultTargetType";
+      
+      TargetType DEFAULT_TARGET_TYPE = TargetType.URI;
+      
+
+      /**
+       * Option that may be set to specify a default for {@link FTS#FTS_TIMEOUT},
+       * to be used in fulltext search whenever the {@link FTS#FTS_TIMEOUT} is
+       * left unspecified. When set, the vocabulary
+       * {@link FTS#FTS_TIMEOUT} may be used to override the default.
+       */
+      String FTS_TIMEOUT = FTS.class.getName() + ".defaultTimeout";
+      
+      final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+      
+      /**
+       * Option that may be set to specify a default for {@link FTS#PARAMS},
+       * to be used in fulltext search whenever the {@link FTS# } is
+       * left unspecified. When set, the vocabulary
+       * {@link FTS# } may be used to override the default.
+       */
+      String FTS_PARAMS = FTS.class.getName() + ".defaultParams";
+      
+      final String DEFAULT_PARAMS = "";
+      
+   }
+   
    /**
     * The namespace used for magic search predicates.
     */
@@ -176,9 +232,7 @@ public interface FTS {
     * {@link EndpointType} enum values.
     */
    final URI ENDPOINT_TYPE = new URIImpl(NAMESPACE + "endpointType");
-   
-   
-   final EndpointType DEFAULT_ENDPOINT_TYPE = EndpointType.SOLR;
+
    
    
    /**
@@ -223,8 +277,6 @@ public interface FTS {
     * provided, the {@value #DEFAULT_TARGET_TYPE} will be used.
     */   
    final URI TARGET_TYPE = new URIImpl(NAMESPACE + "targetType");
-   
-   public static final TargetType DEFAULT_TARGET_TYPE = TargetType.URI;
 
    /**
     * Magic predicate used to query for free text search metadata to set a
@@ -249,10 +301,6 @@ public interface FTS {
     */
    final URI TIMEOUT = new URIImpl(NAMESPACE + "timeout");
 
-   /**
-    * The default timeout for a free text search (milliseconds).
-    */
-   final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
    
    /**
     * Magic predicate to indicate the output variable in which the score
