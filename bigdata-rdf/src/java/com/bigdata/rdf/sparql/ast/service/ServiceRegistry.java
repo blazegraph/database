@@ -101,23 +101,24 @@ public class ServiceRegistry {
 
         }
         
-//        if (true) {
-//
-//            /**
-//             * @see <a
-//             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/607">
-//             *      HISTORY SERVICE </a>
-//             */
-//
+        if (true) {
+
+            /**
+             * @see <a
+             *      href="https://sourceforge.net/apps/trac/bigdata/ticket/607">
+             *      HISTORY SERVICE </a>
+             */
 //            add(new URIImpl(BD.NAMESPACE + "history"),
-////                    new HistoryServiceFactory());
-//            /*
-//             * Replacing with a history service using RDR instead of a custom
-//             * index.
-//             */
-//                    new RDRHistoryServiceFactory());
-//
-//        }
+//                    new HistoryServiceFactory());
+            
+            /**
+             * Replacing with a history service using RDR instead of a custom
+             * index.
+             */
+            add(new URIImpl(BD.NAMESPACE + "history"),
+                    new RDRHistoryServiceFactory());
+
+        }
         
         // The Gather-Apply-Scatter RDF Graph Mining service.
         add(GASService.Options.SERVICE_KEY, new GASService());
