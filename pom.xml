@@ -125,6 +125,7 @@ dependencies.
         <resource>
             <directory>bigdata/src/test</directory>
             <includes>
+                <include>**/*.csv</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
