@@ -93,7 +93,7 @@ public interface FTS {
        * Option that may be set to specify a default for {@link FTS#ENDPOINT},
        * to be used in fulltext search whenever the {@link FTS#ENDPOINT} is
        * left unspecified. When not set, the {@link FTS#ENDPOINT} is
-       * mandatory in FTS SERVICE queries; when set, the vocabulary
+       * mandatory in FTS SERVICE queries; when set, the magic vocabulary
        * {@link FTS#ENDPOINT} may be used to override the default.
        */
       String FTS_ENDPOINT = FTS.class.getName() + ".defaultEndpoint"; 
@@ -102,7 +102,7 @@ public interface FTS {
       /**
        * Option that may be set to specify a default for {@link FTS#ENDPOINT_TYPE},
        * to be used in fulltext search whenever the {@link FTS#ENDPOINT_TYPE} is
-       * left unspecified. When set, the vocabulary
+       * left unspecified. When set, the magic vocabulary
        * {@link FTS#ENDPOINT_TYPE} may be used to override the default.
        */
       String FTS_ENDPOINT_TYPE = FTS.class.getName() + ".defaultEndpointType";
@@ -112,7 +112,7 @@ public interface FTS {
       /**
        * Option that may be set to specify a default for {@link FTS#TARGET_TYPE},
        * to be used in fulltext search whenever the {@link FTS#TARGET_TYPE} is
-       * left unspecified. When set, the vocabulary
+       * left unspecified. When set, the magic vocabulary
        * {@link FTS#TARGET_TYPE} may be used to override the default.
        */
       String FTS_TARGET_TYPE = FTS.class.getName() + ".defaultTargetType";
@@ -123,22 +123,54 @@ public interface FTS {
       /**
        * Option that may be set to specify a default for {@link FTS#FTS_TIMEOUT},
        * to be used in fulltext search whenever the {@link FTS#FTS_TIMEOUT} is
-       * left unspecified. When set, the vocabulary
+       * left unspecified. When set, the magic vocabulary
        * {@link FTS#FTS_TIMEOUT} may be used to override the default.
        */
       String FTS_TIMEOUT = FTS.class.getName() + ".defaultTimeout";
       
-      final long DEFAULT_TIMEOUT = Long.MAX_VALUE;
+      final int DEFAULT_TIMEOUT = Integer.MAX_VALUE;
       
       /**
        * Option that may be set to specify a default for {@link FTS#PARAMS},
-       * to be used in fulltext search whenever the {@link FTS# } is
+       * to be used in fulltext search whenever the {@link FTS#PARAMS} is
        * left unspecified. When set, the vocabulary
-       * {@link FTS# } may be used to override the default.
+       * {@link FTS#PARAMS} may be used to override the default.
        */
       String FTS_PARAMS = FTS.class.getName() + ".defaultParams";
       
       final String DEFAULT_PARAMS = "";
+      
+      /**
+       * Option that may be set to specify a default for {@link FTS#SEARCH_FIELD},
+       * to be used in fulltext search whenever the {@link FTS#SEARCH_FIELD} is
+       * left unspecified. When set, the magic vocabulary
+       * {@link FTS#SEARCH_FIELD} may be used to override the default.
+       */
+      String FTS_SEARCH_FIELD = FTS.class.getName() + ".defaultSearchField";
+      
+      final String DEFAULT_SEARCH_FIELD = "id"; // this is the Solr default
+
+      
+      /**
+       * Option that may be set to specify a default for {@link FTS#SCORE_FIELD},
+       * to be used in fulltext search whenever the {@link FTS#SCORE_FIELD} is
+       * left unspecified. When set, the magic vocabulary
+       * {@link FTS#SCORE_FIELD} may be used to override the default.
+       */
+      String FTS_SCORE_FIELD = FTS.class.getName() + ".defaultScoreField";
+      
+      final String DEFAULT_SCORE_FIELD = null; // no system default
+      
+      
+      /**
+       * Option that may be set to specify a default for {@link FTS#SNIPPET_FIELD},
+       * to be used in fulltext search whenever the {@link FTS#SNIPPET_FIELD} is
+       * left unspecified. When set, the magic vocabulary
+       * {@link FTS#SNIPPET_FIELD} may be used to override the default.
+       */
+      String FTS_SNIPPET_FIELD = FTS.class.getName() + ".defaultSnippetField";
+      
+      final String DEFAULT_SNIPPET_FIELD = null; // no system default
       
    }
    
@@ -184,9 +216,8 @@ public interface FTS {
     * position corresponding to the indexed literals matching any of the terms
     * obtained when the literal was tokenized.
     * 
-    * <p>
-    * Note: The context position should be unbound when using statement
-    * identifiers.
+    * You may want to use {@link FTS#RESULT_FIELD} to fix the result field
+    * that is mapped to the result variable.
     */
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
     
@@ -317,6 +348,10 @@ public interface FTS {
     * The referenced variable must not be used somewhere else in the scope.
     * It will be bound to an xsd:double typed literal indicating the score
     * for the match.
+    * 
+    * In order to use this, you also need to set {@link FTS#SCORE_FIELD}
+    * to fix the result field that is mapped to the score variable.
+    * 
     */
    final URI SCORE = new URIImpl(NAMESPACE + "score");
 
@@ -336,7 +371,58 @@ public interface FTS {
     * 
     * The referenced variable must not be used somewhere else in the scope.
     * It will be bound to an untyped (text) literal.
+    * 
+    * In order to use this, you need to set {@link FTS#SNIPPET_FIELD} to fix
+    * the result field that is mapped to the snippet variable.
     */
    final URI SNIPPET = new URIImpl(NAMESPACE + "snippet");
+   
+   /**
+    * Magic predicate to indicate the external search service result field
+    * which will be stored in the result variable.
+    * 
+    * <pre>
+    * 
+    * select ?s
+    * where {
+    *   ?s fts:search &quot;scale-out RDF triplestore&quot; .
+    *   ?s fts:searchField "id" .
+    * }
+    * 
+    * </pre>
+    */
+   final URI SEARCH_FIELD = new URIImpl(NAMESPACE + "searchField");
+   
+   /**
+    * Magic predicate to indicate the external search service field whose
+    * value will be bound to the snippet variable (see {@link FTS#SNIPPET}).
+    * 
+    * <pre>
+    * 
+    * select ?s
+    * where {
+    *   ?s fts:search &quot;scale-out RDF triplestore&quot; .
+    *   ?s fts:snippetField "value" .
+    * }
+    * 
+    * </pre>
+    */
+   final URI SNIPPET_FIELD = new URIImpl(NAMESPACE + "snippetField");
+   
+   /**
+    * Magic predicate to indicate the external search service field whose
+    * value will be bound to the score variable (see {@link FTS#SCORE}).
+    * 
+    * <pre>
+    * 
+    * select ?s
+    * where {
+    *   ?s fts:search &quot;scale-out RDF triplestore&quot; .
+    *   ?s fts:scoreField "score" .
+    * }
+    * 
+    * </pre>
+    */
+   final URI SCORE_FIELD = new URIImpl(NAMESPACE + "scoreField");   
 
 }

@@ -70,7 +70,10 @@ public class ASTFulltextSearchOptimizer extends ASTSearchOptimizerBase {
         set.add(FTS.TIMEOUT);
         set.add(FTS.SCORE);
         set.add(FTS.SNIPPET);
-   
+        set.add(FTS.SEARCH_FIELD);
+        set.add(FTS.SNIPPET_FIELD);
+        set.add(FTS.SCORE_FIELD);
+        
         searchUris = Collections.unmodifiableSet(set);
     }
    

@@ -44,7 +44,7 @@ public interface IFulltextSearchHit<V extends Comparable<V>> {
    /**
     * The score associated with the search result.
     */
-    public double getScore();
+    public Double getScore();
 
     /**
      * The search snippet associated with the result.

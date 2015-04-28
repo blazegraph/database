@@ -33,6 +33,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
@@ -44,7 +45,6 @@ import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.fts.FulltextSearchHit;
 import com.bigdata.service.fts.FulltextSearchHiterator;
 import com.bigdata.service.fts.IFulltextSearch;
-import com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery;
 
 /**
  * Implementation based on the built-in keyword search capabilities for bigdata.
@@ -63,16 +63,6 @@ public class SolrFulltextSearchImpl implements
    public FulltextSearchHiterator<FulltextSearchHit> search(
          com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery query) {
 
-      // TODO: remove for production:
-      FulltextSearchHit hit1 = new FulltextSearchHit(
-            "http://example.com/s1", 1.0, "SNIPPET 1", query.getIncomingBindings(), query.getTargetType());
-      FulltextSearchHit hit2 = new FulltextSearchHit(
-            "http://example.com/s2", 0.9, "SNIPPET 2", query.getIncomingBindings(), query.getTargetType());
-      
-      FulltextSearchHit[] hits = { hit1, hit2 };
-      return new FulltextSearchHiterator<FulltextSearchHit>(hits);
-
-      /*
       if (query != null) {
 
          try {
@@ -82,122 +72,219 @@ public class SolrFulltextSearchImpl implements
 
          } catch (Exception e) {
 
-            throw new FulltextSearchException("Error execution fulltext search: " + e);
+            throw new FulltextSearchException(
+                  "Error execution fulltext search: " + e);
          }
       }
 
       return new FulltextSearchHiterator<FulltextSearchHit>(
             new FulltextSearchHit[] {});
-            */
-      
+
    }
 
+   
+   @SuppressWarnings("deprecation")
    private FulltextSearchHit[] queryIndex(FulltextSearchQuery query)
          throws Exception {
 
-      final HttpClient httpClient = new DefaultHttpClient();
-      final HttpGet request = new HttpGet(query.getEndpoint());
-
-      // TODO: remove this example once we verified everything works fine
-      // String solrIndexURL =
-      // "http://128.86.231.88:8983/solr/select/"
-      // +
-      // "?q=Rembrandt*+AND+%28+thesaurus%3Ahttp%3A%2F%2Fcollection.britishmuseum.org%2Fid%2Fperson-institution+%29+&"
-      // + "fl=id%2Clabel%2Cnotes%2Cthesaurus&indent=on"
-      // +
-      // "&bf=ln%28uses%29&qf=label_str%5E16+label%5E8+altLabel_str%5E4+altLabel%5E2+text"
-      // + "&wt=json&rows=50&defType=edismax";
-
-      final HttpParams params = new BasicHttpParams();
-      request.setParams(params);
-
-      // the search query is passed as a parameter
-      params.setParameter("q", URLEncoder.encode(query.getQuery(), "UTF8"));
-
-      // and also the special param string needs to be passed
-      String searchParams = query.getParams();
-      if (searchParams != null) {
-         final String[] searchParamsSpl = searchParams.split("&");
-         for (int i = 0; i < searchParamsSpl.length; i++) {
-
-            final String searchParam = searchParamsSpl[i];
-            final String[] keyValue = searchParam.split("=");
-            if (keyValue.length == 2) {
-               params.setParameter(keyValue[0], keyValue[1]);
-            }
-         }
+      final HttpClient httpClient;
+      final Integer queryTimeout = query.getSearchTimeout();
+      if (queryTimeout!=null) {
+         
+         final HttpParams httpParams = new BasicHttpParams();
+         HttpConnectionParams.setConnectionTimeout(httpParams, queryTimeout);
+         HttpConnectionParams.setSoTimeout(httpParams, queryTimeout);
+         httpClient = new DefaultHttpClient(httpParams);
+         
+      } else {
+         
+         httpClient = new DefaultHttpClient();
+         
       }
 
       try {
 
-         final HttpResponse response = httpClient.execute(request);
+         final StringBuffer requestStr = new StringBuffer();
+         requestStr.append(query.getEndpoint());
+         requestStr.append("?q=" + URLEncoder.encode(query.getQuery(),"UTF-8"));
+         requestStr.append("&wt=json");
+         
+         final String searchParams = query.getParams();
+         if (searchParams!=null && !searchParams.isEmpty()) {
+            requestStr.append("&");
+            requestStr.append(searchParams);
+         }
+
+         final HttpGet httpGet = new HttpGet(requestStr.toString());
+         
+         final HttpResponse response = httpClient.execute(httpGet);
+         
 
          if (response == null) {
 
-            throw new FulltextSearchException("No response from fulltext service");
+            throw new FulltextSearchException(
+                  "No response from fulltext service");
 
          }
 
          final int statusCode = response.getStatusLine().getStatusCode();
          if (statusCode != 200) {
 
-            throw new FulltextSearchException("Status code != 200 received from "
-                  + "external fulltext service: " + statusCode);
+            throw new FulltextSearchException(
+                  "Status code != 200 received from "
+                        + "external fulltext service: " + statusCode);
 
          }
 
-         final String jsonStr = EntityUtils.toString(response.getEntity(),
-               "UTF-8");
+         final String jsonStr = EntityUtils.toString(response.getEntity(), "UTF-8");
          final JSONObject json = new JSONObject(jsonStr);
 
          return constructFulltextSearchList(json, query);
 
       } catch (IOException e) {
 
-         throw new FulltextSearchException("Error submitting the keyword search"
-               + " to the external service: " + e.getMessage());
+         throw new FulltextSearchException(
+               "Error submitting the keyword search"
+                     + " to the external service: " + e.getMessage());
 
+      } finally {
+
+         if (httpClient!=null) {
+            httpClient.getConnectionManager().shutdown();
+         }
+         
       }
 
    }
 
+   /**
+    * Constructs a list of fulltext search results from a Solr json result
+    * string.
+    * 
+    * @param solrResultsJSON
+    * @param query
+    * @return
+    * @throws JSONException
+    */
    private FulltextSearchHit[] constructFulltextSearchList(
          JSONObject solrResultsJSON, FulltextSearchQuery query)
          throws JSONException {
 
+      String searchColumn = query.getSearchField();
+      String snippetColumn = query.getSnippetField();
+      String scoreColumn = query.getScoreField();
+      
       JSONObject resp = solrResultsJSON.getJSONObject("response");
       JSONArray docs = resp.getJSONArray("docs");
 
-      List<FulltextSearchHit> searchHits = new ArrayList<FulltextSearchHit>(
-            docs.length());
+      /**
+       * Collect results from JSON
+       */
+      List<FulltextSearchHit> searchHits =
+            new ArrayList<FulltextSearchHit>(docs.length());
       for (int i = 0; i < docs.length(); i++) {
 
          JSONObject result = docs.getJSONObject(i);
-         String sID = result.getString("id");
 
-         String notes = " ";
-         if (result.has("notes")) {
-            JSONArray notesArray = result.getJSONArray("notes");
+         String search = null;
+         if (searchColumn!=null && !searchColumn.isEmpty()
+               && result.has(searchColumn)) {
+            
+            search = flattenJsonResult(result.get(searchColumn));
+                  
+         } else {
+            
+            throw new FulltextSearchException(
+                  "Search field undefined, empty, or does not exist.");
 
-            if (notesArray.length() > 0) {
-               StringBuilder notesBuilder = new StringBuilder(
-                     notesArray.getString(0));
-               for (int j = 1; j < notesArray.length(); j++) {
-                  notesBuilder.append("; ");
-                  notesBuilder.append(notesArray.getString(j));
-               }
-               notes = notesBuilder.toString();
-            }
          }
 
-         // TODO: include score
-         FulltextSearchHit currentHit = new FulltextSearchHit(sID, 0.5, notes,
-               query.getIncomingBindings(), query.getTargetType());
+               
+         String snippet = null;
+         if (snippetColumn!=null && !snippetColumn.isEmpty()) {
+            
+            snippet = result.has(snippetColumn) ?
+                  flattenJsonResult(result.get(snippetColumn)) : null;
+            
+         }
+          
+         String score = null;
+         if (scoreColumn!=null && !scoreColumn.isEmpty()) {
 
-         searchHits.add(currentHit);
+            score = result.has(scoreColumn) ?
+                  flattenJsonResult(result.get(scoreColumn)) : null;
+            
+         }
+            
+         Double scoreAsDouble = null;
+         if (score!=null) {
+
+            try {
+               scoreAsDouble = Double.valueOf(score);
+            } catch (NumberFormatException e) {
+               
+               if (log.isInfoEnabled()) {
+                  log.info("Could not cast score to double: " + score);
+               }
+            }
+            
+         }
+
+         if (search!=null && !search.isEmpty()) {
+            FulltextSearchHit currentHit = 
+                  new FulltextSearchHit(search, scoreAsDouble, snippet,
+                  query.getIncomingBindings(), query.getTargetType());
+
+            searchHits.add(currentHit);
+            
+         }
+
       }
 
       return searchHits.toArray(new FulltextSearchHit[searchHits.size()]);
+   }
+   
+   /**
+    * Flattens a JSON result item, i.e. if the item is an array, it is
+    * (non-recursively) flattened, applying toString() to sub items,
+    * otherwise toString() is called directly.
+    * 
+    * @param obj the json result item
+    * @return
+    */
+   String flattenJsonResult(Object obj) {
+      
+      if (obj instanceof JSONArray) {
+         
+         StringBuffer buf = new StringBuffer();
+         
+         final JSONArray arr = (JSONArray)obj;
+         for (int i=0; i<arr.length(); i++) {
+            
+            try {
+               
+               final Object cur = arr.get(i);
+               
+               if (cur!=null) {
+                  buf.append(cur.toString());
+                  
+               }
+               
+            } catch (Exception e) {
+
+               // ignoring is probably the best we can do here
+               
+            }
+         }
+         
+         return buf.toString();
+         
+      } else {
+         
+         return obj.toString();
+         
+      }
+      
    }
 
 }

@@ -55,28 +55,29 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       final String query;
       final String params;
       final String endpoint;
-      final Long searchTimeout;
+      final Integer searchTimeout;
+      final String searchField;
+      final String scoreField;
+      final String snippetField;      
       final IBindingSet incomingBindings;
       final TargetType targetType;
-
+      
       /**
        * Constructor
-       * 
-       * @param query
-       *           the query string
-       * @param params
-       *           the parameters to be passed to Solr
-       * @param endpoint
-       *           the endpoint to which to submit the query
        */
       public FulltextSearchQuery(final String query, final String params,
-            final String endpoint, final Long searchTimeout,
-            final IBindingSet incomingBindings, final TargetType targetType) {
+            final String endpoint, final Integer searchTimeout,
+            final String searchField, final String scoreField, 
+            final String snippetField, final IBindingSet incomingBindings,
+            final TargetType targetType) {
 
          this.query = query;
          this.params = params;
          this.endpoint = endpoint;
          this.searchTimeout = searchTimeout;
+         this.searchField = searchField;
+         this.scoreField = scoreField;
+         this.snippetField = snippetField;
          this.incomingBindings = incomingBindings;
          this.targetType = targetType;
 
@@ -106,8 +107,30 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       /**
        * @return the search timeout
        */
-      public Long getSearchTimeout() {
+      public Integer getSearchTimeout() {
          return searchTimeout;
+      }
+
+      /**
+       * @return the field that is mapped to the search result
+       */
+      public String getSearchField() {
+         return searchField;
+      }
+
+      
+      /**
+       * @return the field that is mapped to the snippet variable
+       */
+      public String getSnippetField() {
+         return snippetField;
+      }
+      
+      /**
+       * @return the field that is mapped to the score
+       */
+      public String getScoreField() {
+         return scoreField;
       }
 
       /**
