@@ -40,6 +40,8 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
+import com.bigdata.btree.BytesUtil;
+import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -60,6 +62,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.util.Bits;
 
 /**
  * A write buffer for absorbing the output of the RIO parser or other

@@ -55,7 +55,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
     
     public Properties getProperties() {
         
-        return getProperties(MyRDRHistory.class);
+        return getProperties(RDRHistory.class);
         
     }
 
@@ -123,7 +123,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
 
             {
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        s, p, o, false);
+                        s, p, o, true);
                 assertTrue(stmts.hasNext());
                 stmts.close();
             }
@@ -131,7 +131,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             {
                 BigdataBNode sid = vf.createBNode(stmt);
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        sid, MyRDRHistory.ADDED, null, false);
+                        sid, RDRHistory.Vocab.ADDED, null, true);
                 assertTrue(stmts.hasNext());
                 Literal l = (Literal) stmts.next().getObject();
                 assertTrue(l.getDatatype().equals(XSD.DATETIME));
@@ -145,11 +145,11 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 2);
+            assertTrue(cxn.size() == 3);
 
             {
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        s, p, o, false);
+                        s, p, o, true);
                 assertFalse(stmts.hasNext());
                 stmts.close();
             }
@@ -157,10 +157,50 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             {
                 BigdataBNode sid = vf.createBNode(stmt);
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        sid, MyRDRHistory.REMOVED, null, false);
+                        sid, RDRHistory.Vocab.REMOVED, null, true);
                 assertTrue(stmts.hasNext());
                 Literal l = (Literal) stmts.next().getObject();
                 assertTrue(l.getDatatype().equals(XSD.DATETIME));
+                stmts.close();
+            }
+            
+            cxn.add(stmt);
+            cxn.commit();
+            
+            if (log.isInfoEnabled()) {
+                log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
+            }
+            
+            assertTrue(cxn.size() == 4);
+
+            {
+                RepositoryResult<Statement> stmts = cxn.getStatements(
+                        s, p, o, true);
+                assertTrue(stmts.hasNext());
+                stmts.close();
+            }
+
+            {
+                BigdataBNode sid = vf.createBNode(stmt);
+                RepositoryResult<Statement> stmts = cxn.getStatements(
+                        sid, null, null, true);
+                int adds = 0;
+                int removes = 0;
+                while (stmts.hasNext()) {
+                    final Statement result = stmts.next();
+                    Literal l = (Literal) result.getObject();
+                    assertTrue(l.getDatatype().equals(XSD.DATETIME));
+                    final URI action = result.getPredicate();
+                    if (action.equals(RDRHistory.Vocab.ADDED)) {
+                        adds++;
+                    } else if (action.equals(RDRHistory.Vocab.REMOVED)) {
+                        removes++;
+                    } else {
+                        fail();
+                    }
+                }
+                assertTrue(adds == 2);
+                assertTrue(removes == 1);
                 stmts.close();
             }
             
@@ -208,14 +248,14 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
 
             {
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        s, p, o, false);
+                        s, p, o, true);
                 assertTrue(stmts.hasNext());
                 stmts.close();
             }
 
             {
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        s, p, l, false);
+                        s, p, l, true);
                 assertTrue(stmts.hasNext());
                 stmts.close();
             }
@@ -223,7 +263,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             {
                 BigdataBNode sid = vf.createBNode(stmt1);
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        sid, MyRDRHistory.ADDED, null, false);
+                        sid, RDRHistory.Vocab.ADDED, null, true);
                 assertFalse(stmts.hasNext());
                 stmts.close();
             }
@@ -231,7 +271,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             {
                 BigdataBNode sid = vf.createBNode(stmt2);
                 RepositoryResult<Statement> stmts = cxn.getStatements(
-                        sid, MyRDRHistory.ADDED, null, false);
+                        sid, RDRHistory.Vocab.ADDED, null, true);
                 assertTrue(stmts.hasNext());
                 Literal l2 = (Literal) stmts.next().getObject();
                 assertTrue(l2.getDatatype().equals(XSD.DATETIME));
@@ -259,6 +299,20 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
 
             sail.initialize();
             final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            
+            {
+                
+                final BigdataSailRepositoryConnection read =
+                        repo.getReadOnlyConnection();
+                
+                try {
+                    read.prepareTupleQuery(QueryLanguage.SPARQL, "select * { ?s ?p ?o }").evaluate();
+                } finally {
+                    read.close();
+                }
+                
+            }
+            
             cxn = (BigdataSailRepositoryConnection) repo.getConnection();
 
             {
@@ -297,15 +351,18 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 log.info(cxn.getTripleStore().dumpStore().insert(0,'\n'));
             }
             
-            assertTrue(cxn.size() == 8);
+            assertTrue(cxn.size() == 10);
             
             {
                 final String sparql =
                     "select ?s ?p ?o ?action ?time \n" +
                     "where { \n" +
-                    "  service bd:history { \n" +
-                    "    << ?s ?p ?o >> ?action ?time . \n" +
-                    "  } \n" +
+//                    "  service bd:history { \n" +
+//                    "    << ?s ?p ?o >> ?action ?time . \n" +
+//                    "  } \n" +
+                    "  bind(<< ?s ?p ?o >> as ?sid) . \n" +
+                    "  hint:Prior hint:history true . \n" +
+                    "  ?sid ?action ?time . \n" +
                     "  values (?s) { \n" +
                     "    (<:s1>) \n" +
                     "  } \n" +
@@ -330,9 +387,12 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 final String sparql =
                     "select ?s ?p ?o ?action ?time \n" +
                     "where { \n" +
-                    "  service bd:history { \n" +
-                    "    << ?s ?p ?o >> ?action ?time . \n" +
-                    "  } \n" +
+//                    "  service bd:history { \n" +
+//                    "    << ?s ?p ?o >> ?action ?time . \n" +
+//                    "  } \n" +
+                    "  bind(<< ?s ?p ?o >> as ?sid) . \n" +
+                    "  hint:Prior hint:history true . \n" +
+                    "  ?sid ?action ?time . \n" +
                     "}";
                 
                 final TupleQueryResult result =
@@ -354,9 +414,12 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
                 final String sparql =
                     "select ?s ?p ?o ?action ?time \n" +
                     "where { \n" +
-                    "  service bd:history { \n" +
-                    "    << ?s <:p> ?o >> <:removed> ?time . \n" +
-                    "  } \n" +
+//                    "  service bd:history { \n" +
+//                    "    << ?s <:p> ?o >> <:removed> ?time . \n" +
+//                    "  } \n" +
+                    "  bind(<< ?s <:p> ?o >> as ?sid) . \n" +
+                    "  hint:Prior hint:history true . \n" +
+                    "  ?sid <:removed> ?time . \n" +
                     "}";
                 
                 final TupleQueryResult result =
@@ -382,29 +445,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
         }
     }
     
-    public static class MyRDRHistory extends RDRHistory {
-
-        public static final URI ADDED = new URIImpl(":added");
-        
-        public static final URI REMOVED = new URIImpl(":removed");
-        
-        public MyRDRHistory(final AbstractTripleStore database) {
-            super(database);
-        }
-
-        @Override
-        protected URI added() {
-            return ADDED;
-        }
-
-        @Override
-        protected URI removed() {
-            return REMOVED;
-        }
-        
-    }
-
-    public static class CustomRDRHistory extends MyRDRHistory {
+    public static class CustomRDRHistory extends RDRHistory {
 
         public CustomRDRHistory(AbstractTripleStore database) {
             super(database);

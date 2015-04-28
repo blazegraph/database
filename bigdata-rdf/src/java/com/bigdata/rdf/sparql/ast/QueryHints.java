@@ -619,4 +619,14 @@ public interface QueryHints {
    String DEFAULT_AST_OPTIMIZER_CLASS = System.getProperty(
          AST_OPTIMIZER_CLASS, DefaultOptimizerList.class.getName());
 
+   
+   /**
+    * Used to mark a predicate for historical read.  When history mode is 
+    * enabled, statements are not actually deleted, they are just marked as
+    * history using StatementEnum.History.  By default these historical SPOs
+    * are hidden from view during read.
+    */
+   String HISTORY = "history";
+       
+
 }

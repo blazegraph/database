@@ -26,27 +26,31 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.lang.reflect.Array;
 import java.util.Collection;
+import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.UUID;
+
+import javax.xml.datatype.DatatypeConstants;
+import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFException;
-import org.openrdf.model.BNode;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.StatementImpl;
-import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQueryResult;
-import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
@@ -55,10 +59,19 @@ import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 
+import com.bigdata.blueprints.BigdataGraphAtom.EdgeAtom;
+import com.bigdata.blueprints.BigdataGraphAtom.EdgeLabelAtom;
 import com.bigdata.blueprints.BigdataGraphAtom.ElementType;
-import com.bigdata.blueprints.BigdataSelection.Bindings;
+import com.bigdata.blueprints.BigdataGraphAtom.ExistenceAtom;
+import com.bigdata.blueprints.BigdataGraphAtom.PropertyAtom;
+import com.bigdata.blueprints.BigdataGraphEdit.Action;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sail.RDRHistory;
+import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.Features;
@@ -1385,6 +1398,8 @@ public abstract class BigdataGraph implements Graph {
 	
 	/**
 	 * Project a subgraph using a SPARQL query.
+     * <p>
+     * Warning: You MUST close this iterator when finished.
 	 */
     @SuppressWarnings("unchecked")
     public ICloseableIterator<BigdataGraphAtom> project(final String queryStr) 
@@ -1409,7 +1424,7 @@ public abstract class BigdataGraph implements Graph {
         
         final GraphQueryResult result = query.evaluate();
 
-        final IStriterator sitr = new Striterator(new WrappedResult(
+        final IStriterator sitr = new Striterator(new WrappedResult<Statement>(
                 result, readFromWriteConnection ? null : cxn
                 ));
         
@@ -1433,78 +1448,55 @@ public abstract class BigdataGraph implements Graph {
         });
         
         return (ICloseableIterator<BigdataGraphAtom>) sitr;
-//        {
-//
-//            @Override
-//            public BigdataGraphAtom next() {
-//                try {
-//                    return toGraphAtom(result.next());
-//                } catch (QueryEvaluationException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            }
-//
-//            @Override
-//            public void remove() {
-//                throw new UnsupportedOperationException();
-//            }
-//            
-//            @Override
-//            public void close() {
-//                try {
-//                    result.close();
-//                } catch (QueryEvaluationException e) { 
-//                    log.warn("Could not close result");
-//                }
-//                try {
-//                    if (!readFromWriteConnection) {
-//                        cxn.close();
-//                    }
-//                } catch (RepositoryException e) {
-//                    log.warn("Could not close connection");
-//                }
-//            }
-//
-////            @Override
-////            protected void finalize() throws Throwable {
-////                super.finalize();
-////                System.err.println("closed: " + closed);
-////            }
-//            
-//        };
-
+        
 	}
 	
 	/**
 	 * Convert a unit of RDF data to an atomic unit of PG data.
 	 */
 	protected BigdataGraphAtom toGraphAtom(final Statement stmt) {
-	    
+
         final URI s = (URI) stmt.getSubject();
-        final String sid = factory.fromURI(s);
         final URI p = (URI) stmt.getPredicate();
-        final String pid = factory.fromURI(p);
         final Value o = stmt.getObject();
+        
+        return toGraphAtom(s, p, o);
+        
+	}
+	
+    /**
+     * Convert a unit of RDF data to an atomic unit of PG data.
+     */
+    protected BigdataGraphAtom toGraphAtom(final URI s, final URI p, final Value o) {
+	        
+        final String sid = factory.fromURI(s);
+        final String pid = factory.fromURI(p);
         
         final BigdataGraphAtom atom;
         if (o instanceof URI) {
             
             /*
-             * Either an edge or a type statement.
+             * Either an edge or an element type statement.
              */
             if (p.equals(factory.getTypeURI()) && 
                 (o.equals(factory.getVertexURI()) || o.equals(factory.getEdgeURI()))) {
                 
+                /*
+                 * Element type. 
+                 */
                 if (o.equals(factory.getVertexURI())) {
-                    atom = new BigdataGraphAtom(sid, ElementType.VERTEX, null, null, null, null, null);
+                    atom = new ExistenceAtom(sid, ElementType.VERTEX);
                 } else {
-                    atom = new BigdataGraphAtom(sid, ElementType.EDGE, null, null, null, null, null);
+                    atom = new ExistenceAtom(sid, ElementType.EDGE);
                 }
                 
             } else {
                 
+                /*
+                 * Edge.
+                 */
                 final String oid = factory.fromURI((URI) o);
-                atom = new BigdataGraphAtom(pid, null, sid, oid, null, null, null);
+                atom = new EdgeAtom(pid, sid, oid);
                 
             }
             
@@ -1515,13 +1507,19 @@ public abstract class BigdataGraph implements Graph {
              */
             if (p.equals(factory.getLabelURI())) {
                 
+                /*
+                 * Edge label.
+                 */
                 final String label = factory.fromLiteral((Literal) o).toString();
-                atom = new BigdataGraphAtom(sid, null, null, null, label, null, null);
+                atom = new EdgeLabelAtom(sid, label);
                 
             } else {
                 
+                /*
+                 * Property.
+                 */
                 final Object oval = factory.fromLiteral((Literal) o);
-                atom = new BigdataGraphAtom(sid, null, null, null, null, pid, oval);
+                atom = new PropertyAtom(sid, pid, oval);
             
             }
             
@@ -1533,87 +1531,73 @@ public abstract class BigdataGraph implements Graph {
 	
     /**
      * Select results using a SPARQL query.
-     * 
-     * TODO FIXME Make this a streaming API like project()
+     * <p>
+     * Warning: You MUST close this iterator when finished.
      */
-    public BigdataSelection select(final String queryStr) throws Exception {
+    @SuppressWarnings("unchecked")
+    public ICloseableIterator<BigdataBindingSet> select(final String queryStr) throws Exception {
         
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
         
-        try {
-            
-            if (sparqlLog.isTraceEnabled()) {
-                sparqlLog.trace("query:\n"+queryStr);
-            }
-            
-            final TupleQuery query = (TupleQuery) 
-                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
-            
-            if (sparqlLog.isTraceEnabled()) {
-                if (query instanceof BigdataSailTupleQuery) {
-                    final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
-                    sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
-                }
-            }
-            
-            final TupleQueryResult result = query.evaluate();
-            try {
-                
-                final BigdataSelection selection = convert(result);
-                
-                return selection;
-                
-            } finally {
-                result.close();
-            }
-            
-        } finally {
-        
-            if (!readFromWriteConnection) {
-                cxn.close();
-            }
-            
+        if (sparqlLog.isTraceEnabled()) {
+            sparqlLog.trace("query:\n"+queryStr);
         }
+        
+        final TupleQuery query = (TupleQuery) 
+                cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        
+        if (sparqlLog.isTraceEnabled()) {
+            if (query instanceof BigdataSailTupleQuery) {
+                final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+                sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+            }
+        }
+        
+        final TupleQueryResult result = query.evaluate();
+        
+        final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
+                result, readFromWriteConnection ? null : cxn
+                ));
+        
+        sitr.addFilter(new Resolver() {
+            private static final long serialVersionUID = 1L;
+            @Override
+            protected Object resolve(final Object e) {
+                final BindingSet bs = (BindingSet) e;
+                return convert(bs);
+            }
+        });
+        
+        return (ICloseableIterator<BigdataBindingSet>) sitr;
             
     }
     
     /**
      * Convert SPARQL/RDF results into PG form.
-     * 
-     * TODO FIXME Make this a streaming API like project()
      */
-    protected BigdataSelection convert(final TupleQueryResult result) 
-            throws Exception {
+    protected BigdataBindingSet convert(final BindingSet bs) {
         
-        final BigdataSelection selection = new BigdataSelection();
+        final BigdataBindingSet bbs = new BigdataBindingSet();
         
-        while (result.hasNext()) {
+        for (String key : bs.getBindingNames()) {
             
-            final BindingSet bs = result.next();
+            final Value val= bs.getBinding(key).getValue();
             
-            final Bindings bindings = selection.newBindings();
-            
-            for (String key : bs.getBindingNames()) {
-                
-                final Value val= bs.getBinding(key).getValue();
-                
-                final Object o;
-                if (val instanceof Literal) {
-                    o = factory.fromLiteral((Literal) val);
-                } else if (val instanceof URI) {
-                    o = factory.fromURI((URI) val);
-                } else {
-                    continue;
-                }
-                
-                bindings.put(key, o);
-                
+            final Object o;
+            if (val instanceof Literal) {
+                o = factory.fromLiteral((Literal) val);
+            } else if (val instanceof URI) {
+                o = factory.fromURI((URI) val);
+            } else {
+                continue;
             }
+            
+            bbs.put(key, o);
             
         }
         
-        return selection;
+        return bbs;
         
     }
 
@@ -1664,6 +1648,115 @@ public abstract class BigdataGraph implements Graph {
             throw new RuntimeException(e);
         }
 
+    }
+    
+    /**
+     * Sparql template for history query.
+     */
+    private static final String HISTORY_TEMPLATE =
+            "prefix hint: <"+QueryHints.NAMESPACE+">\n" +
+            "select ?s ?p ?o ?action ?time\n" +
+            "where {\n"+
+            "    bind(<< ?s ?p ?o >> as ?sid) . \n" +
+            "    hint:Prior hint:history true . \n" +
+            "    ?sid ?action ?time . \n" +
+            "}";
+    
+    /**
+     * If history is enabled, return an iterator of historical graph edits 
+     * related to any of the supplied ids.  To enable history, make sure
+     * the database is in statement identifiers mode and that the RDR History
+     * class is enabled.
+     * <p>
+     * Warning: You MUST close this iterator when finished.
+     * 
+     * @see {@link AbstractTripleStore.Options#STATEMENT_IDENTIFIERS}
+     * @see {@link AbstractTripleStore.Options#RDR_HISTORY_CLASS}
+     * @see {@link RDRHistory}
+     */
+    @SuppressWarnings("unchecked")
+    public ICloseableIterator<BigdataGraphEdit> history(final List<URI> ids) 
+            throws Exception {
+        
+//        final List<URI> ids = new LinkedList<URI>();
+//        for (Object id : vertexIds) {
+//            ids.add(factory.toVertexURI(id));
+//        }
+//        for (Object id : edgeIds) {
+//            ids.add(factory.toEdgeURI(id));
+//        }
+        
+        final StringBuilder sb = new StringBuilder(HISTORY_TEMPLATE);
+        
+        if (ids.size() > 0) {
+            final StringBuilder vc = new StringBuilder();
+            vc.append("    values (?s) { \n");
+            for (URI id : ids) {
+                vc.append("        (<"+id+">) \n");
+            }
+            vc.append("    } \n");
+            sb.insert(sb.length()-1, vc.toString());
+        }
+        
+        final String queryStr = sb.toString();
+                    
+        if (sparqlLog.isTraceEnabled()) {
+            sparqlLog.trace("query:\n"+queryStr);
+        }
+        
+        final RepositoryConnection cxn = readFromWriteConnection ? 
+                getWriteConnection() : getReadConnection();
+        
+        final TupleQuery query = (TupleQuery) 
+                cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+        
+        if (sparqlLog.isTraceEnabled()) {
+            if (query instanceof BigdataSailTupleQuery) {
+                final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+                sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+            }
+        }
+        
+        final TupleQueryResult result = query.evaluate();
+        
+        final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
+                result, readFromWriteConnection ? null : cxn
+                ));
+        
+        sitr.addFilter(new Resolver() {
+            private static final long serialVersionUID = 1L;
+            @Override
+            protected Object resolve(final Object e) {
+                final BindingSet bs = (BindingSet) e;
+                final URI s = (URI) bs.getValue("s");
+                final URI p = (URI) bs.getValue("p");
+                final Value o = bs.getValue("o");
+                final URI a = (URI) bs.getValue("action");
+                final Literal t = (Literal) bs.getValue("time");
+                
+                if (!t.getDatatype().equals(XSD.DATETIME)) {
+                    throw new RuntimeException("Unexpected timestamp in result: " + bs);
+                }
+                
+                final BigdataGraphEdit.Action action;
+                if (a.equals(RDRHistory.Vocab.ADDED)) {
+                    action = Action.Add;
+                } else if (a.equals(RDRHistory.Vocab.REMOVED)) {
+                    action = Action.Remove;
+                } else {
+                    throw new RuntimeException("Unexpected action in result: " + bs);
+                }
+                
+                final BigdataGraphAtom atom = toGraphAtom(s, p, o);
+                
+                final long timestamp = DateTimeExtension.getTimestamp(t.getLabel());
+                
+                return new BigdataGraphEdit(action, atom, timestamp);
+            }
+        });
+        
+        return (ICloseableIterator<BigdataGraphEdit>) sitr;
+            
     }
     
     protected static final Features FEATURES = new Features();

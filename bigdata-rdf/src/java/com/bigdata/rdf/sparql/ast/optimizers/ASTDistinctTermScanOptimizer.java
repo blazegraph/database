@@ -31,6 +31,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
@@ -48,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -60,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.striterator.IKeyOrder;
 
 /**
@@ -255,6 +259,20 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
       // The single triple pattern.
       final StatementPatternNode sp = (StatementPatternNode) whereClause.get(0);
 
+      /*
+       * When in history mode, we can't do a distinct term scan unless the 
+       * StatementPatternNode has been marked to read history.  The distinct
+       * term scan will visit terms that might have been deleted.
+       */
+      if (context.getAbstractTripleStore().isRDRHistory()) {
+          
+          if (!sp.getQueryHintAsBoolean(QueryHints.HISTORY, false)) {
+              // Can not rewrite.
+              return;
+          }
+          
+      }
+      
       IKeyOrder<ISPO> keyOrder = getApplicableKeyOrderIfExists(sp,
             projectedVar, context);
       if (keyOrder == null) {

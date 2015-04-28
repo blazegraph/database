@@ -70,9 +70,9 @@ public class RDRHistory implements IChangeLog {
      */
     public interface Vocab {
     
-        URI ADDED = new URIImpl(BD.NAMESPACE + "added"); 
+        URI ADDED = new URIImpl("blaze:history:added"); 
                 
-        URI REMOVED = new URIImpl(BD.NAMESPACE + "removed"); 
+        URI REMOVED = new URIImpl("blaze:history:removed"); 
         
     }            
     
@@ -126,7 +126,7 @@ public class RDRHistory implements IChangeLog {
         try {
             
             final IV<?,?>[] ivs = resolveTerms(
-                    new URI[] { added(), removed() });
+                    new URI[] { Vocab.ADDED, Vocab.REMOVED });
             added = ivs[0];
             removed = ivs[1];
             
@@ -138,36 +138,6 @@ public class RDRHistory implements IChangeLog {
             throw new RuntimeException(ex);
         }
         
-    }
-    
-    /**
-     * Return the term to be used for add events:
-     * 
-     * <pre>
-     * {@code
-     * <sid> <added> "timestamp"^^xsd:long
-     * }
-     * </pre>
-     * 
-     * @return
-     */
-    protected URI added() {
-        return Vocab.ADDED;
-    }
-    
-    /**
-     * Return the term to be used for remove events:
-     * 
-     * <pre>
-     * {@code
-     * <sid> <removed> "timestamp"^^xsd:long
-     * }
-     * </pre>
-     * 
-     * @return
-     */
-    protected URI removed() {
-        return Vocab.REMOVED;
     }
     
     /**

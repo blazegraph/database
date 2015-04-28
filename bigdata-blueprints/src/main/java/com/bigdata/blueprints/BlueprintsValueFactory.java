@@ -56,16 +56,6 @@ public interface BlueprintsValueFactory {
     URI getLabelURI();
     
     /**
-     * Return the URI used to mark an atom as added in the history.
-     */
-    URI getAddedURI();
-    
-    /**
-     * Return the URI used to mark an atom as removed in the history.
-     */
-    URI getRemovedURI();
-    
-    /**
      * Create a vertex URI from a blueprints vertex id.
      */
 	URI toVertexURI(Object key);
