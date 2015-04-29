@@ -31,7 +31,6 @@ package com.bigdata.journal;
  * A read-only view of an {@link ICommitRecord}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class CommitRecord implements ICommitRecord {
 
@@ -71,30 +70,35 @@ public class CommitRecord implements ICommitRecord {
         
     }
 
+    @Override
     final public long getTimestamp() {
         
         return timestamp;
         
     }
 
+    @Override
     final public long getCommitCounter() {
         
         return commitCounter;
         
     }
     
+    @Override
     final public int getRootAddrCount() {
         
         return roots.length;
         
     }
     
+    @Override
     final public long getRootAddr(int index) {
         
         return roots[index];
         
     }
 
+    @Override
     public String toString() {
         
         StringBuffer sb = new StringBuffer();
@@ -122,7 +126,8 @@ public class CommitRecord implements ICommitRecord {
         
     }
 
-    public boolean equals(Object o) {
+    @Override
+    public boolean equals(final Object o) {
         if (this == o)
             return true;
         if (!(o instanceof ICommitRecord))
