@@ -533,7 +533,14 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                break;
             case URI:
             default:
-               val = vf.createURI(hit.getRes());
+               try {
+                  val = vf.createURI(hit.getRes());
+               } catch (IllegalArgumentException e) {
+                  
+                  throw new FulltextSearchException(
+                        FulltextSearchException.TYPE_CAST_EXCEPTION 
+                        + ":" + hit.getRes());
+               }
                break;
             }
 
@@ -1000,7 +1007,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
             } else {
                throw new FulltextSearchException(
-                     "Fulltext search variable unbound at runtime: " + var);
+                  FulltextSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
             }
          }
       }

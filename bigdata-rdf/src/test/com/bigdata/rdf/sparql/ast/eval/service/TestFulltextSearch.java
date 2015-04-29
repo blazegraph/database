@@ -27,7 +27,12 @@ import com.bigdata.rdf.sparql.ast.eval.AbstractDataDrivenSPARQLTestCase;
 import com.bigdata.service.fts.FulltextSearchException;
 
 /**
- * Data driven test suite for external full text search.
+ * Data driven test suite for external full text search. At the time being,
+ * this test suite requires a local Solr index set up at port 1234, with
+ * a collection called "blazegraph" and the file fts-solr-collection.xml 
+ * loaded into this collection.
+ * 
+ * TODO: fully automate test case & hook in test case into test suite
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
@@ -49,27 +54,36 @@ public class TestFulltextSearch extends AbstractDataDrivenSPARQLTestCase {
 
 
     /**
-     * Verify simple fulltext search with full configuration
+     * Verify simple fulltext search with small configuration.
      * 
      * @throws Exception
      */
-    // TODO
-    public void testSingleFulltextSearch() throws Exception {
+    public void testSingleFulltextSearchMin() throws Exception {
        
-       new TestHelper("fts-single").runTest();
+       new TestHelper("fts-singleMin").runTest();
        
     }
-    
+
+    /**
+     * Verify simple fulltext search with full configuration.
+     * 
+     * @throws Exception
+     */
+    public void testSingleFulltextSearchMax() throws Exception {
+       
+       new TestHelper("fts-singleMax").runTest();
+       
+    }
+
     /**
      * Verify simple fulltext search with full configuration, where the
      * magic vocabulary is already encapsulated into a SERVICE node.
      * 
      * @throws Exception
      */
-    // TODO
     public void testSingleFulltextSearchUsingService() throws Exception {
        
-       new TestHelper("fts-single-as-service").runTest();
+       new TestHelper("fts-singleAsService").runTest();
        
     }
 
@@ -79,10 +93,9 @@ public class TestFulltextSearch extends AbstractDataDrivenSPARQLTestCase {
      * 
      * @throws Exception
      */
-    // TODO
     public void testMultiFulltextSearch() throws Exception {
        
-       new TestHelper("fts-multi").runTest();
+       new TestHelper("fts-multiRequest").runTest();
        
     }
     
@@ -92,7 +105,6 @@ public class TestFulltextSearch extends AbstractDataDrivenSPARQLTestCase {
      * 
      * @throws Exception
      */
-    // TODO
     public void testJoinWithFulltextSearch() throws Exception {
        
        new TestHelper("fts-join").runTest();
@@ -100,12 +112,23 @@ public class TestFulltextSearch extends AbstractDataDrivenSPARQLTestCase {
     }
 
     /**
+     * Test case comprising a complex WITH query that puts everything
+     * together.
+     * 
+     * @throws Exception
+     */
+    public void testComplexWithQuery() throws Exception {
+       
+       new TestHelper("fts-complexWithQuery").runTest();
+
+    }
+    
+    /**
      * Verify that a subsequent filter applied to a keyword result 
      * returns the desired result.
      * 
      * @throws Exception
      */
-    // TODO
     public void testFilterOfFulltextSearch() throws Exception {
        
        new TestHelper("fts-filter").runTest();
@@ -205,31 +228,47 @@ public class TestFulltextSearch extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
-    
     /**
-     * Verify that default values are used for the endpoint type,
-     * the params, and the target type, in case they are left unspecified.
+     * Verify that there is a proper error message when injection variable
+     * is not yet bound.
      * 
      * @throws Exception
      */
-    // TODO
-    public void testDefaultValuesUsage() throws Exception {
+    public void testVariableInjectionFailing() throws Exception {
        
-       new TestHelper("fts-defaultValues").runTest();
+       try {
 
+          new TestHelper("fts-variableInjectionFailing").runTest();
+
+       } catch (Exception e) {
+          
+          if (e.getMessage().contains(FulltextSearchException.SERVICE_VARIABLE_UNBOUND)) {
+             return; // expected
+          }
+       }
+       
+       throw new RuntimeException("Test runs through, but should not.");
     }
-
+    
     /**
-     * Verify that default values are properly overridden for the
-     * params and the target type parameter.
+     * Casting of non-URI to URI results in proper exception.
      * 
      * @throws Exception
      */
-    // TODO
-    public void testDefaultValuesOverride() throws Exception {
+    public void testTypeCastException() throws Exception {
        
-       new TestHelper("fts-defaultValuesOverride").runTest();
+       try {
+       
+          new TestHelper("fts-typeCastException").runTest();
 
+       } catch (Exception e) {
+          
+          if (e.getMessage().contains(FulltextSearchException.TYPE_CAST_EXCEPTION)) {
+             return; // expected
+          }
+       }
+       
+       throw new RuntimeException("Test runs through, but should not.");
     }
-    
+
 }

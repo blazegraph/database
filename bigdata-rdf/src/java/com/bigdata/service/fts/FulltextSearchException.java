@@ -41,6 +41,12 @@ public class FulltextSearchException extends RuntimeException {
 
    public final static String NO_ENDPOINT_SPECIFIED = 
          "Endpoint not specified or empty";
+   
+   public final static String SERVICE_VARIABLE_UNBOUND = 
+         "Service magic variable unbound at runtime";
+
+   public final static String TYPE_CAST_EXCEPTION = 
+         "Casting of result to URI failed";
 
    public FulltextSearchException(String s) {
       super(s);
