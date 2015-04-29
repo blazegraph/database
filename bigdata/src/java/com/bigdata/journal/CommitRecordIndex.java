@@ -481,7 +481,6 @@ public class CommitRecordIndex extends BTree {
      * An entry in the persistent index.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class Entry {
        
@@ -496,7 +495,7 @@ public class CommitRecordIndex extends BTree {
          */
         public final long addr;
         
-        public Entry(long commitTime,long addr) {
+        public Entry(final long commitTime, final long addr) {
             
             this.commitTime = commitTime;
             
@@ -504,6 +503,7 @@ public class CommitRecordIndex extends BTree {
             
         }
         
+        @Override
         public String toString() {
             return super.toString() + "{commitTime=" + commitTime + ",addr="
                     + addr + "}";
@@ -513,7 +513,6 @@ public class CommitRecordIndex extends BTree {
          * Used to (de-)serialize {@link Entry}s (NOT thread-safe).
          * 
          * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-         * @version $Id$
          */
         public static class EntrySerializer {
 
@@ -578,7 +577,6 @@ public class CommitRecordIndex extends BTree {
      * Encapsulates key and value formation for the {@link CommitRecordIndex}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static public class CommitRecordIndexTupleSerializer extends
             DefaultTupleSerializer<Long, Entry> {
@@ -675,6 +673,7 @@ public class CommitRecordIndex extends BTree {
          */
         private final static transient byte VERSION = VERSION0;
 
+        @Override
         public void readExternal(final ObjectInput in) throws IOException,
                 ClassNotFoundException {
 
@@ -692,6 +691,7 @@ public class CommitRecordIndex extends BTree {
 
         }
 
+        @Override
         public void writeExternal(final ObjectOutput out) throws IOException {
 
             super.writeExternal(out);
