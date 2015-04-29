@@ -603,6 +603,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	<version>${sesame.version}</version>
     </dependency>
     <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-store-testsuite</artifactId>
+	<version>${sesame.version}</version>
+    </dependency>
+    <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-core</artifactId>
         <version>${jini.version}</version>
