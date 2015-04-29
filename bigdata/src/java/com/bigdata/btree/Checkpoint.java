@@ -79,6 +79,7 @@ public class Checkpoint implements ICheckpoint, Externalizable {
 	 */
     private IndexTypeEnum indexType;
 
+    @Override
     final public long getCheckpointAddr() {
         
         if (addrCheckpoint == 0L) {
@@ -91,82 +92,108 @@ public class Checkpoint implements ICheckpoint, Externalizable {
         
     }
 
+    @Override
     final public boolean hasCheckpointAddr() {
         
         return addrCheckpoint != 0L;
         
     }
 
+    @Override
     final public long getMetadataAddr() {
         
         return addrMetadata;
         
     }
     
+    @Override
     final public long getRootAddr() {
         
         return addrRoot;
         
     }
     
+    @Override
     final public long getBloomFilterAddr() {
         
         return addrBloomFilter;
         
     }
 
+   /**
+    * {@inheritDoc}
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1229" > DumpJournal fails on
+    *      non-BTree classes </a>
+    */
+    @Override
     public final int getHeight() {
 
-		switch (indexType) {
-		case BTree:
-			return height;
-		default:
-			throw new UnsupportedOperationException();
-		}
+//		switch (indexType) {
+//		case BTree:
+//			return height;
+//		default:
+//			throw new UnsupportedOperationException();
+//		}
+       return height;
         
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1229" > DumpJournal fails on
+     *      non-BTree classes </a>
+     */
+    @Override
     public final int getGlobalDepth() {
     	
-		switch (indexType) {
-		case HTree:
-			return height;
-		default:
-			throw new UnsupportedOperationException();
-		}
+//		switch (indexType) {
+//		case HTree:
+//			return height;
+//		default:
+//			throw new UnsupportedOperationException();
+//		}
+       return height;
 
     }
 
+    @Override
     public final long getNodeCount() {
         
         return nnodes;
         
     }
 
+    @Override
     public final long getLeafCount() {
         
         return nleaves;
         
     }
 
+    @Override
     public final long getEntryCount() {
         
         return nentries;
         
     }
 
+    @Override
     public final long getCounter() {
         
         return counter;
         
     }
 
+    @Override
     public final long getRecordVersion() {
         
         return counter;
         
     }
     
+    @Override
     public final IndexTypeEnum getIndexType() {
         
         return indexType;
@@ -177,6 +204,7 @@ public class Checkpoint implements ICheckpoint, Externalizable {
      * A human readable representation of the state of the {@link Checkpoint}
      * record.
      */
+    @Override
     public final String toString() {
 
         return "Checkpoint" + //
@@ -581,6 +609,7 @@ public class Checkpoint implements ICheckpoint, Externalizable {
         
     }
 
+    @Override
     public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
         
         final int version = in.readInt();
@@ -656,6 +685,7 @@ public class Checkpoint implements ICheckpoint, Externalizable {
         
     }
 
+    @Override
     public void writeExternal(final ObjectOutput out) throws IOException {
 
         out.writeInt(currentVersion);
