@@ -68,7 +68,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.IHit;
 import com.bigdata.service.fts.FTS.EndpointType;
-import com.bigdata.service.fts.FTS.TargetType;
+import com.bigdata.service.fts.FTS.SearchResultType;
 import com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery;
 import com.bigdata.service.fts.impl.SolrFulltextSearchImpl;
 
@@ -261,7 +261,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          // all input variables must have been bound and point to literals
          if (uri.equals(FTS.SEARCH) || uri.equals(FTS.ENDPOINT)
                || uri.equals(FTS.ENDPOINT_TYPE) || uri.equals(FTS.PARAMS)
-               || uri.equals(FTS.TARGET_TYPE) || uri.equals(FTS.SEARCH_FIELD)
+               || uri.equals(FTS.SEARCH_RESULT_TYPE) || uri.equals(FTS.SEARCH_FIELD)
                || uri.equals(FTS.SCORE_FIELD) || uri.equals(FTS.SNIPPET_FIELD)
                || uri.equals(FTS.TIMEOUT)) {
 
@@ -330,7 +330,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       private final TermNode endpoint;
       private final TermNode endpointType;
       private final TermNode params;
-      private final TermNode targetType;
+      private final TermNode searchResultType;
       private final TermNode searchTimeout;
       private final TermNode searchField;
       private final TermNode scoreField;
@@ -374,7 +374,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          TermNode endpoint = null;
          TermNode endpointType = null;
          TermNode params = null;
-         TermNode targetType = null;
+         TermNode searchResultType = null;
          TermNode searchTimeout = null;
          TermNode searchField = null;
          TermNode scoreField = null;
@@ -396,8 +396,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                endpointType = meta.o();
             } else if (FTS.PARAMS.equals(p)) {
                params = meta.o();
-            } else if (FTS.TARGET_TYPE.equals(p)) {
-               targetType = meta.o();
+            } else if (FTS.SEARCH_RESULT_TYPE.equals(p)) {
+               searchResultType = meta.o();
             } else if (FTS.TIMEOUT.equals(p)) {
                searchTimeout = meta.o();
             } else if (FTS.SEARCH_FIELD.equals(p)) {
@@ -428,7 +428,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.endpoint = endpoint;
          this.endpointType = endpointType;
          this.params = params;
-         this.targetType = targetType;
+         this.searchResultType = searchResultType;
          this.searchTimeout = searchTimeout;
          this.searchField = searchField;
          this.scoreField = scoreField;
@@ -442,7 +442,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          return new FulltextSearchMultiHiterator(bsList, query, endpoint,
                endpointType, params, searchField, scoreField, snippetField, 
-               targetType, searchTimeout);
+               searchResultType, searchTimeout);
 
       }
 
@@ -524,10 +524,10 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
                   .getInstance(store.getLexiconRelation().getNamespace());
 
             /**
-             * The targetType determines the type to which we cast results
+             * The searchResultTyppe determines the type to which we cast results
              */
             final BigdataValue val;
-            switch (hit.getTargetType()) {
+            switch (hit.getSearchResultType()) {
             case LITERAL:
                val = vf.createLiteral(hit.getRes());
                break;
@@ -630,7 +630,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       final TermNode endpoint;
       final TermNode endpointType;
       final TermNode params;
-      final TermNode targetType;
+      final TermNode searchResultType;
       final TermNode searchTimeout;
       final TermNode searchField;
       final TermNode scoreField;
@@ -644,7 +644,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             final TermNode query, final TermNode endpoint,
             final TermNode endpointType, final TermNode params,
             final TermNode searchField, final TermNode scoreField, 
-            final TermNode snippetField, final TermNode targetType, 
+            final TermNode snippetField, final TermNode searchResultType, 
             final TermNode searchTimeout) {
 
          this.query = query;
@@ -652,7 +652,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.endpoint = endpoint;
          this.endpointType = endpointType;
          this.params = params;
-         this.targetType = targetType;
+         this.searchResultType = searchResultType;
          this.searchTimeout = searchTimeout;
          this.searchField = searchField;
          this.scoreField = scoreField;
@@ -739,7 +739,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          final String endpoint = resolveEndpoint(bs);
          final EndpointType endpointType = resolveEndpointType(bs);
          final String params = resolveParams(bs);
-         final TargetType targetType = resolveTargetType(bs);
+         final SearchResultType searchResultType = resolveSearchResultType(bs);
          final Integer searchTimeout = resolveSearchTimeout(bs);
          final String searchField = resolveSearchField(bs);
          final String scoreField = resolveScoreField(bs);
@@ -760,7 +760,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          FulltextSearchQuery sq = new FulltextSearchQuery(
                query, params, endpoint, searchTimeout, searchField,
-               scoreField, snippetField, bs, targetType);
+               scoreField, snippetField, bs, searchResultType);
          curDelegate = (FulltextSearchHiterator) ftSearch.search(sq);
 
          return true;
@@ -787,33 +787,33 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
       }
 
-      private TargetType resolveTargetType(IBindingSet bs) {
+      private SearchResultType resolveSearchResultType(IBindingSet bs) {
 
-         String targetTypeStr = resolveAsString(targetType, bs);
+         String searchResultTypeStr = resolveAsString(searchResultType, bs);
 
          // try override with system default, if not set
-         if (targetTypeStr==null || targetTypeStr.isEmpty()) {
-            targetTypeStr = getProperty(FTS.Options.FTS_TARGET_TYPE);
+         if (searchResultTypeStr==null || searchResultTypeStr.isEmpty()) {
+            searchResultTypeStr = getProperty(FTS.Options.FTS_SEARCH_RESULT_TYPE);
          }
                   
-         if (targetTypeStr != null && !targetTypeStr.isEmpty()) {
+         if (searchResultTypeStr != null && !searchResultTypeStr.isEmpty()) {
 
             try {
 
-               return TargetType.valueOf(targetTypeStr);
+               return SearchResultType.valueOf(searchResultTypeStr);
 
             } catch (Exception e) {
 
                // illegal, ignore and proceed
                if (log.isDebugEnabled()) {
-                  log.warn("Illegal target type: " + targetTypeStr);
+                  log.warn("Illegal target type: " + searchResultTypeStr);
                }
 
             }
 
          }
 
-         return FTS.Options.DEFAULT_TARGET_TYPE; // fallback
+         return FTS.Options.DEFAULT_SEARCH_RESULT_TYPE; // fallback
 
       }
 

@@ -6,4 +6,5 @@ SELECT ?res ?label WHERE {
   ?res fts:endpointType  "SOLR" .
   ?res fts:params "fl=uri" .
   ?res fts:searchField "uri" .
+  ?res fts:searchResultType "URI" .
 }

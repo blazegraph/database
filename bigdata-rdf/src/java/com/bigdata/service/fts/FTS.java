@@ -57,7 +57,7 @@ import com.bigdata.rdf.store.BDS;
  *   ?res fts:endpoint  "http://my.external.solr.endpoint:5656" .
  *   ?res fts:endpointType  "Solr" .
  *   ?res fts:params "defType=dismax&bf=uses^50" .
- *   ?res fts:targetType  "URI" .
+ *   ?res fts:searchResultType "URI" .
  *   ?res fts:score ?score .
  *   ?res fts:snippet ?snippet . 
  * }
@@ -110,14 +110,14 @@ public interface FTS {
       EndpointType DEFAULT_ENDPOINT_TYPE = EndpointType.SOLR;
 
       /**
-       * Option that may be set to specify a default for {@link FTS#TARGET_TYPE},
-       * to be used in fulltext search whenever the {@link FTS#TARGET_TYPE} is
+       * Option that may be set to specify a default for {@link FTS#SEARCH_RESULT_TYPE},
+       * to be used in fulltext search whenever the {@link FTS#SEARCH_RESULT_TYPE} is
        * left unspecified. When set, the magic vocabulary
-       * {@link FTS#TARGET_TYPE} may be used to override the default.
+       * {@link FTS#SEARCH_RESULT_TYPE} may be used to override the default.
        */
-      String FTS_TARGET_TYPE = FTS.class.getName() + ".defaultTargetType";
+      String FTS_SEARCH_RESULT_TYPE = FTS.class.getName() + ".defaultSearchResultType";
       
-      TargetType DEFAULT_TARGET_TYPE = TargetType.URI;
+      SearchResultType DEFAULT_SEARCH_RESULT_TYPE = SearchResultType.LITERAL;
       
 
       /**
@@ -190,7 +190,7 @@ public interface FTS {
     * Target type for extracted entities, determining whether they are
     * parsed into a literal or interpreted as a URI.
     */
-   public static enum TargetType {
+   public static enum SearchResultType {
       URI,
       LITERAL
    }
@@ -297,15 +297,15 @@ public interface FTS {
     * select ?s
     * where {
     *   ?s fts:search &quot;scale-out RDF triplestore&quot; .
-    *   ?s fts:targetType &quot;LITERAL&quot; .
+    *   ?s searchResultType &quot;LITERAL&quot; .
     * }
     * 
     * </pre>
     * 
     * Allowed values are "URI" and "LITERAL"; if none of these values is
-    * provided, the {@value #DEFAULT_TARGET_TYPE} will be used.
+    * provided, the {@value #DEFAULT_SEARCH_RESULT_TYPE} will be used.
     */   
-   final URI TARGET_TYPE = new URIImpl(NAMESPACE + "targetType");
+   final URI SEARCH_RESULT_TYPE = new URIImpl(NAMESPACE + "searchResultType");
 
    /**
     * Magic predicate used to query for free text search metadata to set a

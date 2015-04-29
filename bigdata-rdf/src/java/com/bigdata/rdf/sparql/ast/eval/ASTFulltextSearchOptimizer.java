@@ -66,7 +66,7 @@ public class ASTFulltextSearchOptimizer extends ASTSearchOptimizerBase {
         set.add(FTS.ENDPOINT);
         set.add(FTS.ENDPOINT_TYPE);
         set.add(FTS.PARAMS);
-        set.add(FTS.TARGET_TYPE);
+        set.add(FTS.SEARCH_RESULT_TYPE);
         set.add(FTS.TIMEOUT);
         set.add(FTS.SCORE);
         set.add(FTS.SNIPPET);

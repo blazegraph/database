@@ -25,7 +25,7 @@
 package com.bigdata.service.fts;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.service.fts.FTS.TargetType;
+import com.bigdata.service.fts.FTS.SearchResultType;
 
 /**
  * Metadata about a fulltext search result (against an external service).
@@ -59,5 +59,5 @@ public interface IFulltextSearchHit<V extends Comparable<V>> {
     /**
      * Get the conversion target type for the search hit
      */
-    public TargetType getTargetType();
+    public SearchResultType getSearchResultType();
 }

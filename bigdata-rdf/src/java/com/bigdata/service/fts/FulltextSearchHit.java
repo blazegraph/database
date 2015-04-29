@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.fts;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.service.fts.FTS.TargetType;
+import com.bigdata.service.fts.FTS.SearchResultType;
 
 
 /**
@@ -40,18 +40,19 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
    protected final Double score;
    protected final String snippet;
    protected final IBindingSet incomingBindings;
-   protected final TargetType targetType;
+   protected final SearchResultType searchResultType;
 
    
    
    public FulltextSearchHit(
          final String res, final Double score, final String snippet,
-         final IBindingSet incomingBindings, final TargetType targetType) {
+         final IBindingSet incomingBindings, 
+         final SearchResultType searchResultType) {
       this.res = res;
       this.score = score;
       this.snippet = snippet;
       this.incomingBindings = incomingBindings;
-      this.targetType = targetType;
+      this.searchResultType = searchResultType;
    }
 
    public String toString() {
@@ -107,8 +108,8 @@ public class FulltextSearchHit<V extends Comparable<V>> implements IFulltextSear
    }
    
    @Override
-   public TargetType getTargetType() {
-      return targetType;
+   public SearchResultType getSearchResultType() {
+      return searchResultType;
    }
 
 }
