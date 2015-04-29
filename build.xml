@@ -566,6 +566,7 @@ ga('send', 'pageview');
    <!--
     @see http://trac.bigdata.com/ticket/628 (Create a bigdata-client jar for the NSS REST API)
     @see http://trac.bigdata.com/ticket/1153 (ant "bigdata-client" does not bundle the openrdf remote classes)
+    @see http://trac.bigdata.com/ticket/1235 (bigdata-client does not invoke ServiceProviderHook.forceLoad())
     -->
    <target name="bigdata-client" depends="clean, prepare, jar"  
          description="Prepare the bigdata web access client library.">
@@ -574,6 +575,7 @@ ga('send', 'pageview');
                -c ${build.dir}/${version}.jar
                 -v
                --
+               com.bigdata.rdf.ServiceProviderHook.class
                com.bigdata.rdf.sail.webapp.client.*.class
                com.bigdata.rdf.sail.remote.*.class
                com.bigdata.rdf.properties.*.class
