@@ -233,7 +233,7 @@ public class SolrFulltextSearchImpl implements
          if (search!=null && !search.isEmpty()) {
             FulltextSearchHit currentHit = 
                   new FulltextSearchHit(search, scoreAsDouble, snippet,
-                  query.getIncomingBindings(), query.getTargetType());
+                  query.getIncomingBindings(), query.getSearchResultType());
 
             searchHits.add(currentHit);
             

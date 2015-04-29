@@ -95,7 +95,7 @@ extends AbstractASTEvaluationTestCase {
         final IV paramsIV = makeIV(FTS.PARAMS);
 
         @SuppressWarnings("rawtypes")
-        final IV targetTypeIV = makeIV(FTS.TARGET_TYPE);
+        final IV searchResultType = makeIV(FTS.SEARCH_RESULT_TYPE);
         
         @SuppressWarnings("rawtypes")
         final IV scoreIV = makeIV(FTS.SCORE);
@@ -124,7 +124,7 @@ extends AbstractASTEvaluationTestCase {
             makeIV(store.getValueFactory().createLiteral("bf=uses^50"));
 
         @SuppressWarnings("rawtypes")
-        final IV targetTypeValueIV = 
+        final IV searchResultTypeValueIV = 
             makeIV(store.getValueFactory().createLiteral("URI"));
 
 
@@ -142,7 +142,7 @@ extends AbstractASTEvaluationTestCase {
          *   ?res fts:endpoint  "http://my.external.solr.endpoint:5656" .
          *   ?res fts:endpointType  "Solr" .
          *   ?res fts:params "bf=uses^50" .
-         *   ?res fts:targetType  "URI" .
+         *   ?res fts:searchResultType  "URI" .
          *   ?res fts:score ?score .
          *   ?res fts:snippet ?snippet . 
          *   ?res ?p ?o
@@ -185,8 +185,8 @@ extends AbstractASTEvaluationTestCase {
                   null/* c */, Scope.DEFAULT_CONTEXTS));
             
             whereClause.addChild(new StatementPatternNode(new VarNode("res"),
-                  new ConstantNode(targetTypeIV), 
-                  new ConstantNode(targetTypeValueIV),
+                  new ConstantNode(searchResultType), 
+                  new ConstantNode(searchResultTypeValueIV),
                   null/* c */, Scope.DEFAULT_CONTEXTS));
 
             whereClause.addChild(new StatementPatternNode(new VarNode("res"),
@@ -216,7 +216,7 @@ extends AbstractASTEvaluationTestCase {
          *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#endpoint]), ConstantNode(TermId(0L)[http://my.external.solr.endpoint:5656]), DEFAULT_CONTEXTS)
          *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#endpointType]), ConstantNode(TermId(0L)[bf=uses^50]), DEFAULT_CONTEXTS)
          *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#params]), ConstantNode(TermId(0L)[blue]), DEFAULT_CONTEXTS)
-         *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#targetType]), ConstantNode(TermId(0L)[URI]), DEFAULT_CONTEXTS)
+         *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#searchResultType]), ConstantNode(TermId(0L)[URI]), DEFAULT_CONTEXTS)
          *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#score]), VarNode(score), DEFAULT_CONTEXTS)
          *           StatementPatternNode(VarNode(res), ConstantNode(TermId(0U)[http://www.bigdata.com/rdf/fts#snippet]), VarNode(snippet), DEFAULT_CONTEXTS)
          *         }
@@ -268,8 +268,8 @@ extends AbstractASTEvaluationTestCase {
                       null/* c */, Scope.DEFAULT_CONTEXTS));
 
                 serviceGraphPattern.addChild(new StatementPatternNode(new VarNode("res"),
-                      new ConstantNode(targetTypeIV), new ConstantNode(
-                      targetTypeValueIV), null/* c */, Scope.DEFAULT_CONTEXTS));
+                      new ConstantNode(searchResultType), new ConstantNode(
+                      searchResultTypeValueIV), null/* c */, Scope.DEFAULT_CONTEXTS));
 
                 serviceGraphPattern.addChild(new StatementPatternNode(new VarNode("res"),
                       new ConstantNode(scoreIV), new VarNode("score"), null/* c */,

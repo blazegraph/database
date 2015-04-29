@@ -26,7 +26,7 @@ package com.bigdata.service.fts;
 import java.io.Serializable;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.service.fts.FTS.TargetType;
+import com.bigdata.service.fts.FTS.SearchResultType;
 
 /**
  * Abstraction for search interface against external Solr index.
@@ -60,7 +60,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       final String scoreField;
       final String snippetField;      
       final IBindingSet incomingBindings;
-      final TargetType targetType;
+      final SearchResultType searchResultType;
       
       /**
        * Constructor
@@ -69,7 +69,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
             final String endpoint, final Integer searchTimeout,
             final String searchField, final String scoreField, 
             final String snippetField, final IBindingSet incomingBindings,
-            final TargetType targetType) {
+            final SearchResultType searchResultType) {
 
          this.query = query;
          this.params = params;
@@ -79,7 +79,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
          this.scoreField = scoreField;
          this.snippetField = snippetField;
          this.incomingBindings = incomingBindings;
-         this.targetType = targetType;
+         this.searchResultType = searchResultType;
 
       }
 
@@ -143,8 +143,8 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       /**
        * @return the target type for conversion
        */
-      public TargetType getTargetType() {
-         return targetType;
+      public SearchResultType getSearchResultType() {
+         return searchResultType;
       }
 
       /*
@@ -171,7 +171,7 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
             ((searchTimeout == null) ? 0 : searchTimeout.hashCode());
 
          result = prime * result + 
-            ((targetType == null) ? 0 : targetType.hashCode());
+            ((searchResultType == null) ? 0 : searchResultType.hashCode());
 
          return result;
       }
@@ -211,9 +211,9 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
                || !searchTimeout.equals(other.searchTimeout))
             return false;
 
-         if ((targetType == null && other.targetType != null)
-               || (targetType != null && other.targetType == null)
-               || !targetType.equals(other.targetType))
+         if ((searchResultType == null && other.searchResultType != null)
+               || (searchResultType != null && other.searchResultType == null)
+               || !searchResultType.equals(other.searchResultType))
             return false;
 
          return true;
