@@ -259,6 +259,9 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
     	    <exclude>com/bigdata/TestAll.java</exclude>
 	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
 	  </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>false</reuseForks>
+          <argLine>-Xmx1g -XX:MaxPermSize=256m</argLine>
         </configuration>
       </plugin>
       <plugin>
