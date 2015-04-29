@@ -626,16 +626,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <type>jar</type>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-client</artifactId>
-      <version>${jetty.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-server</artifactId>
-      <version>${jetty.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <version>3.4.5</version>
@@ -750,11 +740,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <artifactId>jetty-jndi</artifactId>
         <version>${jetty.version}</version>
       </dependency>
-           <dependency>
-                  <groupId>org.eclipse.jetty</groupId>
-                  <artifactId>jetty-server</artifactId>
-                  <version>${jetty.version}</version>
-           </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-util</artifactId>
