@@ -65,6 +65,7 @@ import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 
+import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesParser;
 import com.bigdata.rdf.properties.PropertiesParserFactory;
@@ -462,6 +463,9 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
             Integer.toString(DEFAULT_MAX_REQUEST_URL_LENGTH))));
 
       setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
+
+      // See #1235 bigdata-client does not invoke ServiceProviderHook.forceLoad()
+      ServiceProviderHook.forceLoad();
 
    }
 
