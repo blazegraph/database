@@ -94,6 +94,7 @@ dependencies.
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
                 <include>**/*.rq</include>
+                <include>**/*.rdf</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
             </includes>
@@ -147,6 +148,7 @@ dependencies.
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
                 <include>**/*.rq</include>
+                <include>**/*.rdf</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
             </includes>
@@ -293,6 +295,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                        <include>**/*.nt</include>
                        <include>**/*.owl</include>
                        <include>**/*.properties</include>
+                       <include>**/*.rdf</include>
                        <include>**/*.xml</include>
                        <include>**/*.txt</include>
                        <include>**/*.ttl</include>
