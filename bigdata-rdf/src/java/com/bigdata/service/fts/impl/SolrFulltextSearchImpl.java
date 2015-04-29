@@ -52,7 +52,6 @@ import com.bigdata.service.fts.IFulltextSearch;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-// TODO: builtin exceptions
 public class SolrFulltextSearchImpl implements
       IFulltextSearch<FulltextSearchHit> {
 
