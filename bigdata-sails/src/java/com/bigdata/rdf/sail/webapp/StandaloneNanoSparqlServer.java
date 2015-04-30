@@ -68,7 +68,7 @@ public class StandaloneNanoSparqlServer extends NanoSparqlServer {
         
         String propertyFile = System.getProperty(
         		SystemProperties.BIGDATA_PROPERTY_FILE ,
-        		"GraphStore.properties"
+        		"RWStore.properties"
         		);
         
         String portStr = System.getProperty(
