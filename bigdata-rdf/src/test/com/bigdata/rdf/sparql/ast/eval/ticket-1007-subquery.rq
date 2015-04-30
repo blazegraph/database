@@ -1,0 +1,12 @@
+SELECT DISTINCT *
+{ 
+  { 
+    SELECT ?annotatedSource WHERE {
+      hint:SubQuery hint:runOnce true .
+      ?s ?p ?o .
+      FILTER(strstarts(?o,"annotated"))
+      BIND(concat(substr(?o,1,9),"Source") as ?annotatedSource)
+    } 
+  }
+  ?ss ?pp ?annotatedSource 
+} LIMIT 20

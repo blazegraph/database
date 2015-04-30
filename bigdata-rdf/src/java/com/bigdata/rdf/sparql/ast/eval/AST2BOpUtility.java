@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -5345,15 +5346,18 @@ public class AST2BOpUtility extends AST2BOpRTO {
         * require to resolve the IV in case the bound variable is not used
         * anywhere else in the query. To do so, we count the number of 
         * occurrences of the variable in the root query; if it occurs more
-        * than once (i.e., more often than the binding in the assignment node,
-        * it is (in the general case) not safe to suppress the resolving.
+        * than once in the non-select clause (i.e., more often than the binding
+        * in the assignment node, it is (in the general case) not safe to
+        * suppress the resolving.
         * 
         * Note: this again is overly broad. However, there are only rare cases
         * where the same variable is used twice independently (e.g. in
         * unconnected unions), which we ignore here.
         */
-       if (BOpUtility.countOccurrencesOf(
-             ctx.sa.getQueryRoot().getWhereClause(), ass.getVar()) <= 1) {
+       final IVariable<?> assVar = ass.getVar();
+       final QueryRoot root =  ctx.sa.getQueryRoot();
+
+       if (BOpUtility.countVarOccurrencesOutsideProjections(root, assVar) <= 1) {
           return false;
        }
           

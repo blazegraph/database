@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+        <variable name='annotatedSource'/>
+        <variable name='ss'/>
+        <variable name='pp'/>
+    </head>
+    <results>
+        <result>
+            <binding name='annotatedSource'>
+               <literal>annotatedSource</literal>
+            </binding>
+            <binding name='ss'>
+               <uri>http://www.w3.org/2002/07/owl#annotatedSource</uri>
+            </binding>
+            <binding name='pp'>
+               <uri>http://www.w3.org/2000/01/rdf-schema#label</uri>
+            </binding>
+        </result>
+    </results>
+</sparql>
