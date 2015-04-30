@@ -48,6 +48,8 @@ import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 
@@ -1856,31 +1858,35 @@ public class BOpUtility {
      * @param inner the nested BOp we're looking for
      * @return the number of occurrences
      */
-    @SuppressWarnings("unchecked")
-    public static int countOccurrencesOf(final BOp op, final BOp inner) {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static int countVarOccurrencesOutsideProjections(
+       final BOp op, final IVariable inputVar) {
        
-       if (op==null) {
+       if (op==null || inputVar==null) {
           return 0; // no occurrences 
        }
 
-       Iterator<BOp> it = new Striterator(preOrderIteratorWithAnnotations(op))
-               .addFilter(new Filter() {
-                   private static final long serialVersionUID = 1L;
-
-                   @Override
-                   public boolean isValid(Object arg0) {
-                      return arg0.equals(inner);
-                   }
-               });
-        
-       int i=0;
-       while (it.hasNext()) {
-          it.next();
-          i++;
+       int innerNodesTotal = 0;
+       final List<IVariable> vars = toList(op, IVariable.class);
+       for (IVariable var : vars) {
+          if (inputVar.equals(var))
+             innerNodesTotal++;
        }
-        
-       return i;
+       
+       int innerNodesInProj = 0;
+       final List<ProjectionNode> projs = toList(op, ProjectionNode.class);
+       for (ProjectionNode proj : projs) {
+          final List<IVariable> innerVars = toList(proj, IVariable.class);
+          for (IVariable innerVar : innerVars) {
+             if (inputVar.equals(innerVar))
+                innerNodesInProj++;
+          }
+       }
+
+       return innerNodesTotal - innerNodesInProj;
 
    }
+
+    
 
 }
