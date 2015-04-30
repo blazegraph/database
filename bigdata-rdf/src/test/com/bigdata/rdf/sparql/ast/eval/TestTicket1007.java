@@ -453,5 +453,36 @@ public class TestTicket1007 extends AbstractDataDrivenSPARQLTestCase {
            false // checkOrder (because only one solution)
      ).runTest();
   }   
-
+  
+  /**
+   * Test problems with BIND inside and reuse of variable outside of
+   * subquery.
+   * 
+   * <code>
+       SELECT DISTINCT *
+       { 
+         { 
+           SELECT ?annotatedSource WHERE {
+             hint:SubQuery hint:runOnce true .
+             ?s ?p ?o .
+             FILTER(strstarts(?o,"annotated"))
+             BIND(concat(substr(?o,1,9),"Source") as ?annotatedSource)
+          } 
+       }
+       ?ss ?pp ?annotatedSource 
+       } LIMIT 20
+       </code>
+   * 
+   * @see <a href="http://trac.bigdata.com/ticket/490#comment:5">here</a>
+   *      for more details
+   */
+  public void test_ticket_1007_subquery() throws Exception {
+     new TestHelper("ticket-1007-subquery",// testURI,
+           "ticket-1007-subquery.rq",// queryFileURL
+           "ticket-1007-subquery.trig",// dataFileURL
+           "ticket-1007-subquery.srx",// resultFileURL
+           false // checkOrder (because only one solution)
+     ).runTest();
+  }   
+  
 }
