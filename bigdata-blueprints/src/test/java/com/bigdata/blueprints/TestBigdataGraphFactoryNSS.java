@@ -112,10 +112,7 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 	protected void testBigdataGraph(BigdataGraph testGraph) throws Exception {
 
-		final String example = "graph-example-1.xml";
-
-		GraphMLReader.inputGraph(testGraph, this.getClass()
-				.getResourceAsStream(example));
+		loadTestGraph(testGraph, testData);
 
 		for (Vertex v : testGraph.getVertices()) {
 			testPrint(v);
