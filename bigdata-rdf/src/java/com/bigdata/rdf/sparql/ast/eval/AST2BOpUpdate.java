@@ -336,7 +336,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     	 * wholly different plan).
     	 */
 //        if (!context.isCluster()) 
-        {
+        if (false) {
 
             if (runOnQueryEngine) {
             
