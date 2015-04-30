@@ -46,6 +46,7 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
 import com.bigdata.striterator.ChunkedResolvingIterator;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 /**
  * This is an experimental feature that captures history using the change log
@@ -326,12 +327,40 @@ public class RDRHistory implements IChangeLog {
             buffer.flush();
             
             if (log.isDebugEnabled()) {
-                log.debug("# of stmts: " + buffer.counter);
+                log.debug("# of adds: " + buffer.counter);
             }
             
-            if (buffer.counter == 0) {
+            final RemoveBuffer removes = new RemoveBuffer();
+            
+            final IChunkedOrderedIterator<ISPO> it =
+                    tempStore.getAccessPath(SPOKeyOrder.SPO).iterator();
+            
+            /*
+             * If we get two SPOs in a row with the same S we know we have two
+             * change events that cancel each other (add and remove of the same 
+             * thing) and we can remove both from the temp store .  
+             */
+            ISPO last = null;
+            while (it.hasNext()) {
+                final ISPO curr = it.next();
+                if (last != null && last.s().equals(curr.s())) {
+                    removes.add(last);
+                    removes.add(curr);
+                    last = null;
+                } else {
+                    last = curr;
+                }
+            }
+            
+            removes.flush();
+            
+            if (log.isDebugEnabled()) {
+                log.debug("# of removes: " + removes.counter);
+            }
+            
+            if ((buffer.counter - removes.counter) == 0) {
                 /*
-                 * Nothing written to the temp store.
+                 * Nothing written (net) to the temp store.
                  */
                 return;
             }
@@ -429,6 +458,31 @@ public class RDRHistory implements IChangeLog {
         @Override
         protected long flush(final int n, final ISPO[] a) {
             final long l = tempStore.addStatements(a, n);
+            counter += l;
+            return l;
+        }
+
+    }
+
+    /**
+     * SPO buffer backed by the temp store.
+     */
+    private class RemoveBuffer extends AbstractArrayBuffer<ISPO> {
+
+        /*
+         * Use a default capacity of 10000.
+         */
+        private static final int capacity = 10000;
+        
+        private long counter = 0;
+        
+        public RemoveBuffer() {
+            super(capacity, ISPO.class, null);
+        }
+
+        @Override
+        protected long flush(final int n, final ISPO[] a) {
+            final long l = tempStore.removeStatements(a, n);
             counter += l;
             return l;
         }

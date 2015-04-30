@@ -44,6 +44,7 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.sail.TestSparqlUpdateCommit.CommitCounter;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -287,9 +288,9 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
     }
     
     /**
-     * Test the SPARQL service integration.
+     * Test the SPARQL integration.
      */
-    public void testHistoryService() throws Exception {
+    public void testSparqlIntegration() throws Exception {
 
         BigdataSailRepositoryConnection cxn = null;
 
@@ -444,6 +445,52 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             sail.__tearDownUnitTest();
         }
     }
+    
+    /**
+     * Test whether the RDRHistory can handle statements that are added
+     * and removed in the same commit.
+     */
+    public void testRedundantEvents() throws Exception {
+
+        BigdataSailRepositoryConnection cxn = null;
+
+        final BigdataSail sail = getSail(getProperties());
+
+        try {
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+
+            final BigdataValueFactory vf = (BigdataValueFactory) sail
+                    .getValueFactory();
+            final URI s = vf.createURI(":s");
+            final URI p = vf.createURI(":p");
+            final Literal o = vf.createLiteral("foo");
+            final BigdataStatement stmt = vf.createStatement(s, p, o);
+            final BigdataBNode sid = vf.createBNode(stmt);
+
+            cxn.add(stmt);
+            cxn.commit();
+
+            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            
+            cxn.remove(stmt);
+            cxn.add(stmt);
+            cxn.commit();
+
+            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            
+            
+        } finally {
+            if (cxn != null)
+                cxn.close();
+            
+            sail.__tearDownUnitTest();
+        }
+    }
+    
+
     
     public static class CustomRDRHistory extends RDRHistory {
 
