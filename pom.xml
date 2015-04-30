@@ -262,7 +262,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
           <forkCount>1</forkCount>
           <reuseForks>false</reuseForks>
           <basedir>.</basedir>
-          <argLine>-Xmx1g -XX:MaxPermSize=256m</argLine>
+          <argLine>-Xmx4g -XX:+UseMembar -XX:MaxPermSize=256m</argLine>
         </configuration>
       </plugin>
       <plugin>
