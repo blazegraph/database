@@ -98,6 +98,7 @@
         <configuration>
          <forkCount>1</forkCount>
          <reuseForks>false</reuseForks>
+         <basedir>.</basedir>
          <argLine>-Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
         </configuration>
       </plugin>
