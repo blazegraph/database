@@ -186,6 +186,7 @@
 	<antcall target="stopTestServices"/>
 	<antcall target="testReportArchive"/>
     </target>
+
     <target name = "testReportArchive">
 	<!-- Archive the generated HTML report. -->
         <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/surefire-reports" compression="gzip"/>
