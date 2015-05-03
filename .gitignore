@@ -351,3 +351,5 @@ target/**
 *.log
 
 /*/target
+
+.DS_Store
