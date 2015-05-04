@@ -48,6 +48,8 @@ import com.bigdata.bop.solutions.GroupByRewriter;
 import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 
@@ -332,45 +334,68 @@ public class BOpUtility {
      *            An operator.
      * 
      * @return The iterator.
+     * 
+    * @see <a href="http://trac.bigdata.com/ticket/1210" >
+    *      BOpUtility.postOrderIteratorWithAnnotations() is has wrong visitation
+    *      order. </a>
      */
     @SuppressWarnings("unchecked")
     public static Iterator<BOp> postOrderIteratorWithAnnotations(final BOp op) {
        
-        return new Striterator(postOrderIterator(op)).addFilter(new Expander(){
+        // visit the node's operator annotations.
+        final Striterator itr = new Striterator(
+                annotationOpIterator(op));
 
+        itr.append(op.argIterator());
+        
+        // expand each operator annotation with a post-order traversal.
+        itr.addFilter(new Expander() {
             private static final long serialVersionUID = 1L;
 
             @Override
-            protected Iterator expand(final Object arg0) {
-
-                final BOp op = (BOp)arg0;
-
-                // visit the node.
-                final Striterator itr = new Striterator(
-                        new SingleValueIterator(op));
-
-                // visit the node's operator annotations.
-                final Striterator itr2 = new Striterator(
-                        annotationOpIterator(op));
-
-                // expand each operator annotation with a pre-order traversal.
-                itr2.addFilter(new Expander() {
-                    private static final long serialVersionUID = 1L;
-
-                    @Override
-                    protected Iterator expand(final Object ann) {
-                        return postOrderIteratorWithAnnotations((BOp) ann);
-                    }
-                    
-                });
-                
-                // append the pre-order traversal of each annotation.
-                itr.append(itr2);
-
-                return itr;
+            protected Iterator<BOp> expand(final Object ann) {
+                return postOrderIteratorWithAnnotations((BOp) ann);
             }
             
         });
+        
+        // visit the node.
+        itr.append(new SingleValueIterator<BOp>(op));
+
+        
+        return itr;
+        
+//        return new Striterator(postOrderIterator(op)).addFilter(new Expander(){
+//
+//            private static final long serialVersionUID = 1L;
+//
+//            @Override
+//            protected Iterator<BOp> expand(final Object arg0) {
+//
+//                final BOp op = (BOp)arg0;
+//
+//                // visit the node's operator annotations.
+//                final Striterator itr = new Striterator(
+//                        annotationOpIterator(op));
+//
+//                // expand each operator annotation with a post-order traversal.
+//                itr.addFilter(new Expander() {
+//                    private static final long serialVersionUID = 1L;
+//
+//                    @Override
+//                    protected Iterator<BOp> expand(final Object ann) {
+//                        return postOrderIteratorWithAnnotations((BOp) ann);
+//                    }
+//                    
+//                });
+//                
+//                // visit the node.
+//                itr.append(new SingleValueIterator<BOp>(op));
+//
+//                return itr;
+//            }
+//            
+//        });
         
     }
 
@@ -1833,31 +1858,35 @@ public class BOpUtility {
      * @param inner the nested BOp we're looking for
      * @return the number of occurrences
      */
-    @SuppressWarnings("unchecked")
-    public static int countOccurrencesOf(final BOp op, final BOp inner) {
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public static int countVarOccurrencesOutsideProjections(
+       final BOp op, final IVariable inputVar) {
        
-       if (op==null) {
+       if (op==null || inputVar==null) {
           return 0; // no occurrences 
        }
 
-       Iterator<BOp> it = new Striterator(preOrderIteratorWithAnnotations(op))
-               .addFilter(new Filter() {
-                   private static final long serialVersionUID = 1L;
-
-                   @Override
-                   public boolean isValid(Object arg0) {
-                      return arg0.equals(inner);
-                   }
-               });
-        
-       int i=0;
-       while (it.hasNext()) {
-          it.next();
-          i++;
+       int innerNodesTotal = 0;
+       final List<IVariable> vars = toList(op, IVariable.class);
+       for (IVariable var : vars) {
+          if (inputVar.equals(var))
+             innerNodesTotal++;
        }
-        
-       return i;
+       
+       int innerNodesInProj = 0;
+       final List<ProjectionNode> projs = toList(op, ProjectionNode.class);
+       for (ProjectionNode proj : projs) {
+          final List<IVariable> innerVars = toList(proj, IVariable.class);
+          for (IVariable innerVar : innerVars) {
+             if (inputVar.equals(innerVar))
+                innerNodesInProj++;
+          }
+       }
+
+       return innerNodesTotal - innerNodesInProj;
 
    }
+
+    
 
 }

@@ -92,12 +92,14 @@ public interface ICheckpoint {
     int getGlobalDepth();
 
     /**
-     * The #of non-leaf nodes (B+Tree) or directories (HTree).
+     * The #of non-leaf nodes (B+Tree) or directories (HTree). This is ZERO (0)
+     * for a non-recursive data structure such as a solution set stream.
      */
     long getNodeCount();
 
     /**
-     * The #of leaves (B+Tree) or hash buckets (HTree).
+     * The #of leaves (B+Tree), hash buckets (HTree), or ZERO (0) for a solution
+     * set stream.
      */
     long getLeafCount();
 

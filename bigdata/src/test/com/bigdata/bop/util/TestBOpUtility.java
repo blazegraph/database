@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.util;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.FutureTask;
@@ -386,6 +387,111 @@ public class TestBOpUtility extends TestCase2 {
     }
 
     /**
+    * Unit test for {@link BOpUtility#postOrderIteratorWithAnnotations(BOp)}.
+    * <p>
+    * Note: This test depends on the LinkedHashMap imposing the ordering in
+    * which the annotations are declared.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1210" >
+    *      BOpUtility.postOrderIteratorWithAnnotations() is has wrong visitation
+    *      order. </a>
+    */
+    public void test_postOrderIteratorWithAnnotations() {
+
+        final BOp a1 = new BOpBase(new BOp[]{Var.var("a")},null/*annotations*/);
+        final BOp a2 = new BOpBase(new BOp[]{Var.var("b")},null/*annotations*/);
+        // Note: [a3] tests recursion (annotations of annotations).
+        final BOp a3 = new BOpBase(new BOp[] { Var.var("z") }, NV
+                .asMap(
+                        new NV[] { //
+                                new NV("baz", a2),//
+                                new NV("baz2", "skip")//
+                                }//
+                        ));
+        
+        final BOp op2 = new BOpBase(new BOp[] { Var.var("x") }, NV.asMap(new NV[]{//
+                new NV("foo1",a1),//
+                new NV("foo2",a3),//
+                new NV("foo3", "skip"),//
+        }));
+
+        // root
+        final BOp root = new BOpBase(new BOp[] { // root args[]
+                new Constant<String>("12"), Var.var("y"), op2 }, null/* annotations */);
+
+//		final BOp[] expectedMGC = new BOp[] {// MGC - Arguments THEN Annotation
+//
+//				// root annotations {}
+//
+//				// root arguments {"12", ?y, op2}
+//				new Constant<String>("12"),			// root[0]
+//				Var.var("y"),						// root[1]
+//
+//					// op2 annotations {a1, a3}
+//					// a1 children
+//					Var.var("x"),					// op2[0]
+//							Var.var("a"),				// a1[0]
+//						a1,							// op2 anno
+//	
+//						// a3 arguments {?z}
+//							Var.var("z"),			// a3[0]
+//								Var.var("b"),		// a2[0]
+//							a2,						// a3 anno
+//						a3,							// op2 anno
+//	
+//					op2,							// root[2]
+//
+//				root,//
+//		};
+
+		final BOp[] expected = new BOp[] { // Annotations THEN Arguments
+
+				// root annotations {}
+
+				// root arguments {"12", ?y, op2}
+				new Constant<String>("12"),//
+				Var.var("y"),//
+
+				// op2 annotations {a1, a3}
+				// a1 children
+				Var.var("a"),//
+				a1,//
+
+				// a3 annotations {a2}
+				// a2 children {b}
+				Var.var("b"),//
+				a2,//
+				// a3 arguments {?z}
+				Var.var("z"),//
+				a3,//
+
+				// op2 arguments.
+				Var.var("x"),//
+
+				op2,//
+
+				root,//
+		};
+
+		final Object[] actual = unwrap(BOpUtility.postOrderIteratorWithAnnotations(root));
+		assertTrue(actual.length == expected.length);
+		for (int i = 0; i < expected.length; i++){
+            assertTrue("index=" + i + ", expected=" + expected[i] + ", actual="
+                    + actual[i], expected[i].equals(actual[i]));
+		}
+		
+    }
+
+    private Object[] unwrap(Iterator<BOp> iter) {
+		final ArrayList<BOp> array = new ArrayList<BOp>();
+		while (iter.hasNext()) {
+			array.add(iter.next());
+		}
+		
+		return array.toArray();
+	}
+
+	/**
      * Unit test for {@link BOpUtility#getSpannedVariables(BOp)}.
      */
     public void test_getSpannedVariables() {

@@ -54,7 +54,7 @@ import com.bigdata.util.config.NicUtil;
  */
 public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdataGraphFactory {
 
-    protected static final transient Logger log = Logger.getLogger(AbstractTestNSSBlueprintsClient.class);
+    private static final transient Logger log = Logger.getLogger(AbstractTestNSSBlueprintsClient.class);
 
     private Server m_fixture;
 	protected String namespace;
