@@ -57,8 +57,6 @@ import com.bigdata.relation.locator.ILocatableResource;
  * @see DiskOnlyStrategy
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TemporaryRawStore.java 2356 2010-01-28 17:36:13Z martyncutcher
- *          $
  */
 public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 
@@ -180,6 +178,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      * {@link ILocatableResource}s created on a {@link TemporaryStore} are
      * placed within a unique namespace.
      */
+    @Override
     final public UUID getUUID() {
         
         return uuid;
@@ -313,6 +312,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
     /**
      * Closes the store if it gets GCd.
      */
+    @Override
     protected void finalize() throws Throwable {
         
         try {
@@ -340,12 +340,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
         
     }
     
+    @Override
     public String toString() {
         
         return getClass().getName() + "{file=" + getFile() + "}";
         
     }
     
+    @Override
     final public File getFile() {
         
         return buf.getFile();
@@ -355,6 +357,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
     /**
      * Close the store and delete the associated file, if any.
      */
+    @Override
     public void close() {
 
         synchronized (buf) {
@@ -414,6 +417,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      * backing file and {@link #deleteResources()} requires that the store is
      * closed as a pre-condition.
      */
+    @Override
     public void deleteResources() {
 
         synchronized (buf) {
@@ -435,6 +439,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
     /**
      * Note: Temporary stores do not have persistent resource descriptions.
      */
+    @Override
     final public IResourceMetadata getResourceMetadata() {
         
         final File file = buf.getFile();
@@ -449,7 +454,6 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      * Static class since must be {@link Serializable}.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     static final class ResourceMetadata extends AbstractResourceMetadata {
 
@@ -473,12 +477,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 
         private static final long serialVersionUID = 1L;
 
+        @Override
         public boolean isJournal() {
             
             return false;
             
         }
 
+        @Override
         public boolean isIndexSegment() {
 
             return false;
@@ -497,6 +503,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      * Simply delegates to {@link #close()} since {@link #close()} always
      * deletes the backing file for a temporary store.
      */
+    @Override
     final public void destroy() {
 
         if(isOpen())
@@ -504,12 +511,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 
     }
 
+    @Override
     final public void force(boolean metadata) {
         
         buf.force(metadata);
         
     }
 
+    @Override
     final public long size() {
         
         return buf.size();
@@ -523,12 +532,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
         
     }
     
+    @Override
     final public boolean isOpen() {
         
         return buf.isOpen();
         
     }
 
+    @Override
     final public boolean isReadOnly() {
         
         return buf.isReadOnly();
@@ -539,6 +550,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      * Always returns <code>false</code> since the store will be deleted as soon
      * as it is closed.
      */
+    @Override
     final public boolean isStable() {
     
         if (!isOpen())
@@ -552,6 +564,7 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
      * Return <code>false</code> since the temporary store is (at least in
      * principle) backed by disk.
      */
+    @Override
     final public boolean isFullyBuffered() {
         
         if (!isOpen())
@@ -561,12 +574,14 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
         
     }
 
+    @Override
     final public ByteBuffer read(long addr) {
 
         return buf.read(addr);
         
     }
 
+    @Override
     final public long write(ByteBuffer data) {
     
         return buf.write(data);
@@ -595,16 +610,17 @@ public class TemporaryRawStore extends AbstractRawWormStore implements IMRMW {
 
     }
 
+    @Override
     public CounterSet getCounters() {
 
         return buf.getCounters();
         
     }
 
-	@Override
-	public void delete(long addr) {
-		// void
-		
-	}
+   @Override
+   public void delete(long addr) {
+      // void
+      
+   }
 
 }
