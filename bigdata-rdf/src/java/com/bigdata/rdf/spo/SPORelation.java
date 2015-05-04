@@ -288,9 +288,10 @@ public class SPORelation extends AbstractRelation<ISPO> {
                 AbstractTripleStore.Options.BLOOM_FILTER,
                 AbstractTripleStore.Options.DEFAULT_BLOOM_FILTER));
         
-        this.history = null != getProperty(
+        final String historyClass = getProperty(
                 AbstractTripleStore.Options.RDR_HISTORY_CLASS,
                 null);
+        this.history = historyClass != null && historyClass.length() > 0;
 
         // declare the various indices.
         {

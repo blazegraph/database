@@ -1499,7 +1499,7 @@ abstract public class AbstractTripleStore extends
             
             final String className = getProperty(Options.RDR_HISTORY_CLASS, null);
             
-            if (className != null) {
+            if (className != null && className.length() > 0) {
                 
                 if (!statementIdentifiers) {
                     throw new RuntimeException("statement identifiers must be enabled for RDR history");
