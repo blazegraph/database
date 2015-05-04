@@ -42,7 +42,7 @@ import com.tinkerpop.blueprints.impls.GraphTest;
  */
 public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCase {
 
-    protected static final transient Logger log = Logger.getLogger(AbstractTestBigdataGraph.class);
+    private static final transient Logger log = Logger.getLogger(AbstractTestBigdataGraph.class);
     
     /**
      * 

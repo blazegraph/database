@@ -37,6 +37,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
+import com.bigdata.BigdataStatics;
+import com.bigdata.bop.solutions.SolutionSetStream;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.HTreeIndexMetadata;
@@ -45,6 +47,7 @@ import com.bigdata.btree.keys.KV;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.htree.HTree;
 import com.bigdata.rwstore.IRWStrategy;
+import com.bigdata.stream.Stream.StreamIndexMetadata;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
@@ -175,9 +178,12 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
     }
 
     /**
-     * Test with an HTree.
-     */
-    public void test_journal_oneIndex_HTree_RandomData() throws IOException,
+    * Test with an HTree.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1229" > DumpJournal fails on
+    *      non-BTree classes </a>
+    */
+    public void test_journal_oneIndex_HTree_RandomData_withoutDumpPages() throws IOException,
             InterruptedException, ExecutionException {
 
         final Journal src = getStore(getProperties());
@@ -201,6 +207,111 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
                     ndx.insert(kv.key, kv.val);
 
                 }
+
+            }
+
+            src.commit();
+
+            new DumpJournal(src)
+                    .dumpJournal(true/* dumpHistory */, false/* dumpPages */,
+                            true/* dumpIndices */, false/* showTuples */);
+
+        } finally {
+
+            src.destroy();
+
+        }
+
+    }
+
+    /**
+     * Test with an HTree.
+     */
+    public void test_journal_oneIndex_HTree_RandomData_dumpPages() throws IOException,
+            InterruptedException, ExecutionException {
+
+        final Journal src = getStore(getProperties());
+
+        try {
+
+            // register an index and commit the journal.
+            final String NAME = "testIndex";
+
+            src.registerIndex(new HTreeIndexMetadata(NAME, UUID.randomUUID()));
+
+            {
+
+                final HTree ndx = (HTree) src.getUnisolatedIndex(NAME);
+
+                final KV[] a = AbstractBTreeTestCase
+                        .getRandomKeyValues(1000/* ntuples */);
+
+                for (KV kv : a) {
+
+                    ndx.insert(kv.key, kv.val);
+
+                }
+
+            }
+
+            src.commit();
+
+            new DumpJournal(src)
+                    .dumpJournal(true/* dumpHistory */, true/* dumpPages */,
+                            true/* dumpIndices */, false/* showTuples */);
+
+        } finally {
+
+            src.destroy();
+
+        }
+
+    }
+
+    /**
+    * Test with an {@link SolutionSetStream}.
+    * 
+    * @see <a href="http://trac.bigdata.com/ticket/1229" > DumpJournal fails on
+    *      non-BTree classes </a>
+    */
+    public void test_journal_oneIndex_SolutionSetStream_NoData() throws IOException,
+            InterruptedException, ExecutionException {
+
+        final Journal src = getStore(getProperties());
+
+        try {
+
+            // register an index and commit the journal.
+            final String NAME = "testIndex";
+   
+            {
+               final StreamIndexMetadata md = new StreamIndexMetadata(NAME,
+                     UUID.randomUUID());
+               /**
+                * TODO GIST : We should not have to do this here. See
+                * Checkpoint.create() and SolutionSetStream.create() for why this
+                * is necessary.
+                * 
+                * @see https://sourceforge.net/apps/trac/bigdata/ticket/585 (GIST)
+                */
+               md.setStreamClassName(SolutionSetStream.class.getName());
+               src.registerIndex(md);
+            }
+
+            {
+
+                final SolutionSetStream ndx = (SolutionSetStream) src.getUnisolatedIndex(NAME);
+
+//                ndx.put(new Striterator(solutions));
+//                
+//                final KV[] a = AbstractBTreeTestCase
+//                        .getRandomKeyValues(1000/* ntuples */);
+//
+//                for (KV kv : a) {
+//
+//                    ndx.insert(kv.key, kv.val);
+//
+//                }
 
             }
 
@@ -384,7 +495,13 @@ public class TestDumpJournal extends ProxyTestCase<Journal> {
      *      DumpJournal does not protect against concurrent updates (NSS) </a>
      */
     public void test_dumpJournal_concurrent_updates() throws Exception {
-        
+        if(!BigdataStatics.runKnownBadTests) {
+           /* FIXME Disabled per #762 pending resolution. Note that DumpJournal
+            * concurrent with updates appears to work at the NSS layer as of the
+            * 1.5.2 development branch.
+            */
+           return;
+        }
         final String PREFIX = "testIndex#";
         final int NUM_INDICES = 4;
 
