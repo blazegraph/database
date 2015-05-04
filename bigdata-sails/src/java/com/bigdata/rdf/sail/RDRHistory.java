@@ -45,6 +45,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.relation.accesspath.AbstractArrayBuffer;
+import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedResolvingIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
@@ -192,6 +193,13 @@ public class RDRHistory implements IChangeLog {
         properties.setProperty(
                 com.bigdata.rdf.store.AbstractTripleStore.Options.BLOOM_FILTER,
                 "false");
+        
+        /*
+         * Turn off history for the temp store.
+         */
+        properties.setProperty(
+                com.bigdata.rdf.store.AbstractTripleStore.Options.RDR_HISTORY_CLASS,
+                "");
         
         final TempTripleStore tempStore = new TempTripleStore(database
                 .getIndexManager().getTempStore(), properties, database);
@@ -482,7 +490,8 @@ public class RDRHistory implements IChangeLog {
 
         @Override
         protected long flush(final int n, final ISPO[] a) {
-            final long l = tempStore.removeStatements(a, n);
+            final long l = tempStore.removeStatements(
+                    new ChunkedArrayIterator<ISPO>(n, a, null), false);
             counter += l;
             return l;
         }
