@@ -335,8 +335,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     	 * query engine that things could be different (but that requires a
     	 * wholly different plan).
     	 */
-//        if (!context.isCluster()) 
-        if (false) {
+//        if (!context.isCluster())
+        {
 
             if (runOnQueryEngine) {
             
