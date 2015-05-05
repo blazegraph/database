@@ -1411,19 +1411,29 @@ public abstract class BigdataGraph implements Graph {
         if (sparqlLog.isTraceEnabled()) {
             sparqlLog.trace("query:\n"+queryStr);
         }
-                
-        final org.openrdf.query.GraphQuery query = 
-                cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+
+        final GraphQueryResult result;
+        try {
+            
+            final org.openrdf.query.GraphQuery query = 
+                    cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
         
-        if (sparqlLog.isTraceEnabled()) {
-            if (query instanceof BigdataSailGraphQuery) {
-                final BigdataSailGraphQuery bdgq = (BigdataSailGraphQuery) query;
-                sparqlLog.trace("optimized AST:\n"+bdgq.optimize());
+            if (sparqlLog.isTraceEnabled()) {
+                if (query instanceof BigdataSailGraphQuery) {
+                    final BigdataSailGraphQuery bdgq = (BigdataSailGraphQuery) query;
+                    sparqlLog.trace("optimized AST:\n"+bdgq.optimize());
+                }
             }
+        
+            result = query.evaluate();
+
+        } catch (Exception ex) {
+            if (!readFromWriteConnection) {
+                cxn.close();
+            }
+            throw ex;
         }
         
-        final GraphQueryResult result = query.evaluate();
-
         final IStriterator sitr = new Striterator(new WrappedResult<Statement>(
                 result, readFromWriteConnection ? null : cxn
                 ));
@@ -1543,18 +1553,28 @@ public abstract class BigdataGraph implements Graph {
         if (sparqlLog.isTraceEnabled()) {
             sparqlLog.trace("query:\n"+queryStr);
         }
-        
-        final TupleQuery query = (TupleQuery) 
-                cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
-        
-        if (sparqlLog.isTraceEnabled()) {
-            if (query instanceof BigdataSailTupleQuery) {
-                final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
-                sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+
+        final TupleQueryResult result;
+        try {
+            
+            final TupleQuery query = (TupleQuery) 
+                    cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
+            
+            if (sparqlLog.isTraceEnabled()) {
+                if (query instanceof BigdataSailTupleQuery) {
+                    final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+                    sparqlLog.trace("optimized AST:\n"+bdtq.optimize());
+                }
             }
-        }
+            
+            result = query.evaluate();
         
-        final TupleQueryResult result = query.evaluate();
+        } catch (Exception ex) {
+            if (!readFromWriteConnection) {
+                cxn.close();
+            }
+            throw ex;
+        }
         
         final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
                 result, readFromWriteConnection ? null : cxn
