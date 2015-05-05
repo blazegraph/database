@@ -450,7 +450,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
      * Test whether the RDRHistory can handle statements that are added
      * and removed in the same commit.
      */
-    public void testRedundantEvents() throws Exception {
+    public void testFullyRedundantEvents() throws Exception {
 
         BigdataSailRepositoryConnection cxn = null;
 
@@ -480,6 +480,55 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
             cxn.commit();
 
             assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            
+            
+        } finally {
+            if (cxn != null)
+                cxn.close();
+            
+            sail.__tearDownUnitTest();
+        }
+    }
+    
+    /**
+     * Test whether the RDRHistory can handle statements that are added
+     * and removed in the same commit.
+     */
+    public void testPartiallyRedundantEvents() throws Exception {
+
+        BigdataSailRepositoryConnection cxn = null;
+
+        final BigdataSail sail = getSail(getProperties());
+
+        try {
+
+            sail.initialize();
+            final BigdataSailRepository repo = new BigdataSailRepository(sail);
+            cxn = (BigdataSailRepositoryConnection) repo.getConnection();
+
+            final BigdataValueFactory vf = (BigdataValueFactory) sail
+                    .getValueFactory();
+            final URI s = vf.createURI(":s");
+            final URI p = vf.createURI(":p");
+            final Literal o = vf.createLiteral("foo");
+            final Literal bar = vf.createLiteral("bar");
+            final BigdataStatement stmt = vf.createStatement(s, p, o);
+            final BigdataStatement stmt2 = vf.createStatement(s, p, bar);
+            final BigdataBNode sid = vf.createBNode(stmt);
+            final BigdataBNode sid2 = vf.createBNode(stmt2);
+
+            cxn.add(stmt);
+            cxn.commit();
+
+            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            
+            cxn.remove(stmt);
+            cxn.add(stmt);
+            cxn.add(stmt2);
+            cxn.commit();
+
+            assertTrue(cxn.getTripleStore().getAccessPath(sid, null, null).rangeCount(false) == 1);
+            assertTrue(cxn.getTripleStore().getAccessPath(sid2, null, null).rangeCount(false) == 1);
             
             
         } finally {
