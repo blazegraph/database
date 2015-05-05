@@ -31,6 +31,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -90,7 +91,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
     * Note: This could extend the base class to allow for search service
     * configuration options.
     */
-   private final BigdataNativeServiceOptions serviceOptions;
+   private final BigdataNativeServiceOptions serviceOptions;   
 
    public FulltextSearchServiceFactory() {
 
@@ -113,9 +114,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          throw new IllegalArgumentException();
 
       final AbstractTripleStore store = params.getTripleStore();
-
-      if (store == null)
-         throw new IllegalArgumentException();
+      
+      final FulltextSearchDefaults defaults = 
+            new FulltextSearchDefaults(serviceOptions.getServiceConfig());
 
       final ServiceNode serviceNode = params.getServiceNode();
 
@@ -148,8 +149,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       /*
        * Create and return the ServiceCall object which will execute this query.
        */
-      return new ExternalServiceSearchCall(store, searchVar, statementPatterns,
-            getServiceOptions());
+      return new FulltextSearchServiceCall(store, searchVar, statementPatterns,
+            getServiceOptions(), defaults);
 
    }
 
@@ -321,7 +322,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
     * Note: This has the {@link AbstractTripleStore} reference attached. This is
     * not a {@link Serializable} object. It MUST run on the query controller.
     */
-   private static class ExternalServiceSearchCall implements
+   private static class FulltextSearchServiceCall implements
          MockIVReturningServiceCall {
 
       private final AbstractTripleStore store;
@@ -335,13 +336,15 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       private final TermNode searchField;
       private final TermNode scoreField;
       private final TermNode snippetField;
+      private final FulltextSearchDefaults defaults;
 
       private final IVariable<IV>[] vars;
 
-      public ExternalServiceSearchCall(final AbstractTripleStore store,
+      public FulltextSearchServiceCall(final AbstractTripleStore store,
             final IVariable<?> searchVar,
             final Map<URI, StatementPatternNode> statementPatterns,
-            final IServiceOptions serviceOptions) {
+            final IServiceOptions serviceOptions,
+            final FulltextSearchDefaults defaults) {
 
          if (store == null)
             throw new IllegalArgumentException();
@@ -358,6 +361,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.store = store;
 
          this.serviceOptions = serviceOptions;
+         
+         this.defaults = defaults;
 
          /*
           * Unpack the "search" magic predicate: [?searchVar solr:search
@@ -442,7 +447,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          return new FulltextSearchMultiHiterator(bsList, query, endpoint,
                endpointType, params, searchField, scoreField, snippetField, 
-               searchResultType, searchTimeout);
+               searchResultType, searchTimeout, defaults);
 
       }
 
@@ -635,7 +640,9 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       final TermNode searchField;
       final TermNode scoreField;
       final TermNode snippetField;
-
+      
+      final FulltextSearchDefaults defaults;
+      
       int nextBindingSetItr = 0;
 
       FulltextSearchHiterator<IFulltextSearchHit> curDelegate;
@@ -645,7 +652,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             final TermNode endpointType, final TermNode params,
             final TermNode searchField, final TermNode scoreField, 
             final TermNode snippetField, final TermNode searchResultType, 
-            final TermNode searchTimeout) {
+            final TermNode searchTimeout, final FulltextSearchDefaults defaults) {
 
          this.query = query;
          this.bindingSet = bindingSet;
@@ -657,6 +664,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.searchField = searchField;
          this.scoreField = scoreField;
          this.snippetField = snippetField;
+         
+         this.defaults = defaults;
 
          init();
 
@@ -793,7 +802,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          // try override with system default, if not set
          if (searchResultTypeStr==null || searchResultTypeStr.isEmpty()) {
-            searchResultTypeStr = getProperty(FTS.Options.FTS_SEARCH_RESULT_TYPE);
+            searchResultTypeStr = defaults.getDefaultSearchResultType();
          }
                   
          if (searchResultTypeStr != null && !searchResultTypeStr.isEmpty()) {
@@ -823,7 +832,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          // try override with system default, if not set
          if (searchTimeoutStr==null) {
-            searchTimeoutStr = getProperty(FTS.Options.FTS_TIMEOUT);
+            searchTimeoutStr = defaults.getDefaultTimeout();
          }
          
          if (searchTimeoutStr != null && !searchTimeoutStr.isEmpty()) {
@@ -853,7 +862,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          
          // try override with system default, if not set
          if (paramStr==null) { // allow for paramStr being empty string override
-            paramStr = getProperty(FTS.Options.FTS_PARAMS);
+            paramStr = defaults.getDefaultParams();
          }
          
          return paramStr==null || paramStr.isEmpty() ?
@@ -871,7 +880,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          // try override with system default, if not set
          if (endpointTypeStr==null) {
-            endpointTypeStr = getProperty(FTS.Options.FTS_ENDPOINT_TYPE);
+            endpointTypeStr = defaults.getDefaultEndpointType();
          }
          
          if (endpointTypeStr != null && !endpointTypeStr.isEmpty()) {
@@ -905,7 +914,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          
          // try override with system default, if not set
          if (endpointStr==null || endpointStr.isEmpty()) {
-            endpointStr = getProperty(FTS.Options.FTS_ENDPOINT);
+            endpointStr = defaults.getDefaultEndpoint();
          }
          
          
@@ -932,7 +941,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          
          // try override with system default, if not set
          if (searchFieldStr==null || searchFieldStr.isEmpty()) {
-            searchFieldStr = getProperty(FTS.Options.FTS_SEARCH_FIELD);
+            searchFieldStr = defaults.getDefaultSearchField();
          }
          
          return searchFieldStr==null || searchFieldStr.isEmpty() ?
@@ -950,7 +959,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          
          // try override with system default, if not set
          if (scoreFieldStr==null || scoreFieldStr.isEmpty()) {
-            scoreFieldStr = getProperty(FTS.Options.FTS_SCORE_FIELD);
+            scoreFieldStr = defaults.getDefaultScoreField();
          }
          
          return scoreFieldStr==null || scoreFieldStr.isEmpty() ?
@@ -968,7 +977,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          
          // try override with system default, if not set
          if (snippetFieldStr==null || snippetFieldStr.isEmpty()) {
-            snippetFieldStr = getProperty(FTS.Options.FTS_SNIPPET_FIELD);
+            snippetFieldStr = defaults.getDefaultSnippetField();
          }
          
          return snippetFieldStr==null || snippetFieldStr.isEmpty() ?
@@ -1011,14 +1020,85 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             }
          }
       }
-      
-      public String getProperty(String property) {
-         
-          // TODO: this should read from the configuration file as well
-          return System.getProperty(property, null);
-          
-      }
 
    }
+   
+   /**
+    * Default values for external fulltext search, as defined in configuration
+    * @author msc
+    *
+    */
+   public static class FulltextSearchDefaults {
+
+      final String defaultEndpoint;
+      final String defaultEndpointType;
+      final String defaultSearchResultType;
+      final String defaultTimeout;
+      final String defaultParams;
+      final String defaultSearchField;
+      final String defaultScoreField;
+      final String defaultSnippetField;
+
+      public FulltextSearchDefaults(final Properties p) {
+         
+         this.defaultEndpoint = 
+               p.getProperty(FTS.Options.FTS_ENDPOINT);
+         
+         this.defaultEndpointType = 
+               p.getProperty(FTS.Options.FTS_ENDPOINT_TYPE);
+         
+         this.defaultSearchResultType = 
+               p.getProperty(FTS.Options.FTS_SEARCH_RESULT_TYPE);
+         
+         this.defaultTimeout =
+               p.getProperty(FTS.Options.FTS_TIMEOUT);
+         
+         this.defaultParams =
+               p.getProperty(FTS.Options.FTS_PARAMS);
+
+         this.defaultSearchField =
+               p.getProperty(FTS.Options.FTS_SEARCH_FIELD);
+         
+         this.defaultScoreField =
+               p.getProperty(FTS.Options.FTS_SCORE_FIELD);
+         
+         this.defaultSnippetField =
+               p.getProperty(FTS.Options.FTS_SNIPPET_FIELD);
+      }
+      
+      
+      public String getDefaultEndpoint() {
+         return defaultEndpoint;
+      }
+
+      public String getDefaultEndpointType() {
+         return defaultEndpointType;
+      }
+
+      public String getDefaultSearchResultType() {
+         return defaultSearchResultType;
+      }
+
+      public String getDefaultTimeout() {
+         return defaultTimeout;
+      }
+
+      public String getDefaultParams() {
+         return defaultParams;
+      }
+
+      public String getDefaultSearchField() {
+         return defaultSearchField;
+      }
+
+      public String getDefaultScoreField() {
+         return defaultScoreField;
+      }
+
+      public String getDefaultSnippetField() {
+         return defaultSnippetField;
+      }
+   }
+   
 
 }
