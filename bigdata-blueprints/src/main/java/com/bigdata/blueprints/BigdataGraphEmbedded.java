@@ -175,6 +175,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 //		    if (cxn != null) {
 //		        cxn.close();
 //		    }
+		    // commit shuts down cxn
 			commit();
 			repo.shutDown();
 		} catch (Exception e) {
