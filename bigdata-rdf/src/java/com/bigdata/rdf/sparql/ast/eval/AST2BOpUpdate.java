@@ -314,6 +314,13 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
+     * MP: Make SPARQL Update an auto-commit operation by default.
+     * 
+     * TODO FIXME Bryan please fix me.
+     */
+    public static boolean AUTO_COMMIT = true;
+    
+    /**
      * Commit.
      * <p>
      * Note: Not required on cluster (Shard-wise ACID updates).
@@ -336,7 +343,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     	 * wholly different plan).
     	 */
 //        if (!context.isCluster())
-        {
+        if (AUTO_COMMIT) {
 
             if (runOnQueryEngine) {
             
