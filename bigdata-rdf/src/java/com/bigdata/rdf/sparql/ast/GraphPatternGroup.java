@@ -148,5 +148,5 @@ abstract public class GraphPatternGroup<E extends IGroupMemberNode> extends
         return children;
         
     }
-
+    
 }

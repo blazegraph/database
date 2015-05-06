@@ -202,7 +202,7 @@ public class TestASTFastRangeCountOptimizer extends AbstractOptimizerTestCase {
 									), varNode(w)
 								)),
 								where(
-									statementPatternNode(varNode(s), varNode(p), varNode(o), varNodes(z))
+									statementPatternNode(varNode(s), varNode(p), varNode(o), (Object[])varNodes(z))
 								)
 							);
 					
