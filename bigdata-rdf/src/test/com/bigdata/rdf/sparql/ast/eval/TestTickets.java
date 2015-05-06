@@ -32,6 +32,7 @@ package com.bigdata.rdf.sparql.ast.eval;
  * trac </a>.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
 public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
@@ -671,6 +672,72 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_429c.rq",// queryFileURL
              "ticket_429.trig",// dataFileURL
              "ticket_429b.srx"// resultFileURL (not matching: reuse 429b)
+       ).runTest();    
+    } 
+    
+    /**
+     * Nested OPTIONAL-BIND construct
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_933a() throws Exception {
+       new TestHelper("ticket_933a",// testURI,
+             "ticket_933a.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_933abcd.srx"// resultFileURL
+       ).runTest();    
+    } 
+    
+    /**
+     * Nested OPTIONAL-BIND construct, advanced
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_933b() throws Exception {
+       new TestHelper("ticket_933b",// testURI,
+             "ticket_933b.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_933abcd.srx"// resultFileURL
+       ).runTest();    
+    } 
+    
+    /**
+     * Similiar to 933a, but with statement patterns instead of BIND clause.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_933c() throws Exception {
+       new TestHelper("ticket_933c",// testURI,
+             "ticket_933c.rq",// queryFileURL
+             "ticket_933cd.trig",// dataFileURL
+             "ticket_933abcd.srx"// resultFileURL
+       ).runTest();    
+    } 
+    
+    /**
+     * Similiar to 933b, but with statement patterns instead of BIND clause.
+     * 
+     * @throws Exception
+     */
+    public void test_ticket_933d() throws Exception {
+       new TestHelper("ticket_933d",// testURI,
+             "ticket_933d.rq",// queryFileURL
+             "ticket_933cd.trig",// dataFileURL
+             "ticket_933abcd.srx"// resultFileURL
+       ).runTest();    
+    } 
+
+    /**
+     * Optional translation approach issues mentioned in ticket #933.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/801">
+     * Adding Optional removes solutions</a>.
+     */
+    public void test_ticket_933e() throws Exception {
+       new TestHelper("ticket_933e",// testURI,
+             "ticket_933e.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_933e.srx"// resultFileURL
        ).runTest();    
     } 
 }
