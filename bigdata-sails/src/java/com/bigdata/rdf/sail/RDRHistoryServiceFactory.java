@@ -108,7 +108,7 @@ public class RDRHistoryServiceFactory implements CustomServiceFactory {
 //        
 //        return new RDRHistoryServiceCall(store, getServiceOptions(), group);
 
-        throw new RuntimeException("deprecated");
+        throw new UnsupportedOperationException("deprecated");
         
     }
     
