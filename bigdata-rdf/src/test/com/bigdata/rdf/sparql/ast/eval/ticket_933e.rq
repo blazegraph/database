@@ -1,0 +1,31 @@
+SELECT *
+FROM <eg:a>
+WITH
+{ SELECT *
+  WHERE
+  {  { BIND ( 4 as ?y )
+      }
+      UNION 
+      {  BIND ( 4 as ?z )
+      }
+  } LIMIT 2
+} AS %sub
+WITH
+{ SELECT *
+  WHERE
+  {  
+     INCLUDE %sub
+     OPTIONAL { BIND ( 5 as ?z) }
+     OPTIONAL { BIND ( 5 as ?y) }
+  } 
+} AS %bound
+WHERE
+{
+  INCLUDE %bound
+  OPTIONAL {  
+        BIND ( 4 as ?z )
+           }
+  OPTIONAL {
+        BIND ( 4 as ?y )
+           }
+}
