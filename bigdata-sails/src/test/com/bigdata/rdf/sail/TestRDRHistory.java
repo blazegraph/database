@@ -420,7 +420,7 @@ public class TestRDRHistory extends ProxyBigdataSailTestCase {
 //                    "  } \n" +
                     "  bind(<< ?s <:p> ?o >> as ?sid) . \n" +
                     "  hint:Prior hint:history true . \n" +
-                    "  ?sid <:removed> ?time . \n" +
+                    "  ?sid <blaze:history:removed> ?time . \n" +
                     "}";
                 
                 final TupleQueryResult result =
