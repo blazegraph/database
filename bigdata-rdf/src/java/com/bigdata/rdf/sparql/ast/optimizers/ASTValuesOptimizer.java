@@ -49,38 +49,36 @@ public class ASTValuesOptimizer implements IASTOptimizer {
     public IQueryNode optimize(final AST2BOpContext context, 
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
-       // BBT: Commented out to restore CI and have things compile locally.
-       
-//        if (!(queryNode instanceof QueryRoot))
-//            return queryNode;
-//
-//        final QueryRoot queryRoot = (QueryRoot) queryNode;
-//        
-//        if (queryRoot.getBindingsClause() == null) {
-//
-//            // Main WHERE clause
-//            @SuppressWarnings("unchecked")
-//            final GraphPatternGroup<IGroupMemberNode> whereClause = 
-//                (GraphPatternGroup<IGroupMemberNode>) queryRoot.getWhereClause();
-//
-//            if (whereClause != null) {
-//
-//                final List<BindingsClause> bc = 
-//                        whereClause.getChildren(BindingsClause.class);
-//
-//                if (!bc.isEmpty()) {
-//                    
-//                    /*
-//                     * Promote to query root.
-//                     */
-//                    queryRoot.setBindingsClause(bc.get(0));
-//                    whereClause.removeChild(bc.get(0));
-//                    
-//                }
-//                
-//            }
-//
-//        }
+        if (!(queryNode instanceof QueryRoot))
+            return queryNode;
+
+        final QueryRoot queryRoot = (QueryRoot) queryNode;
+        
+        if (queryRoot.getBindingsClause() == null) {
+
+            // Main WHERE clause
+            @SuppressWarnings("unchecked")
+            final GraphPatternGroup<IGroupMemberNode> whereClause = 
+                (GraphPatternGroup<IGroupMemberNode>) queryRoot.getWhereClause();
+
+            if (whereClause != null) {
+
+                final List<BindingsClause> bc = 
+                        whereClause.getChildren(BindingsClause.class);
+
+                if (!bc.isEmpty()) {
+                    
+                    /*
+                     * Promote to query root.
+                     */
+                    queryRoot.setBindingsClause(bc.get(0));
+                    whereClause.removeChild(bc.get(0));
+                    
+                }
+                
+            }
+
+        }
 
         return queryNode;
 
