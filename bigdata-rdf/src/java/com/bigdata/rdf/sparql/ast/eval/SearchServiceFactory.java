@@ -28,10 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -70,8 +71,15 @@ import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
+import com.bigdata.striterator.SingleValueChunkedIterator;
 
+import cutthecrap.utils.striterators.ArrayIterator;
+import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.ICloseableIterator;
+import cutthecrap.utils.striterators.Resolver;
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A factory for a search service. It accepts a group consisting of search magic
@@ -586,6 +594,7 @@ public class SearchServiceFactory implements ServiceFactory {
          * set input to the service.
          */
         @Override
+        @SuppressWarnings({ "rawtypes", "unchecked" })
         public ICloseableIterator<IBindingSet> call(
                 final IBindingSet[] bindingsClause) {
 
@@ -596,8 +605,34 @@ public class SearchServiceFactory implements ServiceFactory {
                  * the search engine for each of the source solutions.
                  */
 
-                throw new UnsupportedOperationException();
+                /*
+                 * Fixed this to allow an incoming binding stream that does not
+                 * include any of the search variables.
+                 */
+//                throw new UnsupportedOperationException();
 
+                for (IBindingSet bs : bindingsClause) {
+                    if (rangeCountVar != null) {
+                        if (bs.isBound(rangeCountVar)) {
+                            /*
+                             * FIXME This case is not supported.  We need to run
+                             * the search engine for each of the source solutions.
+                             */
+                            throw new UnsupportedOperationException();
+                        }
+                    } else {
+                        for (int i = 0; i < vars.length; i++) {
+                            if (bs.isBound(vars[i])) {
+                                /*
+                                 * FIXME This case is not supported.  We need to run
+                                 * the search engine for each of the source solutions.
+                                 */
+                                throw new UnsupportedOperationException();
+                            }
+                        }
+                    }
+                }
+                
             }
 
             if (bindingsClause.length == 1 && !bindingsClause[0].isEmpty()) {
@@ -615,75 +650,38 @@ public class SearchServiceFactory implements ServiceFactory {
             
             	final int i = getRangeCount();
             	
-            	@SuppressWarnings({ "rawtypes", "unchecked" })
-				final ListBindingSet bs = new ListBindingSet(
-            			new IVariable[] { rangeCountVar },
-            			new IConstant[] { new Constant(new XSDNumericIV(i)) });
-            	
-            	return new ChunkedArrayIterator<IBindingSet>(new IBindingSet[] {
-            		bs
-            	});
-            	
+                final ListBindingSet bs = new ListBindingSet(
+                        new IVariable[] { rangeCountVar },
+                        new IConstant[] { new Constant(new XSDNumericIV(i)) });
+
+                return new SingleValueChunkedIterator<IBindingSet>(bs);
+                
             } else {
             
-            	return new HitConverter(getHiterator());
+                final Striterator sitr = new Striterator(getHiterator());
+                sitr.addFilter(new Resolver() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    protected Object resolve(final Object obj) {
+                        return bind((IHit<?>) obj);
+                    }
+                    
+                });
             	
-            }
+                return new ChunkedWrappedIterator<IBindingSet>(sitr);
 
+            }
+            
         }
+
+        /**
+         * Convert an {@link IHit} into an {@link IBindingSet}.
+         */
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        private IBindingSet bind(final IHit<?> hit) {
             
-        private class HitConverter implements ICloseableIterator<IBindingSet> {
-            
-            private final Hiterator<IHit<?>> src;
-
-            private IHit<?> current = null;
-            private boolean open = true;
-            
-            public HitConverter(final Hiterator<IHit<?>> src) {
-                
-                this.src = src;
-                
-            }
-            
-            public void close() {
-                if (open) {
-                    open = false;
-                }
-            }
-
-            public boolean hasNext() {
-                if (!open)
-                    return false;
-                if (current != null)
-                    return true;
-                while (src.hasNext()) {
-                    current = src.next();
-                    return true;
-                }
-                return current != null;
-            }
-
-            public IBindingSet next() {
-
-                if (!hasNext())
-                    throw new NoSuchElementException();
-                
-                final IHit<?> tmp = current;
-                
-                current = null;
-                
-                return newBindingSet(tmp);
-                
-            }
-
-            /**
-             * Convert an {@link IHit} into an {@link IBindingSet}.
-             */
-            private IBindingSet newBindingSet(final IHit<?> hit) {
-                
-                @SuppressWarnings({ "unchecked", "rawtypes" })
-                final IConstant<?>[] vals = 
-                search == null ?
+            final IConstant<?>[] vals = search == null ?
                 new IConstant[] {
                     new Constant(hit.getDocId()), // searchVar
                     new Constant(new XSDNumericIV(hit.getCosine())), // cosine
@@ -695,27 +693,71 @@ public class SearchServiceFactory implements ServiceFactory {
                     new Constant(new XSDNumericIV(hit.getRank())), // rank
                     new Constant(((BigdataLiteral) query).getIV())
                 };
+        
+            final IBindingSet bs = new ListBindingSet(vars, vals);
             
-                final ListBindingSet bs = new ListBindingSet(vars, vals);
-                
-                if (log.isTraceEnabled()) {
-                	log.trace(bs);
-                	log.trace(query.getClass());
-                	log.trace(((BigdataLiteral) query).getIV());
-                	log.trace(((BigdataLiteral) query).getIV().getClass());
-                }
-                
-                return bs;
-                
+            if (log.isTraceEnabled()) {
+                log.trace(bs);
+                log.trace(query.getClass());
+                log.trace(((BigdataLiteral) query).getIV());
+                log.trace(((BigdataLiteral) query).getIV().getClass());
             }
+            
+            return bs;
+            
+        }
 
-            public void remove() {
-                
-                throw new UnsupportedOperationException();
-                
-            }
-
-        } // class HitConverter
+//        private class HitConverter implements ICloseableIterator<IBindingSet> {
+//            
+//            private final Hiterator<IHit<?>> src;
+//
+//            private IHit<?> current = null;
+//            private boolean open = true;
+//            
+//            public HitConverter(final Hiterator<IHit<?>> src) {
+//                
+//                this.src = src;
+//                
+//            }
+//            
+//            public void close() {
+//                if (open) {
+//                    open = false;
+//                }
+//            }
+//
+//            public boolean hasNext() {
+//                if (!open)
+//                    return false;
+//                if (current != null)
+//                    return true;
+//                while (src.hasNext()) {
+//                    current = src.next();
+//                    return true;
+//                }
+//                return current != null;
+//            }
+//
+//            public IBindingSet next() {
+//
+//                if (!hasNext())
+//                    throw new NoSuchElementException();
+//                
+//                final IHit<?> tmp = current;
+//                
+//                current = null;
+//                
+//                return newBindingSet(tmp);
+//                
+//            }
+//
+//            public void remove() {
+//                
+//                throw new UnsupportedOperationException();
+//                
+//            }
+//
+//        } // class HitConverter
 
         @Override
         public IServiceOptions getServiceOptions() {

@@ -22,6 +22,7 @@ import org.openrdf.rio.RDFParser;
 import org.openrdf.rio.RDFParserFactory;
 
 import com.bigdata.rdf.ServiceProviderHook;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * A {@link TupleQueryResultParserFactory} for parsers of SPARQL-1.1 JSON Tuple
@@ -33,7 +34,14 @@ public class BigdataSPARQLResultsJSONParserForConstructFactory implements RDFPar
     
 	@Override
 	public RDFParser getParser() {
-		return new BigdataSPARQLResultsJSONParserForConstruct();
+		//TICKET 1284:  Quads needed. This is a workaround to create a value factory
+		//in the default namespace.
+		final String namespace = "kb";
+		return new BigdataSPARQLResultsJSONParserForConstruct(BigdataValueFactoryImpl.getInstance(namespace));
+	}
+	
+	public RDFParser getParser(String namespace) {
+		return new BigdataSPARQLResultsJSONParserForConstruct(BigdataValueFactoryImpl.getInstance(namespace));
 	}
 
 	@Override
