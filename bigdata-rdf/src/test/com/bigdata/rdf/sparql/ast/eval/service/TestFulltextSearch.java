@@ -32,8 +32,6 @@ import com.bigdata.service.fts.FulltextSearchException;
  * a collection called "blazegraph" and the file fts-solr-collection.xml 
  * loaded into this collection.
  * 
- * TODO: fully automate test case & hook in test case into test suite
- * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */

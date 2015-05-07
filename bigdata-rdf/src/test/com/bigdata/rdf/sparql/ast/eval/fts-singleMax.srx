@@ -14,7 +14,7 @@
          <uri>http://example.com/metaphacts</uri>
       </binding>
       <binding name="score">
-         <literal datatype="http://www.w3.org/2001/XMLSchema#double">0.33875558</literal>
+         <literal datatype="http://www.w3.org/2001/XMLSchema#double">0.29942045</literal>
       </binding>
       <binding name="snippet">
          <literal>Metaphacts is a company providing knowledge graph solutions</literal>
@@ -25,7 +25,7 @@
          <uri>http://example.com/SYSTAP</uri>
       </binding>
       <binding name="score">
-         <literal datatype="http://www.w3.org/2001/XMLSchema#double">0.29641113</literal>
+         <literal datatype="http://www.w3.org/2001/XMLSchema#double">0.23953636</literal>
       </binding>
       <binding name="snippet">
          <literal>SYSTAP is a company providing ultra high-performance graph databases</literal>
