@@ -40,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
@@ -2895,6 +2896,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             ));
         }
     };
+    
+    /**
+     * Clear all term caches for the supplied namespace.
+     */
+    @SuppressWarnings("rawtypes")
+    static public void clearTermCacheFactory(final String namespace) {
+        
+        final Iterator it = termCacheFactory.entryIterator();
+        while (it.hasNext()) {
+            final NT nt = (NT) ((Entry) it.next()).getKey();
+            if (nt.getName().equals(namespace)) {
+                it.remove();
+            }
+        }
+        
+    }
     
     /**
      * The {@link Vocabulary} implementation class.
