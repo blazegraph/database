@@ -1,5 +1,5 @@
 PREFIX fts: <http://www.bigdata.com/rdf/fts#>
 SELECT ?res WHERE {
   ?res fts:search "IT" .
-  ?res fts:endpoint "http://localhost:1234/solr/blazegraph/select" .
+  ?res fts:endpoint "http://localhost:8983/solr/solrtest/select" .
 }
