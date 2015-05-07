@@ -29,12 +29,14 @@ import java.util.Properties;
 
 import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
@@ -112,25 +114,62 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	    return repo;
 	}
 	
-    protected final ThreadLocal<BigdataSailRepositoryConnection> cxn = new ThreadLocal<BigdataSailRepositoryConnection>() {
+    protected final BigdataThreadLocal cxn = new BigdataThreadLocal();
+    
+    protected class BigdataThreadLocal extends ThreadLocal<BigdataSailRepositoryConnection> {
+
         protected BigdataSailRepositoryConnection initialValue() {
-            BigdataSailRepositoryConnection cxn = null;
             try {
-                cxn = repo.getUnisolatedConnection();
-                cxn.setAutoCommit(false);
-                cxn.addChangeLog(BigdataGraphEmbedded.this);
+                return _initialValue();
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
-            return cxn;
         }
-    };
+        
+        private boolean create = true;
+        
+        private BigdataSailRepositoryConnection _initialValue() throws Exception {
+            if (!create) {
+                return null;
+            }
+            
+            final BigdataSailRepositoryConnection cxn = repo.getUnisolatedConnection();
+            try {
+                cxn.setAutoCommit(false);
+                cxn.addChangeLog(BigdataGraphEmbedded.this);
+                return cxn;
+            } catch (Exception ex) {
+                cxn.close();
+                throw ex;
+            }
+        }
+        
+        /**
+         * Normal semantics - get or create.
+         */
+        @Override
+        public BigdataSailRepositoryConnection get() {
+            return get(true);
+        }
+        
+        /**
+         * Modified semantics - only create if create is true.
+         */
+        public BigdataSailRepositoryConnection get(final boolean create) {
+            BigdataThreadLocal.this.create = create;
+            return super.get();
+        }
+
+        /**
+         * Test for existence of thread local object without creating.
+         */
+        public boolean exists() {
+            return get(false) != null;
+        }
+
+    }
 
 	protected BigdataSailRepositoryConnection getWriteConnection() throws Exception {
-//	    if (cxn == null) {
-//	        cxn = repo.getUnisolatedConnection();
-//	        cxn.setAutoCommit(false);
-//	    }
 	    return cxn.get();
 	}
 	
@@ -141,12 +180,12 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	@Override
 	public void commit() {
 		try {
-//		    if (cxn != null)
-//		        cxn.commit();
-            final RepositoryConnection cxn = this.cxn.get();
-            cxn.commit();
-            cxn.close();
-            this.cxn.remove();
+            final RepositoryConnection cxn = this.cxn.get(false);
+            if (cxn != null) {
+                cxn.commit();
+                cxn.close();
+                this.cxn.remove();
+            }
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -155,15 +194,12 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	@Override
 	public void rollback() {
 		try {
-//		    if (cxn != null) {
-//    			cxn.rollback();
-//    			cxn.close();
-//    			cxn = null;
-//		    }
-		    final RepositoryConnection cxn = this.cxn.get();
-		    cxn.rollback();
-		    cxn.close();
-		    this.cxn.remove();
+            final RepositoryConnection cxn = this.cxn.get(false);
+            if (cxn != null) {
+                cxn.rollback();
+                cxn.close();
+                this.cxn.remove();
+            }
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -172,11 +208,10 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	@Override
 	public void shutdown() {
 		try {
-//		    if (cxn != null) {
-//		        cxn.close();
-//		    }
-		    // commit shuts down cxn
-			commit();
+		    // if there is a connection open, commit and close
+		    if (cxn.exists()) {
+		        commit();
+		    }
 			repo.shutDown();
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -191,7 +226,6 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	public StringBuilder dumpStore() {
 	    return repo.getDatabase().dumpStore();
 	}
-	
 	
     protected static final Features FEATURES = new Features();
 

@@ -112,6 +112,7 @@ import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.StatementWriter;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -1237,6 +1238,8 @@ public class BigdataSail extends SailBase implements Sail {
                     if (log.isInfoEnabled())
                         log.info("Closing the backing database");
 
+                    final BigdataValueFactoryImpl vf = ((BigdataValueFactoryImpl)getValueFactory());
+
                     /*
                      * Discard the value factory for the lexicon's namespace.
                      * iff the backing Journal will also be closed.
@@ -1246,10 +1249,17 @@ public class BigdataSail extends SailBase implements Sail {
                      * AbstractTripleStore instances for the same namespace and
                      * database instance.
                      */
-                    ((BigdataValueFactoryImpl)getValueFactory()).remove();
+                    vf.remove();
+
+                    /*
+                     * Discard all term cache entries for the lexicon's
+                     * namespace with the same caveat as above for the 
+                     * backing Journal.
+                     */
+                    LexiconRelation.clearTermCacheFactory(vf.getNamespace());
 
                     database.close();
-
+                    
                 }
                 
             } finally {
