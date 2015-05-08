@@ -133,7 +133,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                             // BufferMode.DiskWORM,
                             BufferMode.MemStore,
                             // BufferMode.DiskRW,
-                            })), TestMode.quads);
+                            })), TestMode.triples);
 
         } else {
 
@@ -423,9 +423,11 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             restApiOps.add(new SparqlUpdate(sharedTestState,
                     "INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }"));
 
-            restApiOps
-                    .add(new SparqlUpdate(sharedTestState,
-                            "INSERT {GRAPH ?g {?x rdfs:label ?y . }} WHERE {GRAPH ?g {?x foaf:name ?y }}"));
+            if (testMode == TestMode.quads) {
+                restApiOps
+                        .add(new SparqlUpdate(sharedTestState,
+                                "INSERT {GRAPH ?g {?x rdfs:label ?y . }} WHERE {GRAPH ?g {?x foaf:name ?y }}"));
+            }
         }
 
         // NSS Mutation API
