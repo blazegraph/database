@@ -133,7 +133,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                             // BufferMode.DiskWORM,
                             BufferMode.MemStore,
                             // BufferMode.DiskRW,
-                            })), TestMode.triples);
+                            })), TestMode.quads);
 
         } else {
 
@@ -1199,8 +1199,10 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                 // Wrap as FutureTask.
                 final FutureTask<Void> ft = new FutureTask<Void>(
+                        
                         new Callable<Void>() {
 
+                            @Override
                             public Void call() throws Exception {
                                 // do operation.
                                 doApplyToNamespace(repo, uuid);
@@ -1427,11 +1429,9 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             final String namespace = "n"
                     + sharedTestState.namespaceCreateCounter.getAndIncrement();
 
-            final Properties properties = sharedTestState.testMode
-                    .getProperties();
-
-            properties.put(RemoteRepository.OPTION_CREATE_KB_NAMESPACE,
-                    namespace);
+            // Note: Wrap properties to avoid modification!
+            final Properties properties = new Properties(
+                    sharedTestState.testMode.getProperties());
 
             // UUID assigned to the operation.
             final UUID uuid = UUID.randomUUID();
@@ -1441,6 +1441,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
             new Callable<Void>() {
 
+                @Override
                 public Void call() throws Exception {
 
                     // create namespace.
@@ -1458,6 +1459,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                     return null;
                 }
+                
             });
 
             begin(namespace, uuid, ft);
@@ -1510,6 +1512,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                 new Callable<Void>() {
 
+                    @Override
                     public Void call() throws Exception {
 
                         /*
