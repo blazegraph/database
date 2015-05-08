@@ -1210,10 +1210,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
     private final class SparqlUpdate extends QueryOrUpdate implements
             IPreparedSparqlUpdate {
         
-        public SparqlUpdate(final ConnectOptions opts, final UUID id,
+        public SparqlUpdate(final ConnectOptions opts, final UUID uuid,
                 final String updateStr) {
 
-            super(opts, id, updateStr, true/*update*/);
+            super(opts, uuid, updateStr, true/*update*/);
 
         }
         
@@ -1228,21 +1228,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
         public void evaluate(final IPreparedQueryListener listener) 
                 throws Exception {
          
-        	JettyResponseListener response = null;
-            try {
+            setupConnectOptions();
 
-                setupConnectOptions();
-
-                // Note: No response body is expected.
-                
-                checkResponseCode(response = doConnect(opts));
-
-            } finally {
-                
-            	if (response != null)
-            		response.abort();
-	                            
-            }
+            mgr.sparqlUpdateResults(opts, getQueryId(), listener);
             
         }
         

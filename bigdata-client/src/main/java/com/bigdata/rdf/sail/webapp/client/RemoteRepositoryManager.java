@@ -1317,6 +1317,66 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
    }
 
+    /**
+     * Processing the response for a SPARQL UPDATE request.
+     * <p>
+     * Note: This is not compatible with the MONITOR option. That option
+     * requires the client to parse the response body to figure out whether or
+     * not the UPDATE operation was successful.
+     * 
+     * @param response
+     *            The connection from which to read the results.
+     * 
+     * @throws Exception
+     *             If anything goes wrong.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1255" > RemoteRepository
+     *      does not CANCEL a SPARQL UPDATE if there is a client error </a>
+     */
+    void sparqlUpdateResults(final ConnectOptions opts, final UUID queryId,
+            final IPreparedQueryListener listener) throws Exception {
+
+        JettyResponseListener response = null;
+        try {
+
+            // Note: No response body is expected.
+
+            response = doConnect(opts);
+
+            checkResponseCode(response);
+
+        } finally {
+
+            if (response == null) {
+                try {
+                    /*
+                     * Some error prevented our obtaining a response.
+                     * 
+                     * POST back to the server in an attempt to cancel the
+                     * request if already executing on the server.
+                     */
+                    cancel(queryId);
+                } catch (Exception ex) {
+                    log.warn(ex);
+                }
+            } else {
+                /*
+                 * Note: We are not reading anything from the response so I
+                 * THINK that we do not need to call listener.abort(). If we do
+                 * need to call this, then we might need to distinguish between
+                 * a normal response and when we read the response entity.
+                 */
+//                response.abort();
+            }
+            if (listener != null) {
+                // Notify client-side listener.
+                listener.closed(queryId);
+            }
+
+        }
+
+    }
+   
    /**
     * Cancel a query running remotely on the server.
     * 
