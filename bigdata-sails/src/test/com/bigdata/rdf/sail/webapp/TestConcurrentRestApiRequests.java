@@ -23,29 +23,46 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.nio.channels.ClosedByInterruptException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import junit.framework.Test;
 
+import org.openrdf.model.Statement;
+import org.openrdf.model.impl.StatementImpl;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 
+import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
@@ -59,20 +76,33 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * 
  * @param <S>
  * 
- * @see SPARQLUpdateTest
+ *           FIXME Add tests at the openrdf remote client interface layer as
+ *           well. They are all flyweight wrappers around our own
+ *           RemoteRepositoryManager (given the target namespace).
+ * 
+ *           FIXME Make sure that this test is running with GROUP_COMMIT enabled
+ *           (it is, but GROUP_COMMIT should be parameterized unless we move the
+ *           embedded use entirely over to that API).
+ * 
+ *           FIXME Also run this test with ISOLATABLE_INDICES enabled
+ *           (potentially just for some of the namespaces since this is a
+ *           per-namespace configuration property).
+ * 
+ *           FIXME Add Tx oriented tests. We might need to have a pool of
+ *           (tx,namespace) pairs. Or just IRemoteTx objects.
  */
 public class TestConcurrentRestApiRequests<S extends IIndexManager> extends
-		AbstractTestNanoSparqlClient<S> {
+      AbstractTestNanoSparqlClient<S> {
 
-    public TestConcurrentRestApiRequests() {
+   public TestConcurrentRestApiRequests() {
 
-    }
+   }
 
-	public TestConcurrentRestApiRequests(final String name) {
+   public TestConcurrentRestApiRequests(final String name) {
 
-		super(name);
+      super(name);
 
-	}
+   }
 
    /*
     * Note: We need to be running this test suite for each of the BufferModes
@@ -84,407 +114,1325 @@ public class TestConcurrentRestApiRequests<S extends IIndexManager> extends
     * something in the proxy test pattern with the outcome that the tests are
     * not properly distinct.]
     */
-	static public Test suite() {
+   static public Test suite() {
 
-		return ProxySuiteHelper.suiteWhenStandalone(TestConcurrentRestApiRequests.class,
-				"test.*",
-				new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[]{
-				BufferMode.Transient, 
-				BufferMode.DiskWORM, 
-				BufferMode.MemStore,
-				BufferMode.DiskRW, 
-				})),
-				TestMode.quads
-				);
-	}
+      return ProxySuiteHelper.suiteWhenStandalone(
+            TestConcurrentRestApiRequests.class, "test.*",
+            new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[] {
+            // BufferMode.Transient,
+            // BufferMode.DiskWORM,
+            BufferMode.MemStore,
+            // BufferMode.DiskRW,
+                  })), TestMode.quads);
+   }
 
-	private static final String EX_NS = "http://example.org/";
+   private static final String EX_NS = "http://example.org/";
 
-//    private ValueFactory f = new ValueFactoryImpl();
-//    private URI bob, alice, graph1, graph2;
-//    protected RemoteRepository m_repo;
+   /**
+    * Shared state for the test harness that is used to coordinated across the
+    * execution of the tasks.
+    */
+   private static class SharedTestState {
+      /**
+       * The {@link TestMode} (triples, RDR, quads, etc.).
+       */
+      private final TestMode testMode;
+      /**
+       * The #of tests that are currently executing (many of these may be waiting
+       * on a namespace lock).
+       */
+      private final AtomicLong nrunning = new AtomicLong();
+      /**
+       * The #of tests that are actually doing something (they have their
+       * namespace lock and are doing work).
+       */
+      private final AtomicLong nacting = new AtomicLong();
+      /**
+       * The #of operation instances that are actually doing something (they
+       * have their namespace lock and are doing work).
+       */
+      private final ConcurrentHashMap<RestApiOp, String/* namespace */> activeTasks = new ConcurrentHashMap<RestApiOp, String>();
+      /**
+       * The #of namespaces that have been created to date. The names of the
+       * current namespaces (those that exist) are in {@link #namespaces}.
+       */
+      private final AtomicLong namespaceCreateCounter;
+      /**
+       * The #of namespaces that exist. This is maintained in a separate counter
+       * to avoid invoking {@link ConcurrentHashMap#size()} all the time.
+       */
+      private final AtomicLong namespaceExistCounter;
+      /**
+       * The minimum #of namespaces once the test harness is up and running.
+       */
+      private final AtomicLong minimumNamespaceCount;
+      /**
+       * A lock used to make sure that we do not violate the
+       * {@link #minimumNamespaceCount}.
+       */
+      private final Lock destroyNamespaceLock;
+      /**
+       * This map is used to track the namespaces that exist on the server.
+       * Operations choose the target namespace from among the current ones in a
+       * pattern in which they also obtain either a readLock() or a writeLock().
+       * The writeLock() provides exclusive access (in the scope of the test
+       * harness) to the associated namespace. The readLock() allows concurrent
+       * access to the associated namespace.
+       */
+      private final ConcurrentHashMap<String, ReadWriteLock> namespaces;
 
-	@Override
-	public void setUp() throws Exception {
+      private final Random r;
 
-		super.setUp();
-	  
-//        bob = f.createURI(EX_NS, "bob");
-//        alice = f.createURI(EX_NS, "alice");
+      public SharedTestState(final TestMode testMode) {
+
+         if (testMode == null)
+            throw new IllegalArgumentException();
+
+         this.testMode = testMode;
+
+         r = new Random();
+
+         namespaces = new ConcurrentHashMap<String, ReadWriteLock>();
+
+         namespaceCreateCounter = new AtomicLong();
+
+         namespaceExistCounter = new AtomicLong();
+
+         minimumNamespaceCount = new AtomicLong();
+         
+         destroyNamespaceLock = new ReentrantLock();
+         
+      }
+
+      /**
+       * Return a namespace at random from the set of known to exist namespaces.
+       * The caller will hold the appropriate lock.
+       */
+      private String lockRandomNamespace(final boolean readOnly) {
+         final int k = r.nextInt((int) namespaceExistCounter.get());
+         int i = -1;
+         while (true) {
+            for (Map.Entry<String, ReadWriteLock> e : namespaces.entrySet()) {
+               if (namespaceExistCounter.get() == 0) {
+                  /*
+                   * Either we need to run some operations that create new
+                   * namespaces or we need to NOT run operations that destroy
+                   * the last namespace.
+                   */
+                  throw new RuntimeException("No namespaces? readOnly="
+                        + readOnly);
+               }
+               i++;
+               if (i < k) {
+//                  log.info("Ignoring: i=" + i + "<k=" + k + ", namespace="
+//                        + e.getKey());
+                  continue;
+               }
+               // We can accept this namespace.
+               final String namespace = e.getKey();
+               final ReadWriteLock lock = e.getValue();
+               // Take the lock.
+               final Lock takenLock;
+               {
+                  if (readOnly)
+                     takenLock = lock.readLock();// read lock.
+                  else
+                     takenLock = lock.writeLock(); // write lock.
+                  // acquire the lock.
+                  takenLock.lock(); 
+               }
+               if (namespaces.get(namespace) != lock) {
+                  /*
+                   * The lock object was changed. Release the lock and look some
+                   * more.
+                   */
+                  takenLock.unlock();
+                  continue; // continue looking.
+               }
+               /*
+                * Namespace still exists in the map and is governed by the same
+                * lock.
+                */
+               return namespace;
+            }
+         }
+         // We should never get here.
+      }
+
+      /**
+       * Release a lock on a namespace.
+       * 
+       * @param namespace
+       *           Then namespace (required).
+       * @param readOnly
+       *           When <code>true</code> the caller is holding the readLock().
+       *           When <code>false</code> they are holding the writeLock().
+       * @param remove
+       *           when <code>true</code> the <i>namespace</i> will be removed
+       *           from the map.
+       * 
+       * @throws IllegalArgumentException
+       *            if the <i>namespace</i> is <code>null</code>.
+       * @throws IllegalStateException
+       *            if <code>remove:=true</code> and
+       *            <code>readOnly:=false</code> since removal from the map
+       *            requires an exclusive lock to avoid violating locks obtained
+       *            by other callers.
+       * @throws IllegalStateException
+       *            if <i>namespace</i> is not found in the map.
+       * @throws RuntimeException
+       *            An unchecked exception is thrown if the caller does not hold
+       *            the appropriate lock.
+       */
+      private void unlockNamespace(final String namespace,
+            final boolean readOnly, final boolean remove) {
+         if (namespace == null)
+            throw new IllegalArgumentException();
+         if (remove && readOnly) {
+            /*
+             * Note: We might need to relax this constraint if we allow DESTROY
+             * NAMESPACE operation without regard to concurrent client API
+             * requests. (Or perhaps we will just not use this map when we do
+             * that since the whole point is to violate the client's management
+             * of the namespaces and provoke failures that arise from those
+             * violated assumptions).
+             */
+            throw new IllegalStateException(
+                  "Removal from map requires exclusive lock: namespace="
+                        + namespace);
+         }
+         // resolve entry in map.
+         final ReadWriteLock lock = namespaces.get(namespace);
+         if (lock == null)
+            throw new IllegalStateException("Not locked: namespace="
+                  + namespace);
+         if (remove) {
+            // remove entry from map.
+            if (!namespaces.remove(namespace, lock)) {
+               throw new AssertionError("Entry not found in map: " + namespace);
+            }
+         }
+         // release lock.
+         if (readOnly)
+            lock.readLock().unlock();
+         else
+            lock.writeLock().unlock();
+      }
+
+   }
+
+   private Collection<RestApiOp> restApiOps;
+
+   private SharedTestState sharedTestState;
+
+   @Override
+   public void setUp() throws Exception {
+
+      super.setUp();
+
+      restApiOps = new LinkedList<RestApiOp>();
+
+      sharedTestState = new SharedTestState(getTestMode());
+
+      setupOperationMixture(getTestMode());
+
+   }
+
+   @Override
+   public void tearDown() throws Exception {
+
+      restApiOps = null;
+
+      sharedTestState = null;
+
+      super.tearDown();
+
+   }
+
+   /**
+    * Create a bunch of operations to run against the REST API.
+    * 
+    * TODO Assign weights to each and then normalize the weights as
+    * probabilities. Choose based on the normalized probabilities.
+    * 
+    * TODO Conditionally include quads or RDR specific operations based on the
+    * {@link TestMode}.
+    */
+   private void setupOperationMixture(final TestMode testMode) {
+
+      // SPARQL QUERY
+      {
+
+         // tuple query
+         restApiOps.add(new SparqlTupleQueryOp(sharedTestState,
+               "SELECT (COUNT(*) as ?count) WHERE {?x foaf:name ?y }"));
+
+         // graph query
+         restApiOps.add(new SparqlGraphQueryOp(sharedTestState,
+               "CONSTRUCT WHERE {?x foaf:name ?y }"));
+
+         // boolean query
+         restApiOps.add(new SparqlBooleanQueryOp(sharedTestState,
+               "ASK WHERE {?x foaf:name ?y }"));
+
+      }
+
+      // SPARQL UPDATE
+      {
+
+         restApiOps
+               .add(new DropAll(sharedTestState).setOperationFrequency(.01));
+
+         restApiOps
+               .add(new SparqlUpdate(
+                     sharedTestState,
+                     "LOAD <file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig>"));
+
+         restApiOps.add(new SparqlUpdate(sharedTestState,
+               "INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }"));
+
+         restApiOps
+               .add(new SparqlUpdate(sharedTestState,
+                     "INSERT {GRAPH ?g {?x rdfs:label ?y . }} WHERE {GRAPH ?g {?x foaf:name ?y }}"));
+      }
+
+      // NSS Mutation API
+      {
+
+         // moderately large bulk load.
+         restApiOps.add(new InsertWithBody(sharedTestState)
+               .setOperationFrequency(.10));
+
+      }
+
+      // Multitenancy API.
+      {
+
+         restApiOps.add(new CreateNamespaceOp(sharedTestState)
+               .setOperationFrequency(.03));
+
+         restApiOps.add(new DropNamespaceOp(sharedTestState)
+               .setOperationFrequency(.01));
+
+      }
+
+   }
+
+   /**
+    * Get a set of useful namespace prefix declarations.
+    * 
+    * @return namespace prefix declarations for rdf, rdfs, dc, foaf and ex.
+    */
+   static private String getNamespaceDeclarations() {
+      final StringBuilder declarations = new StringBuilder();
+      // declarations.append("PREFIX rdf: <" + RDF.NAMESPACE + "> \n");
+      // declarations.append("PREFIX rdfs: <" + RDFS.NAMESPACE + "> \n");
+      // declarations.append("PREFIX dc: <" + DC.NAMESPACE + "> \n");
+      // declarations.append("PREFIX foaf: <" + FOAF.NAMESPACE + "> \n");
+      declarations.append("PREFIX ex: <" + EX_NS + "> \n");
+      // declarations.append("PREFIX xsd: <" + XMLSchema.NAMESPACE + "> \n");
+      declarations.append("\n");
+
+      return declarations.toString();
+   }
+
+   /**
+    * A stress test of concurrent SPARQL UPDATE requests against multiple
+    * namespaces that is intended to run in CI.
+    */
+   public void test_concurrentClients() throws Exception {
+
+      /*
+       * Note: Using a timeout will cause any tasks still running when the
+       * timeout expires to be interrupted.
+       * 
+       * See TestConcurrentJournal for the original version of this code.
+       */
+      doConcurrentClientTest(//
+            m_mgr,// remote repository manager
+            30, TimeUnit.SECONDS,// timeout
+            5, // #of concurrent requests
+            5, // minimum #of namespaces
+            100 // #of trials
+      );
+
+   }
+
+   /**
+    * A 24 hour stress test.
+    */
+   public void stressTest_concurrentClients_24Hours() throws Exception {
+
+      doConcurrentClientTest(//
+            m_mgr,// remote repository manager
+            24, TimeUnit.HOURS, // long run.
+            16, // #of concurrent requests
+            20, // minimum #of namespaces
+            10000 // #of trials
+      );
+
+   }
+
+   /**
+    * A stress test of concurrent operations on multiple namespaces.
+    * 
+    * @param rmgr
+    *           The {@link RemoteRepositoryManager} providing access to the end
+    *           point(s) under test.
+    * @param timeout
+    *           The timeout before the test will terminate.
+    * @param unit
+    *           The unit for that timeout.
+    * @param nthreads
+    *           The #of concurrent client requests to issue (GTE 1).
+    * @param initialNamespacesCount
+    *           The initial number of namespaces (GTE 0).
+    * @param ntrials
+    *           The #of requests to issue (GTE 1).
+    * @throws Exception
+    * 
+    *            TODO Each client should submit tasks with a scheduled (or
+    *            variable) delay. This will allow us to adjust both the #of
+    *            clients and the amount that they overlap their requests.
+    * 
+    *            FIXME (****) Interrupt tasks with a non-zero probability. This
+    *            needs to be done with respect to the tasks that are currently
+    *            being executed for the client (we want the interrupts to occur
+    *            primarily when the REST request is being processed by the
+    *            server, but it could also interrupt the client as it prepares /
+    *            sends the request and while it is consuming the response). The
+    *            interrupt will be turned into a POST CANCEL to the server.
+    * 
+    *            FIXME Not all REST API methods support CANCEL. Each REST API
+    *            method needs to allow a UUID, the task for each request must be
+    *            declared to the NSS status page, and the code must check each
+    *            task to see if it is running and (if so) then interrupt it.
+    * 
+    *            FIXME Handle {@link DatasetNotFoundException} as propagated
+    *            back up to the HTTP layer IFF we allow a namespace to be
+    *            deleted by a concurrent operation (this is prevented by locking
+    *            right now).
+    */
+   private Result doConcurrentClientTest(final RemoteRepositoryManager rmgr, //
+         final long timeout, final TimeUnit unit, //
+         final int nthreads,//
+         final int initialNamespacesCount,//
+         final int ntrials//
+   ) throws Exception {
+
+      if (rmgr == null)
+         throw new IllegalArgumentException();
+
+      if (timeout <= 0)
+         throw new IllegalArgumentException();
+
+      if (unit == null)
+         throw new IllegalArgumentException();
+
+      if (nthreads <= 0)
+         throw new IllegalArgumentException();
+
+      if (initialNamespacesCount <= 0)
+         throw new IllegalArgumentException();
+
+      if (ntrials <= 0)
+         throw new IllegalArgumentException();
+
+      final Random r = new Random();
+
+      /*
+       * Setup the initial namespaces.
+       */
+      {
+
+         for (int i = 0; i < initialNamespacesCount; i++) {
+
+            final RestApiOp op = new CreateNamespaceOp(sharedTestState);
+
+            op.newInstance(rmgr).call();
+
+         }
+
+         if (log.isInfoEnabled())
+            log.info("Created " + initialNamespacesCount
+                  + " initial nammespaces");
+
+         // Make sure that we do not reduce the #of namespaces below this limit.
+         sharedTestState.minimumNamespaceCount.set(initialNamespacesCount);
+         
+      }
+
+      /*
+       * Setup the tasks that we will submit. This is done by creating a
+       * distribution of tasks based on their normalized probability as declared
+       * in the test setup.
+       * 
+       * TODO It would be good to generate the actual task instances on demand
+       * over time while respecting the distribution so we can run a very long
+       * running workload based on this test harness rather than having to
+       * generate all tasks up front.
+       */
+      final Collection<Callable<Void>> tasks = new LinkedHashSet<Callable<Void>>();
+
+      {
+
+         // the templates for the tasks (w/ unnormalized probabilities).
+         final RestApiOp[] ops = restApiOps.toArray(new RestApiOp[0]);
+         
+         // compute normalized probability for each operation template.
+         final double[] p = new double[ops.length];
+         {
+            {
+               double sum = 0d;
+               for (int i = 0; i < ops.length; i++) {
+                  sum += p[i] = ops[i].operationProbability;
+               }
+               if (sum == 0d)
+                  throw new AssertionError("No assiging probabilities");
+               for (int i = 0; i < ops.length; i++) {
+                  p[i] /= sum;
+               }
+            }
+            // verify probabilities sum to ~ 1.0
+            {
+               double sum = 0d;
+               for (int i = 0; i < ops.length; i++) {
+                  sum += p[i];
+               }
+               assert sum <= 1.01d : "sum=" + sum + "::" + Arrays.toString(p);
+               assert sum >= 0.99d : "sum=" + sum + "::" + Arrays.toString(p);
+            }
+         }
+
+         // Create population of randomly selected operations.
+         for (int trial = 0; trial < ntrials; trial++) {
+
+            // Random selection of operation.
+            final RestApiOp op;
+            {
+               final double d = r.nextDouble();
+               double sum = 0d;
+               int indexOf = -1;
+               for (int i = 0; i < ops.length; i++) {
+                  sum += p[i];
+                  if (sum >= d) {
+                     indexOf = i;
+                     break;
+                  }
+               }
+               if (indexOf == -1) {
+                  // Handles d ~ 1.0.
+                  indexOf = ops.length - 1;
+               }
+               op = ops[indexOf];
+            }
+
+            tasks.add(op.newInstance(rmgr));
+
+         }
+
+      }
+
+      /*
+       * Run all tasks and wait for up to the timeout for them to complete.
+       */
+
+      if (log.isInfoEnabled())
+         log.info("Submitting " + tasks.size() + " tasks");
+
+      final long beginNanos = System.nanoTime();
+
+      final ExecutorService executorService = Executors.newFixedThreadPool(
+            nthreads, DaemonThreadFactory.defaultThreadFactory());
+
+      int nfailed = 0; // #of tasks that failed.
+      // int nretry = 0; // #of tasks that threw RetryException
+      int ninterrupt = 0; // #of interrupted tasks.
+      int ncommitted = 0; // #of tasks that successfully committed.
+      int nuncommitted = 0; // #of tasks that did not complete in time.
+      final long elapsedNanos;
+
+      try {
+
+         final List<Future<Void>> results = executorService.invokeAll(tasks,
+               timeout, TimeUnit.SECONDS);
+
+         elapsedNanos = System.nanoTime() - beginNanos;
+
+         /*
+          * Examine the futures to see how things went.
+          */
+         final Iterator<Future<Void>> itr = results.iterator();
+
+         while (itr.hasNext()) {
+
+            final Future<?> future = itr.next();
+
+            if (future.isCancelled()) {
+
+               nuncommitted++;
+
+               continue;
+
+            }
+
+            try {
+
+               future.get();
+
+               ncommitted++;
+
+            } catch (ExecutionException ex) {
+
+               if (isInnerCause(ex, InterruptedException.class)
+                     || isInnerCause(ex, ClosedByInterruptException.class)) {
+
+                  /*
+                   * Note: Tasks will be interrupted if a timeout occurs when
+                   * attempting to run the submitted tasks - this is normal.
+                   */
+
+                  log.warn("Interrupted: " + ex);
+
+                  ninterrupt++;
+
+               } else {
+
+                  // Other kinds of exceptions are errors.
+
+                  fail("Not expecting: " + ex, ex);
+
+               }
+
+            }
+
+         }
+
+      } finally {
+         executorService.shutdownNow();
+      }
+
+      final Result ret = new Result();
+
+      // these are the results.
+      ret.put("nfailed", "" + nfailed);
+      ret.put("ncommitted", "" + ncommitted);
+      ret.put("ninterrupt", "" + ninterrupt);
+      ret.put("nuncommitted", "" + nuncommitted);
+      ret.put("elapsed(ms)", "" + TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
+      ret.put("tasks/sec", "" + (ncommitted * 1000 / TimeUnit.NANOSECONDS.toMillis(elapsedNanos)));
+
+      log.warn(ret.toString(true/* newline */));
+
+      return ret;
+
+   }
+
+   /**
+    * Abstract base class for REST API operation templates. An instance of the
+    * template is obtained using {@link #newInstance(RemoteRepositoryManager)}.
+    * Those template instances can then execute against the server using the
+    * provisioned client API.
+    */
+   static abstract private class RestApiOp {
+
+      /**
+       * Shared state used to coordinate the individual operations.
+       */
+      protected final SharedTestState sharedTestState;
+
+      /**
+       * True iff this is a read-only task.
+       */
+      private final boolean readOnly;
+
+//      /**
+//       * The UUID associated with the client operation. This is used to cancel
+//       * (interrupt) client tasks on the server.
+//       * 
+//       * Note: The {@link RemoteRepository} MUST pass this through to the server
+//       * for this to have any effect. And the server needs to recognize the UUID
+//       * and support cancellation.
+//       * 
+//       * TODO We do not currently support this for all REST API operations in
+//       * the client/server. Change this.
+//       */
+//      protected final UUID queryId = UUID.randomUUID();
+
+      /**
+       * The probability that the task will be interrupted while it is executing
+       * (this probability is independent for each task so it does not need to
+       * be normalized) (default is ZERO).
+       */
+      private double interruptProbability = 0.0d;
+      /**
+       * The un-normalized likelihood that the task will be executed relative to
+       * the other tasks in the workload mixture (default is ONE).
+       */
+      private double operationProbability = 1.0d;
+
+      @Override
+      public String toString() {
+         
+         return getClass().getSimpleName();
+         
+      }
+      
+      RestApiOp(final SharedTestState sharedTestState, final boolean readOnly) {
+         if (sharedTestState == null)
+            throw new IllegalArgumentException();
+         this.sharedTestState = sharedTestState;
+         this.readOnly = readOnly;
+      }
+
+      /**
+       * Return true iff this is a read-only task.
+       */
+      public final boolean isReadOnly() {
+         return readOnly;
+      }
+
+      /**
+       * The probability that the task will be interrupted while it is executing
+       * (this probability is independent for each task so it does not need to
+       * be normalized) (default is ZERO).
+       */
+      public RestApiOp setInterruptProbability(double newValue) {
+         if (newValue < 0 || newValue >= 1)
+            throw new IllegalArgumentException();
+         this.interruptProbability = newValue;
+         return this;
+      }
+
+      /**
+       * Set the relative likelihood that this operation will be executed
+       * compared to the other operations in the workload mixture (default is
+       * ONE).
+       * <p>
+       * Note: These likelihoods must be normalized by the test harness to
+       * ensure that they sum to ONE.
+       */
+      public RestApiOp setOperationFrequency(final double newValue) {
+         if (newValue < 0 || newValue >= 1)
+            throw new IllegalArgumentException();
+         this.operationProbability = newValue;
+         return this;
+      }
+
+      /**
+       * Return an instance of this operation template that will run using the
+       * specified client API.
+       * 
+       * @param rmgr
+       *           The client API.
+       *           
+       * @return An instance of the operation template for execution by the test
+       *         harness.
+       */
+      public Callable<Void> newInstance(final RemoteRepositoryManager rmgr) {
+
+         if (rmgr == null)
+            throw new IllegalArgumentException();
+
+         return new InnerCallable(rmgr);
+
+      }
+
+      private class InnerCallable implements Callable<Void> {
+         
+         private final RemoteRepositoryManager rmgr;
+         
+         InnerCallable(final RemoteRepositoryManager rmgr) {
+            if (rmgr == null)
+               throw new IllegalArgumentException();
+            this.rmgr = rmgr;
+         }
+
+         /**
+          * Execute the client operation.
+          * 
+          * @throws Exception
+          *            whatever is thrown back to the client (or by the client) for
+          *            the task.
+          */
+         @Override
+         final public Void call() throws Exception {
+            try {
+               sharedTestState.nrunning.incrementAndGet();
+               doApply(rmgr);
+               return (Void) null;
+            } catch (Throwable t) {
+               /*
+                * Note: The stack traces here are from the *client*. Any stack
+                * trace from the server shows up as the response entity and we DO
+                * NOT have visibility into that trace (no RMI style stack frame
+                * from the server).
+                * 
+                * TODO There may also be http status codes that we need to
+                * explicitly look for here and report back as success/failure along
+                * appropriate dimensions. This could all be returned as
+                * side-effects on the Task, but the FutureTask will not have access
+                * to that so maybe as a return type?
+                */
+               if (isTerminationByInterrupt(t)) {
+                  if (log.isInfoEnabled())
+                     log.info(t);
+                  /*
+                   * The test harness is either being torn down or has explicitly
+                   * interrupted the execution of this RestApiOp. We will wrap (a)
+                   * and re-throw the exception; and (b) CANCEL the operation on
+                   * the server.
+                   */
+                  final InterruptedException ex = new InterruptedException(
+                        toString());
+                  ex.initCause(t);
+//                  try {
+//                     /*
+//                      * This relies on (a) the client setting the UUID on the REST
+//                      * operation; and (b) the server recognizing and using that
+//                      * UUID; and (c) the server implementing the logic to locate
+//                      * and interrupt the server-side task for that UUID. Without
+//                      * all of those pieces this will fail to actually cancel the
+//                      * operation on the server.
+//                      */
+//                     rmgr.cancel(queryId);
+//                  } catch (Throwable t2) {
+//                     throw new RuntimeException(
+//                           "Error cancelling client operation: " + this, t2);
+//                  }
+                  throw ex;
+               } // end interrupt of client logic.
+                 // launder anything else.
+               if (t instanceof Exception)
+                  throw ((Exception) t);
+               throw new RuntimeException(toString(), t);
+            } finally {
+               sharedTestState.nrunning.decrementAndGet();
+            }
+
+         }
+
+         private boolean isTerminationByInterrupt(final Throwable cause) {
+
+            if (InnerCause.isInnerCause(cause, InterruptedException.class))
+               return true;
+            if (InnerCause.isInnerCause(cause, CancellationException.class))
+               return true;
+            if (InnerCause.isInnerCause(cause, ClosedByInterruptException.class))
+               return true;
+            if (InnerCause.isInnerCause(cause, BufferClosedException.class))
+               return true;
+            if (InnerCause.isInnerCause(cause, QueryTimeoutException.class))
+               return true;
+
+            return false;
+
+         }
+
+      }
+      
+      /** When the client API operation begins to execute. */
+      private long beginNanos = -1L;
+      
+      /**
+       * Log begin client API operation and note timestamp.
+       * 
+       * @param namespace
+       *           The namespace.
+       */
+      protected void begin(final String namespace) {
+
+         beginNanos = System.nanoTime();
+         
+         sharedTestState.activeTasks.put(this, namespace);
+         
+         log.warn("Call"//
+               // + ": nrunning=" + sharedTestState.nrunning
+               + ": nactive="
+               + sharedTestState.nacting.incrementAndGet()
+               + ", namespace=" + namespace
+               + ", op="
+               + toString()
+               + ", active=" + sharedTestState.activeTasks.entrySet().toString());
+
+      }
+
+      /**
+       * Log end client API operation.
+       * 
+       * @param namespace
+       *           The namespace.
+       */
+      protected void done(final String namespace) {
+
+         final long elapsedNanos = System.nanoTime() - beginNanos;
+
+         sharedTestState.activeTasks.remove(this, namespace);
+
+         log.warn("Done"//
+//               + ": nrunning="
+//               + sharedTestState.nrunning.get()
+               + ": nactive="
+               + sharedTestState.nacting.decrementAndGet()
+               + ", namespace=" + namespace + ", op="
+               + toString()
+               + ", elapsed="
+               + TimeUnit.NANOSECONDS.toMillis(elapsedNanos)
+               + "ms");
+
+      }
+
+      /**
+       * Obtain an exclusive lock on a random existing namespace.
+       * 
+       * @return The name of that namespace.
+       */
+      protected String lockRandomNamespaceExclusive() {
+         return sharedTestState.lockRandomNamespace(false/* readOnly */);
+      }
+
+      /**
+       * Release an exclusive lock on the specified namespace.
+       * 
+       * @param namespace
+       *           The name of that namespace.
+       * @param remove
+       *           <code>true</code> iff the namespace should be removed from
+       *           the map.
+       */
+      protected void unlockNamespaceExclusive(final String namespace, final boolean remove) {
+         sharedTestState
+               .unlockNamespace(namespace, false/* readOnly */, remove);
+      }
+
+      /**
+       * Obtain an non-exclusive lock on a random existing namespace.
+       * 
+       * @return The name of that namespace.
+       */
+      protected String lockRandomNamespace() {
+         return sharedTestState.lockRandomNamespace(true/* readOnly */);
+      }
+
+      /**
+       * Release a non-exclusive lock on the specified namespace.
+       * 
+       * @param namespace
+       *           The name of that namespace.
+       */
+      protected void unlockNamespace(final String namespace) {
+         sharedTestState
+               .unlockNamespace(namespace, true/* readOnly */, false/* remove */);
+      }
+
+      /**
+       * Implement this method for a concrete REST API operation.
+       */
+      protected abstract void doApply(final RemoteRepositoryManager rmgr)
+            throws Exception;
+
+   }
+
+   /**
+    * Abstract base class for tests that operate against a random namespace that
+    * is known to exist on the server. The class builds in the pattern for
+    * selecting the namespace at random and holding a <em>non-exclusive</em>
+    * lock across the namespace.
+    */
+   private static abstract class RandomNamespaceOp extends RestApiOp {
+
+      RandomNamespaceOp(final SharedTestState sharedTestState,
+            final boolean readOnly) {
+
+         super(sharedTestState, readOnly);
+
+      }
+
+      @Override
+      final protected void doApply(final RemoteRepositoryManager rmgr) throws Exception {
+
+         // obtain non-exclusive lock for random existing namespace.
+         final String namespace = lockRandomNamespace();
+
+         try {
+
+            // client API for that namespace.
+            final RemoteRepository repo = rmgr
+                  .getRepositoryForNamespace(namespace);
+
+            begin(namespace);
+            
+            // do operation.
+            doApplyToNamespace(repo);
+
+            done(namespace);
+            
+         } finally {
+
+            // release non-exclusive lock.
+            unlockNamespace(namespace);
+
+         }
+
+      }
+
+      /**
+       * Invoked to execute an operation against a namespace.
+       * 
+       * @param repo
+       *           The client API for that namespace.
+       * 
+       * @throws Exception
+       */
+      abstract protected void doApplyToNamespace(RemoteRepository repo) throws Exception;
+
+   }
+
+   /*
+    * SPARQL QUERY
+    */
+
+   private static class SparqlTupleQueryOp extends RandomNamespaceOp {
+
+      SparqlTupleQueryOp(final SharedTestState sharedTestState,
+            final String queryStr) {
+
+         super(sharedTestState, true/* readOnly */);
+
+         this.queryStr = getNamespaceDeclarations() + queryStr;
+
+      }
+
+      private final String queryStr;
+
+      @Override
+      protected void doApplyToNamespace(final RemoteRepository repo) throws Exception {
+
+         repo.prepareTupleQuery(queryStr).evaluate();
+
+      }
+   }
+
+   private static class SparqlGraphQueryOp extends RandomNamespaceOp {
+
+      SparqlGraphQueryOp(final SharedTestState sharedTestState,
+            final String queryStr) {
+
+         super(sharedTestState, true/* readOnly */);
+
+         this.queryStr = getNamespaceDeclarations() + queryStr;
+
+      }
+
+      private final String queryStr;
+
+      @Override
+      protected void doApplyToNamespace(final RemoteRepository repo) throws Exception {
+
+         repo.prepareGraphQuery(queryStr).evaluate();
+
+      }
+
+   }
+
+   private static class SparqlBooleanQueryOp extends RandomNamespaceOp {
+
+      SparqlBooleanQueryOp(final SharedTestState sharedTestState,
+            final String queryStr) {
+
+         super(sharedTestState, true/* readOnly */);
+
+         this.queryStr = getNamespaceDeclarations() + queryStr;
+
+      }
+
+      private final String queryStr;
+
+      @Override
+      protected void doApplyToNamespace(final RemoteRepository repo) throws Exception {
+
+         repo.prepareBooleanQuery(queryStr).evaluate();
+
+      }
+
+   }
+
+   /*
+    * SPARQL UPDATE
+    */
+
+   private static class SparqlUpdate extends RandomNamespaceOp {
+
+      SparqlUpdate(final SharedTestState sharedTestState, final String updateStr) {
+
+         super(sharedTestState, false/* readOnly */);
+
+         this.updateStr = getNamespaceDeclarations() + updateStr;
+
+      }
+
+      private final String updateStr;
+
+      @Override
+      protected void doApplyToNamespace(final RemoteRepository repo) throws Exception {
+
+         repo.prepareUpdate(updateStr).evaluate();
+
+      }
+
+   }
+   
+   private static class DropAll extends SparqlUpdate {
+
+      DropAll(SharedTestState sharedTestState) {
+         super(sharedTestState, "DROP ALL");
+      }
+
+   }
+
+   /*
+    * Non-SPARQL MUTATION API
+    */
+
+   private static class InsertWithBody extends RandomNamespaceOp {
+
+      InsertWithBody(final SharedTestState sharedTestState) {
+         super(sharedTestState, false/* readOnly */);
+      }
+
+      @Override
+      protected void doApplyToNamespace(final RemoteRepository repo) throws Exception {
+
+         // Setup data.
+         final RemoteRepository.AddOp op;
+         {
+            final Collection<Statement> stmts = new ArrayList<>(100000);
+            for (int i = 0; i < 100000; i++) {
+               stmts.add(generateTriple());
+            }
+            op = new RemoteRepository.AddOp(stmts);
+         }
+
+         // do mutation.
+         repo.add(op);
+
+      }
+
+      private static Statement generateTriple() {
+
+         return new StatementImpl(new URIImpl(EX_NS + UUID.randomUUID()),
+               new URIImpl(EX_NS + UUID.randomUUID()), new URIImpl(EX_NS
+                     + UUID.randomUUID()));
+
+      }
+
+   }
+
+   /*
+    * MULTITENANCY API
+    * 
+    * TODO LIST NAMESPACES, GET PROPERTIES
+    */
+
+   private static class CreateNamespaceOp extends RestApiOp {
+
+      CreateNamespaceOp(final SharedTestState sharedTestState) {
+         super(sharedTestState, false/* readOnly */);
+      }
+
+      @Override
+      protected void doApply(final RemoteRepositoryManager rmgr)
+            throws Exception {
+
+         final String namespace = "n"
+               + sharedTestState.namespaceCreateCounter.getAndIncrement();
+
+         final Properties properties = sharedTestState.testMode.getProperties();
+
+         properties.put(RemoteRepository.OPTION_CREATE_KB_NAMESPACE, namespace);
+
+         begin(namespace);
+
+         // create namespace.
+         rmgr.createRepository(namespace, properties);
+
+         // add entry IFF created.
+         if (sharedTestState.namespaces.putIfAbsent(namespace,
+               new ReentrantReadWriteLock()) != null) {
+            // Should not exist! Each namespace name is distinct!!!
+            throw new AssertionError("namespace=" + namespace);
+         }
+
+         // Track #of namespaces that exist in the service.
+         sharedTestState.namespaceExistCounter.incrementAndGet();
+
+         done(namespace);
+         
+      }
+
+   }
+
+   /**
+    * Drop a namespace.
+    * 
+    * FIXME Implement variant operation in which we drop the namespace even
+    * though other operations are already queued against that namespace (which
+    * could be namespace drops, queries, or mutations). This will provide some
+    * coverage for error handling when a namespace disappears concurrent with
+    * client requests against that namespace.
+    */
+   private static class DropNamespaceOp extends RestApiOp {
+
+      DropNamespaceOp(final SharedTestState sharedTestState) {
+         super(sharedTestState, false/* readOnly */);
+      }
+
+      @Override
+      protected void doApply(final RemoteRepositoryManager rmgr)
+            throws Exception {
+
+         // exclusive lock on random namespace.
+         final String namespace = lockRandomNamespaceExclusive();
+
+         try {
+
+            /*
+             * Atomic decision whether to destroy the namespace (MUTEX).
+             * 
+             * TODO This MUTEX section means that at most one DESTORY NAMESPACE
+             * operation can run at a time. This means that we are never running
+             * those operations concurrently and that means that we could be
+             * missing some interesting edge cases in the concurrency control.
+             * Modify this code to support more concurrency.
+             */
+            sharedTestState.destroyNamespaceLock.lock();
+            try {
+
+               // Track #of namespaces that exist in the service.
+               if (sharedTestState.namespaceExistCounter.get() <= sharedTestState.minimumNamespaceCount
+                     .get()) {
+
+                  log.warn("NOT NAMESPACE: min="
+                        + sharedTestState.minimumNamespaceCount + ", cur="
+                        + sharedTestState.namespaceExistCounter);
+
+                  return;
+
+               }
+
+               begin(namespace);
+
+               // destroy the namespace.
+               rmgr.deleteRepository(namespace);
+
+               done(namespace);
+
+            } finally {
+
+               unlockNamespaceExclusive(namespace, true/* remove */);
+
+            }
+
+         } finally {
+
+            sharedTestState.destroyNamespaceLock.unlock();
+
+         }
+
+      }
+
+   }
+
+//   public static void main(final String[] args) throws Exception {
 //
-//        graph1 = f.createURI(EX_NS, "graph1");
-//        graph2 = f.createURI(EX_NS, "graph2");
-	}
-	
-//	/**
-//	 * Load the test data set.
-//	 * 
-//	 * @throws Exception
-//	 */
-//	private void doLoadFile() throws Exception {
-//        /*
-//		 * Only for testing. Clients should use AddOp(File, RDFFormat) or SPARQL
-//		 * UPDATE "LOAD".
-//		 */
-//        loadFile(
-//                "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig",
-//                RDFFormat.TRIG);
-//	}
-	
-	@Override
-	public void tearDown() throws Exception {
-	    
-//	    bob = alice = graph1 = graph2 = null;
-//	    
-//	    f = null;
-	    
-	    super.tearDown();
-	    
-	}
-
-    /**
-     * Get a set of useful namespace prefix declarations.
-     * 
-     * @return namespace prefix declarations for rdf, rdfs, dc, foaf and ex.
-     */
-    static private String getNamespaceDeclarations() {
-        final StringBuilder declarations = new StringBuilder();
-//        declarations.append("PREFIX rdf: <" + RDF.NAMESPACE + "> \n");
-//        declarations.append("PREFIX rdfs: <" + RDFS.NAMESPACE + "> \n");
-//        declarations.append("PREFIX dc: <" + DC.NAMESPACE + "> \n");
-//        declarations.append("PREFIX foaf: <" + FOAF.NAMESPACE + "> \n");
-        declarations.append("PREFIX ex: <" + EX_NS + "> \n");
-//        declarations.append("PREFIX xsd: <" +  XMLSchema.NAMESPACE + "> \n");
-        declarations.append("\n");
-
-        return declarations.toString();
-    }
-    
-    /**
-     * A stress test of concurrent SPARQL UPDATE requests against multiple 
-     * namespaces.
-     * 
-     * @throws Exception 
-     */
-	public void test_concurrentClients() throws Exception {
-
-		/*
-		 * Note: Using a timeout will cause any tasks still running when the
-		 * timeout expires to be interrupted.
-		 * 
-		 * See TestConcurrentJournal for the original version of this code.
-		 */
-		doConcurrentClientTest(//
-				m_repo.getRemoteRepositoryManager(),// MultiTenancy API client
-				30, TimeUnit.SECONDS,// timeout
-				5, // #of concurrent requests
-				20, // #of namespaces
-				100 // #of trials
-		);
-
-	}
-
-	/**
-	 * A stress test of concurrent operations on multiple namespaces.
-	 * 
-	 * @param rmgr
-	 *            The {@link RemoteRepositoryManager} providing access to the
-	 *            end point(s) under test.
-	 * 
-	 * @param timeout
-	 *            The timeout before the test will terminate.
-	 * @param unit
-	 *            The unit for that timeout.
-	 * 
-	 * @param nthreads
-	 *            The #of concurrent client requests to issue (GTE 1).
-	 *            Concurrent requests against the same namespace are
-	 *            non-blocking. A mutation request against a namespace will be
-	 *            serialized against other mutations on the same namespace (but
-	 *            should be concurrent against mutations on other namespaces
-	 *            when group commit is enabled).
-	 * 
-	 * @param nnamespaces
-	 *            The number of namespaces against which concurrent requests
-	 *            will be issued (GTE 1).
-	 * 
-	 * @param ntrials
-	 *            The #of requests to issue (GTE 1).
-	 * @throws Exception 
-	 */
-	private Result doConcurrentClientTest(
-			final RemoteRepositoryManager rmgr, //
-			final long timeout, final TimeUnit unit, //
-			final int nthreads,//
-			final int nnamespaces,//
-			final int ntrials//
-			)
-			throws Exception {
-
-		if (rmgr == null)
-			throw new IllegalArgumentException();
-				
-		if (timeout <= 0)
-			throw new IllegalArgumentException();
-
-		if (unit == null)
-			throw new IllegalArgumentException();
-		
-		if (nthreads <= 0)
-			throw new IllegalArgumentException();
-
-		if (nnamespaces <= 0)
-			throw new IllegalArgumentException();
-
-		if (ntrials <= 0)
-			throw new IllegalArgumentException();
-
-		final Random r = new Random();
-
-		/*
-		 * Setup the namespaces.
-		 * 
-		 * TODO Could create/destroy the namespaces during the test as well.
-		 * That would introduce another source of contention - one that has
-		 * proven to be an important kind of contention for provoking failure.
-		 */
-		final String[] namespaces = new String[nnamespaces];
-		{
-
-			for (int i = 0; i < nnamespaces; i++) {
-
-				final String namespace = namespaces[i] = "kb#" + i;
-
-				final Properties properties = getTestMode().getProperties();
-
-				properties.setProperty(
-						RemoteRepository.OPTION_CREATE_KB_NAMESPACE, namespace);
-
-				rmgr.createRepository(namespace, properties);
-
-			}
-
-		}
-
-		if (log.isInfoEnabled())
-			log.info("Created " + nnamespaces + " namespaces: "
-					+ Arrays.toString(namespaces));
-
-		/*
-		 * Setup the tasks that we will submit.
-		 */
-
-		final Collection<Callable<Void>> tasks = new LinkedHashSet<Callable<Void>>();
-
-		{
-
-			final MutationOp[] ops = MutationOp.values();
-
-			for (int i = 0; i < ntrials; i++) {
-
-//				final Collection<String> tmp = new LinkedHashSet<String>(
-//						nnamespaces);
-
-				final String namespace = namespaces[r.nextInt(nnamespaces)];
-
-				final MutationOp op = MutationOp.values()[r.nextInt(ops.length)];
-
-				tasks.add(new WriteTask(rmgr
-						.getRepositoryForNamespace(namespace), i, op));
-
-			}
-		}
-
-		/*
-		 * Run all tasks and wait for up to the timeout for them to complete.
-		 */
-
-		if (log.isInfoEnabled())
-			log.info("Submitting " + tasks.size() + " tasks");
-
-		final long begin = System.nanoTime();
-
-		final ExecutorService executorService = Executors.newFixedThreadPool(
-				nthreads, DaemonThreadFactory.defaultThreadFactory());
-		
-		int nfailed = 0; // #of tasks that failed.
-		// int nretry = 0; // #of tasks that threw RetryException
-		int ninterrupt = 0; // #of interrupted tasks.
-		int ncommitted = 0; // #of tasks that successfully committed.
-		int nuncommitted = 0; // #of tasks that did not complete in time.
-		final long elapsed;
-		
-		try {
-		
-		final List<Future<Void>> results = executorService
-				.invokeAll(tasks, timeout, TimeUnit.SECONDS);
-
-		elapsed = System.nanoTime() - begin;
-
-		/*
-		 * Examine the futures to see how things went.
-		 */
-		final Iterator<Future<Void>> itr = results.iterator();
-
-		while (itr.hasNext()) {
-
-			final Future<?> future = itr.next();
-
-			if (future.isCancelled()) {
-
-				nuncommitted++;
-
-				continue;
-
-			}
-
-			try {
-
-				future.get();
-
-				ncommitted++;
-
-			} catch (ExecutionException ex) {
-
-				if (isInnerCause(ex, InterruptedException.class)
-						|| isInnerCause(ex, ClosedByInterruptException.class)) {
-
-					/*
-					 * Note: Tasks will be interrupted if a timeout occurs when
-					 * attempting to run the submitted tasks - this is normal.
-					 */
-
-					log.warn("Interrupted: " + ex);
-
-					ninterrupt++;
-
-//				} else if (isInnerCause(ex, SpuriousException.class)) {
+//      if (args.length < 2) {
+//         System.err
+//               .println("(triples|sids|quads) (propertyFile|configFile) (tm)?");
+//         System.exit(1);
+//      }
 //
-//					nfailed++;
+//      final TestMode testMode = TestMode.valueOf(args[0]);
 //
-//					// } else if(isInnerCause(ex, RetryException.class)) {
-//					//
-//					// nretry++;
-
-				} else {
-
-					// Other kinds of exceptions are errors.
-
-					fail("Not expecting: " + ex, ex);
-
-				}
-
-			}
-
-		}
-
-		} finally {
-		executorService.shutdownNow();
-		}
-
-		/*
-		 * Compute bytes written per second.
-		 */
-
-//		final long seconds = TimeUnit.NANOSECONDS.toSeconds(elapsed));
-
-//		final long bytesWrittenPerSecond = indexManager.getRootBlockView()
-//				.getNextOffset() / (seconds == 0 ? 1 : seconds);
-
-		final Result ret = new Result();
-
-		// these are the results.
-		ret.put("nfailed", "" + nfailed);
-		// ret.put("nretry",""+nretry);
-		ret.put("ncommitted", "" + ncommitted);
-		ret.put("ninterrupt", "" + ninterrupt);
-		ret.put("nuncommitted", "" + nuncommitted);
-		ret.put("elapsed(ms)", "" + TimeUnit.NANOSECONDS.toMillis(elapsed));
-//		ret.put("bytesWrittenPerSec", "" + bytesWrittenPerSecond);
-		ret.put("tasks/sec", "" + (ncommitted * 1000 / elapsed));
-		// ret.put("maxRunning",
-		// ""+journal.getConcurrencyManager().writeService.getMaxRunning());
-		// ret.put("maxPoolSize",
-		// ""+journal.getConcurrencyManager().writeService.getMaxPoolSize());
-		// ret.put("maxLatencyUntilCommit",
-		// ""+journal.getConcurrencyManager().writeService.getMaxCommitWaitingTime());
-		// ret.put("maxCommitLatency",
-		// ""+journal.getConcurrencyManager().writeService.getMaxCommitServiceTime());
-
-		System.err.println(ret.toString(true/* newline */));
-
-//		journal.deleteResources();
-
-		return ret;
-
-	}
-
-	static private final Random r = new Random();
-
-//	public static class ReadTask implements Callable<Long> {
-//		
-//	}
-	
-	/*
-	 * TODO It would be nice to have pre-/post- condition checks for these. That
-	 * would be possible with Jeremy's suggestion (ABORT IF/UNLESS ASK). Those
-	 * pre-/post- conditions could be developed by analyzing the original tests
-	 * for SPARQL UPDATE operations in TestSparqlUpdate.
-	 * 
-	 * TODO Could turn this enum into a class and push down the evaluate()
-	 * method onto that class so we could handle query and update or other rest
-	 * api methods through the same abstraction within this stress test.
-	 */
-	static enum MutationOp {
-		SparqlUpdateDropAll("DROP ALL"), //
-		SparqlUpdateLoad(
-				"LOAD <file:bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/dataset-update.trig>"), //
-		SparqlUpdateInsertWhere(
-				"INSERT {?x rdfs:label ?y . } WHERE {?x foaf:name ?y }"), //
-		SparqlUpdateInsertWhereGraph(
-				"INSERT {GRAPH ?g {?x rdfs:label ?y . }} WHERE {GRAPH ?g {?x foaf:name ?y }}");
-		MutationOp(final String updateStr) {
-			this.updateStr = getNamespaceDeclarations() + updateStr;
-		}
-
-		public final String updateStr;
-	}
-
-	/**
-	 * A task that issues mutation requests using the REST API.
-	 */
-	static private class WriteTask implements Callable<Void> {
-
-		private final RemoteRepository repo;
-		private final int trial;
-		private final MutationOp op;
-
-		public WriteTask(final RemoteRepository repo, final int trial,
-				final MutationOp op) {
-
-			if (repo == null)
-				throw new IllegalArgumentException();
-
-			if (op == null)
-				throw new IllegalArgumentException();
-
-			this.repo = repo;
-
-			this.trial = trial;
-
-			this.op = op;
-
-		}
-
-		@Override
-		public Void call() throws Exception {
-
-			repo.prepareUpdate(op.updateStr).evaluate();
-
-			return null;
-
-		}
-
-	} // class WriteTask
+////    if (testMode != TestMode.triples)
+////       fail("Unsupported test mode: " + testMode);
+//      
+//      final File propertyFile = new File(args[1]);
+//
+//      if (!propertyFile.exists())
+//         fail("No such file: " + propertyFile);
+//
+//      // Setup test result.
+//      final TestResult result = new TestResult();
+//      
+//      // Setup listener, which will write the result on System.out
+//      result.addListener(new ResultPrinter(System.out));
+//      
+//      result.addListener(new TestListener() {
+//         
+//         @Override
+//         public void startTest(Test arg0) {
+//            log.info(arg0);
+//         }
+//         
+//         @Override
+//         public void endTest(Test arg0) {
+//            log.info(arg0);
+//         }
+//         
+//         @Override
+//         public void addFailure(Test arg0, AssertionFailedError arg1) {
+//            log.error(arg0,arg1);
+//         }
+//         
+//         @Override
+//         public void addError(Test arg0, Throwable arg1) {
+//            log.error(arg0,arg1);
+//         }
+//      });
+//      
+//      // Open Journal / Connect to the configured federation.
+//      final IIndexManager indexManager = TestNanoSparqlServerWithProxyIndexManager
+//            .openIndexManager(propertyFile.getAbsolutePath());
+//
+//      try {
+//
+//         // Setup test suite
+//         final Test test = ProxySuiteHelper.suiteWhenStandalone(
+//               TestConcurrentRestApiRequests.class, "stress.*",
+//               new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[] {
+//               // BufferMode.Transient,
+//               // BufferMode.DiskWORM,
+//               // BufferMode.MemStore,
+//               BufferMode.DiskRW, })), testMode);
+//
+//         // Run the test suite.
+//         test.run(result);
+//
+//      } finally {
+//
+//         if (indexManager instanceof JiniFederation<?>) {
+//            // disconnect
+//            ((JiniFederation<?>) indexManager).shutdownNow();
+//         } else {
+//            // destroy journal.
+//            ((Journal) indexManager).destroy();
+//         }
+//
+//      }
+//
+//      final String msg = "nerrors=" + result.errorCount() + ", nfailures="
+//            + result.failureCount() + ", nrun=" + result.runCount();
+//
+//      if (result.errorCount() > 0 || result.failureCount() > 0) {
+//
+//         // At least one test failed.
+//         fail(msg);
+//
+//      }
+//
+//      // All green.
+//      System.out.println(msg);
+//
+//   }
 
 }
