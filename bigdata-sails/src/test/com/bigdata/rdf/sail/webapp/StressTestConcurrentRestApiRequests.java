@@ -122,14 +122,29 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      */
     static public Test suite() {
 
-        return ProxySuiteHelper.suiteWhenStandalone(
-                StressTestConcurrentRestApiRequests.class, "test.*",
-                new LinkedHashSet<BufferMode>(Arrays.asList(new BufferMode[] {
-                // BufferMode.Transient,
-                // BufferMode.DiskWORM,
-                BufferMode.MemStore,
-                // BufferMode.DiskRW,
-                        })), TestMode.quads);
+        if (true) {
+
+            return ProxySuiteHelper.suiteWhenStandalone(
+                    StressTestConcurrentRestApiRequests.class, //
+                    "test.*",// normal
+                    new LinkedHashSet<BufferMode>(Arrays
+                            .asList(new BufferMode[] {
+                            // BufferMode.Transient,
+                            // BufferMode.DiskWORM,
+                            BufferMode.MemStore,
+                            // BufferMode.DiskRW,
+                            })), TestMode.quads);
+
+        } else {
+
+            return ProxySuiteHelper.suiteWhenStandalone(
+                    StressTestConcurrentRestApiRequests.class, //
+                    "stressTest_concurrentClients_24Hours",// 24 hours!
+                    new LinkedHashSet<BufferMode>(Arrays
+                            .asList(new BufferMode[] { BufferMode.DiskRW, })),
+                    TestMode.quads);
+        }
+
     }
 
     private static final String EX_NS = "http://example.org/";
@@ -471,10 +486,10 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
          */
         doConcurrentClientTest(//
                 m_mgr,// remote repository manager
-                30, TimeUnit.SECONDS,// timeout
+                10, TimeUnit.SECONDS,// timeout
                 20, // #of concurrent requests
                 20, // minimum #of namespaces
-                5000, // #of trials
+                4000, // #of trials
                 1000L, 1000L, TimeUnit.MILLISECONDS // task interruption rate.
         );
 
@@ -692,6 +707,18 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
         try {
 
+            /*
+             * Note: As soon as this timeout is reached the remaining client API
+             * tasks will be interrupted. This will cause CANCEL operations to
+             * be posted to the server. These actions (CANCEL and client
+             * initiating the termination of the HTTP request) will cause the
+             * server to report errors out of launderThrowable(). THIS IS THE
+             * EXPECTED BEHAVIOR.
+             * 
+             * If such errors show up before the timeout then they are real
+             * errors and need to be diagnosed. This test driver will report any
+             * such errors as test failures.
+             */
             final List<Future<Void>> results = executorService.invokeAll(tasks,
                     timeout, TimeUnit.SECONDS);
 
@@ -839,6 +866,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
         /**
          * True iff this is a read-only task.
          */
+        @SuppressWarnings("unused")
         private final boolean readOnly;
 
 //        /**
@@ -867,12 +895,12 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             this.readOnly = readOnly;
         }
 
-        /**
-         * Return true iff this is a read-only task.
-         */
-        public final boolean isReadOnly() {
-            return readOnly;
-        }
+//        /**
+//         * Return true iff this is a read-only task.
+//         */
+//        public final boolean isReadOnly() {
+//            return readOnly;
+//        }
 
 //        /**
 //         * The probability that the task will be interrupted while it is
@@ -950,7 +978,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                      * entity and we DO NOT have visibility into that trace (no
                      * RMI style stack frame from the server).
                      * 
-                     * TODO There may also be http status codes that we need to
+                     * TODO There may also be HTTP status codes that we need to
                      * explicitly look for here and report back as
                      * success/failure along appropriate dimensions. This could
                      * all be returned as side-effects on the Task, but the
@@ -1040,8 +1068,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             // insert into cancellable map (UUID => FutureTask)
             sharedTestState.futures.put(uuid, ft);
             
-            log.warn("Call"//
-                    // + ": nrunning=" + sharedTestState.nrunning
+            if (log.isInfoEnabled())
+                log.info("Call"//
                     + ": nactive="
                     + sharedTestState.nacting.incrementAndGet()
                     + ", namespace="
@@ -1070,9 +1098,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             // Remove from collection of cancellable Futures.
             sharedTestState.futures.remove(uuid);
             
-            log.warn("Done"//
-            // + ": nrunning="
-            // + sharedTestState.nrunning.get()
+            if (log.isInfoEnabled())
+                log.info("Done"//
                     + ": nactive="
                     + sharedTestState.nacting.decrementAndGet()
                     + ", namespace="
@@ -1080,7 +1107,9 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                     + ", op="
                     + toString()
                     + ", elapsed="
-                    + TimeUnit.NANOSECONDS.toMillis(elapsedNanos) + "ms");
+                    + TimeUnit.NANOSECONDS.toMillis(elapsedNanos) + "ms"
+                    + ", active="
+                    + sharedTestState.activeTasks.entrySet().toString());
 
         }
 
@@ -1500,7 +1529,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                             if (sharedTestState.namespaceExistCounter.get() <= sharedTestState.minimumNamespaceCount
                                     .get()) {
 
-                                log.warn("NOT NAMESPACE: min="
+                                log.warn("AT NAMESPACE MINIMUM: min="
                                         + sharedTestState.minimumNamespaceCount
                                         + ", cur="
                                         + sharedTestState.namespaceExistCounter);
