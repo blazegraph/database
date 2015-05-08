@@ -162,6 +162,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTPropertyPathOptimizer());
         
         /**
+         * If we have a singleton BindingsClause inside the main where clause
+         * and no BindingsClause attached to the QueryRoot, we can promote the
+         * BC from inline to top-level and avoid an extra hash index / hash join
+         * later.
+         */
+        add(new ASTValuesOptimizer());
+        
+        /**
          * Visit all the value expression nodes and convert them into value
          * expressions. If a value expression can be evaluated to a constant,
          * then it is replaced by that constant.
