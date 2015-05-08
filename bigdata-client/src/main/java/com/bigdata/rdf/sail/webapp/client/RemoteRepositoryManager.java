@@ -678,20 +678,27 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      *            The namespace of the KB instance.
      * @param properties
      *            The configuration properties for that KB instance.
-     *            
-     * @throws Exception 
+     * 
+     * @throws Exception
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1257"> createRepository()
+     *      does not set the namespace on the Properties</a>
      */
     public void createRepository(final String namespace,
-            final Properties properties) throws Exception {
+            final Properties properties2) throws Exception {
 
         if (namespace == null)
             throw new IllegalArgumentException();
-        if (properties == null)
+        if (properties2 == null)
             throw new IllegalArgumentException();
-        if (properties.getProperty(OPTION_CREATE_KB_NAMESPACE) == null)
-            throw new IllegalArgumentException("Property not defined: "
-                    + OPTION_CREATE_KB_NAMESPACE);
+//        if (properties.getProperty(OPTION_CREATE_KB_NAMESPACE) == null)
+//            throw new IllegalArgumentException("Property not defined: "
+//                    + OPTION_CREATE_KB_NAMESPACE);
 
+        // Set the namespace property.
+        final Properties properties = new Properties(properties2);
+        properties.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
+        
 //        final ConnectOptions opts = new ConnectOptions(baseServiceURL
 //                + "/namespace", httpClient);
 
