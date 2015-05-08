@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
@@ -815,19 +814,6 @@ public class QueryServlet extends BigdataRDFServlet {
 		return req.getParameter(ATTR_UPDATE);
 	}
 	
-	// Note: Referenced by the test suite. Should be moved to utility class.
-	static String readFully(final Reader reader) throws IOException {
-	    final char[] arr = new char[8*1024]; // 8K at a time
-		final StringBuffer buf = new StringBuffer();
-		int numChars;
-
-		while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
-			buf.append(arr, 0, numChars);
-		}
-
-		return buf.toString();
-	}
-
     /**
      * Sends an explanation for the query rather than the query results. The
      * query is still run, but the query statistics are reported instead of the
