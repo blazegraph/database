@@ -1,0 +1,208 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>net.petrikainulainen.maven</groupId>
+    <artifactId>running-solr-with-maven</artifactId>
+    <packaging>war</packaging>
+    <version>0.1</version>
+    <name>Todo Solr Example</name>
+    <description>
+        This Maven project demonstrates how we can run Solr in a development environment.
+    </description>
+    <licenses>
+        <license>
+            <name>Apache License 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+    <properties>
+        <slf4j.version>1.7.7</slf4j.version>
+        <solr.version>4.3.0</solr.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <build.profile.id>dev</build.profile.id>
+            </properties>
+        </profile>
+    </profiles>
+    <dependencies>
+        <!-- SLF4J -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jul-to-slf4j</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+        </dependency>
+        <!-- Solr 4.3.0 -->
+        <dependency>
+            <groupId>org.apache.solr</groupId>
+            <artifactId>solr</artifactId>
+            <version>${solr.version}</version>
+            <type>war</type>
+        </dependency>
+    </dependencies>
+    <build>
+        <finalName>solr</finalName>
+        <filters>
+            <filter>${project.basedir}/profiles/${build.profile.id}/config.properties</filter>
+        </filters>
+        <resources>
+            <resource>
+                <filtering>true</filtering>
+                <directory>src/main/resources</directory>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>properties-maven-plugin</artifactId>
+                <version>1.0-alpha-2</version>
+                <configuration>
+                    <files>
+                        <!-- Properties are read from profile specific property file -->
+                        <file>${project.basedir}/profiles/${build.profile.id}/config.properties</file>
+                    </files>
+                </configuration>
+                <executions>
+                    <!-- Load properties for the default lifecycle -->
+                    <execution>
+                        <id>default-lifecycle-properties</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>read-project-properties</goal>
+                        </goals>
+                    </execution>
+                    <!-- Load properties for the clean lifecycle -->
+                    <execution>
+                        <id>clean-lifecycle-properties</id>
+                        <phase>pre-clean</phase>
+                        <goals>
+                            <goal>read-project-properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>2.7</version>
+                <!--
+                    Copy the solr.xml to the correct directory and apply properties
+                    filtering to it.
+                -->
+                <executions>
+                    <execution>
+                        <id>copy-solr-xml</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Configure the directory in which the file is copied. -->
+                            <outputDirectory>${solr.solr.home}</outputDirectory>
+                            <resources>
+                                <!--
+                                    Configure the copied file and apply properties filtering to it.
+                                -->
+                                <resource>
+                                    <directory>${project.basedir}/src/main/resources</directory>
+                                    <filtering>true</filtering>
+                                    <includes>
+                                        <include>solr.xml</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <!--
+                         Copy everything found from the src/main/config directory to
+                         the correct directory.
+                    -->
+                    <execution>
+                        <id>copy-solr-config</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Configure the target directory in which the files are copied. -->
+                            <outputDirectory>${solr.solr.home}/${solr.default.core.directory}/conf</outputDirectory>
+                            <!--
+                                Configure the directory which contents are copied to the target directory.
+                                Disable properties filtering.
+                            -->
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/src/main/config</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>2.6</version>
+                <configuration>
+                    <filesets>
+                        <!-- Delete the overlays directory from the project root directory -->
+                        <fileset>
+                            <directory>overlays</directory>
+                        </fileset>
+                        <!-- Delete the Solr home directory -->
+                        <fileset>
+                            <directory>${solr.solr.home}</directory>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>9.2.3.v20140905</version>
+                <configuration>
+                    <stopPort>9966</stopPort>
+                    <stopKey>stop</stopKey>
+                    <!-- Listen to port 8983 -->
+                    <httpConnector>
+                        <port>8983</port>
+                        <idleTimeout>60000</idleTimeout>
+                    </httpConnector>
+                    <!-- Read system properties from profile specific configuration file -->
+                    <systemPropertiesFile>${project.basedir}/profiles/${build.profile.id}/config.properties</systemPropertiesFile>
+                    <!-- Set the context path -->
+                    <webApp>
+                        <contextPath>/solr</contextPath>
+                    </webApp>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
