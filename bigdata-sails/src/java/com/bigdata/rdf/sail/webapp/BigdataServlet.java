@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
@@ -614,4 +615,17 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
    /** An empty Resource[] for decode. */
    static private final Resource[] EMPTY_RESOURCE_ARRAY = new Resource[0];
    
+   static protected String readFully(final Reader reader) throws IOException {
+
+      final char[] arr = new char[8 * 1024]; // 8K at a time
+      final StringBuffer buf = new StringBuffer();
+      int numChars;
+
+      while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
+         buf.append(arr, 0, numChars);
+      }
+
+      return buf.toString();
+   }
+
 }

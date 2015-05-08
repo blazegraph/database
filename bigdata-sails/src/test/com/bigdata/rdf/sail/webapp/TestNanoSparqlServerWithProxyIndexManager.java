@@ -268,7 +268,6 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(Test_REST_DELETE_WITH_BODY.class);
          suite.addTestSuite(TestNanoSparqlClient.class);
          suite.addTestSuite(TestMultiTenancyAPI.class); // Multi-tenancy API.
-         suite.addTestSuite(StressTest_REST_MultiTenancy.class);
 
          // Transaction management API.
          suite.addTestSuite(Test_REST_TX_API.class);
@@ -302,10 +301,20 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
              * time.
              */
             suite.addTestSuite(TestSparqlUpdate.class);
-            suite.addTestSuite(TestConcurrentRestApiRequests.class);
+            suite.addTestSuite(StressTestConcurrentRestApiRequests.class);
             suite.addTestSuite(NativeDistinctNamedGraphUpdateTest.class);
             suite.addTestSuite(HashDistinctNamedGraphUpdateTest.class);
          }
+
+            // Stress tests. See code for even longer running versions.
+            {
+                // Multi-tenancy API (focus on add/drop namespace + LOAD)
+                suite.addTestSuite(StressTest_REST_MultiTenancy.class);
+
+                // REST API (parameterized workload).
+                suite.addTestSuite(StressTestConcurrentRestApiRequests.class);
+
+            }
 
          // SPARQL 1.1 Federated Query.
          suite.addTestSuite(TestFederatedQuery.class);

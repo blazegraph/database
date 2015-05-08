@@ -210,7 +210,8 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        return mgr.graphResults(opts, null/*queryId*/, null/*preparedListener*/);
+        return mgr
+                .graphResults(opts, null/* queryId */, null/* preparedListener */);
 
     }
 
@@ -219,12 +220,32 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * 
      * @param query
      *            the query string
-     * @return the {@link TupleQuery}
+     * 
+     * @return The {@link IPreparedTupleQuery}.
      */
     public IPreparedTupleQuery prepareTupleQuery(final String query)
             throws Exception {
 
-        return new TupleQuery(mgr.newQueryConnectOptions(sparqlEndpointURL,tx), UUID.randomUUID(), query);
+        return prepareTupleQuery(query, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a tuple (select) query.
+     * 
+     * @param query
+     *            the query string
+     * 
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     * 
+     * @return The {@link IPreparedTupleQuery}.
+     */
+    public IPreparedTupleQuery prepareTupleQuery(final String query,
+            final UUID uuid) throws Exception {
+
+        return new TupleQuery(
+                mgr.newQueryConnectOptions(sparqlEndpointURL, tx), uuid, query);
 
     }
 
@@ -233,13 +254,31 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * 
      * @param query
      *            the query string
-     *            
-     * @return the {@link IPreparedGraphQuery}
+     * 
+     * @return The {@link IPreparedGraphQuery}
      */
     public IPreparedGraphQuery prepareGraphQuery(final String query)
             throws Exception {
 
-        return new GraphQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(), query);
+        return prepareGraphQuery(query, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a graph query.
+     * 
+     * @param query
+     *            the query string
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     * 
+     * @return The {@link IPreparedGraphQuery}
+     */
+    public IPreparedGraphQuery prepareGraphQuery(final String query,
+            final UUID uuid) throws Exception {
+
+        return new GraphQuery(
+                mgr.newQueryConnectOptions(sparqlEndpointURL, tx), uuid, query);
 
     }
 
@@ -254,7 +293,25 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedBooleanQuery prepareBooleanQuery(final String query)
             throws Exception {
 
-        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(), query);
+        return prepareBooleanQuery(query, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a boolean (ask) query.
+     * 
+     * @param query
+     *            the query string
+     * 
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     *            
+     * @return the {@link IPreparedBooleanQuery}
+     */
+    public IPreparedBooleanQuery prepareBooleanQuery(final String query, final UUID uuid)
+            throws Exception {
+
+        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), uuid, query);
 
     }
 
@@ -264,15 +321,34 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * @param updateStr
      *            The SPARQL UPDATE request.
      * 
-     * @return The {@link SparqlUpdate} opertion.
+     * @return The {@link SparqlUpdate} operation.
      * 
      * @throws Exception
      */
     public IPreparedSparqlUpdate prepareUpdate(final String updateStr)
             throws Exception {
 
-        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(),
-                updateStr);
+        return prepareUpdate(updateStr, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a SPARQL UPDATE request.
+     * 
+     * @param updateStr
+     *            The SPARQL UPDATE request.
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     * 
+     * @return The {@link SparqlUpdate} operation.
+     * 
+     * @throws Exception
+     */
+    public IPreparedSparqlUpdate prepareUpdate(final String updateStr, final UUID uuid)
+            throws Exception {
+
+        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL,
+                tx), uuid, updateStr);
 
     }
 
@@ -881,17 +957,17 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * <p>
      * Right now, the only metadata is the query ID.
      */
-    protected abstract class Query implements IPreparedOperation, IPreparedQuery {
+    protected abstract class QueryOrUpdate implements IPreparedOperation, IPreparedQuery {
         
         protected final ConnectOptions opts;
         
-        protected final UUID id;
+        private final UUID uuid;
 
         protected final String query;
 
         private final boolean update;
 
-        public Query(final ConnectOptions opts, final UUID id,
+        public QueryOrUpdate(final ConnectOptions opts, final UUID id,
                 final String query) {
 
             this(opts, id, query, false/* update */);
@@ -907,7 +983,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
          * @param update
          *            <code>true</code> iff this is a SPARQL update.
          */
-        public Query(final ConnectOptions opts, final UUID id,
+        public QueryOrUpdate(final ConnectOptions opts, final UUID uuid,
                 final String query, final boolean update) {
 
             if (opts == null)
@@ -916,8 +992,11 @@ public class RemoteRepository extends RemoteRepositoryBase {
             if (query == null)
                 throw new IllegalArgumentException();
             
+            if (uuid == null)
+                throw new IllegalArgumentException();
+            
             this.opts = opts;
-            this.id = id;
+            this.uuid = uuid;
             this.query = query;
             this.update = update;
             
@@ -926,7 +1005,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         @Override
         final public UUID getQueryId() {
             
-            return id;
+            return uuid;
             
         }
         
@@ -954,7 +1033,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
                 
             }
 
-            if (id != null)
+//            if (id != null)
                 opts.addRequestParam("queryId", getQueryId().toString());
                 
         }
@@ -1012,7 +1091,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-    private final class TupleQuery extends Query implements IPreparedTupleQuery {
+    private final class TupleQuery extends QueryOrUpdate implements IPreparedTupleQuery {
         
         public TupleQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
@@ -1050,7 +1129,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-    private final class GraphQuery extends Query implements IPreparedGraphQuery {
+    private final class GraphQuery extends QueryOrUpdate implements IPreparedGraphQuery {
 
         public GraphQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
@@ -1088,7 +1167,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
     }
 
-    private final class BooleanQuery extends Query implements
+    private final class BooleanQuery extends QueryOrUpdate implements
             IPreparedBooleanQuery {
         
         public BooleanQuery(final ConnectOptions opts, final UUID id,
@@ -1128,7 +1207,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-    private final class SparqlUpdate extends Query implements
+    private final class SparqlUpdate extends QueryOrUpdate implements
             IPreparedSparqlUpdate {
         
         public SparqlUpdate(final ConnectOptions opts, final UUID id,
