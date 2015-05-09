@@ -98,6 +98,11 @@ public abstract class BigdataGraph implements Graph {
     
     private static final transient Logger sparqlLog = Logger.getLogger(
             BigdataGraph.class.getName() + ".SparqlLogger");
+
+    /**
+     * Maximum number of chars to print through the SparqlLogger.
+     */
+    public static final int SPARQL_LOG_MAX = 10000;
     
     public interface Options {
         
@@ -1409,7 +1414,8 @@ public abstract class BigdataGraph implements Graph {
                 getWriteConnection() : getReadConnection();
         
         if (sparqlLog.isTraceEnabled()) {
-            sparqlLog.trace("query:\n"+queryStr);
+            sparqlLog.trace("query:\n"+ (queryStr.length() <= SPARQL_LOG_MAX 
+                    ? queryStr : queryStr.substring(0, SPARQL_LOG_MAX)+" ..."));
         }
 
         final GraphQueryResult result;
@@ -1551,7 +1557,8 @@ public abstract class BigdataGraph implements Graph {
                 getWriteConnection() : getReadConnection();
         
         if (sparqlLog.isTraceEnabled()) {
-            sparqlLog.trace("query:\n"+queryStr);
+            sparqlLog.trace("query:\n"+ (queryStr.length() <= SPARQL_LOG_MAX 
+                    ? queryStr : queryStr.substring(0, SPARQL_LOG_MAX)+" ..."));
         }
 
         final TupleQueryResult result;
@@ -1721,7 +1728,8 @@ public abstract class BigdataGraph implements Graph {
         final String queryStr = sb.toString();
                     
         if (sparqlLog.isTraceEnabled()) {
-            sparqlLog.trace("query:\n"+queryStr);
+            sparqlLog.trace("query:\n"+ (queryStr.length() <= SPARQL_LOG_MAX 
+                    ? queryStr : queryStr.substring(0, SPARQL_LOG_MAX)+" ..."));
         }
         
         final RepositoryConnection cxn = readFromWriteConnection ? 
