@@ -3,6 +3,7 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.IV;
@@ -188,6 +189,16 @@ public class VarNode extends TermNode {
 		
 	}
 	
+    /**
+     * Hot-swap the IVariable underneath this VarNode.
+     */
+    @Override
+    public void setValueExpression(IValueExpression<? extends IV> ve) {
+
+        setArg(0, ve);
+        
+    }
+
     /**
 	 * Overridden to mark metadata about variables.
 	 */
