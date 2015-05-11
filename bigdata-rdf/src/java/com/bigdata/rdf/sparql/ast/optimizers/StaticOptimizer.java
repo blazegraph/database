@@ -673,12 +673,7 @@ public final class StaticOptimizer {
 		}
 
 		final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
-		/*
-		 * Changed recursive to true so that we get the right produced
-		 * bindings out of UnionNodes so that they can be reordered
-		 * correctly.
-		 */
-		sa.getDefinitelyProducedBindings(node, vars, true);
+		sa.getDefinitelyProducedBindings(node, vars, false);
 
 		final Set<String> varNames = new LinkedHashSet<String>();
 		for (IVariable<?> v : vars)

@@ -39,10 +39,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
-import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -50,7 +48,6 @@ import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.BasicBooleanQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.BasicIntQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
@@ -120,11 +117,6 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             final StaticAnalysis sa, final IBindingSet[] bSets,
             final JoinGroupNode group) {
 
-        final GlobalAnnotations globals = new GlobalAnnotations(
-                ctx.getLexiconNamespace(),
-                ctx.getTimestamp()
-                );
-
         for (ServiceNode node : group.getChildren(ServiceNode.class)) {
 
             if (log.isDebugEnabled()) {
@@ -173,9 +165,6 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             TermNode left = null;
             TermNode right = null;
             IGroupMemberNode pathExpr = null;
-            JoinGroupNode group1 = null;
-            JoinGroupNode group2 = null;
-            
             for (StatementPatternNode child : subgroup.getStatementPatterns()) {
                 if (child.getQueryHintAsBoolean(PATH_EXPR, false)) {
                     if (pathExpr != null) {
@@ -200,7 +189,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                                 child.c(), 
                                 child.getScope()
                                 );
-                        group1 = new JoinGroupNode();
+                        final JoinGroupNode group1 = new JoinGroupNode();
                         group1.addChild(forward);
                         
                         final StatementPatternNode reverse = 
@@ -211,7 +200,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                                 child.c(), 
                                 child.getScope()
                                 );
-                        group2 = new JoinGroupNode();
+                        final JoinGroupNode group2 = new JoinGroupNode();
                         group2.addChild(reverse);
                         
                         final UnionNode union = new UnionNode();
@@ -236,55 +225,6 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                 }
             }
             
-            IVariable<?> leftVar = null;
-            if (left instanceof VarNode) {
-                leftVar = ((VarNode) left).getValueExpression();
-            }
-            
-            IVariable<?> rightVar = null;
-            if (right instanceof VarNode) {
-                rightVar = ((VarNode) right).getValueExpression();
-            }
-            
-            /*
-             * Remap any filters on the left/right vars onto the transitive
-             * left/right vars instead.
-             */
-            for (FilterNode f : subgroup.getChildren(FilterNode.class)) {
-                
-                final Iterator<BOp> it = 
-                        BOpUtility.preOrderIteratorWithAnnotations(f);
-
-                boolean swap = false;
-                while (it.hasNext()) {
-                    final BOp bop = it.next();
-                    if (!(bop instanceof VarNode)) {
-                        continue;
-                    }
-                    
-                    final VarNode v = (VarNode) bop;
-                    final IVariable<?> ve = v.getValueExpression();
-                    if (leftVar != null && leftVar.equals(ve)) {
-                        v.setValueExpression(tVarLeft.getValueExpression());
-                        swap = true;
-                    } else if (rightVar != null && rightVar.equals(ve)) {
-                        v.setValueExpression(tVarRight.getValueExpression());
-                        swap = true;
-                    }                    
-                }
-
-                /*
-                 * If we've swapped any vars, also re-generate the underlying 
-                 * value expression on the filter node.
-                 */
-                if (swap) {
-                    final IValueExpressionNode veNode = f.getValueExpressionNode(); 
-                    veNode.setValueExpression(null);
-                    AST2BOpUtility.toVE(globals, veNode);
-                }
-                
-            }
-            
             final ArbitraryLengthPathNode alpNode = new ArbitraryLengthPathNode(
                     left, right,
                     tVarLeft, tVarRight,
@@ -300,6 +240,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                      * left and right) anonymous, since they cannot be projected
                      * out in a meaningful fashion.
                      */
+//                    for (BOp term : child.args()) {
                     final Iterator<BOp> it = 
                             BOpUtility.preOrderIteratorWithAnnotations(child);
                     while (it.hasNext()) {
@@ -310,12 +251,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     }
                     child.setQueryHints(new Properties());
                     subgroup.removeChild(child);
-                    if (bidirectional) {
-                        group1.addChild((IGroupMemberNode) child.clone());
-                        group2.addChild((IGroupMemberNode) child.clone());
-                    } else {
-                        alpNode.subgroup().addChild(child);
-                    }
+                    alpNode.subgroup().addChild(child);
                 }
             }
             
