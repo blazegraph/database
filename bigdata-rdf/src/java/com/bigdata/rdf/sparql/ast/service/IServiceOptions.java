@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import java.util.Properties;
-
 import org.openrdf.model.Value;
 import org.openrdf.query.BindingSet;
 
@@ -36,7 +34,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Options, metadata and configuration for service end points.
+ * Options and metadata for service end points.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
@@ -87,10 +85,5 @@ public interface IServiceOptions {
      * known to expose the bigdata LBS pattern.
      */
     boolean isBigdataLBS();
-    
-    /**
-     * Gets (external) configuration for services.
-     */
-    Properties getServiceConfig();
     
 }

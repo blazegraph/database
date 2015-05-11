@@ -34,11 +34,24 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 
 /**
- * Service invocation interface for an external (non-bigdata, but same JVM)
- * service. Data interchange with the external service uses the internal
- * {@link IBindingSet} and it is up to the implementing service to do any
- * conversion. The service must return internal values with mocked IVs, which
- * will be resolved against the database, turning them into {@link IV}s.
+ * <p>
+ * Service invocation interface for an external (non-bigdata) service. Data
+ * interchange with the external service uses the internal {@link IBindingSet} 
+ * abstraction and it is up to the implementing service to do any conversion of
+ * external entities. More precisely, the service must return internal values
+ * with mocked IVs, which will be automatically resolved against the database,
+ * turning them into {@link IV}s. This can be understood as the most generic
+ * kind of interface for interacting with external services.
+ * </p>
+ * 
+ * <p>
+ * In order to determine the set of mocked IVs, the service must specify the set
+ * of variables for which such mocked IVs are generated. This can be understood
+ * as the set of "outgoing" variables of the service, i.e. those variables
+ * that are bound by executing the service call. All variables occurring in
+ * the service that are not part of this set are considered incoming variables;
+ * they must be bound (if at all) prior to executing the service.
+ * </p>
  * 
  * @see ServiceRegistry
  * @see ServiceFactory

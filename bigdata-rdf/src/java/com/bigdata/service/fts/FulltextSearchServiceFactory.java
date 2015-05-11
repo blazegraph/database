@@ -45,6 +45,7 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -115,8 +116,12 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
       final AbstractTripleStore store = params.getTripleStore();
       
-      final FulltextSearchDefaults defaults = 
-            new FulltextSearchDefaults(serviceOptions.getServiceConfig());
+      final Properties props =
+         store.getIndexManager()!=null && 
+         store.getIndexManager() instanceof AbstractJournal  ?
+         ((AbstractJournal)store.getIndexManager()).getProperties() : null;
+      
+      final FulltextSearchDefaults deflts = new FulltextSearchDefaults(props);
 
       final ServiceNode serviceNode = params.getServiceNode();
 
@@ -150,7 +155,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
        * Create and return the ServiceCall object which will execute this query.
        */
       return new FulltextSearchServiceCall(store, searchVar, statementPatterns,
-            getServiceOptions(), defaults);
+            getServiceOptions(), deflts);
 
    }
 
@@ -485,6 +490,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          }
 
+         /** TODO: closing logics */
          public void close() {
             if (open) {
                open = false;
