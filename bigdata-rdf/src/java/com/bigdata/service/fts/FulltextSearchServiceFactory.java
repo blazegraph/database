@@ -155,7 +155,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
        * Create and return the ServiceCall object which will execute this query.
        */
       return new FulltextSearchServiceCall(store, searchVar, statementPatterns,
-            getServiceOptions(), deflts);
+            getServiceOptions(), deflts, params);
 
    }
 
@@ -342,6 +342,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       private final TermNode scoreField;
       private final TermNode snippetField;
       private final FulltextSearchDefaults defaults;
+      private final ServiceCallCreateParams serviceCallParams;
 
       private final IVariable<IV>[] vars;
 
@@ -349,7 +350,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             final IVariable<?> searchVar,
             final Map<URI, StatementPatternNode> statementPatterns,
             final IServiceOptions serviceOptions,
-            final FulltextSearchDefaults defaults) {
+            final FulltextSearchDefaults defaults,
+            final ServiceCallCreateParams serviceCallParams) {
 
          if (store == null)
             throw new IllegalArgumentException();
@@ -369,6 +371,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          
          this.defaults = defaults;
 
+         this.serviceCallParams = serviceCallParams;
+         
          /*
           * Unpack the "search" magic predicate: [?searchVar solr:search
           * objValue]
@@ -452,7 +456,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
          return new FulltextSearchMultiHiterator(bsList, query, endpoint,
                endpointType, params, searchField, scoreField, snippetField, 
-               searchResultType, searchTimeout, defaults);
+               searchResultType, searchTimeout, defaults, serviceCallParams);
 
       }
 
@@ -466,7 +470,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       @Override
       public ICloseableIterator<IBindingSet> call(IBindingSet[] incomingBs) {
 
-         final FulltextSearchMultiHiterator<IFulltextSearchHit<?>> hiterator = getSolrSearchResultIterator(incomingBs);
+         final FulltextSearchMultiHiterator<IFulltextSearchHit<?>> hiterator = 
+               getSolrSearchResultIterator(incomingBs);
 
          return new FulltextSearchHitConverter(hiterator);
 
@@ -646,6 +651,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
       final TermNode searchField;
       final TermNode scoreField;
       final TermNode snippetField;
+      final ServiceCallCreateParams serviceCallParams;
       
       final FulltextSearchDefaults defaults;
       
@@ -658,7 +664,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
             final TermNode endpointType, final TermNode params,
             final TermNode searchField, final TermNode scoreField, 
             final TermNode snippetField, final TermNode searchResultType, 
-            final TermNode searchTimeout, final FulltextSearchDefaults defaults) {
+            final TermNode searchTimeout, final FulltextSearchDefaults defaults,
+            final ServiceCallCreateParams serviceCallParams) {
 
          this.query = query;
          this.bindingSet = bindingSet;
@@ -672,6 +679,7 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          this.snippetField = snippetField;
          
          this.defaults = defaults;
+         this.serviceCallParams = serviceCallParams;
 
          init();
 
@@ -776,7 +784,8 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          FulltextSearchQuery sq = new FulltextSearchQuery(
                query, params, endpoint, searchTimeout, searchField,
                scoreField, snippetField, bs, searchResultType);
-         curDelegate = (FulltextSearchHiterator) ftSearch.search(sq);
+         curDelegate = (FulltextSearchHiterator) 
+               ftSearch.search(sq, serviceCallParams.getClientConnectionManager());
 
          return true;
       }

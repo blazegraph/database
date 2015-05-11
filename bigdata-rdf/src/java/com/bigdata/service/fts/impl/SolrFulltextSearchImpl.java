@@ -23,24 +23,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.fts.impl;
 
-import java.io.IOException;
-import java.net.URLEncoder;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.util.FutureResponseListener;
 
+import com.bigdata.service.fts.FTS;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.fts.FulltextSearchHit;
 import com.bigdata.service.fts.FulltextSearchHiterator;
@@ -60,12 +57,13 @@ public class SolrFulltextSearchImpl implements
 
    @Override
    public FulltextSearchHiterator<FulltextSearchHit> search(
-         com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery query) {
+         com.bigdata.service.fts.IFulltextSearch.FulltextSearchQuery query,
+         HttpClient client) {
 
       if (query != null) {
 
          try {
-            FulltextSearchHit[] hits = queryIndex(query);
+            FulltextSearchHit[] hits = queryIndex(query, client);
 
             return new FulltextSearchHiterator<FulltextSearchHit>(hits);
 
@@ -83,76 +81,73 @@ public class SolrFulltextSearchImpl implements
 
    
    @SuppressWarnings("deprecation")
-   private FulltextSearchHit[] queryIndex(FulltextSearchQuery query)
+   private FulltextSearchHit[] queryIndex(
+         FulltextSearchQuery query, HttpClient httpClient)
          throws Exception {
 
-      final HttpClient httpClient;
-      final Integer queryTimeout = query.getSearchTimeout();
-      if (queryTimeout!=null) {
-         
-         final HttpParams httpParams = new BasicHttpParams();
-         HttpConnectionParams.setConnectionTimeout(httpParams, queryTimeout);
-         HttpConnectionParams.setSoTimeout(httpParams, queryTimeout);
-         httpClient = new DefaultHttpClient(httpParams);
-         
-      } else {
-         
-         httpClient = new DefaultHttpClient();
-         
+      if (httpClient.isStopped()) {
+         throw new FulltextSearchException("The client has been stopped");
+      }
+      
+      
+      Request request = httpClient.newRequest(query.getEndpoint());
+      
+      // Limit response content buffer to 512 KiB
+      FutureResponseListener listener =
+         new FutureResponseListener(request, 10 * 1024 * 1024); // 100 MB size
+      
+      request.param("q", query.getQuery());
+      request.param("wt", "json");
+
+      final String searchParams = query.getParams();
+      if (searchParams!=null && !searchParams.isEmpty()) {
+         final String[] params = searchParams.split("&");
+         for (int i=0; i<params.length; i++) {
+            if (params[i]!=null) {
+               String kv[] = params[i].split("=");
+               if (kv.length==2 && kv[0]!=null && !(kv[0].isEmpty())) {
+                  if (!(kv[0].equals("wt"))) {
+                     try {
+                        final String val = kv[1]==null ? "" : 
+                           URLDecoder.decode(kv[1], "UTF-8");
+                        request.param(kv[0], kv[1]);
+                     } catch (Exception e) {
+                        if (log.isInfoEnabled()) {
+                           log.info("Solr search param: '" + params[i] + "'" +
+                                 "' can't be URL decoded. Will be ignored...");
+                        }
+                     }
+                  }
+               } else {
+                  if (log.isInfoEnabled()) {
+                     log.info("Invalid Solr search param: '" + params[i] + "'");
+                     log.info("Will be ignored...");
+                  }
+               }
+            }
+         }
+      }
+      
+      final Integer queryTimeoutSpecified = query.getSearchTimeout();
+      final Integer queryTimeoutUsed = 
+            queryTimeoutSpecified==null ?
+            FTS.Options.DEFAULT_TIMEOUT : queryTimeoutSpecified;
+      
+      request.send(listener);
+      ContentResponse resp = listener.get(queryTimeoutUsed, TimeUnit.MILLISECONDS);
+
+      final int statusCode = resp.getStatus();
+      if (statusCode != 200) {
+
+         throw new FulltextSearchException("Status code != 200 received from "
+               + "external fulltext service: " + statusCode);
+
       }
 
-      try {
+      final String jsonStr = resp.getContentAsString();
+      final JSONObject json = new JSONObject(jsonStr);
 
-         final StringBuffer requestStr = new StringBuffer();
-         requestStr.append(query.getEndpoint());
-         requestStr.append("?q=" + URLEncoder.encode(query.getQuery(),"UTF-8"));
-         requestStr.append("&wt=json");
-         
-         final String searchParams = query.getParams();
-         if (searchParams!=null && !searchParams.isEmpty()) {
-            requestStr.append("&");
-            requestStr.append(searchParams);
-         }
-
-         final HttpGet httpGet = new HttpGet(requestStr.toString());
-         
-         final HttpResponse response = httpClient.execute(httpGet);
-         
-
-         if (response == null) {
-
-            throw new FulltextSearchException(
-                  "No response from fulltext service");
-
-         }
-
-         final int statusCode = response.getStatusLine().getStatusCode();
-         if (statusCode != 200) {
-
-            throw new FulltextSearchException(
-                  "Status code != 200 received from "
-                        + "external fulltext service: " + statusCode);
-
-         }
-
-         final String jsonStr = EntityUtils.toString(response.getEntity(), "UTF-8");
-         final JSONObject json = new JSONObject(jsonStr);
-
-         return constructFulltextSearchList(json, query);
-
-      } catch (IOException e) {
-
-         throw new FulltextSearchException(
-               "Error submitting the keyword search"
-                     + " to the external service: " + e.getMessage());
-
-      } finally {
-
-         if (httpClient!=null) {
-            httpClient.getConnectionManager().shutdown();
-         }
-         
-      }
+      return constructFulltextSearchList(json, query);
 
    }
 
