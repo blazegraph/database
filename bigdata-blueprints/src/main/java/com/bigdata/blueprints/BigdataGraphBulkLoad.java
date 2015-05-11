@@ -65,11 +65,11 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		this.cxn.addChangeLog(this);
 	}
 
-	protected RepositoryConnection getWriteConnection() throws Exception {
+	public RepositoryConnection getWriteConnection() throws Exception {
 		return cxn;
 	}
 
-	protected RepositoryConnection getReadConnection() throws Exception {
+	public RepositoryConnection getReadConnection() throws Exception {
 		return cxn;
 	}
 

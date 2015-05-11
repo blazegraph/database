@@ -42,6 +42,10 @@ public class BigdataBindingSet implements Iterable<Map.Entry<String,Object>> {
     public Object get(final String key) {
         return this.vals.get(key);
     }
+    
+    public boolean isBound(final String key) {
+        return this.vals.containsKey(key);
+    }
 
     public Set<String> getKeys() {
         return this.vals.keySet();

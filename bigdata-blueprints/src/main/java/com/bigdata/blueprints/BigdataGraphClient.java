@@ -137,7 +137,7 @@ public class BigdataGraphClient extends BigdataGraph {
     * ISOLATABLE_INDICES).
     */
 	@Override
-	protected BigdataSailRemoteRepositoryConnection getWriteConnection() throws Exception {
+	public BigdataSailRemoteRepositoryConnection getWriteConnection() throws Exception {
 	    if (cxn == null) {
 	        cxn = repo.getConnection();
 	    }
@@ -153,7 +153,7 @@ public class BigdataGraphClient extends BigdataGraph {
     * ISOLATABLE_INDICES).
     */
 	@Override
-    protected BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
+    public BigdataSailRemoteRepositoryConnection getReadConnection() throws Exception {
         return getWriteConnection();
     }
     

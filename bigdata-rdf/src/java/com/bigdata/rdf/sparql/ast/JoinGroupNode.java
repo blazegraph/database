@@ -28,10 +28,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.sparql.ast.hints.OptimizerQueryHint;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -400,6 +403,10 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
     	final Iterator<IReorderableNode> it = nodes.iterator();
     	while (it.hasNext()) {
     		final IReorderableNode node = it.next();
+    		if (ASTStaticJoinOptimizer.log.isDebugEnabled()) {
+        		ASTStaticJoinOptimizer.log.debug(node);
+        		ASTStaticJoinOptimizer.log.debug(node.isReorderable());
+    		}
     		if (!node.isReorderable()) {
     			it.remove();
     		}
