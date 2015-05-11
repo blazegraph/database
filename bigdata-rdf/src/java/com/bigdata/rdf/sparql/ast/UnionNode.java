@@ -15,14 +15,14 @@ import com.bigdata.rdf.store.ITripleStore;
  * Note: This node only accepts {@link JoinGroupNode}s as children.
  */
 public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReorderableNode {
-	
+    
     /**
      * 
      */
     private static final long serialVersionUID = 1L;
 
     private static final transient Logger log = Logger.getLogger(UnionNode.class);
-	
+    
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
      */
@@ -39,23 +39,23 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
 
         super(args, anns);
         for (BOp x:args) {
-        	assert x instanceof JoinGroupNode;
+            assert x instanceof JoinGroupNode;
         }
 
     }
 
-	//    /**
-//	 * Construct a non-optional union.
-//	 */
-	public UnionNode() {
-		
-	}
+    //    /**
+//     * Construct a non-optional union.
+//     */
+    public UnionNode() {
+        
+    }
 
-//	public UnionNode(final boolean optional) {
-//		
-//		super(optional);
-//		
-//	}
+//    public UnionNode(final boolean optional) {
+//        
+//        super(optional);
+//        
+//    }
 
     @Override
     public UnionNode addChild(final JoinGroupNode child) {
@@ -92,46 +92,55 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
     }
     
 
-	@Override
- 	public long getEstimatedCardinality(StaticOptimizer optimizer) {
- 		long cardinality = 0;
- 		for (JoinGroupNode child : this) {
- 			StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren());
- 			cardinality += opt.getCardinality();
- 		}
- 		return cardinality;
- 	}
+    @Override
+     public long getEstimatedCardinality(StaticOptimizer optimizer) {
+         long cardinality = 0;
+         for (JoinGroupNode child : this) {
+             StaticOptimizer opt = new StaticOptimizer(optimizer, child.getReorderableChildren());
+             cardinality += opt.getCardinality();
+         }
+         return cardinality;
+     }
 
-	@Override
-	public boolean isReorderable() {
-		for (JoinGroupNode child : this) {
-			for (IGroupMemberNode grandchild : child) {
-				if (! (grandchild instanceof IReorderableNode))
-					return false;
-				if (! ((IReorderableNode)grandchild).isReorderable())
-					return false;
-			}
-		}
-		return true;
-	}
+    @Override
+    public boolean isReorderable() {
+        for (JoinGroupNode child : this) {
+            for (IGroupMemberNode grandchild : child) {
+                /*
+                 * Even though a FilterNode is not itself re-orderable doesn't
+                 * mean we can't re-order the UnionNode.  I was getting some
+                 * horrible join orders from the static optimizer for simple 
+                 * UnionNodes that were just statement patterns + filters.
+                 */
+                if (grandchild instanceof FilterNode) {
+                    continue;
+                }
+                if (! (grandchild instanceof IReorderableNode))
+                    return false;
+                if (! ((IReorderableNode)grandchild).isReorderable())
+                    return false;
+            }
+        }
+        return true;
+    }
 
 
     @Override
     public void addArg(final BOp newArg) {
-    	assert newArg instanceof JoinGroupNode;
+        assert newArg instanceof JoinGroupNode;
         super.addArg(newArg);
     }
 
     @Override
     public void addArg(final int index, final BOp newArg) {
-    	assert newArg instanceof JoinGroupNode;
+        assert newArg instanceof JoinGroupNode;
         super.addArg(index, newArg);
 
     }
 
     @Override
     public int replaceWith(final BOp oldChild, final BOp newChild) {
-    	assert newChild instanceof JoinGroupNode;
-    	return  super.replaceWith(oldChild, newChild);
+        assert newChild instanceof JoinGroupNode;
+        return  super.replaceWith(oldChild, newChild);
     }
 }
