@@ -2646,23 +2646,31 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * Now, we're ready to set up the ALPOp at the core. 
          */
         final IVariableOrConstant<?> leftTerm = 
-        		(IVariableOrConstant<?>) alpNode.left().getValueExpression();
+        		alpNode.left().getValueExpression();
         
         final IVariableOrConstant<?> rightTerm = 
-        		(IVariableOrConstant<?>) alpNode.right().getValueExpression();
+        		alpNode.right().getValueExpression();
         
         final IVariable<?> tVarLeft = 
-        		(IVariable<?>) alpNode.tVarLeft().getValueExpression();
+        		alpNode.tVarLeft().getValueExpression();
         
         final IVariable<?> tVarRight = 
-        		(IVariable<?>) alpNode.tVarRight().getValueExpression();
+        		alpNode.tVarRight().getValueExpression();
+        
+        final IVariable<?> edgeVar = alpNode.edgeVar() != null ? 
+                alpNode.edgeVar().getValueExpression() : null;
            	
+        final IVariableOrConstant<?> middleTerm = alpNode.middle() != null ? 
+                alpNode.middle().getValueExpression() : null;
+                    
         left = applyQueryHints(new ArbitraryLengthPathOp(leftOrEmpty(left),//
     			new NV(ArbitraryLengthPathOp.Annotations.SUBQUERY, subquery),
     			new NV(ArbitraryLengthPathOp.Annotations.LEFT_TERM, leftTerm),
     			new NV(ArbitraryLengthPathOp.Annotations.RIGHT_TERM, rightTerm),
     			new NV(ArbitraryLengthPathOp.Annotations.TRANSITIVITY_VAR_LEFT, tVarLeft),
     			new NV(ArbitraryLengthPathOp.Annotations.TRANSITIVITY_VAR_RIGHT, tVarRight),
+                new NV(ArbitraryLengthPathOp.Annotations.EDGE_VAR, edgeVar),
+                new NV(ArbitraryLengthPathOp.Annotations.MIDDLE_TERM, middleTerm),
     			new NV(ArbitraryLengthPathOp.Annotations.LOWER_BOUND, alpNode.lowerBound()),
     			new NV(ArbitraryLengthPathOp.Annotations.UPPER_BOUND, alpNode.upperBound()),
                 new NV(ArbitraryLengthPathOp.Annotations.PROJECT_IN_VARS, projectInVarsArr),

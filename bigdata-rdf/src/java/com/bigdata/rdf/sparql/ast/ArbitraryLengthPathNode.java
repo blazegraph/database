@@ -35,6 +35,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
+import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTALPServiceOptimizer;
@@ -94,6 +95,17 @@ public class ArbitraryLengthPathNode
          * The upper bound on the number of rounds to run.
          */
         String UPPER_BOUND =  Annotations.class.getName() + ".upperBound";
+        
+        /**
+         * The middle term - can be a variable or a constant.
+         */
+        String MIDDLE_TERM = Annotations.class.getName() + ".middleTerm";
+
+        /**
+         * The variable representing the visited edge. Bound using the binding 
+         * from the middle term. Only used by ALP service when projecting edges.
+         */
+        String EDGE_VAR = Annotations.class.getName() + ".edgeVar";
         
     }
 	
@@ -192,6 +204,29 @@ public class ArbitraryLengthPathNode
     }
     
     /**
+     * Returns the (optional) middle term.
+     */
+    public TermNode middle() {
+        return (VarNode) super.getProperty(Annotations.MIDDLE_TERM);
+    }
+    
+    /**
+     * Return the (optional) edge var.
+     */
+    public VarNode edgeVar() {
+        return (VarNode) super.getProperty(Annotations.EDGE_VAR);
+    }
+    
+    /**
+     * Set the edge var and middle term.  Only used by the ALP service when 
+     * projecting edges.
+     */
+    public void setEdgeVar(final VarNode edgeVar, final TermNode middle) {
+        setProperty(Annotations.MIDDLE_TERM, middle);
+        setProperty(Annotations.EDGE_VAR, edgeVar);
+    }
+
+    /**
      * Return the subgroup.
      */
     public JoinGroupNode subgroup() {
@@ -204,10 +239,8 @@ public class ArbitraryLengthPathNode
      */
     public Set<IVariable<?>> getMaybeProducedBindings() {
 
-        final Set<IVariable<?>> producedBindings = new LinkedHashSet<IVariable<?>>();
+        final Set<IVariable<?>> producedBindings = getDefinitelyProducedBindings();
 
-        addProducedBinding(left(), producedBindings);
-        addProducedBinding(right(), producedBindings);
         for (StatementPatternNode sp : subgroup().getStatementPatterns()) {
             addProducedBinding(sp.s(), producedBindings);
             addProducedBinding(sp.p(), producedBindings);
@@ -230,22 +263,24 @@ public class ArbitraryLengthPathNode
         addProducedBinding(left(), producedBindings);
         addProducedBinding(right(), producedBindings);
         
+        final VarNode edgeVar = edgeVar();
+        if (edgeVar != null) {
+            addProducedBinding(edgeVar, producedBindings);
+        }
+        
         return producedBindings;
 
     }
     
     /**
      * Return the set of variables used by this ALP node (statement pattern
-     * terms and inside filters).  Used to determine what needs to be projected
+     * terms and inside filters). Used to determine what needs to be projected
      * into the op.
      */
     public Set<IVariable<?>> getUsedVars() {
         
-        final Set<IVariable<?>> used = new LinkedHashSet<IVariable<?>>();
+        final Set<IVariable<?>> used = getDefinitelyProducedBindings();
         
-        addUsedVar(left(), used);
-        addUsedVar(right(), used);
-
         for (StatementPatternNode sp : subgroup().getStatementPatterns()) {
             addUsedVar(sp.s(), used);
             addUsedVar(sp.p(), used);
@@ -345,10 +380,19 @@ public class ArbitraryLengthPathNode
 	@Override
 	public boolean isReorderable() {
 
-		final long estCard = getEstimatedCardinality(null);
-		
-		return estCard >= 0 && estCard < Long.MAX_VALUE;
-		
+//		final long estCard = getEstimatedCardinality(null);
+//		
+//		return estCard >= 0 && estCard < Long.MAX_VALUE;
+
+	    /*
+	     * I think it's always better to allow this thing to be re-ordered.
+	     * If it shares join variables with anything that is usually going
+	     * to produce a better order, regardless of whether we can calculate
+	     * the true cardinality of the underlying subgroup.  Reordering by
+	     * variable-sharing is better than not re-ordering it at all.
+	     */
+	    return true;
+	    
 	}
 
 	@Override
@@ -386,49 +430,116 @@ public class ArbitraryLengthPathNode
 			}
 		}
 		
-		/*
-		 * TODO finish the ASTCardinalityOptimizer
-		 */
-		BOp pathExpr = null;
-		if (group.arity() == 1) {
-			
-		    pathExpr = group.get(0);
-		    
-		} else {
-		    
-		    for (BOp node : group.getChildren()) {
-		        final ASTBase astNode = (ASTBase) node;
-		        if (astNode.getQueryHintAsBoolean(
-		                ASTALPServiceOptimizer.PATH_EXPR, false)) {
-		            pathExpr = node;
-		            break;
-		        }
-		    }
-
-		}
-		
-        final long result;
-	    if (pathExpr != null && pathExpr.getProperty(
-	            AST2BOpBase.Annotations.ESTIMATED_CARDINALITY) != null) {
-	        
-            final long estCard = pathExpr.getProperty(
-                    AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
-                    Long.MAX_VALUE); 
-	            
-            result = (estCard < Long.MAX_VALUE) ? 
-                    estCard + zeroMatchAdjustment : Long.MAX_VALUE;
-                
-        } else {
-	            
-            result = Long.MAX_VALUE;
-                   
-        }
-	                
         if (log.isDebugEnabled()) {
-            log.debug("reported cardinality: " + result);
+            log.debug("zma: " + zeroMatchAdjustment);
+        }
+		
+        /*
+         * Normal simple ALP node will have the cardinality on the group.
+         */
+        final long groupCard = group.getProperty(
+              AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
+              Long.MAX_VALUE);
+        
+        if (groupCard < Long.MAX_VALUE) {
+            
+            final long result = groupCard + zeroMatchAdjustment;
+            if (log.isDebugEnabled()) {
+                log.debug("reported cardinality: " + result);
+            }
+            return result;
+            
         }
         
-        return result;
+        long result = 0;
+        
+        /*
+         * Try to find a path expr (ALP service).  We would not need to do this
+         * if we were calculating the cardinality of the join groups.
+         * 
+         * TODO finish the ASTCardinalityOptimizer
+         */
+        final Iterator<BOp> it = 
+                BOpUtility.preOrderIteratorWithAnnotations(group);
+
+        while (it.hasNext()) {
+            final BOp bop = it.next();
+            
+            if (log.isDebugEnabled()) {
+                log.debug("considering:\n"+bop);
+            }
+            
+            if (!(bop instanceof StatementPatternNode)) {
+                if (log.isDebugEnabled()) {
+                    log.debug("continuing");
+                }
+                continue;
+            }
+            final StatementPatternNode sp = (StatementPatternNode) bop;
+            
+            if (!sp.getQueryHintAsBoolean(ASTALPServiceOptimizer.PATH_EXPR, false)) {
+                if (log.isDebugEnabled()) {
+                    log.debug("continuing");
+                }
+                continue;
+            }
+            
+            if (sp.getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY) == null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("continuing");
+                }
+                continue;
+            }
+                
+            final long estCard = sp.getProperty(
+                    AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
+                    Long.MAX_VALUE);
+            
+            if (estCard == Long.MAX_VALUE) {
+                result = Long.MAX_VALUE;
+            }
+                
+            if (result == Long.MAX_VALUE) {
+                if (log.isDebugEnabled()) {
+                    log.debug("continuing");
+                }
+                continue;
+            }
+
+            result += estCard;
+            
+        }
+        
+        if (result > 0) {
+            
+            if (log.isDebugEnabled()) {
+                log.debug("found a path expression");
+            }
+            
+            result += zeroMatchAdjustment;
+            
+            if (log.isDebugEnabled()) {
+                log.debug("reported cardinality: " + result);
+            }
+            
+            return result;
+            
+        }
+        
+        if (log.isDebugEnabled()) {
+            log.debug("could not find a path expr");
+        }
+        
+        /*
+         * Must be a complex alp like: ?x (<a>/<b>)* ?y
+         */
+	    /*
+	     * We can't be certain of the exact cardinality, but we know if it 
+	     * shares variables with an ancestor it will probably still do better
+	     * than a statement pattern with known cardinality that does not share
+	     * any variables.
+	     */
+        return Long.MAX_VALUE / 2;
         
 	}
 

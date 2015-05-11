@@ -209,13 +209,13 @@ public abstract class BigdataGraph implements Graph {
      * Different implementations will return different types of connections
      * depending on the mode (client/server, embedded, read-only, etc.)
      */
-	protected abstract RepositoryConnection getWriteConnection() throws Exception;
+	public abstract RepositoryConnection getWriteConnection() throws Exception;
 	
 	/**
 	 * A read-only connection can be used for read operations without blocking
 	 * or being blocked by writers.
 	 */
-    protected abstract RepositoryConnection getReadConnection() throws Exception;
+    public abstract RepositoryConnection getReadConnection() throws Exception;
 	
 	/**
 	 * Return a single-valued property for an edge or vertex.
@@ -1417,7 +1417,7 @@ public abstract class BigdataGraph implements Graph {
             sparqlLog.trace("query:\n"+ (queryStr.length() <= SPARQL_LOG_MAX 
                     ? queryStr : queryStr.substring(0, SPARQL_LOG_MAX)+" ..."));
         }
-
+                
         final GraphQueryResult result;
         try {
             

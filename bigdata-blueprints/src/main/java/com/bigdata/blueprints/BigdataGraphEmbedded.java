@@ -169,11 +169,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
     }
 
-	protected BigdataSailRepositoryConnection getWriteConnection() throws Exception {
+	public BigdataSailRepositoryConnection getWriteConnection() throws Exception {
 	    return cxn.get();
 	}
 	
-	protected BigdataSailRepositoryConnection getReadConnection() throws Exception {
+	public BigdataSailRepositoryConnection getReadConnection() throws Exception {
 	    return repo.getReadOnlyConnection();
 	}
 	
