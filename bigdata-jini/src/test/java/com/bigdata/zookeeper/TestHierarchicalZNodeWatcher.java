@@ -155,11 +155,7 @@ public class TestHierarchicalZNodeWatcher extends AbstractZooTestCase implements
 
         /* FIXME There is a stochastic CI failure at the following assertion.
          * I have increased the poll timeout to the sessionTimeout to see if
-         * that makes the problem go away. BT 6/22/2011.  
-         * 
-         * BT 5/11/2015 This *might* be related to timeout bugs per BLZG-34
-         * 
-         * @see http://jira.blazegraph.com/browse/BLZG-34
+         * that makes the problem go away. BT 6/22/2011.
          */
         assertNotNull(e);
 

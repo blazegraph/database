@@ -435,26 +435,9 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
                 remaining = nanos - (System.nanoTime() - begin);
 
-                /*
-                 * The timeout for Object.wait(long timeout) MUST BE GT ZERO. If
-                 * it is ZERO, then Object.wait(timeout) will ignore the timeout
-                 * and this code will not exit the loop based on the timeout.
-                 * 
-                 * The code avoids a timeout of ZERO milliseconds by converting
-                 * [remaining] from nanoseconds to milliseconds before checking
-                 * the termination condition.
-                 * 
-                 * @see http://jira.blazegraph.com/browse/BLZG-34 (Bug in
-                 * JiniCoreServicesConfiguration.getServiceRegistrars()
-                 * (infinite wait))
-                 */
-                
-                final long remainingMillis = TimeUnit.NANOSECONDS
-                        .toMillis(remaining);
+                if (remaining <= 0) {
 
-                if (remainingMillis <= 0) {
-
-                    // Note: Avoids negative/zero timeout for signal.wait().
+                    // Note: Avoids negative timeout fo signal.wait().
                     break;
                     
                 }
@@ -470,7 +453,7 @@ public class JiniCoreServicesConfiguration extends ServiceConfiguration {
 
                     try {
 
-                        signal.wait(remainingMillis);
+                        signal.wait(TimeUnit.NANOSECONDS.toMillis(remaining));
 
                     } catch(InterruptedException ex) {
 

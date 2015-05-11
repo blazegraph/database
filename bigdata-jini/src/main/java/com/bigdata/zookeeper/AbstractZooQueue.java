@@ -359,11 +359,9 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
         public boolean awaitCondition(final long timeout, final TimeUnit unit)
                 throws InterruptedException, KeeperException {
 
-            final long beginMillis = System.currentTimeMillis();
+            final long begin = System.currentTimeMillis();
             
-            final long timeoutMillis = unit.toMillis(timeout);
-            
-            long remainingMillis = timeoutMillis;
+            long remaining = unit.toMillis(timeout);
 
             try {
 
@@ -382,18 +380,17 @@ abstract public class AbstractZooQueue<E extends Serializable> extends
                     
                     try {
 
-                        while (!isDone(n) && remainingMillis > 0) {
+                        while (!isDone(n)) {
 
-                            this.wait(remainingMillis); // wait() MUST BE GT ZERO !!!
+                            this.wait(remaining);
 
-                            // See http://jira.blazegraph.com/browse/BLZG-34
-                            remainingMillis = timeoutMillis - (System.currentTimeMillis() - beginMillis);
+                            remaining -= System.currentTimeMillis() - begin;
 
                             n = zookeeper.getChildren(zpath, this).size();
 
                             if(INFO)
                                 log.info("Queue size: " + n + ", remaining="
-                                        + remainingMillis + "ms");
+                                        + remaining + "ms");
                             
                         }
 

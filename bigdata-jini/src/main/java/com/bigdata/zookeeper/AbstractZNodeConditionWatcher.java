@@ -352,11 +352,9 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
             final long timeout, final TimeUnit unit)
             throws InterruptedException {
 
-        final long beginMillis = System.currentTimeMillis();
+        final long begin = System.currentTimeMillis();
 
-        final long timeoutMillis = unit.toMillis(timeout);
-        
-        long remainingMillis = timeoutMillis;
+        long millis = unit.toMillis(timeout);
 
         synchronized (this) {
 
@@ -390,16 +388,15 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
             
             }
 
-            while (remainingMillis > 0 && !conditionsatisfied && !isCancelled()) {
+            while (millis > 0 && !conditionsatisfied && !isCancelled()) {
 
-                this.wait(remainingMillis); // Note: wait() MUST BE GT ZERO !!!
+                this.wait(millis);
 
-                // See http://jira.blazegraph.com/browse/BLZG-34
-                remainingMillis = timeoutMillis - (System.currentTimeMillis() - beginMillis);
+                millis -= (System.currentTimeMillis() - begin);
 
                 if (log.isInfoEnabled())
                     log.info("woke up: conditionSatisifed="
-                            + conditionsatisfied + ", remaining=" + remainingMillis
+                            + conditionsatisfied + ", remaining=" + millis
                             + "ms");
                 
             }
@@ -410,7 +407,7 @@ abstract public class AbstractZNodeConditionWatcher implements Watcher {
                 
             }
 
-            return remainingMillis > 0;
+            return millis > 0;
             
         }
         
