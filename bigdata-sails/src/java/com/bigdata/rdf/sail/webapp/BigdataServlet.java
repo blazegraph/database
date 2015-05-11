@@ -242,43 +242,65 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
     *      Concurrent unisolated operations against multiple KBs </a>
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
     */
    protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
          throws DatasetNotFoundException, InterruptedException,
          ExecutionException, IOException {
 
-      final IIndexManager indexManager = getIndexManager();
+        final IIndexManager indexManager = getIndexManager();
 
-      /*
-       * ::CAUTION::
-       * 
-       * MUTATION TASKS MUST NOT FLUSH OR CLOSE THE HTTP OUTPUT STREAM !!!
-       * 
-       * THIS MUST BE DONE *AFTER* THE GROUP COMMIT POINT.
-       * 
-       * THE GROUP COMMIT POINT OCCURS *AFTER* THE TASK IS DONE.
-       */
+        /*
+         * ::CAUTION::
+         * 
+         * MUTATION TASKS MUST NOT FLUSH OR CLOSE THE HTTP OUTPUT STREAM !!!
+         * 
+         * THIS MUST BE DONE *AFTER* THE GROUP COMMIT POINT.
+         * 
+         * THE GROUP COMMIT POINT OCCURS *AFTER* THE TASK IS DONE.
+         */
 
-      // Submit task. Will run.
-      final FutureTask<T> ft = AbstractApiTask.submitApiTask(indexManager, task);
+        final BigdataRDFContext context = getBigdataRDFContext();
+        
+        try {
 
-      // Await Future.
-      ft.get();
+            // Submit task. Will run.
+            final FutureTask<T> ft = AbstractApiTask.submitApiTask(
+                    indexManager, task);
 
-      /*
-       * IFF successful, flush and close the response.
-       * 
-       * Note: This *commits* the http response to the client. The client will
-       * see this as the commit point on the database and will expect to have
-       * any mutation visible in subsequent reads.
-       */
-      task.flushAndClose();
+            // register task.
+            context.addTask(task, ft);
+            
+            // Await Future.
+            ft.get();
 
-      // TODO Modify to return T rather than Future<T> if we are always doing the get() here?
-      return ft;
+            /*
+             * IFF successful, flush and close the response.
+             * 
+             * Note: This *commits* the http response to the client. The client
+             * will see this as the commit point on the database and will expect
+             * to have any mutation visible in subsequent reads.
+             */
+            task.flushAndClose();
+
+            /*
+             * TODO Modify to return T rather than Future<T> if we are always
+             * doing the get() here? (If we do this then we also need to hook
+             * the FutureTask to remove itself from the set of known running
+             * tasks.)
+             */
+            return ft;
+
+        } finally {
+            
+            context.removeTask(task.uuid);
+
+        }
 
     }
-
+   
     /**
      * Return the {@link HAStatusEnum} -or- <code>null</code> if the
      * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA

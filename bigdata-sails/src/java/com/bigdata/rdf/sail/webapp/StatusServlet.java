@@ -67,6 +67,7 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -280,9 +281,12 @@ public class StatusServlet extends BigdataRDFServlet {
 
             if (!tryCancelQuery(queryEngine, queryId)) {
                 if (!tryCancelUpdate(context, queryId)) {
-                    queryEngine.addPendingCancel(queryId);
-                    if (log.isInfoEnabled()) {
-                        log.info("No such QUERY or UPDATE: " + queryId);
+                    if (!tryCancelTask(context, queryId)) {
+                        queryEngine.addPendingCancel(queryId);
+                        if (log.isInfoEnabled()) {
+                            log.info("No such QUERY, UPDATE, or task: "
+                                    + queryId);
+                        }
                     }
                 }
             }
@@ -352,6 +356,42 @@ public class StatusServlet extends BigdataRDFServlet {
                         return true;
 
                     }
+
+                }
+
+            }
+
+        }
+
+        // Either not found or found but not running when cancelled.
+        return false;
+
+   }
+    
+
+    /**
+     * Attempt to cancel a task that is neither a SPARQL QUERY nor a SPARQL UPDATE.
+     * @param context
+     * @param queryId
+     * @return
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
+     */
+    static private boolean tryCancelTask(final BigdataRDFContext context,
+            final UUID queryId) {
+
+        final TaskAndFutureTask<?> tmp = context.getTaskById(queryId);
+
+        if (tmp != null) {
+
+            final Future<?> f = tmp.ft;
+
+            if (f != null) {
+
+                if (f.cancel(true/* mayInterruptIfRunning */)) {
+log.fatal("CANCEL: "+tmp.task); // FIXME LOG @ FATAL
+                    return true;
 
                 }
 
@@ -839,8 +879,6 @@ public class StatusServlet extends BigdataRDFServlet {
              * the NSS.  If we find anything there, it is presumed to still be
              * executing (it it is done, it will be removed very soon after the
              * UPDATE commits).
-             * 
-             * FIXME SPARQL UPDATE REQUESTS.
              */
             {
                 
@@ -1039,29 +1077,6 @@ public class StatusServlet extends BigdataRDFServlet {
                  * 
                  * @see AST2BOpUpdate
                  */
-
-//                final QueryRoot optimizedAST = astContainer
-//                        .getOptimizedAST();
-//
-//                if (optimizedAST != null) {
-//
-//                    current.node("h2", "Optimized AST");
-//
-//                    current.node("pre", optimizedAST.toString());
-//
-//                }
-//
-//                final PipelineOp queryPlan = astContainer
-//                        .getQueryPlan();
-//
-//                if (queryPlan != null) {
-//
-//                    current.node("h2", "Query Plan");
-//
-//                    current.node("pre", BOpUtility
-//                            .toString(queryPlan));
-//
-//                }
 
             }
 

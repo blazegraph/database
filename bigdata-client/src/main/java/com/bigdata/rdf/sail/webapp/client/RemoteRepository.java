@@ -1033,9 +1033,11 @@ public class RemoteRepository extends RemoteRepositoryBase {
                 
             }
 
-//            if (id != null)
-                opts.addRequestParam("queryId", getQueryId().toString());
-                
+            final UUID queryId = getQueryId();
+
+            if (queryId != null)
+                opts.addRequestParam(QUERYID, queryId.toString());
+
         }
         
         @Override

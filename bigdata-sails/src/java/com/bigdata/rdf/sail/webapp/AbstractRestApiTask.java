@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -40,6 +41,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 
 import com.bigdata.journal.AbstractTask;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.NV;
 
@@ -56,8 +58,18 @@ import com.bigdata.util.NV;
  */
 abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 
-   private static final Logger log = Logger.getLogger(AbstractRestApiTask.class);
-   
+    private static final Logger log = Logger.getLogger(AbstractRestApiTask.class);
+
+    /**
+     * The {@link UUID} associated with this task. This is used to CANCEL a
+     * task.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
+     */
+    protected final UUID uuid;
+    
     /** The {@link HttpServletRequest}. */
     protected final HttpServletRequest req;
     
@@ -194,16 +206,25 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
      *            The namespace of the target KB instance.
      * @param timestamp
      *            The timestamp of the view of that KB instance.
-     *            @param isGSRRequired 
-     *            <code>true</code>
-     *             iff the task requires a lock on the GRS index.
+     * @param isGSRRequired
+     *            <code>true</code> iff the task requires a lock on the GRS
+     *            index.
      */
     protected AbstractRestApiTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final boolean isGRSRequired) {
-        super(namespace,timestamp, isGRSRequired);
+
+        super(namespace, timestamp, isGRSRequired);
+        
         this.req = req;
+        
         this.resp = resp;
+
+        // Extract the UUID of the request (if given).
+        final String s = req.getParameter(QueryHints.QUERYID);
+        
+        // The given UUID or a randomly assigned one.
+        this.uuid = s == null ? UUID.randomUUID() : UUID.fromString(s);
     }
 
     /**
