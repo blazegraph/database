@@ -44,6 +44,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -122,7 +123,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      */
     static public Test suite() {
 
-        if (true) {
+        if (false) {
 
             return ProxySuiteHelper.suiteWhenStandalone(
                     StressTestConcurrentRestApiRequests.class, //
@@ -132,9 +133,17 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                             // BufferMode.Transient,
                             // BufferMode.DiskWORM,
                             BufferMode.MemStore,
-                            // BufferMode.DiskRW,
+//                             BufferMode.DiskRW,
                             })), TestMode.quads);
 
+        } else if(true) {
+
+            return ProxySuiteHelper.suiteWhenStandalone(
+                    StressTestConcurrentRestApiRequests.class, //
+                    "stressTest_concurrentClients_2Hours",// 2 hours!
+                    new LinkedHashSet<BufferMode>(Arrays
+                            .asList(new BufferMode[] { BufferMode.DiskRW, })),
+                    TestMode.quads);
         } else {
 
             return ProxySuiteHelper.suiteWhenStandalone(
@@ -489,10 +498,26 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
         doConcurrentClientTest(//
                 m_mgr,// remote repository manager
                 10, TimeUnit.SECONDS,// timeout
-                20, // #of concurrent requests
+                16, // #of concurrent requests
                 20, // minimum #of namespaces
                 4000, // #of trials
                 1000L, 1000L, TimeUnit.MILLISECONDS // task interruption rate.
+        );
+
+    }
+
+    /**
+     * A 2 hour stress test.
+     */
+    public void stressTest_concurrentClients_2Hours() throws Exception {
+
+        doConcurrentClientTest(//
+                m_mgr,// remote repository manager
+                2, TimeUnit.HOURS, // long run.
+                16, // #of concurrent requests
+                20, // minimum #of namespaces
+                Bytes.megabyte32, // #of trials
+                5000L, 5000L, TimeUnit.MILLISECONDS // task interruption rate.
         );
 
     }
@@ -722,7 +747,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
              * such errors as test failures.
              */
             final List<Future<Void>> results = executorService.invokeAll(tasks,
-                    timeout, TimeUnit.SECONDS);
+                    timeout, unit);
 
             elapsedNanos = System.nanoTime() - beginNanos;
 
@@ -798,6 +823,13 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
         log.warn(ret.toString(true/* newline */));
 
+        /*
+         * FIXME Chase down all callers of Result<init>. Are the tests correctly
+         * designed to detect failures? (nfailed==0)?
+         */
+        if (nfailed > 0)
+            fail("Test failed: " + ret.toString());
+        
         return ret;
 
     }
@@ -1499,6 +1531,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
         protected void doApply(final RemoteRepositoryManager rmgr)
                 throws Exception {
 
+            final AtomicBoolean success = new AtomicBoolean(false);
+            
             // exclusive lock on random namespace.
             final String namespace = lockRandomNamespaceExclusive();
 
@@ -1545,6 +1579,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                             // destroy the namespace.
                             rmgr.deleteRepository(namespace);
+                            
+                            success.set(true);
 
                         } finally {
 
@@ -1572,7 +1608,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
             } finally {
 
-                unlockNamespaceExclusive(namespace, true/* remove */);
+                // Unlock. Remove IFF successful.
+                unlockNamespaceExclusive(namespace, success.get()/* remove */);
 
             }
 
@@ -1581,3 +1618,25 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
     }
 
 }
+/**
+ * FIXME Verify that we are observing CANCEL requests for non-SPARQL QUERY and
+ * non-SPARQL UPDATE operations (specifically CREATE NAMESPACE and DROP
+ * NAMESPACE) on the server. Go ahead and test out the CANCEL DROP NAMESPACE
+ * manually using a large load into one namespace + commit. Then DROP NAMESPACE
+ * and look for the operation running in the status window. Finally cancel that
+ * operation and make sure that it is terminated (non-success). This might
+ * require the DROP NAMESPACE operation to be hacked to pause for 60s rather
+ * than continuing to give me enough time after it has queued the delete blocks
+ * to actually interrupt the task.
+ * 
+ * FIXME Try a test that writes a lot of data into a namespace and then (in a
+ * second operation) deletes the namespace and cancels the DELETE after 200ms.
+ * Verify that the namespace is NOT deleted. Do again. Then write another large
+ * namespace and commit. Verify that a series of small commits may then be
+ * taken. The goal is to drive recycling of deferred frees from a partial
+ * release of slots.
+ * 
+ * FIXME This test might be passing with the RWStore.reset() changes. Roll those
+ * back and see if we can provoke a test failure. Until we can get to a failure
+ * we do not really know if we have a test for the problem.
+ */

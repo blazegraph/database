@@ -685,26 +685,55 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      *      does not set the namespace on the Properties</a>
      */
     public void createRepository(final String namespace,
-            final Properties properties2) throws Exception {
+            final Properties properties) throws Exception {
+
+        createRepository(namespace, properties, UUID.randomUUID());
+        
+    }
+
+    /**
+     * 
+     * Create a new KB instance.
+     * 
+     * @param namespace
+     *            The namespace of the KB instance.
+     * @param properties
+     *            The configuration properties for that KB instance.
+     * @param uuid
+     *            The {@link UUID} to be associated with this request.
+     * 
+     * @throws Exception
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1257"> createRepository()
+     *      does not set the namespace on the Properties</a>
+     */
+    public void createRepository(final String namespace,
+                final Properties properties, final UUID uuid) throws Exception {
 
         if (namespace == null)
             throw new IllegalArgumentException();
-        if (properties2 == null)
+        if (properties == null)
+            throw new IllegalArgumentException();
+        if (uuid == null)
             throw new IllegalArgumentException();
 //        if (properties.getProperty(OPTION_CREATE_KB_NAMESPACE) == null)
 //            throw new IllegalArgumentException("Property not defined: "
 //                    + OPTION_CREATE_KB_NAMESPACE);
 
         // Set the namespace property.
-        final Properties properties = new Properties(properties2);
-        properties.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
+        final Properties tmp = new Properties(properties);
+        tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
         
 //        final ConnectOptions opts = new ConnectOptions(baseServiceURL
 //                + "/namespace", httpClient);
 
+        // FIXME tx: why not present here (or rather I know why, but let's document it).
         final ConnectOptions opts = new ConnectOptions(baseServiceURL
                 + "/namespace");
 
+        if (uuid != null) // See #1254 FIXME Lift UUID into newConnectOptions() for consistency in the API
+            opts.addRequestParam(QUERYID, uuid.toString());
+        
         opts.method = "POST";
 
         JettyResponseListener response = null;
@@ -719,7 +748,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
             final PropertiesWriter writer = PropertiesWriterRegistry
                     .getInstance().get(format).getWriter(baos);
 
-            writer.write(properties);
+            writer.write(tmp);
             
             final byte[] data = baos.toByteArray();
             
@@ -743,22 +772,40 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     }
 
     /**
-     * Create a new KB instance.
+     * Destroy a KB instance.
      * 
      * @param namespace
      *            The namespace of the KB instance.
-     * @param properties
-     *            The configuration properties for that KB instance.
      *            
      * @throws Exception 
      */
     public void deleteRepository(final String namespace) throws Exception {
+
+        deleteRepository(namespace, UUID.randomUUID());
+                
+    }
+
+    /**
+     * Destroy a KB instance.
+     * 
+     * @param namespace
+     *            The namespace of the KB instance.
+     * @param uuid
+     *            The {@link UUID} to be assigned to the request.a
+     *            
+     * @throws Exception
+     */
+    public void deleteRepository(final String namespace, final UUID uuid)
+            throws Exception {
 
         final ConnectOptions opts = newConnectOptions(
                getRepositoryBaseURLForNamespace(namespace), null/* txId */);
 
         opts.method = "DELETE";
 
+        if (uuid != null) // See #1254 FIXME Lift UUID into newConnectOptions() for consistency in the API
+            opts.addRequestParam(QUERYID, uuid.toString());
+        
         JettyResponseListener response = null;
 
         try {

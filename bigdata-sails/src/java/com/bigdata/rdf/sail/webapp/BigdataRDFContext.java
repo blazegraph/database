@@ -43,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -276,6 +277,76 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     private final ConcurrentHashMap<UUID/* queryId2 */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
 
+    /**
+     * Class units a task and its future.
+     */
+    static class TaskAndFutureTask<T> {
+
+         public final AbstractRestApiTask<T> task;
+         public final FutureTask<T> ft;
+
+         TaskAndFutureTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft) {
+             this.task = task;
+             this.ft = ft;
+         }
+
+    }
+
+    /**
+     * A mapping from the given (or assigned) {@link UUID} to the
+     * {@link AbstractRestApiTask}.
+     * <p>
+     * Note: This partly duplicates information already captured by some other
+     * collections. However it is the only source for this information for tasks
+     * other than SPARQL QUERY or SPARQL UPDATE.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
+     */
+    private final ConcurrentHashMap<UUID/* RestAPITask */, TaskAndFutureTask<?>> m_restTasks = new ConcurrentHashMap<UUID, TaskAndFutureTask<?>>();
+
+
+    /**
+     * Return the {@link AbstractRestApiTask} for a currently executing request.
+     * 
+     * @param uuid
+     *            The {@link UUID} for the request.
+     * 
+     * @return The {@link AbstractRestApiTask} iff it was found.
+     */
+    TaskAndFutureTask<?> getTaskById(final UUID uuid) {
+
+        return m_restTasks.get(uuid);
+        
+    }
+
+    /**
+     * Register a task and the associated {@link FutureTask}.
+     * 
+     * @param task
+     *            The task.
+     * @param ft
+     *            The {@link FutureTask} (which is used to cancel the task).
+     */
+    <T> void addTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft) {
+
+        m_restTasks.put(task.uuid, new TaskAndFutureTask<T>(task, ft));
+        
+    }
+    
+    /**
+     * Remove a task (the task should be known to be done).
+     * 
+     * @param uuid
+     *            The task {@link UUID}.
+     */
+    void removeTask(final UUID uuid) {
+
+        m_restTasks.remove(uuid);
+        
+    }
+    
     /**
      * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
      * UPDATE request.
