@@ -25,6 +25,8 @@ package com.bigdata.service.fts;
 
 import java.io.Serializable;
 
+import org.eclipse.jetty.client.HttpClient;
+
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.service.fts.FTS.SearchResultType;
 
@@ -44,8 +46,10 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
     * 
     * @return The result set.
     */
-   public FulltextSearchHiterator<A> search(final FulltextSearchQuery query);
-
+   public FulltextSearchHiterator<A> search(
+         final FulltextSearchQuery query, 
+         HttpClient client);
+   
    // public int count(final ExternalSolrSearchQuery query);
 
    public static class FulltextSearchQuery implements Serializable {
@@ -220,5 +224,6 @@ public interface IFulltextSearch<A extends IFulltextSearchHit> {
       }
 
    }
+
 
 }
