@@ -31,23 +31,35 @@ import com.bigdata.rdf.store.BDS;
 
 
 /**
- * A vocabulary for the bigdata external full text search facility. The
- * interface is generic in the sense that we could add generic full text
- * search services, by just appending {@link EndpointType}s and adding
- * implementations for them. For the beginning, we start with a Solr index.
- * 
- *  
+ * <p>
+ * A vocabulary for the bigdata external full text search facility. 
  * The FTS search may be used to combine text search and graph search, 
  * just like the {@link BDS} - the basic difference is that this search is
  * going against an *external* service, whereas {@link BDS} is querying the
- * internal fulltext index (which is kept in synch along the lines).
+ * internal fulltext index (which is kept in synch along the lines). Note that,
+ * in contrast to the {@link BDS}, such an external search service is not
+ * necessarily tightly coupled/in synch with the underlying RDF store. In
+ * contrary, it may be a loose, uncoupled document collection that is queried
+ * as part of a SPARQL query (implementing a hybrid search paradigm) and returns
+ * arbitrary results. These results may be valid URIs (that could be joined
+ * with parts of the document later on), but as well simple literals or the
+ * score value, to be displayed as part of the underlying query.
  * 
+ * <p>
+ * Note that interface is generic in the sense that we could add generic full 
+ * text search services, by just appending {@link EndpointType}s and adding
+ * implementations for them. For the beginning, we start with a Solr index.
+ * </p>
+ *  
+ * <p>
  * Low-latency, user facing search applications may be created by slicing the
  * external full text search results and feeding them incrementally into
  * SPARQL queries. This approach allows the application to manage the cost
  * of the SPARQL query by bounding the input. If necessary, additional results
  * can be feed into the query. 
+ * </p>
  * 
+ * <p>
  * Example:
  * 
  * <pre>
@@ -65,7 +77,9 @@ import com.bigdata.rdf.store.BDS;
  * 
  * The query returns the result matches (converted to URIs), including the
  * score and sample snippets for the matches.
+ * </p>
  * 
+ * <p>
  * Here's another example using a SERVICE keyword directly: 
  * 
  * <pre>
@@ -79,6 +93,7 @@ import com.bigdata.rdf.store.BDS;
  *   }
  *   hint:Prior hint:runLast "true" .
  * }
+ * </p>
  * 
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>

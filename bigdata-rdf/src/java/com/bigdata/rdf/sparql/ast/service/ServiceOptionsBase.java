@@ -27,73 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.Properties;
-
-import com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 abstract public class ServiceOptionsBase implements IServiceOptions {
-
-   /**
-    * String to allow specification of service property file via system
-    * parameter.
-    */
-   private static String SERVICE_PROPERTY_FILE = "bigdata.servicePropertyFile";
-
-   /**
-    * String to allow specification of service property file via system
-    * parameter.
-    */
-   private static String DEFAULT_SERVICE_PROPERTY_FILE = "Service.properties";
-
-   private static final Properties properties = new Properties();
-
-   /**
-    * Static initialization of service configuration.
-    */
-   static {
-      final String propertyFile = System.getProperty(
-            SERVICE_PROPERTY_FILE,
-            DEFAULT_SERVICE_PROPERTY_FILE);
-
-      final URL propertyFileUrl;
-      if (new File(propertyFile).exists()) {
-
-          // Check the file system.
-          try {
-              propertyFileUrl = new URL("file:" + propertyFile);
-          } catch (MalformedURLException ex) {
-              throw new RuntimeException(ex);
-          }
-
-      } else {
-
-          // Check the classpath.
-          propertyFileUrl = ServiceOptionsBase.class
-                  .getClassLoader().getResource(propertyFile);
-  
-      }
-
-      if (propertyFileUrl!=null) {
-         try {
-            
-            InputStream is = new BufferedInputStream(propertyFileUrl.openStream());
-            properties.load(is);
-            
-         } catch (Exception e) {
-            // ignore: file must not be given/exist
-         }      
-      }
-      
-   }     
 
    /**
     * The location of the propertyFile for setting service properties. This
@@ -121,10 +59,5 @@ abstract public class ServiceOptionsBase implements IServiceOptions {
 
     public void setBigdataLBS(final boolean newValue) {
         this.useLBS = newValue;
-    }
-    
-    @Override
-    public Properties getServiceConfig() {
-       return properties;
     }
 }
