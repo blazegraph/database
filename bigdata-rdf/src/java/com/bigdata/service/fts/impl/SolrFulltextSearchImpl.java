@@ -110,7 +110,7 @@ public class SolrFulltextSearchImpl implements
                      try {
                         final String val = kv[1]==null ? "" : 
                            URLDecoder.decode(kv[1], "UTF-8");
-                        request.param(kv[0], kv[1]);
+                        request.param(kv[0], val);
                      } catch (Exception e) {
                         if (log.isInfoEnabled()) {
                            log.info("Solr search param: '" + params[i] + "'" +
