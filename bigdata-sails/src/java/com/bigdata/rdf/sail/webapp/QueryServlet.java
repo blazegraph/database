@@ -412,7 +412,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
 
-	private static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
+	static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
 		
 		private final String updateStr;
     	private final BigdataRDFContext context;
@@ -590,7 +590,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private static class SparqlQueryTask extends AbstractRestApiTask<Void> {
+    static class SparqlQueryTask extends AbstractRestApiTask<Void> {
 
 		private final String queryStr;
 		private final BigdataRDFContext context;

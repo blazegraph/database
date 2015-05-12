@@ -47,7 +47,6 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
-import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
 /**
  * Query hints are directives understood by the SPARQL end point. A query hint

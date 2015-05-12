@@ -159,7 +159,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long postGraphML(final String path) throws Exception {
         
-        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for postGraphML. See #1254.
+        final UUID uuid = UUID.randomUUID();
+        
+        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("blueprints");
 
@@ -204,14 +207,18 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
         // TODO Unit test when isolated by a transaction. The server is already
         // creating a tx for this so it might hit a fence post.
-        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL,tx);
+        
+        // TODO Allow client to specify UUID for SERVICE DESCRIPTION. See #1254.
+        final UUID uuid = UUID.randomUUID();
+        
+        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.method = "GET";
 
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
         return mgr
-                .graphResults(opts, null/* queryId */, null/* preparedListener */);
+                .graphResults(opts, uuid, null/* preparedListener */);
 
     }
 
@@ -245,7 +252,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             final UUID uuid) throws Exception {
 
         return new TupleQuery(
-                mgr.newQueryConnectOptions(sparqlEndpointURL, tx), uuid, query);
+                mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx), uuid, query);
 
     }
 
@@ -278,7 +285,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             final UUID uuid) throws Exception {
 
         return new GraphQuery(
-                mgr.newQueryConnectOptions(sparqlEndpointURL, tx), uuid, query);
+                mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx), uuid, query);
 
     }
 
@@ -311,7 +318,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedBooleanQuery prepareBooleanQuery(final String query, final UUID uuid)
             throws Exception {
 
-        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), uuid, query);
+        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx), uuid, query);
 
     }
 
@@ -347,7 +354,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedSparqlUpdate prepareUpdate(final String updateStr, final UUID uuid)
             throws Exception {
 
-        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL,
+        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid,
                 tx), uuid, updateStr);
 
     }
@@ -515,7 +522,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
          /*
           * This is the new code path that optimizes the effort by the server.
           */
-         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
+          // TODO Allow client to specify UUID for HASSTMT. See #1254.
+          final UUID uuid = UUID.randomUUID();
+         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
          opts.addRequestParam("HASSTMT");
          opts.addRequestParam("includeInferred",
@@ -639,7 +648,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
          throw new IllegalArgumentException();
       }
 
-      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
+      // TODO Allow client to specify UUID for ESTCARD. See #1254.
+      final UUID uuid = UUID.randomUUID();
+      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("ESTCARD");
         if (exact) {
@@ -696,11 +707,16 @@ public class RemoteRepository extends RemoteRepositoryBase {
     * FIXME This should be a streaming response for scalability. That will
     * require us to change the return type for the method. E.g., to something
     * that implements {@link Closeable}. Callers will then have to invoke
-    * {@link Closeable#close()} to avoid leaking resources.
+    * {@link Closeable#close()} to avoid leaking resources. (This change could
+    * be made when making the CONTEXTS an operation that can be given a UUID
+    * for cancellation by the client.)
     */
     public Collection<Resource> getContexts() throws Exception {
     	
-        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for CONTEXTS. See #1254.
+        final UUID uuid = UUID.randomUUID();
+
+        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("CONTEXTS");
 
@@ -735,7 +751,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long add(final AddOp add) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for ADD_OP. See #1254.
+        final UUID uuid = UUID.randomUUID();
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
         
         add.prepareForWire();
         
@@ -792,7 +811,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
     */
     public long remove(final RemoveOp remove) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for REMOVE. See #1254.
+        final UUID uuid = UUID.randomUUID();
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
         
         remove.prepareForWire();
             
@@ -886,7 +908,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long update(final RemoveOp remove, final AddOp add) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for UPDATE. See #1254.
+        final UUID uuid = UUID.randomUUID();
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
         
         remove.prepareForWire();
         add.prepareForWire();
