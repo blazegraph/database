@@ -122,7 +122,20 @@ public abstract class BigdataGraph implements Graph {
          */
         String LAX_PROPERTIES = BigdataGraph.class.getName() + ".laxProperties";
         
+        /**
+         * Set a global query timeout to apply to issuing queries.
+         */
+        String MAX_QUERY_TIME = BigdataGraph.class.getName() + ".max_query_time";
+        
     }
+    
+    /**
+     * Max Query Time used to globally set the query timeout.
+     * 
+     * Default is -1 (unlimited)
+     */
+    protected int maxQueryTime = -1;
+ 
     
     /**
      * URI used for typing elements.
@@ -179,6 +192,9 @@ public abstract class BigdataGraph implements Graph {
                 Options.READ_FROM_WRITE_CONNECTION, "false"));
         this.laxProperties = Boolean.valueOf(props.getProperty(
                 Options.LAX_PROPERTIES, "false"));
+        
+		this.maxQueryTime = Integer.parseInt(props.getProperty(
+				Options.MAX_QUERY_TIME, "-1"));
 	    
 	    this.TYPE = factory.getTypeURI();
 	    this.VERTEX = factory.getVertexURI();
@@ -1423,6 +1439,8 @@ public abstract class BigdataGraph implements Graph {
             
             final org.openrdf.query.GraphQuery query = 
                     cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+            
+            setMaxQueryTime(query);
         
             if (sparqlLog.isTraceEnabled()) {
                 if (query instanceof BigdataSailGraphQuery) {
@@ -1567,6 +1585,8 @@ public abstract class BigdataGraph implements Graph {
             final TupleQuery query = (TupleQuery) 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
             
+            setMaxQueryTime(query);
+            
             if (sparqlLog.isTraceEnabled()) {
                 if (query instanceof BigdataSailTupleQuery) {
                     final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
@@ -1640,6 +1660,8 @@ public abstract class BigdataGraph implements Graph {
             
             final BooleanQuery query = (BooleanQuery) 
                     cxn.prepareBooleanQuery(QueryLanguage.SPARQL, queryStr);
+
+            setMaxQueryTime(query);
             
             final boolean result = query.evaluate();
             
@@ -1899,6 +1921,21 @@ public abstract class BigdataGraph implements Graph {
 //            System.err.println("closed: " + closed);
 //        }
         
+    }
+    
+    /**
+     * Utility function to set the GraphQuery timeout to the global
+     * setting if it is configured.
+     * 
+     * @param query
+     */
+    protected void setMaxQueryTime(final org.openrdf.query.Query query)
+    {
+    	if(maxQueryTime > 0)
+    	{
+    		query.setMaxQueryTime(maxQueryTime);
+    	}
+    	
     }
     
 }
