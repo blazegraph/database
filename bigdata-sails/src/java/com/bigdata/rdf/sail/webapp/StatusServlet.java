@@ -1081,12 +1081,6 @@ public class StatusServlet extends BigdataRDFServlet {
             current.node("p")
             .attr("class", "update")
             //
-//            .text("solutions=" + solutionsOut)
-//            //
-//            .text(", chunks=" + chunksOut)
-//            //
-//            .text(", children=" + children.length)
-            //
             .text("elapsed=").node("span")
                .attr("class", "elapsed").text("" + elapsedMillis).close()
             .text("ms")
