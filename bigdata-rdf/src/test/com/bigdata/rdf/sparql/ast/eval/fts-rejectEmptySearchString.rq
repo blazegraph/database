@@ -1,0 +1,11 @@
+PREFIX fts: <http://www.bigdata.com/rdf/fts#>
+SELECT ?res ?score ?snippet WHERE {
+  ?res fts:search "" .
+  ?res fts:endpoint "http://localhost:8983/solr/solrtest/select" .
+  ?res fts:endpointType  "SOLR" .
+  ?res fts:params "defType=dismax&bf=uses^50" .
+  ?res fts:searchResultType  "URI" .
+  ?res fts:timeout "5000" .
+  ?res fts:score ?score .
+  ?res fts:snippet ?snippet .
+}

@@ -152,6 +152,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTExistsOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTNamedSubqueryOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
+import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
@@ -913,6 +914,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         // true if we need to materialize variables before running the SERVICE.
         final boolean isMaterialize;
+        // variables that are generated inside the service and may carry mock IVs
+        final Set<IVariable<IV>> varsToMockResolve = new HashSet<IVariable<IV>>();
         if(serviceRef instanceof IConstant) {
 
             final BigdataURI serviceURI = ServiceCallUtility
@@ -930,7 +933,24 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final boolean isBigdata = serviceCall.getServiceOptions()
                     .isBigdataNativeService();
 
-            isMaterialize = !isBigdata;
+            /*
+             * In case we are dealing with a run last service (either implicit
+             * by the type of service or explicitly enforced by a query hint),
+             * we may need to use variable bindings inside, so materialization
+             * might be required here as well.
+             */
+            isMaterialize = !isBigdata ||
+                !serviceCall.getServiceOptions().isRunFirst() ||
+                !serviceNode.getProperty(QueryHints.RUN_FIRST, false);
+            
+            /*
+             * For service calls returning mocked IVs, we need to resolve
+             * the mocked IVs in order to make them usable in subsequent joins.
+             */
+            if (serviceCall instanceof MockIVReturningServiceCall) {
+               MockIVReturningServiceCall esc = (MockIVReturningServiceCall)serviceCall;
+               varsToMockResolve.addAll(esc.getMockVariables());
+            }
 
         } else {
 
@@ -948,7 +968,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             isMaterialize = true;
             
         }
-
+        
         /*
          * SERVICEs do not have explicit "projections" (there is no capacity to
          * rename variables) but they still must hide variables which are not in
@@ -1113,6 +1133,23 @@ public class AST2BOpUtility extends AST2BOpRTO {
          */
         left = addMaterializationSteps3(left, doneSet, needsMaterialization,
                 queryHints, ctx);
+
+        /**
+         * This is a special handling for external services, which might create
+         * values that are reused/joined with IVs. We need to properly resolve
+         * them in order to make subsequen joins successful.
+         */
+        if (!varsToMockResolve.isEmpty()) {
+           
+           left = addMockTermResolverOp(
+                 left,//
+                 varsToMockResolve,//
+                 ChunkedMaterializationOp.Annotations.DEFAULT_MATERIALIZE_INLINE_IVS,
+                 null,//
+                 queryHints,//
+                 ctx//
+                 ); 
+        }
 
         return left;
 

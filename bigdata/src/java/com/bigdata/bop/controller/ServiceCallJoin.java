@@ -57,6 +57,7 @@ import com.bigdata.htree.HTree;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
+import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.service.RemoteServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
@@ -706,7 +707,11 @@ public class ServiceCallJoin extends PipelineOp {
 
                         itr = doRemoteServiceCall(
                                 (RemoteServiceCall) serviceCall, left);
-
+                    } else if (serviceCall instanceof MockIVReturningServiceCall) {
+                       
+                       itr = doExternalMockIVServiceCall(
+                                (MockIVReturningServiceCall)serviceCall, left);
+                       
                     } else {
 
                         throw new AssertionError();
@@ -756,15 +761,26 @@ public class ServiceCallJoin extends PipelineOp {
                 return serviceCall.call(left);
 
             }
-
+            
             /**
              * Evaluate an openrdf "service" call in the same JVM.
+             */
+            private ICloseableIterator<IBindingSet> doExternalMockIVServiceCall(
+                    final MockIVReturningServiceCall serviceCall,
+                    final IBindingSet left[]) throws Exception {
+
+                return doNonBigdataMockIVServiceCall(serviceCall, left);
+                
+            }
+
+            /**
+             * Evaluate an generic service producing mock IVs.
              */
             private ICloseableIterator<IBindingSet> doExternalServiceCall(
                     final ExternalServiceCall serviceCall,
                     final IBindingSet left[]) throws Exception {
 
-                return doNonBigdataServiceCall(serviceCall, left);
+                return doNonBigdataSesameServiceCall(serviceCall, left);
                 
             }
 
@@ -775,7 +791,7 @@ public class ServiceCallJoin extends PipelineOp {
                     final RemoteServiceCall serviceCall,
                     final IBindingSet left[]) throws Exception {
 
-                return doNonBigdataServiceCall(serviceCall, left);
+                return doNonBigdataSesameServiceCall(serviceCall, left);
                 
             }
             
@@ -791,7 +807,7 @@ public class ServiceCallJoin extends PipelineOp {
              *            
              * @return The solutions.
              */
-            private ICloseableIterator<IBindingSet> doNonBigdataServiceCall(
+            private ICloseableIterator<IBindingSet> doNonBigdataSesameServiceCall(
                     final ServiceCall<BindingSet> serviceCall,
                     final IBindingSet left[]) throws Exception {
 
@@ -841,6 +857,30 @@ public class ServiceCallJoin extends PipelineOp {
 
                 return new ChunkedArrayIterator<IBindingSet>(
                         bigdataSolutionChunk);
+
+            }
+            
+            /**
+             * Service call against a (non sesame based) external endpoint.
+             * 
+             * @param serviceCall
+             *            The object which will make the service call.
+             * @param left
+             *            The source solutions.
+             *            
+             * @return The solutions.
+             */
+            private ICloseableIterator<IBindingSet> doNonBigdataMockIVServiceCall(
+                    final ServiceCall<IBindingSet> serviceCall,
+                    final IBindingSet left[]) throws Exception {
+               
+               /**
+                * Note: a MockTermResolverOp will be wrapped around this
+                * service in AST2BopUtitlity.addService(), so we don't need to
+                * care about dictionary resolving mocked URIs here, but just
+                * call the service.
+                */
+               return serviceCall.call(left);
 
             }
 
