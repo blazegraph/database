@@ -284,10 +284,38 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
          public final AbstractRestApiTask<T> task;
          public final FutureTask<T> ft;
+         public final long beginNanos;
+         private final AtomicLong elapsedNanos = new AtomicLong(-1L);
 
-         TaskAndFutureTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft) {
+         TaskAndFutureTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft, final long beginNanos) {
              this.task = task;
              this.ft = ft;
+             this.beginNanos = beginNanos;
+         }
+
+         /**
+          * Hook must be invoked when the task is done executing.
+          */
+         void done() {
+             elapsedNanos.set(System.nanoTime() - beginNanos);
+         }
+         
+         /**
+         * The elapsed nanoseconds that the task has been executing. The clock
+         * stops once {@link #done()} is called.
+         */
+         long getElapsedNanos() {
+             
+            final long elapsedNanos = this.elapsedNanos.get();
+
+            if (elapsedNanos == -1L) {
+
+                return System.nanoTime() - beginNanos;
+
+            }
+
+            return elapsedNanos;
+
          }
 
     }
@@ -306,6 +334,44 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     private final ConcurrentHashMap<UUID/* RestAPITask */, TaskAndFutureTask<?>> m_restTasks = new ConcurrentHashMap<UUID, TaskAndFutureTask<?>>();
 
+    /**
+     * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
+     * UPDATE request.
+     * 
+     * @param queryId2
+     *            The {@link UUID} for the request.
+     *            
+     * @return The {@link RunningQuery} iff it was found.
+     */
+    RunningQuery getQueryById(final UUID queryId2) {
+
+        return m_queries2.get(queryId2);
+        
+    }
+    
+    /**
+     * Factory for the query identifiers.
+     */
+    private final AtomicLong m_queryIdFactory = new AtomicLong();
+    
+    /**
+     * The currently executing queries (does not include queries where a client
+     * has established a connection but the query is not running because the
+     * {@link #queryService} is blocking).
+     * 
+     * @see #m_queries
+     */
+    final Map<Long, RunningQuery> getQueries() {
+
+        return m_queries;
+        
+    }
+    
+    final public AtomicLong getQueryIdFactory() {
+    
+        return m_queryIdFactory;
+        
+    }
 
     /**
      * Return the {@link AbstractRestApiTask} for a currently executing request.
@@ -331,7 +397,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     <T> void addTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft) {
 
-        m_restTasks.put(task.uuid, new TaskAndFutureTask<T>(task, ft));
+        m_restTasks.put(task.uuid, new TaskAndFutureTask<T>(task, ft, System.nanoTime()));
         
     }
     
@@ -343,39 +409,32 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     void removeTask(final UUID uuid) {
 
-        m_restTasks.remove(uuid);
-        
+        final TaskAndFutureTask<?> task = m_restTasks.remove(uuid);
+
+        if (task != null) {
+
+            // Notify the task that it is done executing.
+            task.done();
+            
+        }
+
     }
     
     /**
-     * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
-     * UPDATE request.
+     * A mapping from the given (or assigned) {@link UUID} to the
+     * {@link AbstractRestApiTask}.
+     * <p>
+     * Note: This partly duplicates information already captured by some other
+     * collections. However it is the only source for this information for tasks
+     * other than SPARQL QUERY or SPARQL UPDATE.
      * 
-     * @param queryId2
-     *            The {@link UUID} for the request.
-     *            
-     * @return The {@link RunningQuery} iff it was found.
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
      */
-    RunningQuery getQueryById(final UUID queryId2) {
+    final Map<UUID/* RestAPITask */, TaskAndFutureTask<?>> getTasks() {
 
-        return m_queries2.get(queryId2);
-        
-    }
-    
-    /**
-     * Factory for the query identifiers.
-     */
-    private final AtomicLong m_queryIdFactory = new AtomicLong();
-    
-    final public Map<Long, RunningQuery> getQueries() {
-
-        return m_queries;
-        
-    }
-    
-    final public AtomicLong getQueryIdFactory() {
-    
-        return m_queryIdFactory;
+        return m_restTasks;
         
     }
     

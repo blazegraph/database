@@ -44,6 +44,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
@@ -242,14 +243,17 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
     *      Concurrent unisolated operations against multiple KBs </a>
-     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
-     *      operations should be cancelable from both REST API and workbench
-     *      </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+    *      operations should be cancelable from both REST API and workbench
+    *      </a>
     */
    protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
          throws DatasetNotFoundException, InterruptedException,
          ExecutionException, IOException {
 
+        if (task == null)
+            throw new IllegalArgumentException();
+       
         final IIndexManager indexManager = getIndexManager();
 
         /*

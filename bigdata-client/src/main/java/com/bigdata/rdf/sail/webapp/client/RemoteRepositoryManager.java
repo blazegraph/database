@@ -469,7 +469,6 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
    }
 
-   // FIXME Should we be doing this? Are we leaking HttpClient or Executor resources otherwise?
    /**
     * {@inheritDoc}
     * <p>
@@ -645,6 +644,24 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
    }
 
+   /**
+    * Obtain a <a href="http://vocab.deri.ie/void/"> VoID </a> description of
+    * the configured KBs. Each KB has its own namespace and corresponds to a
+    * VoID "data set".
+    * <p>
+    * Note: This method uses an HTTP GET and hence can be cached by the server.
+    * 
+    * @return A <a href="http://vocab.deri.ie/void/"> VoID </a> description of
+    *         the configured KBs.
+    * 
+    * @throws Exception
+    */
+   public GraphQueryResult getRepositoryDescriptions() throws Exception {
+
+       return getRepositoryDescriptions(UUID.randomUUID());
+
+   }
+   
     /**
      * Obtain a <a href="http://vocab.deri.ie/void/"> VoID </a> description of
      * the configured KBs. Each KB has its own namespace and corresponds to a
@@ -652,23 +669,27 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      * <p>
      * Note: This method uses an HTTP GET and hence can be cached by the server.
      * 
+     * @param uuid
+     *            The {@link UUID} to be associated with this request.
+     * 
      * @return A <a href="http://vocab.deri.ie/void/"> VoID </a> description of
      *         the configured KBs.
      * 
      * @throws Exception
      */
-    public GraphQueryResult getRepositoryDescriptions() throws Exception {
+    public GraphQueryResult getRepositoryDescriptions(final UUID uuid)
+            throws Exception {
 
-        final ConnectOptions opts = new ConnectOptions(baseServiceURL + "/namespace");
+        final ConnectOptions opts = newConnectOptions(baseServiceURL
+                + "/namespace", uuid, null/* tx */);
         
         opts.method = "GET";
 
-//        HttpResponse response = null;
-//        GraphQueryResult result = null;
-        
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        return graphResults(opts, null/* queryId */, null /*listener*/);
+        // Note: asynchronous result set processing.
+        return graphResults(opts, uuid, null /*listener*/);
+
     }
 
     /**
@@ -708,7 +729,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      *      does not set the namespace on the Properties</a>
      */
     public void createRepository(final String namespace,
-                final Properties properties, final UUID uuid) throws Exception {
+            final Properties properties, final UUID uuid) throws Exception {
 
         if (namespace == null)
             throw new IllegalArgumentException();
@@ -724,18 +745,13 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
         final Properties tmp = new Properties(properties);
         tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
         
-//        final ConnectOptions opts = new ConnectOptions(baseServiceURL
-//                + "/namespace", httpClient);
-
-        // FIXME tx: why not present here (or rather I know why, but let's document it).
-        final ConnectOptions opts = new ConnectOptions(baseServiceURL
-                + "/namespace");
-
-        if (uuid != null) // See #1254 FIXME Lift UUID into newConnectOptions() for consistency in the API
-            opts.addRequestParam(QUERYID, uuid.toString());
-        
-        opts.method = "POST";
-
+        /*
+         * Note: This operation does not currently permit embedding into a
+         * read/write tx.
+         */
+        final ConnectOptions opts = newConnectOptions(baseServiceURL
+                + "/namespace", uuid, null/* tx */);
+    
         JettyResponseListener response = null;
 
         // Setup the request entity.
@@ -799,13 +815,10 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
             throws Exception {
 
         final ConnectOptions opts = newConnectOptions(
-               getRepositoryBaseURLForNamespace(namespace), null/* txId */);
+               getRepositoryBaseURLForNamespace(namespace), uuid, null/* txId */);
 
         opts.method = "DELETE";
 
-        if (uuid != null) // See #1254 FIXME Lift UUID into newConnectOptions() for consistency in the API
-            opts.addRequestParam(QUERYID, uuid.toString());
-        
         JettyResponseListener response = null;
 
         try {
@@ -843,7 +856,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
         final String sparqlEndpointURL = getRepositoryBaseURLForNamespace(namespace);
        
         final ConnectOptions opts = newConnectOptions(sparqlEndpointURL
-            + "/properties", null/* txId */);
+                + "/properties", UUID.randomUUID()/* queryId */, null/* txId */);
 
         opts.method = "GET";
 
@@ -1076,13 +1089,16 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     * 
     * @param sparqlEndpointURL
     *           The SPARQL end point.
+    * @param uuid
+    *            The unique identifier for the request that may be used to
+    *            CANCEL the request.
     * @param tx
     *           A transaction that will isolate the operation (optional).
     */
    final protected ConnectOptions newQueryConnectOptions(
-         final String sparqlEndpointURL, final IRemoteTx tx) {
+         final String sparqlEndpointURL, final UUID uuid, final IRemoteTx tx) {
 
-       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, tx);
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, uuid, tx);
 
        opts.method = getQueryMethod();
        
@@ -1098,13 +1114,16 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     * 
     * @param sparqlEndpointURL
     *           The SPARQL end point.
+    * @param uuid
+    *            The unique identifier for the request that may be used to
+    *            CANCEL the request.
     * @param tx
     *           A transaction that will isolate the operation (optional).
     */
    final protected ConnectOptions newUpdateConnectOptions(
-         final String sparqlEndpointURL, final IRemoteTx tx) {
+         final String sparqlEndpointURL, final UUID uuid, final IRemoteTx tx) {
 
-       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, tx);
+       final ConnectOptions opts = newConnectOptions(sparqlEndpointURL, uuid, tx);
        
        opts.method = "POST";
        
@@ -1124,44 +1143,48 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 //       
 //   }
    
-   /**
-    * Return the {@link ConnectOptions} which will be used by default for the
-    * specified service URL.
-    * <p>
-    * There are three cases:
-    * <dl>
-    * <dt>
-    * The operation is not isolated by a transaction</dt>
-    * <dd>This will return a {@link RemoteRepository} that DOES NOT specify a
-    * timestamp to be used for read or write operations. For read operations,
-    * this will cause it to use the default view of the namespace (as configured
-    * on the server) and that will always be non-blocking (either reading
-    * against the then current lastCommitTime on the database or reading against
-    * an explicit read lock). For write operations, this will cause it to use
-    * the UNISOLATED view of the namespace.</dd>
-    * <dt>
-    * The operation is isolated by a read/write transaction</dt>
-    * <dd>This will return a {@link RemoteRepository} which specifies the
-    * transaction identifier (txId) for both read and write operations. This
-    * ensures that they both have the same view of the write set of the
-    * transaction (we can not use the readsOnCommitTime for read operations
-    * because writes on the transaction are not visible unless we use the txId).
-    * </dd>
-    * <dt>
-    * The operation is isolated by a read-only transaction</dt>
-    * <dd>This will return a {@link RemoteRepository} which use the
-    * readsOnCommitTime for the transaction. This provides snapshot isolation
-    * without any overhead and is also compatible with HA (where the transaction
-    * management is performed on the leader and the followers are not be aware
-    * of the txIds)</dd>
-    * </dl>
-    * 
-    * @param serviceURL
-    *           The URL of the service for the request.
-    * @param tx
-    *           A transaction that will isolate the operation (optional).
-    */
-   ConnectOptions newConnectOptions(final String serviceURL, final IRemoteTx tx) {
+    /**
+     * Return the {@link ConnectOptions} which will be used by default for the
+     * specified service URL.
+     * <p>
+     * There are three cases:
+     * <dl>
+     * <dt>
+     * The operation is not isolated by a transaction</dt>
+     * <dd>This will return a {@link RemoteRepository} that DOES NOT specify a
+     * timestamp to be used for read or write operations. For read operations,
+     * this will cause it to use the default view of the namespace (as
+     * configured on the server) and that will always be non-blocking (either
+     * reading against the then current lastCommitTime on the database or
+     * reading against an explicit read lock). For write operations, this will
+     * cause it to use the UNISOLATED view of the namespace.</dd>
+     * <dt>
+     * The operation is isolated by a read/write transaction</dt>
+     * <dd>This will return a {@link RemoteRepository} which specifies the
+     * transaction identifier (txId) for both read and write operations. This
+     * ensures that they both have the same view of the write set of the
+     * transaction (we can not use the readsOnCommitTime for read operations
+     * because writes on the transaction are not visible unless we use the
+     * txId).</dd>
+     * <dt>
+     * The operation is isolated by a read-only transaction</dt>
+     * <dd>This will return a {@link RemoteRepository} which use the
+     * readsOnCommitTime for the transaction. This provides snapshot isolation
+     * without any overhead and is also compatible with HA (where the
+     * transaction management is performed on the leader and the followers are
+     * not be aware of the txIds)</dd>
+     * </dl>
+     * 
+     * @param serviceURL
+     *            The URL of the service for the request.
+     * @param uuid
+     *            The unique identifier for the request that may be used to
+     *            CANCEL the request.
+     * @param tx
+     *            A transaction that will isolate the operation (optional).
+     */
+    ConnectOptions newConnectOptions(final String serviceURL, final UUID uuid,
+            final IRemoteTx tx) {
    
       final ConnectOptions opts = new ConnectOptions(serviceURL);
 
@@ -1195,6 +1218,16 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
       }
        
+      if (uuid != null) { 
+            /**
+             * Associate requests with a UUID so they may be cancelled.
+             * 
+             * @see #1254 (All REST API operations should be cancelable from
+             *      both REST API and workbench.)
+             */
+          opts.addRequestParam(QUERYID, uuid.toString());
+      }
+      
       return opts;
 
    }
@@ -1210,8 +1243,9 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
     * @throws Exception
     *             If anything goes wrong.
     */
-   GraphQueryResult graphResults(final ConnectOptions opts,
-           final UUID queryId, final IPreparedQueryListener listener) throws Exception {
+    GraphQueryResult graphResults(final ConnectOptions opts,
+            final UUID queryId, final IPreparedQueryListener listener)
+            throws Exception {
 
      // The listener handling the http response.
      JettyResponseListener response = null;
@@ -1441,12 +1475,21 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
    
      if (queryId == null)
         return;
-     
-       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL, null/* txId */);
+  
+        /*
+         * Note: The CANCEL request reuses the same parameter name ("queryId")
+         * to identify the UUIDs of the request(s) that should be cancelled.
+         * This means that we need to be careful on the server that the CANCEL
+         * request does not get registered under the UUID of the request to be
+         * canceled and thus cause itself to be cancelled....
+         */
+       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL,
+               queryId, null/* txId */);
 
        opts.addRequestParam("cancelQuery");
 
-       opts.addRequestParam("queryId", queryId.toString());
+       // Note: handled above.
+//       opts.addRequestParam(QUERYID, queryId.toString());
 
        JettyResponseListener response = null;
        try {
