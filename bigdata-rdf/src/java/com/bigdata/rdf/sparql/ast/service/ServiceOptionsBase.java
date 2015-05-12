@@ -27,11 +27,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
+
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 abstract public class ServiceOptionsBase implements IServiceOptions {
 
+   /**
+    * The location of the propertyFile for setting service properties. This
+    * to allow overriding the default value via passing a Java Property at
+    * the command line.
+    */
+   
+   
     private boolean isRunFirst = false;
     private boolean useLBS = false;
 
