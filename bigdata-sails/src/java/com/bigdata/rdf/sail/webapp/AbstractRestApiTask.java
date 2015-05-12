@@ -227,6 +227,15 @@ abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
         this.uuid = s == null ? UUID.randomUUID() : UUID.fromString(s);
     }
 
+    @Override
+    public String toString() {
+
+      return getClass().getSimpleName() + "{namespace=" + getNamespace()
+            + ",timestamp=" + getTimestamp() + ", isGRSRequired="
+            + isGRSRequired() + "}";
+
+    }
+
     /**
 	 * Reports the mutation count and elapsed operation time as specified by the
 	 * REST API for mutation operations.
