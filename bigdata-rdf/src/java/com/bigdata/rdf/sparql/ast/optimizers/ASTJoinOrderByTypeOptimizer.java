@@ -47,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -198,6 +199,7 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
      * 
      * 11. Assignments
      * 12. Post-conditionals
+     *     
      * </pre> 
      * Most of this logic was lifted out of {@link AST2BOpUtility}.
      * <p>
@@ -337,10 +339,12 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
          * pipeline generation) needs to be deferred until we actually evaluate
          * the join graph (at least for the RTO).
          */
+        
         { // begin required joins.
 
             /*
-             * Run some service calls first (or as early as possible).
+             * Run some service calls first (or as early as possible) and
+             * schedule service calls to be run last
              */
             {
 
@@ -358,12 +362,22 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
                         final ServiceFactory f = ServiceRegistry.getInstance()
                                 .get(serviceURI);
 
-                        if (f != null && f.getServiceOptions().isRunFirst()) {
+                        
+                        if (f!=null) {
+                           
+                            /**
+                             * Queue services in the beginning or in the end.
+                             * Note that the query hint can be used to override
+                             * the service defaults.
+                             */
+                            if (f.getServiceOptions().isRunFirst()) {
 
-                            ordered.add(n);
+                                ordered.add(n);
 
-                            sitr.remove();
-
+                                sitr.remove();
+                              
+                            } 
+                           
                         }
 
                     }
@@ -516,7 +530,8 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
 
             /*
              * Run remaining service calls (those with a variable
-             * service ref).
+             * service ref that have not been scheduled as run first or run
+             * last).
              */
             for (ServiceNode n : serviceNodes) {
 
@@ -646,7 +661,7 @@ public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer
             ordered.add(n);
             
         }
-
+        
         final int arity = joinGroup.arity();
 
         if (ordered.size() != arity) {
