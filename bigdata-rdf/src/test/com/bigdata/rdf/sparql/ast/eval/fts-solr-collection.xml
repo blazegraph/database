@@ -1,0 +1,33 @@
+<add>
+  <doc>
+    <field name="id">SYSTAP</field>
+    <field name="uri">http://example.com/SYSTAP</field>
+    <field name="fullName">SYSTAP, LLC</field>
+    <field name="description">SYSTAP is a company providing ultra high-performance graph databases</field>
+  </doc>
+  <doc>
+    <field name="id">metaphacts</field>
+    <field name="uri">http://example.com/metaphacts</field>
+    <field name="fullName">metaphacts GmbH</field>
+    <field name="description">Metaphacts is a company providing knowledge graph solutions</field>
+  </doc>
+  <doc>
+    <field name="id">SAP</field>
+    <field name="uri">http://example.com/SAP</field>
+    <field name="fullName">SAP AG</field>
+    <field name="description">The SAP company is a market leader in IT enterprise software</field>
+  </doc>
+  <doc>
+    <field name="id">Siemens</field>
+    <field name="uri">http://example.com/Siemens</field>
+    <field name="fullName">Siemens AG</field>
+    <field name="description">The Siemens company is a market leader in the energy domain and beyond</field>
+  </doc>
+  <doc>
+    <field name="id">Apple</field>
+    <field name="uri">http://example.com/Apple</field>
+    <field name="fullName">Apple Inc</field>
+    <field name="description">The Apple company delivers innovative software and hardware in the IT and communication domain</field>
+  </doc>
+</add>
+

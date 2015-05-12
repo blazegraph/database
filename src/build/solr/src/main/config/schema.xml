@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<schema name="todo" version="1.5">
+    <fields>
+        <field name="id" type="string" indexed="true" stored="true" required="true"/>
+        <field name="uri" type="text_general" indexed="true" stored="true" multiValued="true"/>
+        <field name="fullName" type="text_general" indexed="true" stored="true" multiValued="false"/>
+        <field name="description" type="text_general" indexed="true" stored="true" multiValued="false"/>
+        
+        <field name="text" type="text_general" indexed="true" stored="false" multiValued="true"/>
+        <field name="_version_" type="long" indexed="true" stored="true"/>        
+    </fields>
+
+    <uniqueKey>id</uniqueKey>
+
+    <copyField source="fullName" dest="text"/>
+    <copyField source="description" dest="text"/>
+
+    <types>
+        <fieldType name="long" class="solr.TrieLongField" precisionStep="0" positionIncrementGap="0"/>
+        <fieldType name="string" class="solr.StrField" sortMissingLast="true" />
+        <fieldType name="text_general" class="solr.TextField" positionIncrementGap="100">
+            <!-- Configures the analysis done at the index phase -->
+            <analyzer type="index">
+                <!-- Uses word break rules of the Unicode Text Segmentation algorith when splitting text into words. -->
+                <tokenizer class="solr.StandardTokenizerFactory"/>
+                <!-- Removes words found from stopwords.txt file. This filter is case insensitive. -->
+                <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" enablePositionIncrements="true" />
+                <!-- Transforms text to lower case -->
+                <filter class="solr.LowerCaseFilterFactory"/>
+            </analyzer>
+            <!-- Configures the analysis done at the query time -->
+            <analyzer type="query">
+                <!-- Uses word break rules of the Unicode Text Segmentation algorith when splitting text into words. -->
+                <tokenizer class="solr.StandardTokenizerFactory"/>
+                <!-- Removes words found from stopwords.txt file. This filter is case insensitive. -->
+                <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" enablePositionIncrements="true" />
+                <!-- Applies synonyms found from the synonyms.txt file. -->
+                <filter class="solr.SynonymFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
+                <!-- Transforms text to lower case -->
+                <filter class="solr.LowerCaseFilterFactory"/>
+            </analyzer>
+        </fieldType>
+    </types>
+</schema>

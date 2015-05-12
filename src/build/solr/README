@@ -1,0 +1,38 @@
+This is an example application setting up Solr. It is used internally for
+setting up the Solr index as part of the testing procedure for the external
+fulltext search feature documented at
+
+> http://wiki.blazegraph.com/wiki/index.php/ExternalFullTextSearch
+
+The project is taken from
+
+- https://github.com/pkainulainen/maven-examples
+- http://www.petrikainulainen.net/programming/maven/running-solr-with-maven/
+
+and licensed under Apache 2.0 (see attached LICENSE file).
+
+It is hooked in into CI as follows:
+
+- Call "mvn jetty:stop; mvn clean; mvn jetty:run" before running the tests starts the server (stop and clean redundantly, in case there were problems in prior run)
+- Call "curl 'http://localhost:8983/solr/update?commit=true' --data-binary @/bigdata-rdf/src/test/com/bigdata/rdf/sparql/ast/eval/fts-solr-collection.xml -H 'Content-type:application/xml'" loads the test data into Solr
+- Call "mvn jetty:stop; mvn clean" cleans up
+
+--------------------------------------------------
+-- Original setup description from the author:  --
+-- (note: these things have been preconfigured  --
+--  for running the tests, no need to make any  --
+--  changes except for, when running locally,   --
+--  you may want to adjust the solr path in     --
+--  /dev/config.properties file...)             --
+--------------------------------------------------
+
+CONFIGURATION:
+
+- Open profiles/dev/config.properties
+- Set the value of solr.home.directory property
+- Update the Solr schema if necessary (this one haa a custom schema)
+
+RUN:
+
+- Run either mvn jetty:run or mvn:jetty:run-war
+- Open browser and go to url: http://localhost:8983/solr/
