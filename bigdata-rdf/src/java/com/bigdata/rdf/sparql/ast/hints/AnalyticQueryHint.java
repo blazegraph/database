@@ -38,7 +38,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Query hint for turning analyic query on/off.
+ * Query hint for turning analytic query on/off.
  * <p>
  * TODO Allow this to be specified for each hash index build rather than just
  * globally for the query execution context. The primary consumer of hash
