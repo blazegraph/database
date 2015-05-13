@@ -37,6 +37,7 @@ import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
@@ -162,6 +163,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTPropertyPathOptimizer());
         
         /**
+         * If we have a singleton BindingsClause inside the main where clause
+         * and no BindingsClause attached to the QueryRoot, we can promote the
+         * BC from inline to top-level and avoid an extra hash index / hash join
+         * later.
+         */
+        add(new ASTValuesOptimizer());
+        
+        /**
          * Visit all the value expression nodes and convert them into value
          * expressions. If a value expression can be evaluated to a constant,
          * then it is replaced by that constant.
@@ -282,6 +291,16 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTSearchOptimizer());
         
+
+        /**
+         * Translate {@link SolrSearch#SEARCH} and associated magic predicates
+         * into a a {@link ServiceNode}. If there are multiple external Solr
+         * searches in the query, then each is translated into its own
+         * {@link ServiceNode}. The magic predicates identify the bindings to
+         * be projected out of the named subquery (score, snippet, etc).
+         */
+        add(new ASTFulltextSearchOptimizer());
+
         /**
          * Imposes a LIMIT of ONE for a non-aggregation ASK query.
          */
