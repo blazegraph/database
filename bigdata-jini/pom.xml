@@ -97,7 +97,7 @@
         <version>2.18.1</version>
         <configuration>
          <basedir>${basedir}</basedir>
-         <argLine>-server -ea -Xms512m -Xmx4g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
+         <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
 
         </configuration>
       </plugin>
