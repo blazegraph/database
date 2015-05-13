@@ -26,19 +26,13 @@ import info.aduna.iteration.CloseableIteration;
 
 import java.lang.reflect.Array;
 import java.util.Collection;
-import java.util.Date;
-import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.UUID;
-
-import javax.xml.datatype.DatatypeConstants;
-import javax.xml.datatype.XMLGregorianCalendar;
 
 import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFException;
@@ -46,7 +40,6 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
@@ -125,7 +118,7 @@ public abstract class BigdataGraph implements Graph {
         /**
          * Set a global query timeout to apply to issuing queries.
          */
-        String MAX_QUERY_TIME = BigdataGraph.class.getName() + ".max_query_time";
+        String MAX_QUERY_TIME = BigdataGraph.class.getName() + ".maxQueryTime";
         
     }
     
@@ -134,8 +127,7 @@ public abstract class BigdataGraph implements Graph {
      * 
      * Default is -1 (unlimited)
      */
-    protected int maxQueryTime = -1;
- 
+    protected final int maxQueryTime;
     
     /**
      * URI used for typing elements.
@@ -157,21 +149,21 @@ public abstract class BigdataGraph implements Graph {
      */
     protected final URI LABEL;
 
-	/**
-	 * Factory for round-tripping between Blueprints data and RDF data.
-	 */
-	protected final BlueprintsValueFactory factory;
-	
-	/**
-	 * Allow re-use of edge identifiers.
-	 */
-	private final boolean laxEdges;
-	
-	/**
-	 * If true, read from the write connection.  Necessary for the test suites.
-	 */
-	private final boolean readFromWriteConnection;
-	
+    /**
+     * Factory for round-tripping between Blueprints data and RDF data.
+     */
+    protected final BlueprintsValueFactory factory;
+    
+    /**
+     * Allow re-use of edge identifiers.
+     */
+    private final boolean laxEdges;
+    
+    /**
+     * If true, read from the write connection.  Necessary for the test suites.
+     */
+    private final boolean readFromWriteConnection;
+    
     /**
      * If true, use pure append mode (don't check old property values).
      */
@@ -181,63 +173,62 @@ public abstract class BigdataGraph implements Graph {
         this(factory, new Properties());
     }
     
-	public BigdataGraph(final BlueprintsValueFactory factory,
-	        final Properties props) {
+    public BigdataGraph(final BlueprintsValueFactory factory,
+            final Properties props) {
 
-	    this.factory = factory;
-	    
-	    this.laxEdges = Boolean.valueOf(props.getProperty(
-	            Options.LAX_EDGES, "false"));
+        this.factory = factory;
+        
+        this.laxEdges = Boolean.valueOf(props.getProperty(
+                Options.LAX_EDGES, "false"));
         this.readFromWriteConnection = Boolean.valueOf(props.getProperty(
                 Options.READ_FROM_WRITE_CONNECTION, "false"));
         this.laxProperties = Boolean.valueOf(props.getProperty(
                 Options.LAX_PROPERTIES, "false"));
+        this.maxQueryTime = Integer.parseInt(props.getProperty(
+                Options.MAX_QUERY_TIME, "-1"));
         
-		this.maxQueryTime = Integer.parseInt(props.getProperty(
-				Options.MAX_QUERY_TIME, "-1"));
-	    
-	    this.TYPE = factory.getTypeURI();
-	    this.VERTEX = factory.getVertexURI();
-	    this.EDGE = factory.getEdgeURI();
-	    this.LABEL = factory.getLabelURI();
-	    
-	}
-	
-	/**
-	 * For some reason this is part of the specification (i.e. part of the
-	 * Blueprints test suite).
-	 */
-	public String toString() {
-	    
-	    return getClass().getSimpleName().toLowerCase();
-	    
-	}
-	
-	/**
-	 * Return the factory used to round-trip between Blueprints values and
-	 * RDF values.
-	 */
-	public BlueprintsValueFactory getValueFactory() {
-	    return factory;
-	}
-	
+        this.TYPE = factory.getTypeURI();
+        this.VERTEX = factory.getVertexURI();
+        this.EDGE = factory.getEdgeURI();
+        this.LABEL = factory.getLabelURI();
+        
+    }
+    
+    /**
+     * For some reason this is part of the specification (i.e. part of the
+     * Blueprints test suite).
+     */
+    public String toString() {
+        
+        return getClass().getSimpleName().toLowerCase();
+        
+    }
+    
+    /**
+     * Return the factory used to round-trip between Blueprints values and
+     * RDF values.
+     */
+    public BlueprintsValueFactory getValueFactory() {
+        return factory;
+    }
+    
     /**
      * Different implementations will return different types of connections
      * depending on the mode (client/server, embedded, read-only, etc.)
      */
-	public abstract RepositoryConnection getWriteConnection() throws Exception;
-	
-	/**
-	 * A read-only connection can be used for read operations without blocking
-	 * or being blocked by writers.
-	 */
+    public abstract RepositoryConnection getWriteConnection() throws Exception;
+    
+    /**
+     * A read-only connection can be used for read operations without blocking
+     * or being blocked by writers.
+     */
     public abstract RepositoryConnection getReadConnection() throws Exception;
-	
-	/**
-	 * Return a single-valued property for an edge or vertex.
+    
+    /**
+     * Return a single-valued property for an edge or vertex.
      * 
      * @see {@link BigdataElement}
-	 */
+     */
     public Object getProperty(final URI uri, final String prop) {
         
         return getProperty(uri, factory.toPropertyURI(prop));
@@ -249,52 +240,52 @@ public abstract class BigdataGraph implements Graph {
      * 
      * @see {@link BigdataElement}
      */
-	public Object getProperty(final URI uri, final URI prop) {
+    public Object getProperty(final URI uri, final URI prop) {
 
-		try {
-			
-		    final RepositoryConnection cxn = readFromWriteConnection ? 
-		            getWriteConnection() : getReadConnection();
-		    
+        try {
+            
+            final RepositoryConnection cxn = readFromWriteConnection ? 
+                    getWriteConnection() : getReadConnection();
+            
             try {
                 
-    			final RepositoryResult<Statement> result = 
-    					cxn.getStatements(uri, prop, null, false);
-    			
-    			if (result.hasNext()) {
-    				
-    			    final Statement stmt = result.next();
-    			    
-    				if (!result.hasNext()) {
+                final RepositoryResult<Statement> result = 
+                        cxn.getStatements(uri, prop, null, false);
+                
+                if (result.hasNext()) {
+                    
+                    final Statement stmt = result.next();
+                    
+                    if (!result.hasNext()) {
     
-    				    /*
-    				     * Single value.
-    				     */
-    				    return getProperty(stmt.getObject());
-    				    
-    				} else {
+                        /*
+                         * Single value.
+                         */
+                        return getProperty(stmt.getObject());
+                        
+                    } else {
     
-    				    /*
-    				     * Multi-value, use a list.
-    				     */
-    				    final List<Object> list = new LinkedList<Object>();
+                        /*
+                         * Multi-value, use a list.
+                         */
+                        final List<Object> list = new LinkedList<Object>();
     
-    				    list.add(getProperty(stmt.getObject()));
-    				    
-    				    while (result.hasNext()) {
-    				        
-    				        list.add(getProperty(result.next().getObject()));
-    				        
-    				    }
-    				    
-    				    return list;
-    				    
-    				}
+                        list.add(getProperty(stmt.getObject()));
+                        
+                        while (result.hasNext()) {
+                            
+                            list.add(getProperty(result.next().getObject()));
+                            
+                        }
+                        
+                        return list;
+                        
+                    }
     
-    			}
-    			
-    			return null;
-    			
+                }
+                
+                return null;
+                
             } finally {
                 
                 if (!readFromWriteConnection) {
@@ -302,17 +293,17 @@ public abstract class BigdataGraph implements Graph {
                 }
                 
             }
-			
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
-	
-	protected Object getProperty(final Value value) {
-	    
+        
+    }
+    
+    protected Object getProperty(final Value value) {
+        
         if (!(value instanceof Literal)) {
             throw new RuntimeException("not a property: " + value);
         }
@@ -323,8 +314,8 @@ public abstract class BigdataGraph implements Graph {
         
         return o;
 
-	}
-	
+    }
+    
 //    /**
 //     * Return a multi-valued property for an edge or vertex.
 //     * 
@@ -338,86 +329,86 @@ public abstract class BigdataGraph implements Graph {
 //        
 //    }
 //
-//	/**
+//    /**
 //     * Return a multi-valued property for an edge or vertex.
 //     * 
 //     * TODO get rid of me
 //     * 
 //     * @see {@link BigdataElement}
-//	 */
-//	public List<Object> getProperties(final URI uri, final URI prop) {
+//     */
+//    public List<Object> getProperties(final URI uri, final URI prop) {
 //
-//		try {
-//			
-//			final RepositoryResult<Statement> result = 
-//					getWriteConnection().getStatements(uri, prop, null, false);
-//			
-//			final List<Object> props = new LinkedList<Object>();
-//			
-//			while (result.hasNext()) {
-//				
-//				final Value value = result.next().getObject();
-//				
-//				if (!(value instanceof Literal)) {
-//					throw new RuntimeException("not a property: " + value);
-//				}
-//				
-//				final Literal lit = (Literal) value;
-//				
-//				props.add(factory.fromLiteral(lit));
-//				
-//			}
-//			
-//			return props;
-//			
+//        try {
+//            
+//            final RepositoryResult<Statement> result = 
+//                    getWriteConnection().getStatements(uri, prop, null, false);
+//            
+//            final List<Object> props = new LinkedList<Object>();
+//            
+//            while (result.hasNext()) {
+//                
+//                final Value value = result.next().getObject();
+//                
+//                if (!(value instanceof Literal)) {
+//                    throw new RuntimeException("not a property: " + value);
+//                }
+//                
+//                final Literal lit = (Literal) value;
+//                
+//                props.add(factory.fromLiteral(lit));
+//                
+//            }
+//            
+//            return props;
+//            
 //        } catch (RuntimeException e) {
 //            throw e;
 //        } catch (Exception e) {
 //            throw new RuntimeException(e);
 //        }
-//		
-//	}
-	
-	/**
-	 * Return the property names for an edge or vertex.
+//        
+//    }
+    
+    /**
+     * Return the property names for an edge or vertex.
      * 
      * @see {@link BigdataElement}
-	 */
-	public Set<String> getPropertyKeys(final URI uri) {
-		
-		try {
-			
+     */
+    public Set<String> getPropertyKeys(final URI uri) {
+        
+        try {
+            
             final RepositoryConnection cxn = readFromWriteConnection ? 
                     getWriteConnection() : getReadConnection();
 
             try {
                 
                 final RepositoryResult<Statement> result = 
-    					cxn.getStatements(uri, null, null, false);
-    			
-    			final Set<String> properties = new LinkedHashSet<String>();
-    			
-    			while (result.hasNext()) {
-    				
-    				final Statement stmt = result.next();
-    				
-    				if (!(stmt.getObject() instanceof Literal)) {
-    					continue;
-    				}
-    				
-    				if (stmt.getPredicate().equals(LABEL)) {
-    					continue;
-    				}
-    				
-    				final String p = 
-    						factory.fromURI(stmt.getPredicate());
-    				
-    				properties.add(p);
-    				
-    			}
-    			
-    			return properties;
-    			
+                        cxn.getStatements(uri, null, null, false);
+                
+                final Set<String> properties = new LinkedHashSet<String>();
+                
+                while (result.hasNext()) {
+                    
+                    final Statement stmt = result.next();
+                    
+                    if (!(stmt.getObject() instanceof Literal)) {
+                        continue;
+                    }
+                    
+                    if (stmt.getPredicate().equals(LABEL)) {
+                        continue;
+                    }
+                    
+                    final String p = 
+                            factory.fromURI(stmt.getPredicate());
+                    
+                    properties.add(p);
+                    
+                }
+                
+                return properties;
+                
             } finally {
                 
                 if (!readFromWriteConnection) {
@@ -425,15 +416,15 @@ public abstract class BigdataGraph implements Graph {
                 }
                 
             }
-    			
-			
+                
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
     /**
      * Remove all values for a particular property on an edge or vertex.
@@ -446,26 +437,26 @@ public abstract class BigdataGraph implements Graph {
         
     }
     
-	/**
-	 * Remove all values for a particular property on an edge or vertex.
+    /**
+     * Remove all values for a particular property on an edge or vertex.
      * 
      * @see {@link BigdataElement}
-	 */
-	public Object removeProperty(final URI uri, final URI prop) {
+     */
+    public Object removeProperty(final URI uri, final URI prop) {
 
-		try {
-			
-			final Object oldVal = getProperty(uri, prop);
-			
-			getWriteConnection().remove(uri, prop, null);
-			
-			return oldVal;
-			
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	
-	}
+        try {
+            
+            final Object oldVal = getProperty(uri, prop);
+            
+            getWriteConnection().remove(uri, prop, null);
+            
+            return oldVal;
+            
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    
+    }
 
     /**
      * Set a single-value property on an edge or vertex (remove the old
@@ -524,36 +515,36 @@ public abstract class BigdataGraph implements Graph {
 
     }
     
-	/**
-	 * Set a single-value property on an edge or vertex (remove the old
-	 * value first).
-	 * 
-	 * @see {@link BigdataElement}
-	 */
-	public void setProperty(final URI uri, final URI prop, final Literal val) {
-		
-		try {
+    /**
+     * Set a single-value property on an edge or vertex (remove the old
+     * value first).
+     * 
+     * @see {@link BigdataElement}
+     */
+    public void setProperty(final URI uri, final URI prop, final Literal val) {
+        
+        try {
 
-		    final RepositoryConnection cxn = getWriteConnection();
-		    
-		    if (!laxProperties) {
-		        
-    		    // remove the old value
-    		    cxn.remove(uri, prop, null);
-    		    
-		    }
-		    
-		    // add the new value
-			cxn.add(uri, prop, val);
-			
+            final RepositoryConnection cxn = getWriteConnection();
+            
+            if (!laxProperties) {
+                
+                // remove the old value
+                cxn.remove(uri, prop, null);
+                
+            }
+            
+            // add the new value
+            cxn.add(uri, prop, val);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
-	
+        
+    }
+    
     /**
      * Set a multi-value property on an edge or vertex (remove the old
      * values first).
@@ -645,46 +636,46 @@ public abstract class BigdataGraph implements Graph {
     public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
             final String label) {
         
-	    if (log.isInfoEnabled())
-	        log.info("("+key+", "+from+", "+to+", "+label+")");
-	    
-	    /*
-	     * Null edge labels allowed for anonymous edges (in laxEdges mode).
-	     */
-		if (label == null && !laxEdges) {
-			throw new IllegalArgumentException();
-		}
-		
-		if (key != null && !laxEdges) {
-			
-			final Edge edge = getEdge(key);
-			
-			if (edge != null) {
-				if (!(edge.getVertex(Direction.OUT).equals(from) &&
-						(edge.getVertex(Direction.IN).equals(to)))) {
-					throw new IllegalArgumentException("edge already exists: " + key);
-				}
-			}
-			
-		}
-			
+        if (log.isInfoEnabled())
+            log.info("("+key+", "+from+", "+to+", "+label+")");
+        
+        /*
+         * Null edge labels allowed for anonymous edges (in laxEdges mode).
+         */
+        if (label == null && !laxEdges) {
+            throw new IllegalArgumentException();
+        }
+        
+        if (key != null && !laxEdges) {
+            
+            final Edge edge = getEdge(key);
+            
+            if (edge != null) {
+                if (!(edge.getVertex(Direction.OUT).equals(from) &&
+                        (edge.getVertex(Direction.IN).equals(to)))) {
+                    throw new IllegalArgumentException("edge already exists: " + key);
+                }
+            }
+            
+        }
+            
         final String eid = key != null ? key.toString() : UUID.randomUUID().toString();
         
         final URI edgeURI = factory.toEdgeURI(eid);
 
-		try {
-				
-		    // do we need to check this?
-//			if (cxn().hasStatement(edgeURI, TYPE, EDGE, false)) {
-//				throw new IllegalArgumentException("edge " + eid + " already exists");
-//			}
+        try {
+                
+            // do we need to check this?
+//            if (cxn().hasStatement(edgeURI, TYPE, EDGE, false)) {
+//                throw new IllegalArgumentException("edge " + eid + " already exists");
+//            }
 
-			final URI fromURI = factory.toVertexURI(from.getId().toString());
-			final URI toURI = factory.toVertexURI(to.getId().toString());
-			
-			final RepositoryConnection cxn = getWriteConnection();
-			
-			cxn.add(fromURI, edgeURI, toURI);
+            final URI fromURI = factory.toVertexURI(from.getId().toString());
+            final URI toURI = factory.toVertexURI(to.getId().toString());
+            
+            final RepositoryConnection cxn = getWriteConnection();
+            
+            cxn.add(fromURI, edgeURI, toURI);
             if (label != null) {
                 /*
                  * TODO FIXME Add an "anonymous" argument to specify that we
@@ -692,91 +683,91 @@ public abstract class BigdataGraph implements Graph {
                  * bundling that decision with a null label. 
                  */
                 cxn.add(edgeURI, TYPE, EDGE);
-			    cxn.add(edgeURI, LABEL, factory.toLiteral(label));
-			}
-			
-			return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
-			
+                cxn.add(edgeURI, LABEL, factory.toLiteral(label));
+            }
+            
+            return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	/**
-	 * Add a vertex.
-	 */
-	@Override
-	public Vertex addVertex(final Object key) {
-		
-	    if (log.isInfoEnabled())
-	        log.info("("+key+")");
-	    
-		try {
-			
-			final String vid = key != null ? 
-					key.toString() : UUID.randomUUID().toString();
-					
-			final URI uri = factory.toVertexURI(vid);
+    /**
+     * Add a vertex.
+     */
+    @Override
+    public Vertex addVertex(final Object key) {
+        
+        if (log.isInfoEnabled())
+            log.info("("+key+")");
+        
+        try {
+            
+            final String vid = key != null ? 
+                    key.toString() : UUID.randomUUID().toString();
+                    
+            final URI uri = factory.toVertexURI(vid);
 
             // do we need to check this?
-//			if (cxn().hasStatement(vertexURI, TYPE, VERTEX, false)) {
-//				throw new IllegalArgumentException("vertex " + vid + " already exists");
-//			}
-			
-			getWriteConnection().add(uri, TYPE, VERTEX);
+//            if (cxn().hasStatement(vertexURI, TYPE, VERTEX, false)) {
+//                throw new IllegalArgumentException("vertex " + vid + " already exists");
+//            }
+            
+            getWriteConnection().add(uri, TYPE, VERTEX);
 
-			return new BigdataVertex(uri, this);
-			
+            return new BigdataVertex(uri, this);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	/**
-	 * Lookup an edge.
-	 */
-	@Override
-	public Edge getEdge(final Object key) {
-	    
-	    if (log.isInfoEnabled())
-	        log.info("("+key+")");
-		
-		if (key == null)
-			throw new IllegalArgumentException();
-		
-		try {
-			
-			final URI edge = factory.toEdgeURI(key.toString());
-			
+    /**
+     * Lookup an edge.
+     */
+    @Override
+    public Edge getEdge(final Object key) {
+        
+        if (log.isInfoEnabled())
+            log.info("("+key+")");
+        
+        if (key == null)
+            throw new IllegalArgumentException();
+        
+        try {
+            
+            final URI edge = factory.toEdgeURI(key.toString());
+            
             final RepositoryConnection cxn = readFromWriteConnection ? 
                     getWriteConnection() : getReadConnection();
                     
             try {
-			
+            
                 final RepositoryResult<Statement> result = 
-					cxn.getStatements(null, edge, null, false);
-			
-    			if (result.hasNext()) {
-    				
-    				final Statement stmt = result.next();
-    				
-    				if (result.hasNext()) {
-    					throw new RuntimeException(
-    							"duplicate edge: " + key);
-    				}
-    				
-    				return new BigdataEdge(stmt, this);
-    				
-    			}
-    			
-    			return null;
-			
+                    cxn.getStatements(null, edge, null, false);
+            
+                if (result.hasNext()) {
+                    
+                    final Statement stmt = result.next();
+                    
+                    if (result.hasNext()) {
+                        throw new RuntimeException(
+                                "duplicate edge: " + key);
+                    }
+                    
+                    return new BigdataEdge(stmt, this);
+                    
+                }
+                
+                return null;
+            
             } finally {
                 
                 if (!readFromWriteConnection) {
@@ -790,32 +781,32 @@ public abstract class BigdataGraph implements Graph {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	/**
-	 * Iterate all edges.
-	 */
-	@Override
-	public Iterable<Edge> getEdges() {
-		
+    /**
+     * Iterate all edges.
+     */
+    @Override
+    public Iterable<Edge> getEdges() {
+        
         if (log.isInfoEnabled())
             log.info("");
         
         try {
             
-        	final URI wild = null;
-        	return getEdges(wild, wild);
-        	
+            final URI wild = null;
+            return getEdges(wild, wild);
+            
         } catch (RuntimeException ex) {
             throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
-		
-	}
-	
-	/**
+        
+    }
+    
+    /**
      * Find edges based on the from and to vertices and the edge labels, all
      * optional parameters (can be null). The edge labels can be null to include
      * all labels.
@@ -829,23 +820,23 @@ public abstract class BigdataGraph implements Graph {
      *            the edge labels to consider (optional)
      * @return the edges matching the supplied criteria
      */
-	Iterable<Edge> getEdges(final URI from, final URI to, 
-	        final String... labels) throws Exception {
+    Iterable<Edge> getEdges(final URI from, final URI to, 
+            final String... labels) throws Exception {
 
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
                 
-	    final GraphQueryResult stmts = getElements(cxn, from, to, labels);
-	    
+        final GraphQueryResult stmts = getElements(cxn, from, to, labels);
+        
         /*
          * EdgeIterable will close the connection if necessary.
          */
         return new EdgeIterable(cxn, stmts);
         
-	}
+    }
 
-	/**
-	 * Translates the request to a high-performance SPARQL query:
+    /**
+     * Translates the request to a high-performance SPARQL query:
      * 
      * construct {
      *   ?from ?edge ?to .
@@ -858,11 +849,11 @@ public abstract class BigdataGraph implements Graph {
      *   ?edge rdfs:label ?label .
      *   filter(?label in ("label1", "label2", ...)) .
      * }
-	 */
-	protected GraphQueryResult getElements(final RepositoryConnection cxn,
-	        final URI from, final URI to, final String... labels) 
-	                throws Exception {
-	    
+     */
+    protected GraphQueryResult getElements(final RepositoryConnection cxn,
+            final URI from, final URI to, final String... labels) 
+                    throws Exception {
+        
         final StringBuilder sb = new StringBuilder();
         sb.append("construct { ?from ?edge ?to . } where {\n");
         sb.append("  ?edge <"+TYPE+"> <"+EDGE+"> .\n");
@@ -894,32 +885,32 @@ public abstract class BigdataGraph implements Graph {
 
         return stmts;
             
-	}
-	
-	/**
-	 * Find edges based on a SPARQL construct query.  The query MUST construct
-	 * edge statements: 
-	 * <p>
-	 * construct { ?from ?edge ?to } where { ... }
-	 * 
-	 * @see {@link BigdataGraphQuery}
-	 */
-	Iterable<Edge> getEdges(final String queryStr) throws Exception { 
-	    
+    }
+    
+    /**
+     * Find edges based on a SPARQL construct query.  The query MUST construct
+     * edge statements: 
+     * <p>
+     * construct { ?from ?edge ?to } where { ... }
+     * 
+     * @see {@link BigdataGraphQuery}
+     */
+    Iterable<Edge> getEdges(final String queryStr) throws Exception { 
+        
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
                 
-		final org.openrdf.query.GraphQuery query = 
-				cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-		
-		final GraphQueryResult stmts = query.evaluate();
-		
+        final org.openrdf.query.GraphQuery query = 
+                cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+        
+        final GraphQueryResult stmts = query.evaluate();
+        
         /*
          * EdgeIterable will close the connection if necessary.
          */
-		return new EdgeIterable(cxn, stmts);
+        return new EdgeIterable(cxn, stmts);
 
-	}
+    }
 
     /**
      * Find vertices based on the supplied from and to vertices and the edge 
@@ -936,29 +927,29 @@ public abstract class BigdataGraph implements Graph {
      * @return
      *             the vertices matching the supplied criteria
      */
-	Iterable<Vertex> getVertices(final URI from, final URI to, 
-			final String... labels) throws Exception {
-		
+    Iterable<Vertex> getVertices(final URI from, final URI to, 
+            final String... labels) throws Exception {
+        
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
                 
-		if (from != null && to != null) {
-			throw new IllegalArgumentException();
-		}
-		
-		if (from == null && to == null) {
-			throw new IllegalArgumentException();
-		}
-		
+        if (from != null && to != null) {
+            throw new IllegalArgumentException();
+        }
+        
+        if (from == null && to == null) {
+            throw new IllegalArgumentException();
+        }
+        
         final GraphQueryResult stmts = getElements(cxn, from, to, labels);
         
         /*
          * VertexIterable will close the connection if necessary.
          */
         return new VertexIterable(cxn, stmts, from == null);
-		
-	}
-	
+        
+    }
+    
     /**
      * Find vertices based on a SPARQL construct query. If the subject parameter
      * is true, the vertices will be taken from the subject position of the
@@ -967,91 +958,91 @@ public abstract class BigdataGraph implements Graph {
      * 
      * @see {@link BigdataGraphQuery}
      */
-	Iterable<Vertex> getVertices(final String queryStr, final boolean subject) 
-	        throws Exception {
-	    
+    Iterable<Vertex> getVertices(final String queryStr, final boolean subject) 
+            throws Exception {
+        
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
                 
-		final org.openrdf.query.GraphQuery query = 
-				cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
-		
-		final GraphQueryResult stmts = query.evaluate();
-		
+        final org.openrdf.query.GraphQuery query = 
+                cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
+        
+        final GraphQueryResult stmts = query.evaluate();
+        
         /*
          * VertexIterable will close the connection if necessary.
          */
-		return new VertexIterable(cxn, stmts, subject);
-			
-	}
-	
-	/**
-	 * Find edges with the supplied property value.
-	 * 
-	 * construct {
+        return new VertexIterable(cxn, stmts, subject);
+            
+    }
+    
+    /**
+     * Find edges with the supplied property value.
+     * 
+     * construct {
      *   ?from ?edge ?to .
      * }
      * where {
      *   ?edge <prop> <val> .
      *   ?from ?edge ?to .
      * }
-	 */
-	@Override
-	public Iterable<Edge> getEdges(final String prop, final Object val) {
-		
+     */
+    @Override
+    public Iterable<Edge> getEdges(final String prop, final Object val) {
+        
         if (log.isInfoEnabled())
             log.info("("+prop+", "+val+")");
         
-		final URI p = factory.toPropertyURI(prop);
-		final Literal o = factory.toLiteral(val);
-		
-		try {
-		
-	        final StringBuilder sb = new StringBuilder();
-	        sb.append("construct { ?from ?edge ?to . } where {\n");
-	        sb.append("  ?edge <"+p+"> "+o+" .\n");
-	        sb.append("  ?from ?edge ?to .\n");
-	        sb.append("}");
+        final URI p = factory.toPropertyURI(prop);
+        final Literal o = factory.toLiteral(val);
+        
+        try {
+        
+            final StringBuilder sb = new StringBuilder();
+            sb.append("construct { ?from ?edge ?to . } where {\n");
+            sb.append("  ?edge <"+p+"> "+o+" .\n");
+            sb.append("  ?from ?edge ?to .\n");
+            sb.append("}");
 
-	        final String queryStr = sb.toString();
+            final String queryStr = sb.toString();
 
-			return getEdges(queryStr);
-			
+            return getEdges(queryStr);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	/**
-	 * Lookup a vertex.
-	 */
-	@Override
-	public Vertex getVertex(final Object key) {
-		
+    /**
+     * Lookup a vertex.
+     */
+    @Override
+    public Vertex getVertex(final Object key) {
+        
         if (log.isInfoEnabled())
             log.info("("+key+")");
         
-		if (key == null)
-			throw new IllegalArgumentException();
-		
-		final URI uri = factory.toVertexURI(key.toString());
-		
-		try {
-		    
+        if (key == null)
+            throw new IllegalArgumentException();
+        
+        final URI uri = factory.toVertexURI(key.toString());
+        
+        try {
+            
             final RepositoryConnection cxn = readFromWriteConnection ? 
                     getWriteConnection() : getReadConnection();
                     
             try {
                 
-    			if (cxn.hasStatement(uri, TYPE, VERTEX, false)) {
-    				return new BigdataVertex(uri, this);
-    			}
-    			
-    			return null;
-    			
+                if (cxn.hasStatement(uri, TYPE, VERTEX, false)) {
+                    return new BigdataVertex(uri, this);
+                }
+                
+                return null;
+                
             } finally {
                 
                 if (!readFromWriteConnection) {
@@ -1059,203 +1050,203 @@ public abstract class BigdataGraph implements Graph {
                 }
                 
             }
-			
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	
+    
     /**
      * Iterate all vertices.
      */
-	@Override
-	public Iterable<Vertex> getVertices() {
-		
+    @Override
+    public Iterable<Vertex> getVertices() {
+        
         if (log.isInfoEnabled())
             log.info("");
         
-		try {
-		    
+        try {
+            
             final RepositoryConnection cxn = readFromWriteConnection ? 
                     getWriteConnection() : getReadConnection();
                     
-			final RepositoryResult<Statement> result = 
-					cxn.getStatements(null, TYPE, VERTEX, false);
-			
-			/*
-			 * VertexIterable will close the connection if necessary.
-			 */
-			return new VertexIterable(cxn, result, true);
-			
+            final RepositoryResult<Statement> result = 
+                    cxn.getStatements(null, TYPE, VERTEX, false);
+            
+            /*
+             * VertexIterable will close the connection if necessary.
+             */
+            return new VertexIterable(cxn, result, true);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
     /**
      * Find vertices with the supplied property value.
      */
-	@Override
-	public Iterable<Vertex> getVertices(final String prop, final Object val) {
-		
+    @Override
+    public Iterable<Vertex> getVertices(final String prop, final Object val) {
+        
         if (log.isInfoEnabled())
             log.info("("+prop+", "+val+")");
         
-		final URI p = factory.toPropertyURI(prop);
-		final Literal o = factory.toLiteral(val);
-		
-		try {
-		    
+        final URI p = factory.toPropertyURI(prop);
+        final Literal o = factory.toLiteral(val);
+        
+        try {
+            
             final RepositoryConnection cxn = readFromWriteConnection ? 
                     getWriteConnection() : getReadConnection();
                     
-			final RepositoryResult<Statement> result = 
-					cxn.getStatements(null, p, o, false);
-			
+            final RepositoryResult<Statement> result = 
+                    cxn.getStatements(null, p, o, false);
+            
             /*
              * VertexIterable will close the connection if necessary.
              */
-			return new VertexIterable(cxn, result, true);
-			
+            return new VertexIterable(cxn, result, true);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	/**
-	 * Providing an override implementation for our GraphQuery to avoid the
-	 * low-performance scan and filter paradigm. See {@link BigdataGraphQuery}. 
-	 */
-	@Override
-	public GraphQuery query() {
+    /**
+     * Providing an override implementation for our GraphQuery to avoid the
+     * low-performance scan and filter paradigm. See {@link BigdataGraphQuery}. 
+     */
+    @Override
+    public GraphQuery query() {
 
-	    if (log.isInfoEnabled())
+        if (log.isInfoEnabled())
             log.info("");
         
-//		return new DefaultGraphQuery(this);
-	    return new BigdataGraphQuery(this);
-	}
+//        return new DefaultGraphQuery(this);
+        return new BigdataGraphQuery(this);
+    }
 
-	/**
-	 * Remove an edge and its properties.
-	 */
-	@Override
-	public void removeEdge(final Edge edge) {
-	    
-		try {
-		    
-			final URI uri = factory.toURI(edge);
-			
+    /**
+     * Remove an edge and its properties.
+     */
+    @Override
+    public void removeEdge(final Edge edge) {
+        
+        try {
+            
+            final URI uri = factory.toURI(edge);
+            
             if (!getWriteConnection().hasStatement(uri, TYPE, EDGE, false)) {
                 throw new IllegalStateException();
             }
             
             final URI wild = null;
             
-			// remove the edge statement
-			getWriteConnection().remove(wild, uri, wild);
-			
-			// remove its properties
-			getWriteConnection().remove(uri, wild, wild);
-			
+            // remove the edge statement
+            getWriteConnection().remove(wild, uri, wild);
+            
+            // remove its properties
+            getWriteConnection().remove(uri, wild, wild);
+            
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-		
-	}
+        
+    }
 
-	/**
-	 * Remove a vertex and its edges and properties.
-	 * 
-	 * TODO FIXME I am not fully removing dependent edges.
-	 */
-	@Override
-	public void removeVertex(final Vertex vertex) {
-	    
-		try {
-		    
-			final URI uri = factory.toURI(vertex);
-			
+    /**
+     * Remove a vertex and its edges and properties.
+     * 
+     * TODO FIXME I am not fully removing dependent edges.
+     */
+    @Override
+    public void removeVertex(final Vertex vertex) {
+        
+        try {
+            
+            final URI uri = factory.toURI(vertex);
+            
             if (!getWriteConnection().hasStatement(uri, TYPE, VERTEX, false)) {
                 throw new IllegalStateException();
             }
             
             final URI wild = null;
             
-			// remove outgoing edges and properties
-			getWriteConnection().remove(uri, wild, wild);
-			
-			// remove incoming edges
-			getWriteConnection().remove(wild, wild, uri);
-			
-		} catch (RuntimeException e) {
+            // remove outgoing edges and properties
+            getWriteConnection().remove(uri, wild, wild);
+            
+            // remove incoming edges
+            getWriteConnection().remove(wild, wild, uri);
+            
+        } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-		
-	}
+            throw new RuntimeException(e);
+        }
+        
+    }
 
-	/**
-	 * Translate a collection of Bigdata statements into an iteration of
-	 * Blueprints vertices.
-	 *  
-	 * @author mikepersonick
-	 *
-	 * TODO FIXME Find a better way to close the connection associated with
-	 * this iterable.
-	 */
-	public class VertexIterable implements Iterable<Vertex>, Iterator<Vertex> {
+    /**
+     * Translate a collection of Bigdata statements into an iteration of
+     * Blueprints vertices.
+     *  
+     * @author mikepersonick
+     *
+     * TODO FIXME Find a better way to close the connection associated with
+     * this iterable.
+     */
+    public class VertexIterable implements Iterable<Vertex>, Iterator<Vertex> {
 
-	    private final RepositoryConnection cxn;
+        private final RepositoryConnection cxn;
         
         private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
-		
-		private final boolean subject;
-		
-		private final List<Vertex> cache;
-		
-		public VertexIterable(final RepositoryConnection cxn,
-				final CloseableIteration<Statement, ? extends OpenRDFException> stmts,
-				final boolean subject) {
-		    this.cxn = cxn;
-			this.stmts = stmts;
-			this.subject = subject;
-			this.cache = new LinkedList<Vertex>();
-		}
-		
-		@Override
-		public boolean hasNext() {
-			try {
-				return stmts.hasNext();
-			} catch (OpenRDFException e) {
-				throw new RuntimeException(e);
-			}
-		}
+        
+        private final boolean subject;
+        
+        private final List<Vertex> cache;
+        
+        public VertexIterable(final RepositoryConnection cxn,
+                final CloseableIteration<Statement, ? extends OpenRDFException> stmts,
+                final boolean subject) {
+            this.cxn = cxn;
+            this.stmts = stmts;
+            this.subject = subject;
+            this.cache = new LinkedList<Vertex>();
+        }
+        
+        @Override
+        public boolean hasNext() {
+            try {
+                return stmts.hasNext();
+            } catch (OpenRDFException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
-		@Override
-		public Vertex next() {
-			try {
-				final Statement stmt = stmts.next();
-				final URI v = (URI) 
-						(subject ? stmt.getSubject() : stmt.getObject());
-				final Vertex vertex = new BigdataVertex(v, BigdataGraph.this);
-				cache.add(vertex);
-				return vertex;
-			} catch (OpenRDFException e) {
-				throw new RuntimeException(e);
+        @Override
+        public Vertex next() {
+            try {
+                final Statement stmt = stmts.next();
+                final URI v = (URI) 
+                        (subject ? stmt.getSubject() : stmt.getObject());
+                final Vertex vertex = new BigdataVertex(v, BigdataGraph.this);
+                cache.add(vertex);
+                return vertex;
+            } catch (OpenRDFException e) {
+                throw new RuntimeException(e);
             } finally {
                 if (!hasNext()) {
                     try {
@@ -1272,19 +1263,19 @@ public abstract class BigdataGraph implements Graph {
                     }
                 }
             }
-		}
+        }
 
-		@Override
-		public void remove() {
-			throw new UnsupportedOperationException();
-		}
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
 
-		@Override
-		public Iterator<Vertex> iterator() {
-			return hasNext() ? this : cache.iterator();
-		}
-		
-	}
+        @Override
+        public Iterator<Vertex> iterator() {
+            return hasNext() ? this : cache.iterator();
+        }
+        
+    }
 
     /**
      * Translate a collection of Bigdata statements into an iteration of
@@ -1295,40 +1286,40 @@ public abstract class BigdataGraph implements Graph {
      * TODO FIXME Find a better way to close the connection associated with
      * this iterable.
      */
-	public class EdgeIterable implements Iterable<Edge>, Iterator<Edge> {
+    public class EdgeIterable implements Iterable<Edge>, Iterator<Edge> {
 
-	    private final RepositoryConnection cxn;
-	    
-		private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
-		
-		private final List<Edge> cache;
-		
-		public EdgeIterable(final RepositoryConnection cxn,
-				final CloseableIteration<Statement, ? extends OpenRDFException> stmts) {
-		    this.cxn = cxn;
-			this.stmts = stmts;
-			this.cache = new LinkedList<Edge>();
-		}
-		
-		@Override
-		public boolean hasNext() {
-			try {
-				return stmts.hasNext();
-			} catch (OpenRDFException e) {
-				throw new RuntimeException(e);
-			}
-		}
+        private final RepositoryConnection cxn;
+        
+        private final CloseableIteration<Statement, ? extends OpenRDFException> stmts;
+        
+        private final List<Edge> cache;
+        
+        public EdgeIterable(final RepositoryConnection cxn,
+                final CloseableIteration<Statement, ? extends OpenRDFException> stmts) {
+            this.cxn = cxn;
+            this.stmts = stmts;
+            this.cache = new LinkedList<Edge>();
+        }
+        
+        @Override
+        public boolean hasNext() {
+            try {
+                return stmts.hasNext();
+            } catch (OpenRDFException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
-		@Override
-		public Edge next() {
-			try {
-				final Statement stmt = stmts.next();
-				final Edge edge = new BigdataEdge(stmt, BigdataGraph.this);
-				cache.add(edge);
-				return edge;
-			} catch (OpenRDFException e) {
-				throw new RuntimeException(e);
-			} finally {
+        @Override
+        public Edge next() {
+            try {
+                final Statement stmt = stmts.next();
+                final Edge edge = new BigdataEdge(stmt, BigdataGraph.this);
+                cache.add(edge);
+                return edge;
+            } catch (OpenRDFException e) {
+                throw new RuntimeException(e);
+            } finally {
                 if (!hasNext()) {
                     try {
                         stmts.close();
@@ -1343,20 +1334,20 @@ public abstract class BigdataGraph implements Graph {
                         log.warn("Could not close connection");
                     }
                 }
-			}
-		}
+            }
+        }
 
-		@Override
-		public void remove() {
-			throw new UnsupportedOperationException();
-		}
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
 
-		@Override
-		public Iterator<Edge> iterator() {
-			return hasNext() ? this : cache.iterator();
-		}
-		
-	}
+        @Override
+        public Iterator<Edge> iterator() {
+            return hasNext() ? this : cache.iterator();
+        }
+        
+    }
 
     /**
      * Fuse two iterables together into one.  Useful for combining IN and OUT
@@ -1373,59 +1364,59 @@ public abstract class BigdataGraph implements Graph {
      *  
      * @author mikepersonick
      */
-	public class FusedIterable<T> implements Iterable<T>, Iterator<T> {
-		
-		private final Iterable<T>[] args;
-		
-		private transient int i = 0;
-		
-		private transient Iterator<T> curr;
-		
-		public FusedIterable(final Iterable<T>... args) {
-			this.args = args;
-			this.curr = args[0].iterator();
-		}
-		
-		@Override
-		public boolean hasNext() {
-			if (curr.hasNext()) {
-				return true;
-			}
-			while (!curr.hasNext() && i < (args.length-1)) {
-				curr = args[++i].iterator();
-				if (curr.hasNext()) {
-					return true;
-				}
-			}
-			return false;
-		}
+    public class FusedIterable<T> implements Iterable<T>, Iterator<T> {
+        
+        private final Iterable<T>[] args;
+        
+        private transient int i = 0;
+        
+        private transient Iterator<T> curr;
+        
+        public FusedIterable(final Iterable<T>... args) {
+            this.args = args;
+            this.curr = args[0].iterator();
+        }
+        
+        @Override
+        public boolean hasNext() {
+            if (curr.hasNext()) {
+                return true;
+            }
+            while (!curr.hasNext() && i < (args.length-1)) {
+                curr = args[++i].iterator();
+                if (curr.hasNext()) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-		@Override
-		public T next() {
-			return curr.next();
-		}
+        @Override
+        public T next() {
+            return curr.next();
+        }
 
-		@Override
-		public void remove() {
-			throw new UnsupportedOperationException();
-		}
-		
-		@Override
-		public Iterator<T> iterator() {
-			return this;
-		}
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public Iterator<T> iterator() {
+            return this;
+        }
 
-	}
-	
-	/**
-	 * Project a subgraph using a SPARQL query.
+    }
+    
+    /**
+     * Project a subgraph using a SPARQL query.
      * <p>
      * Warning: You MUST close this iterator when finished.
-	 */
+     */
     @SuppressWarnings("unchecked")
     public ICloseableIterator<BigdataGraphAtom> project(final String queryStr) 
-	        throws Exception {
-	    
+            throws Exception {
+        
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
         
@@ -1483,12 +1474,12 @@ public abstract class BigdataGraph implements Graph {
         
         return (ICloseableIterator<BigdataGraphAtom>) sitr;
         
-	}
-	
-	/**
-	 * Convert a unit of RDF data to an atomic unit of PG data.
-	 */
-	protected BigdataGraphAtom toGraphAtom(final Statement stmt) {
+    }
+    
+    /**
+     * Convert a unit of RDF data to an atomic unit of PG data.
+     */
+    protected BigdataGraphAtom toGraphAtom(final Statement stmt) {
 
         final URI s = (URI) stmt.getSubject();
         final URI p = (URI) stmt.getPredicate();
@@ -1496,13 +1487,13 @@ public abstract class BigdataGraph implements Graph {
         
         return toGraphAtom(s, p, o);
         
-	}
-	
+    }
+    
     /**
      * Convert a unit of RDF data to an atomic unit of PG data.
      */
     protected BigdataGraphAtom toGraphAtom(final URI s, final URI p, final Value o) {
-	        
+            
         final String sid = factory.fromURI(s);
         final String pid = factory.fromURI(p);
         
@@ -1561,8 +1552,8 @@ public abstract class BigdataGraph implements Graph {
         
         return atom;
 
-	}
-	
+    }
+    
     /**
      * Select results using a SPARQL query.
      * <p>
@@ -1924,18 +1915,13 @@ public abstract class BigdataGraph implements Graph {
     }
     
     /**
-     * Utility function to set the GraphQuery timeout to the global
+     * Utility function to set the Query timeout to the global
      * setting if it is configured.
-     * 
-     * @param query
      */
-    protected void setMaxQueryTime(final org.openrdf.query.Query query)
-    {
-    	if(maxQueryTime > 0)
-    	{
-    		query.setMaxQueryTime(maxQueryTime);
-    	}
-    	
+    protected void setMaxQueryTime(final org.openrdf.query.Query query) {
+        if (maxQueryTime > 0) {
+            query.setMaxQueryTime(maxQueryTime);
+        }
     }
     
 }
