@@ -241,8 +241,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
     public MemoryManager(final DirectBufferPool pool, final int sectors) {
 
-        this(pool, sectors, null/* properties */);
-        
+        this(pool, sectors, true/* blocking */, null/* properties */);
+
     }
 
     /**
@@ -284,6 +284,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
      *            allocate from that pool (each "sector" is one buffer). This
      *            may be {@link Integer#MAX_VALUE} for an effectively unbounded
      *            capacity.
+     *            @param blocks When <code>true</code> an allocation request 
+     *            will block until it can be satisfied. When <code>false</code>
+     *            and allocation request that can not be satisfied immediately
+     *            will result in a {@link MemoryManagerOutOfMemory}.
      * @param properties
      *            Used to communicate various configuration properties,
      *            including
@@ -294,9 +298,12 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
      *             if <i>pool</i> is <code>null</code>.
      * @throws IllegalArgumentException
      *             if <i>sectors</i> is non-positive.
+     *             
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-42" > Per query
+     * memory limit for analytic query mode. </a>
      */
     public MemoryManager(final DirectBufferPool pool, final int sectors,
-            final Properties properties) {
+            final boolean blocks, final Properties properties) {
             
 		if (pool == null)
 			throw new IllegalArgumentException();
