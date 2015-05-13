@@ -65,6 +65,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.DirectBufferPoolAllocator;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITx;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
@@ -1650,8 +1651,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
             try {
                 memoryManager = this.memoryManager.get();
                 if (memoryManager == null) {
-                    this.memoryManager.set(memoryManager = new MemoryManager(
-                            DirectBufferPool.INSTANCE));
+                    this.memoryManager.set(memoryManager = newMemoryManager());
                 }
             } finally {
                 lock.unlock();
@@ -1668,7 +1668,62 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         return queryAttributes;
         
     }
+    
+    /**
+     * Allocate a memory manager for the query.
+     * 
+     * @see QueryHints#ANALYTIC_MAX_MEMORY_PER_QUERY
+     * 
+     * @see QueryHints#DEFAULT_ANALYTIC_MAX_MEMORY_PER_QUERY
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-42" > Per query
+     *      memory limit for analytic query mode. </a>
+     */
+    private IMemoryManager newMemoryManager() {
+        
+        // The native memory pool that will be used by this query.
+        final DirectBufferPool pool = DirectBufferPool.INSTANCE;
+        
+        // Figure out how much memory may be allocated by this query.
+        long maxMemoryBytesPerQuery = QueryHints.DEFAULT_ANALYTIC_MAX_MEMORY_PER_QUERY;
+        if (maxMemoryBytesPerQuery < 0) {
+            // Ignore illegal values.
+            maxMemoryBytesPerQuery = 0L;
+        }
 
+        final boolean blocking;
+        final int nsectors;
+        if (maxMemoryBytesPerQuery == 0) {
+            /*
+             * Allocation are blocking IFF there is no bound on the memory for
+             * the query.
+             */
+            blocking = true; // block until allocation is satisfied.
+            nsectors = Integer.MAX_VALUE; // no limit
+        } else {
+            /*
+             * Allocations do not block if we run out of native memory for this
+             * query. Instead a memory allocation exception will be thrown and
+             * the query will break.
+             * 
+             * The #of sectors is computed by dividing through by the size of
+             * the backing native ByteBuffers and then rounding up.
+             */
+            blocking = false; // throw exception if query uses too much RAM.
+
+            // The capacity of the buffers in this pool.
+            final int bufferCapacity = pool.getBufferCapacity();
+
+            // Figure out the maximum #of buffers (rounding up).
+            nsectors = (int) Math.ceil(maxMemoryBytesPerQuery
+                    / (double) bufferCapacity);
+
+        }
+
+        return new MemoryManager(pool, nsectors, blocking, null/* properties */);
+
+    }
+    
     private final IQueryAttributes queryAttributes = new DefaultQueryAttributes();
 
     /**
