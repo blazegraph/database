@@ -3469,18 +3469,38 @@ public abstract class AbstractHA3JournalServerTestCase extends
     /** Verify zookeeper is running on the local host at the client port. */
     protected void assertZookeeperRunning() {
 
-        if (!isZookeeperRunning())
+        if (!isZookeeperRunning()) {
+            final String pname = "test.zookeeper.installDir";
+            final String zookeeperDirStr = System.getProperty(pname,"NOT_DEFINED");
+            final File zookeeperDir = new File(zookeeperDirStr);
+            final File binDir = new File(zookeeperDir, "bin");
+            final String shell = SystemUtil.isWindows() ? "cmd" : "/bin/sh";
+            final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
+                    : "zkServer.sh";
             fail("Zookeeper not running: localIP=" + getZKInetAddress()
-                    + ", clientPort=" + getZKClientPort());
+                    + ", clientPort=" + getZKClientPort() + ":: installDir="
+                    + zookeeperDirStr + ", binDir=" + binDir + ", shell="
+                    + shell + ", executable=" + executable);
+        }
 
     }
 
     /** Verify zookeeper is not running on the local host at the client port. */
     protected void assertZookeeperNotRunning() {
 
-        if (isZookeeperRunning())
+        if (isZookeeperRunning()) {
+            final String pname = "test.zookeeper.installDir";
+            final String zookeeperDirStr = System.getProperty(pname,"NOT_DEFINED");
+            final File zookeeperDir = new File(zookeeperDirStr);
+            final File binDir = new File(zookeeperDir, "bin");
+            final String shell = SystemUtil.isWindows() ? "cmd" : "/bin/sh";
+            final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
+                    : "zkServer.sh";
             fail("Zookeeper is running: localIP=" + getZKInetAddress()
-                    + ", clientPort=" + getZKClientPort());
+                    + ", clientPort=" + getZKClientPort()+ ":: installDir="
+                    + zookeeperDirStr + ", binDir=" + binDir + ", shell="
+                    + shell + ", executable=" + executable);
+        }
         
     }
 
