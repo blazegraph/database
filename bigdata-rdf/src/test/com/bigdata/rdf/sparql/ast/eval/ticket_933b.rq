@@ -1,0 +1,7 @@
+SELECT *
+{
+  OPTIONAL {
+    BIND ("3" as ?x)
+  }
+  BIND ("4" as ?x)
+}

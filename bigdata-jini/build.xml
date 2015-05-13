@@ -70,8 +70,11 @@
     </target>
 
     <target name="preTestPreparation">
+        <!-- make sure we have a clean set of test reports -->
         <delete dir="${HATest.dir}" quiet="true" />
         <mkdir dir="${HATest.dir}" />
+        <delete dir="${test.results.dir}/surefire-reports" quiet="true" />
+        <mkdir dir="${test.results.dir}/surefire-reports" />
 	<antcall target = "startTestServices"/>
     </target>
 
@@ -188,11 +191,9 @@
     </target>
 
     <target name = "testReportArchive">
-	<!-- Archive the generated HTML report. -->
-        <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/surefire-reports" compression="gzip"/>
+         <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/surefire-reports" compression="gzip"/>
 
-        <!-- Archive the HA test suite output logs. -->
-        <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HATest.dir}" compression="gzip"/>
+         <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HATest.dir}" compression="gzip"/>
     </target>
 
 </project>

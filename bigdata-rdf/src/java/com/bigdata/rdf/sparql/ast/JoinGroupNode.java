@@ -317,29 +317,6 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 		
 	}
 
-	/**
-	 * Return the nodes of the supplied type.  Uses isAssignableFrom to 
-	 * determine whether the node is an instance of the supplied type.
-	 */
-	@SuppressWarnings("unchecked")
-	public <T> List<T> getChildren(final Class<T> type) {
-		
-		final List<T> children = new LinkedList<T>();
-		
-		for (IQueryNode node : this) {
-			
-			if (type.isAssignableFrom(node.getClass())) {
-				
-				children.add((T) node);
-				
-			}
-			
-		}
-		
-		return children;
-		
-	}
-
     /**
      * Return any <code>LET x:= expr</code> or <code>(expr AS ?x)</code> nodes
      * in <i>this</i> group (these are modeled in exactly the same way by the

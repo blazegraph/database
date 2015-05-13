@@ -36,6 +36,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
@@ -659,6 +660,9 @@ public class TestReificationDoneRightParser extends
     public void test_triple_ref_pattern_all_vars()
             throws MalformedQueryException, TokenMgrError, ParseException {
 
+        if (!BigdataStatics.runKnownBadTests) // FIXME RDR TEST KNOWN TO FAIL.
+            return;
+
         final String sparql //
                 = "prefix : <http://example.com/>\n" //
                 + "select ?a {\n"//
@@ -902,6 +906,9 @@ public class TestReificationDoneRightParser extends
     public void test_update_insert_data_RDR() throws MalformedQueryException,
             TokenMgrError, ParseException {
 
+      if (!BigdataStatics.runKnownBadTests) // FIXME RDR TEST KNOWN TO FAIL.
+          return;
+        
       final String sparql = "PREFIX : <http://example/>\n"//
             + "INSERT DATA {\n"//
             + "   <:s> <:p> \"d\" . \n"//

@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<sparql
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema#"
+    xmlns="http://www.w3.org/2005/sparql-results#" >
+  <head>
+    <variable name="res"/>
+    <variable name="searchTerm"/>
+  </head>
+  <results>
+     <result>
+      <binding name="res">
+         <uri>http://example.com/SYSTAP</uri>
+      </binding>
+      <binding name="searchTerm">
+         <literal>SYSTAP</literal>
+      </binding>
+     </result>
+     <result>
+      <binding name="res">
+         <uri>http://example.com/metaphacts</uri>
+      </binding>
+      <binding name="searchTerm">
+         <literal>company</literal>
+      </binding>
+     </result>
+     <result>
+      <binding name="res">
+         <uri>http://example.com/SYSTAP</uri>
+      </binding>
+      <binding name="searchTerm">
+         <literal>company</literal>
+      </binding>
+     </result>
+     <result>
+      <binding name="res">
+         <uri>http://example.com/Apple</uri>
+      </binding>
+      <binding name="searchTerm">
+         <literal>company</literal>
+      </binding>
+     </result>
+     <result>
+      <binding name="res">
+         <uri>http://example.com/Siemens</uri>
+      </binding>
+      <binding name="searchTerm">
+         <literal>company</literal>
+      </binding>
+     </result>
+     <result>
+      <binding name="res">
+         <uri>http://example.com/SAP</uri>
+      </binding>
+      <binding name="searchTerm">
+         <literal>company</literal>
+      </binding>
+     </result>     
+  </results>
+</sparql>
