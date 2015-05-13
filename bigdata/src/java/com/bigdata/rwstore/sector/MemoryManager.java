@@ -121,8 +121,22 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
     private final int m_sectorSize;
     
+    /**
+     * The maximum #of sectors that may be allocated.
+     */
     private final int m_maxSectors;
 	
+    /**
+     * When <code>true</code> allocations will block if the memory pool is
+     * exhausted. Otherwise an allocation request that occurs when there is no
+     * memory available within the pool will immediately throw a
+     * {@link MemoryManagerOutOfMemory} exception.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-42" > Per query
+     *      memory limit for analytic query mode. </a>
+     */
+    private final boolean m_blocks;
+    
 	private final ArrayList<SectorAllocator> m_sectors = new ArrayList<SectorAllocator>();
 	
 	/**
@@ -144,7 +158,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	/** The #of slot bytes in current allocations. */
 	private final AtomicLong m_slotBytes = new AtomicLong();
 	
-	   /**
+    /**
      * The #of open transactions (read-only or read-write).
      * 
      * This is guarded by the {@link #m_allocationLock}.
@@ -314,6 +328,8 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		m_pool = pool;
 		
 		m_maxSectors = sectors;
+
+		m_blocks = blocks;
 		
 		m_resources = new ArrayList<IBufferAccess>();
 		
@@ -330,6 +346,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	}
 
+    @Override
 	protected void finalize() throws Throwable {
 		// release to pool.
 		releaseDirectBuffers();
@@ -363,13 +380,30 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	/**
 	 * Return the maximum #of sectors which may be allocated.
 	 */
+	@Override
 	public int getMaxSectors() {
 		return m_maxSectors;
+	}
+	
+    /**
+     * Return <code>true</code> iff the default policy of this
+     * {@link MemoryManager} instance is to block if an allocation can not be
+     * made (due to exhaustion of the maximum number of backing buffers for the
+     * {@link MemoryManager} instance). Return <code>false</code> iff the
+     * allocation will throw a {@link MemoryManagerOutOfMemory} exception if the
+     * backing memory pool is exhausted.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-42" > Per query
+     *      memory limit for analytic query mode. </a>
+     */
+	public boolean isBlocking() {
+	    return m_blocks;
 	}
 	
 	/**
 	 * Return the #of sectors which are currently in use. 
 	 */
+	@Override
 	public int getSectorCount() {
 		m_allocationLock.lock();
 		try {
@@ -383,6 +417,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 * The size in bytes of the backing sector. This is the upper bound on the
 	 * #of bytes which may be stored against a single sector.
 	 */
+	@Override
 	public int getSectorSize() {
 		
 		return m_sectorSize;
@@ -398,12 +433,14 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		
 	}
 	
+	@Override
 	public long allocate(final ByteBuffer data) {
 
-		return allocate(data, true/* blocks */);
+		return allocate(data, m_blocks);
 
 	}
 
+	@Override
 	public long allocate(final ByteBuffer data, final boolean blocks) {
 
 		if (data == null)
@@ -443,9 +480,10 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	}
 	
+	@Override
 	public long allocate(final int nbytes) {
 
-		return allocate(nbytes, true/*blocks*/);
+		return allocate(nbytes, m_blocks);
 
 	}
 	
@@ -580,6 +618,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	/*
 	 * Core allocation method.
 	 */
+	@Override
 	public long allocate(final int nbytes, final boolean blocks) {
 
 		if (nbytes <= 0)
@@ -690,6 +729,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 	
+    @Override
 	public ByteBuffer[] get(final long addr) {
 
 		if (addr == 0L)
@@ -733,6 +773,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 
+	@Override
 	public byte[] read(final long addr) {
 
 		return MemoryManager.read(this, addr);
@@ -886,6 +927,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return (int) (addr & 0xFFFFFFFFL);
 	}
 
+    @Override
 	public void free(final long addr) {
 
 		if (addr == 0L)
@@ -1002,6 +1044,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 	
+    @Override
 	public long getPhysicalAddress(final long addr) {
 		// Should this compute based on sector index and sector size?
 		final int rwaddr = getAllocationAddress(addr);
@@ -1023,6 +1066,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return addr;
 	}
 
+    @Override
 	public void clear() {
 		m_allocationLock.lock();
 		try {
@@ -1041,6 +1085,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 	
+    @Override
 	public void addToFreeList(final SectorAllocator sector) {
 		m_allocationLock.lock();
 		try {
@@ -1051,6 +1096,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 
+    @Override
 	public void removeFromFreeList(final SectorAllocator sector) {
 		m_allocationLock.lock();
 		try {
@@ -1061,6 +1107,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		}
 	}
 
+    @Override
 	public void trimSector(final long trim, final SectorAllocator sector) {
 		// Do not trim when using buffer pool
 	}
@@ -1068,10 +1115,12 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	/**
 	 * Maintain allocationContext to check for session protection
 	 */
+    @Override
 	public IMemoryManager createAllocationContext() {
 		return new AllocationContext(this);
 	}
 
+    @Override
 	public int allocationSize(final long addr) {
 		return getAllocationSize(addr);
 	}
@@ -1093,18 +1142,22 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return m_extent.get();
 	}
 	
+    @Override
 	public long getAllocationCount() {
 		return m_allocCount.get();
 	}
 
+    @Override
 	public long getSlotBytes() {
 		return m_slotBytes.get();
 	}
 
+    @Override
 	public long getUserBytes() {
 		return m_userBytes.get();
 	}
 
+    @Override
 	public CounterSet getCounters() {
 
 		final CounterSet root = new CounterSet();
@@ -1133,10 +1186,15 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		root.addCounter("userBytes", new OneShotInstrument<Long>(
 				getUserBytes()));
 		
+        // report whether or not the allocation policy is blocking.
+        root.addCounter("blocking", new OneShotInstrument<Boolean>(
+                isBlocking()));
+        
 		return root;
 		
 	}
 
+    @Override
 	public String toString() {
 
 		return getClass().getName() + "{counters=" + getCounters() + "}";
@@ -1242,6 +1300,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 //	 * @param externalCache - used by the Journal to cache historical BTree references
 //	 * @param dataSize - the size of the checkpoint data (fixed for any version)
 //	 */
+    @Override
 	public void registerExternalCache(
 			final ConcurrentWeakValueCache<Long, ICommitter> externalCache, final int dataSize) {
 		
@@ -1511,6 +1570,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 		return new IRawTx() {
 		    private final AtomicBoolean m_open = new AtomicBoolean(true);
 			
+		    @Override
 			public void close() {
 				if (m_open.compareAndSet(true/*expect*/, false/*update*/)) {
 					deactivateTx();

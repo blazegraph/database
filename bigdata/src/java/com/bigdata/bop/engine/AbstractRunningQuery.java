@@ -1692,7 +1692,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
              * the query.
              */
             blocking = true; // block until allocation is satisfied.
-            nsectors = 0; // no limit
+            nsectors = Integer.MAX_VALUE; // no limit
         } else {
             /*
              * Allocations do not block if we run out of native memory for this
