@@ -51,8 +51,6 @@ import com.bigdata.quorum.QuorumMember;
  * services when joining a met quorum.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestHA3QuorumSemantics.java 2965 2010-06-02 20:19:51Z
- *          thompsonbry $
  * 
  *          FIXME We must also test with k:=5 in order to see some situations
  *          which do not appear with k:=3 (not sure which ones off hand, but I
@@ -211,6 +209,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         //         fixture.awaitDeque();
         
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 assertEquals(new UUID[] { serviceId0, serviceId1, serviceId2 },
                         quorum0.getMembers());
@@ -261,6 +260,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         assertNull(client2.downStreamId);
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 // test prior/next.
                 assertEquals(new UUID[] { null, serviceId1 }, quorum0
@@ -479,6 +479,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         assertFalse(quorum2.isQuorumMet());
         
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 // The last consensus on the mock clients should have been cleared.
                 assertEquals(-1L, client0.lastConsensusValue);
@@ -501,6 +502,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         //         fixture.awaitDeque();
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 // No change.
                 assertEquals(-1L, client0.lastConsensusValue);
@@ -555,6 +557,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         actor2.memberAdd();
         //         fixture.awaitDeque();
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 assertEquals(3, quorum0.getMembers().length);
                 assertEquals(3, quorum1.getMembers().length);
@@ -571,6 +574,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         //         fixture.awaitDeque();
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 assertEquals(new UUID[] { serviceId0, serviceId1, serviceId2 },
                         quorum0.getPipeline());
@@ -605,6 +609,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertEquals(token1, quorum2.lastValidToken());
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -651,6 +656,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -722,6 +728,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
              * Service join in the same order in which they cast their votes.
              */
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
                             .getJoined());
@@ -760,6 +767,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -807,6 +815,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
             // The pipeline order is the same as the vote order.
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId2, serviceId1 },
                             quorum0.getPipeline());
@@ -833,6 +842,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // the votes were withdrawn.
                     assertEquals(0, quorum0.getVotes().size());
@@ -842,6 +852,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             });
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // the consensus was cleared.
                     assertEquals(-1L, client0.lastConsensusValue);
@@ -890,6 +901,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -939,6 +951,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
             // The pipeline order is the same as the vote order.
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId1,
                             serviceId2 }, quorum0.getPipeline());
@@ -963,6 +976,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -986,6 +1000,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
              * Service join in the same order in which they cast their votes.
              */
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
                             .getJoined());
@@ -1009,6 +1024,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
             // The pipeline order is the same as the vote order.
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
                             .getPipeline());
@@ -1026,6 +1042,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(0, quorum0.getVotes().size());
@@ -1061,6 +1078,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertFalse(quorum2.isQuorumMet());
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // Service leaves forced pipeline leaves.
                     assertEquals(new UUID[] {}, quorum0.getPipeline());
@@ -1105,6 +1123,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         actor2.memberAdd();
         //         fixture.awaitDeque();
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 assertEquals(3, quorum0.getMembers().length);
                 assertEquals(3, quorum1.getMembers().length);
@@ -1121,6 +1140,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         //         fixture.awaitDeque();
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 assertEquals(new UUID[] { serviceId0, serviceId1, serviceId2 },
                         quorum0.getPipeline());
@@ -1155,6 +1175,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertEquals(token1, quorum2.lastValidToken());
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -1201,6 +1222,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -1274,6 +1296,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
              * Service join in the same order in which they cast their votes.
              */
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId2 }, quorum0
                             .getJoined());
@@ -1313,6 +1336,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //		fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -1360,6 +1384,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
             // The pipeline order is the same as the vote order.
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId2, serviceId1 },
                             quorum0.getPipeline());
@@ -1386,6 +1411,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // the votes were withdrawn.
                     assertEquals(0, quorum0.getVotes().size());
@@ -1395,6 +1421,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             });
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // the consensus was cleared.
                     assertEquals(-1L, client0.lastConsensusValue);
@@ -1443,6 +1470,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -1492,6 +1520,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
             // The pipeline order is the same as the vote order.
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId1,
                             serviceId2 }, quorum0.getPipeline());
@@ -1517,6 +1546,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(1, quorum0.getVotes().size());
@@ -1540,6 +1570,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
              * Service join in the same order in which they cast their votes.
              */
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
                             .getJoined());
@@ -1563,6 +1594,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
 
             // The pipeline order is the same as the vote order.
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     assertEquals(new UUID[] { serviceId0, serviceId1 }, quorum0
                             .getPipeline());
@@ -1581,6 +1613,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             //         fixture.awaitDeque();
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // services have voted for a single lastCommitTime.
                     assertEquals(0, quorum0.getVotes().size());
@@ -1616,6 +1649,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertFalse(quorum2.isQuorumMet());
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
                     // Service leaves forced pipeline leaves.
                     assertEquals(new UUID[] {}, quorum0.getPipeline());
@@ -1678,6 +1712,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         actor0.pipelineAdd();
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 /*
                  * The service which we will cause to vote first (and hence will
@@ -1717,6 +1752,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertTrue(quorum0.isQuorumMet());
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
 
                     // services have voted for a single lastCommitTime.
@@ -1809,6 +1845,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
         actor0.pipelineAdd();
 
         assertCondition(new Runnable() {
+            @Override
             public void run() {
                 /*
                  * The service which we will cause to vote first (and hence will
@@ -1850,6 +1887,7 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             assertTrue(quorum0.isQuorumMet());
 
             assertCondition(new Runnable() {
+                @Override
                 public void run() {
 
                     // services have voted for a single lastCommitTime.
@@ -1901,10 +1939,10 @@ public class TestZkHA3QuorumSemantics extends AbstractZkQuorumTestCase {
             });
 
             // check votes cast
-            assertTrue(quorum1.getCastVote(serviceId1) == quorum1.getCastVoteIfConsensus(serviceId0));
-            assertTrue(quorum1.getCastVote(serviceId1) != quorum1.getCastVote(serviceId2));
+            assertEquals(quorum1.getCastVote(serviceId1), quorum1.getCastVoteIfConsensus(serviceId0));
+            assertNotSame(quorum1.getCastVote(serviceId1), quorum1.getCastVote(serviceId2));
             actor2.castVote(lastCommitTime);
-            assertTrue(quorum1.getCastVoteIfConsensus(serviceId1) == quorum1.getCastVoteIfConsensus(serviceId2));
+            assertEquals(quorum1.getCastVoteIfConsensus(serviceId1), quorum1.getCastVoteIfConsensus(serviceId2));
             
             Thread.sleep(100);
 
