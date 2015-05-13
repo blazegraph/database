@@ -32,6 +32,9 @@ import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
+import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -463,6 +466,23 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
             }
         }
     }
+    
+    public QueryEngine getQueryEngine() {
+    	final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+                .getQueryController(getIndexManager());
+    	
+    	return queryEngine;
+    }
+
+	private IIndexManager getIndexManager() {
+	
+		final BigdataSailRepository repo = this.getRepository();
+		
+		final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
+		
+		return indexMgr;
+		
+	}
 
 
 //    @Override
