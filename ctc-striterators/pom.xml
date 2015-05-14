@@ -5,14 +5,14 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.1-SNAPSHOT</version>
+    <version>1.5.2-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
-  <artifactId>striterator</artifactId>
+  <artifactId>ctc-striterators</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>striterator</name>
+  <name>ctc-striterators</name>
   <packaging>jar</packaging>
 
   <reporting>
@@ -62,13 +62,13 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <version>${junit3.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
-      <version>1.1-b3-dev</version>
+      <version>${junit-ext.version}</version>
     </dependency>
     <dependency>
        <!-- log4j is the primary logger for bigdata. -->

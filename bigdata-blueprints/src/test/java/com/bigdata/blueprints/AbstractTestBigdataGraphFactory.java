@@ -24,6 +24,7 @@ package com.bigdata.blueprints;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 
 import junit.framework.TestCase;
 
@@ -86,9 +87,10 @@ public abstract class AbstractTestBigdataGraphFactory extends TestCase {
 
 	protected void loadTestGraph(BigdataGraph graph, String resource)
 			throws IOException {
+		
 		GraphMLReader
-				.inputGraph(graph, TestBigdataGraphFactoryFile.class
-						.getResourceAsStream(resource));
+				.inputGraph(graph, this.getClass().getClassLoader().
+							getResourceAsStream(resource));
 
 	}
 
