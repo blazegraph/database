@@ -46,15 +46,15 @@ dependencies.
 
 --><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
    <modelVersion>4.0.0</modelVersion>
-   <groupId>com.bigdata</groupId>
-   <artifactId>bigdata</artifactId>
-   <version>1.5.2-SNAPSHOT</version>
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>1.5.2-SNAPSHOT</version>
     <relativePath>blazegraph-parent/pom.xml</relativePath>
    </parent>
+   <groupId>com.bigdata</groupId>
+   <artifactId>bigdata</artifactId>
+   <version>${bigdata.version}</version>
    <packaging>jar</packaging>
    <name>Blazegraph(tm)</name>
     <description>Blazegraph(tm) Maven Build</description>
@@ -633,34 +633,34 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-blueprints</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
@@ -669,12 +669,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
@@ -708,7 +708,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>junit-ext</artifactId>
-       <version>1.1-b3-dev</version>
+      <version>${junit-ext.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
