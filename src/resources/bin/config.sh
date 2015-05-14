@@ -55,5 +55,5 @@ fi
 #Group commit (true|false)
 
 if [ -z "${GROUP_COMMIT}" ] ; then
-	export GROUP_COMMIT=false
+	export GROUP_COMMIT=true
 fi
