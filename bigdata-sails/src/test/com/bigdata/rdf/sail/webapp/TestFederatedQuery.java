@@ -364,8 +364,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         final URI william = f.createURI(EX_NS, "william");
 
         // clears the repository and adds new data
-        prepareTest("simple-default-graph.ttl",
-                Arrays.asList("simple.ttl"));
+        prepareTest(PREFIX+"simple-default-graph.ttl",
+                Arrays.asList(PREFIX+"simple.ttl"));
             
         final StringBuilder qb = new StringBuilder();
         qb.append(" SELECT * \n"); 
@@ -416,8 +416,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
 //  @Test
     public void test1() throws Exception{
-        prepareTest("data01.ttl", Arrays.asList("data01endpoint.ttl"));
-        execute("service01.rq", "service01.srx", false);          
+        prepareTest(PREFIX+"data01.ttl", Arrays.asList(PREFIX+"data01endpoint.ttl"));
+        execute(PREFIX+"service01.rq", PREFIX+"service01.srx", false);          
     }
 
 //  @Test
@@ -430,14 +430,14 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 //        };
 //        localSail.getDatabase().getLexiconRelation().addTerms(values, values.length, false/*readOnly*/);
 //        }
-        prepareTest(null, Arrays.asList("data02endpoint1.ttl", "data02endpoint2.ttl"));
-        execute("service02.rq", "service02.srx", false);          
+        prepareTest(null, Arrays.asList(PREFIX+"data02endpoint1.ttl", PREFIX+"data02endpoint2.ttl"));
+        execute(PREFIX+"service02.rq", PREFIX+"service02.srx", false);          
     }
     
 //  @Test
     public void test3() throws Exception {      
-        prepareTest(null, Arrays.asList("data03endpoint1.ttl", "data03endpoint2.ttl"));
-        execute("service03.rq", "service03.srx", false);  
+        prepareTest(null, Arrays.asList(PREFIX+"data03endpoint1.ttl", PREFIX+"data03endpoint2.ttl"));
+        execute(PREFIX+"service03.rq", PREFIX+"service03.srx", false);  
     }
     
     /*
@@ -446,9 +446,9 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      */
 ////  @Test
 //    public void test4() throws Exception {      
-//        prepareTest("data04.ttl", Arrays.asList("data04endpoint.ttl"));
+//        prepareTest(PREFIX+"data04.ttl", Arrays.asList(PREFIX+"data04endpoint.ttl"));
 ////        System.err.println(localSail.getDatabase().dumpStore());
-//        execute("service04.rq", "service04.srx", false);
+//        execute(PREFIX+"service04.rq", PREFIX+"service04.srx", false);
 //    }
     
     // @Test
@@ -502,29 +502,29 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     
 //  @Test
     public void test6() throws Exception { //     fail("FIXME RESTORE"); // FIXME RESTORE
-        prepareTest(null, Arrays.asList("data06endpoint1.ttl"));
-        execute("service06.rq", "service06.srx", false);          
+        prepareTest(null, Arrays.asList(PREFIX+"data06endpoint1.ttl"));
+        execute(PREFIX+"service06.rq", PREFIX+"service06.srx", false);          
     }
     
 //  @Test
     public void test7() throws Exception { //     fail("FIXME RESTORE");// FIXME RESTORE
         // clears the repository and adds new data + execute
-        prepareTest("data07.ttl", Collections.<String>emptyList());
-        execute("service07.rq", "service07.srx", false);          
+        prepareTest(PREFIX+"data07.ttl", Collections.<String>emptyList());
+        execute(PREFIX+"service07.rq", PREFIX+"service07.srx", false);          
     }
     
 //  @Test
     public void test8() throws Exception {
         /* test where the SERVICE expression is to be evaluated as ASK request */
-        prepareTest("data08.ttl", Arrays.asList("data08endpoint.ttl"));
-        execute("service08.rq", "service08.srx", false);          
+        prepareTest(PREFIX+"data08.ttl", Arrays.asList(PREFIX+"data08endpoint.ttl"));
+        execute(PREFIX+"service08.rq", PREFIX+"service08.srx", false);          
     }   
     
 //  @Test
     public void test9() throws Exception {
         /* test where the service endpoint is bound at runtime through BIND */
-        prepareTest(null, Arrays.asList("data09endpoint.ttl"));
-        execute("service09.rq", "service09.srx", false);          
+        prepareTest(null, Arrays.asList(PREFIX+"data09endpoint.ttl"));
+        execute(PREFIX+"service09.rq", PREFIX+"service09.srx", false);          
     }
     
     /**
@@ -534,8 +534,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 //  @Test
     public void test10() throws Exception {
         /* test how we deal with blank node */
-        prepareTest("data10.ttl", Arrays.asList("data10endpoint.ttl"));
-        execute("service10.rq", "service10.srx", false);          
+        prepareTest(PREFIX+"data10.ttl", Arrays.asList(PREFIX+"data10endpoint.ttl"));
+        execute(PREFIX+"service10.rq", PREFIX+"service10.srx", false);          
     }
 
     /**
@@ -547,16 +547,16 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      */
     public void test10b() throws Exception {
         /* test how we deal with blank node */
-        prepareTest("data10.ttl", Arrays.asList("data10endpoint.ttl"));
-        execute("service10b.rq", "service10.srx", false);          
+        prepareTest(PREFIX+"data10.ttl", Arrays.asList(PREFIX+"data10endpoint.ttl"));
+        execute(PREFIX+"service10b.rq", PREFIX+"service10.srx", false);          
     }
     
 //  @Test
     public void test11() throws Exception {
         /* test vectored join with more intermediate results */
         // clears the repository and adds new data + execute
-        prepareTest("data11.ttl", Arrays.asList("data11endpoint.ttl"));
-        execute("service11.rq", "service11.srx", false);      
+        prepareTest(PREFIX+"data11.ttl", Arrays.asList(PREFIX+"data11endpoint.ttl"));
+        execute(PREFIX+"service11.rq", PREFIX+"service11.srx", false);      
     }
     
     /**
@@ -605,8 +605,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 //     */
 //    public void test13() throws Exception {
 //        /* test for bug SES-899: cross product is required */
-//        prepareTest(null, Arrays.asList("data13.ttl"));
-//        execute("service13.rq", "service13.srx", false);              
+//        prepareTest(null, Arrays.asList(PREFIX+"data13.ttl"));
+//        execute(PREFIX+"service13.rq", PREFIX+"service13.srx", false);              
 //    }
 
     /**
@@ -619,14 +619,14 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      */
     public void test13b() throws Exception {
         /* test for bug SES-899: cross product is required */
-        prepareTest(null, Arrays.asList("data13.ttl"));
-        execute("service13b.rq", "service13.srx", false);              
+        prepareTest(null, Arrays.asList(PREFIX+"data13.ttl"));
+        execute(PREFIX+"service13b.rq", PREFIX+"service13.srx", false);              
     }
     
     public void testEmptyServiceBlock() throws Exception {
         /* test for bug SES-900: nullpointer for empty service block */
-        prepareTest(null, Arrays.asList("data13.ttl"));
-        execute("service14.rq", "service14.srx", false);  
+        prepareTest(null, Arrays.asList(PREFIX+"data13.ttl"));
+        execute(PREFIX+"service14.rq", PREFIX+"service14.srx", false);  
     }
     
     /**

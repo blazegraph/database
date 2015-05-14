@@ -1832,15 +1832,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
                     throw new IOException("Could not create directory: "
                             + webAppDir);
                 }
-                //FIXME:  This should be refactored to pick up the sources 
-                //from the maven depdency.  
-                //TODO: Refactor once bidata-war is a maven artifact
-                copyFiles(new File("src/test/resources/bigdata-war/"), webAppDir);
+                copyFiles(new File("bigdata-war/src"), webAppDir);
             }
 
             // log4j configuration.
             copyFile(new File(
-                    "src/test/resources/logging/log4j-dev.properties"),
+                    "bigdata/src/resources/logging/log4j-dev.properties"),
                     new File(serviceDir, "log4j-" + name + ".properties"),
                     false/* append */);
 
@@ -1851,7 +1848,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
             // java logging configuration.
             copyFile(new File(
-                    "src/test/resources/logging/logging.properties"),
+                    "bigdata/src/resources/logging/logging.properties"),
                     new File(serviceDir, "logging-" + name + ".properties"),
                     false/* append */);
 
@@ -3469,38 +3466,18 @@ public abstract class AbstractHA3JournalServerTestCase extends
     /** Verify zookeeper is running on the local host at the client port. */
     protected void assertZookeeperRunning() {
 
-        if (!isZookeeperRunning()) {
-            final String pname = "test.zookeeper.installDir";
-            final String zookeeperDirStr = System.getProperty(pname,"NOT_DEFINED");
-            final File zookeeperDir = new File(zookeeperDirStr);
-            final File binDir = new File(zookeeperDir, "bin");
-            final String shell = SystemUtil.isWindows() ? "cmd" : "/bin/sh";
-            final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
-                    : "zkServer.sh";
+        if (!isZookeeperRunning())
             fail("Zookeeper not running: localIP=" + getZKInetAddress()
-                    + ", clientPort=" + getZKClientPort() + ":: installDir="
-                    + zookeeperDirStr + ", binDir=" + binDir + ", shell="
-                    + shell + ", executable=" + executable);
-        }
+                    + ", clientPort=" + getZKClientPort());
 
     }
 
     /** Verify zookeeper is not running on the local host at the client port. */
     protected void assertZookeeperNotRunning() {
 
-        if (isZookeeperRunning()) {
-            final String pname = "test.zookeeper.installDir";
-            final String zookeeperDirStr = System.getProperty(pname,"NOT_DEFINED");
-            final File zookeeperDir = new File(zookeeperDirStr);
-            final File binDir = new File(zookeeperDir, "bin");
-            final String shell = SystemUtil.isWindows() ? "cmd" : "/bin/sh";
-            final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
-                    : "zkServer.sh";
+        if (isZookeeperRunning())
             fail("Zookeeper is running: localIP=" + getZKInetAddress()
-                    + ", clientPort=" + getZKClientPort()+ ":: installDir="
-                    + zookeeperDirStr + ", binDir=" + binDir + ", shell="
-                    + shell + ", executable=" + executable);
-        }
+                    + ", clientPort=" + getZKClientPort());
         
     }
 
