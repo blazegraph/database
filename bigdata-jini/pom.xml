@@ -11,7 +11,7 @@
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jini</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>${bigdata.version}</version>
   <name>bigdata-jini</name>
   <packaging>jar</packaging>
 
@@ -179,35 +179,35 @@ ga('send', 'pageview');
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <version>${junit3.version}</version>
       <scope>test</scope>
     </dependency>
      <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
-      <version>1.1-b3-dev</version>
+      <version>${junit-ext.version}</version>
     </dependency>
      <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <version>${bigdata.version}</version>
     </dependency>
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>1.5.2-SNAPSHOT</version>
+      <version>${bigdata.version}</version>
     </dependency>
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>1.5.2-SNAPSHOT</version>
+      <version>${bigdata.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
-      <version>3.4.5</version>
+      <version>${zookeeper.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -247,97 +247,97 @@ ga('send', 'pageview');
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jsk-lib</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jsk-platform</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jsk-resources</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>mahalo</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>mahalo-dl</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>fiddler</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>fiddler-dl</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>reggie</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>reggie-dl</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>mercury</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>mercury-dl</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>outrigger</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>outrigger-dl</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>norm</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>norm-dl</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>org.apache.river</groupId>
         <artifactId>start</artifactId>
-        <version>2.2.1</version>
+        <version>${jini.version}</version>
         <type>jar</type>
     </dependency>
     <!-- There is no artifact in maven central for tools 2.2.1 -->
@@ -348,9 +348,9 @@ ga('send', 'pageview');
         <type>jar</type>
     </dependency>
     <dependency>
-	<groupId>com.sun.jini</groupId>
-	<artifactId>sun-util</artifactId>
-	<version>2.1</version>
+        <groupId>com.sun.jini</groupId>
+	    <artifactId>sun-util</artifactId>
+	    <version>2.1</version>
     </dependency>
     <dependency>
        <!-- log4j is the primary logger for bigdata. -->

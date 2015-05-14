@@ -11,7 +11,7 @@
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-blueprints</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>${bigdata.version}</version>
   <name>bigdata-blueprints</name>
   <packaging>jar</packaging>
 
@@ -64,12 +64,12 @@ ga('send', 'pageview');
      <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <version>${bigdata.version}</version>
     </dependency>
      <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
-      <version>1.1-b3-dev</version>
+      <version>${junit-ext.version}</version>
     </dependency>
     <dependency>
 	<groupId>com.tinkerpop.blueprints</groupId>

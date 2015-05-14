@@ -11,7 +11,7 @@
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-gas</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>${bigdata.version}</version>
   <name>bigdata-gas</name>
   <packaging>jar</packaging>
   <build>
@@ -75,16 +75,20 @@ ga('send', 'pageview');
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <version>${junit3.version}</version>
       <scope>test</scope>
     </dependency>
-<!--
+    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. -->
+    <dependency>
+      <groupId>com.bigdata</groupId>
+      <artifactId>bigdata</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
       <version>${sesame.version}</version>
     </dependency>
--->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>striterator</artifactId>
