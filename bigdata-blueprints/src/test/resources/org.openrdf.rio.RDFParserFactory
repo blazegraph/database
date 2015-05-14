@@ -1,0 +1,3 @@
+com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory
+com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory
+com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactory

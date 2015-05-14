@@ -142,6 +142,7 @@
 /bigdata-jini/counters*.xml
 /bigdata-jini/zookeeper
 /bigdata-jini/test-fed
+/bigdata-jini/benchmark
 
 # /bigdata-jini/lib/
 /bigdata-jini/lib/rio-1.2.1.jar
