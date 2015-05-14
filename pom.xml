@@ -52,7 +52,7 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.1-SNAPSHOT</version>
+    <version>1.5.2-SNAPSHOT</version>
     <relativePath>blazegraph-parent/pom.xml</relativePath>
    </parent>
    <packaging>jar</packaging>
