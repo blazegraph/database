@@ -610,19 +610,19 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-core</artifactId>
-        <version>${jini.version}</version>
+        <version>2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
-        <groupId>com.sun.jini</groupId>
+        <groupId>org.apache.river</groupId>
         <artifactId>tools</artifactId>
-        <version>${jini.version}</version>
+        <version>2.2.2</version>
         <type>jar</type>
     </dependency>
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-ext</artifactId>
-        <version>${jini.version}</version>
+        <version>2.1</version>
         <type>jar</type>
     </dependency>
     <dependency>
