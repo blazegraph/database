@@ -5,31 +5,15 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT</version>
+    <version>1.5.1-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-gas</artifactId>
-  <version>${bigdata.version}</version>
+  <version>1.0-SNAPSHOT</version>
   <name>bigdata-gas</name>
   <packaging>jar</packaging>
-  <build>
-   <plugins>
-    <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.6</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-   </plugins>
-  </build>
 
   <reporting>
     <plugins>
@@ -75,20 +59,16 @@ ga('send', 'pageview');
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
+      <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
-    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. -->
-    <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
-    </dependency>
+<!--
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
       <version>${sesame.version}</version>
     </dependency>
+-->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>striterator</artifactId>
