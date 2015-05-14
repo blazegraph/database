@@ -70,10 +70,5 @@
        <artifactId>log4j</artifactId>
        <version>${log4j.version}</version>
      </dependency>
-    <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>1.5.1</version>
-    </dependency>
   </dependencies>
 </project>
