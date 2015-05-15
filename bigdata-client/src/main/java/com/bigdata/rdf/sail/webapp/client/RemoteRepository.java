@@ -31,6 +31,8 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,6 +40,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
+import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -64,8 +67,8 @@ import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
  */
 public class RemoteRepository extends RemoteRepositoryBase {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(RemoteRepository.class);
+    private static final transient Logger log = Logger
+            .getLogger(RemoteRepository.class);
 
    /**
     * The {@link RemoteRepositoryManager} object use to manage all access to the
@@ -751,10 +754,29 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long add(final AddOp add) throws Exception {
         
-        // TODO Allow client to specify UUID for ADD_OP. See #1254.
-        final UUID uuid = UUID.randomUUID();
+        return add(add, UUID.randomUUID()/*queryId*/);
+        
+    }
+    
+    /**
+     * Adds RDF data to the remote repository.
+     * 
+     * @param add
+     *            The RDF data to be added.
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     *            
+     * @return The mutation count.
+     * 
+     * @see See #1254 / BLZG-1259
+     */
+    public long add(final AddOp add, final UUID uuid) throws Exception {
 
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
+        if (add == null)
+            throw new IllegalArgumentException();
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(
+                sparqlEndpointURL, uuid, tx);
         
         add.prepareForWire();
         
@@ -767,10 +789,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
             opts.entity = entity;
             
         }
-            
-        if (add.uri != null) {
-            // set the resource to load : FIXME REST API allows multiple URIs, but RemoteRepository does not.
-            opts.addRequestParam("uri", add.uri);
+  
+        if (add.uris != null) {
+            // set the resource(s) to load
+            opts.addRequestParam("uri", add.uris.toArray(new String[0]));
         }
         
         if (add.context != null && add.context.length > 0) {
@@ -778,22 +800,37 @@ public class RemoteRepository extends RemoteRepositoryBase {
             opts.addRequestParam("context-uri", toStrings(add.context));
         }
         
+        opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+        
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
-            
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
             checkResponseCode(response = doConnect(opts));
             
             final MutationResult result = mutationResults(response);
             
+            ok = true;
+            
             return result.mutationCount;
             
         } finally {
-            
-        	if (response != null)
-        		response.abort();
-        	
+
+            if (response != null) {
+                // Abort the http response handling.
+                response.abort();
+                if (!ok) {
+                    try {
+                        /*
+                         * POST back to the server to cancel the request in case
+                         * it is still running on the server.
+                         */
+                        cancel(uuid);
+                    } catch (Exception ex) {
+                        log.warn(ex);
+                    }
+                }
+            }
         }
         
     }
@@ -811,8 +848,26 @@ public class RemoteRepository extends RemoteRepositoryBase {
     */
     public long remove(final RemoveOp remove) throws Exception {
         
-        // TODO Allow client to specify UUID for REMOVE. See #1254.
-        final UUID uuid = UUID.randomUUID();
+        return remove(remove, UUID.randomUUID());
+
+    }
+    
+    /**
+     * Removes RDF data from the remote repository.
+     * 
+     * @param remove
+     *            The RDF data to be removed.
+     * 
+     * @return The mutation count.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+     *      not encoded/decoded according to openrdf semantics (REST API) </a>
+     * @see #1254 / BLZG-1259
+     */
+    public long remove(final RemoveOp remove, final UUID uuid) throws Exception {
+
+        if (remove == null)
+            throw new IllegalArgumentException();
 
         final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
         
@@ -870,21 +925,37 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
         }
         
+        opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
             
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-
             checkResponseCode(response = doConnect(opts));
             
             final MutationResult result = mutationResults(response);
+            
+            ok = true;
             
             return result.mutationCount;
             
         } finally {
             
-        	if (response != null)
-        		response.abort();
+            if (response != null) {
+                // Abort the http response handling.
+                response.abort();
+                if (!ok) {
+                    try {
+                        /*
+                         * POST back to the server to cancel the request in case
+                         * it is still running on the server.
+                         */
+                        cancel(uuid);
+                    } catch (Exception ex) {
+                        log.warn(ex);
+                    }
+                }
+            }
                         
         }
         
@@ -907,46 +978,92 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * @return The mutation count.
      */
     public long update(final RemoveOp remove, final AddOp add) throws Exception {
-        
-        // TODO Allow client to specify UUID for UPDATE. See #1254.
-        final UUID uuid = UUID.randomUUID();
 
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
-        
+        return update(remove, add, UUID.randomUUID());
+
+    }
+
+    /**
+     * Perform an ACID update
+     * <p>
+     * There are two different patterns which are supported:
+     * <dl>
+     * <dt>UPDATE (DELETE statements selected by a QUERY plus INSERT statements
+     * from Request Body using PUT)</dt>
+     * <dd>Where query is a CONSTRUCT or DESCRIBE query. <br>
+     * Note: The QUERY + DELETE operation is ACID. <br>
+     * Note: You MAY specify a CONSTRUCT query with an empty WHERE clause in
+     * order to specify a set of statements to be removed without reference to
+     * statements already existing in the database.</dd>
+     * <dt>UPDATE (POST with Multi-Part Request Body)</dt>
+     * <dd>You can specify two sets of serialized statements - one to be removed
+     * and one to be added..</dd>
+     * </dl>
+     * 
+     * @param remove
+     *            The RDF data to be removed (either a collection of statements
+     *            or a CONSTRUCT or DESCRIBE QUERY identifying the data to be
+     *            deleted).
+     * @param add
+     *            The RDF data to be added (must be a collection of statements).
+     * 
+     * @return The mutation count.
+     * @see http
+     *      ://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer#UPDATE_.28D
+     *      ELETE_.2B_INSERT.29
+     */
+    public long update(final RemoveOp remove, final AddOp add, final UUID uuid)
+            throws Exception {
+
+        if(remove == null)
+            throw new IllegalArgumentException();
+
+        if(add == null)
+            throw new IllegalArgumentException();
+
         remove.prepareForWire();
+        
         add.prepareForWire();
-        
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(
+                sparqlEndpointURL, uuid, tx);
+
         if (remove.format != null) {
-        
+
+            // Code path when caller specifies data to be removed.
             opts.method = "POST";
             opts.addRequestParam("update");
-            
+
+            // Note: Multi-part MIME request entity.
             final MultipartEntity entity = new MultipartEntity();
-            entity.addPart(new FormBodyPart("remove", 
-                    new ByteArrayBody(
-                            remove.data, 
-                            remove.format.getDefaultMIMEType(), 
-                            "remove")));
-            entity.addPart(new FormBodyPart("add", 
-                    new ByteArrayBody(
-                            add.data, 
-                            add.format.getDefaultMIMEType(), 
-                            "add")));
-            
+
+            // The data to be removed.
+            entity.addPart(new FormBodyPart("remove", new ByteArrayBody(
+                    remove.data, remove.format.getDefaultMIMEType(), "remove")));
+
+            // The data to be added.
+            entity.addPart(new FormBodyPart("add", new ByteArrayBody(add.data,
+                    add.format.getDefaultMIMEType(), "add")));
+
+            // The multi-part request entity.
             opts.entity = entity;
-        
+
         } else {
-            
+
+            // Code path when caller specifies CONSTRUCT or DESCRIBE query
+            // identifying the data to be removed.
             opts.method = "PUT";
-            opts.addRequestParam("query", remove.query);
             
+            // QUERY specifying the data to be removed.
+            opts.addRequestParam("query", remove.query);
+
+            // The data to be added.
             final ByteArrayEntity entity = new ByteArrayEntity(add.data);
             entity.setContentType(add.format.getDefaultMIMEType());
-        
             opts.entity = entity;
-            
+
         }
-        
+
         if (add.context != null) {
             // set the default context for insert.
             opts.addRequestParam("context-uri-insert", toStrings(add.context));
@@ -957,21 +1074,37 @@ public class RemoteRepository extends RemoteRepositoryBase {
             opts.addRequestParam("context-uri-delete", toStrings(remove.context));
         }
         
+        opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+        
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
 
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-            
             checkResponseCode(response = doConnect(opts));
             
             final MutationResult result = mutationResults(response);
+            
+            ok = true;
             
             return result.mutationCount;
             
         } finally {
             
-        	if (response != null)
-        		response.abort();
+            if (response != null) {
+                // Abort the http response handling.
+                response.abort();
+                if (!ok) {
+                    try {
+                        /*
+                         * POST back to the server to cancel the request in case
+                         * it is still running on the server.
+                         */
+                        cancel(uuid);
+                    } catch (Exception ex) {
+                        log.warn(ex);
+                    }
+                }
+            }
             
         }
         
@@ -1268,7 +1401,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public static class AddOp {
 
-        private String uri;
+        private List<String> uris;
         private Iterable<? extends Statement> stmts;
         private byte[] data;
         private File file;
@@ -1278,9 +1411,19 @@ public class RemoteRepository extends RemoteRepositoryBase {
         private Resource[] context;
         
         public AddOp(final String uri) {
-            this.uri = uri;
+            if (uri == null)
+                throw new IllegalArgumentException();
+            this.uris = Collections.singletonList(uri);
         }
-        
+
+        public AddOp(final Collection<String> uris) {
+            if (uris == null)
+                throw new IllegalArgumentException();
+            if (uris.isEmpty())
+                throw new IllegalArgumentException();
+            this.uris = new LinkedList<String>(uris);
+        }
+
         public AddOp(final Iterable<? extends Statement> stmts) {
             this.stmts = stmts;
         }

@@ -852,11 +852,18 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      */
     public Properties getRepositoryProperties(final String namespace)
             throws Exception {
+        
+        return getRepositoryProperties(namespace,UUID.randomUUID());
+        
+    }
+
+    public Properties getRepositoryProperties(final String namespace,
+            final UUID uuid) throws Exception {
 
         final String sparqlEndpointURL = getRepositoryBaseURLForNamespace(namespace);
        
         final ConnectOptions opts = newConnectOptions(sparqlEndpointURL
-                + "/properties", UUID.randomUUID()/* queryId */, null/* txId */);
+                + "/properties", uuid/* queryId */, null/* txId */);
 
         opts.method = "GET";
 
