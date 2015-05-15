@@ -53,9 +53,16 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import junit.framework.Test;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.URI;
+import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.parser.sparql.SPARQLUpdateTest;
 
 import com.bigdata.bop.engine.QueryTimeoutException;
@@ -97,6 +104,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  *            (tx,namespace) pairs. Or just IRemoteTx objects. Could be an inner
  *            class in which isolation is known to be enabled. Make sure it is
  *            part of the test suite.
+ *            
+ *            TODO Refactor this test suite so we can use it against an NSS
+ *            service end point rather than just integrated tests. That will
+ *            make it easier to run as part of the long-lived testing leading
+ *            up to a release.
  */
 public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
         extends AbstractTestNanoSparqlClient<S> {
@@ -123,7 +135,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      */
     static public Test suite() {
 
-        if (false) {
+        if (true) {
 
             return ProxySuiteHelper.suiteWhenStandalone(
                     StressTestConcurrentRestApiRequests.class, //
@@ -140,7 +152,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
             return ProxySuiteHelper.suiteWhenStandalone(
                     StressTestConcurrentRestApiRequests.class, //
-                    "stressTest_concurrentClients_2Hours",// 2 hours!
+//                    "stressTest_concurrentClients_2Hours",// 2 hours!
+                    "stressTest_concurrentClients_10Minutes", // 10m
                     new LinkedHashSet<BufferMode>(Arrays
                             .asList(new BufferMode[] { BufferMode.DiskRW, })),
                     TestMode.quads);
@@ -157,6 +170,21 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
     }
 
     private static final String EX_NS = "http://example.org/";
+
+    /** Bundles together future and operator. */
+    private static class FutureAndTask {
+        final Future<Void> f;
+        final RestApiOp op;
+
+        FutureAndTask(final Future<Void> f, final RestApiOp op) {
+            if (f == null)
+                throw new IllegalArgumentException();
+            if (op == null)
+                throw new IllegalArgumentException();
+            this.f = f;
+            this.op = op;
+        }
+    }
 
     /**
      * Shared state for the test harness that is used to coordinated across the
@@ -178,8 +206,10 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
          */
         private final AtomicLong nacting = new AtomicLong();
         /**
-         * The #of operation instances that are actually doing something (they
-         * have their namespace lock and are doing work).
+         * The #of operation instances that are actually doing work on a
+         * namespace (they have their namespace lock and are doing work).
+         * 
+         * @see RandomNamespaceOp#begin(String, UUID, FutureTask)
          */
         private final ConcurrentHashMap<RestApiOp, String/* namespace */> activeTasks = new ConcurrentHashMap<RestApiOp, String>();
         /**
@@ -188,7 +218,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
          * provoke code paths associated with error handling in both the client
          * and (more vitally) the server.
          */
-        private final ConcurrentHashMap<UUID,Future<Void>> futures = new ConcurrentHashMap<UUID,Future<Void>>();
+        private final ConcurrentHashMap<UUID, FutureAndTask> futures = new ConcurrentHashMap<UUID, FutureAndTask>();
         /**
          * The #of namespaces that have been created to date. The names of the
          * current namespaces (those that exist) are in {@link #namespaces}.
@@ -437,9 +467,32 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                         .add(new SparqlUpdate(sharedTestState,
                                 "INSERT {GRAPH ?g {?x rdfs:label ?y . }} WHERE {GRAPH ?g {?x foaf:name ?y }}"));
             }
+
         }
 
-        // NSS Mutation API
+        // TODO ESTCARD
+        {        
+            
+        }
+        
+        /**
+         * NSS Mutation API
+         * 
+         * FIXME Finish mutation API.
+         * 
+         * <pre>
+         * 2.8 INSERT
+         * 2.8.1 INSERT RDF (POST with Body) - done.
+         * 2.8.2 INSERT RDF (POST with URLs)
+         * 2.9 DELETE
+         * 2.9.1 DELETE with Query
+         * 2.9.2 DELETE with Body (using POST) - done.
+         * 2.9.3 DELETE with Access Path
+         * 2.11 UPDATE (DELETE + INSERT)
+         * 2.11.1 UPDATE (DELETE statements selected by a QUERY plus INSERT statements from Request Body using PUT)
+         * 2.11.2 UPDATE (POST with Multi-Part Request Body)
+         * </pre>
+         */
         {
 
             restApiOps
@@ -450,15 +503,29 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                     .add(new InsertWithBody(sharedTestState, 10000/* batchSize */)
                             .setOperationFrequency(.01));
 
+            restApiOps
+                    .add(new DeleteWithBody(sharedTestState, 1000/* batchSize */)
+                            .setOperationFrequency(.2));
+
+            restApiOps
+                    .add(new DeleteWithBody(sharedTestState, 10000/* batchSize */)
+                            .setOperationFrequency(.01));
+
         }
 
         // Multitenancy API.
         {
 
-            restApiOps.add(new CreateNamespaceOp(sharedTestState)
+            restApiOps.add(new DESCRIBE_DATA_SETS(sharedTestState)
+                    .setOperationFrequency(.05));
+
+            restApiOps.add(new CREATE_DATA_SET(sharedTestState)
                     .setOperationFrequency(.03));
 
-            restApiOps.add(new DropNamespaceOp(sharedTestState)
+            restApiOps.add(new LIST_PROPERTIES(sharedTestState)
+                    .setOperationFrequency(.20));
+
+            restApiOps.add(new DESTROY_DATA_SET(sharedTestState)
                     .setOperationFrequency(.01));
 
         }
@@ -502,6 +569,22 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                 20, // minimum #of namespaces
                 4000, // #of trials
                 1000L, 1000L, TimeUnit.MILLISECONDS // task interruption rate.
+        );
+
+    }
+
+    /**
+     * A 10 minute stress test.
+     */
+    public void stressTest_concurrentClients_10Minutes() throws Exception {
+
+        doConcurrentClientTest(//
+                m_mgr,// remote repository manager
+                10, TimeUnit.MINUTES, // long run.
+                16, // #of concurrent requests
+                20, // minimum #of namespaces
+                Bytes.megabyte32, // #of trials
+                5000L, 5000L, TimeUnit.MILLISECONDS // task interruption rate.
         );
 
     }
@@ -605,9 +688,13 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
          */
         {
 
+            // Make sure that we do not reduce the #of namespaces below this
+            // limit.
+            sharedTestState.minimumNamespaceCount.set(initialNamespacesCount);
+            
             for (int i = 0; i < initialNamespacesCount; i++) {
 
-                final RestApiOp op = new CreateNamespaceOp(sharedTestState);
+                final RestApiOp op = new CREATE_DATA_SET(sharedTestState);
 
                 op.newInstance(rmgr).call();
 
@@ -616,10 +703,6 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             if (log.isInfoEnabled())
                 log.info("Created " + initialNamespacesCount
                         + " initial nammespaces");
-
-            // Make sure that we do not reduce the #of namespaces below this
-            // limit.
-            sharedTestState.minimumNamespaceCount.set(initialNamespacesCount);
 
         }
 
@@ -868,10 +951,11 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                     return;
                 }
                 final UUID uuid = uuids[r.nextInt(uuids.length)];
-                final Future<Void> ft = sharedTestState.futures.get(uuid);
+                final FutureAndTask tmp = sharedTestState.futures.get(uuid);
+                final Future<Void> ft = tmp.f;
                 ft.cancel(true/* mayInterruptIfRunning */);
                 if (ft.isCancelled()) {
-                    log.warn("Cancelled task: uuid=" + uuid);
+                    log.warn("Cancelled task: op=" + tmp.op + ", uuid=" + uuid);
                     // POST CANCEL request.
                     try {
                         rmgr.cancel(uuid);
@@ -1001,9 +1085,14 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
              */
             @Override
             final public Void call() throws Exception {
+                /*
+                 * The UUID that will be assigned to a REST API request that we
+                 * can cancel from the test harness.
+                 */
+                final UUID uuid = UUID.randomUUID();
                 try {
                     sharedTestState.nrunning.incrementAndGet();
-                    doApply(rmgr);
+                    doApply(rmgr, uuid);
                     return (Void) null;
                 } catch (Throwable t) {
                     /*
@@ -1100,7 +1189,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             sharedTestState.activeTasks.put(this, namespace);
 
             // insert into cancellable map (UUID => FutureTask)
-            sharedTestState.futures.put(uuid, ft);
+            sharedTestState.futures.put(uuid, new FutureAndTask(ft, this));
             
             if (log.isInfoEnabled())
                 log.info("Call"//
@@ -1193,9 +1282,15 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
         /**
          * Implement this method for a concrete REST API operation.
+         * 
+         * @param rmgr
+         *            The client API for the remote service.
+         * @param uuid
+         *            The UUID that the test harness may use to cancel the
+         *            request.
          */
-        protected abstract void doApply(final RemoteRepositoryManager rmgr)
-                throws Exception;
+        protected abstract void doApply(final RemoteRepositoryManager rmgr,
+                final UUID uuid) throws Exception;
 
     }
 
@@ -1215,8 +1310,8 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
         }
 
         @Override
-        final protected void doApply(final RemoteRepositoryManager rmgr)
-                throws Exception {
+        final protected void doApply(final RemoteRepositoryManager rmgr,
+                final UUID uuid) throws Exception {
 
             // obtain non-exclusive lock for random existing namespace.
             final String namespace = lockRandomNamespace();
@@ -1227,8 +1322,6 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                 final RemoteRepository repo = rmgr
                         .getRepositoryForNamespace(namespace);
 
-                final UUID uuid = UUID.randomUUID();
-
                 // Wrap as FutureTask.
                 final FutureTask<Void> ft = new FutureTask<Void>(
                         
@@ -1236,6 +1329,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                             @Override
                             public Void call() throws Exception {
+
                                 // do operation.
                                 doApplyToNamespace(repo, uuid);
 
@@ -1244,6 +1338,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                         });
                 
 
+                // register test.
                 begin(namespace, uuid, ft);
                 
                 ft.run();// run in our thread.
@@ -1254,6 +1349,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                     
                 } finally {
                     
+                    // done with test.
                     done(namespace, uuid);
                     
                 }
@@ -1396,7 +1492,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      * FIXME Provide coverage for both mutation and read-only operations
      * (estcard, etc.)
      * 
-     * FIXME (***) Non-SPARQL API MUST SUPPORT CANCEL.
+     * FIXME (***) Non-SPARQL API MUST SUPPORT CANCEL and WE MUST PASS IN THE DESIRED UUID SO WE CAN CANCEL FROM THE TEST HARNESS.
      */
 
     private static class InsertWithBody extends RandomNamespaceOp {
@@ -1405,10 +1501,14 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
         InsertWithBody(final SharedTestState sharedTestState,
                 final int batchSize) {
+
             super(sharedTestState, false/* readOnly */);
+            
             if (batchSize <= 0)
                 throw new IllegalArgumentException();
+            
             this.batchSize = batchSize;
+            
         }
 
         @Override
@@ -1426,7 +1526,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             }
 
             // do mutation.
-            repo.add(op);
+            repo.add(op, uuid);
 
         }
 
@@ -1440,6 +1540,87 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
     }
 
+    /**
+     * DELETE WITH BODY
+     * <p>
+     * Note: This implementation uses a SELECT query with a LIMIT to identify
+     * a set of statements that exist in the namespace. This is done because we
+     * are using a lot of UUIDs when writing on the namespaces so we can not
+     * expect a randomly generated set of UUID-based statements to match
+     * anything on DELETE. Hence we delete out statements that are known to
+     * exist.
+     * <p>
+     * Note: This does not wrap the SELECT query and the DELETE operation
+     * with a transaction so the operation is not guaranteed to be atomic.
+     * Therefore the #of statements actually removed is not guaranteed to be the
+     * same as the #of statements that we POST in the DELETE request.
+     */
+    private static class DeleteWithBody extends RandomNamespaceOp {
+
+        private final boolean quads;
+        private final int batchSize;
+
+        DeleteWithBody(final SharedTestState sharedTestState,
+                final int batchSize) {
+
+            super(sharedTestState, false/* readOnly */);
+            
+            if (batchSize <= 0)
+                throw new IllegalArgumentException();
+            
+            this.batchSize = batchSize;
+            
+            quads = sharedTestState.testMode == TestMode.quads;
+            
+        }
+
+        @Override
+        protected void doApplyToNamespace(final RemoteRepository repo,
+                final UUID uuid) throws Exception {
+
+            /*
+             * Setup data to be deleted.
+             * 
+             * Note: This uses SELECT rather than CONSTRUCT since we need to get
+             * the graph as well when addressing a QUADS mode namespace.
+             */
+            final ValueFactory vf = ValueFactoryImpl.getInstance();
+            final Collection<Statement> stmts = new ArrayList<>(batchSize);
+            TupleQueryResult result = null;
+            try {
+                if (quads) {
+                    result = repo.prepareTupleQuery(
+                            "SELECT * WHERE {GRAPH ?g {?s ?p ?o} }")
+                            .evaluate();
+                } else {
+                    result = repo.prepareTupleQuery(
+                            "SELECT * WHERE {?s ?p ?o}").evaluate();
+                }
+                while (result.hasNext() && stmts.size() < batchSize) {
+                    final BindingSet bset = result.next();
+                    final Resource s = (Resource) bset.getBinding("s")
+                            .getValue();
+                    final URI p = (URI) bset.getBinding("p").getValue();
+                    final Value o = (Value) bset.getBinding("o").getValue();
+                    final Resource g = (Resource) (quads ? bset.getBinding("g")
+                            .getValue() : null);
+                    final Statement stmt = quads ? vf.createStatement(s, p, o,
+                            g) : vf.createStatement(s, p, o);
+                    stmts.add(stmt);
+                }
+            } finally {
+                if (result != null)
+                    result.close();
+            }
+
+            // do mutation.
+            repo.remove(new RemoteRepository.RemoveOp(stmts), uuid);
+
+        }
+
+    }
+
+
     /*
      * MULTITENANCY API
      * 
@@ -1448,25 +1629,113 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      * FIXME (***) Multi-Tenancy API must support CANCEL.
      */
 
-    private static class CreateNamespaceOp extends RestApiOp {
+    abstract private static class RepositoryManagerOp extends RestApiOp {
 
-        CreateNamespaceOp(final SharedTestState sharedTestState) {
+        protected final String namespace;
+        
+        RepositoryManagerOp(final SharedTestState sharedTestState,
+                final boolean readOnly, final String namespace) {
+            super(sharedTestState, readOnly);
+            if (namespace == null)
+                throw new IllegalArgumentException();
+            this.namespace = namespace;
+        }
+        
+        @Override
+        final protected void doApply(final RemoteRepositoryManager rmgr,
+                final UUID uuid) throws Exception {
+            
+            // Obtain task and wrap as FutureTask.
+            final FutureTask<Void> ft = new FutureTask<Void>(
+                    getTask(rmgr, uuid));
+
+            begin(namespace, uuid, ft);
+            
+            ft.run();// run in our thread.
+
+            try {
+            
+                ft.get(); // check future.
+                
+            } finally {
+                
+                done(namespace, uuid);
+                
+            }
+            
+        }
+        
+        /**
+         * Return the task.
+         * 
+         * @param uuid
+         *            The UUID that the task must assign to the REST API
+         *            operation that it is under test. The task MAY be cancelled
+         *            by the test harness using this UUID.
+         */
+        protected abstract Callable<Void> getTask(
+                final RemoteRepositoryManager rmgr, final UUID uuid);
+
+    }
+    
+//    private static class CREATE_DATA_SET extends RepositoryManagerOp {
+//
+//        CREATE_DATA_SET(final SharedTestState sharedTestState) {
+//            super(sharedTestState, false/* readOnly */, //
+//                    "n"
+//                            + sharedTestState.namespaceCreateCounter
+//                                    .incrementAndGet()//
+//            );
+//        }
+//
+//        @Override
+//        protected Callable<Void> getTask(final RemoteRepositoryManager rmgr,
+//                final UUID uuid) {
+//
+//            return new Callable<Void>() {
+//
+//                @Override
+//                public Void call() throws Exception {
+//
+//                    // Note: Wrap properties to avoid modification!
+//                    final Properties properties = new Properties(
+//                            sharedTestState.testMode.getProperties());
+//
+//                    // create namespace.
+//                    rmgr.createRepository(namespace, properties, uuid);
+//
+//                    // add entry IFF created.
+//                    if (sharedTestState.namespaces.putIfAbsent(namespace,
+//                            new ReentrantReadWriteLock()) != null) {
+//                        // Should not exist! Each namespace name is distinct!!!
+//                        throw new AssertionError("namespace=" + namespace);
+//                    }
+//
+//                    // Track #of namespaces that exist in the service.
+//                    sharedTestState.namespaceExistCounter.incrementAndGet();
+//
+//                    return null;
+//                }
+//                
+//            };
+//
+//        }
+//
+//    }
+    
+    private static class CREATE_DATA_SET extends RestApiOp {
+
+        CREATE_DATA_SET(final SharedTestState sharedTestState) {
             super(sharedTestState, false/* readOnly */);
         }
 
         @Override
-        protected void doApply(final RemoteRepositoryManager rmgr)
-                throws Exception {
+        protected void doApply(final RemoteRepositoryManager rmgr,
+                final UUID uuid) throws Exception {
 
+            // Note: Do NOT assign the namespace until the task executes!!!
             final String namespace = "n"
-                    + sharedTestState.namespaceCreateCounter.getAndIncrement();
-
-            // Note: Wrap properties to avoid modification!
-            final Properties properties = new Properties(
-                    sharedTestState.testMode.getProperties());
-
-            // UUID assigned to the operation.
-            final UUID uuid = UUID.randomUUID();
+                    + sharedTestState.namespaceCreateCounter.incrementAndGet();
 
             // Wrap as FutureTask.
             final FutureTask<Void> ft = new FutureTask<Void>(
@@ -1475,6 +1744,10 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                 @Override
                 public Void call() throws Exception {
+
+                    // Note: Wrap properties to avoid modification!
+                    final Properties properties = new Properties(
+                            sharedTestState.testMode.getProperties());
 
                     // create namespace.
                     rmgr.createRepository(namespace, properties);
@@ -1495,17 +1768,17 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             });
 
             begin(namespace, uuid, ft);
-            
-            ft.run();// run in our thread.
+
+            ft.run(); // run in our thread.
 
             try {
-            
+
                 ft.get(); // check future.
-                
+
             } finally {
-                
+
                 done(namespace, uuid);
-                
+
             }
 
         }
@@ -1521,15 +1794,15 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      * coverage for error handling when a namespace disappears concurrent with
      * client requests against that namespace.
      */
-    private static class DropNamespaceOp extends RestApiOp {
+    private static class DESTROY_DATA_SET extends RestApiOp {
 
-        DropNamespaceOp(final SharedTestState sharedTestState) {
+        DESTROY_DATA_SET(final SharedTestState sharedTestState) {
             super(sharedTestState, false/* readOnly */);
         }
 
         @Override
-        protected void doApply(final RemoteRepositoryManager rmgr)
-                throws Exception {
+        protected void doApply(final RemoteRepositoryManager rmgr,
+                final UUID uuid) throws Exception {
 
             final AtomicBoolean success = new AtomicBoolean(false);
             
@@ -1537,9 +1810,6 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
             final String namespace = lockRandomNamespaceExclusive();
 
             try {
-
-                // UUID assigned to the operation.
-                final UUID uuid = UUID.randomUUID();
 
                 // Wrap as FutureTask.
                 final FutureTask<Void> ft = new FutureTask<Void>(
@@ -1578,7 +1848,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
                             }
 
                             // destroy the namespace.
-                            rmgr.deleteRepository(namespace);
+                            rmgr.deleteRepository(namespace, uuid);
                             
                             success.set(true);
 
@@ -1610,6 +1880,75 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
 
                 // Unlock. Remove IFF successful.
                 unlockNamespaceExclusive(namespace, success.get()/* remove */);
+
+            }
+
+        }
+
+    }
+    
+    /**
+     * Operator to obtain a SERVICE DESCRIPTION of all known data sets (aka
+     * namespaces).
+     */
+    private static class DESCRIBE_DATA_SETS extends RepositoryManagerOp {
+
+        DESCRIBE_DATA_SETS(final SharedTestState sharedTestState) {
+            /*
+             * Note: A mock namespace is used to make sure that this operation
+             * is not serialized on any real namespace.
+             */
+            super(sharedTestState, true/* readOnly */, //
+                    "mock-namespace-" + UUID.randomUUID()//
+            );
+        }
+
+        @Override
+        protected Callable<Void> getTask(final RemoteRepositoryManager rmgr,
+                final UUID uuid) {
+ 
+            return new Callable<Void>() {
+            
+                public Void call() throws Exception {
+                
+                    rmgr.getRepositoryDescriptions(uuid);
+                    
+                    return null;
+                    
+                }
+
+            };
+
+        }
+
+    }
+
+    /**
+     * Operator to obtain the properties for a specific namespace.
+     * 
+     * FIXME THIS TASK IS NOT CANCELLED YET.
+     */
+    private static class LIST_PROPERTIES extends RestApiOp {
+
+        LIST_PROPERTIES(final SharedTestState sharedTestState) {
+            super(sharedTestState, true/* readOnly */);
+        }
+
+        @Override
+        protected void doApply(final RemoteRepositoryManager rmgr,
+                final UUID uuid) throws Exception {
+            
+            // obtain non-exclusive lock for random existing namespace.
+            final String namespace = lockRandomNamespace();
+
+            try {
+                
+                rmgr.getRepositoryProperties(namespace, uuid);
+                
+            } finally {
+
+                // release non-exclusive lock.
+                unlockNamespace(namespace);
 
             }
 
