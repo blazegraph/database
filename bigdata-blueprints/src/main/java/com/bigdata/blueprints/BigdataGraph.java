@@ -48,7 +48,6 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.Update;
-import org.openrdf.query.impl.AbstractQuery;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
@@ -59,12 +58,15 @@ import com.bigdata.blueprints.BigdataGraphAtom.ElementType;
 import com.bigdata.blueprints.BigdataGraphAtom.ExistenceAtom;
 import com.bigdata.blueprints.BigdataGraphAtom.PropertyAtom;
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
+import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
+import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.RDRHistory;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -1445,6 +1447,7 @@ public abstract class BigdataGraph implements Graph {
                 
         final GraphQueryResult result;
         UUID queryId = null;
+
         try {
             
             final org.openrdf.query.GraphQuery query = 
@@ -1477,9 +1480,8 @@ public abstract class BigdataGraph implements Graph {
             throw ex;
         }
         
-        final IStriterator sitr = new Striterator(new WrappedResult<Statement>(
-                result, readFromWriteConnection ? null : cxn
-                ));
+		final IStriterator sitr = new Striterator(new WrappedResult<Statement>(
+				result, readFromWriteConnection ? null : cxn, queryId));
         
         sitr.addFilter(new Filter() {
             private static final long serialVersionUID = 1L;
@@ -1499,8 +1501,6 @@ public abstract class BigdataGraph implements Graph {
                 return toGraphAtom(stmt);
             }
         });
-        
-        tearDownQuery(queryId, externalQueryId);
         
         return (ICloseableIterator<BigdataGraphAtom>) sitr;
         
@@ -1613,18 +1613,21 @@ public abstract class BigdataGraph implements Graph {
         }
 
         final TupleQueryResult result;
+        UUID queryId = null;
+
         try {
             
             final TupleQuery query = (TupleQuery) 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
 
             setMaxQueryTime(query);
+            
 
 			if (query instanceof BigdataSailTupleQuery
 					&& cxn instanceof BigdataSailRepositoryConnection) {
 
 				final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
-				setupQuery((BigdataSailRepositoryConnection) cxn,
+				queryId = setupQuery((BigdataSailRepositoryConnection) cxn,
 						bdtq.getASTContainer(), QueryType.SELECT,
 						externalQueryId);
 			}
@@ -1645,9 +1648,9 @@ public abstract class BigdataGraph implements Graph {
             throw ex;
         }
         
-        final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
-                result, readFromWriteConnection ? null : cxn
-                ));
+		final IStriterator sitr = new Striterator(
+				new WrappedResult<BindingSet>(result,
+						readFromWriteConnection ? null : cxn, queryId));
         
         sitr.addFilter(new Resolver() {
             private static final long serialVersionUID = 1L;
@@ -1689,14 +1692,23 @@ public abstract class BigdataGraph implements Graph {
         return bbs;
         
     }
-
     /**
      * Select results using a SPARQL query.
      */
     public boolean ask(final String queryStr) throws Exception {
+    	return ask(queryStr, UUID.randomUUID().toString());
+    }
+
+    /**
+     * Select results using a SPARQL query.
+     */
+	public boolean ask(final String queryStr, String externalQueryId)
+			throws Exception {
         
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
+                
+        UUID queryId = null;
         
         try {
             
@@ -1705,7 +1717,18 @@ public abstract class BigdataGraph implements Graph {
 
             setMaxQueryTime(query);
             
+            if (query instanceof BigdataSailBooleanQuery
+					&& cxn instanceof BigdataSailRepositoryConnection) {
+
+				final BigdataSailBooleanQuery bdtq = (BigdataSailBooleanQuery) query;
+				queryId = setupQuery((BigdataSailRepositoryConnection) cxn,
+						bdtq.getASTContainer(), QueryType.ASK,
+						externalQueryId);
+			}
+            
             final boolean result = query.evaluate();
+            
+            tearDownQuery(queryId);
             
             return result;
             
@@ -1906,16 +1929,34 @@ public abstract class BigdataGraph implements Graph {
 //        
 //    }
     
-    public static class WrappedResult<E> implements ICloseableIterator<E> {
+    public class WrappedResult<E> implements ICloseableIterator<E> {
         
         private final CloseableIteration<E,?> it;
         
         private final RepositoryConnection cxn;
         
+        private final UUID queryId;
+        
         public WrappedResult(final CloseableIteration<E,?> it, 
                 final RepositoryConnection cxn) {
             this.it = it;
             this.cxn = cxn;
+            this.queryId = null;
+        }
+
+        /**
+         * Allows you to pass a query UUID to perform a tear down
+         * when it exits.
+         * 
+         * @param it
+         * @param cxn
+         * @param queryId
+         */
+        public WrappedResult(final CloseableIteration<E,?> it, 
+                final RepositoryConnection cxn, UUID queryId) {
+            this.it = it;
+            this.cxn = cxn;
+            this.queryId = queryId;
         }
 
         @Override
@@ -1944,6 +1985,7 @@ public abstract class BigdataGraph implements Graph {
         @Override
         public void close() {
             try {
+            	tearDownQuery(queryId);
                 it.close();
             } catch (Exception e) {
                 log.warn("Could not close result");
@@ -1966,6 +2008,64 @@ public abstract class BigdataGraph implements Graph {
     }
     
     /**
+	 * Metadata about running {@link AbstractQueryTask}s (this includes both
+	 * queries and update requests).
+	 */
+	public static class RunningQuery {
+	
+		/**
+		 * The unique identifier for this query as assigned by the Embedded
+		 * Graph implementation end point (rather than the {@link QueryEngine}).
+		 */
+		protected final String extQueryId;
+	
+		/**
+		 * The unique identifier for this query for the {@link QueryEngine}
+		 * (non-<code>null</code>).
+		 * 
+		 * @see QueryEngine#getRunningQuery(UUID)
+		 */
+		protected final UUID queryId2;
+	
+		/** The timestamp when the query was accepted (ns). */
+		protected final long begin;
+	
+		public RunningQuery(final String extQueryId, final UUID queryId2,
+				final long begin) {
+	
+			if (queryId2 == null)
+				throw new IllegalArgumentException();
+	
+			this.extQueryId = extQueryId;
+	
+			this.queryId2 = queryId2;
+	
+			// this.query = query;
+	
+			this.begin = begin;
+	
+		}
+		
+		public long getElapsedTimeNS() {
+			return (System.nanoTime() - this.begin);
+		}
+		
+		public String getExtQueryId() {
+			return extQueryId;
+		}
+	
+		public UUID getQueryId2() {
+			return queryId2;
+		}
+	
+		public long getBegin() {
+			return begin;
+		}
+	
+	
+	}
+
+	/**
      * Utility function to set the Query timeout to the global
      * setting if it is configured.
      */
@@ -1974,6 +2074,48 @@ public abstract class BigdataGraph implements Graph {
             query.setMaxQueryTime(maxQueryTime);
         }
     }
+    
+	/**
+	 * Return a Collection of running queries
+	 * 
+	 * @return
+	 */
+	public abstract Collection<RunningQuery> getRunningQueries();
+
+	/**
+	 * Kill a running query specified by the UUID. Do nothing if the query has
+	 * completed.
+	 * 
+	 * @param queryId
+	 */
+	public abstract void killQuery(UUID queryId);
+
+	/**
+	 * Kill a running query specified by the external query ID String. Do
+	 * nothing if the query has completed.
+	 * 
+	 * @param externalQueryId
+	 */
+	public abstract void killQuery(String externalQueryId);
+
+	/**
+	 * Kill a running query specified by the RunningQuery object. Do nothing if
+	 * the query has completed.
+	 * 
+	 * @param r
+	 */
+	public abstract void killQuery(RunningQuery r);
+	
+	/**
+	 * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
+	 * UPDATE request.
+	 * 
+	 * @param queryId2
+	 *            The {@link UUID} for the request.
+	 * 
+	 * @return The {@link RunningQuery} iff it was found.
+	 */
+	public abstract RunningQuery getQueryById(final UUID queryId2);
     
 	/**
 	 * Embedded clients can override this to access query management
@@ -1993,6 +2135,6 @@ public abstract class BigdataGraph implements Graph {
 	 * 
 	 * @param absQuery
 	 */
-	protected abstract void tearDownQuery(UUID queryId, String externalQueryId);
-    
+	protected abstract void tearDownQuery(UUID queryId);
+	
 }

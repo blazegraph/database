@@ -480,7 +480,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         }
     }
     
-    public QueryEngine getQueryEngine() {
+    protected QueryEngine getQueryEngine() {
 
     	final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
                 .getQueryController(getIndexManager());
@@ -672,7 +672,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 			log.debug("Setup Query (External ID, UUID):  ( " + extQueryId
 					+ " , " + queryId2 + " )");
 			log.debug("External query for " + queryId2 + " is :\n"
-					+ getExternalQueryIdForUUID(queryId2));
+					+ getQueryById(queryId2).getExtQueryId());
 			log.debug(runningQueriesToString());
 		}
 
@@ -738,72 +738,15 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	 */
 	private static final ConcurrentHashMap<UUID/* queryId2 */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
 
-	/**
-	 * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
-	 * UPDATE request.
-	 * 
-	 * @param queryId2
-	 *            The {@link UUID} for the request.
-	 * 
-	 * @return The {@link RunningQuery} iff it was found.
-	 */
-	RunningQuery getQueryById(final UUID queryId2) {
+	
+	public RunningQuery getQueryById(final UUID queryId2) {
 
 		return m_queries2.get(queryId2);
 
 	}
 
-	/**
-	 * Metadata about running {@link AbstractQueryTask}s (this includes both
-	 * queries and update requests).
-	 */
-	static class RunningQuery {
-
-		/**
-		 * The unique identifier for this query as assigned by the Embedded
-		 * Graph implementation end point (rather than the {@link QueryEngine}).
-		 */
-		final String extQueryId;
-
-		/**
-		 * The unique identifier for this query for the {@link QueryEngine}
-		 * (non-<code>null</code>).
-		 * 
-		 * @see QueryEngine#getRunningQuery(UUID)
-		 */
-		final UUID queryId2;
-
-		/**
-		 * The task executing the query (non-<code>null</code>).
-		final AbstractQueryTask queryTask;
-		 */
-
-		// /** The query. */
-		// final String query;
-
-		/** The timestamp when the query was accepted (ns). */
-		final long begin;
-
-		public RunningQuery(final String extQueryId, final UUID queryId2,
-				final long begin) {
-
-			if (queryId2 == null)
-				throw new IllegalArgumentException();
-
-			this.extQueryId = extQueryId;
-
-			this.queryId2 = queryId2;
-
-			// this.query = query;
-
-			this.begin = begin;
-
-		}
-
-	}
-
 	@Override
-	protected void tearDownQuery(UUID queryId, String externalQueryId) {
+	protected void tearDownQuery(UUID queryId) {
 		
 		if (queryId != null) {
 			
@@ -814,10 +757,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 			final RunningQuery r = m_queries2.get(queryId);
 
-			m_queries.remove(externalQueryId, r);
+			m_queries.remove(r.getExtQueryId(), r);
 			m_queries2.remove(queryId);
 
 			if(log.isDebugEnabled()) {
+				log.debug("Tearing down query: " + queryId );
 				log.debug("m_queries2 has " + m_queries2.size());
 			}
 		}
@@ -840,16 +784,45 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 		return sb.toString();
 		
 	}
+	
+	public Collection<RunningQuery> getRunningQueries() {
+		final Collection<RunningQuery> queries = m_queries2.values();
 
-	public String getExternalQueryIdForUUID(UUID queryId)
-	{
+		return queries;
+	}
+	
+	public void killRunningQuery(UUID queryId) {
 		final RunningQuery r = m_queries2.get(queryId);
-		
-		if(r != null) {
-			return r.extQueryId;
-		} else {
-			return null;
+
+		if (log.isDebugEnabled()) {
+			log.debug("Killing " + r.getQueryId2() + " , " + r.getExtQueryId());
 		}
 	}
-    
+
+	public void killRunningQuery(String externalQueryId) {
+		final RunningQuery r = m_queries.get(externalQueryId);
+
+		if (log.isDebugEnabled()) {
+			log.debug("Killing " + r.getQueryId2() + " , " + r.getExtQueryId());
+		}
+	}
+
+	@Override
+	public void killQuery(UUID queryId) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void killQuery(String externalQueryId) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void killQuery(RunningQuery r) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

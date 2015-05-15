@@ -380,9 +380,37 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 	}
 
 	@Override
-	protected void tearDownQuery(UUID queryId, String externalQueryId) {
+	protected void tearDownQuery(UUID queryId) {
 		//This is a NOOP for the BigdataGraphBulkLoad
 		
+	}
+
+	@Override
+	public Collection<RunningQuery> getRunningQueries() {
+		//This is a NOOP for the BigdataGraphBulkLoad
+		return null;
+	}
+
+	@Override
+	public void killQuery(UUID queryId) {
+		//This is a NOOP for the BigdataGraphBulkLoad
+		
+	}
+
+	@Override
+	public void killQuery(String externalQueryId) {
+		//This is a NOOP for the BigdataGraphBulkLoad
+	}
+
+	@Override
+	public void killQuery(RunningQuery r) {
+		//This is a NOOP for the BigdataGraphBulkLoad
+	}
+
+	@Override
+	public RunningQuery getQueryById(UUID queryId2) {
+		//This is a NOOP for the BigdataGraphBulkLoad
+		return null;
 	}
 
 }

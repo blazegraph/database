@@ -64,6 +64,7 @@ import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
+import com.bigdata.rdf.sail.QueryCancellationHelper;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -275,10 +276,12 @@ public class StatusServlet extends BigdataRDFServlet {
 
         final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
                 .getQueryController(indexManager);
+        
+        QueryCancellationHelper.cancelQueries(queryIds, queryEngine);
 
         for (UUID queryId : queryIds) {
 
-            if (!tryCancelQuery(queryEngine, queryId)) {
+            if (!QueryCancellationHelper.tryCancelQuery(queryEngine, queryId)) {
                 if (!tryCancelUpdate(context, queryId)) {
                     queryEngine.addPendingCancel(queryId);
                     if (log.isInfoEnabled()) {
@@ -291,41 +294,6 @@ public class StatusServlet extends BigdataRDFServlet {
 
         buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "");
         
-    }
-
-    static private boolean tryCancelQuery(final QueryEngine queryEngine,
-            final UUID queryId) {
-
-        final IRunningQuery q;
-        try {
-
-            q = queryEngine.getRunningQuery(queryId);
-
-        } catch (RuntimeException ex) {
-
-            /*
-             * Ignore.
-             * 
-             * Either the IRunningQuery has already terminated or this is an
-             * UPDATE rather than a QUERY.
-             */
-
-            return false;
-
-        }
-
-        if (q != null && q.cancel(true/* mayInterruptIfRunning */)) {
-
-            // TODO Could paint the page with this information.
-            if (log.isInfoEnabled())
-                log.info("Cancelled query: " + queryId);
-
-            return true;
-
-        }
-
-        return false;
-
     }
 
     /**
