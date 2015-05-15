@@ -23,11 +23,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.blueprints;
 
 import java.util.Properties;
+import java.util.UUID;
 
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.tinkerpop.blueprints.Features;
 
 /**
@@ -217,5 +221,20 @@ public class BigdataGraphClient extends BigdataGraph {
         FEATURES.supportsTransactions = false; //BigdataGraph.FEATURES.supportsTransactions;
         
     }
+
+	@Override
+	protected UUID setupQuery(BigdataSailRepositoryConnection cxn,
+			ASTContainer astContainer, QueryType queryType, String extQueryId) {
+		//This is a NOOP when using the REST client as the query management is implemented
+		//in the rest client.
+		return null;
+	}
+
+	@Override
+	protected void tearDownQuery(UUID queryId, String externalQueryId) {
+		//This is a NOOP when using the REST client as the query management is implemented
+		//in the rest client.
+		
+	}
 
 }

@@ -48,6 +48,7 @@ import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.Update;
+import org.openrdf.query.impl.AbstractQuery;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
@@ -61,9 +62,12 @@ import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.RDRHistory;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.tinkerpop.blueprints.Direction;
 import com.tinkerpop.blueprints.Edge;
@@ -125,7 +129,7 @@ public abstract class BigdataGraph implements Graph {
     /**
      * Max Query Time used to globally set the query timeout.
      * 
-     * Default is -1 (unlimited)
+     * Default is 0 (unlimited)
      */
     protected final int maxQueryTime;
     
@@ -185,7 +189,7 @@ public abstract class BigdataGraph implements Graph {
         this.laxProperties = Boolean.valueOf(props.getProperty(
                 Options.LAX_PROPERTIES, "false"));
         this.maxQueryTime = Integer.parseInt(props.getProperty(
-                Options.MAX_QUERY_TIME, "-1"));
+                Options.MAX_QUERY_TIME, "0"));
         
         this.TYPE = factory.getTypeURI();
         this.VERTEX = factory.getVertexURI();
@@ -1407,15 +1411,29 @@ public abstract class BigdataGraph implements Graph {
         }
 
     }
-    
+
     /**
      * Project a subgraph using a SPARQL query.
      * <p>
      * Warning: You MUST close this iterator when finished.
      */
-    @SuppressWarnings("unchecked")
     public ICloseableIterator<BigdataGraphAtom> project(final String queryStr) 
             throws Exception {
+    	return this.project(queryStr,UUID.randomUUID().toString());
+    }
+    
+	/**
+	 * Project a subgraph using a SPARQL query.
+	 *
+	 * This version allows passing an external system ID to allow association
+	 * between queries in the query engine when using an Embedded Client.
+	 * 
+	 * <p>
+	 * Warning: You MUST close this iterator when finished.
+	 */
+	@SuppressWarnings("unchecked")
+	public ICloseableIterator<BigdataGraphAtom> project(final String queryStr,
+			String externalQueryId) throws Exception {
         
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
@@ -1426,12 +1444,22 @@ public abstract class BigdataGraph implements Graph {
         }
                 
         final GraphQueryResult result;
+        UUID queryId = null;
         try {
             
             final org.openrdf.query.GraphQuery query = 
                     cxn.prepareGraphQuery(QueryLanguage.SPARQL, queryStr);
             
             setMaxQueryTime(query);
+            
+            if (query instanceof BigdataSailGraphQuery
+					&& cxn instanceof BigdataSailRepositoryConnection) {
+
+				final BigdataSailGraphQuery bdtq = (BigdataSailGraphQuery) query;
+				queryId = setupQuery((BigdataSailRepositoryConnection) cxn,
+						bdtq.getASTContainer(), QueryType.CONSTRUCT,
+						externalQueryId);
+			}
         
             if (sparqlLog.isTraceEnabled()) {
                 if (query instanceof BigdataSailGraphQuery) {
@@ -1471,6 +1499,8 @@ public abstract class BigdataGraph implements Graph {
                 return toGraphAtom(stmt);
             }
         });
+        
+        tearDownQuery(queryId, externalQueryId);
         
         return (ICloseableIterator<BigdataGraphAtom>) sitr;
         
@@ -1554,14 +1584,26 @@ public abstract class BigdataGraph implements Graph {
 
     }
     
-    /**
-     * Select results using a SPARQL query.
-     * <p>
-     * Warning: You MUST close this iterator when finished.
-     */
-    @SuppressWarnings("unchecked")
-    public ICloseableIterator<BigdataBindingSet> select(final String queryStr) throws Exception {
-        
+	/**
+	 * Select results using a SPARQL query.
+	 * <p>
+	 * Warning: You MUST close this iterator when finished.
+	 */
+	@SuppressWarnings("unchecked")
+	public ICloseableIterator<BigdataBindingSet> select(final String queryStr)
+			throws Exception {
+		return this.select(queryStr, UUID.randomUUID().toString());
+	}
+
+	/**
+	 * Select results using a SPARQL query.
+	 * <p>
+	 * Warning: You MUST close this iterator when finished.
+	 */
+	@SuppressWarnings("unchecked")
+	public ICloseableIterator<BigdataBindingSet> select(final String queryStr,
+			String externalQueryId) throws Exception {
+
         final RepositoryConnection cxn = readFromWriteConnection ? 
                 getWriteConnection() : getReadConnection();
         
@@ -1575,8 +1617,17 @@ public abstract class BigdataGraph implements Graph {
             
             final TupleQuery query = (TupleQuery) 
                     cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
-            
+
             setMaxQueryTime(query);
+
+			if (query instanceof BigdataSailTupleQuery
+					&& cxn instanceof BigdataSailRepositoryConnection) {
+
+				final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+				setupQuery((BigdataSailRepositoryConnection) cxn,
+						bdtq.getASTContainer(), QueryType.SELECT,
+						externalQueryId);
+			}
             
             if (sparqlLog.isTraceEnabled()) {
                 if (query instanceof BigdataSailTupleQuery) {
@@ -1923,5 +1974,25 @@ public abstract class BigdataGraph implements Graph {
             query.setMaxQueryTime(maxQueryTime);
         }
     }
+    
+	/**
+	 * Embedded clients can override this to access query management
+	 * capabilities.
+	 * 
+	 * @param cxn
+	 * @param astContainer
+	 * 
+	 * @return
+	 */
+	protected abstract UUID setupQuery(final BigdataSailRepositoryConnection cxn
+   		 , ASTContainer astContainer, QueryType queryType, String extQueryId);
+	
+	/**
+	 * Embedded clients can override this to access query management
+	 * capabilities.
+	 * 
+	 * @param absQuery
+	 */
+	protected abstract void tearDownQuery(UUID queryId, String externalQueryId);
     
 }
