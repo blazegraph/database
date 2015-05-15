@@ -377,6 +377,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
             left = addStartOpOnCluster(queryBase, ctx);
             
         }
+        
+        
+        // add bindings clause object
+        final Object bindingsClause = 
+              queryBase.annotations().get(QueryBase.Annotations.BINDINGS_CLAUSE);
+        if (bindingsClause!=null && bindingsClause instanceof BindingsClause) {
+           left = addValues(left,
+                 (BindingsClause)bindingsClause, doneSet, ctx);
+        }
+        
 
         /*
          * Named subqueries.
@@ -2981,7 +2991,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 continue;
             } else if (child instanceof BindingsClause) {
                 /*
-                 * FIXME Support VALUES clause
+                 * VALUES clause
                  */
                 left = addValues(left,
                         (BindingsClause) child, doneSet, ctx);

@@ -175,8 +175,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = 
+              new IBindingSet[] { batchResolveIVs(store, bs) };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
@@ -237,8 +237,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = 
+              new IBindingSet[] { batchResolveIVs(store, bs) };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
@@ -318,8 +318,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = 
+              new IBindingSet[] { batchResolveIVs(store, bs) };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
@@ -442,8 +442,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = 
+              new IBindingSet[] { batchResolveIVs(store, bs) };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
@@ -491,8 +491,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] bindingSets = 
+              new IBindingSet[] { batchResolveIVs(store, bs) };
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
@@ -811,198 +811,6 @@ public class ASTEvalHelper {
             throw new QueryEvaluationException(t);
         }
 
-    }
-    
-    /**
-     * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}
-     * and merges it with the BINDINGS clause (if any) attached to the
-     * {@link QueryRoot}.
-     * 
-     * @param astContainer
-     *            The query container.
-     * @param src
-     *            The {@link BindingSet}.
-     * 
-     * @return The {@link IBindingSet}.
-     */
-    //private Note: Exposed to CBD class.
-    static IBindingSet[] mergeBindingSets(
-            final ASTContainer astContainer, final IBindingSet src) {
-
-        if (astContainer == null)
-            throw new IllegalArgumentException();
-
-        if (src == null)
-            throw new IllegalArgumentException();
-        
-        final List<List<IBindingSet>> bindingsClauses;
-        {
-            
-//            final BindingsClause x = astContainer.getOriginalAST()
-//                    .getBindingsClause();
-            final List<BindingsClause> x = getDefinitelyProducedBindingsClauses(
-                    astContainer.getOriginalAST());
-         
-            if (x == null) {
-            
-                bindingsClauses = null;
-                
-            } else {
-                
-//                bindingsClause = x.getBindingSets();
-                bindingsClauses = new LinkedList<List<IBindingSet>>();
-                
-                for (BindingsClause bc : x) {
-                    
-                    bindingsClauses.add(bc.getBindingSets());
-                    
-                }
-                
-            }
-
-        }
-
-        if (bindingsClauses == null || bindingsClauses.isEmpty()) {
-
-            // Just the solution provided through the API.
-            return new IBindingSet[] { src };
-            
-        }
-        
-        if (src.isEmpty() && bindingsClauses.size() == 1) {
-
-            /*
-             * No source solution, so just use the BINDINGS clause solutions.
-             */
-            
-            return bindingsClauses.get(0)
-                    .toArray(new IBindingSet[bindingsClauses.get(0).size()]);
-            
-        }
-
-        bindingsClauses.add(0, Arrays.asList(src));
-        
-        /*
-         * We have to merge the source solution given through the openrdf API
-         * with the solutions in the BINDINGS clause. This "merge" is a join. If
-         * the join fails for any solution, then that solution is dropped. Since
-         * there is only one solution from the API, the cardinality of the join
-         * is at most [1 x |BINDINGS|].
-         */
-        List<IBindingSet> left = new LinkedList<IBindingSet>();
-        
-        for (List<IBindingSet> bindingsClause : bindingsClauses) {
-
-            final List<IBindingSet> tmp = new LinkedList<IBindingSet>();
-            
-            for (IBindingSet l : left) {
-            
-                final Iterator<IBindingSet> itr = bindingsClause.iterator();
-    
-                while (itr.hasNext()) {
-    
-                    final IBindingSet right = itr.next();
-    
-                    final IBindingSet join = BOpContext.bind(l/* left */, right,
-                            null/* constraints */, null/* varsToKeep */);
-    
-                    if (join != null) {
-    
-                        tmp.add(join);
-    
-                    }
-    
-                }
-                
-            }
-            
-            left = tmp;
-
-        }
-
-        // Return the results of that join.
-        return left.toArray(new IBindingSet[left.size()]);
-        
-    }
-    
-    static List<BindingsClause> getDefinitelyProducedBindingsClauses(final QueryRoot query) {
-        
-        final List<BindingsClause> bindingsClauses = new LinkedList<BindingsClause>();
-        
-        if (query.getBindingsClause() != null) {
-            
-            bindingsClauses.add(query.getBindingsClause());
-            
-        }
-
-//        final Map<String, BindingsClause> nsBindingsClauses = 
-//                new LinkedHashMap<String, List<BindingsClause>>();
-//        for (NamedSubqueryRoot ns : query.getNamedSubqueriesNotNull()) {
-//            if (ns.getBindingsClause() != null)
-//                nsBindingsClauses.put(ns.getName(), ns.getBindingsClause());
-//        }
-        
-        getDefinitelyProducedBindingsClauses(query.getWhereClause(), bindingsClauses);
-        
-        return bindingsClauses;
-        
-    }
-    
-    static void getDefinitelyProducedBindingsClauses(
-            final GroupNodeBase<?> group, 
-//            final Map<String, BindingsClause> nsBindingsClauses,
-            final List<BindingsClause> bindingsClauses) {
-        
-        if (group == null) {
-            return;
-        }
-        
-        if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
-            return;
-        }
-        
-        if (group instanceof UnionNode) {
-            return;
-        }
-        
-        for (IGroupMemberNode child : group) {
-            
-            if (child instanceof SubqueryRoot) {
-                
-                final SubqueryRoot subquery = (SubqueryRoot) child;
-                
-                if (subquery.getBindingsClause() != null) {
-                    
-                    bindingsClauses.add(subquery.getBindingsClause());
-                    
-                }
-                
-                getDefinitelyProducedBindingsClauses(subquery.getWhereClause(), bindingsClauses);
-                
-            } else if (child instanceof BindingsClause) {
-                
-                bindingsClauses.add((BindingsClause) child);
-                
-            }
-
-        }        
-        
-        // recurse into the childen
-        for (IGroupMemberNode child : group) {
-
-            if (child instanceof GroupNodeBase) {
-                
-                getDefinitelyProducedBindingsClauses((GroupNodeBase<?>) child, bindingsClauses);
-                
-            } 
-//            else if (child instanceof SubqueryRoot) {
-//                
-//                getDefinitelyBindingsClauses(((SubqueryRoot) child).getWhereClause(), bindingsClauses);
-//                
-//            }
-            
-        }
-        
     }
     
     /**

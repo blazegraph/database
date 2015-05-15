@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+
 /**
  * Data driven test suite for SPARQL 1.1 BINDINGS clause.
  * 
@@ -194,6 +195,91 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
 
         new TestHelper("sparql11-bindings-04").runTest();
         
+    }
+    
+    
+    /**
+     * Problem with multiple VALUES clauses, as described in 
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-48">
+     * Query fails to project subquery variables</a>.
+     */
+    public void test_ticket_bg48a() throws Exception {
+       new TestHelper("ticket_bg48a",// testURI,
+             "ticket_bg48a.rq",// queryFileURL
+             "ticket_bg48.trig",// dataFileURL
+             "ticket_bg48.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    /**
+     * Problem with multiple VALUES clauses, as described in 
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-48">
+     * Query fails to project subquery variables</a>.
+     */
+    public void test_ticket_bg48b() throws Exception {
+       new TestHelper("ticket_bg48b",// testURI,
+             "ticket_bg48b.rq",// queryFileURL
+             "ticket_bg48.trig",// dataFileURL
+             "ticket_bg48.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    /**
+     * Problem with multiple VALUES clauses, as described in 
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-48">
+     * Query fails to project subquery variables</a>.
+     */
+    public void test_ticket_bg48c() throws Exception {
+       new TestHelper("ticket_bg48c",// testURI,
+             "ticket_bg48c.rq",// queryFileURL
+             "ticket_bg48.trig",// dataFileURL
+             "ticket_bg48.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    /**
+     * Problem with multiple VALUES clauses, as described in 
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-50">
+     * Queries with multiple VALUES clauses</a>.
+     */
+    public void test_ticket_bg50a() throws Exception {
+       new TestHelper("ticket_bg50a",// testURI,
+             "ticket_bg50a.rq",// queryFileURL
+             "ticket_bg50.trig",// dataFileURL
+             "ticket_bg50.srx"// resultFileURL
+       ).runTest();           
+    }
+    
+    /**
+     * Problem with multiple VALUES clauses, as described in 
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-50">
+     * Queries with multiple VALUES clauses</a>.
+     */
+    public void test_ticket_bg50b() throws Exception {
+       new TestHelper("ticket_bg50b",// testURI,
+             "ticket_bg50b.rq",// queryFileURL
+             "ticket_bg50.trig",// dataFileURL
+             "ticket_bg50.srx"// resultFileURL
+       ).runTest();           
+    }
+    
+    /**
+     * Problem with multiple VALUES clauses, as described in 
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-50">
+     * Queries with multiple VALUES clauses</a>.
+     */
+    public void test_ticket_bg50c() throws Exception {
+       new TestHelper("ticket_bg50c",// testURI,
+             "ticket_bg50c.rq",// queryFileURL
+             "ticket_bg50.trig",// dataFileURL
+             "ticket_bg50.srx"// resultFileURL
+       ).runTest();           
     }
     
 }
