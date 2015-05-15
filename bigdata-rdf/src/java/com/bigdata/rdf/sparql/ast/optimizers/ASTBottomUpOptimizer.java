@@ -954,9 +954,13 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              */
             if(childGroup.isMinus()) {
 
-                // FIXME This should be an "in-scope" test (not MUST|MAYBE).
+            	// the static condition under which we can drop the MINUS is
+            	// that the variables that left and right variables do not
+            	// overlap, satisfying the condition that the intersection of
+            	// the left and right variables is empty; for a justification
+            	// see http://www.w3.org/TR/sparql11-query/#sparqlAlgebra
                 final Set<IVariable<?>> incomingBound = sa
-                        .getDefinitelyIncomingBindings(childGroup,
+                        .getMaybeIncomingBindings(childGroup,
                                 new LinkedHashSet<IVariable<?>>());
 
                 final Set<IVariable<?>> maybeProduced = sa
