@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Collection;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -231,10 +232,37 @@ public class BigdataGraphClient extends BigdataGraph {
 	}
 
 	@Override
-	protected void tearDownQuery(UUID queryId, String externalQueryId) {
+	protected void tearDownQuery(UUID queryId) {
 		//This is a NOOP when using the REST client as the query management is implemented
 		//in the rest client.
 		
+	}
+
+	@Override
+	public Collection<RunningQuery> getRunningQueries() {
+		//TODO:  Implement for REST API
+		return null;
+	}
+
+	@Override
+	public void killQuery(UUID queryId) {
+		//TODO:  Implement for REST API
+	}
+
+	@Override
+	public void killQuery(String externalQueryId) {
+		//TODO:  Implement for REST API
+	}
+
+	@Override
+	public void killQuery(RunningQuery r) {
+		//TODO:  Implement for REST API
+	}
+
+	@Override
+	public RunningQuery getQueryById(UUID queryId2) {
+		//TODO:  Implement for REST API
+		return null;
 	}
 
 }
