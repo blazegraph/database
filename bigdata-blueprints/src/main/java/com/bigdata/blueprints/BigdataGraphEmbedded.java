@@ -468,6 +468,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
     }
     
     public QueryEngine getQueryEngine() {
+
     	final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
                 .getQueryController(getIndexManager());
     	
