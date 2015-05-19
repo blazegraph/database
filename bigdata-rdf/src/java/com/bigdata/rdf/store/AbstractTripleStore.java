@@ -3577,6 +3577,12 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    final public StringBuilder dumpStore(final boolean history) {
+
+        return dumpStore(this, true, true, true, history, false);
+
+    }
+
     final public StringBuilder dumpStore(
             final AbstractTripleStore resolveTerms, final boolean explicit,
             final boolean inferred, final boolean axioms) {
