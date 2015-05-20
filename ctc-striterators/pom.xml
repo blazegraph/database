@@ -69,6 +69,7 @@
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
       <version>${junit-ext.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
        <!-- log4j is the primary logger for bigdata. -->
