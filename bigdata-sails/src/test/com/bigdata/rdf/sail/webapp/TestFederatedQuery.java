@@ -160,14 +160,6 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         
     }
 
-    /**
-     * The openrdf services test suite data.
-     */
-    private static final String PREFIX = "openrdf-service/";
-
-//    /** The "local" repository object. */
-//    private RemoteRepository localRepository;
-    
     @Override
     public void setUp() throws Exception {
         
@@ -492,11 +484,10 @@ public class TestFederatedQuery<S extends IIndexManager> extends
                     serviceURI2_alias);
 
             prepareTest(
-                    PREFIX + "data05.ttl",
-                    Arrays.asList(PREFIX + "data05endpoint1.ttl", PREFIX
-                            + "data05endpoint2.ttl"));
+                    "data05.ttl",
+                    Arrays.asList("data05endpoint1.ttl", "data05endpoint2.ttl"));
 
-            execute(PREFIX + "service05.rq", PREFIX + "service05.srx", false);
+            execute("service05.rq", "service05.srx", false);
 
         } finally {
         
