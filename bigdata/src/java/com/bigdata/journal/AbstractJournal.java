@@ -2506,6 +2506,19 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             throw new IllegalStateException();
         }
 
+        if (abortRequired.get()) {
+            /**
+             * Do not permit mutation if an abort must be performed.
+             * 
+             * @see http://jira.blazegraph.com/browse/BLZG-181 (Add critical
+             *      section protection to AbstractJournal.abort() and
+             *      BigdataSailConnection.rollback())
+             * @see http://jira.blazegraph.com/browse/BLZG-1236 (Recycler error
+             *      in 1.5.1)
+             */
+            throw new AbortRequiredException();
+        }
+        
     }
 
     @Override
@@ -4061,7 +4074,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
         	// Critical Section Check. @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
         	if (abortRequired.get()) 
-        		throw new IllegalStateException("Commit cannot be called, a call to abort must be made before further updates");
+        		throw new AbortRequiredException();
 
             final CommitState cs = new CommitState(this, commitTime);
 
