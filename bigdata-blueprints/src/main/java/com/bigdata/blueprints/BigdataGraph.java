@@ -2118,6 +2118,17 @@ public abstract class BigdataGraph implements Graph {
 	public abstract RunningQuery getQueryById(final UUID queryId2);
     
 	/**
+	 * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
+	 * UPDATE request.
+	 * 
+	 * @param queryId2
+	 *            The {@link UUID} for the request.
+	 * 
+	 * @return The {@link RunningQuery} iff it was found.
+	 */
+	public abstract RunningQuery getQueryByExternalId(final String extQueryId);
+
+	/**
 	 * Embedded clients can override this to access query management
 	 * capabilities.
 	 * 

@@ -413,4 +413,10 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		return null;
 	}
 
+	@Override
+	public RunningQuery getQueryByExternalId(String extQueryId) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

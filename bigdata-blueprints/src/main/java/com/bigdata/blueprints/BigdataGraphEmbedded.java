@@ -49,6 +49,7 @@ import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.QueryCancellationHelper;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.StatusServlet;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -746,6 +747,12 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 
 	@Override
+	public RunningQuery getQueryByExternalId(String extQueryId) {
+		
+		return m_queries.get(extQueryId);
+	}
+
+	@Override
 	protected void tearDownQuery(UUID queryId) {
 		
 		if (queryId != null) {
@@ -809,20 +816,26 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 	@Override
 	public void killQuery(UUID queryId) {
-		// TODO Auto-generated method stub
-		
+		QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
 	}
 
 	@Override
-	public void killQuery(String externalQueryId) {
-		// TODO Auto-generated method stub
+	public void killQuery(String extQueryId) {
 		
+		final RunningQuery rQuery = getQueryByExternalId(extQueryId);
+		killQuery(rQuery);
+
 	}
 
 	@Override
-	public void killQuery(RunningQuery r) {
-		// TODO Auto-generated method stub
-		
+	public void killQuery(RunningQuery rQuery) {
+
+		if(rQuery != null) {
+			final UUID queryId = rQuery.getQueryId2();
+			QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
+		}
+
 	}
+
 
 }
