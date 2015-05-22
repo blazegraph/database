@@ -81,11 +81,10 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
  * @todo verify more necessary outcomes of the different tests using assertions.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public class TestLockManager extends TestCase implements IComparisonTest {
 
-    public static final Logger log = Logger.getLogger(TestLockManager.class);
+    private static final Logger log = Logger.getLogger(TestLockManager.class);
 
     /**
      * 
@@ -106,6 +105,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      */
     public static class Wait10ResourceTask implements Callable<Object> {
 
+        @Override
         public Object call() throws Exception {
 
             synchronized (this) {
@@ -136,6 +136,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      */
     static class DeathResourceTask implements Callable<Object> {
 
+        @Override
         public Object call() throws Exception {
 
             throw new HorridTaskDeath();
@@ -160,6 +161,7 @@ public class TestLockManager extends TestCase implements IComparisonTest {
      * behavior of tasks that lock only a single resource, eg., unisolated
      * operations on the {@link DataService}.
      */
+    @Override
     public Result doComparisonTest(final Properties properties) throws Exception {
 
         final long testTimeout = Integer.parseInt(properties.getProperty(
@@ -362,15 +364,11 @@ public class TestLockManager extends TestCase implements IComparisonTest {
                 }
             }
         }
-        if (nerrors > 0) {
-            log.warn("There were " + nerrors + " errors and " + ndeadlock
-                    + " deadlocks");
-        }
 
         // Done.
         System.out.println(db.toString());
 
-        Result result = new Result();
+        final Result result = new Result();
 
         double perSec = (ncomplete *1000d) / elapsed;
         
@@ -388,6 +386,11 @@ public class TestLockManager extends TestCase implements IComparisonTest {
         result.put("elapsed", ""+elapsed);
 
         System.err.println(result.toString(true/*newline*/));
+        
+        if (nerrors > 0) {
+            fail("There were " + nerrors + " errors and " + ndeadlock
+                    + " deadlocks::" + result.toString());
+        }
         
         return result;
         
