@@ -1,3 +1,26 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sparql.ast.service;
 
 import java.util.Iterator;
@@ -6,6 +29,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.http.conn.ClientConnectionManager;
 import org.eclipse.jetty.client.HttpClient;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
@@ -22,6 +46,8 @@ import com.bigdata.rdf.sparql.ast.service.history.HistoryServiceFactory;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
+import com.bigdata.service.fts.FTS;
+import com.bigdata.service.fts.FulltextSearchServiceFactory;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 
@@ -80,6 +106,9 @@ public class ServiceRegistry {
 
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
+        
+        // Add the external Solr search service
+        add(FTS.SEARCH, new FulltextSearchServiceFactory());
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());

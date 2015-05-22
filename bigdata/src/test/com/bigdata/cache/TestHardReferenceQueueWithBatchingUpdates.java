@@ -427,18 +427,20 @@ public class TestHardReferenceQueueWithBatchingUpdates extends TestCase2
 
     }
 
+    @Override
     public void setUpComparisonTest(Properties properties) throws Exception {
         
 //        queue = xxx;
         
     }
     
+    @Override
     public void tearDownComparisonTest() throws Exception {
     
-        queue = null;
+//        queue = null;
 
     }
-    private IHardReferenceQueue<Object> queue;
+//    private IHardReferenceQueue<Object> queue;
     
     /**
      * Additional properties understood by this test.
