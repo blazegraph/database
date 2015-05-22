@@ -87,6 +87,8 @@ import com.bigdata.rdf.vocab.decls.DCTermsVocabularyDecl;
 public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCase {
 
 //    private static final Logger log = Logger.getLogger(TestReificationDoneRight.class);
+	
+	public static final String TEST_RESOURCE_PREFIX = "/com/bigdata/rdf/sparql/ast/eval/reif/";
     
     /**
      * 
@@ -156,10 +158,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		 * matching lexical items.)
 		 */
 
-		final TestHelper h = new TestHelper("reif/rdr-00", // testURI,
-				"reif/rdr-02.rq",// queryFileURL
-				"reif/empty.ttl",// dataFileURL
-				"reif/rdr-02.srx"// resultFileURL
+		final TestHelper h = new TestHelper(TEST_RESOURCE_PREFIX + "rdr-00", // testURI,
+				TEST_RESOURCE_PREFIX + "rdr-02.rq",// queryFileURL
+				TEST_RESOURCE_PREFIX + "empty.ttl",// dataFileURL
+				TEST_RESOURCE_PREFIX + "rdr-02.srx"// resultFileURL
 		);
 
 		h.runTest();
@@ -172,10 +174,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
      */
     public void test_reificationDoneRight_00_loadDataFromFile() throws Exception {
 
-    	new TestHelper("reif/rdr-00-loadFromFile", // testURI,
-				"reif/rdr-02.rq",// queryFileURL
-				"reif/rdr-02.ttlx",// dataFileURL
-				"reif/rdr-02.srx"// resultFileURL
+    	new TestHelper(TEST_RESOURCE_PREFIX + "rdr-00-loadFromFile", // testURI,
+				TEST_RESOURCE_PREFIX + "rdr-02.rq",// queryFileURL
+				TEST_RESOURCE_PREFIX + "rdr-02.ttlx",// dataFileURL
+				TEST_RESOURCE_PREFIX + "rdr-02.srx"// resultFileURL
 		).runTest();
 
     }
@@ -235,10 +237,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 		 * matching lexical items.)
 		 */
 
-		new TestHelper("reif/rdr-00a", // testURI,
-				"reif/rdr-02a.rq",// queryFileURL
-				"reif/empty.ttl",// dataFileURL
-				"reif/rdr-02a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-00a", // testURI,
+				TEST_RESOURCE_PREFIX + "rdr-02a.rq",// queryFileURL
+				TEST_RESOURCE_PREFIX + "empty.ttl",// dataFileURL
+				TEST_RESOURCE_PREFIX + "rdr-02a.srx"// resultFileURL
 		).runTest();
 
     }
@@ -249,10 +251,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
      */
     public void test_reificationDoneRight_00a_loadFromFile() throws Exception {
 
-		new TestHelper("reif/rdr-00a-loadFromFile", // testURI,
-				"reif/rdr-02a.rq",// queryFileURL
-				"reif/rdr-02.ttlx",// dataFileURL
-				"reif/rdr-02a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-00a-loadFromFile", // testURI,
+				TEST_RESOURCE_PREFIX + "rdr-02a.rq",// queryFileURL
+				TEST_RESOURCE_PREFIX + "rdr-02.ttlx",// dataFileURL
+				TEST_RESOURCE_PREFIX + "rdr-02a.srx"// resultFileURL
 		).runTest();
 
     }
@@ -272,10 +274,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_01() throws Exception {
 
-		new TestHelper("reif/rdr-01", // testURI,
-                "reif/rdr-01.rq",// queryFileURL
-                "reif/rdr-01.ttl",// dataFileURL
-                "reif/rdr-01.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-01", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-01.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01.ttl",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -295,10 +297,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_01_usingRDRData() throws Exception {
 
-		new TestHelper("reif/rdr-01-usingRDRData", // testURI,
-                "reif/rdr-01.rq",// queryFileURL
-                "reif/rdr-01.ttlx",// dataFileURL
-                "reif/rdr-01.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-01-usingRDRData", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-01.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01.ttlx",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -319,10 +321,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_01a() throws Exception {
 
-		new TestHelper("reif/rdr-01a", // testURI,
-                "reif/rdr-01a.rq",// queryFileURL
-                "reif/rdr-01.ttl",// dataFileURL
-                "reif/rdr-01a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-01a", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-01a.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01.ttl",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01a.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -343,10 +345,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_01a_usingRDRData() throws Exception {
 
-		new TestHelper("reif/rdr-01a-usingRDRData", // testURI,
-                "reif/rdr-01a.rq",// queryFileURL
-                "reif/rdr-01.ttlx",// dataFileURL
-                "reif/rdr-01a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-01a-usingRDRData", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-01a.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01.ttlx",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-01a.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -362,10 +364,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_02() throws Exception {
 
-		new TestHelper("reif/rdr-02", // testURI,
-                "reif/rdr-02.rq",// queryFileURL
-                "reif/rdr-02.ttl",// dataFileURL
-                "reif/rdr-02.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-02", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-02.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02.ttl",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -381,10 +383,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_02_usingRDRData() throws Exception {
 
-		new TestHelper("reif/rdr-02", // testURI,
-                "reif/rdr-02.rq",// queryFileURL
-                "reif/rdr-02.ttlx",// dataFileURL
-                "reif/rdr-02.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-02", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-02.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02.ttlx",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -403,10 +405,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_02a() throws Exception {
 
-		new TestHelper("reif/rdr-02a", // testURI,
-                "reif/rdr-02a.rq",// queryFileURL
-                "reif/rdr-02a.ttl",// dataFileURL
-                "reif/rdr-02a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-02a", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-02a.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02a.ttl",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02a.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -425,10 +427,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_02a_usingRDRData() throws Exception {
 
-		new TestHelper("reif/rdr-02a", // testURI,
-                "reif/rdr-02a.rq",// queryFileURL
-                "reif/rdr-02a.ttlx",// dataFileURL
-                "reif/rdr-02a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-02a", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-02a.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02a.ttlx",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-02a.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -460,10 +462,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_03() throws Exception {
 
-		new TestHelper("reif/rdr-03", // testURI,
-                "reif/rdr-03.rq",// queryFileURL
-                "reif/rdr-03.ttl",// dataFileURL
-                "reif/rdr-03.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-03", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-03.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-03.ttl",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-03.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -495,10 +497,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	 */
 	public void test_reificationDoneRight_03a() throws Exception {
 
-		new TestHelper("reif/rdr-03a", // testURI,
-                "reif/rdr-03a.rq",// queryFileURL
-                "reif/rdr-03a.ttl",// dataFileURL
-                "reif/rdr-03a.srx"// resultFileURL
+		new TestHelper(TEST_RESOURCE_PREFIX + "rdr-03a", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-03a.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-03a.ttl",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-03a.srx"// resultFileURL
                 ).runTest();
 
 	}
@@ -511,10 +513,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
      */
     public void test_reificationDoneRight_04() throws Exception {
 
-        new TestHelper("reif/rdr-04", // testURI,
-                "reif/rdr-04.rq",// queryFileURL
-                "reif/rdr-04.ttlx",// dataFileURL
-                "reif/rdr-04.srx"// resultFileURL
+        new TestHelper(TEST_RESOURCE_PREFIX + "rdr-04", // testURI,
+                TEST_RESOURCE_PREFIX + "rdr-04.rq",// queryFileURL
+                TEST_RESOURCE_PREFIX + "rdr-04.ttlx",// dataFileURL
+                TEST_RESOURCE_PREFIX + "rdr-04.srx"// resultFileURL
                 ).runTest();
 
     }
@@ -533,10 +535,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
         if (!BigdataStatics.runKnownBadTests) // FIXME RDR TEST KNOWN TO FAIL.
             return;
 
-        new TestHelper("reif/rdr-05a", // testURI,
-               "reif/rdr-05a.rq",// queryFileURL
-               "reif/rdr-05.ttl",// dataFileURL
-               "reif/rdr-05.srx"// resultFileURL
+        new TestHelper(TEST_RESOURCE_PREFIX + "rdr-05a", // testURI,
+               TEST_RESOURCE_PREFIX + "rdr-05a.rq",// queryFileURL
+               TEST_RESOURCE_PREFIX + "rdr-05.ttl",// dataFileURL
+               TEST_RESOURCE_PREFIX + "rdr-05.srx"// resultFileURL
                ).runTest();
 
    }
@@ -550,10 +552,10 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
      */
     public void test_reificationDoneRight_05b() throws Exception {
 
-       new TestHelper("reif/rdr-05b", // testURI,
-               "reif/rdr-05b.rq",// queryFileURL
-               "reif/rdr-05.ttl",// dataFileURL
-               "reif/rdr-05.srx"// resultFileURL
+       new TestHelper(TEST_RESOURCE_PREFIX + "rdr-05b", // testURI,
+               TEST_RESOURCE_PREFIX + "rdr-05b.rq",// queryFileURL
+               TEST_RESOURCE_PREFIX + "rdr-05.ttl",// dataFileURL
+               TEST_RESOURCE_PREFIX + "rdr-05.srx"// resultFileURL
                ).runTest();
 
    }

@@ -81,6 +81,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
@@ -93,6 +94,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.rdf</include>
                 <include>**/*.srx</include>
@@ -113,6 +115,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
@@ -125,6 +128,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
@@ -139,6 +143,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
@@ -154,6 +159,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.rdf</include>
                 <include>**/*.srx</include>
@@ -170,6 +176,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
@@ -184,6 +191,7 @@ dependencies.
                 <include>**/*.xml</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
