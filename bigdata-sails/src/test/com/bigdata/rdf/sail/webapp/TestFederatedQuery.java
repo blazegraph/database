@@ -137,6 +137,8 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  */
 public class TestFederatedQuery<S extends IIndexManager> extends
         AbstractTestNanoSparqlClient<S> {
+	
+	public static final String TEST_RESOURCE_PATH = "/com/bigdata/rdf/sail/webapp/openrdf-service/";
 
     public TestFederatedQuery() {
 
@@ -325,9 +327,15 @@ public class TestFederatedQuery<S extends IIndexManager> extends
     private void loadDataSet(final RemoteRepository rep, final String datasetFile)
             throws Exception {
 
-       final URL datasetUri = TestFederatedQuery.class.getResource(datasetFile);
-      
-       rep.add(new AddOp(datasetUri.toExternalForm()));
+		final URL datasetUri = TestFederatedQuery.class.getClass().getResource(
+				TEST_RESOURCE_PATH + datasetFile);
+		
+		if(log.isInfoEnabled()) {
+			log.info("datasetFile: " + datasetFile);
+			log.info("datasetUri: " + datasetUri);
+		}
+		
+		rep.add(new AddOp(datasetUri.toExternalForm()));
 
 //        final InputStream dataset = TestFederatedQuery.class
 //                .getResourceAsStream(datasetFile);
@@ -725,7 +733,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
      * @throws IOException
      */
     private String readQueryString(final String queryResource) throws RepositoryException, IOException {
-       final InputStream stream = TestFederatedQuery.class.getResourceAsStream(queryResource);
+		final InputStream stream = TestFederatedQuery.class
+				.getResourceAsStream(TEST_RESOURCE_PATH + queryResource);
         try {
             return IOUtil.readString(new InputStreamReader(stream, "UTF-8"));
         } finally {
@@ -746,7 +755,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
        final TupleQueryResultFormat tqrFormat = QueryResultIO.getParserFormatForFileName(resultFile);
     
         if (tqrFormat != null) {
-           final InputStream in = TestFederatedQuery.class.getResourceAsStream(resultFile);
+           final InputStream in = TestFederatedQuery.class.getResourceAsStream(TEST_RESOURCE_PATH + resultFile);
             try {
                final TupleQueryResultParser parser = QueryResultIO.createParser(tqrFormat);
                 parser.setValueFactory(ValueFactoryImpl.getInstance());
@@ -787,7 +796,8 @@ public class TestFederatedQuery<S extends IIndexManager> extends
             final Set<Statement> result = new LinkedHashSet<Statement>();
             parser.setRDFHandler(new StatementCollector(result));
     
-            final InputStream in = TestFederatedQuery.class.getResourceAsStream(resultFile);
+			final InputStream in = TestFederatedQuery.class
+					.getResourceAsStream(TEST_RESOURCE_PATH + resultFile);
             try {
                 parser.parse(in, null);     // TODO check
             }
