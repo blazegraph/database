@@ -25,10 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.blueprints.BigdataGraph.RunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 
@@ -44,6 +46,17 @@ public class QueryCancellationHelper {
 	
 	static private final transient Logger log = Logger
             .getLogger(QueryCancellationHelper.class);
+	
+	public static void cancelQuery(final UUID queryId,
+			final QueryEngine queryEngine) {
+
+		final Collection<UUID> queryIds = new LinkedList<UUID>();
+		
+		queryIds.add(queryId);
+
+		cancelQueries(queryIds, queryEngine);
+
+	}
 	
 	public static void cancelQueries(final Collection<UUID> queryIds,
 			final QueryEngine queryEngine) {
@@ -92,7 +105,6 @@ public class QueryCancellationHelper {
 
         if (q != null && q.cancel(true/* mayInterruptIfRunning */)) {
 
-            // TODO Could paint the page with this information.
             if (log.isInfoEnabled())
                 log.info("Cancelled query: " + queryId);
             
@@ -110,10 +122,37 @@ public class QueryCancellationHelper {
      * @param queryId
      * @return
      */
-    public static boolean tryCancelUpdate(QueryTask queryId) {
 
-//
-//        if (query != null) {
+	public static boolean tryCancelUpdate(final QueryEngine queryEngine,
+			RunningQuery query) {
+
+
+		if (query != null) {
+
+			final IRunningQuery q;
+			try {
+
+				q = queryEngine.getRunningQuery(query.getQueryId2());
+				
+				if(q != null && q.cancel(true /* interrupt when running */)) {
+					return true;
+				}
+
+			} catch (RuntimeException ex) {
+
+				/*
+				 * Ignore.
+				 * 
+				 * Either the IRunningQuery has already terminated or this is an
+				 * UPDATE rather than a QUERY.
+				 */
+
+				return false;
+
+			}
+		}
+        		
+        		
 //
 //            if (query.queryTask instanceof UpdateTask) {
 //
@@ -137,5 +176,11 @@ public class QueryCancellationHelper {
         return false;
 
    }
+
+    //TODO:  Unify the webapp and embedded
+    public static boolean tryCancelUpdate(UUID queryId) {
+    	
+    	return false;
+    }
 
 }
