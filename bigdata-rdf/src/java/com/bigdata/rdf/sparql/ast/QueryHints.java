@@ -38,6 +38,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
+import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
@@ -179,7 +180,7 @@ public interface QueryHints {
 //     * @see #TAG
 //     */
 //    String DEFAULT_TAG = "";
- 
+
     /**
      * When <code>true</code>, enables all query hints pertaining to analytic
      * query patterns. When <code>false</code>, those features are disabled.
@@ -193,15 +194,56 @@ public interface QueryHints {
      * hint:Query hint:analytic "true".
      * </pre>
      * 
+     * The default is <code>false</code>. The default may be
+     * overridden using the environment variable named
+     * 
+     * <pre>
+     * com.bigdata.rdf.sparql.ast.QueryHints.analytic
+     * </pre>
+     * 
      * @see #NATIVE_DISTINCT_SPO
      * @see #NATIVE_DISTINCT_SOLUTIONS
      * @see #NATIVE_HASH_JOINS
      * @see #MERGE_JOIN
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-43" > Add System 
+     *      property to enable analytic query mode. </a>
      */
-    String ANALYTIC = "analytic";//QueryHints.class.getName() + ".analytic";
+    String ANALYTIC = "analytic";
 
-    boolean DEFAULT_ANALYTIC = false;
+    boolean DEFAULT_ANALYTIC = Boolean.valueOf(System.getProperty(
+            QueryHints.class.getName() + "." + ANALYTIC, "false"));
 
+    /**
+     * The maximum amount of native heap memory that may be allocated for a
+     * single query when using the analytic query mode -or- ZERO (0L) if no
+     * limit should be imposed. When non-zero, queries that exceed this limit
+     * will be broken with a memory allocation exception. Together with a limit
+     * on the number of concurrent queries, this may be used to limit the amount
+     * of native memory consumed by the query engine.
+     * <p>
+     * The default is ZERO (0) which implies no limit. The default may be
+     * overridden using the environment variable named
+     * 
+     * <pre>
+     * com.bigdata.rdf.sparql.ast.QueryHints.analyticMaxMemoryPerQuery
+     * </pre>
+     * <p>
+     * Native memory allocations are made using a {@link DirectBufferPool}. The
+     * per-query limit will be rounded up to a multiple of buffers based on the
+     * configured buffer capacity. The default is a 1MB buffer, so the
+     * granularity of the limit is multiples of 1MB.
+     * 
+     * @see DirectBufferPool
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-42" > Per query
+     *      memory limit for analytic query mode. </a>
+     */
+    String ANALYTIC_MAX_MEMORY_PER_QUERY = "analyticMaxMemoryPerQuery";
+    
+    long DEFAULT_ANALYTIC_MAX_MEMORY_PER_QUERY = Long.valueOf(System
+            .getProperty(QueryHints.class.getName() + "."
+                    + ANALYTIC_MAX_MEMORY_PER_QUERY, "0"));
+    
     /**
      * When <code>true</code>, will use the version of DISTINCT SOLUTIONS based
      * on the {@link HTree} and the native (C process) heap. When

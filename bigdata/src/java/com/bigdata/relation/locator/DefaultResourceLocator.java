@@ -775,8 +775,18 @@ public class DefaultResourceLocator<T extends ILocatableResource<T>> //
                         .getGlobalRowStore(readTime);
 
                 // Read the properties from the GRS.
-                map = rowStore == null ? null : rowStore.read(
-                        RelationSchema.INSTANCE, namespace);
+                try {
+                    map = rowStore == null ? null : rowStore.read(
+                            RelationSchema.INSTANCE, namespace);
+                } catch (RuntimeException ex) {
+                    // Provide more information in trace. 
+                    // See http://jira.blazegraph.com/browse/BLZG-1268
+                    throw new RuntimeException(ex.getMessage() + "::namespace="
+                            + namespace + ", timestamp="
+                            + TimestampUtility.toString(timestamp)
+                            + ", readTime="
+                            + TimestampUtility.toString(readTime), ex);
+                }
 
                 if (map != null) {
 

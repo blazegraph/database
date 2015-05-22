@@ -124,7 +124,7 @@ public class StressTestLockContention extends ProxyTestCase<Journal> {
              * returns.
              */
 
-            futures = (List)journal.invokeAll(tasks, 20, TimeUnit.SECONDS);
+            futures = (List<Future<Object>>)journal.invokeAll(tasks, 20, TimeUnit.SECONDS);
 
         } finally {
 
@@ -208,17 +208,19 @@ public class StressTestLockContention extends ProxyTestCase<Journal> {
             
         }
         
-        if(log.isInfoEnabled())
-            log.info("#tasks=" + ntasks + " : ncancelled=" + ncancelled
+        final String msg = "#tasks=" + ntasks + " : ncancelled=" + ncancelled
                 + ", ncomplete=" + ncomplete + ", ninterrupt=" + ninterrupt
-                + ", nretry=" + nretry + ", nerror=" + nerror);
+                + ", nretry=" + nretry + ", nerror=" + nerror;
+        
+        if(log.isInfoEnabled())
+            log.info(msg);
         
         /*
          * No errors are allowed, but some tasks may never start due to the high
          * lock contention.
          */
         
-        assertEquals("nerror", 0, nerror);
+        assertEquals(msg, 0, nerror);
         
     }
 

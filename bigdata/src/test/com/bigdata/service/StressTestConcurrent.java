@@ -129,6 +129,7 @@ public class StressTestConcurrent extends
     /**
      * @todo try varying the releaseAge
      */
+    @Override
     public Properties getProperties() {
         
         final Properties properties = new Properties(super.getProperties());
@@ -207,12 +208,14 @@ public class StressTestConcurrent extends
         
     }
     
+    @Override
     public void setUpComparisonTest(Properties properties) throws Exception {
 
         super.setUp();
         
     }
 
+    @Override
     public void tearDownComparisonTest() throws Exception {
 
         super.tearDown();
@@ -448,6 +451,7 @@ public class StressTestConcurrent extends
 
                     final Random r = new Random();
                     
+                    @Override
                     public void run() {
                         try {
                             if(r.nextBoolean()) {
