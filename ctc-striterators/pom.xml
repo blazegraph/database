@@ -11,7 +11,7 @@
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>ctc-striterators</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>${bigdata.version}</version>
   <name>ctc-striterators</name>
   <packaging>jar</packaging>
 
