@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.journal;
 
+import java.nio.channels.ClosedByInterruptException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -35,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,8 +47,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IIndex;
+import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.Journal.Options;
 import com.bigdata.rawstore.Bytes;
@@ -154,7 +157,7 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
         
         final long elapsed2 = now - begin;
         
-        System.err.println("#tasks=" + ntasks + ", elapsed=" + elapsed1
+        log.warn("#tasks=" + ntasks + ", elapsed=" + elapsed1
                 + ", #indices created per second="
                 + (int)(1000d * ntasks / elapsed1) + ", commit=" + elapsed2 + "ms");
         
@@ -197,8 +200,9 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
 				final AtomicInteger ndone = new AtomicInteger(0);
 				final Condition done = lock.newCondition();
 
-				Thread t1 = new Thread() {
+				final Thread t1 = new Thread() {
 
+				    @Override
 					public void run() {
 
 						for (int i = 0; i < ntasks / 2; i++) {
@@ -226,8 +230,9 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
 
 				};
 
-				Thread t2 = new Thread() {
+				final Thread t2 = new Thread() {
 
+				    @Override
 					public void run() {
 						for (int i = ntasks / 2; i < ntasks; i++) {
 
@@ -280,7 +285,7 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
 
 				final long elapsed2 = now - begin;
 
-				System.err.println("#tasks=" + ntasks + ", elapsed=" + elapsed1 + ", #indices created per second="
+				log.warn("#tasks=" + ntasks + ", elapsed=" + elapsed1 + ", #indices created per second="
 						+ (int) (1000d * ntasks / elapsed1) + ", commit=" + elapsed2 + "ms");
 
 			} finally {
@@ -368,7 +373,8 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
         
     }
     
-    public Result doComparisonTest(Properties properties) throws Exception {
+    @Override
+    public Result doComparisonTest(final Properties properties) throws Exception {
 
         final int ntasks = Integer.parseInt(properties.getProperty(TestOptions.NTASKS));
 
@@ -413,9 +419,9 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
                             
                             if(ninsert>0) {
 
-                                KeyBuilder keyBuilder = new KeyBuilder(4);
+                                final KeyBuilder keyBuilder = new KeyBuilder(4);
                             
-                                IIndex ndx = getIndex(resource); 
+                                final IIndex ndx = getIndex(resource); 
 
                                 // inserts are ordered, which is best case performance.
                                 for(int i=0; i<ninsert; i++) {
@@ -443,43 +449,52 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
          */
         
         final long begin = System.currentTimeMillis();
-        
+
+        // #of failed tasks (does not count tasks that were cancelled).
+        int nerrors = 0;
         try {
             
-            journal.invokeAll(tasks,timeout,TimeUnit.SECONDS);
+                final List<Future<Void>> futures = journal.invokeAll(tasks,
+                        timeout, TimeUnit.SECONDS);
+                
+                for(Future<Void> f : futures) {
+
+                    if (f.isCancelled()) {
+                        // Ignore cancelled tasks.
+                        continue;
+                    }
+
+                    try {
+
+                        f.get();
+
+                    } catch (ExecutionException ex) {
+                    
+                        if (isInnerCause(ex, InterruptedException.class)
+                                || isInnerCause(ex,
+                                        ClosedByInterruptException.class)) {
+
+                            /*
+                             * Note: Tasks will be interrupted if a timeout
+                             * occurs when attempting to run the submitted tasks
+                             * - this is normal.
+                             */
+
+                            log.warn("Interrupted: " + ex);
+
+                            // ninterrupt++;
+                        } else {
+                            nerrors++;
+                        }
+                    }
+                    
+                }
 
         } catch(RejectedExecutionException ex) {
             
             log.warn("Some tasks could not be submitted (queue is full?)", ex);
             
         }
-
-//        System.err.println("timeout="+timeout);
-//        
-//        // sleep until the tasks are done or the timeout is expired.
-//        while(true) {
-//        
-//            if(nrun.get()==ntasks) break;
-//            
-//            final long elapsed = System.currentTimeMillis() - begin;
-//            
-//            if(timeout > elapsed) {
-//                
-//                System.err.println("Timeout exceeded: timeout="+timeout+", elapsed="+elapsed);
-//                
-//                break;
-//                
-//            }
-//            
-//            /*
-//             * Note: Don't wait too long it or throws off the estimate of the elapsed
-//             * time.
-//             */
-//            synchronized(this) {
-//                wait(100);
-//            }
-//            
-//        }
 
         /*
          * the actual run time.
@@ -502,9 +517,10 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
 
         final double tasksPerCommit = ((double)ndone) / ncommits;
         
-        Result result = new Result();
+        final Result result = new Result();
         
         result.put("ndone", ""+ndone);
+        result.put("nerrors", ""+nerrors);
         result.put("ncommits", ""+ncommits);
         result.put("elapsed", ""+elapsed);
         result.put("tasks/sec", ""+tasksPerSecond);
@@ -518,6 +534,9 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
         if (log.isInfoEnabled())
             log.info(result.toString(true/* newline */));
 
+        if (nerrors > 0)
+            fail(result.toString());
+            
         return result;
 
         } finally {
@@ -536,10 +555,12 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
 
     }
 
+    @Override
     public void setUpComparisonTest(Properties properties) throws Exception {
         
     }
 
+    @Override
     public void tearDownComparisonTest() throws Exception {
         
     }
@@ -550,9 +571,9 @@ public class StressTestGroupCommit extends ProxyTestCase<Journal> implements ICo
      * @param args
      * @throws Exception
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(final String[] args) throws Exception {
 
-        Properties properties = new Properties();
+        final Properties properties = new Properties();
         
         properties.setProperty(TestOptions.NTASKS,"10000");
 

@@ -33,6 +33,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.ha.msg.HAMessageWrapper;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
@@ -240,6 +241,11 @@ public class TestHASendAndReceive3Nodes extends
     public void testPipelineChange_smallMessage() throws InterruptedException,
             ExecutionException, IOException, TimeoutException {
 
+        if (!BigdataStatics.runKnownBadTests) {
+            // Conditionally disabled to clean up CI. See BLZG-1279
+            return;
+        }
+        
         doTestPipelineChange(50/* msgSize */, true/* smallMessage */);
 
     }

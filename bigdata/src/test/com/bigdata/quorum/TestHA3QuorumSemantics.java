@@ -49,8 +49,6 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorumMember;
  * services when joining a met quorum.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: TestHA3QuorumSemantics.java 2965 2010-06-02 20:19:51Z
- *          thompsonbry $
  * 
  *          FIXME We must also test with k:=5 in order to see some situations
  *          which do not appear with k:=3 (not sure which ones off hand, but I
@@ -1947,10 +1945,10 @@ public class TestHA3QuorumSemantics extends AbstractQuorumTestCase {
             });
 
             // check votes cast
-            assertTrue(quorum1.getCastVote(serviceId1) == quorum1.getCastVoteIfConsensus(serviceId0));
-            assertTrue(quorum1.getCastVote(serviceId1) != quorum1.getCastVote(serviceId2));
+            assertEquals(quorum1.getCastVote(serviceId1), quorum1.getCastVoteIfConsensus(serviceId0));
+            assertNotSame(quorum1.getCastVote(serviceId1), quorum1.getCastVote(serviceId2));
             actor2.castVote(lastCommitTime);
-            assertTrue(quorum1.getCastVoteIfConsensus(serviceId1) == quorum1.getCastVoteIfConsensus(serviceId2));
+            assertEquals(quorum1.getCastVoteIfConsensus(serviceId1), quorum1.getCastVoteIfConsensus(serviceId2));
             
             Thread.sleep(100);
 
