@@ -4294,6 +4294,9 @@ abstract public class AbstractTripleStore extends
      * 
      * @param src
      *            The source iterator.
+     * 
+     * @see BLZG-1268 (NPE during read-only namespace resolution caused by RDR
+     *      Truth Maintenance and GRS concurrent modification)
      */
     @SuppressWarnings("unused")
     public IChunkedOrderedIterator<ISPO> computeClosureForStatementIdentifiers(

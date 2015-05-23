@@ -390,15 +390,17 @@ abstract public class AbstractMRMWTestCase
         
         // start clients.
         
-        System.err.println("Starting clients.");
+        if (log.isInfoEnabled())
+            log.info("Starting clients.");
         
         final List<Future<Integer>> results = clientService.invokeAll(tasks,
                 timeout, TimeUnit.SECONDS);
 
         final long elapsed = System.currentTimeMillis() - begin;
         
-        System.err.println("Halting clients.");
-        
+        if (log.isInfoEnabled())
+            log.info("Halting clients.");
+
         // force the clients to terminate.
         clientService.shutdownNow();
 
@@ -434,11 +436,11 @@ abstract public class AbstractMRMWTestCase
         int nsuccess = 0; // #of trials that successfully committed.
         int ncancelled = 0; // #of trials that did not complete in time.
 //        int nerr = 0;
-        Throwable[] errors = new Throwable[ntrials];
+        final Throwable[] errors = new Throwable[ntrials];
         
         while(itr.hasNext()) {
 
-            Future<Integer> future = itr.next();
+            final Future<Integer> future = itr.next();
             
             if(future.isCancelled()) {
                 
@@ -529,11 +531,15 @@ abstract public class AbstractMRMWTestCase
         
         System.err.println(ret.toString(true/*newline*/));
         
-        System.out.println(store.getCounters().toString());
-  
+        if (log.isInfoEnabled())
+            log.info(store.getCounters().toString());
+
         // Caller will destroy.
 //        store.destroy();
 
+        if (nerr.get() > 0)
+            fail(ret.toString());
+        
         return ret;
 
     }
@@ -929,11 +935,11 @@ abstract public class AbstractMRMWTestCase
      * Concrete instance for running stress tests and comparisons.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      */
     public static class StressTestMRMW extends AbstractMRMWTestCase {
 
-        public Result doComparisonTest(Properties properties) throws Exception {
+        @Override
+        public Result doComparisonTest(final Properties properties) throws Exception {
             
             setUpComparisonTest(properties);
             
@@ -941,6 +947,7 @@ abstract public class AbstractMRMWTestCase
             
         }
         
+        @Override
         protected IRawStore getStore() {
 
             assert store != null;
