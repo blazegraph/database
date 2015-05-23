@@ -645,6 +645,8 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <artifactId>zookeeper</artifactId>
       <version>3.4.5</version>
     </dependency>
+<!--
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-blueprints</artifactId>
@@ -679,7 +681,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
-<!--
+<!-- TODO: Factor out dependency on bigdata-jini
 -->
      <dependency>
        <groupId>com.blazegraph</groupId>
@@ -696,12 +698,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>dsi-utils</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
 <!--
      <dependency>
@@ -728,7 +730,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>lgpl-utils</artifactId>
-       <version>1.0-SNAPSHOT</version>
+       <version>${bigdata.version}</version>
      </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>
