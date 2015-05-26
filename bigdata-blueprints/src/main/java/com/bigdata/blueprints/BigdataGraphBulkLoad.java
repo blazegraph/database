@@ -375,7 +375,7 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 	@Override
 	protected UUID setupQuery(BigdataSailRepositoryConnection cxn,
 			ASTContainer astContainer, QueryType queryType, String extQueryId) {
-		//This is a NOOP for the BigdataGraphBulkLoad
+	//This is a NOOP for the BigdataGraphBulkLoad
 		return null;
 	}
 
