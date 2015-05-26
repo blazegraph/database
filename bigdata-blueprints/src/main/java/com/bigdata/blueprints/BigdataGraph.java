@@ -1731,11 +1731,21 @@ public abstract class BigdataGraph implements Graph {
         }
             
     }
-    
     /**
      * Update graph using SPARQL Update.
      */
     public void update(final String queryStr) throws Exception {
+    	final String randomUUID = UUID.randomUUID().toString();
+    	
+    	update(queryStr, randomUUID);
+    }
+        
+    
+    /**
+     * Update graph using SPARQL Update.
+     */
+	public void update(final String queryStr, final String extQueryId)
+			throws Exception {
         
         try {
             
@@ -2007,7 +2017,7 @@ public abstract class BigdataGraph implements Graph {
 		 * The unique identifier for this query as assigned by the Embedded
 		 * Graph implementation end point (rather than the {@link QueryEngine}).
 		 */
-		protected final String extQueryId;
+		private final String extQueryId;
 	
 		/**
 		 * The unique identifier for this query for the {@link QueryEngine}
@@ -2015,13 +2025,15 @@ public abstract class BigdataGraph implements Graph {
 		 * 
 		 * @see QueryEngine#getRunningQuery(UUID)
 		 */
-		protected final UUID queryId2;
+		private final UUID queryId2;
 	
 		/** The timestamp when the query was accepted (ns). */
-		protected final long begin;
+		private final long begin;
+		
+		private final boolean isUpdateQuery;
 	
 		public RunningQuery(final String extQueryId, final UUID queryId2,
-				final long begin) {
+				final long begin, boolean isUpdateQuery) {
 	
 			if (queryId2 == null)
 				throw new IllegalArgumentException();
@@ -2030,9 +2042,9 @@ public abstract class BigdataGraph implements Graph {
 	
 			this.queryId2 = queryId2;
 	
-			// this.query = query;
-	
 			this.begin = begin;
+			
+			this.isUpdateQuery = isUpdateQuery;
 	
 		}
 		
@@ -2051,8 +2063,10 @@ public abstract class BigdataGraph implements Graph {
 		public long getBegin() {
 			return begin;
 		}
-	
-	
+		
+		public boolean getIsUpdateQuery() {
+			return isUpdateQuery;
+		}
 	}
 
 	/**
@@ -2127,9 +2141,10 @@ public abstract class BigdataGraph implements Graph {
 	 * 
 	 * @return
 	 */
-	protected abstract UUID setupQuery(final BigdataSailRepositoryConnection cxn
-   		 , ASTContainer astContainer, QueryType queryType, String extQueryId);
-	
+	protected abstract UUID setupQuery(
+			final BigdataSailRepositoryConnection cxn,
+			ASTContainer astContainer, QueryType queryType, String extQueryId);
+
 	/**
 	 * Embedded clients can override this to access query management
 	 * capabilities.

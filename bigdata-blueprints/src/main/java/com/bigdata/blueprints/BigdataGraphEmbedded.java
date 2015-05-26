@@ -654,16 +654,30 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	 * 
      * @param The connection.
      */
-     protected UUID setupQuery(final BigdataSailRepositoryConnection cxn
-    		 , ASTContainer astContainer, QueryType queryType, String extQueryId) {
+	protected UUID setupQuery(final BigdataSailRepositoryConnection cxn,
+			ASTContainer astContainer, final QueryType queryType,
+			final String extId) {
 
         // Note the begin time for the query.
         final long begin = System.nanoTime();
 
         // Figure out the UUID under which the query will execute.
 		final UUID queryId2 = setQueryId(astContainer, UUID.randomUUID());
+		
+		//Set to UUID of internal ID if it is null.
+		final String extQueryId = extId == null?queryId2.toString():extId;
+		
+		if (log.isDebugEnabled() && extId == null) {
+			log.debug("Received null external query ID.  Using "
+					+ queryId2.toString());
+		}
+		
+		final boolean isUpdateQuery = queryType != QueryType.ASK
+				&& queryType != QueryType.CONSTRUCT
+				&& queryType != QueryType.DESCRIBE
+				&& queryType != QueryType.SELECT;
         
-        final RunningQuery r = new RunningQuery(extQueryId, queryId2, begin);
+        final RunningQuery r = new RunningQuery(extQueryId, queryId2, begin, isUpdateQuery);
 
         // Stuff it in the maps of running queries.
         m_queries.put(extQueryId, r);
@@ -785,7 +799,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	
 		while(iter.hasNext()){
 			final RunningQuery r = iter.next();
-			sb.append(r.queryId2 + " : \n" + r.extQueryId);
+			sb.append(r.getQueryId2() + " : \n" + r.getExtQueryId());
 		}
 		
 		return sb.toString();
@@ -797,12 +811,17 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 		return queries;
 	}
-	
+/*	
 	public void killRunningQuery(UUID queryId) {
 		final RunningQuery r = m_queries2.get(queryId);
 
 		if (log.isDebugEnabled()) {
 			log.debug("Killing " + r.getQueryId2() + " , " + r.getExtQueryId());
+		}
+		
+		if( r != null)
+		{
+			QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
 		}
 	}
 
@@ -812,15 +831,20 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 		if (log.isDebugEnabled()) {
 			log.debug("Killing " + r.getQueryId2() + " , " + r.getExtQueryId());
 		}
+		
+		killRunningQuery(r.getQueryId2());
 	}
+	*/
 
 	@Override
-	public void killQuery(UUID queryId) {
+	public void killQuery(final UUID queryId) {
+
+		assert(queryId != null);
 		QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
 	}
 
 	@Override
-	public void killQuery(String extQueryId) {
+	public void killQuery(final String extQueryId) {
 		
 		final RunningQuery rQuery = getQueryByExternalId(extQueryId);
 		killQuery(rQuery);
@@ -828,11 +852,23 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 
 	@Override
-	public void killQuery(RunningQuery rQuery) {
+	public void killQuery(final RunningQuery rQuery) {
 
 		if(rQuery != null) {
 			final UUID queryId = rQuery.getQueryId2();
+			
+			if(log.isDebugEnabled()) {
+				log.debug("Killing query external ID: "
+						+ rQuery.getExtQueryId() + " , UUID: "
+						+ rQuery.getQueryId2());
+				log.debug(this.runningQueriesToString());
+			}
+			
 			QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
+
+			if(log.isDebugEnabled()) {
+				log.debug(this.runningQueriesToString());
+			}
 		}
 
 	}
