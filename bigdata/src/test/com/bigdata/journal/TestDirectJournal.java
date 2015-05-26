@@ -253,9 +253,10 @@ public class TestDirectJournal extends AbstractJournalTestCase {
             super(name);
         }
 
+        @Override
         protected IRawStore getStore() {
 
-            Properties properties = getProperties();
+            final Properties properties = getProperties();
             
             properties.setProperty(Options.DELETE_ON_EXIT,"true");
 

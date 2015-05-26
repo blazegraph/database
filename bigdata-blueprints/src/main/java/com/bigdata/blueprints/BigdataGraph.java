@@ -173,7 +173,7 @@ public abstract class BigdataGraph implements Graph {
     /**
      * If true, use pure append mode (don't check old property values).
      */
-    private final boolean laxProperties;
+    protected final boolean laxProperties;
     
     public BigdataGraph(final BlueprintsValueFactory factory) {
         this(factory, new Properties());
@@ -477,11 +477,6 @@ public abstract class BigdataGraph implements Graph {
             @SuppressWarnings("unchecked")
             final Collection<Object> vals = (Collection<Object>) val;
                     
-            // empty collection, do nothing
-            if (vals.size() == 0) {
-                return;
-            }
-            
             final Collection<Literal> literals = new LinkedList<Literal>();
             
             for (Object o : vals) {
@@ -495,12 +490,7 @@ public abstract class BigdataGraph implements Graph {
         } else if (val.getClass().isArray()) {
 
             final int len = Array.getLength(val);
-            
-            // empty array, do nothing
-            if (len == 0) {
-                return;
-            }
-            
+
             final Collection<Literal> literals = new LinkedList<Literal>();
             
             for (int i = 0; i < len; i++) {
