@@ -69,7 +69,7 @@ import com.bigdata.util.NV;
 public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
         implements IComparisonTest {
 
-    protected static final Logger log = Logger.getLogger(PerformanceTest.class);
+    private static final Logger log = Logger.getLogger(PerformanceTest.class);
     
     public PerformanceTest() {
 
@@ -275,7 +275,8 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
      * This is safer than placing a limit directly on the thread pool using
      * {@link IBigdataClient.Options#CLIENT_THREAD_POOL_SIZE}.
      */
-    public Result doComparisonTest(Properties properties) throws Exception {
+    @Override
+    public Result doComparisonTest(final Properties properties) throws Exception {
 
         /*
          * Note: This is fixed at zero since any delay here decreases the
@@ -317,10 +318,10 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
         final ScheduledExecutorService submitService = new ScheduledThreadPoolExecutor(
                 2/*size*/);
 
-        ScheduledFuture submitFuture = null;
+        ScheduledFuture<?> submitFuture = null;
 
         // used to collect futures.
-        final LinkedBlockingQueue<Future> futuresQueue = new LinkedBlockingQueue<Future>();
+        final LinkedBlockingQueue<Future<?>> futuresQueue = new LinkedBlockingQueue<Future<?>>();
         
         try {
 
@@ -334,7 +335,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
              * Submit task that will consume the futures of the workload tasks
              * that we run on the data services.
              */
-            final Future consumeFuture = submitService.submit(new Runnable() {
+            final Future<?> consumeFuture = submitService.submit(new Runnable() {
 
                 public void run() {
 
@@ -342,7 +343,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
 
                         while (!Thread.interrupted()) {
 
-                            final Future f = futuresQueue.take();
+                            final Future<?> f = futuresQueue.take();
 
                             ncomplete.incrementAndGet();
 
@@ -381,6 +382,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
 
             submitFuture = submitService.scheduleAtFixedRate(new Runnable() {
 
+                @Override
                 public void run() {
 
                     final long elapsed = System.currentTimeMillis() - begin;
@@ -409,6 +411,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
 
                     fed.getExecutorService().submit(new Runnable() {
 
+                        @Override
                         public void run() {
 
                             try {
@@ -523,8 +526,9 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
     
 //    private final String path = "src/resources/config/standalone/";
     private JiniServicesHelper helper;
-    private JiniFederation fed; 
+    private JiniFederation<?> fed; 
 
+    @Override
     public void setUpComparisonTest(final Properties properties)
             throws Exception {
 
@@ -559,6 +563,7 @@ public class PerformanceTest //extends ProxyTestCase<AbstractScaleOutFederation>
      * to complete. You should therefore ignore the messy warnings and errors
      * generated after destroy() is called!
      */
+    @Override
     public void tearDownComparisonTest() throws Exception {
 
         System.err.println("Will destroy services");
