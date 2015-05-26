@@ -34,6 +34,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.blueprints.webapp.BlueprintsServlet;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
@@ -258,7 +259,7 @@ public class RESTServlet extends BigdataRDFServlet {
         	
         } else if (req.getParameter(BlueprintsServlet.ATTR_BLUEPRINTS) != null) {
             
-            m_blueprintsServlet.doPost(req, resp);
+            m_blueprintsServlet.doPostRequest(req, resp);
             
         } else if (req.getParameter("uri") != null) {
 
