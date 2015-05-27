@@ -27,6 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.Properties;
+
+import com.bigdata.journal.BufferMode;
+import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.store.AbstractTripleStore;
+
 
 /**
  * Data driven test suite for SPARQL 1.1 BINDINGS clause.
@@ -282,4 +289,103 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();           
     }
     
+    /**
+     * Duplicate in VALUES get replicated problem
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1299">
+     * duplicates in VALUES get replicated</a>.
+     */
+    public void test_ticket_bg1299() throws Exception {
+       new TestHelper("ticket_bg1299",// testURI,
+             "ticket_bg1299.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg1299.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Testing proper use of VALUES clause inside named subqueries.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
+     * named subquery and VALUES expression</a>.
+     */
+    public void test_ticket_bg1296a() throws Exception {
+       new TestHelper("ticket_bg1296a",// testURI,
+             "ticket_bg1296a.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg1296.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * Testing proper use of VALUES clause inside named subqueries.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
+     * named subquery and VALUES expression</a>.
+     */
+    public void test_ticket_bg1296b() throws Exception {
+       new TestHelper("ticket_bg1296b",// testURI,
+             "ticket_bg1296b.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg1296.srx"// resultFileURL
+       ).runTest();
+    }    
+
+    /**
+     * Testing proper use of VALUES clause inside named subqueries.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
+     * named subquery and VALUES expression</a>.
+     */
+    public void test_ticket_bg1296c() throws Exception {
+       new TestHelper("ticket_bg1296c",// testURI,
+             "ticket_bg1296c.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg1296.srx"// resultFileURL
+       ).runTest();
+    }    
+
+    /**
+     * Testing proper use of VALUES clause inside named subqueries.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
+     * named subquery and VALUES expression</a>.
+     */
+    public void test_ticket_bg1296d() throws Exception {
+       new TestHelper("ticket_bg1296d",// testURI,
+             "ticket_bg1296d.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg1296.srx"// resultFileURL
+       ).runTest();
+    }    
+
+    /**
+     * Combination of VALUES clause and SERVICE keyword
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1256">
+     * Service call with values clauses create a cross product</a>
+     */
+    public void test_ticket_bg1256() throws Exception {
+       new TestHelper("ticket_bg1256",// testURI,
+             "ticket_bg1256.rq",// queryFileURL
+             "ticket_bg1256.trig",// dataFileURL
+             "ticket_bg1256.srx"// resultFileURL
+       ).runTest();
+    }   
+    
+    /**
+     * Some of the test cases require the FTS index, so we need a custom
+     * properties definition here.
+     */
+    @Override
+    public Properties getProperties() {
+
+        // Note: clone to avoid modifying!!!
+        final Properties properties = (Properties) super.getProperties().clone();
+
+        properties.setProperty(AbstractTripleStore.Options.TEXT_INDEX, "true");
+
+        return properties;
+
+    }    
 }
