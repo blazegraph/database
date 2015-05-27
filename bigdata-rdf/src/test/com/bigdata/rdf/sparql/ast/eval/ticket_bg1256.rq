@@ -1,0 +1,11 @@
+select ?o ?d
+where {
+    service bds:search {
+        ?o bds:search "foo" .
+    }
+    values (?d) {
+        (<http://example.org/a>)
+        (<http://example.org/b>)
+        (<http://example.org/c>)
+    }
+}
