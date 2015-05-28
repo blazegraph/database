@@ -118,6 +118,11 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	
 	public static final String OUTPUT_FORMAT_XML_SHORT = "xml";
 
+	/**
+	 * Flag to signify a blueprints operation.
+	 */
+	public static final transient String ATTR_BLUEPRINTS = "blueprints";
+
     /**
      * 
      */
