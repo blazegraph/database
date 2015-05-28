@@ -66,6 +66,7 @@ import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sail.QueryCancelledException;
 import com.bigdata.rdf.sail.RDRHistory;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -2173,9 +2174,9 @@ public abstract class BigdataGraph implements Graph {
 	 * Wrapper method to clean up query and throw exception is interrupted. 
 	 * 
 	 * @param queryId
-	 * @throws QueryInterruptedException 
+	 * @throws QueryCancelledException 
 	 */
-	protected void finalizeQuery(final UUID queryId) throws QueryInterruptedException {
+	protected void finalizeQuery(final UUID queryId) throws QueryCancelledException {
 
 		//Need to call before tearDown
 		final boolean isQueryCancelled = isQueryCancelled(queryId);
@@ -2188,7 +2189,7 @@ public abstract class BigdataGraph implements Graph {
 				log.debug(queryId + " execution canceled.");
 			}
 			
-        	throw new QueryInterruptedException(queryId + " execution canceled.");
+        	throw new QueryCancelledException(queryId + " execution canceled.", queryId);
         }
 		
 	}
