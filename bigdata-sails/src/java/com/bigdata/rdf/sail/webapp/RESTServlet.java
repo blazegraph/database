@@ -67,7 +67,7 @@ public class RESTServlet extends BigdataRDFServlet {
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
     private WorkbenchServlet m_workbenchServlet;
-    private BlueprintsServlet m_blueprintsServlet;
+    private BigdataRDFServlet m_blueprintsServlet;
     
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
@@ -257,7 +257,7 @@ public class RESTServlet extends BigdataRDFServlet {
         	
         	m_workbenchServlet.doPost(req, resp);
         	
-        } else if (req.getParameter(BlueprintsServlet.ATTR_BLUEPRINTS) != null) {
+        } else if (req.getParameter(BigdataRDFServlet.ATTR_BLUEPRINTS) != null) {
             
             m_blueprintsServlet.doPostRequest(req, resp);
             

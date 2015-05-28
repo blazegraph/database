@@ -54,11 +54,6 @@ public class BlueprintsServlet extends BigdataRDFServlet {
         "application/graphml+xml"    
     }) ;
     
-    /**
-     * Flag to signify a blueprints operation.
-     */
-    public static final transient String ATTR_BLUEPRINTS = "blueprints";
-
     public BlueprintsServlet() {
 
     }
