@@ -208,11 +208,15 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public GraphQueryResult getServiceDescription() throws Exception {
 
+        return getServiceDescription(UUID.randomUUID());
+        
+    }
+    
+    public GraphQueryResult getServiceDescription(final UUID uuid)
+            throws Exception {
+
         // TODO Unit test when isolated by a transaction. The server is already
         // creating a tx for this so it might hit a fence post.
-        
-        // TODO Allow client to specify UUID for SERVICE DESCRIPTION. See #1254.
-        final UUID uuid = UUID.randomUUID();
         
         final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
