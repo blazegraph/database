@@ -848,8 +848,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 		QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
 
 		RunningQuery q = getQueryById(queryId);
-		//Set the status to cancelled in the internal queue.
-		q.setCancelled(true);
+
+		if(q != null) {
+			//Set the status to cancelled in the internal queue.
+			q.setCancelled(true);
+		}
 	}
 
 	@Override
