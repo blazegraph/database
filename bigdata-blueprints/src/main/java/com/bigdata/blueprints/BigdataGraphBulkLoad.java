@@ -419,4 +419,10 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		return null;
 	}
 
+	@Override
+	protected boolean isQueryCancelled(UUID queryId) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
 }

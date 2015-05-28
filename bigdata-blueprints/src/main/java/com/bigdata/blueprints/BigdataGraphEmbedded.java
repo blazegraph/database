@@ -37,6 +37,7 @@ import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -778,15 +779,43 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 			final RunningQuery r = m_queries2.get(queryId);
 
-			m_queries.remove(r.getExtQueryId(), r);
-			m_queries2.remove(queryId);
+			if (r != null) {
+				m_queries.remove(r.getExtQueryId(), r);
+				m_queries2.remove(queryId);
 
-			if(log.isDebugEnabled()) {
-				log.debug("Tearing down query: " + queryId );
-				log.debug("m_queries2 has " + m_queries2.size());
+				if (log.isDebugEnabled()) {
+					log.debug("Tearing down query: " + queryId);
+					log.debug("m_queries2 has " + m_queries2.size());
+				}
 			}
+
 		}
 
+	}
+	
+	/**
+	 * Helper method to determine if a query was cancelled.
+	 * 
+	 * @param queryId
+	 * @return
+	 */
+	protected boolean isQueryCancelled(final UUID queryId) {
+
+		if (log.isDebugEnabled()) {
+			log.debug(queryId);
+		}
+		
+		RunningQuery q = getQueryById(queryId);
+
+		if (log.isDebugEnabled() && q != null) {
+			log.debug(queryId + " isCancelled: " + q.isCancelled());
+		}
+
+		if (q != null) {
+			return q.isCancelled();
+		}
+
+		return false;
 	}
 	
 	public String runningQueriesToString()
@@ -811,36 +840,16 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 		return queries;
 	}
-/*	
-	public void killRunningQuery(UUID queryId) {
-		final RunningQuery r = m_queries2.get(queryId);
-
-		if (log.isDebugEnabled()) {
-			log.debug("Killing " + r.getQueryId2() + " , " + r.getExtQueryId());
-		}
-		
-		if( r != null)
-		{
-			QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
-		}
-	}
-
-	public void killRunningQuery(String externalQueryId) {
-		final RunningQuery r = m_queries.get(externalQueryId);
-
-		if (log.isDebugEnabled()) {
-			log.debug("Killing " + r.getQueryId2() + " , " + r.getExtQueryId());
-		}
-		
-		killRunningQuery(r.getQueryId2());
-	}
-	*/
 
 	@Override
 	public void killQuery(final UUID queryId) {
 
 		assert(queryId != null);
 		QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
+
+		RunningQuery q = getQueryById(queryId);
+		//Set the status to cancelled in the internal queue.
+		q.setCancelled(true);
 	}
 
 	@Override
@@ -853,19 +862,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 		if(rQuery != null) {
 			final UUID queryId = rQuery.getQueryId2();
-			
-			if(log.isDebugEnabled()) {
-				log.debug("Killing query external ID: "
-						+ rQuery.getExtQueryId() + " , UUID: "
-						+ rQuery.getQueryId2());
-				log.debug(this.runningQueriesToString());
-			}
-			
-			QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
-
-			if(log.isDebugEnabled()) {
-				log.debug(this.runningQueriesToString());
-			}
+			killQuery(queryId);
 		}
 
 	}
