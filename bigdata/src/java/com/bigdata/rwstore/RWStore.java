@@ -2948,7 +2948,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * we must remember so that we avoid clearing down the store.
              */
             for (FixedAllocator fa : m_allocs) {
-                isolatedWrites = isolatedWrites || fa.reset(m_writeCacheService, m_committedNextAllocation);
+                isolatedWrites |= fa.reset(m_writeCacheService, m_committedNextAllocation);
             }
             
             /**
@@ -2971,6 +2971,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
                     final int last = m_allocs.size()-1;
                     final FixedAllocator fa = m_allocs.get(last);
                     if (fa.getDiskAddr() == 0) {
+                    	fa.setIndex(-1);
                         // must remove from free list!
                         m_freeFixed[fixedAllocatorIndex(fa.m_size)].remove(fa);
                         // ..and then from main allocation list

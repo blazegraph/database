@@ -126,6 +126,10 @@ public class FixedAllocator implements Allocator {
      *            A bit obtained from {@link RWStore#metaAlloc()}.
      */
 	public void setDiskAddr(final int addr) {
+		if (m_index == -1) {
+			throw new IllegalStateException("Attempt to set a storage addr for an invalid FixedAllcator");
+		}
+
 		m_diskAddr = addr;
 	}
 
