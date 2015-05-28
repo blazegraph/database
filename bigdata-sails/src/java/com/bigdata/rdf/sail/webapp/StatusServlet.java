@@ -40,6 +40,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -68,8 +69,12 @@ import com.bigdata.rdf.sail.QueryCancellationHelper;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
+import com.bigdata.rdf.sail.webapp.QueryServlet.SparqlQueryTask;
+import com.bigdata.rdf.sail.webapp.QueryServlet.SparqlUpdateTask;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -143,16 +148,19 @@ public class StatusServlet extends BigdataRDFServlet {
 
     /**
      * The name of a request parameter whose value is the {@link UUID} of a
-     * top-level query.
+     * top-level query. See also {@link QueryHints#QUERYID} which is the same
+     * value.
      */
     private static final String QUERY_ID = "queryId";
 
     /**
-     * The name of a request parameter used to cancel a running query. At least
-     * one {@link #QUERY_ID} must also be specified. Queries specified by their
-     * {@link #QUERY_ID} will be cancelled if they are still running.
+     * The name of a request parameter used to cancel a running query (or any
+     * other kind of REST API operation). At least one {@link #QUERY_ID} must
+     * also be specified. Queries specified by their {@link #QUERY_ID} will be
+     * cancelled if they are still running.
      * 
      * @see #QUERY_ID
+     * @see QueryHints#QUERYID
      */
     protected static final String CANCEL_QUERY = "cancelQuery";
 
@@ -241,6 +249,16 @@ public class StatusServlet extends BigdataRDFServlet {
      * needs to build a suitable response. This is done to support a use case
      * where the status page is repainted as well as a remote "cancel" command.
      * 
+     * <p>
+     * 
+     * CAUTION: The implementation of this request MUST NOT cause itself to be
+     * registered as a task using {@link #submitApiTask(AbstractRestApiTask)}.
+     * Doing so makes the CANCEL request itself subject to cancellation. This
+     * would be a HUGE problem since the name of the query parameter ("queryId")
+     * for the operations to be cancelled by a CANCEL request is the same name
+     * that is used to associate a request with a UUID. In effect, this would
+     * cause CANCEL to always CANCEL itself!
+     * 
      * @param req
      * @param resp
      * @param indexManager
@@ -283,16 +301,24 @@ public class StatusServlet extends BigdataRDFServlet {
 
             if (!QueryCancellationHelper.tryCancelQuery(queryEngine, queryId)) {
                 if (!tryCancelUpdate(context, queryId)) {
-                    queryEngine.addPendingCancel(queryId);
-                    if (log.isInfoEnabled()) {
-                        log.info("No such QUERY or UPDATE: " + queryId);
+                    if (!tryCancelTask(context, queryId)) {
+                        queryEngine.addPendingCancel(queryId);
+                        if (log.isInfoEnabled()) {
+                            log.info("No such QUERY, UPDATE, or task: "
+                                    + queryId);
+                        }
                     }
                 }
             }
             
         }
 
-        buildAndCommitResponse(resp, HTTP_OK, MIME_TEXT_PLAIN, "");
+        /*
+         * DO NOT COMMIT RESPONSE. CALLER MUST COMMIT
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+         * operations should be cancelable from both REST API and workbench </a>
+         */
         
     }
 
@@ -332,6 +358,42 @@ public class StatusServlet extends BigdataRDFServlet {
 
    }
     
+
+    /**
+     * Attempt to cancel a task that is neither a SPARQL QUERY nor a SPARQL UPDATE.
+     * @param context
+     * @param queryId
+     * @return
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
+     */
+    static private boolean tryCancelTask(final BigdataRDFContext context,
+            final UUID queryId) {
+
+        final TaskAndFutureTask<?> tmp = context.getTaskById(queryId);
+
+        if (tmp != null) {
+
+            final Future<?> f = tmp.ft;
+
+            if (f != null) {
+
+                if (f.cancel(true/* mayInterruptIfRunning */)) {
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        // Either not found or found but not running when cancelled.
+        return false;
+
+   }
+    
     /**
      * <p>
      * A status page. Options include:
@@ -357,6 +419,10 @@ public class StatusServlet extends BigdataRDFServlet {
      * </dl>
      * </p>
      * 
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
+     *      
      * @todo This status page combines information about the addressed KB and
      *       the backing store. Those items should be split out onto different
      *       status requests. One should be at a URI for the database. The other
@@ -807,8 +873,6 @@ public class StatusServlet extends BigdataRDFServlet {
              * the NSS.  If we find anything there, it is presumed to still be
              * executing (it it is done, it will be removed very soon after the
              * UPDATE commits).
-             * 
-             * FIXME SPARQL UPDATE REQUESTS.
              */
             {
                 
@@ -873,9 +937,72 @@ public class StatusServlet extends BigdataRDFServlet {
                     showUpdateRequest(req, resp, current, acceptedQuery,
                             showQueryDetails);
 
-                }
+                } // next UPDATE request
 
-            }
+            } // SPARQL UPDATE requests
+            
+            /*
+             * Now handle any other kinds of REST API requests.
+             * 
+             * Note: We have to explicitly exclude the SPARQL QUERY and SPARQL
+             * UPDATE requests here since they were captured above.
+             * 
+             * TODO Refactor to handle all three kinds of requests using a
+             * common approach.
+             * 
+             * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+             * operations should be cancelable from both REST API and workbench
+             * </a>
+             */
+            {
+                
+                final Iterator<TaskAndFutureTask<?>> itr = getBigdataRDFContext()
+                        .getTasks().values().iterator();
+
+                while (itr.hasNext()) {
+
+                    final TaskAndFutureTask<?> task = itr.next();
+
+                    if (task.task instanceof SparqlUpdateTask
+                            || task.task instanceof SparqlQueryTask) {
+
+                        // Already handled above.
+                        continue;
+
+                    }
+
+                    // The UUID for this REST API request.
+                    final UUID queryId = task.task.uuid;
+
+                    if (!requestedQueryIds.isEmpty()
+                            && !requestedQueryIds.contains(queryId)) {
+                        // Information was not requested for this task.
+                        continue;
+                    }
+
+                    final Future<?> f = task.ft;
+                    if (f != null) {
+                        if (f.isDone()) {
+                            try {
+                                f.get();
+                                // Already terminated (normal completion).
+                                continue;
+                            } catch (InterruptedException ex) {
+                                // Propagate interrupt.
+                                Thread.currentThread().interrupt();
+                            } catch (ExecutionException ex) {
+                                // Already terminated (failure).
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    showTaskRequest(req, resp, current, task,
+                            showQueryDetails);
+
+                } // next UPDATE request
+
+            } // Other REST API requests.
             
             doc.closeAll(current);
 
@@ -921,12 +1048,6 @@ public class StatusServlet extends BigdataRDFServlet {
             // Open <p>.
             current.node("p")
             .attr("class", "update")
-            //
-//            .text("solutions=" + solutionsOut)
-//            //
-//            .text(", chunks=" + chunksOut)
-//            //
-//            .text(", children=" + children.length)
             //
             .text("elapsed=").node("span")
                .attr("class", "elapsed").text("" + elapsedMillis).close()
@@ -1008,28 +1129,101 @@ public class StatusServlet extends BigdataRDFServlet {
                  * @see AST2BOpUpdate
                  */
 
-//                final QueryRoot optimizedAST = astContainer
-//                        .getOptimizedAST();
-//
-//                if (optimizedAST != null) {
-//
-//                    current.node("h2", "Optimized AST");
-//
-//                    current.node("pre", optimizedAST.toString());
-//
-//                }
-//
-//                final PipelineOp queryPlan = astContainer
-//                        .getQueryPlan();
-//
-//                if (queryPlan != null) {
-//
-//                    current.node("h2", "Query Plan");
-//
-//                    current.node("pre", BOpUtility
-//                            .toString(queryPlan));
-//
-//                }
+            }
+
+        }
+
+        return current;
+
+    }
+
+    /**
+     * Display metadata about a currently executing task.
+     * 
+     * @param req
+     * @param resp
+     * @param current
+     * @param task
+     * @param showQueryDetails
+     * @return
+     * @throws IOException
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+     *      operations should be cancelable from both REST API and workbench
+     *      </a>
+     */
+    private <T> XMLBuilder.Node showTaskRequest(final HttpServletRequest req,
+            final HttpServletResponse resp, //final Writer w,
+            XMLBuilder.Node current,// final IRunningQuery q,
+            final TaskAndFutureTask<T> task, final boolean showQueryDetails)
+            throws IOException {
+
+        // The UUID for this REST API request.
+        final UUID queryId = task.task.uuid;
+
+        // The time since the task began executing (until it stops).
+        final long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(task
+                .getElapsedNanos());
+
+        current.node("h1", "Task");
+        {
+
+            // Open <FORM>
+            current = current.node("FORM").attr("method", "POST")
+                    .attr("action", "");
+
+            final String detailsURL = req.getRequestURL().append(
+                    "?").append(SHOW_QUERIES).append("=").append(
+                    DETAILS).append("&").append(QUERY_ID).append(
+                    "=").append(queryId.toString()).toString();
+            
+            // Open <p>.
+            current.node("p")
+            .attr("class", "task")
+            //
+            .text("elapsed=").node("span")
+               .attr("class", "elapsed").text("" + elapsedMillis).close()
+            .text("ms")
+            //
+            .text(", ").node("a").attr("href", detailsURL)
+            .attr("class", "details-url")
+            .text("details").close()//
+            .close();
+
+            // open <p>
+            current = current.node("p");
+            // Pass the queryId.
+            current.node("INPUT").attr("type", "hidden").attr(
+                    "name", "queryId").attr("value", queryId)
+                    .close();
+            current.node("INPUT").attr("type", "submit").attr(
+                    "name", CANCEL_QUERY).attr("value", "Cancel")
+                    .close();
+            current = current.close(); // close <p>
+
+            current = current.close(); // close <FORM>
+
+        }
+
+        {
+
+            /*
+             * Format the task into the response.
+             * 
+             * TODO Improve our reporting here through an explicit API for this
+             * information. This currently conveys the type of task (Class), the
+             * namespace, and the timestamp associated with the task. It
+             * *should* be a nice rendering of the request.
+             */
+
+            final String queryString = task.task.toString();
+
+            if (queryString != null) {
+
+                current.node("h2", "TASK");
+
+                current.node("p").attr("class", "query-string")
+                        .text(task.task.toString()).close();
 
             }
 

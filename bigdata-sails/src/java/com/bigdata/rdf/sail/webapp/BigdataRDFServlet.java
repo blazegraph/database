@@ -373,9 +373,6 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * namespace is represented by the first component of the URI. If there is
      * no namespace, then return the configured default namespace.
      * 
-     * @param uri
-     *            The URI path string.
-     * 
      * @return The namespace.
      * 
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/689" >
