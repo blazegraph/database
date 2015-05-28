@@ -2095,12 +2095,12 @@ public abstract class BigdataGraph implements Graph {
 	public abstract void killQuery(UUID queryId);
 
 	/**
-	 * Kill a running query specified by the external query ID String. Do
-	 * nothing if the query has completed.
+	 * Kill a running query specified by the UUID String.
+	 * Do nothing if the query has completed.
 	 * 
-	 * @param externalQueryId
+	 * @param String uuid
 	 */
-	public abstract void killQuery(String externalQueryId);
+	public abstract void killQuery(String uuid);
 
 	/**
 	 * Kill a running query specified by the RunningQuery object. Do nothing if

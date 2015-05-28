@@ -844,11 +844,8 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 
 	@Override
-	public void killQuery(final String extQueryId) {
-		
-		final RunningQuery rQuery = getQueryByExternalId(extQueryId);
-		killQuery(rQuery);
-
+	public void killQuery(final String uuid) {
+		killQuery(UUID.fromString(uuid));
 	}
 
 	@Override
