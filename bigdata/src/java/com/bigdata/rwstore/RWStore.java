@@ -2948,7 +2948,7 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
              * we must remember so that we avoid clearing down the store.
              */
             for (FixedAllocator fa : m_allocs) {
-                isolatedWrites = isolatedWrites || fa.reset(m_writeCacheService, m_committedNextAllocation);
+                isolatedWrites |= fa.reset(m_writeCacheService, m_committedNextAllocation);
             }
             
             /**
