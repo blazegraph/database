@@ -271,4 +271,10 @@ public class BigdataGraphClient extends BigdataGraph {
 		return null;
 	}
 
+	@Override
+	protected boolean isQueryCancelled(UUID queryId) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
 }

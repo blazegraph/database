@@ -44,6 +44,7 @@ import org.openrdf.model.impl.StatementImpl;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.BooleanQuery;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryInterruptedException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
@@ -1718,7 +1719,7 @@ public abstract class BigdataGraph implements Graph {
             
             final boolean result = query.evaluate();
             
-            tearDownQuery(queryId);
+            finalizeQuery(queryId);
             
             return result;
             
@@ -1985,18 +1986,21 @@ public abstract class BigdataGraph implements Graph {
         @Override
         public void close() {
             try {
-            	tearDownQuery(queryId);
-                it.close();
-            } catch (Exception e) {
-                log.warn("Could not close result");
-            }
-            if (cxn != null) {
-                try {
-                    cxn.close();
-                } catch (RepositoryException e) {
-                    log.warn("Could not close connection");
-                }
-            }
+				finalizeQuery(queryId);
+				it.close();
+			} catch (RuntimeException ex) {
+				throw ex;
+			} catch (Exception ex) {
+				throw new RuntimeException(ex);
+			} finally {
+				if (cxn != null) {
+					try {
+						cxn.close();
+					} catch (RepositoryException e) {
+						log.warn("Could not close connection");
+					}
+				}
+			}   
         }
         
 //        @Override
@@ -2013,6 +2017,7 @@ public abstract class BigdataGraph implements Graph {
 	 */
 	public static class RunningQuery {
 	
+
 		/**
 		 * The unique identifier for this query as assigned by the Embedded
 		 * Graph implementation end point (rather than the {@link QueryEngine}).
@@ -2030,8 +2035,16 @@ public abstract class BigdataGraph implements Graph {
 		/** The timestamp when the query was accepted (ns). */
 		private final long begin;
 		
+		/**
+		 * Is the query an update query.
+		 */
 		private final boolean isUpdateQuery;
-	
+		
+		/**
+		 * Was the query cancelled.
+		 */
+		protected boolean isCancelled = false;
+		
 		public RunningQuery(final String extQueryId, final UUID queryId2,
 				final long begin, boolean isUpdateQuery) {
 	
@@ -2045,6 +2058,8 @@ public abstract class BigdataGraph implements Graph {
 			this.begin = begin;
 			
 			this.isUpdateQuery = isUpdateQuery;
+			
+			this.setCancelled(false);
 	
 		}
 		
@@ -2066,6 +2081,15 @@ public abstract class BigdataGraph implements Graph {
 		
 		public boolean getIsUpdateQuery() {
 			return isUpdateQuery;
+		}
+
+		public boolean isCancelled() {
+			return isCancelled;
+		}
+
+		public void setCancelled(boolean isCancelled) {
+			this.isCancelled = isCancelled;
+			
 		}
 	}
 
@@ -2144,6 +2168,30 @@ public abstract class BigdataGraph implements Graph {
 	protected abstract UUID setupQuery(
 			final BigdataSailRepositoryConnection cxn,
 			ASTContainer astContainer, QueryType queryType, String extQueryId);
+	
+	/**
+	 * Wrapper method to clean up query and throw exception is interrupted. 
+	 * 
+	 * @param queryId
+	 * @throws QueryInterruptedException 
+	 */
+	protected void finalizeQuery(final UUID queryId) throws QueryInterruptedException {
+
+		//Need to call before tearDown
+		final boolean isQueryCancelled = isQueryCancelled(queryId);
+		
+		tearDownQuery(queryId);
+		
+		if(isQueryCancelled){
+		
+			if(log.isDebugEnabled()) {
+				log.debug(queryId + " execution canceled.");
+			}
+			
+        	throw new QueryInterruptedException(queryId + " execution canceled.");
+        }
+		
+	}
 
 	/**
 	 * Embedded clients can override this to access query management
@@ -2152,5 +2200,13 @@ public abstract class BigdataGraph implements Graph {
 	 * @param absQuery
 	 */
 	protected abstract void tearDownQuery(UUID queryId);
+	
+	/**
+	 * Helper method to determine if a query was cancelled.
+	 * 
+	 * @param queryId
+	 * @return
+	 */
+	protected abstract boolean isQueryCancelled(final UUID queryId);
 	
 }
