@@ -1,0 +1,6 @@
+SELECT *
+WHERE {
+{ BIND ( "x" as $X ) FILTER( BOUND($Y)) }
+
+}
+VALUES ?Y { "y" }
