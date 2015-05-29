@@ -181,7 +181,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
         
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -284,7 +284,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -399,7 +399,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -548,7 +548,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -684,7 +684,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -802,7 +802,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -961,7 +961,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1098,7 +1098,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1186,7 +1186,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1323,7 +1323,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1478,7 +1478,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1621,7 +1621,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1717,7 +1717,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -2024,7 +2024,7 @@ where {
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
         
         assertSameAST(expected, actual);
 

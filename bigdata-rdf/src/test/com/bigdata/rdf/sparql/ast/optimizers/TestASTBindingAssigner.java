@@ -141,7 +141,8 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -223,7 +224,8 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -315,7 +317,8 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
 
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 //        System.err.println(actual.toString());
@@ -408,7 +411,8 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
 
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 //        System.err.println(actual.toString());
@@ -487,7 +491,8 @@ public class TestASTBindingAssigner extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTBindingAssigner();
 
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 //        System.err.println(actual.toString());

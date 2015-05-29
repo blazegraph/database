@@ -44,6 +44,7 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -114,7 +115,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
     
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -148,7 +149,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         processGroup(context, queryRoot, queryRoot, queryRoot.getWhereClause());
 
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

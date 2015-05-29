@@ -33,6 +33,7 @@ import java.util.LinkedList;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -50,11 +51,11 @@ import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 public class ASTUnionFiltersOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
@@ -103,7 +104,7 @@ public class ASTUnionFiltersOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

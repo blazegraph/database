@@ -502,7 +502,7 @@ public class TestASTHashJoinOptimizer extends AbstractASTEvaluationTestCase {
         new ASTSetValueExpressionsOptimizer().optimize(context, expected, bsets);
         
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         /*
          * FIXME This is failing because the optimizer is not finished yet.

@@ -385,7 +385,7 @@ public class TestASTComplexOptionalOptimizer extends
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         System.out.println("EXPECTED:");
         System.out.println(expected);

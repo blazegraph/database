@@ -32,6 +32,7 @@ import java.util.Iterator;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -75,11 +76,11 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 	 * {@link #optimize(AST2BOpContext, StaticAnalysis, GraphPatternGroup)} method.
 	 */
     @Override
-    public IQueryNode optimize(final AST2BOpContext context, 
+    public ASTOptimizerResult optimize(final AST2BOpContext context, 
     		final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
@@ -128,7 +129,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

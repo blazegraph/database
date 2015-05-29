@@ -39,6 +39,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -91,7 +92,7 @@ import cutthecrap.utils.striterators.Striterator;
 public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -139,7 +140,7 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
             
         }
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSets);
         
     }
 

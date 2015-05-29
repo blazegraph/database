@@ -41,6 +41,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -121,11 +122,11 @@ public abstract class ASTSearchOptimizerBase implements IASTOptimizer {
     
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if(!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -159,7 +160,7 @@ public abstract class ASTSearchOptimizerBase implements IASTOptimizer {
 
         }
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSets);
 
     }
 

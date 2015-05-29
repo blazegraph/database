@@ -156,7 +156,7 @@ public class TestASTWildcardProjectionOptimizer extends
         final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -248,7 +248,7 @@ public class TestASTWildcardProjectionOptimizer extends
         final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -340,7 +340,7 @@ public class TestASTWildcardProjectionOptimizer extends
         final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -443,7 +443,7 @@ public class TestASTWildcardProjectionOptimizer extends
       final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
 
       final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-            given/* queryNode */, bsets);
+            given/* queryNode */, bsets).getOptimizedQueryNode();
 
       assertSameAST(expected, actual);
 
@@ -707,7 +707,7 @@ public class TestASTWildcardProjectionOptimizer extends
       final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
 
       final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-              given/* queryNode */, bsets);
+              given/* queryNode */, bsets).getOptimizedQueryNode();
 
       assertSameAST(expected, actual);
 

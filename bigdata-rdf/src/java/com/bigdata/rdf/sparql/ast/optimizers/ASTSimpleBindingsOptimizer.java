@@ -11,6 +11,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -19,6 +20,10 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
+ * NOTE: this optimizer is now subsumed by the {@link ASTStaticBindingsOptimizer}.
+ * 
+ * ---
+ * 
  * Removed simple {@link AssignmentNode} in graph patterns, adding them directly
  * to the bindingSet. Note that ASTBind nodes (i.e., BIND expressions) in
  * the query are translated into {@link AssignmentNode} in the bigdata model.
@@ -51,21 +56,22 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * 
  */
+@Deprecated
 public class ASTSimpleBindingsOptimizer implements IASTOptimizer {
 
    @Override
-   public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
+   public ASTOptimizerResult optimize(AST2BOpContext context, IQueryNode queryNode,
          IBindingSet[] bindingSets) {
 
       /**
        * In case the binding sets variable is null, nothing needs to be done 
        */
       if (bindingSets == null) {
-         return queryNode;
+         return new ASTOptimizerResult(queryNode, bindingSets);
       }
       
       if (!(queryNode instanceof QueryRoot))
-         return queryNode;
+         return new ASTOptimizerResult(queryNode, bindingSets);
 
       final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -77,7 +83,7 @@ public class ASTSimpleBindingsOptimizer implements IASTOptimizer {
        */
       {
          if (queryRoot.getBindingsClause()!=null) {
-            return queryNode;
+            return new ASTOptimizerResult(queryNode, bindingSets);
          }
       }
       
@@ -107,7 +113,7 @@ public class ASTSimpleBindingsOptimizer implements IASTOptimizer {
 
       }      
       
-      return queryNode;
+      return new ASTOptimizerResult(queryNode, bindingSets);
    }
 
    private void doOptimize(

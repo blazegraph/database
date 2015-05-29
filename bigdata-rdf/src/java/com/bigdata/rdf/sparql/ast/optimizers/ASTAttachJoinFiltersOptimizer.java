@@ -36,6 +36,7 @@ import java.util.Set;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -78,7 +79,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
 
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -106,7 +107,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         attachJoinFilters(context, sa, queryRoot.getWhereClause());
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSets);
         
     }
 

@@ -253,10 +253,9 @@ public class TestASTUnionFiltersOptimizer extends AbstractOptimizerTestCase {
         
         final IQueryNode actual = opt2.optimize(
         		null/* AST2BOpContext */,
-        		opt1.optimize(null/* AST2BOpContext */, given/* queryNode */, bsets),
+        		opt1.optimize(null/* AST2BOpContext */, given/* queryNode */, bsets).getOptimizedQueryNode(),
         		bsets
-        		);
-
+        		).getOptimizedQueryNode();
         assertSameAST(expected, actual);
 
     }

@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.CloseableIteration;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -56,7 +55,6 @@ import org.openrdf.query.impl.TupleQueryResultImpl;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -77,18 +75,12 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
-import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
-import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.cache.DescribeBindingsCollector;
@@ -193,9 +185,8 @@ public class ASTEvalHelper {
             itr = ASTEvalHelper.evaluateQuery(
                     astContainer,
                     context,
-                    bindingSets
-                    , materializeProjectionInQuery//
-                    , new IVariable[0]// required
+                    materializeProjectionInQuery,
+                    new IVariable[0]// required
                     );
             return itr.hasNext();
         } finally {
@@ -259,10 +250,8 @@ public class ASTEvalHelper {
                 && !optimizedQuery.hasSlice();
 
         final CloseableIteration<BindingSet, QueryEvaluationException> itr = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets,
-                        materializeProjectionInQuery//
-                        , projected//
-                );
+                .evaluateQuery(astContainer, context, 
+                        materializeProjectionInQuery, projected);
 
         TupleQueryResult r = null;
         try {
@@ -559,8 +548,7 @@ public class ASTEvalHelper {
         
         // Solutions to the WHERE clause (as projected).
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets//
-                        , materializeProjectionInQuery//
+                .evaluateQuery(astContainer, context, materializeProjectionInQuery//
                         , optimizedQuery.getProjection().getProjectionVars()//
                 );
 
@@ -777,7 +765,6 @@ public class ASTEvalHelper {
     CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final ASTContainer astContainer,
             final AST2BOpContext ctx,            
-            final IBindingSet[] bindingSets, 
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
@@ -793,8 +780,8 @@ public class ASTEvalHelper {
                     .getQueryAttributes();
 
             // Submit query for evaluation.
-            runningQuery = ctx.queryEngine.eval(queryPlan, bindingSets,
-                    queryAttributes);
+            runningQuery = ctx.queryEngine.eval(queryPlan, 
+                  astContainer.getQueryPlanBS(), queryAttributes);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame

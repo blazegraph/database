@@ -279,7 +279,7 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */).getOptimizedQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -496,7 +496,7 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */).getOptimizedQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -719,7 +719,7 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */).getOptimizedQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -971,7 +971,7 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */).getOptimizedQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -1191,10 +1191,12 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
             IQueryNode actual;
             
             actual = new ASTWildcardProjectionOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
             
             actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -1231,7 +1233,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             IQueryNode tmp = new ASTWildcardProjectionOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
 
             try {
                 new ASTDescribeOptimizer()

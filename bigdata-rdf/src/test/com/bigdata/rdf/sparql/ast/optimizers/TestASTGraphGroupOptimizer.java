@@ -124,12 +124,12 @@ public class TestASTGraphGroupOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
 
         queryRoot = BOpUtility.deepCopy(queryRoot);
         
         queryRoot = (QueryRoot) new ASTGraphGroupOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
 
         /*
          * Create the expected AST.
@@ -219,12 +219,12 @@ public class TestASTGraphGroupOptimizer extends
        QueryRoot queryRoot = astContainer.getOriginalAST();
        
        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-               context, queryRoot, null/* bindingSets */);
+               context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
 
        queryRoot = BOpUtility.deepCopy(queryRoot);
        
        queryRoot = (QueryRoot) new ASTGraphGroupOptimizer().optimize(
-               context, queryRoot, null/* bindingSets */);
+               context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
 
        /*
         * Create the expected AST.

@@ -39,6 +39,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -64,7 +65,7 @@ public class ASTBatchResolveTermsOptimizer implements IASTOptimizer {
 			.getLogger(ASTBatchResolveTermsOptimizer.class);
 	
 	@Override
-	public IQueryNode optimize(final AST2BOpContext context,
+	public ASTOptimizerResult optimize(final AST2BOpContext context,
 			final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
 		/*
@@ -215,7 +216,7 @@ public class ASTBatchResolveTermsOptimizer implements IASTOptimizer {
 
 		}
 
-		return queryNode;
+		return new ASTOptimizerResult(queryNode, bindingSets);
 
 	}
 

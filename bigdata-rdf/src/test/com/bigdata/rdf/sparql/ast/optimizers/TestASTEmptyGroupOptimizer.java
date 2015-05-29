@@ -172,7 +172,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -215,7 +215,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -258,7 +258,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -309,7 +309,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -405,7 +405,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -524,7 +524,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -661,7 +661,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -768,7 +768,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -869,7 +869,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1028,7 +1028,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1118,7 +1118,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1269,7 +1269,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1361,7 +1361,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1463,7 +1463,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1573,7 +1573,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1685,7 +1685,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1775,7 +1775,7 @@ public class TestASTEmptyGroupOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTEmptyGroupOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 

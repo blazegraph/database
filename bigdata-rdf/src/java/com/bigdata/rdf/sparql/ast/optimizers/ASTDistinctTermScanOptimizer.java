@@ -39,6 +39,7 @@ import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -92,7 +93,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
    }
 
    @Override
-   public IQueryNode optimize(final AST2BOpContext context,
+   public ASTOptimizerResult optimize(final AST2BOpContext context,
          final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
       final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -111,7 +112,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
          }
 
          if (!ok) {
-            return queryNode;
+            return new ASTOptimizerResult(queryNode, bindingSets);
          }
       }
         
@@ -141,7 +142,7 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
       // rewrite the top-level select
       doSelectQuery(context, sa, (QueryRoot) queryNode, (QueryBase) queryNode);
 
-      return queryNode;
+      return new ASTOptimizerResult(queryNode, bindingSets);
    }
 
    private void doRecursiveRewrite(final AST2BOpContext context,

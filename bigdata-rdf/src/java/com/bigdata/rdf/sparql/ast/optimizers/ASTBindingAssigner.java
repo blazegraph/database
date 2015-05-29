@@ -42,6 +42,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -67,7 +68,12 @@ import cutthecrap.utils.striterators.Striterator;
  * to be a {@link ConstantNode}. The rewrite uses the special form of the
  * {@link Constant} constructor which associates the variable with the constant.
  * 
+ * TODO: don't check for a single binding, but rather compute the distinct
+ *       of all variables (independently): if this projection is unique, we're
+ *       on the safe side and can statically replace the respective variable.
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
 public class ASTBindingAssigner implements IASTOptimizer {
@@ -76,7 +82,7 @@ public class ASTBindingAssigner implements IASTOptimizer {
             .getLogger(ASTBindingAssigner.class);
     
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSet) {
 
         if (bindingSet == null || bindingSet.length != 1) {
@@ -86,11 +92,11 @@ public class ASTBindingAssigner implements IASTOptimizer {
              * TODO We can still apply this when there are multiple solutions if
              * any variable is bound to the same constant in all solutions.
              */
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSet);
         }
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSet);
 
         // consider only the first solution.
         final IBindingSet bset = bindingSet[0];
@@ -144,7 +150,7 @@ public class ASTBindingAssigner implements IASTOptimizer {
 
         }
         
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSet);
 
     }
     

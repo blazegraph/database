@@ -28,6 +28,7 @@ import java.util.List;
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -46,11 +47,11 @@ public class ASTValuesOptimizer implements IASTOptimizer {
             .getLogger(ASTValuesOptimizer.class);
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context, 
+    public ASTOptimizerResult optimize(final AST2BOpContext context, 
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
@@ -80,7 +81,7 @@ public class ASTValuesOptimizer implements IASTOptimizer {
 
         }
 
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

@@ -276,7 +276,7 @@ public abstract class AbstractOptimizerTestCase extends
 					given), store);
 
 			final IQueryNode actual = rewriter.optimize(context, given,
-					new IBindingSet[] {});
+					new IBindingSet[] {}).getOptimizedQueryNode();
 
 			assertSameAST(expected, actual);
 			

@@ -267,7 +267,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
 				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
-						op/* queryNode */, context.getBindings()/* bindingSets */);
+						op/* queryNode */, context.getBindings()/* bindingSets */)
+						.getOptimizedQueryNode();
 
 			}
 			
