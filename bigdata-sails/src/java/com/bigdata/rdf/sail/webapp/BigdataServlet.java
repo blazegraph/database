@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.Writer;
 import java.util.LinkedList;
 import java.util.List;
@@ -43,6 +44,7 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.quorum.AbstractQuorum;
+import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.store.BD;
@@ -241,43 +243,68 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
     *      doLocalAbort() should interrupt NSS requests and AbstractTasks </a>
     * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
     *      Concurrent unisolated operations against multiple KBs </a>
+    * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+    *      operations should be cancelable from both REST API and workbench
+    *      </a>
     */
    protected <T> FutureTask<T> submitApiTask(final AbstractRestApiTask<T> task)
          throws DatasetNotFoundException, InterruptedException,
          ExecutionException, IOException {
 
-      final IIndexManager indexManager = getIndexManager();
+        if (task == null)
+            throw new IllegalArgumentException();
+       
+        final IIndexManager indexManager = getIndexManager();
 
-      /*
-       * ::CAUTION::
-       * 
-       * MUTATION TASKS MUST NOT FLUSH OR CLOSE THE HTTP OUTPUT STREAM !!!
-       * 
-       * THIS MUST BE DONE *AFTER* THE GROUP COMMIT POINT.
-       * 
-       * THE GROUP COMMIT POINT OCCURS *AFTER* THE TASK IS DONE.
-       */
+        /*
+         * ::CAUTION::
+         * 
+         * MUTATION TASKS MUST NOT FLUSH OR CLOSE THE HTTP OUTPUT STREAM !!!
+         * 
+         * THIS MUST BE DONE *AFTER* THE GROUP COMMIT POINT.
+         * 
+         * THE GROUP COMMIT POINT OCCURS *AFTER* THE TASK IS DONE.
+         */
 
-      // Submit task. Will run.
-      final FutureTask<T> ft = AbstractApiTask.submitApiTask(indexManager, task);
+        final BigdataRDFContext context = getBigdataRDFContext();
+        
+        try {
 
-      // Await Future.
-      ft.get();
+            // Submit task. Will run.
+            final FutureTask<T> ft = AbstractApiTask.submitApiTask(
+                    indexManager, task);
 
-      /*
-       * IFF successful, flush and close the response.
-       * 
-       * Note: This *commits* the http response to the client. The client will
-       * see this as the commit point on the database and will expect to have
-       * any mutation visible in subsequent reads.
-       */
-      task.flushAndClose();
+            // register task.
+            context.addTask(task, ft);
+            
+            // Await Future.
+            ft.get();
 
-      // TODO Modify to return T rather than Future<T> if we are always doing the get() here?
-      return ft;
+            /*
+             * IFF successful, flush and close the response.
+             * 
+             * Note: This *commits* the http response to the client. The client
+             * will see this as the commit point on the database and will expect
+             * to have any mutation visible in subsequent reads.
+             */
+            task.flushAndClose();
+
+            /*
+             * TODO Modify to return T rather than Future<T> if we are always
+             * doing the get() here? (If we do this then we also need to hook
+             * the FutureTask to remove itself from the set of known running
+             * tasks.)
+             */
+            return ft;
+
+        } finally {
+            
+            context.removeTask(task.uuid);
+
+        }
 
     }
-
+   
     /**
      * Return the {@link HAStatusEnum} -or- <code>null</code> if the
      * {@link IIndexManager} is not an {@link AbstractQuorum} or is not HA
@@ -614,4 +641,17 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
    /** An empty Resource[] for decode. */
    static private final Resource[] EMPTY_RESOURCE_ARRAY = new Resource[0];
    
+   static protected String readFully(final Reader reader) throws IOException {
+
+      final char[] arr = new char[8 * 1024]; // 8K at a time
+      final StringBuffer buf = new StringBuffer();
+      int numChars;
+
+      while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
+         buf.append(arr, 0, numChars);
+      }
+
+      return buf.toString();
+   }
+
 }

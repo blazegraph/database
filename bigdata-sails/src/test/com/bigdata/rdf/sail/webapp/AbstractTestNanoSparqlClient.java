@@ -59,7 +59,6 @@ import org.openrdf.model.vocabulary.RDF;
 import org.openrdf.model.vocabulary.RDFS;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -452,7 +451,19 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
 //
 //	}
 
-	/**
+   static protected String readFully(final Reader reader) throws IOException {
+      final char[] arr = new char[8 * 1024]; // 8K at a time
+      final StringBuffer buf = new StringBuffer();
+      int numChars;
+
+      while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
+         buf.append(arr, 0, numChars);
+      }
+
+      return buf.toString();
+   }
+
+    /**
 	 * Counts the #of results in a SPARQL result set.
 	 * 
 	 * @param result
