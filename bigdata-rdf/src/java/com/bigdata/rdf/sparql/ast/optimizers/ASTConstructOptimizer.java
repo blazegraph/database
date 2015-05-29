@@ -32,7 +32,9 @@ import java.util.Iterator;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.ConstructNode.Annotations;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
@@ -42,7 +44,6 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
-import com.bigdata.rdf.sparql.ast.ConstructNode.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -62,11 +63,11 @@ public class ASTConstructOptimizer implements IASTOptimizer {
     }
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -74,10 +75,10 @@ public class ASTConstructOptimizer implements IASTOptimizer {
         case CONSTRUCT:
             break;
         default:
-        	if (context.nativeDistinctSPO) {
-        	    queryRoot.setProperty(Annotations.NATIVE_DISTINCT, true);
-        	}
-            return queryRoot;
+           	if (context.nativeDistinctSPO) {
+           	    queryRoot.setProperty(Annotations.NATIVE_DISTINCT, true);
+           	}
+           	return new ASTOptimizerResult(queryRoot, bindingSets);
         }
 
         final ConstructNode constructNode = queryRoot.getConstruct();
@@ -196,7 +197,7 @@ public class ASTConstructOptimizer implements IASTOptimizer {
             
         }
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSets);
 
     }
 

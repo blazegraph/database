@@ -35,6 +35,7 @@ import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
@@ -102,7 +103,7 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
     
 	@SuppressWarnings("unchecked")
     @Override
-	public IQueryNode optimize(final AST2BOpContext context, 
+	public ASTOptimizerResult optimize(final AST2BOpContext context, 
 			final IQueryNode queryNode, //final DatasetNode dataset, 
 			final IBindingSet[] bindingSet) {
 		
@@ -111,7 +112,7 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 		if (queryRoot.getQueryType() != QueryType.DESCRIBE) {
 			
 		    // Not a query that we will rewrite.
-		    return queryRoot;
+		   return new ASTOptimizerResult(queryRoot, bindingSet);
 		    
 		}
 
@@ -321,7 +322,7 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 			
 		}
 		
-		return queryRoot;
+		return new ASTOptimizerResult(queryRoot, bindingSet);
 		
 	}
 	

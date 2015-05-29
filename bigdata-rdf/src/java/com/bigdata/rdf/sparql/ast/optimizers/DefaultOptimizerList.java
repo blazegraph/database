@@ -136,11 +136,36 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
+       
+       /**
+        * Rewrites any {@link ProjectionNode} with a wild card into the set of
+        * variables visible to the {@link QueryBase} having that projection.
+        * This is done first for the {@link NamedSubqueriesNode} and then
+        * depth-first for the WHERE clause. Only variables projected by a
+        * subquery will be projected by the parent query.
+        * <p>
+        * Note: This needs to be run before anything else which looks at the
+        * {@link ProjectionNode}.
+        */
+       add(new ASTWildcardProjectionOptimizer());
+       
+       /**
+        * Optimizes various constructs that lead to global static bindings 
+        * for query execution, such as BIND/VALUES clauses involving constants,
+        * but also FILTER expressions binding a variable via sameTerm() or
+        * IN to one ore more constants. These constructs are removed from
+        * the query and added to the binding set we start out with.
+        * 
+        * IMPORTANT NOTE: setting up the starting binding set, this optimizer
+        * is an important prerequisite for others and should be run early in
+        * the optimzer pipeline.
+        */
+       add(new ASTStaticBindingsOptimizer());       
+       
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
-    	 * into an7 full text index to determine the IN
-    	 * set.
+    	 * into a full text index to determine the IN set.
     	 * 
     	 * Convert:
     	 * 
@@ -230,29 +255,8 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTEmptyGroupOptimizer());
         
-        /**
-         * Rewrites any {@link ProjectionNode} with a wild card into the set of
-         * variables visible to the {@link QueryBase} having that projection.
-         * This is done first for the {@link NamedSubqueriesNode} and then
-         * depth-first for the WHERE clause. Only variables projected by a
-         * subquery will be projected by the parent query.
-         * <p>
-         * Note: This needs to be run before anything else which looks at the
-         * {@link ProjectionNode}.
-         */
-        add(new ASTWildcardProjectionOptimizer());
+
         
-        /**
-         * 
-         */
-        
-        /**
-         * Makes implicit bindings in the query explicit, in order to make them
-         * amenable to subsequent optimization through the 
-         * {@link ASTBindingAssigner}. Implicit bindings are those
-         */
-        // currently outcommented, see ticket 
-//        add(new ASTSimpleBindingsOptimizer());
         
         /**
          * Propagates bindings from an input solution into the query, replacing

@@ -160,7 +160,8 @@ public class TestASTSetValueExpressionOptimizer extends AbstractASTEvaluationTes
         final IASTOptimizer rewriter = new ASTSetValueExpressionsOptimizer();
         
         final IQueryNode actual = rewriter.optimize(new AST2BOpContext(
-                new ASTContainer(given), store), given/* queryNode */, bsets);
+                new ASTContainer(given), store), given/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
         

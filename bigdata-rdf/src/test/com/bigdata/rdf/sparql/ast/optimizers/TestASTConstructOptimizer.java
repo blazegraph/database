@@ -369,7 +369,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
 
             // Sort the args for comparison.
             {
@@ -590,7 +591,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
             
             assertSameAST(expected, actual);
 
@@ -868,7 +870,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
             
             assertSameAST(expected, actual);
 
@@ -1172,7 +1175,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
             
             assertSameAST(expected, actual);
 
@@ -1408,7 +1412,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, queryRoot, null/* bindingSet */)
+                    .getOptimizedQueryNode();
             
             assertSameAST(expected, actual);
 

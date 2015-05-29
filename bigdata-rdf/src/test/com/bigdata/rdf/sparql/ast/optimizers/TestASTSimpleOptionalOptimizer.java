@@ -111,10 +111,12 @@ public class TestASTSimpleOptionalOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
 
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */)
+                .getOptimizedQueryNode();
 
         queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */)
+                .getOptimizedQueryNode();
 
         final GraphPatternGroup<?> whereClause = queryRoot.getWhereClause();
 
@@ -205,7 +207,8 @@ public class TestASTSimpleOptionalOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */)
+                .getOptimizedQueryNode();
 
         /*
          * Create the expected AST.
@@ -289,12 +292,12 @@ public class TestASTSimpleOptionalOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
 
         queryRoot = BOpUtility.deepCopy(queryRoot);
         
         queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
 
         /*
          * Create the expected AST.

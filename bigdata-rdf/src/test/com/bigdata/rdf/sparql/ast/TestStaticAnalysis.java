@@ -505,7 +505,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         // Set the IValueExpressions on the AST.
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
 
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
@@ -660,11 +660,11 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
         
         // Set the IValueExpressions on the AST.
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
 
         // Rewrite the wild card in the projection.
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
         
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
@@ -863,7 +863,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         // Rewrite the wild card in the projection.
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
 
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
@@ -1028,7 +1028,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         // rewrite the search predicates as an AST ServiceNode.
         queryRoot = (QueryRoot) new ASTSearchOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
 
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
@@ -1122,7 +1122,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         // Assign join variables to join groups.
         queryRoot = (QueryRoot) new ASTSubGroupJoinVarOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
 
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
@@ -1341,7 +1341,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
 
         // Set the IValueExpressions on the AST.
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null /* bindingSets */);
+                context, queryRoot, null /* bindingSets */).getOptimizedQueryNode();
 
         if (log.isInfoEnabled())
             log.info("\nqueryStr=\n" + queryStr + "\nAST:\n"
@@ -2842,7 +2842,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                     store);
 
             queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer()
-                    .optimize(context, queryRoot, bindingSets);
+                    .optimize(context, queryRoot, bindingSets).getOptimizedQueryNode();
 
         }
         
@@ -2977,7 +2977,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                     store);
 
             queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer()
-                    .optimize(context, queryRoot, bindingSets);
+                    .optimize(context, queryRoot, bindingSets).getOptimizedQueryNode();
 
         }
         
@@ -3147,7 +3147,7 @@ public class TestStaticAnalysis extends AbstractASTEvaluationTestCase {
                     store);
 
             queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer()
-                    .optimize(context, queryRoot, bindingSets);
+                    .optimize(context, queryRoot, bindingSets).getOptimizedQueryNode();
 
         }
         

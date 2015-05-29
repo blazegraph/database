@@ -43,6 +43,7 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -152,7 +153,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     }
     
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
 //    	{
@@ -170,7 +171,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 //    	}
     	
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         if (log.isDebugEnabled()) {
         	log.debug("before:\n"+queryNode);
@@ -227,7 +228,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         	log.debug("after:\n"+queryNode);
         }
         
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

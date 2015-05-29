@@ -36,6 +36,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -59,7 +60,7 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
 
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -87,7 +88,7 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         assignJoinVars(sa, queryRoot.getWhereClause());
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSets);
 
     }
     

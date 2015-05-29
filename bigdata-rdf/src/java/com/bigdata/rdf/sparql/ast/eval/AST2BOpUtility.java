@@ -106,6 +106,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -215,8 +216,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      *         Interrupt of thread submitting a query for evaluation does not
      *         always terminate the AbstractRunningQuery </a>.
      */
-    static PipelineOp convert(final AST2BOpContext ctx,
-            final IBindingSet[] bindingSets) {
+    static PipelineOp convert(final AST2BOpContext ctx, final IBindingSet[] bindingSets) {
 
         // The AST query model.
         final ASTContainer astContainer = ctx.astContainer;
@@ -224,16 +224,23 @@ public class AST2BOpUtility extends AST2BOpRTO {
         // The AST model as produced by the parser.
         final QueryRoot originalQuery = astContainer.getOriginalAST();
         
-        // Compute some summary statistics about the exogenous bindings.
+        /**
+         * The summary stats based on the exogeneous bindings are important
+         * input to the join optimizer etc. Note that the 
+         * ASTStaticBindingsOptimzer might modify this set and update the
+         * solution set stats; however, we want to initialize it here, e.g.
+         * for the case where the optimizer is (manually) disabled.
+         */
         ctx.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         // Run the AST query rewrites / query optimizers.
-        final QueryRoot optimizedQuery = (QueryRoot) ctx.optimizers.optimize(ctx,
-                originalQuery, bindingSets);
+        final ASTOptimizerResult optRes = 
+           ctx.optimizers.optimize(ctx, originalQuery, bindingSets);
         
         // Set the optimized AST model on the container.
+        final QueryRoot optimizedQuery = (QueryRoot)optRes.getOptimizedQueryNode();
         astContainer.setOptimizedAST(optimizedQuery);
-
+        
         // Final static analysis object for the optimized query.
         ctx.sa = new StaticAnalysis(optimizedQuery, ctx);
 
@@ -272,6 +279,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
         // Attach the query plan to the ASTContainer.
         astContainer.setQueryPlan(left);
+        
+        // Set the optimized binding set on the container.
+        astContainer.setQueryPlanBS(optRes.getOptimizedBindingSet());
 
         if (log.isInfoEnabled()) {
             log.info(astContainer);
@@ -836,8 +846,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final NamedSubqueryRoot subqueryRoot,
             final Set<IVariable<?>> doneSet, final AST2BOpContext ctx) {
 
-        final PipelineOp subqueryPlan = convertQueryBase(null/* left */,
-                subqueryRoot, doneSet, ctx);
+        final IVariable<?>[] subqueryProjVars = 
+           subqueryRoot!=null && subqueryRoot.getProjection()!=null && 
+           subqueryRoot.getProjection().getProjectionVars()!=null ?
+           subqueryRoot.getProjection().getProjectionVars() :  new IVariable[] {};
+       
+        final PipelineOp subqueryBase = 
+           addDistinctProjectionOp(null, ctx, subqueryRoot, subqueryProjVars);
+        
+        final PipelineOp subqueryPlan = 
+           convertQueryBase(subqueryBase,subqueryRoot, doneSet, ctx);
 
         /*
          * Annotate the named subquery with the set of variables known to be
@@ -5333,9 +5351,78 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), node, ctx);
         }
+        
+        final Set<IVariable<?>> joinVarsSet = new HashSet<IVariable<?>>();
+        if (joinVars!=null) {
+           for (int i=0; i<joinVars.length; i++) {
+              joinVarsSet.add(joinVars[i]);
+           }
+        }
+
+        final Set<IVariable<?>> projectInVarsSet = new HashSet<IVariable<?>>();
+        if (projectInVars!=null) {
+           for (int i=0; i<projectInVars.length; i++) {
+              projectInVarsSet.add(projectInVars[i]);
+           }
+        }
+        
+        /** 
+         * If the projection is not implicit by the hash join operator,
+         * we need to apply it on top.
+         */
+        if (!joinVarsSet.equals(projectInVarsSet)) {
+           /*
+            * Adding a projection operator before the
+            * subquery plan ensures that variables which are not visible are
+            * dropped out of the solutions flowing through the subquery.
+            * However, those variables are already present in the hash index so
+            * they can be reunited with the solutions for the subquery in the
+            * solution set hash join at the end of the subquery plan.
+            * 
+            * Note that, when projecting variables inside the subquery, we need
+            * to remove duplicates in the outer solution, to avoid a blowup in
+            * the result size (the inner result is joined with the complete
+            * outer result retained though the previous HashIndexOp at a later
+            * point anyway, what we're doing here just serves the purpose to avoid
+            * the computation of unneeded bindings inside the subclause, in the
+            * sense that we pass in every possible binding once), cf. ticket #835.
+            */
+           left = addDistinctProjectionOp(left, ctx, node, projectInVars);        
+         
+        }
       
         return left;      
     }
+
+    /**
+     * Appends a distinct projection to the current pipeline
+     * 
+     * @param left
+     * @param ctx
+     * @param node
+     * @param projectInVars
+     * @return
+     */
+    private static PipelineOp addDistinctProjectionOp(PipelineOp left,
+       final AST2BOpContext ctx, final ASTBase node,
+       final IVariable<?>[] projectionVars) {
+      
+       final List<NV> anns = new LinkedList<NV>();
+       anns.add(new NV(
+           JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
+       anns.add(new NV(
+           JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectionVars));
+       anns.add(new NV(
+           JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
+           BOpEvaluationContext.CONTROLLER));
+       anns.add(new NV(
+           JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
+  
+       left = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
+           anns.toArray(new NV[anns.size()]));
+      
+       return left;
+   }
 
    /**
      * Makes a static (pessimistic) best effort decision whether or not the

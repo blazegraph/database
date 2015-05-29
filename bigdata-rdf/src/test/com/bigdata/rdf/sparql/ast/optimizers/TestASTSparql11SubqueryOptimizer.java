@@ -264,7 +264,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
         
@@ -425,7 +425,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -558,7 +558,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -696,7 +696,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -830,7 +830,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         /*
          * FIXME This failing because we are not computing the join variables

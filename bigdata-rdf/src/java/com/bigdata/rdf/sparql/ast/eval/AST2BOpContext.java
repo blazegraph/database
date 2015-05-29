@@ -321,9 +321,6 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         if (stats == null)
             throw new IllegalArgumentException();
         
-        if(sss != null)
-            throw new IllegalStateException();
-        
         this.sss = stats;
         
     }

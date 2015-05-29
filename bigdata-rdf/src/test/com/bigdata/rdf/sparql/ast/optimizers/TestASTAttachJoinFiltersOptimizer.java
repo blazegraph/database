@@ -164,7 +164,7 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -177,7 +177,8 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
          * as well.
          */
         final IQueryNode actual2 = rewriter.optimize(context,
-                BOpUtility.deepCopy(expected)/* queryNode */, bsets);
+                BOpUtility.deepCopy(expected)/* queryNode */, bsets)
+                .getOptimizedQueryNode();
 
         assertSameAST(expected, actual2);
         
@@ -274,7 +275,8 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
         
         final IQueryNode qIntermediate = 
         	valueExpRewriter.optimize(
-        		contextValueExpRewriter, qUnoptimized, bsetsValueExpRewriter);
+        		contextValueExpRewriter, qUnoptimized, bsetsValueExpRewriter)
+        		.getOptimizedQueryNode();
         
         // the join rewriter is what we want to test
         final IASTOptimizer joinRewriter = 
@@ -287,7 +289,8 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
 
         
         final IQueryNode qOptimized = joinRewriter.optimize(
-        	contextJoinRewriter, qIntermediate, bsetsJoinRewriter);
+        	contextJoinRewriter, qIntermediate, bsetsJoinRewriter)
+        	.getOptimizedQueryNode();
         
         /** This is the output we expect
          * QueryType: SELECT

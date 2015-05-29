@@ -191,7 +191,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -310,7 +310,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -428,7 +428,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -541,7 +541,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -652,7 +652,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -796,7 +796,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -999,7 +999,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets);
+        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 

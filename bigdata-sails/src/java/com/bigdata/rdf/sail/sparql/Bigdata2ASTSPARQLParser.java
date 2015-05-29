@@ -432,7 +432,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
             
             final QueryRoot queryRoot2 = (QueryRoot)
-            		opt.optimize(context2, queryRoot, null);
+            		opt.optimize(context2, queryRoot, null).getOptimizedQueryNode();
             
             BigdataExprBuilder.verifyAggregate(queryRoot2);
 

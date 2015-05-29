@@ -36,6 +36,7 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -62,11 +63,11 @@ import cutthecrap.utils.striterators.Striterator;
 public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if(!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -130,7 +131,7 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
         // Rewrite the projection on the QueryRoot last.
         rewriteProjection(sa, queryRoot);
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSets);
     
     }
 

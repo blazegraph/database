@@ -247,7 +247,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
         final IASTOptimizer rewriter = new ASTRunFirstRunLastOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -467,7 +467,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
         final IASTOptimizer rewriter = new ASTRunFirstRunLastOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 

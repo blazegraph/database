@@ -485,8 +485,7 @@ public class CBD {
 
         // Solutions to the WHERE clause (as projected).
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets//
-                        , materializeProjectionInQuery//
+                .evaluateQuery(astContainer, context, materializeProjectionInQuery//
                         , optimizedQuery.getProjection().getProjectionVars()//
                 );
 

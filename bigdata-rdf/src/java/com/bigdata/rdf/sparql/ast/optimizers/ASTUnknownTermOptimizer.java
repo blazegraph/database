@@ -32,6 +32,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -126,11 +127,11 @@ public class ASTUnknownTermOptimizer implements IASTOptimizer {
             .getLogger(ASTUnknownTermOptimizer.class);
 
     @Override
-    public IQueryNode optimize(AST2BOpContext context, IQueryNode queryNode,
+    public ASTOptimizerResult optimize(AST2BOpContext context, IQueryNode queryNode,
             IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -178,7 +179,7 @@ public class ASTUnknownTermOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

@@ -279,7 +279,7 @@ public class TestASTFlattenUnionsOptimizer extends AbstractASTEvaluationTestCase
         final IASTOptimizer rewriter = new ASTFlattenUnionsOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -425,7 +425,7 @@ public class TestASTFlattenUnionsOptimizer extends AbstractASTEvaluationTestCase
         final IASTOptimizer rewriter = new ASTFlattenUnionsOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets);
+                given/* queryNode */, bsets).getOptimizedQueryNode();
 
         assertSameAST(expected, actual);
 

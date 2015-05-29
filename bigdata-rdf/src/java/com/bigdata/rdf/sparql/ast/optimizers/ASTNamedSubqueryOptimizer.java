@@ -42,6 +42,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
@@ -84,7 +85,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      *             given named solution set.
      */
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSet) {
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -95,7 +96,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
         if (namedSubqueries == null || namedSubqueries.isEmpty()) {
 
             // NOP.
-            return queryRoot;
+           return new ASTOptimizerResult(queryRoot, bindingSet);
 
         }
 
@@ -125,7 +126,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
          */
         assignJoinVars(queryRoot, context, namedSubqueries, allIncludes);
 
-        return queryRoot;
+        return new ASTOptimizerResult(queryRoot, bindingSet);
 
     }
 

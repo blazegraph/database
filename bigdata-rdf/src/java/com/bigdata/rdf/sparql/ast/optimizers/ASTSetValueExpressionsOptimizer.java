@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -76,7 +77,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
     }
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         final QueryRoot query = (QueryRoot) queryNode;
@@ -92,7 +93,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
 
         convert2(globals, query); // Should be faster.
         
-        return query;
+        return new ASTOptimizerResult(query, bindingSets);
         
     }
 

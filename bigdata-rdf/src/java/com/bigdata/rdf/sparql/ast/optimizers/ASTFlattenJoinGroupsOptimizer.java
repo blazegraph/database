@@ -32,6 +32,7 @@ import java.util.List;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
@@ -66,11 +67,11 @@ public class ASTFlattenJoinGroupsOptimizer implements IASTOptimizer {
 //            .getLogger(ASTFlattenUnionsOptimizer.class);
 //    
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
+    public ASTOptimizerResult optimize(final AST2BOpContext context,
             final IQueryNode queryNode, final IBindingSet[] bindingSets) {
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new ASTOptimizerResult(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -118,7 +119,7 @@ public class ASTFlattenJoinGroupsOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
-        return queryNode;
+        return new ASTOptimizerResult(queryNode, bindingSets);
 
     }
 

@@ -59,12 +59,12 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
          * The ordered set of declared variables for which there MIGHT be a
          * binding in any given solution.
          */
-        String DECLARED_VARS = "declaredVars";
+        public String DECLARED_VARS = "declaredVars";
 
         /**
          * The binding sets.
          */
-        String BINDING_SETS = "bindingSets";
+        public String BINDING_SETS = "bindingSets";
 
     }
     
