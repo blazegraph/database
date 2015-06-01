@@ -92,11 +92,11 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
                    final QueryBase queryBase = itr.next();
 
-                   rewriteProjection(sa, queryBase);
+                   rewriteProjection(sa, queryBase, null);
 
                }
 
-             rewriteProjection(sa, subqueryRoot);
+             rewriteProjection(sa, subqueryRoot, null);
                
             }
 
@@ -122,14 +122,15 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
                 final QueryBase queryBase = itr.next();
 
-                rewriteProjection(sa, queryBase);
+                rewriteProjection(sa, queryBase, null);
 
             }
 
         }
 
         // Rewrite the projection on the QueryRoot last.
-        rewriteProjection(sa, queryRoot);
+        rewriteProjection(
+           sa, queryRoot, context.getSolutionSetStats().getUsedVars());
 
         return new ASTOptimizerResult(queryRoot, bindingSets);
     
@@ -145,14 +146,14 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
      *            rewritten.
      */
     private void rewriteProjection(final StaticAnalysis sa,
-            final QueryBase queryBase) {
+            final QueryBase queryBase, Set<IVariable<?>> exogeneousVars) {
 
         final ProjectionNode projection = queryBase.getProjection();
 
         if (projection != null && projection.isWildcard()) {
 
-            final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryBase
-                    .getWhereClause();
+            final GroupNodeBase<IGroupMemberNode> whereClause = 
+                  (GroupNodeBase<IGroupMemberNode>) queryBase.getWhereClause();
 
             final ProjectionNode p2 = new ProjectionNode();
             
@@ -166,6 +167,10 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             
             final Set<IVariable<?>> varSet = sa.getSpannedVariables(
                     whereClause, new LinkedHashSet<IVariable<?>>());
+            if (exogeneousVars!=null) {
+               varSet.addAll(exogeneousVars);
+            }
+
 
             for(IVariable<?> var : varSet) {
             

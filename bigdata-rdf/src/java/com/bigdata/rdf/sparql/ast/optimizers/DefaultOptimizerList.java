@@ -138,18 +138,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     public DefaultOptimizerList() {
        
        /**
-        * Rewrites any {@link ProjectionNode} with a wild card into the set of
-        * variables visible to the {@link QueryBase} having that projection.
-        * This is done first for the {@link NamedSubqueriesNode} and then
-        * depth-first for the WHERE clause. Only variables projected by a
-        * subquery will be projected by the parent query.
-        * <p>
-        * Note: This needs to be run before anything else which looks at the
-        * {@link ProjectionNode}.
-        */
-       add(new ASTWildcardProjectionOptimizer());
-       
-       /**
         * Optimizes various constructs that lead to global static bindings 
         * for query execution, such as BIND/VALUES clauses involving constants,
         * but also FILTER expressions binding a variable via sameTerm() or
@@ -186,15 +174,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * the value expressions.
          */
         add(new ASTPropertyPathOptimizer());
-        
-        /**
-         * If we have a singleton BindingsClause inside the main where clause
-         * and no BindingsClause attached to the QueryRoot, we can promote the
-         * BC from inline to top-level and avoid an extra hash index / hash join
-         * later.
-         */
-        add(new ASTValuesOptimizer());
-        
+
         /**
          * Visit all the value expression nodes and convert them into value
          * expressions. If a value expression can be evaluated to a constant,
@@ -255,7 +235,18 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTEmptyGroupOptimizer());
         
-
+        
+        /**
+         * Rewrites any {@link ProjectionNode} with a wild card into the set of
+         * variables visible to the {@link QueryBase} having that projection.
+         * This is done first for the {@link NamedSubqueriesNode} and then
+         * depth-first for the WHERE clause. Only variables projected by a
+         * subquery will be projected by the parent query.
+         * <p>
+         * Note: This needs to be run before anything else which looks at the
+         * {@link ProjectionNode}.
+         */
+        add(new ASTWildcardProjectionOptimizer());
         
         
         /**
