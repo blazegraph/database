@@ -1,0 +1,6 @@
+SELECT * WHERE {
+  FILTER(!bound(?x))
+  {
+    BIND(1 AS ?x)
+  }
+} 
