@@ -40,7 +40,11 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * If we have a singleton BindingsClause inside the main where clause and no
  * BindingsClause attached to the QueryRoot, we can promote the BC from inline
  * to top-level and avoid an extra hash index / hash join later.
+ * 
+ * Note: this optimizer is subsumed by the {@link ASTStaticBindingsOptimizer}.
+ *       It has been removed from the optimizer chain.
  */
+@Deprecated
 public class ASTValuesOptimizer implements IASTOptimizer {
 
     private static final Logger log = Logger
