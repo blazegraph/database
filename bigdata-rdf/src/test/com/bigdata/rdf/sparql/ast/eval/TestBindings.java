@@ -634,6 +634,135 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
      * 
      * <pre>
      * SELECT * WHERE {
+     *   FILTER(!bound(?x))
+     *   {
+     *     BIND(1 AS ?x)
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp04a() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp04a",// testURI,
+             "bindingsAndBottomUp04a.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp04a.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   FILTER(!bound(?x))
+     *   {
+     *     VALUES ?x { 1 }
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp04b() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp04b",// testURI,
+             "bindingsAndBottomUp04b.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp04b.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   FILTER(!bound(?x))
+     *   {
+     *     BIND(2 AS ?x2)
+     *     {
+     *        BIND(1 AS ?x)
+     *     }
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp04c() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp04c",// testURI,
+             "bindingsAndBottomUp04c.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp04c.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   FILTER(!bound(?x))
+     *   {
+     *     VALUES ?x2 { 2 }
+     *     {
+     *       VALUES ?x { 1 }
+     *     }
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp04d() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp04d",// testURI,
+             "bindingsAndBottomUp04d.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp04d.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   FILTER(!bound(?x) || !bound(?y))
+     *   {
+     *     BIND(1 AS ?x)
+     *     {
+     *       BIND(2 AS ?y)
+     *     }
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp04e() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp04e",// testURI,
+             "bindingsAndBottomUp04e.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp04e.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
      *   BIND(1 AS ?a)
      *   BIND(2 AS ?b)
      * } VALUES ?c { "c1" "c2" }
