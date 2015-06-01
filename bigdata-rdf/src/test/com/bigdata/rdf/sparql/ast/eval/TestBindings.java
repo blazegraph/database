@@ -763,6 +763,82 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
      * 
      * <pre>
      * SELECT * WHERE {
+     *   BIND(5*?x AS ?y)
+     *   {
+     *     BIND(1 AS ?x)
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp05a() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp05a",// testURI,
+             "bindingsAndBottomUp05a.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp05a.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   BIND(5*?x AS ?y)
+     *   {
+     *     {
+     *       VALUES ?x { 1 }
+     *     }
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp05b() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp05b",// testURI,
+             "bindingsAndBottomUp05b.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp05b.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   BIND(1 AS ?x)
+     *   {
+     *     {
+     *       BIND(5*?x AS ?y)
+     *     }
+     *   }
+     * } 
+     * </pre>
+     * 
+     * over empty graph.
+     */
+    public void testBindingsAndBottomUp05c() throws Exception {
+
+       new TestHelper("bindingsAndBottomUp05c",// testURI,
+             "bindingsAndBottomUp05c.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "bindingsAndBottomUp05c.srx"// resultFileURL
+       ).runTest();       
+       
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
      *   BIND(1 AS ?a)
      *   BIND(2 AS ?b)
      * } VALUES ?c { "c1" "c2" }
