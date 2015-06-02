@@ -68,14 +68,11 @@ import cutthecrap.utils.striterators.Striterator;
  * to be a {@link ConstantNode}. The rewrite uses the special form of the
  * {@link Constant} constructor which associates the variable with the constant.
  * 
- * TODO: don't check for a single binding, but rather compute the distinct
- *       of all variables (independently): if this projection is unique, we're
- *       on the safe side and can statically replace the respective variable.
- * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
+@Deprecated
 public class ASTBindingAssigner implements IASTOptimizer {
 
     private static final Logger log = Logger
