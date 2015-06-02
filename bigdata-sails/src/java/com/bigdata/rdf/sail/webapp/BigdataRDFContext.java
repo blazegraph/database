@@ -286,6 +286,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          public final AbstractRestApiTask<T> task;
          public final FutureTask<T> ft;
          public final long beginNanos;
+         public UUID taskUuid;
          private final AtomicLong elapsedNanos = new AtomicLong(-1L);
 
          TaskAndFutureTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft, final long beginNanos) {
@@ -293,6 +294,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
              this.ft = ft;
              this.beginNanos = beginNanos;
          }
+         
+         
 
          /**
           * Hook must be invoked when the task is done executing.
@@ -318,6 +321,32 @@ public class BigdataRDFContext extends BigdataBaseContext {
             return elapsedNanos;
 
          }
+         
+         /**
+ 		 * Convenience method to return com.bigdata.rdf.sail.model.RunningQuery from a BigdataRDFContext
+ 		 * running query. 
+ 		 * 
+ 		 * There is a current difference between the embedded and the REST model in that
+ 		 * the embedded model uses an arbitrary string as an External ID, but the 
+ 		 * REST version uses a timestamp.  The timestap is tightly coupled to the current
+ 		 * workbench.
+ 		 * 
+ 		 * TODO:  This needs to be refactored into unified model between the embedded and REST clients for tasks.
+ 		 * 
+ 		 * @return 
+ 		 */
+ 		public com.bigdata.rdf.sail.model.RunningQuery getModelRunningQuery() {
+ 		
+ 			final com.bigdata.rdf.sail.model.RunningQuery modelQuery;
+ 			
+ 			final boolean isUpdateQuery = false;
+ 			
+ 			modelQuery = new com.bigdata.rdf.sail.model.RunningQuery(
+ 					Long.toString(this.beginNanos), this.task.uuid, this.beginNanos,
+ 					isUpdateQuery);
+ 			
+ 			return modelQuery;
+ 		}
 
     }
 
@@ -2282,7 +2311,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-            acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
+            acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
         }
 
         // Do conneg.
@@ -2390,6 +2419,30 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			
 			this.queryTask = queryTask;
 
+		}
+		
+		/**
+		 * Convenience method to return com.bigdata.rdf.sail.model.RunningQuery from a BigdataRDFContext
+		 * running query. 
+		 * 
+		 * There is a current difference between the embedded and the REST model in that
+		 * the embedded model uses an arbitrary string as an External ID, but the 
+		 * REST version uses a timestamp.  The timestap is tightly coupled to the current
+		 * workbench.
+		 * 
+		 * @return 
+		 */
+		public com.bigdata.rdf.sail.model.RunningQuery getModelRunningQuery() {
+		
+			final com.bigdata.rdf.sail.model.RunningQuery modelQuery;
+			
+			final boolean isUpdateQuery = queryTask instanceof UpdateTask?true:false;
+			
+			modelQuery = new com.bigdata.rdf.sail.model.RunningQuery(
+					Long.toString(this.queryId), this.queryId2, this.begin,
+					isUpdateQuery);
+			
+			return modelQuery;
 		}
 
 	}

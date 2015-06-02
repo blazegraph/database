@@ -26,7 +26,10 @@ import java.util.Collection;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
@@ -52,8 +55,11 @@ import com.tinkerpop.blueprints.Features;
  * 
  */
 public class BigdataGraphClient extends BigdataGraph {
+	
+    private static final transient Logger log = Logger.getLogger(BigdataGraphClient.class);
 
     private static final Properties props = new Properties();
+
     static {
         /*
          * We don't want the BigdataGraph to close our connection after every
@@ -245,18 +251,29 @@ public class BigdataGraphClient extends BigdataGraph {
 	}
 
 	@Override
-	public void killQuery(UUID queryId) {
-		//TODO:  Implement for REST API
+	public void cancel(UUID queryId) {
+
+		assert(queryId != null);
+
+		try {
+			this.repo.cancel(queryId);
+		} catch (Exception e) {
+			if(log.isDebugEnabled()) {
+				log.debug(e);
+			}
+		}
 	}
 
 	@Override
-	public void killQuery(String externalQueryId) {
-		//TODO:  Implement for REST API
+	public void cancel(String queryId) {
+		assert(queryId != null);
+		cancel(UUID.fromString(queryId));
 	}
 
 	@Override
-	public void killQuery(RunningQuery r) {
-		//TODO:  Implement for REST API
+	public void cancel(RunningQuery r) {
+		assert(r != null);
+		cancel(r.getQueryUuid());
 	}
 
 	@Override

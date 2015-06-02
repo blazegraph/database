@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -66,6 +68,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.QueryCancellationHelper;
+import com.bigdata.rdf.sail.model.JsonHelper;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
@@ -73,12 +76,16 @@ import com.bigdata.rdf.sail.webapp.BigdataRDFContext.TaskAndFutureTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
 import com.bigdata.rdf.sail.webapp.QueryServlet.SparqlQueryTask;
 import com.bigdata.rdf.sail.webapp.QueryServlet.SparqlUpdateTask;
+import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.InnerCause;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 /**
  * A status page for the service.
@@ -139,7 +146,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * @see #DETAILS
      * @see #QUERY_ID
      */
-    private static final String SHOW_QUERIES = "showQueries";
+    public static final String SHOW_QUERIES = "showQueries";
 
     /**
      * @see #SHOW_QUERIES
@@ -462,6 +469,114 @@ public class StatusServlet extends BigdataRDFServlet {
 
          return;
       }
+      
+		final String acceptHeader = ConnegUtil
+				.getMimeTypeForQueryParameterServiceRequest(
+						req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
+						req.getHeader(ConnectOptions.ACCEPT_HEADER));
+
+      if(BigdataRDFServlet.MIME_JSON.equals(acceptHeader))
+    	  doGetJsonResponse(req, resp);
+      else {
+    	  doGetHtmlResponse(req, resp);
+      }
+        
+    }
+    
+    /**
+     * 
+     * Internal method to process the Servlet request returning the results in JSON form.  Currently only 
+     * supports the listing of running queries.
+     * 
+     * TODO:  This is an initial version and should be refactored to support HTML, XML, JSON, and RDF.  
+     * {@link http://jira.blazegraph.com/browse/BLZG-1316}
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
+	private void doGetJsonResponse(HttpServletRequest req,
+			HttpServletResponse resp) throws IOException {
+
+		resp.setContentType(MIME_JSON);
+		final Writer w = new OutputStreamWriter(resp.getOutputStream(), UTF8);
+
+		final Set<UUID> requestedQueryIds = getRequestedQueryIds(req);
+
+		// Map from IRunningQuery.queryId => RunningQuery (for SPARQL QUERY
+		// requests).
+		final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap = getQueryCrosswalkMap();
+
+		final List<com.bigdata.rdf.sail.model.RunningQuery> modelRunningQueries = new ArrayList<com.bigdata.rdf.sail.model.RunningQuery>();
+
+		/*
+		 * Show the queries that are currently executing (actually running on
+		 * the QueryEngine).
+		 */
+
+		final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+				.getQueryController(getIndexManager());
+
+		final UUID[] queryIds = queryEngine.getRunningQueries();
+
+		final TreeMap<Long, IRunningQuery> runningQueryAge = orderRunningQueries(
+				queryIds, crosswalkMap, queryEngine);
+
+		/*
+		 * Now, paint the page for each query (or for each queryId that was
+		 * requested).
+		 * 
+		 * Note: This is only SPARQL QUERY requests.
+		 */
+		{
+
+			Iterator<RunningQuery> rSparqlQueries = getRunningSparqlQueries(
+					requestedQueryIds, runningQueryAge, crosswalkMap)
+					.iterator();
+
+			while (rSparqlQueries.hasNext()) {
+
+				final RunningQuery r = rSparqlQueries.next();
+
+				modelRunningQueries.add(r.getModelRunningQuery());
+
+			}
+
+		}
+
+		/*
+		 * 
+		 * This is for Update requests
+		 */
+		{
+			Iterator<RunningQuery> rUpdateQueries = getPendingUpdates(
+					requestedQueryIds).iterator();
+
+			while (rUpdateQueries.hasNext()) {
+
+				final RunningQuery r = rUpdateQueries.next();
+
+				modelRunningQueries.add(r.getModelRunningQuery());
+
+			}
+		}
+
+		// Build and send the JSON Response
+		JsonHelper.writeRunningQueryList(w, modelRunningQueries);
+
+	}
+    
+    /**
+     * Internal method to process the Servlet request returning the results in HTML form.
+     * 
+     * TODO:  This is an initial version and should be refactored to support HTML, XML, JSON, and RDF.  
+     * {@link http://jira.blazegraph.com/browse/BLZG-1316}
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
+    private void doGetHtmlResponse(HttpServletRequest req, HttpServletResponse resp) throws IOException {
 
         // IRunningQuery objects currently running on the query controller.
         final boolean showQueries = req.getParameter(SHOW_QUERIES) != null;
@@ -488,7 +603,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
         // bigdata namespaces known to the index manager.
         final boolean showNamespaces = req.getParameter(SHOW_NAMESPACES) != null;
-
+        
         resp.setContentType(MIME_TEXT_HTML);
         final Writer w = new OutputStreamWriter(resp.getOutputStream(), UTF8);
         try {
@@ -707,29 +822,7 @@ public class StatusServlet extends BigdataRDFServlet {
                 return;
             }
 
-            /*
-             * The set of queryIds for which information was explicitly
-             * requested. If empty, then information will be provided for all
-             * running queries.
-             */
-            final Set<UUID> requestedQueryIds = new HashSet<UUID>();
-            {
-
-                final String[] a = req.getParameterValues(QUERY_ID);
-
-                if (a != null && a.length > 0) {
-
-                    for (String s : a) {
-
-                        final UUID queryId = UUID.fromString(s);
-
-                        requestedQueryIds.add(queryId);
-
-                    }
-
-                }
-
-            }
+            final Set<UUID> requestedQueryIds = getRequestedQueryIds(req);
 
             /**
              * Obtain a cross walk from the {@link QueryEngine}'s
@@ -754,46 +847,8 @@ public class StatusServlet extends BigdataRDFServlet {
 
             final UUID[] queryIds = queryEngine.getRunningQueries();
 
-            // final long now = System.nanoTime();
-
-            /*
-             * Map providing the QueryEngine's IRunningQuery objects in order by
-             * descending elapsed evaluation time (longest running queries are
-             * listed first). This provides a stable ordering and help people to
-             * focus on the problem queries.
-             */
-            final TreeMap<Long, IRunningQuery> runningQueryAge = newQueryMap();
-
-            for (UUID queryId : queryIds) {
-
-                final IRunningQuery query;
-                try {
-
-                    query = queryEngine.getRunningQuery(queryId);
-
-                    if (query == null) {
-
-                        // Already terminated.
-                        continue;
-
-                    }
-
-                } catch (RuntimeException e) {
-
-                    if (InnerCause.isInnerCause(e, InterruptedException.class)) {
-
-                        // Already terminated.
-                        continue;
-
-                    }
-
-                    throw new RuntimeException(e);
-
-                }
-
-                runningQueryAge.put(query.getElapsed(), query);
-
-            }
+			final TreeMap<Long, IRunningQuery> runningQueryAge = orderRunningQueries(
+					queryIds, crosswalkMap, queryEngine);
 
             /*
              * Now, paint the page for each query (or for each queryId that was
@@ -802,67 +857,24 @@ public class StatusServlet extends BigdataRDFServlet {
              * Note: This is only SPARQL QUERY requests.
              */
             {
+            	Iterator<RunningQuery> rSparqlQueries = getRunningSparqlQueries(
+    					requestedQueryIds, runningQueryAge, crosswalkMap)
+    					.iterator();
+    			
+    			while(rSparqlQueries.hasNext()) {
+    				
+    				final RunningQuery acceptedQuery = rSparqlQueries.next();
 
-                final Iterator<Map.Entry<Long/* age */, IRunningQuery>> itr = runningQueryAge
-                        .entrySet().iterator();
+					// Paint the query.
+					current = showQuery(
+							req,
+							resp,
+							w,
+							current,
+							queryEngine.getRunningQuery(acceptedQuery.queryId2),
+							acceptedQuery, showQueryDetails, maxBopLength);
+    			}
 
-                while (itr.hasNext()) {
-
-                    final Map.Entry<Long/* age */, IRunningQuery> e = itr
-                            .next();
-
-//                  final long age = e.getKey();
-
-                    final IRunningQuery q = e.getValue();
-
-                    if (q.isDone() && q.getCause() != null) {
-                        // Already terminated (normal completion).
-                        continue;
-                    }
-
-                    final UUID queryId = q.getQueryId();
-
-                    if (!requestedQueryIds.isEmpty()
-                            && !requestedQueryIds.contains(queryId)) {
-                        // Information was not requested for this query.
-                        continue;
-                    }
-
-                    // Lookup the NanoSparqlServer's RunningQuery object.
-                    final RunningQuery acceptedQuery = crosswalkMap
-                            .get(queryId);
-
-                    if (acceptedQuery == null) {
-
-                        /*
-                         * A query running on the query engine which is not a
-                         * query accepted by the NanoSparqlServer is typically a
-                         * sub-query being evaluated as part of the query plan
-                         * for the top-level query.
-                         * 
-                         * Since we nomw model the parent/child relationship and
-                         * display the data for the child query, we want to skip
-                         * anything which is not recognizable as a top-level
-                         * query submitted to the NanoSparqlServer.
-                         * 
-                         * TODO This does leave open the possibility that a
-                         * query directly submitted against the database from an
-                         * application which embeds bigdata will not be reported
-                         * here. One way to handle that is to make a collection
-                         * of all queries which were skipped here, to remove all
-                         * queries from that collection which were identified as
-                         * subqueries below, and then to paint anything which
-                         * remains and which has not yet been terminated.
-                         */
-                        continue;
-                    }
-
-                    // Paint the query.
-                    current = showQuery(req, resp, w, current, q,
-                            acceptedQuery, showQueryDetails, maxBopLength);
-
-                } // next IRunningQuery.
-                
             } // end of block in which we handle the running queries.
 
             /*
@@ -874,72 +886,19 @@ public class StatusServlet extends BigdataRDFServlet {
              * executing (it it is done, it will be removed very soon after the
              * UPDATE commits).
              */
-            {
-                
-                final Iterator<RunningQuery> itr = getBigdataRDFContext()
-                        .getQueries().values().iterator();
+			{
+				Iterator<RunningQuery> rUpdateQueries = getPendingUpdates(
+						requestedQueryIds).iterator();
 
-                while (itr.hasNext()) {
+				while (rUpdateQueries.hasNext()) {
 
-                    final RunningQuery acceptedQuery = itr.next();
+					final RunningQuery acceptedQuery = rUpdateQueries.next();
 
-                    if (!(acceptedQuery.queryTask instanceof UpdateTask)) {
+					showUpdateRequest(req, resp, current, acceptedQuery,
+							showQueryDetails);
+				}
 
-                        // Not an UPDATE request.
-                        continue;
-
-                    }
-
-                    // The UUID for this UPDATE request.
-                    final UUID queryId = acceptedQuery.queryId2;
-
-                    if (queryId == null) {
-                        
-                        /*
-                         * Note: The UUID is not assigned until the UPDATE
-                         * request begins to execute.
-                         */
-                        continue;
-                    
-                    }
-                    
-                    if (!requestedQueryIds.isEmpty()
-                            && !requestedQueryIds.contains(queryId)) {
-                        // Information was not requested for this UPDATE.
-                        continue;
-                    }
-
-                    if (acceptedQuery.queryTask.updateFuture == null) {
-
-                        // Request has not yet been queued for execution.
-                        continue;
-
-                    } else {
-
-                        final Future<Void> f = acceptedQuery.queryTask.updateFuture;
-
-                        if (f.isDone()) {
-                            try {
-                                f.get();
-                                // Already terminated (normal completion).
-                                continue;
-                            } catch (InterruptedException ex) {
-                                // Propagate interrupt.
-                                Thread.currentThread().interrupt();
-                            } catch (ExecutionException ex) {
-                                // Already terminated (failure).
-                                continue;
-                            }
-                        }
-
-                    }
-                    
-                    showUpdateRequest(req, resp, current, acceptedQuery,
-                            showQueryDetails);
-
-                } // next UPDATE request
-
-            } // SPARQL UPDATE requests
+			} // SPARQL UPDATE requests
             
             /*
              * Now handle any other kinds of REST API requests.
@@ -954,55 +913,19 @@ public class StatusServlet extends BigdataRDFServlet {
              * operations should be cancelable from both REST API and workbench
              * </a>
              */
-            {
-                
-                final Iterator<TaskAndFutureTask<?>> itr = getBigdataRDFContext()
-                        .getTasks().values().iterator();
+			{
 
-                while (itr.hasNext()) {
+				Iterator<TaskAndFutureTask<?>> otherTasks = getOtherTasks(
+				requestedQueryIds).iterator();
 
-                    final TaskAndFutureTask<?> task = itr.next();
+				while (otherTasks.hasNext()) {
 
-                    if (task.task instanceof SparqlUpdateTask
-                            || task.task instanceof SparqlQueryTask) {
+					final TaskAndFutureTask<?> task = otherTasks.next();
+					showTaskRequest(req, resp, current, task, showQueryDetails);
 
-                        // Already handled above.
-                        continue;
+				} // Next Task
 
-                    }
-
-                    // The UUID for this REST API request.
-                    final UUID queryId = task.task.uuid;
-
-                    if (!requestedQueryIds.isEmpty()
-                            && !requestedQueryIds.contains(queryId)) {
-                        // Information was not requested for this task.
-                        continue;
-                    }
-
-                    final Future<?> f = task.ft;
-                    if (f != null) {
-                        if (f.isDone()) {
-                            try {
-                                f.get();
-                                // Already terminated (normal completion).
-                                continue;
-                            } catch (InterruptedException ex) {
-                                // Propagate interrupt.
-                                Thread.currentThread().interrupt();
-                            } catch (ExecutionException ex) {
-                                // Already terminated (failure).
-                                continue;
-                            }
-                        }
-                    }
-                    
-                    showTaskRequest(req, resp, current, task,
-                            showQueryDetails);
-
-                } // next UPDATE request
-
-            } // Other REST API requests.
+			} // Other REST API requests.
             
             doc.closeAll(current);
 
@@ -1558,5 +1481,284 @@ public class StatusServlet extends BigdataRDFServlet {
 		}
 
 	}
+	
+	private Set<UUID> getRequestedQueryIds(HttpServletRequest req) {
 
+		/*
+		 * The set of queryIds for which information was explicitly requested.
+		 * If empty, then information will be provided for all running queries.
+		 */
+		final Set<UUID> requestedQueryIds = new HashSet<UUID>();
+		{
+
+			final String[] a = req.getParameterValues(QUERY_ID);
+
+			if (a != null && a.length > 0) {
+
+				for (String s : a) {
+
+					final UUID queryId = UUID.fromString(s);
+
+					requestedQueryIds.add(queryId);
+
+				}
+
+			}
+
+		}
+		
+		return requestedQueryIds;
+	}
+	
+	/**
+	 * Map providing the QueryEngine's IRunningQuery objects in order by
+	 * descending elapsed evaluation time (longest running queries are listed
+	 * first). This provides a stable ordering and help people to focus on the
+	 * problem queries.
+	 * 
+	 * @return TreeMap<Long, IRunningQuery>
+	 */
+	private TreeMap<Long, IRunningQuery> orderRunningQueries(
+			final UUID[] queryIds,
+			final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap,
+			final QueryEngine queryEngine) {
+
+		final TreeMap<Long, IRunningQuery> runningQueryAge = newQueryMap();
+
+		for (UUID queryId : queryIds) {
+
+			final IRunningQuery query;
+			try {
+
+				query = queryEngine.getRunningQuery(queryId);
+
+				if (query == null) {
+
+					// Already terminated.
+					continue;
+
+				}
+
+			} catch (RuntimeException e) {
+
+				if (InnerCause.isInnerCause(e, InterruptedException.class)) {
+
+					// Already terminated.
+					continue;
+
+				}
+
+				throw new RuntimeException(e);
+
+			}
+
+			final Long elapsedTime = new Long(query.getElapsed());
+			runningQueryAge.put(elapsedTime, query);
+
+		}
+
+		return runningQueryAge;
+	}
+	
+	/**
+	 * Return a collection of running SPARQL QUERY REQUESTS requested).
+	 * 
+	 * Note: This is only SPARQL QUERY requests.
+	 * 
+	 * @return Collection<RunningQuery>
+	 */
+	private Collection<RunningQuery> getRunningSparqlQueries(
+			final Set<UUID> requestedQueryIds,
+			final TreeMap<Long, IRunningQuery> runningQueryAge,
+			final Map<UUID/* IRunningQuery.queryId */, RunningQuery> crosswalkMap) {
+
+			final Iterator<Map.Entry<Long/* age */, IRunningQuery>> itr = runningQueryAge
+					.entrySet().iterator();
+
+			final LinkedList<RunningQuery> runningSparqlQueries = new LinkedList<RunningQuery>();
+
+			while (itr.hasNext()) {
+
+				final Map.Entry<Long/* age */, IRunningQuery> e = itr.next();
+
+				final IRunningQuery q = e.getValue();
+
+				if (q.isDone() && q.getCause() != null) {
+					// Already terminated (normal completion).
+					continue;
+				}
+
+				final UUID queryId = q.getQueryId();
+
+				if (!requestedQueryIds.isEmpty()
+						&& !requestedQueryIds.contains(queryId)) {
+					// Information was not requested for this query.
+					continue;
+				}
+
+				// Lookup the NanoSparqlServer's RunningQuery object.
+				final RunningQuery acceptedQuery = crosswalkMap.get(queryId);
+
+				if (acceptedQuery == null) {
+
+					/*
+					 * A query running on the query engine which is not a query
+					 * accepted by the NanoSparqlServer is typically a sub-query
+					 * being evaluated as part of the query plan for the
+					 * top-level query.
+					 * 
+					 * Since we now model the parent/child relationship and
+					 * display the data for the child query, we want to skip
+					 * anything which is not recognizable as a top-level query
+					 * submitted to the NanoSparqlServer.
+					 * 
+					 * TODO This does leave open the possibility that a query
+					 * directly submitted against the database from an
+					 * application which embeds bigdata will not be reported
+					 * here. One way to handle that is to make a collection of
+					 * all queries which were skipped here, to remove all
+					 * queries from that collection which were identified as
+					 * subqueries below, and then to paint anything which
+					 * remains and which has not yet been terminated.
+					 */
+					continue;
+				}
+
+				// Add the query to the list
+
+				runningSparqlQueries.add(acceptedQuery);
+
+			} // next IRunningQuery.
+
+		return runningSparqlQueries;
+	}
+	
+	/**
+	 *
+	 * Convenience method to return a collection of update requests that may be running.
+	 * 
+	 * @param requestedQueryIds
+	 * @return
+	 */
+	private Collection<RunningQuery> getPendingUpdates(
+			final Set<UUID> requestedQueryIds) {
+	
+		final LinkedList<RunningQuery> pendingUpdates = new LinkedList<RunningQuery>();
+		
+		final Iterator<RunningQuery> itr = getBigdataRDFContext().getQueries()
+				.values().iterator();
+
+		while (itr.hasNext()) {
+
+			final RunningQuery acceptedQuery = itr.next();
+
+			if (!(acceptedQuery.queryTask instanceof UpdateTask)) {
+
+				// Not an UPDATE request.
+				continue;
+
+			}
+
+			// The UUID for this UPDATE request.
+			final UUID queryId = acceptedQuery.queryId2;
+
+			if (queryId == null) {
+
+				/*
+				 * Note: The UUID is not assigned until the UPDATE request
+				 * begins to execute.
+				 */
+				continue;
+
+			}
+
+			if (!requestedQueryIds.isEmpty()
+					&& !requestedQueryIds.contains(queryId)) {
+				// Information was not requested for this UPDATE.
+				continue;
+			}
+
+			if (acceptedQuery.queryTask.updateFuture == null) {
+
+				// Request has not yet been queued for execution.
+				continue;
+
+			} else {
+
+				final Future<Void> f = acceptedQuery.queryTask.updateFuture;
+
+				if (f.isDone()) {
+					try {
+						f.get();
+						// Already terminated (normal completion).
+						continue;
+					} catch (InterruptedException ex) {
+						// Propagate interrupt.
+						Thread.currentThread().interrupt();
+					} catch (ExecutionException ex) {
+						// Already terminated (failure).
+						continue;
+					}
+				}
+
+			}
+			
+			pendingUpdates.add(acceptedQuery);
+
+		} // Next request
+		
+		return pendingUpdates;
+	}
+	
+	private Collection<TaskAndFutureTask<?>> getOtherTasks(final Set<UUID> requestedQueryIds) {
+		
+		final LinkedList<TaskAndFutureTask<?>> otherTasks = new LinkedList<TaskAndFutureTask<?>>();
+		
+		final Iterator<TaskAndFutureTask<?>> itr = getBigdataRDFContext()
+                .getTasks().values().iterator();
+
+        while (itr.hasNext()) {
+
+            final TaskAndFutureTask<?> task = itr.next();
+
+            if (task.task instanceof SparqlUpdateTask
+                    || task.task instanceof SparqlQueryTask) {
+
+                // Already handled
+                continue;
+
+            }
+
+            // The UUID for this REST API request.
+            final UUID queryId = task.task.uuid;
+
+            if (!requestedQueryIds.isEmpty()
+                    && !requestedQueryIds.contains(queryId)) {
+                // Information was not requested for this task.
+                continue;
+            }
+
+            final Future<?> f = task.ft;
+            if (f != null) {
+                if (f.isDone()) {
+                    try {
+                        f.get();
+                        // Already terminated (normal completion).
+                        continue;
+                    } catch (InterruptedException ex) {
+                        // Propagate interrupt.
+                        Thread.currentThread().interrupt();
+                    } catch (ExecutionException ex) {
+                        // Already terminated (failure).
+                        continue;
+                    }
+                }
+            }
+            
+            otherTasks.add(task);
+        }
+        
+        return otherTasks;
+	}
+	
 }

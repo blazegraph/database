@@ -51,6 +51,7 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.QueryCancellationHelper;
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.StatusServlet;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -767,6 +768,11 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 		return m_queries.get(extQueryId);
 	}
 
+	/**
+	 * 
+	 * Remove the query from the internal queues.
+	 * 
+	 */
 	@Override
 	protected void tearDownQuery(UUID queryId) {
 		
@@ -828,7 +834,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	
 		while(iter.hasNext()){
 			final RunningQuery r = iter.next();
-			sb.append(r.getQueryId2() + " : \n" + r.getExtQueryId());
+			sb.append(r.getQueryUuid() + " : \n" + r.getExtQueryId());
 		}
 		
 		return sb.toString();
@@ -842,7 +848,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 
 	@Override
-	public void killQuery(final UUID queryId) {
+	public void cancel(final UUID queryId) {
 
 		assert(queryId != null);
 		QueryCancellationHelper.cancelQuery(queryId, this.getQueryEngine());
@@ -856,16 +862,16 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 
 	@Override
-	public void killQuery(final String uuid) {
-		killQuery(UUID.fromString(uuid));
+	public void cancel(final String uuid) {
+		cancel(UUID.fromString(uuid));
 	}
 
 	@Override
-	public void killQuery(final RunningQuery rQuery) {
+	public void cancel(final RunningQuery rQuery) {
 
 		if(rQuery != null) {
-			final UUID queryId = rQuery.getQueryId2();
-			killQuery(queryId);
+			final UUID queryId = rQuery.getQueryUuid();
+			cancel(queryId);
 		}
 
 	}
