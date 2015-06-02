@@ -22,28 +22,35 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
-import com.bigdata.rdf.lexicon.LexiconRelation;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataStatement;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPOFilter;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BigdataStatementIterator;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.tinkerpop.blueprints.Features;
 import com.tinkerpop.blueprints.TransactionalGraph;
@@ -59,6 +66,8 @@ import com.tinkerpop.blueprints.TransactionalGraph;
  */
 public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalGraph, IChangeLog {
 
+    private final transient static Logger log = Logger.getLogger(BigdataGraphEmbedded.class);
+    
 	final BigdataSailRepository repo;
 	
 //	transient BigdataSailRepositoryConnection cxn;
@@ -226,6 +235,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	public StringBuilder dumpStore() {
 	    return repo.getDatabase().dumpStore();
 	}
+	
 	
     protected static final Features FEATURES = new Features();
 
