@@ -606,7 +606,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     	/*
     	 * Start by adding the exogenous variables.
     	 */
-    	if (evaluationContext != null) {
+    	if (evaluationContext != null && inToplevelQueryScope(node)) {
     		
     		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
     		
@@ -682,6 +682,47 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
+     * Returns true if the current node is located (recursively) inside the
+     * top-level query's scope, false if it is nested inside a subquery or a
+     * named subquery. 
+     * 
+     * @param node
+     * @return
+     */
+    public boolean inToplevelQueryScope(IGroupMemberNode node) {
+       
+       return inGroupScope(queryRoot.getWhereClause(), node);
+
+   }
+
+    /**
+     * Returns true if the current node is identical or (recursively) located
+     * inside the given group's scope, false if it is nested inside a subquery
+     * or a named subquery. 
+     * 
+     * @param node
+     * @return
+     */
+   public boolean inGroupScope(
+      final GroupNodeBase<?> group, IGroupMemberNode node) {
+      
+      if (group==node)
+         return true;
+      
+      for (IGroupMemberNode child : group) {
+         
+         if (child instanceof GroupNodeBase<?>) {
+            
+            if (inGroupScope((GroupNodeBase<?>)child, node))
+               return true;
+         }
+      }
+      
+      return false; // not found
+   }
+
+   
+   /**
      * Return the set of variables which MIGHT be bound coming into this group
      * during top-down, left-to-right evaluation. The returned set is based on a
      * non-recursive analysis of the "maybe" bound variables in each of the
@@ -714,11 +755,11 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     public Set<IVariable<?>> getMaybeIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
-    
+
     	/*
     	 * Start by adding the exogenous variables.
     	 */
-    	if (evaluationContext != null) {
+    	if (evaluationContext != null && inToplevelQueryScope(node)) {
     		
     		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
     		
