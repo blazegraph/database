@@ -106,12 +106,9 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  * </p>
  * 
  * <p>
- * Note: 
- * - The {@link ASTBindingAssigner} optimizer makes use of the optimizations
- *   performed as part of this optimizer, trying to "instantiate" static
- *   bindings into variables and/or filters.
- * - This optimizer generalizes the {@link ASTSimpleBindingsOptimizer} and the
- *   {@link ASTValuesOptimizer}, which have been disabled and marked deprecated
+ * Note: This optimizer generalizes the {@link ASTSimpleBindingsOptimizer}, the
+ *       {@link ASTValuesOptimizer}, and the {@link ASTBindingAssigner}, which
+ *       have been disabled and marked deprecated
  * </p>
  *     
  * <p>
@@ -229,7 +226,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
       final List<IBindingSet> bcBindings = Arrays.asList(staticBindings);
 
-      if (!bcBindings.isEmpty()) {
+      if (!bcVars.isEmpty()) {
          final BindingsClause bc = new BindingsClause(bcVars,bcBindings);
          
          subqueryRoot.setBindingsClause(bc);
