@@ -249,28 +249,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTWildcardProjectionOptimizer());
         
         
-        /**
-         * Propagates bindings from an input solution into the query, replacing
-         * variables with constants while retaining the constant / variable
-         * association.
-         * 
-         * TODO Other optimizations are possible when the {@link IBindingSet}[]
-         * has multiple solutions. In particular, the possible values which a
-         * variable may take on can be written into an IN constraint and
-         * associated with the query in the appropriate scope. Those are not
-         * being handled yet. Also, if a variable takes on the same value in ALL
-         * source solutions, then it can be replaced by a constant.
-         * <p>
-         * The analysis of the source IBindingSet[] should be refactored into a
-         * central location, perhaps on the {@link AST2BOpContext}. We could
-         * collect which variables have bindings ("maybe bound") as well as
-         * statistics about those bindings. This is related to how we will
-         * handle BindingsClause once we support that federation extension.
-         * <p>
-         * Note: {@link ASTBottomUpOptimizer} currently examines the
-         * IBindingSet[].
-         */ 
-        add(new ASTBindingAssigner());
 
         /**
          * Translate {@link BD#SEARCH} and associated magic predicates into a a
