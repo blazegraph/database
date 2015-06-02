@@ -37,6 +37,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -167,8 +168,13 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
             
             final Set<IVariable<?>> varSet = sa.getSpannedVariables(
                     whereClause, new LinkedHashSet<IVariable<?>>());
+            
             if (exogeneousVars!=null) {
                varSet.addAll(exogeneousVars);
+            }
+            if (queryBase.getBindingsClause()!=null) {
+               final BindingsClause bc = queryBase.getBindingsClause();
+               varSet.addAll(bc.getDeclaredVariables());
             }
 
 
