@@ -31,16 +31,16 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 
-import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
-import org.eclipse.jetty.client.HttpClient;
+import org.apache.log4j.Logger;
 import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
@@ -67,8 +67,8 @@ import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
  */
 public class RemoteRepository extends RemoteRepositoryBase {
 
-//    private static final transient Logger log = Logger
-//            .getLogger(RemoteRepository.class);
+    private static final transient Logger log = Logger
+            .getLogger(RemoteRepository.class);
 
    /**
     * The {@link RemoteRepositoryManager} object use to manage all access to the
@@ -162,7 +162,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long postGraphML(final String path) throws Exception {
         
-        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for postGraphML. See #1254.
+        final UUID uuid = UUID.randomUUID();
+        
+        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("blueprints");
 
@@ -205,15 +208,24 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public GraphQueryResult getServiceDescription() throws Exception {
 
+        return getServiceDescription(UUID.randomUUID());
+        
+    }
+    
+    public GraphQueryResult getServiceDescription(final UUID uuid)
+            throws Exception {
+
         // TODO Unit test when isolated by a transaction. The server is already
         // creating a tx for this so it might hit a fence post.
-        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL,tx);
+        
+        final ConnectOptions opts = mgr.newConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.method = "GET";
 
         opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
-        return mgr.graphResults(opts, null/*queryId*/, null/*preparedListener*/);
+        return mgr
+                .graphResults(opts, uuid, null/* preparedListener */);
 
     }
 
@@ -222,12 +234,32 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * 
      * @param query
      *            the query string
-     * @return the {@link TupleQuery}
+     * 
+     * @return The {@link IPreparedTupleQuery}.
      */
     public IPreparedTupleQuery prepareTupleQuery(final String query)
             throws Exception {
 
-        return new TupleQuery(mgr.newQueryConnectOptions(sparqlEndpointURL,tx), UUID.randomUUID(), query);
+        return prepareTupleQuery(query, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a tuple (select) query.
+     * 
+     * @param query
+     *            the query string
+     * 
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     * 
+     * @return The {@link IPreparedTupleQuery}.
+     */
+    public IPreparedTupleQuery prepareTupleQuery(final String query,
+            final UUID uuid) throws Exception {
+
+        return new TupleQuery(
+                mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx), uuid, query);
 
     }
 
@@ -236,13 +268,31 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * 
      * @param query
      *            the query string
-     *            
-     * @return the {@link IPreparedGraphQuery}
+     * 
+     * @return The {@link IPreparedGraphQuery}
      */
     public IPreparedGraphQuery prepareGraphQuery(final String query)
             throws Exception {
 
-        return new GraphQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(), query);
+        return prepareGraphQuery(query, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a graph query.
+     * 
+     * @param query
+     *            the query string
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     * 
+     * @return The {@link IPreparedGraphQuery}
+     */
+    public IPreparedGraphQuery prepareGraphQuery(final String query,
+            final UUID uuid) throws Exception {
+
+        return new GraphQuery(
+                mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx), uuid, query);
 
     }
 
@@ -257,7 +307,25 @@ public class RemoteRepository extends RemoteRepositoryBase {
     public IPreparedBooleanQuery prepareBooleanQuery(final String query)
             throws Exception {
 
-        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(), query);
+        return prepareBooleanQuery(query, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a boolean (ask) query.
+     * 
+     * @param query
+     *            the query string
+     * 
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     *            
+     * @return the {@link IPreparedBooleanQuery}
+     */
+    public IPreparedBooleanQuery prepareBooleanQuery(final String query, final UUID uuid)
+            throws Exception {
+
+        return new BooleanQuery(mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx), uuid, query);
 
     }
 
@@ -267,15 +335,34 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * @param updateStr
      *            The SPARQL UPDATE request.
      * 
-     * @return The {@link SparqlUpdate} opertion.
+     * @return The {@link SparqlUpdate} operation.
      * 
      * @throws Exception
      */
     public IPreparedSparqlUpdate prepareUpdate(final String updateStr)
             throws Exception {
 
-        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL, tx), UUID.randomUUID(),
-                updateStr);
+        return prepareUpdate(updateStr, UUID.randomUUID());
+
+    }
+
+    /**
+     * Prepare a SPARQL UPDATE request.
+     * 
+     * @param updateStr
+     *            The SPARQL UPDATE request.
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     * 
+     * @return The {@link SparqlUpdate} operation.
+     * 
+     * @throws Exception
+     */
+    public IPreparedSparqlUpdate prepareUpdate(final String updateStr, final UUID uuid)
+            throws Exception {
+
+        return new SparqlUpdate(mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid,
+                tx), uuid, updateStr);
 
     }
 
@@ -442,7 +529,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
          /*
           * This is the new code path that optimizes the effort by the server.
           */
-         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
+          // TODO Allow client to specify UUID for HASSTMT. See #1254.
+          final UUID uuid = UUID.randomUUID();
+         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
          opts.addRequestParam("HASSTMT");
          opts.addRequestParam("includeInferred",
@@ -566,7 +655,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
          throw new IllegalArgumentException();
       }
 
-      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
+      // TODO Allow client to specify UUID for ESTCARD. See #1254.
+      final UUID uuid = UUID.randomUUID();
+      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("ESTCARD");
         if (exact) {
@@ -623,11 +714,16 @@ public class RemoteRepository extends RemoteRepositoryBase {
     * FIXME This should be a streaming response for scalability. That will
     * require us to change the return type for the method. E.g., to something
     * that implements {@link Closeable}. Callers will then have to invoke
-    * {@link Closeable#close()} to avoid leaking resources.
+    * {@link Closeable#close()} to avoid leaking resources. (This change could
+    * be made when making the CONTEXTS an operation that can be given a UUID
+    * for cancellation by the client.)
     */
     public Collection<Resource> getContexts() throws Exception {
     	
-        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, tx);
+        // TODO Allow client to specify UUID for CONTEXTS. See #1254.
+        final UUID uuid = UUID.randomUUID();
+
+        final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
         opts.addRequestParam("CONTEXTS");
 
@@ -662,7 +758,29 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public long add(final AddOp add) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
+        return add(add, UUID.randomUUID()/*queryId*/);
+        
+    }
+    
+    /**
+     * Adds RDF data to the remote repository.
+     * 
+     * @param add
+     *            The RDF data to be added.
+     * @param uuid
+     *            The {@link UUID} used to identify this query.
+     *            
+     * @return The mutation count.
+     * 
+     * @see See #1254 / BLZG-1259
+     */
+    public long add(final AddOp add, final UUID uuid) throws Exception {
+
+        if (add == null)
+            throw new IllegalArgumentException();
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(
+                sparqlEndpointURL, uuid, tx);
         
         add.prepareForWire();
         
@@ -675,10 +793,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
             opts.entity = entity;
             
         }
-            
-        if (add.uri != null) {
-            // set the resource to load : FIXME REST API allows multiple URIs, but RemoteRepository does not.
-            opts.addRequestParam("uri", add.uri);
+  
+        if (add.uris != null) {
+            // set the resource(s) to load
+            opts.addRequestParam("uri", add.uris.toArray(new String[0]));
         }
         
         if (add.context != null && add.context.length > 0) {
@@ -686,22 +804,37 @@ public class RemoteRepository extends RemoteRepositoryBase {
             opts.addRequestParam("context-uri", toStrings(add.context));
         }
         
+        opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+        
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
-            
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
             
             checkResponseCode(response = doConnect(opts));
             
             final MutationResult result = mutationResults(response);
             
+            ok = true;
+            
             return result.mutationCount;
             
         } finally {
-            
-        	if (response != null)
-        		response.abort();
-        	
+
+            if (response != null) {
+                // Abort the http response handling.
+                response.abort();
+                if (!ok) {
+                    try {
+                        /*
+                         * POST back to the server to cancel the request in case
+                         * it is still running on the server.
+                         */
+                        cancel(uuid);
+                    } catch (Exception ex) {
+                        log.warn(ex);
+                    }
+                }
+            }
         }
         
     }
@@ -719,7 +852,28 @@ public class RemoteRepository extends RemoteRepositoryBase {
     */
     public long remove(final RemoveOp remove) throws Exception {
         
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
+        return remove(remove, UUID.randomUUID());
+
+    }
+    
+    /**
+     * Removes RDF data from the remote repository.
+     * 
+     * @param remove
+     *            The RDF data to be removed.
+     * 
+     * @return The mutation count.
+     * 
+     * @see <a href="http://trac.bigdata.com/ticket/1177"> Resource... contexts
+     *      not encoded/decoded according to openrdf semantics (REST API) </a>
+     * @see #1254 / BLZG-1259
+     */
+    public long remove(final RemoveOp remove, final UUID uuid) throws Exception {
+
+        if (remove == null)
+            throw new IllegalArgumentException();
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, uuid, tx);
         
         remove.prepareForWire();
             
@@ -775,21 +929,37 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
         }
         
+        opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
             
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-
             checkResponseCode(response = doConnect(opts));
             
             final MutationResult result = mutationResults(response);
+            
+            ok = true;
             
             return result.mutationCount;
             
         } finally {
             
-        	if (response != null)
-        		response.abort();
+            if (response != null) {
+                // Abort the http response handling.
+                response.abort();
+                if (!ok) {
+                    try {
+                        /*
+                         * POST back to the server to cancel the request in case
+                         * it is still running on the server.
+                         */
+                        cancel(uuid);
+                    } catch (Exception ex) {
+                        log.warn(ex);
+                    }
+                }
+            }
                         
         }
         
@@ -812,43 +982,92 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * @return The mutation count.
      */
     public long update(final RemoveOp remove, final AddOp add) throws Exception {
-        
-        final ConnectOptions opts = mgr.newUpdateConnectOptions(sparqlEndpointURL, tx);
-        
+
+        return update(remove, add, UUID.randomUUID());
+
+    }
+
+    /**
+     * Perform an ACID update
+     * <p>
+     * There are two different patterns which are supported:
+     * <dl>
+     * <dt>UPDATE (DELETE statements selected by a QUERY plus INSERT statements
+     * from Request Body using PUT)</dt>
+     * <dd>Where query is a CONSTRUCT or DESCRIBE query. <br>
+     * Note: The QUERY + DELETE operation is ACID. <br>
+     * Note: You MAY specify a CONSTRUCT query with an empty WHERE clause in
+     * order to specify a set of statements to be removed without reference to
+     * statements already existing in the database.</dd>
+     * <dt>UPDATE (POST with Multi-Part Request Body)</dt>
+     * <dd>You can specify two sets of serialized statements - one to be removed
+     * and one to be added..</dd>
+     * </dl>
+     * 
+     * @param remove
+     *            The RDF data to be removed (either a collection of statements
+     *            or a CONSTRUCT or DESCRIBE QUERY identifying the data to be
+     *            deleted).
+     * @param add
+     *            The RDF data to be added (must be a collection of statements).
+     * 
+     * @return The mutation count.
+     * @see http
+     *      ://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer#UPDATE_.28D
+     *      ELETE_.2B_INSERT.29
+     */
+    public long update(final RemoveOp remove, final AddOp add, final UUID uuid)
+            throws Exception {
+
+        if(remove == null)
+            throw new IllegalArgumentException();
+
+        if(add == null)
+            throw new IllegalArgumentException();
+
         remove.prepareForWire();
+        
         add.prepareForWire();
-        
+
+        final ConnectOptions opts = mgr.newUpdateConnectOptions(
+                sparqlEndpointURL, uuid, tx);
+
         if (remove.format != null) {
-        
+
+            // Code path when caller specifies data to be removed.
             opts.method = "POST";
             opts.addRequestParam("update");
-            
+
+            // Note: Multi-part MIME request entity.
             final MultipartEntity entity = new MultipartEntity();
-            entity.addPart(new FormBodyPart("remove", 
-                    new ByteArrayBody(
-                            remove.data, 
-                            remove.format.getDefaultMIMEType(), 
-                            "remove")));
-            entity.addPart(new FormBodyPart("add", 
-                    new ByteArrayBody(
-                            add.data, 
-                            add.format.getDefaultMIMEType(), 
-                            "add")));
-            
+
+            // The data to be removed.
+            entity.addPart(new FormBodyPart("remove", new ByteArrayBody(
+                    remove.data, remove.format.getDefaultMIMEType(), "remove")));
+
+            // The data to be added.
+            entity.addPart(new FormBodyPart("add", new ByteArrayBody(add.data,
+                    add.format.getDefaultMIMEType(), "add")));
+
+            // The multi-part request entity.
             opts.entity = entity;
-        
+
         } else {
-            
+
+            // Code path when caller specifies CONSTRUCT or DESCRIBE query
+            // identifying the data to be removed.
             opts.method = "PUT";
-            opts.addRequestParam("query", remove.query);
             
+            // QUERY specifying the data to be removed.
+            opts.addRequestParam("query", remove.query);
+
+            // The data to be added.
             final ByteArrayEntity entity = new ByteArrayEntity(add.data);
             entity.setContentType(add.format.getDefaultMIMEType());
-        
             opts.entity = entity;
-            
+
         }
-        
+
         if (add.context != null) {
             // set the default context for insert.
             opts.addRequestParam("context-uri-insert", toStrings(add.context));
@@ -859,21 +1078,37 @@ public class RemoteRepository extends RemoteRepositoryBase {
             opts.addRequestParam("context-uri-delete", toStrings(remove.context));
         }
         
+        opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+        
         JettyResponseListener response = null;
+        boolean ok = false;
         try {
 
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
-            
             checkResponseCode(response = doConnect(opts));
             
             final MutationResult result = mutationResults(response);
+            
+            ok = true;
             
             return result.mutationCount;
             
         } finally {
             
-        	if (response != null)
-        		response.abort();
+            if (response != null) {
+                // Abort the http response handling.
+                response.abort();
+                if (!ok) {
+                    try {
+                        /*
+                         * POST back to the server to cancel the request in case
+                         * it is still running on the server.
+                         */
+                        cancel(uuid);
+                    } catch (Exception ex) {
+                        log.warn(ex);
+                    }
+                }
+            }
             
         }
         
@@ -884,17 +1119,17 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * <p>
      * Right now, the only metadata is the query ID.
      */
-    protected abstract class Query implements IPreparedOperation, IPreparedQuery {
+    protected abstract class QueryOrUpdate implements IPreparedOperation, IPreparedQuery {
         
         protected final ConnectOptions opts;
         
-        protected final UUID id;
+        private final UUID uuid;
 
         protected final String query;
 
         private final boolean update;
 
-        public Query(final ConnectOptions opts, final UUID id,
+        public QueryOrUpdate(final ConnectOptions opts, final UUID id,
                 final String query) {
 
             this(opts, id, query, false/* update */);
@@ -910,7 +1145,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
          * @param update
          *            <code>true</code> iff this is a SPARQL update.
          */
-        public Query(final ConnectOptions opts, final UUID id,
+        public QueryOrUpdate(final ConnectOptions opts, final UUID uuid,
                 final String query, final boolean update) {
 
             if (opts == null)
@@ -919,8 +1154,11 @@ public class RemoteRepository extends RemoteRepositoryBase {
             if (query == null)
                 throw new IllegalArgumentException();
             
+            if (uuid == null)
+                throw new IllegalArgumentException();
+            
             this.opts = opts;
-            this.id = id;
+            this.uuid = uuid;
             this.query = query;
             this.update = update;
             
@@ -929,7 +1167,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         @Override
         final public UUID getQueryId() {
             
-            return id;
+            return uuid;
             
         }
         
@@ -957,9 +1195,11 @@ public class RemoteRepository extends RemoteRepositoryBase {
                 
             }
 
-            if (id != null)
-                opts.addRequestParam("queryId", getQueryId().toString());
-                
+            final UUID queryId = getQueryId();
+
+            if (queryId != null)
+                opts.addRequestParam(QUERYID, queryId.toString());
+
         }
         
         @Override
@@ -1015,7 +1255,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-    private final class TupleQuery extends Query implements IPreparedTupleQuery {
+    private final class TupleQuery extends QueryOrUpdate implements IPreparedTupleQuery {
         
         public TupleQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
@@ -1053,7 +1293,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-    private final class GraphQuery extends Query implements IPreparedGraphQuery {
+    private final class GraphQuery extends QueryOrUpdate implements IPreparedGraphQuery {
 
         public GraphQuery(final ConnectOptions opts, final UUID id,
                 final String query) {
@@ -1091,7 +1331,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
     }
 
-    private final class BooleanQuery extends Query implements
+    private final class BooleanQuery extends QueryOrUpdate implements
             IPreparedBooleanQuery {
         
         public BooleanQuery(final ConnectOptions opts, final UUID id,
@@ -1131,13 +1371,13 @@ public class RemoteRepository extends RemoteRepositoryBase {
         
     }
 
-    private final class SparqlUpdate extends Query implements
+    private final class SparqlUpdate extends QueryOrUpdate implements
             IPreparedSparqlUpdate {
         
-        public SparqlUpdate(final ConnectOptions opts, final UUID id,
+        public SparqlUpdate(final ConnectOptions opts, final UUID uuid,
                 final String updateStr) {
 
-            super(opts, id, updateStr, true/*update*/);
+            super(opts, uuid, updateStr, true/*update*/);
 
         }
         
@@ -1152,21 +1392,9 @@ public class RemoteRepository extends RemoteRepositoryBase {
         public void evaluate(final IPreparedQueryListener listener) 
                 throws Exception {
          
-        	JettyResponseListener response = null;
-            try {
+            setupConnectOptions();
 
-                setupConnectOptions();
-
-                // Note: No response body is expected.
-                
-                checkResponseCode(response = doConnect(opts));
-
-            } finally {
-                
-            	if (response != null)
-            		response.abort();
-	                            
-            }
+            mgr.sparqlUpdateResults(opts, getQueryId(), listener);
             
         }
         
@@ -1177,7 +1405,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
      */
     public static class AddOp {
 
-        private String uri;
+        private List<String> uris;
         private Iterable<? extends Statement> stmts;
         private byte[] data;
         private File file;
@@ -1187,9 +1415,19 @@ public class RemoteRepository extends RemoteRepositoryBase {
         private Resource[] context;
         
         public AddOp(final String uri) {
-            this.uri = uri;
+            if (uri == null)
+                throw new IllegalArgumentException();
+            this.uris = Collections.singletonList(uri);
         }
-        
+
+        public AddOp(final Collection<String> uris) {
+            if (uris == null)
+                throw new IllegalArgumentException();
+            if (uris.isEmpty())
+                throw new IllegalArgumentException();
+            this.uris = new LinkedList<String>(uris);
+        }
+
         public AddOp(final Iterable<? extends Statement> stmts) {
             this.stmts = stmts;
         }
