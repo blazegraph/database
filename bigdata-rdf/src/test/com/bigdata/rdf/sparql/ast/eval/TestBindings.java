@@ -33,9 +33,10 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 
 
 /**
- * Data driven test suite for SPARQL 1.1 BINDINGS clause.
+ * Data driven test suite for SPARQL 1.1 BIND & VALUES clause.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a> * 
  * @version $Id$
  * 
  *          TODO Unit test to verify that static analysis correctly leverages
