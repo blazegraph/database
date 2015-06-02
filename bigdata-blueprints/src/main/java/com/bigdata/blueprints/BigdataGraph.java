@@ -59,7 +59,6 @@ import com.bigdata.blueprints.BigdataGraphAtom.ElementType;
 import com.bigdata.blueprints.BigdataGraphAtom.ExistenceAtom;
 import com.bigdata.blueprints.BigdataGraphAtom.PropertyAtom;
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
-import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
@@ -68,7 +67,7 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.QueryCancelledException;
 import com.bigdata.rdf.sail.RDRHistory;
-import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -2013,88 +2012,6 @@ public abstract class BigdataGraph implements Graph {
     }
     
     /**
-	 * Metadata about running {@link AbstractQueryTask}s (this includes both
-	 * queries and update requests).
-	 */
-	public static class RunningQuery {
-	
-
-		/**
-		 * The unique identifier for this query as assigned by the Embedded
-		 * Graph implementation end point (rather than the {@link QueryEngine}).
-		 */
-		private final String extQueryId;
-	
-		/**
-		 * The unique identifier for this query for the {@link QueryEngine}
-		 * (non-<code>null</code>).
-		 * 
-		 * @see QueryEngine#getRunningQuery(UUID)
-		 */
-		private final UUID queryId2;
-	
-		/** The timestamp when the query was accepted (ns). */
-		private final long begin;
-		
-		/**
-		 * Is the query an update query.
-		 */
-		private final boolean isUpdateQuery;
-		
-		/**
-		 * Was the query cancelled.
-		 */
-		protected boolean isCancelled = false;
-		
-		public RunningQuery(final String extQueryId, final UUID queryId2,
-				final long begin, boolean isUpdateQuery) {
-	
-			if (queryId2 == null)
-				throw new IllegalArgumentException();
-	
-			this.extQueryId = extQueryId;
-	
-			this.queryId2 = queryId2;
-	
-			this.begin = begin;
-			
-			this.isUpdateQuery = isUpdateQuery;
-			
-			this.setCancelled(false);
-	
-		}
-		
-		public long getElapsedTimeNS() {
-			return (System.nanoTime() - this.begin);
-		}
-		
-		public String getExtQueryId() {
-			return extQueryId;
-		}
-	
-		public UUID getQueryId2() {
-			return queryId2;
-		}
-	
-		public long getBegin() {
-			return begin;
-		}
-		
-		public boolean getIsUpdateQuery() {
-			return isUpdateQuery;
-		}
-
-		public boolean isCancelled() {
-			return isCancelled;
-		}
-
-		public void setCancelled(boolean isCancelled) {
-			this.isCancelled = isCancelled;
-			
-		}
-	}
-
-	/**
      * Utility function to set the Query timeout to the global
      * setting if it is configured.
      */
@@ -2117,7 +2034,7 @@ public abstract class BigdataGraph implements Graph {
 	 * 
 	 * @param queryId
 	 */
-	public abstract void killQuery(UUID queryId);
+	public abstract void cancel(UUID queryId);
 
 	/**
 	 * Kill a running query specified by the UUID String.
@@ -2125,7 +2042,7 @@ public abstract class BigdataGraph implements Graph {
 	 * 
 	 * @param String uuid
 	 */
-	public abstract void killQuery(String uuid);
+	public abstract void cancel(String uuid);
 
 	/**
 	 * Kill a running query specified by the RunningQuery object. Do nothing if
@@ -2133,7 +2050,7 @@ public abstract class BigdataGraph implements Graph {
 	 * 
 	 * @param r
 	 */
-	public abstract void killQuery(RunningQuery r);
+	public abstract void cancel(RunningQuery r);
 	
 	/**
 	 * Return the {@link RunningQuery} for a currently executing SPARQL QUERY or
@@ -2176,7 +2093,8 @@ public abstract class BigdataGraph implements Graph {
 	 * @param queryId
 	 * @throws QueryCancelledException 
 	 */
-	protected void finalizeQuery(final UUID queryId) throws QueryCancelledException {
+	protected void finalizeQuery(final UUID queryId)
+			throws QueryCancelledException {
 
 		//Need to call before tearDown
 		final boolean isQueryCancelled = isQueryCancelled(queryId);
@@ -2189,7 +2107,8 @@ public abstract class BigdataGraph implements Graph {
 				log.debug(queryId + " execution canceled.");
 			}
 			
-        	throw new QueryCancelledException(queryId + " execution canceled.", queryId);
+			throw new QueryCancelledException(queryId + " execution canceled.",
+					queryId);
         }
 		
 	}

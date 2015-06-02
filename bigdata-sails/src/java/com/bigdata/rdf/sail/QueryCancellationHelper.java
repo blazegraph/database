@@ -27,12 +27,13 @@ package com.bigdata.rdf.sail;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.UUID;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.blueprints.BigdataGraph.RunningQuery;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.rdf.sail.model.RunningQuery;
 
 /**
  *
@@ -132,7 +133,7 @@ public class QueryCancellationHelper {
 			final IRunningQuery q;
 			try {
 
-				q = queryEngine.getRunningQuery(query.getQueryId2());
+				q = queryEngine.getRunningQuery(query.getQueryUuid());
 				
 				if(q != null && q.cancel(true /* interrupt when running */)) {
 					return true;
@@ -177,8 +178,16 @@ public class QueryCancellationHelper {
 
    }
 
-    //TODO:  Unify the webapp and embedded
     public static boolean tryCancelUpdate(UUID queryId) {
+    	
+    	//TODO:  FIXME
+    	
+    	return false;
+    }
+    
+    
+    //TODO:  Unify the webapp and embedded
+    public static boolean tryCancelUpdate(UUID queryId, final Future<Void> f) {
     	
     	return false;
     }

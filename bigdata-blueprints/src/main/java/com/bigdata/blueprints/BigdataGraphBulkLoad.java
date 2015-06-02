@@ -34,6 +34,7 @@ import org.openrdf.repository.RepositoryConnection;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.tinkerpop.blueprints.Edge;
@@ -375,54 +376,66 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 	@Override
 	protected UUID setupQuery(BigdataSailRepositoryConnection cxn,
 			ASTContainer astContainer, QueryType queryType, String extQueryId) {
-	//This is a NOOP for the BigdataGraphBulkLoad
-		return null;
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
 	protected void tearDownQuery(UUID queryId) {
-		//This is a NOOP for the BigdataGraphBulkLoad
-		
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+
 	}
 
 	@Override
 	public Collection<RunningQuery> getRunningQueries() {
-		//This is a NOOP for the BigdataGraphBulkLoad
-		return null;
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
-	public void killQuery(UUID queryId) {
-		//This is a NOOP for the BigdataGraphBulkLoad
-		
+	public void cancel(UUID queryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
-	public void killQuery(String externalQueryId) {
-		//This is a NOOP for the BigdataGraphBulkLoad
+	public void cancel(String externalQueryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
-	public void killQuery(RunningQuery r) {
-		//This is a NOOP for the BigdataGraphBulkLoad
+	public void cancel(RunningQuery r) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
 	public RunningQuery getQueryById(UUID queryId2) {
-		//This is a NOOP for the BigdataGraphBulkLoad
-		return null;
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
 	public RunningQuery getQueryByExternalId(String extQueryId) {
-		// TODO Auto-generated method stub
-		return null;
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 	@Override
 	protected boolean isQueryCancelled(UUID queryId) {
-		// TODO Auto-generated method stub
-		return false;
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 }
