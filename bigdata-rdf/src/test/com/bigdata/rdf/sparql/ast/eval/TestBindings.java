@@ -808,7 +808,243 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();       
        
     }
+
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT * WHERE {
+     *       ?s ?p ?o
+     *     } VALUES ?p { <http://p> }
+     *   }
+     * } VALUES ?p { <http://p> }
+     * </pre>
+     * 
+     * over triple <http://s> <http://p> <http://o> .
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery01() throws Exception {
+
+       new TestHelper("bindingsWithSubquery01",// testURI,
+             "bindingsWithSubquery01.rq",// queryFileURL
+             "bindingsWithSubquery01.trig",// dataFileURL
+             "bindingsWithSubquery01.srx"// resultFileURL
+       ).runTest();       
+
+    }
     
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT * WHERE {
+     *       ?s ?p2 ?o2
+     *     } VALUES ?p2 { <http://p2> }
+     *   }
+     * } VALUES ?p { <http://p> }
+     * </pre>
+     * 
+     * over triples    
+     * 
+     * <pre>
+     * <http://s> <http://p> <http://o> . 
+     * <http://s> <http://p2> <http://o2> .   
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery02() throws Exception {
+
+       new TestHelper("bindingsWithSubquery02",// testURI,
+             "bindingsWithSubquery02.rq",// queryFileURL
+             "bindingsWithSubquery02.trig",// dataFileURL
+             "bindingsWithSubquery02.srx"// resultFileURL
+       ).runTest();       
+
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT ?s WHERE {
+     *       ?s ?p ?o .
+     *     }
+     *   }
+     *   BIND(<http://o> AS ?o)
+     * }
+     * 
+     * </pre>
+     * 
+     * over triples
+     * 
+     * <pre>
+     * <http://s> <http://p> <http://o> .
+     * <http://s> <http://p2> <http://o2> .
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery03a() throws Exception {
+
+       new TestHelper("bindingsWithSubquery03a",// testURI,
+             "bindingsWithSubquery03a.rq",// queryFileURL
+             "bindingsWithSubquery03a.trig",// dataFileURL
+             "bindingsWithSubquery03a.srx"// resultFileURL
+       ).runTest();       
+
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT ?s WHERE {
+     *       ?s ?p ?o .
+     *       FILTER(?o=<http://o2>)
+     *     }
+     *   }
+     *   BIND(<http://o> AS ?o)
+     * }
+     * 
+     * </pre>
+     * 
+     * over triples
+     * 
+     * <pre>
+     * <http://s> <http://p> <http://o> .
+     * <http://s> <http://p2> <http://o2> .
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery03b() throws Exception {
+
+       new TestHelper("bindingsWithSubquery03b",// testURI,
+             "bindingsWithSubquery03b.rq",// queryFileURL
+             "bindingsWithSubquery03b.trig",// dataFileURL
+             "bindingsWithSubquery03b.srx"// resultFileURL
+       ).runTest();       
+
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT ?s WHERE {
+     *       ?s ?p ?o .
+     *       FILTER(?o=<http://o2>)
+     *     }     
+     *   }
+     *   BIND(<http://o> AS ?o)
+     * } 
+     * </pre>
+     * 
+     * over triples
+     * 
+     * <pre>
+     * <http://s> <http://p> <http://o> .
+     * <http://s> <http://p2> <http://o2> .
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery04() throws Exception {
+
+       new TestHelper("bindingsWithSubquery04",// testURI,
+             "bindingsWithSubquery04.rq",// queryFileURL
+             "bindingsWithSubquery04.trig",// dataFileURL
+             "bindingsWithSubquery04.srx"// resultFileURL
+       ).runTest();       
+
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT ?s WHERE {
+     *       BIND(<http://p2> AS ?p)
+     *       ?s ?p ?o .
+     *     }
+     *   }
+     *   BIND(<http://o> AS ?o)
+     * }
+     * </pre>
+     * 
+     * over triples
+     * 
+     * <pre>
+     * <http://s> <http://p> <http://o> .
+     * <http://s> <http://p2> <http://o2> .
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery05() throws Exception {
+
+       new TestHelper("bindingsWithSubquery05",// testURI,
+             "bindingsWithSubquery05.rq",// queryFileURL
+             "bindingsWithSubquery05.trig",// dataFileURL
+             "bindingsWithSubquery05.srx"// resultFileURL
+       ).runTest();       
+
+    }
+    
+    /**
+     * Evaluation of query
+     * 
+     * <pre>
+     * SELECT * WHERE {
+     *   ?s ?p ?o
+     *   {
+     *     SELECT ?s WHERE {
+     *       BIND(<http://p2> AS ?p)
+     *       ?s ?p ?o .
+     *     }
+     *   }
+     *   BIND(<http://o> AS ?o)
+     * } VALUES ?p { <http://p> } 
+     * </pre>
+     * 
+     * over triples
+     * 
+     * <pre>
+     * <http://s> <http://p> <http://o> .
+     * <http://s> <http://p2> <http://o2> .
+     * </pre>
+     * 
+     * @throws Exception
+     */
+    public void testBindingsWithSubquery06() throws Exception {
+
+       new TestHelper("bindingsWithSubquery06",// testURI,
+             "bindingsWithSubquery06.rq",// queryFileURL
+             "bindingsWithSubquery06.trig",// dataFileURL
+             "bindingsWithSubquery06.srx"// resultFileURL
+       ).runTest();       
+
+    }
+        
     /**
      * Evaluation of query
      * 
