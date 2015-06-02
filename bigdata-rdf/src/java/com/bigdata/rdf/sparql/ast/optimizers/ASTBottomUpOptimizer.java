@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -664,11 +663,6 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             final QueryBase queryBase,
             final IBindingSet[] bindingSets) {
 
-        // All exogenous variables (given in the source solutions).
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        final Set<IVariable<?>> exogenous = (context == null ? (Set) Collections
-                .emptySet() : context.getSolutionSetStats().getUsedVars());
-
         // Map for renamed variables.
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 
@@ -705,22 +699,14 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             
             /*
              * All variables potentially bound by joins in this group or a
-             * subgroup.
+             * subgroup. Note that we do not want to add any exogeneous
+             * variables. By semantics, they are joined in *last*, so they're
+             * not visible in any scope.
              */
             final Set<IVariable<?>> maybeBound = sa
                     .getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */);
-            
-            /*
-             * All variables appearing in the source solutions.
-             * 
-             * TODO This is incorrectly considering all exogenous variables. It
-             * must consider only those which are in scope. Exogenous variables
-             * are NOT visible in a Sub-Select unless they are projected into
-             * that Sub-Select.
-             */
-            maybeBound.addAll(exogenous);
-
+ 
             if (group.isOptional()) {
 
                 /*
