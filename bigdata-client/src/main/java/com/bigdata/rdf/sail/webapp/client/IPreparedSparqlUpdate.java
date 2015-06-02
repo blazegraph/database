@@ -27,13 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.webapp.client;
 
-import java.util.UUID;
-
 /**
+ * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
-public interface IPreparedSparqlUpdate {
+public interface IPreparedSparqlUpdate extends IPreparedOperation {
 
     void evaluate() throws Exception;
     
@@ -46,7 +44,5 @@ public interface IPreparedSparqlUpdate {
      * @throws Exception
      */
     void evaluate(IPreparedQueryListener listener) throws Exception;
-    
-    UUID getQueryId();
 
 }

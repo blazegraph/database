@@ -351,10 +351,9 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
       try {
 
-         AbstractApiTask.submitApiTask(
-               indexManager,
-               new RestApiCreateKBTask(req, resp, namespace,
-                     effectiveProperties)).get();
+            submitApiTask(
+                    new RestApiCreateKBTask(req, resp, namespace,
+                            effectiveProperties)).get();
 
       } catch (Throwable e) {
 
@@ -378,8 +377,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
       try {
 
-         AbstractApiTask.submitApiTask(getIndexManager(),
-               new RestApiDestroyKBTask(req, resp, namespace)).get();
+            submitApiTask(new RestApiDestroyKBTask(req, resp, namespace)).get();
 
         } catch (Throwable e) {
 
@@ -408,7 +406,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 		
 		try {
 		   
-         AbstractApiTask.submitApiTask(getIndexManager(),
+         submitApiTask(
                new AbstractRestApiTask<Void>(req, resp, namespace, timestamp) {
 
                   @Override

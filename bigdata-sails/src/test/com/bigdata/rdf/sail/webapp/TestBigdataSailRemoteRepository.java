@@ -72,6 +72,9 @@ import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
  * 
  * @param <S>
  * 
+ *           FIXME *** Explicit tests of web.xml tx URL rewrites. Can we hit the
+ *           transaction manager if all we have is the sparqlEndpointURL?
+ *           
  *           FIXME *** Can we run the same repository test suite that we use for
  *           embedded tests? (BigdataSparqlTest). This would mean having a test
  *           suite class so we can use it from another maven project.
@@ -1033,7 +1036,7 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
       public void test_tx_begin_addStatement_commit() throws RepositoryException,
             MalformedQueryException, UpdateExecutionException {
          
-if(true) return; // FIXME TEST DISABLED
+if(true) return; // FIXME (***) TX TEST DISABLED
 
          assertFalse(cxn.isActive());
 
@@ -1085,7 +1088,7 @@ if(true) return; // FIXME TEST DISABLED
       public void test_tx_begin_UPDATE_commit() throws RepositoryException,
             MalformedQueryException, UpdateExecutionException {
 
-if(true) return; // FIXME TEST DISABLED
+if(true) return; // FIXME (***) TX TEST DISABLED
 
          assertFalse(cxn.isActive());
 

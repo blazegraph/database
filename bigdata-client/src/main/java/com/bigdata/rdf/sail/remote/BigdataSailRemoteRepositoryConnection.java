@@ -1001,27 +1001,31 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 	}
 
 	@Override
-	public void exportStatements(Resource s, URI p, Value o,
-			boolean includeInferred, RDFHandler handler, Resource... c)
-			throws RepositoryException, RDFHandlerException {
+    public void exportStatements(final Resource s, final URI p, final Value o,
+            final boolean includeInferred, final RDFHandler handler,
+            final Resource... c) throws RepositoryException,
+            RDFHandlerException {
 
-		try {
-			
-			final RemoteRepository remote = repo.getRemoteRepository();
-			
-			final GraphQueryResult src = 
-					remote.getStatements(s, p, o, includeInferred, c);
-			
-			handler.startRDF();
-			while (src.hasNext()) {
-				handler.handleStatement(src.next());
-			}
-			handler.endRDF();
+        try {
+
+            final RemoteRepository remote = repo.getRemoteRepository();
+
+            final GraphQueryResult src = remote.getStatements(s, p, o,
+                    includeInferred, c);
+            try {
+                handler.startRDF();
+                while (src.hasNext()) {
+                    handler.handleStatement(src.next());
+                }
+                handler.endRDF();
+            } finally {
+                src.close();
+            }
 			
 		} catch (Exception ex) {
 			
 			throw new RepositoryException(ex);
-			
+
 		}
 		
 	}

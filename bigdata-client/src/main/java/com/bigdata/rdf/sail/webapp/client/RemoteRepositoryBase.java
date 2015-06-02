@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.model.impl.GraphImpl;
+import org.openrdf.model.impl.LinkedHashModel;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.rio.RDFFormat;
@@ -129,7 +129,7 @@ public class RemoteRepositoryBase extends RemoteRepositoryDecls {
     */
    static public Graph asGraph(final GraphQueryResult result) throws Exception {
 
-       final Graph g = new GraphImpl();
+       final Graph g = new LinkedHashModel();
 
        while (result.hasNext()) {
 
