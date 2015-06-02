@@ -466,29 +466,27 @@ public abstract class BigdataGraph implements Graph {
      */
     public void setProperty(final URI s, final String prop, final Object val) {
 
-        setProperty(s, factory.toPropertyURI(prop), toLiterals(val));
-        
-    }
-    
-    protected Collection<Literal> toLiterals(final Object val) {
-        
-        final Collection<Literal> literals = new LinkedList<Literal>();
-        
         if (val instanceof Collection) {
             
             @SuppressWarnings("unchecked")
             final Collection<Object> vals = (Collection<Object>) val;
                     
+            final Collection<Literal> literals = new LinkedList<Literal>();
+            
             for (Object o : vals) {
                 
                 literals.add(factory.toLiteral(o));
                 
             }
             
+            setProperty(s, factory.toPropertyURI(prop), literals);
+            
         } else if (val.getClass().isArray()) {
 
             final int len = Array.getLength(val);
 
+            final Collection<Literal> literals = new LinkedList<Literal>();
+            
             for (int i = 0; i < len; i++) {
                 
                 final Object o = Array.get(val, i);
@@ -497,14 +495,14 @@ public abstract class BigdataGraph implements Graph {
                 
             }
             
+            setProperty(s, factory.toPropertyURI(prop), literals);
+            
         } else {
         
-            literals.add(factory.toLiteral(val));
+            setProperty(s, factory.toPropertyURI(prop), factory.toLiteral(val));
             
         }
-        
-        return literals;
-        
+
     }
     
     /**
@@ -628,26 +626,6 @@ public abstract class BigdataGraph implements Graph {
     public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
             final String label) {
         
-        return addEdge(key, from, to, label, false);
-        
-    }
-        
-    /**
-     * Add an edge.
-     */
-    public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
-            final boolean anonymous) {
-        
-        return addEdge(key, from, to, null, anonymous);
-        
-    }
-        
-    /**
-     * Add an edge.
-     */
-    public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
-            final String label, final boolean anonymous) {
-        
         if (log.isInfoEnabled())
             log.info("("+key+", "+from+", "+to+", "+label+")");
         
@@ -688,13 +666,14 @@ public abstract class BigdataGraph implements Graph {
             final RepositoryConnection cxn = getWriteConnection();
             
             cxn.add(fromURI, edgeURI, toURI);
-            
             if (label != null) {
-                cxn.add(edgeURI, LABEL, factory.toLiteral(label));
-            }
-            
-            if (!anonymous) {
+                /*
+                 * TODO FIXME Add an "anonymous" argument to specify that we
+                 * don't want the (e, TYPE, EDGE) statement rather than
+                 * bundling that decision with a null label. 
+                 */
                 cxn.add(edgeURI, TYPE, EDGE);
+                cxn.add(edgeURI, LABEL, factory.toLiteral(label));
             }
             
             return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
@@ -1905,17 +1884,14 @@ public abstract class BigdataGraph implements Graph {
         public void close() {
             try {
                 it.close();
-            } catch (RuntimeException ex) {
-                throw ex;
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            } finally {
-                if (cxn != null) {
-                    try {
-                        cxn.close();
-                    } catch (RepositoryException e) {
-                        log.warn("Could not close connection");
-                    }
+            } catch (Exception e) {
+                log.warn("Could not close result");
+            }
+            if (cxn != null) {
+                try {
+                    cxn.close();
+                } catch (RepositoryException e) {
+                    log.warn("Could not close connection");
                 }
             }
         }
