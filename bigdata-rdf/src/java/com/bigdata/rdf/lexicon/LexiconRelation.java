@@ -1772,11 +1772,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             
         }
         
-        /*
-         * Because we sometimes text index inline literals we can't  
-         * assume we're done just because nunknown == 0. 
-         */
-        if (nunknown == 0 && textIndex.isEmpty()) {
+        if (nunknown == 0) {
 
             return 0;
 
