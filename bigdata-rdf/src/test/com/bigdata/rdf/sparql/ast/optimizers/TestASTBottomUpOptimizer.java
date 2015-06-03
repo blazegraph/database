@@ -1045,7 +1045,7 @@ public class TestASTBottomUpOptimizer extends
      * <pre>
      * PREFIX : <http://example/>
      * SELECT ?v
-     * { :x :p ?v . { FILTER(?v = 1) } }
+     * { :x :p ?v . { FILTER(?v = "x") } }
      * </pre>
      * 
      * @throws MalformedQueryException
@@ -1057,7 +1057,7 @@ public class TestASTBottomUpOptimizer extends
         final String queryStr = "" + //
                 "PREFIX : <http://example/>\n" + //
                 "SELECT ?v \n" +//
-                "{ :x :p ?v . { FILTER(?v = 1) } }";
+                "{ :x :p ?v . { FILTER(?v = \"x\") } }";
         
         /*
          * Add the Values used in the query to the lexicon. This makes it
@@ -1067,7 +1067,8 @@ public class TestASTBottomUpOptimizer extends
         final BigdataValueFactory f = store.getValueFactory();
         final BigdataURI x = f.createURI("http://example/x");
         final BigdataURI p = f.createURI("http://example/p");
-        final BigdataValue[] values = new BigdataValue[] { x, p };
+        final BigdataLiteral one = f.createLiteral("x");
+        final BigdataValue[] values = new BigdataValue[] { x, p, one };
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
@@ -1078,8 +1079,6 @@ public class TestASTBottomUpOptimizer extends
     
         QueryRoot queryRoot = astContainer.getOriginalAST();
 
-        final QueryRoot expected = BOpUtility.deepCopy(queryRoot);
-        
         /*
          * A single solution with [v] bound. The value of the binding does not
          * matter. The presence of the binding is what is critical.  Since [v]
@@ -1097,7 +1096,13 @@ public class TestASTBottomUpOptimizer extends
                 context, new QueryNodeWithBindingSet(queryRoot, bindingSets)).
                 getQueryNode();
 
-        diff(expected, queryRoot);
+        final JoinGroupNode filterParent =
+              (JoinGroupNode)queryRoot.getWhereClause().args().get(1);
+        FilterNode filter = (FilterNode)filterParent.args().get(0);
+        VarNode var = (VarNode)filter.get(0).get(0);
+        IVariable<IV> iVar = var.getValueExpression();
+        
+        assertTrue(iVar.getName().equals("-unbound-var-v-0"));
 
     }
 
