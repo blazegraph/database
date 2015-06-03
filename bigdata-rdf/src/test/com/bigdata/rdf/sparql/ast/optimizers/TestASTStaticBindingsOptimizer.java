@@ -42,7 +42,6 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
@@ -52,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -149,8 +149,8 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
              new AST2BOpContext(new ASTContainer(given), store);
        
        final IQueryNode actual = 
-          rewriter.optimize(context, given/* queryNode */, bsets).
-             getOptimizedQueryNode();
+          rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsets)).
+             getQueryNode();
 
        assertSameAST(expected, actual);
 
@@ -234,8 +234,8 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
              new AST2BOpContext(new ASTContainer(given), store);
        
        final IQueryNode actual = 
-          rewriter.optimize(context, given/* queryNode */, bsets)
-            .getOptimizedQueryNode();
+          rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsets))
+            .getQueryNode();
 
        assertSameAST(expected, actual);
        
@@ -314,16 +314,16 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       final AST2BOpContext context = 
             new AST2BOpContext(new ASTContainer(given), store);
       
-      final ASTOptimizerResult res = 
-         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       // assert that the bindings set has been modified as expected
-      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      IBindingSet[] resBs = res.getBindingSets();
       assertTrue(resBs.length==1);
       assertTrue(resBs[0].size()==1);
       assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTest)));
       
-      assertSameAST(expected, res.getOptimizedQueryNode());
+      assertSameAST(expected, res.getQueryNode());
    }
    
    /**
@@ -404,16 +404,16 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       final AST2BOpContext context = 
             new AST2BOpContext(new ASTContainer(given), store);
       
-      final ASTOptimizerResult res = 
-         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       // assert that the bindings set has been modified as expected
-      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      IBindingSet[] resBs = res.getBindingSets();
       assertTrue(resBs.length==1);
       assertTrue(resBs[0].size()==1);
       assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTest)));
       
-      assertSameAST(expected, res.getOptimizedQueryNode());
+      assertSameAST(expected, res.getQueryNode());
    }
    
    /**
@@ -494,16 +494,16 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       final AST2BOpContext context = 
             new AST2BOpContext(new ASTContainer(given), store);
       
-      final ASTOptimizerResult res = 
-         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       // assert that the bindings set has been modified as expected
-      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      IBindingSet[] resBs = res.getBindingSets();
       assertTrue(resBs.length==1);
       assertTrue(resBs[0].size()==1);
       assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTest)));
       
-      assertSameAST(expected, res.getOptimizedQueryNode());
+      assertSameAST(expected, res.getQueryNode());
    }
    
    /**
@@ -590,16 +590,16 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       final AST2BOpContext context = 
             new AST2BOpContext(new ASTContainer(given), store);
       
-      final ASTOptimizerResult res = 
-         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       // assert that the bindings set has been modified as expected
-      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      IBindingSet[] resBs = res.getBindingSets();
       assertTrue(resBs.length==1);
       assertTrue(resBs[0].size()==1);
       assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTest)));
       
-      assertSameAST(expected, res.getOptimizedQueryNode());    
+      assertSameAST(expected, res.getQueryNode());    
    }
    
    /**
@@ -684,16 +684,16 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       final AST2BOpContext context = 
             new AST2BOpContext(new ASTContainer(given), store);
       
-      final ASTOptimizerResult res = 
-         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       // assert that the bindings set has been modified as expected
-      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      IBindingSet[] resBs = res.getBindingSets();
       assertTrue(resBs.length==1);
       assertTrue(resBs[0].size()==1);
       assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTest)));
       
-      assertSameAST(expected, res.getOptimizedQueryNode());
+      assertSameAST(expected, res.getQueryNode());
    }
    
 
@@ -766,17 +766,17 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       final AST2BOpContext context = 
             new AST2BOpContext(new ASTContainer(given), store);
       
-      final ASTOptimizerResult res = 
-         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       // assert that the bindings set has been modified as expected
-      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      IBindingSet[] resBs = res.getBindingSets();
       assertTrue(resBs.length==1);
       assertTrue(resBs[0].size()==2);
       assertTrue(resBs[0].get(Var.var("s")).equals(new Constant<IV>(cFalse)));
       assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTrue)));
       
-      assertSameAST(expected, res.getOptimizedQueryNode());      
+      assertSameAST(expected, res.getQueryNode());      
    }
 
    public void testMergeWithComplexExogeneousMapping() {
@@ -919,8 +919,8 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
          final AST2BOpContext context = 
                new AST2BOpContext(new ASTContainer(given), store);
          
-         final ASTOptimizerResult res = 
-            rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+         final QueryNodeWithBindingSet res = 
+            rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
 
       /*
        * Verify that the resulting binding set is:
@@ -930,7 +930,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
        */
          
          // assert that the bindings set has been modified as expected
-         IBindingSet[] resBs = res.getOptimizedBindingSet();
+         IBindingSet[] resBs = res.getBindingSets();
          
          final IBindingSet bs1 = resBs[0];
          assertTrue(bs1.size()==5);
@@ -948,7 +948,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
          assertTrue(bs2.get(Var.var("d")).equals(new Constant<IV>(d2Lit)));
          assertTrue(bs2.get(Var.var("e")).equals(new Constant<IV>(eLit)));
         
-         assertSameAST(expected, res.getOptimizedQueryNode());    
+         assertSameAST(expected, res.getQueryNode());    
    }
 
    /**
@@ -1037,7 +1037,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
             new AST2BOpContext(new ASTContainer(given), store);
 
       final IQueryNode actual = rewriter.optimize(
-         context, given/* queryNode */, bsets).getOptimizedQueryNode();
+         context, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
       assertSameAST(expected, actual);
    }
@@ -1122,8 +1122,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
             new AST2BOpContext(new ASTContainer(given), store);
       
       final IQueryNode actual = rewriter.optimize(
-         context, given/* queryNode */, bsets)
-           .getOptimizedQueryNode();
+         context, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
       assertSameAST(expected, actual);
    }
@@ -1192,8 +1191,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
             new AST2BOpContext(new ASTContainer(given), store);
       
       final IQueryNode actual = rewriter.optimize(
-         context, given/* queryNode */, bsets)
-           .getOptimizedQueryNode();
+         context, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
       assertSameAST(expected, actual);
    }
@@ -1268,8 +1266,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
              new AST2BOpContext(new ASTContainer(given), store);
 
        final IQueryNode actual = rewriter.optimize(
-          context, given/* queryNode */, bsets)
-             .getOptimizedQueryNode();
+          context, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
        assertSameAST(expected, actual);
    }
@@ -1336,8 +1333,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
             new AST2BOpContext(new ASTContainer(given), store);
 
       final IQueryNode actual = rewriter.optimize(
-         context, given/* queryNode */, bsets)
-            .getOptimizedQueryNode();
+         context, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
       assertSameAST(expected, actual);
   }
@@ -1499,8 +1495,9 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
          final AST2BOpContext context = 
                new AST2BOpContext(new ASTContainer(given), store);
          
-         final ASTOptimizerResult res = 
-            rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+         final QueryNodeWithBindingSet res = 
+            rewriter.optimize(context, 
+               new QueryNodeWithBindingSet(given, bsetsGiven));
    
       /*
        * Verify that the resulting binding set is:
@@ -1510,7 +1507,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
        */
          
          // assert that the bindings set has been modified as expected
-         IBindingSet[] resBs = res.getOptimizedBindingSet();
+         IBindingSet[] resBs = res.getBindingSets();
          
          final IBindingSet bs1 = resBs[0];
          assertTrue(bs1.size()==5);
@@ -1528,7 +1525,7 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
          assertTrue(bs2.get(Var.var("d")).equals(new Constant<IV>(d2Lit)));
          assertTrue(bs2.get(Var.var("e")).equals(new Constant<IV>(eLit)));
         
-         assertSameAST(expected, res.getOptimizedQueryNode());    
+         assertSameAST(expected, res.getQueryNode());    
    }
 
    // TOOD: test inline in subquery

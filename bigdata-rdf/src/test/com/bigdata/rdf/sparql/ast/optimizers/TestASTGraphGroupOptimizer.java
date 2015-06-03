@@ -43,6 +43,7 @@ import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -124,12 +125,14 @@ public class TestASTGraphGroupOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         queryRoot = BOpUtility.deepCopy(queryRoot);
         
         queryRoot = (QueryRoot) new ASTGraphGroupOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+              context, new QueryNodeWithBindingSet(queryRoot, null)).
+              getQueryNode();
 
         /*
          * Create the expected AST.
@@ -219,12 +222,14 @@ public class TestASTGraphGroupOptimizer extends
        QueryRoot queryRoot = astContainer.getOriginalAST();
        
        queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-               context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+             context, new QueryNodeWithBindingSet(queryRoot, null)).
+             getQueryNode();
 
        queryRoot = BOpUtility.deepCopy(queryRoot);
        
        queryRoot = (QueryRoot) new ASTGraphGroupOptimizer().optimize(
-               context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+             context, new QueryNodeWithBindingSet(queryRoot, null)).
+             getQueryNode();
 
        /*
         * Create the expected AST.
@@ -307,7 +312,7 @@ public class TestASTGraphGroupOptimizer extends
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
         new ASTGraphGroupOptimizer().optimize(context,
-                astContainer.getOriginalAST(), null/* bindingSets */);
+              new QueryNodeWithBindingSet(astContainer.getOriginalAST(), null));
 
     }
 
@@ -339,7 +344,7 @@ public class TestASTGraphGroupOptimizer extends
         try {
 
             new ASTGraphGroupOptimizer().optimize(context,
-                    astContainer.getOriginalAST(), null/* bindingSets */);
+                  new QueryNodeWithBindingSet(astContainer.getOriginalAST(), null));            
             
             fail("Expecting: " + InvalidGraphContextException.class);
             

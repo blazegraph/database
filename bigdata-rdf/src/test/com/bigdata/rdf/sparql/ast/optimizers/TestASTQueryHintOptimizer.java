@@ -53,6 +53,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -342,7 +343,7 @@ public class TestASTQueryHintOptimizer extends
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
         
@@ -519,7 +520,7 @@ public class TestASTQueryHintOptimizer extends
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -655,7 +656,7 @@ public class TestASTQueryHintOptimizer extends
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -809,7 +810,7 @@ public class TestASTQueryHintOptimizer extends
         context.mergeJoin = false;
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         // Verify true after.
         assertTrue(context.nativeDistinctSolutions);
@@ -942,7 +943,7 @@ public class TestASTQueryHintOptimizer extends
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1083,7 +1084,7 @@ public class TestASTQueryHintOptimizer extends
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 

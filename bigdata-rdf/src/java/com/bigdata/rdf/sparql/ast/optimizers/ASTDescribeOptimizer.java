@@ -35,7 +35,6 @@ import org.openrdf.model.vocabulary.RDF;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
@@ -45,7 +44,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -103,16 +102,18 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
     
 	@SuppressWarnings("unchecked")
     @Override
-	public ASTOptimizerResult optimize(final AST2BOpContext context, 
-			final IQueryNode queryNode, //final DatasetNode dataset, 
-			final IBindingSet[] bindingSet) {
+	public QueryNodeWithBindingSet optimize(
+      final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+      final IQueryNode queryNode = input.getQueryNode();
+      final IBindingSet[] bindingSet = input.getBindingSets();     
 		
 		final QueryRoot queryRoot = (QueryRoot) queryNode;
 		
 		if (queryRoot.getQueryType() != QueryType.DESCRIBE) {
 			
 		    // Not a query that we will rewrite.
-		   return new ASTOptimizerResult(queryRoot, bindingSet);
+		   return new QueryNodeWithBindingSet(queryRoot, bindingSet);
 		    
 		}
 
@@ -322,7 +323,7 @@ public class ASTDescribeOptimizer implements IASTOptimizer {
 			
 		}
 		
-		return new ASTOptimizerResult(queryRoot, bindingSet);
+		return new QueryNodeWithBindingSet(queryRoot, bindingSet);
 		
 	}
 	

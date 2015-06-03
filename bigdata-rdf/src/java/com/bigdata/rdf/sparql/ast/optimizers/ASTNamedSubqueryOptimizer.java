@@ -42,12 +42,12 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryBase;
@@ -85,8 +85,11 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
      *             given named solution set.
      */
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSet) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSet = input.getBindingSets();     
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -96,7 +99,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
         if (namedSubqueries == null || namedSubqueries.isEmpty()) {
 
             // NOP.
-           return new ASTOptimizerResult(queryRoot, bindingSet);
+           return new QueryNodeWithBindingSet(queryRoot, bindingSet);
 
         }
 
@@ -126,7 +129,7 @@ public class ASTNamedSubqueryOptimizer implements IASTOptimizer {
          */
         assignJoinVars(queryRoot, context, namedSubqueries, allIncludes);
 
-        return new ASTOptimizerResult(queryRoot, bindingSet);
+        return new QueryNodeWithBindingSet(queryRoot, bindingSet);
 
     }
 

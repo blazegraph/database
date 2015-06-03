@@ -39,9 +39,9 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -65,9 +65,12 @@ public class ASTBatchResolveTermsOptimizer implements IASTOptimizer {
 			.getLogger(ASTBatchResolveTermsOptimizer.class);
 	
 	@Override
-	public ASTOptimizerResult optimize(final AST2BOpContext context,
-			final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+	public QueryNodeWithBindingSet optimize(
+	      final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+      final IQueryNode queryNode = input.getQueryNode();
+      final IBindingSet[] bindingSets = input.getBindingSets();
+	   
 		/*
 		 * Look for unknown terms and attempt to resolve them now.
 		 */
@@ -216,7 +219,7 @@ public class ASTBatchResolveTermsOptimizer implements IASTOptimizer {
 
 		}
 
-		return new ASTOptimizerResult(queryNode, bindingSets);
+		return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
 	}
 

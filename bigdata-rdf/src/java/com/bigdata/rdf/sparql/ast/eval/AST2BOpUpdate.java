@@ -114,6 +114,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QuadData;
 import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -267,8 +268,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 				 * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
 				 */
 				op = (Update) new ASTBatchResolveTermsOptimizer().optimize(context,
-						op/* queryNode */, context.getBindings()/* bindingSets */)
-						.getOptimizedQueryNode();
+				      new QueryNodeWithBindingSet(op, context.getBindings()))
+						.getQueryNode();
 
 			}
 			

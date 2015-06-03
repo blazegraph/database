@@ -106,7 +106,6 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ASTUtil;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -136,6 +135,7 @@ import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.RangeNode;
@@ -234,11 +234,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
         ctx.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         // Run the AST query rewrites / query optimizers.
-        final ASTOptimizerResult optRes = 
-           ctx.optimizers.optimize(ctx, originalQuery, bindingSets);
+        final QueryNodeWithBindingSet optRes = 
+           ctx.optimizers.optimize(ctx, 
+                 new QueryNodeWithBindingSet(originalQuery, bindingSets));
         
         // Set the optimized AST model on the container.
-        final QueryRoot optimizedQuery = (QueryRoot)optRes.getOptimizedQueryNode();
+        final QueryRoot optimizedQuery = (QueryRoot)optRes.getQueryNode();
         astContainer.setOptimizedAST(optimizedQuery);
         
         // Final static analysis object for the optimized query.
@@ -281,7 +282,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         astContainer.setQueryPlan(left);
         
         // Set the optimized binding set on the container.
-        astContainer.setQueryPlanBS(optRes.getOptimizedBindingSet());
+        astContainer.setOptimizedASTBindingSet(optRes.getBindingSets());
 
         if (log.isInfoEnabled()) {
             log.info(astContainer);

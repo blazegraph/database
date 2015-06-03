@@ -34,7 +34,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleBindingsOptimizer;
 import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
