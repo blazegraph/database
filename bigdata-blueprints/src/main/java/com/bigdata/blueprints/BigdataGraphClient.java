@@ -246,8 +246,15 @@ public class BigdataGraphClient extends BigdataGraph {
 
 	@Override
 	public Collection<RunningQuery> getRunningQueries() {
-		//TODO:  Implement for REST API
-		return null;
+		try {
+			return this.repo.showQueries();
+		} catch (Exception e) {
+			if(log.isDebugEnabled()){
+				log.debug(e);
+			}
+		}
+		
+		throw new RuntimeException("Error while showing queries.");
 	}
 
 	@Override
