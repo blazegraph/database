@@ -490,8 +490,8 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                      return;
                   
                   bs.set(
-                     (IVariable<IV>)((VarNode)right.getValueExpression()),
-                     ((ConstantNode) left).getValueExpression());
+                     (IVariable)right.getValueExpression(),
+                     (IConstant)left.getValueExpression());
 
                }
                
