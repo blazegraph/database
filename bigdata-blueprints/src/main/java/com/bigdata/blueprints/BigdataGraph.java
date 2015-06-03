@@ -1789,9 +1789,15 @@ public abstract class BigdataGraph implements Graph {
      * @see {@link AbstractTripleStore.Options#RDR_HISTORY_CLASS}
      * @see {@link RDRHistory}
      */
-    @SuppressWarnings("unchecked")
     public ICloseableIterator<BigdataGraphEdit> history(final List<URI> ids) 
             throws Exception {
+    	final String randomUUID = UUID.randomUUID().toString();
+    	return history(ids, randomUUID);
+    }
+
+    @SuppressWarnings("unchecked")
+	public ICloseableIterator<BigdataGraphEdit> history(final List<URI> ids,
+			final String extQueryId)            throws Exception {
         
 //        final List<URI> ids = new LinkedList<URI>();
 //        for (Object id : vertexIds) {
@@ -1802,6 +1808,8 @@ public abstract class BigdataGraph implements Graph {
 //        }
         
         final StringBuilder sb = new StringBuilder(HISTORY_TEMPLATE);
+        
+        UUID queryId = null;
         
         if (ids.size() > 0) {
             final StringBuilder vc = new StringBuilder();
@@ -1826,6 +1834,15 @@ public abstract class BigdataGraph implements Graph {
         final TupleQuery query = (TupleQuery) 
                 cxn.prepareTupleQuery(QueryLanguage.SPARQL, queryStr);
         
+        if (query instanceof BigdataSailTupleQuery
+				&& cxn instanceof BigdataSailRepositoryConnection) {
+
+			final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
+			queryId = setupQuery((BigdataSailRepositoryConnection) cxn,
+					bdtq.getASTContainer(), QueryType.SELECT,
+					extQueryId);
+		}
+        
         if (sparqlLog.isTraceEnabled()) {
             if (query instanceof BigdataSailTupleQuery) {
                 final BigdataSailTupleQuery bdtq = (BigdataSailTupleQuery) query;
@@ -1836,7 +1853,7 @@ public abstract class BigdataGraph implements Graph {
         final TupleQueryResult result = query.evaluate();
         
         final IStriterator sitr = new Striterator(new WrappedResult<BindingSet>(
-                result, readFromWriteConnection ? null : cxn
+                result, readFromWriteConnection ? null : cxn, queryId
                 ));
         
         sitr.addFilter(new Resolver() {

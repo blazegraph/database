@@ -664,14 +664,14 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         final long begin = System.nanoTime();
 
         // Figure out the UUID under which the query will execute.
-		final UUID queryId2 = setQueryId(astContainer, UUID.randomUUID());
+		final UUID queryUuid = setQueryId(astContainer, UUID.randomUUID());
 		
 		//Set to UUID of internal ID if it is null.
-		final String extQueryId = extId == null?queryId2.toString():extId;
+		final String extQueryId = extId == null?queryUuid.toString():extId;
 		
 		if (log.isDebugEnabled() && extId == null) {
 			log.debug("Received null external query ID.  Using "
-					+ queryId2.toString());
+					+ queryUuid.toString());
 		}
 		
 		final boolean isUpdateQuery = queryType != QueryType.ASK
@@ -679,21 +679,21 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 				&& queryType != QueryType.DESCRIBE
 				&& queryType != QueryType.SELECT;
         
-        final RunningQuery r = new RunningQuery(extQueryId, queryId2, begin, isUpdateQuery);
+        final RunningQuery r = new RunningQuery(extQueryId, queryUuid, begin, isUpdateQuery);
 
         // Stuff it in the maps of running queries.
         m_queries.put(extQueryId, r);
-        m_queries2.put(queryId2, r);
+        m_queries2.put(queryUuid, r);
         
 		if (log.isDebugEnabled()) {
 			log.debug("Setup Query (External ID, UUID):  ( " + extQueryId
-					+ " , " + queryId2 + " )");
-			log.debug("External query for " + queryId2 + " is :\n"
-					+ getQueryById(queryId2).getExtQueryId());
+					+ " , " + queryUuid + " )");
+			log.debug("External query for " + queryUuid + " is :\n"
+					+ getQueryById(queryUuid).getExtQueryId());
 			log.debug(runningQueriesToString());
 		}
 
-        return queryId2;
+        return queryUuid;
         
     }
      
@@ -711,23 +711,23 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	 * @param query
 	 *            The query.
 	 * 
-	 * @param queryId2
+	 * @param queryUuid
 	 * 
 	 * @return The {@link UUID} which will be associated with the
 	 *         {@link IRunningQuery} and never <code>null</code>.
 	 */
-	protected UUID setQueryId(final ASTContainer astContainer, UUID queryId2) {
+	protected UUID setQueryId(final ASTContainer astContainer, UUID queryUuid) {
 
 		// Figure out the effective UUID under which the query will run.
 		final String queryIdStr = astContainer.getQueryHint(QueryHints.QUERYID);
 		if (queryIdStr == null) {
 			// Not specified, so generate and set on query hint.
-			queryId2 = UUID.randomUUID();
+			queryUuid = UUID.randomUUID();
 		} 
 
-		astContainer.setQueryHint(QueryHints.QUERYID, queryId2.toString());
+		astContainer.setQueryHint(QueryHints.QUERYID, queryUuid.toString());
 
-		return queryId2;
+		return queryUuid;
 	}
 
 	/**
@@ -736,7 +736,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	 * {@link #queryService} is blocking).
 	 * <p>
 	 * Note: This includes both SPARQL QUERY and SPARQL UPDATE requests.
-	 * However, the {@link AbstractQueryTask#queryId2} might not yet be bound
+	 * However, the {@link AbstractQueryTask#queryUuid} might not yet be bound
 	 * since it is not set until the request begins to execute. See
 	 * {@link AbstractQueryTask#setQueryId(ASTContainer)}.
 	 */
@@ -753,12 +753,12 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	 * are not executed on the {@link QueryEngine} and hence we can not use
 	 * {@link QueryEngine#getRunningQuery(UUID)} to resolve the {@link Future}
 	 */
-	private static final ConcurrentHashMap<UUID/* queryId2 */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
+	private static final ConcurrentHashMap<UUID/* queryUuid */, RunningQuery> m_queries2 = new ConcurrentHashMap<UUID, RunningQuery>();
 
 	
-	public RunningQuery getQueryById(final UUID queryId2) {
+	public RunningQuery getQueryById(final UUID queryUuid) {
 
-		return m_queries2.get(queryId2);
+		return m_queries2.get(queryUuid);
 
 	}
 
