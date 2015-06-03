@@ -50,6 +50,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.LinkedHashModel;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
@@ -1028,12 +1029,13 @@ public class QueryServlet extends BigdataRDFServlet {
             if (q != null) {
 
                 final QueryRoot optimizedAST = astContainer.getOptimizedAST();
+                final IBindingSet[] bs = astContainer.getOptimizedASTBindingSet();
 
                 if (optimizedAST != null) {
 
                     current.node("h2", "Optimized AST");
 
-                    current.node("pre", optimizedAST.toString());
+                    current.node("pre", optimizedAST.toString(0, bs));
 
                 }
 
