@@ -50,6 +50,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
+import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -388,7 +389,22 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
             final AssignmentNode an = (AssignmentNode)child;
             final IValueExpression<?> ve = an.getValueExpression();
             
-            if (ve instanceof IConstant) {
+            /**
+             * We apply the optimization in case (i) the value expression is a 
+             * constant that is (ii) represented through a ConstantNode. Note
+             * that value expressions not represented through ConstantNodes
+             * (such as, e.g., CONCAT("a", "b") in principle are amenable to
+             * the optimization as well, but their constructed values have not
+             * yet been joined against the dictionary and later joins might
+             * fail. We could add this dictionary resolving step for the
+             * constructed static bindings (i.e., the exogeneous bindings),
+             * but this is something we'd need to do before applying the
+             * inlining. For now, this is out of scope. Maybe a simpler to
+             * implement strategy would be to resolve these nodes in a prior
+             * phase and look them up, then leaving this code here unchanged.
+             **/
+            if (ve instanceof IConstant && 
+                  an.args().get(1) instanceof ConstantNode) {
 
                IVariable<?> boundVar = an.getVar();
                
