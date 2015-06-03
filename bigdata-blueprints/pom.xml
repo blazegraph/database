@@ -140,6 +140,7 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-war</artifactId>
       <version>${bigdata.version}</version>
+      <type>war</type>
       <scope>test</scope>
     </dependency>
     <dependency>
