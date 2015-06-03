@@ -26,6 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.Constant;
@@ -41,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AbstractASTEvaluationTestCase;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
+import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -244,14 +249,14 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
     * Given
     * 
     * <pre>
-    * SELECT ?p where { BIND(CONST AS ?p) . ?s ?p ?s }
+    * SELECT ?s where { BIND(CONST AS ?p) . ?s ?p ?s }
     * </pre>
     * 
     * and a binding for <code>?s</code> in an input solution, verify that the
     * AST is rewritten as:
     * 
     * <pre>
-    * SELECT ?p where { ?s CONST ?s }
+    * SELECT ?s where { ?s CONST ?s }
     * </pre>
     * 
     * where CONST is the binding for <code>?p</code> in the input solution
@@ -329,14 +334,14 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
     * Given
     * 
     * <pre>
-    * SELECT ?p where { { BIND(CONST AS ?p) . ?s ?p ?s } }
+    * SELECT ?s where { { BIND(CONST AS ?p) . ?s ?p ?s } }
     * </pre>
     * 
     * and a binding for <code>?s</code> in an input solution, verify that the
     * AST is rewritten as:
     * 
     * <pre>
-    * SELECT ?p where { { ?s CONST ?s } }
+    * SELECT ?s where { { ?s CONST ?s } }
     * </pre>
     * 
     * where CONST is the binding for <code>?p</code> in the input solution
@@ -419,14 +424,14 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
     * Given
     * 
     * <pre>
-    * SELECT ?p where { { BIND(CONST AS ?p) } ?s ?p ?s }
+    * SELECT ?s where { { BIND(CONST AS ?p) } ?s ?p ?s }
     * </pre>
     * 
     * and a binding for <code>?s</code> in an input solution, verify that the
     * AST is rewritten as:
     * 
     * <pre>
-    * SELECT ?p where { { } ?s CONST ?s }
+    * SELECT ?s where { { } ?s CONST ?s }
     * </pre>
     * 
     * where CONST is the binding for <code>?p</code> in the input solution
@@ -502,13 +507,99 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
    }
    
    /**
-    * Test inlining from BIND clause of static bindings from VALUES clause,
-    * including the removal of the clause and putting the values into the
-    * exogeneous mapping set.
+    * Test inlining from BIND clause of static bindings from top-level VALUES
+    * clause, including the removal of the clause and putting the values into 
+    * the exogeneous mapping set.
     * 
+    * Given
+    * 
+    * <pre>
+    * SELECT ?p where { ?s ?p ?s } VALUES ?p { CONST }
+    * </pre>
+    * 
+    * and a binding for <code>?s</code> in an input solution, verify that the
+    * AST is rewritten as:
+    * 
+    * <pre>
+    * SELECT ?p where { ?s CONST ?s }
+    * </pre>
+    * 
+    * where CONST is the binding for <code>?p</code> in the input solution
+    * and the exogeneous mapping { ?p -> CONST } is added. 
     */
    public void testInlineFromTopLevelValues() {
       
+      final IV cTest = makeIV(store.getValueFactory().createURI("http://www.test.com"));
+
+      final IBindingSet[] bsetsGiven = 
+         new IBindingSet[] { new ListBindingSet() };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          
+          projection.addProjectionVar(new VarNode("s"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          given.setWhereClause(whereClause);
+          
+          final IVariable<?> var = Var.var("p");
+          final LinkedHashSet<IVariable<?>> declaredVars =
+             new LinkedHashSet<IVariable<?>>();
+          declaredVars.add(var);
+          
+          final List<IBindingSet> bindingSets = new ArrayList<IBindingSet>();
+          IBindingSet bs = new ListBindingSet();
+          bs.set(var, new Constant<IV>(cTest));
+          bindingSets.add(bs);
+          
+          whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                  new VarNode("p"), new VarNode("o"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS));
+
+          final BindingsClause bc = new BindingsClause(declaredVars, bindingSets);
+          given.setBindingsClause(bc);
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          expected.setProjection(projection);
+
+          projection.addProjectionVar(new VarNode("s"));
+
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                  new ConstantNode(new Constant((IVariable) Var.var("p"),
+                          cTest)),
+                  new VarNode("o"), null/* c */, Scope.DEFAULT_CONTEXTS));
+          expected.setWhereClause(whereClause);
+
+      }
+      
+      final ASTStaticBindingsOptimizer rewriter = 
+         new ASTStaticBindingsOptimizer();
+      
+      
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final ASTOptimizerResult res = 
+         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+
+      // assert that the bindings set has been modified as expected
+      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      assertTrue(resBs.length==1);
+      assertTrue(resBs[0].size()==1);
+      assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTest)));
+      
+      assertSameAST(expected, res.getOptimizedQueryNode());    
    }
    
    /**
@@ -532,7 +623,6 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
     * where CONST is the binding for <code>?p</code> in the input solution
     * and the exogeneous mapping { ?p -> CONST } is added. 
     */
-
    public void testInlineFromValues() {
       final IV cTest = makeIV(store.getValueFactory().createURI("http://www.test.com"));
 
@@ -551,8 +641,18 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
           final JoinGroupNode whereClause = new JoinGroupNode();
           given.setWhereClause(whereClause);
           
-          whereClause.addChild(
-                new AssignmentNode(new VarNode("p"), new ConstantNode(cTest)));
+          final IVariable<?> var = Var.var("p");
+          final LinkedHashSet<IVariable<?>> declaredVars =
+             new LinkedHashSet<IVariable<?>>();
+          declaredVars.add(var);
+          
+          final List<IBindingSet> bindingSets = new ArrayList<IBindingSet>();
+          IBindingSet bs = new ListBindingSet();
+          bs.set(var, new Constant<IV>(cTest));
+          bindingSets.add(bs);
+          
+          final BindingsClause bc = new BindingsClause(declaredVars, bindingSets);
+          whereClause.addChild(bc);
           whereClause.addChild(new StatementPatternNode(new VarNode("s"),
                   new VarNode("p"), new VarNode("o"), null/* c */,
                   Scope.DEFAULT_CONTEXTS));
@@ -597,8 +697,86 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
    }
    
 
+   /**
+    * Test inlining from BIND clause of static bindings from top-level VALUES
+    * clause, including the removal of the clause and putting the values into
+    * the exogeneous mapping set.
+    * 
+    * Given
+    * 
+    * <pre>
+    * SELECT ?p where { BIND(1 AS ?p) }
+    * </pre>
+    * 
+    * and a binding for <code>?s</code> in an input solution, verify that the
+    * AST is rewritten as:
+    * 
+    * <pre>
+    * SELECT ?p where { }
+    * </pre>
+    * 
+    * and the exogeneous mapping is /extended/ by { ?p -> CONST }. 
+    */
    public void testMergeWithSimpleExogeneousMapping() {
       
+      final IV cFalse = makeIV(store.getValueFactory().createLiteral(false));
+      final IV cTrue = makeIV(store.getValueFactory().createLiteral(true));
+
+      final IBindingSet[] bsetsGiven = new IBindingSet[] { //
+            new ListBindingSet(//
+                    new IVariable[] { Var.var("s") },//
+                    new IConstant[] { new Constant<IV>(cFalse)}) //
+      };      
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          
+          projection.addProjectionVar(new VarNode("p"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.addChild(
+                new AssignmentNode(new VarNode("p"), new ConstantNode(cTrue)));
+          
+          given.setWhereClause(whereClause);
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection = new ProjectionNode();
+         expected.setProjection(projection);
+         
+         projection.addProjectionVar(new VarNode("p"));
+         
+         final JoinGroupNode whereClause = new JoinGroupNode();
+         expected.setWhereClause(whereClause);
+
+      }
+      
+      final ASTStaticBindingsOptimizer rewriter = 
+         new ASTStaticBindingsOptimizer();
+      
+      
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final ASTOptimizerResult res = 
+         rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+
+      // assert that the bindings set has been modified as expected
+      IBindingSet[] resBs = res.getOptimizedBindingSet();
+      assertTrue(resBs.length==1);
+      assertTrue(resBs[0].size()==2);
+      assertTrue(resBs[0].get(Var.var("s")).equals(new Constant<IV>(cFalse)));
+      assertTrue(resBs[0].get(Var.var("p")).equals(new Constant<IV>(cTrue)));
+      
+      assertSameAST(expected, res.getOptimizedQueryNode());      
    }
 
    public void testMergeWithComplexExogeneousMapping() {
@@ -608,9 +786,169 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
    /**
     * Assert that even for complex exogeneous mappings, variables that map
     * to the same value in all cases are inlined properly.
+    * 
+    * Given
+    * 
+    * <pre>
+    * SELECT ?p where { 
+    *   BIND("b" AS ?b) . 
+    *   VALUES (?c ?d) { ("c1" "d1") ("c2" "d2") } 
+    * } VALUES ?e { "e" }
+    * </pre>
+    * 
+    * and an exogeneous binding set 
+    * { { ?a -> "a1", ?c -> "c1" }, 
+    *   { ?a -> "a2", ?c -> "c2" }, 
+    *   { ?a -> "a3", ?c -> "c1" } } 
+    *   
+    * in an input solution, verify that the rewritten query is
+    * 
+    * <pre>
+    * SELECT ?p where { }
+    * </pre>
+    * 
+    * and that the resulting generated exogeneous binding set is:
+    * 
+    * { { ?a -> "a1", ?b -> "b", ?c -> "c1", ?d -> "d1", ?e -> "e" }, 
+    *   { ?a -> "a2", ?b -> "b", ?c -> "c2", ?d -> "d2", ?e -> "e" } }
+    * 
     */
    public void testInliningForComplexExogeneousMapping() {
       
+      final IV a1Lit = makeIV(store.getValueFactory().createLiteral("a1"));
+      final IV a2Lit = makeIV(store.getValueFactory().createLiteral("a2"));
+      final IV a3Lit = makeIV(store.getValueFactory().createLiteral("a3"));
+      final IV bLit = makeIV(store.getValueFactory().createLiteral("b"));
+      final IV c1Lit = makeIV(store.getValueFactory().createLiteral("c1"));
+      final IV c2Lit = makeIV(store.getValueFactory().createLiteral("c2"));
+      final IV c3Lit = makeIV(store.getValueFactory().createLiteral("c3"));
+      final IV d1Lit = makeIV(store.getValueFactory().createLiteral("d1"));
+      final IV d2Lit = makeIV(store.getValueFactory().createLiteral("d2"));
+      final IV eLit = makeIV(store.getValueFactory().createLiteral("e"));
+
+      /**
+       * Construct in mapping set:
+       * { { ?a -> "a1", ?c -> "c1" }, 
+       *   { ?a -> "a2", ?c -> "c2" }, 
+       *   { ?a -> "a3", ?c -> "c3" } } 
+       */
+      final IBindingSet exogeneousIn1 = new ListBindingSet();
+      exogeneousIn1.set(Var.var("a"), new Constant<IV>(a1Lit));
+      exogeneousIn1.set(Var.var("c"), new Constant<IV>(c1Lit));
+      final IBindingSet exogeneousIn2 = new ListBindingSet();
+      exogeneousIn2.set(Var.var("a"), new Constant<IV>(a2Lit));
+      exogeneousIn2.set(Var.var("c"), new Constant<IV>(c2Lit));
+      final IBindingSet exogeneousIn3 = new ListBindingSet();
+      exogeneousIn3.set(Var.var("a"), new Constant<IV>(a3Lit));
+      exogeneousIn3.set(Var.var("c"), new Constant<IV>(c3Lit));
+      final IBindingSet[] bsetsGiven =
+         new IBindingSet[] { exogeneousIn1, exogeneousIn2, exogeneousIn3 };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          
+          projection.addProjectionVar(new VarNode("p"));
+          
+          // BIND("b" AS ?b)
+          final AssignmentNode bAss = 
+             new AssignmentNode(new VarNode("b"), new ConstantNode(bLit));
+          
+          // VALUES ?e { "e" }
+          final LinkedHashSet<IVariable<?>> declaredVarsE = 
+             new LinkedHashSet<IVariable<?>>();
+          declaredVarsE.add(Var.var("e"));
+          
+          final List<IBindingSet> bindingSetsE = new ArrayList<IBindingSet>();
+          IBindingSet bsE = new ListBindingSet();
+          bsE.set(Var.var("e"), new Constant<IV>(eLit));
+          bindingSetsE.add(bsE);          
+          final BindingsClause eBindings = new BindingsClause(declaredVarsE, bindingSetsE);
+
+          // VALUES (?c ?d) { ("c1" "d1") ("c2" "d2") } 
+          final LinkedHashSet<IVariable<?>> declaredVarsBcd = 
+             new LinkedHashSet<IVariable<?>>();
+          declaredVarsE.add(Var.var("b"));
+          declaredVarsE.add(Var.var("c"));
+          declaredVarsE.add(Var.var("d"));
+          
+          final List<IBindingSet> bindingSetsCd = new ArrayList<IBindingSet>();
+          IBindingSet bsCd1 = new ListBindingSet();
+          bsCd1.set(Var.var("c"), new Constant<IV>(c1Lit));
+          bsCd1.set(Var.var("d"), new Constant<IV>(d1Lit));
+          bindingSetsCd.add(bsCd1);
+          
+          IBindingSet bsCd2 = new ListBindingSet();
+          bsCd2.set(Var.var("c"), new Constant<IV>(c2Lit));
+          bsCd2.set(Var.var("d"), new Constant<IV>(d2Lit));
+          bindingSetsCd.add(bsCd2);
+          
+          final BindingsClause bcdBindings =
+             new BindingsClause(declaredVarsBcd, bindingSetsCd);
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.addChild(bAss);
+          whereClause.addChild(bcdBindings);
+          given.setBindingsClause(eBindings);
+          
+          given.setWhereClause(whereClause);
+
+      }      
+      
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection = new ProjectionNode();
+         expected.setProjection(projection);
+         
+         projection.addProjectionVar(new VarNode("p"));
+         
+         final JoinGroupNode whereClause = new JoinGroupNode();
+         expected.setWhereClause(whereClause);
+
+      }
+      
+      final ASTStaticBindingsOptimizer rewriter = 
+            new ASTStaticBindingsOptimizer();
+         
+         
+         final AST2BOpContext context = 
+               new AST2BOpContext(new ASTContainer(given), store);
+         
+         final ASTOptimizerResult res = 
+            rewriter.optimize(context, given/* queryNode */, bsetsGiven);
+
+      /*
+       * Verify that the resulting binding set is:
+       * { { ?a -> "a1", ?b -> "b", ?c -> "c1", ?d -> "d1", ?e -> "e" }, 
+       *   { ?a -> "a2", ?b -> "b", ?c -> "c2", ?d -> "d2", ?e -> "e" } }
+       * 
+       */
+         
+         // assert that the bindings set has been modified as expected
+         IBindingSet[] resBs = res.getOptimizedBindingSet();
+         
+         final IBindingSet bs1 = resBs[0];
+         assertTrue(bs1.size()==5);
+         assertTrue(bs1.get(Var.var("a")).equals(new Constant<IV>(a1Lit)));
+         assertTrue(bs1.get(Var.var("b")).equals(new Constant<IV>(bLit)));
+         assertTrue(bs1.get(Var.var("c")).equals(new Constant<IV>(c1Lit)));
+         assertTrue(bs1.get(Var.var("d")).equals(new Constant<IV>(d1Lit)));
+         assertTrue(bs1.get(Var.var("e")).equals(new Constant<IV>(eLit)));
+         
+         final IBindingSet bs2 = resBs[1];
+         assertTrue(bs2.size()==5);
+         assertTrue(bs2.get(Var.var("a")).equals(new Constant<IV>(a2Lit)));
+         assertTrue(bs2.get(Var.var("b")).equals(new Constant<IV>(bLit)));
+         assertTrue(bs2.get(Var.var("c")).equals(new Constant<IV>(c2Lit)));
+         assertTrue(bs2.get(Var.var("d")).equals(new Constant<IV>(d2Lit)));
+         assertTrue(bs2.get(Var.var("e")).equals(new Constant<IV>(eLit)));
+        
+         assertSameAST(expected, res.getOptimizedQueryNode());    
    }
 
    /**
@@ -869,4 +1207,8 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
 
        assertSameAST(expected, actual);
    }
+   
+   // TOOD: test for FILTERs (constraints only)
+   
+
 }
