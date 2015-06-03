@@ -36,7 +36,6 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations;
 
 /**
  * The solutions declared by a BINDINGS clause.
@@ -59,12 +58,12 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
          * The ordered set of declared variables for which there MIGHT be a
          * binding in any given solution.
          */
-        public String DECLARED_VARS = "declaredVars";
+        String DECLARED_VARS = "declaredVars";
 
         /**
          * The binding sets.
          */
-        public String BINDING_SETS = "bindingSets";
+        String BINDING_SETS = "bindingSets";
 
     }
     
