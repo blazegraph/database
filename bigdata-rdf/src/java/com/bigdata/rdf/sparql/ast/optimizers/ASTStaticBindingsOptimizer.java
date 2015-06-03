@@ -50,7 +50,6 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
-import com.bigdata.rdf.sparql.ast.ComputedMaterializationRequirement;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -540,41 +539,47 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                final List<IBindingSet> bsList =
                      new ArrayList<IBindingSet>(arity-1);
                int i=0;
-               VarNode varNode = (VarNode)functionNode.get(i++);
-               final IVariable<IV> var = (IVariable<IV>)(varNode.getValueExpression());
 
-               // collect constants and check for literals
-               final List<IConstant> constants = new ArrayList<IConstant>();
-               boolean containsLiteral = false;
-               while (i<arity) {
+               final BOp varNodeCandidate = functionNode.get(i++);
+               if (varNodeCandidate instanceof VarNode) {
+                  final VarNode varNode = (VarNode)varNodeCandidate;
+                  final IVariable<IV> var = 
+                     (IVariable<IV>)(varNode.getValueExpression());
 
-                  final BOp inValue = functionNode.get(i++);
-                  if (inValue instanceof ConstantNode) {
-                     ConstantNode in = (ConstantNode)inValue;
-                     containsLiteral |= in.getValueExpression().get().isLiteral();
+                  // collect constants and check for literals
+                  final List<IConstant> constants = new ArrayList<IConstant>();
+                  boolean containsLiteral = false;
+                  while (i<arity) {
+
+                     final BOp inValue = functionNode.get(i++);
+                     if (inValue instanceof ConstantNode) {
+                        ConstantNode in = (ConstantNode)inValue;
+                        containsLiteral |= in.getValueExpression().get().isLiteral();
+                     }
                   }
+
+                  // we only perform changes if there's no literal
+                  if (!containsLiteral) {
+                     for (IConstant c : constants) {
+                        IBindingSet bs = new ListBindingSet();
+                        bs.set(var,c);
+                        bsList.add(bs);                        
+                     }
+            
+                     staticBindingInfo.addEnforced(bsList);
+                     
+                     final VariableUsageInfo usageInfo =
+                           VariableUsageInfo.merge(
+                              ancOrSelfVarUsageInfo, childVarUsageInfo);
+                        
+                     // add inline tasks for variable
+                     if (usageInfo.varUsed(var)) {
+                        inlineTasks.add(
+                           new InlineTasks(var, usageInfo.getVarUsages(var))); 
+                     }
+                  }                 
                }
 
-               // we only perform changes if there's no literal
-               if (!containsLiteral) {
-                  for (IConstant c : constants) {
-                     IBindingSet bs = new ListBindingSet();
-                     bs.set(var,c);
-                     bsList.add(bs);                        
-                  }
-         
-                  staticBindingInfo.addEnforced(bsList);
-                  
-                  final VariableUsageInfo usageInfo =
-                        VariableUsageInfo.merge(
-                           ancOrSelfVarUsageInfo, childVarUsageInfo);
-                     
-                  // add inline tasks for variable
-                  if (usageInfo.varUsed(var)) {
-                     inlineTasks.add(
-                        new InlineTasks(var, usageInfo.getVarUsages(var))); 
-                  }
-               } 
                
             } // else: there's nothing obvious we can do
 
