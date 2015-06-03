@@ -70,8 +70,8 @@ public class TestAll extends TestCase {
          * Test suite for AST rewrite which replaces a variable bound to a
          * constant in an input solution with that constant.
          */
-        suite.addTestSuite(TestASTBindingAssigner.class);
-
+        suite.addTestSuite(TestASTStaticBindingsOptimizer.class);
+        
         // Unit tests for binding query hints on the AST nodes.
         suite.addTestSuite(TestASTQueryHintOptimizer.class);
 
