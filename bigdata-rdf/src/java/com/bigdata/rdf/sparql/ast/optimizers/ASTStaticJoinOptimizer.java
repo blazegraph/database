@@ -43,7 +43,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -55,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryOptimizerEnum;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.RangeNode;
@@ -153,8 +153,12 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
     }
     
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+       final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+       final IQueryNode queryNode = input.getQueryNode();
+       final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
 //    	{
 //    		
@@ -171,7 +175,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
 //    	}
     	
         if (!(queryNode instanceof QueryRoot))
-           return new ASTOptimizerResult(queryNode, bindingSets);
+           return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         if (log.isDebugEnabled()) {
         	log.debug("before:\n"+queryNode);
@@ -228,7 +232,7 @@ public class ASTStaticJoinOptimizer implements IASTOptimizer {
         	log.debug("after:\n"+queryNode);
         }
         
-        return new ASTOptimizerResult(queryNode, bindingSets);
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
     }
 

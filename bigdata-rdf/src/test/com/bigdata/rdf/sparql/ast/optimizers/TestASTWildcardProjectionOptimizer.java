@@ -42,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -156,7 +157,7 @@ public class TestASTWildcardProjectionOptimizer extends
         final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -248,7 +249,7 @@ public class TestASTWildcardProjectionOptimizer extends
         final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -340,7 +341,7 @@ public class TestASTWildcardProjectionOptimizer extends
         final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -443,7 +444,7 @@ public class TestASTWildcardProjectionOptimizer extends
       final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
 
       final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-            given/* queryNode */, bsets).getOptimizedQueryNode();
+            new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
       assertSameAST(expected, actual);
 
@@ -707,7 +708,7 @@ public class TestASTWildcardProjectionOptimizer extends
       final IASTOptimizer rewriter = new ASTWildcardProjectionOptimizer();
 
       final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-              given/* queryNode */, bsets).getOptimizedQueryNode();
+            new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
       assertSameAST(expected, actual);
 

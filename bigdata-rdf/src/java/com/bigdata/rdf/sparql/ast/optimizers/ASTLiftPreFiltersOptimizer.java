@@ -28,9 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
@@ -51,10 +51,13 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 public class ASTLiftPreFiltersOptimizer implements IASTOptimizer {
 
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context, final IQueryNode queryNode,
-            final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+       final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
-       return new ASTOptimizerResult(queryNode, bindingSets);
+       final IQueryNode queryNode = input.getQueryNode();
+       final IBindingSet[] bindingSets = input.getBindingSets();     
+
+       return new QueryNodeWithBindingSet(queryNode, bindingSets);
         
     }
 

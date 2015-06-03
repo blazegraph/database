@@ -36,7 +36,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -45,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -60,8 +60,12 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
 
     @SuppressWarnings("unchecked")
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
+
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -88,7 +92,7 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         assignJoinVars(sa, queryRoot.getWhereClause());
 
-        return new ASTOptimizerResult(queryRoot, bindingSets);
+        return new QueryNodeWithBindingSet(queryRoot, bindingSets);
 
     }
     

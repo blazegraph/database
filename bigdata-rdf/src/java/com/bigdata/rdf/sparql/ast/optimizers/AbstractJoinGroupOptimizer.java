@@ -32,7 +32,6 @@ import java.util.Iterator;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
@@ -44,6 +43,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
@@ -76,11 +76,14 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 	 * {@link #optimize(AST2BOpContext, StaticAnalysis, GraphPatternGroup)} method.
 	 */
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context, 
-    		final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+       final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+       final IQueryNode queryNode = input.getQueryNode();
+       final IBindingSet[] bindingSets = input.getBindingSets();
+       
         if (!(queryNode instanceof QueryRoot))
-           return new ASTOptimizerResult(queryNode, bindingSets);
+           return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
         
@@ -129,7 +132,7 @@ public abstract class AbstractJoinGroupOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
-        return new ASTOptimizerResult(queryNode, bindingSets);
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
     }
 

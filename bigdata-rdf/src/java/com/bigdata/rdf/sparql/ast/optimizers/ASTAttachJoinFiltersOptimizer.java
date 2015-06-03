@@ -36,7 +36,6 @@ import java.util.Set;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bset.ConditionalRoutingOp;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -46,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -79,9 +79,12 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
 
     @SuppressWarnings("unchecked")
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+          final AST2BOpContext context, final QueryNodeWithBindingSet input) {
         
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();
+
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
@@ -107,7 +110,7 @@ public class ASTAttachJoinFiltersOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         attachJoinFilters(context, sa, queryRoot.getWhereClause());
 
-        return new ASTOptimizerResult(queryRoot, bindingSets);
+        return new QueryNodeWithBindingSet(queryRoot, bindingSets);
         
     }
 

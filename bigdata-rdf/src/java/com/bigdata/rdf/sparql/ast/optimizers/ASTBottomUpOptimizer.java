@@ -43,7 +43,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.rdf.internal.constraints.SparqlTypeErrorBOp;
 import com.bigdata.rdf.sparql.ast.ASTBase;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -62,6 +61,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -177,11 +177,14 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
     }
 
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+          final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();
+       
         if (!(queryNode instanceof QueryRoot))
-            return new ASTOptimizerResult(queryNode, bindingSets);
+            return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -296,7 +299,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         }
 
-        return new ASTOptimizerResult(queryNode, bindingSets);
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
     
     }
 
@@ -941,7 +944,6 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              */
             if(childGroup.isMinus()) {
 
-               // FIXME This should be an "in-scope" test (not MUST|MAYBE).
                final Set<IVariable<?>> incomingBound = sa
                        .getDefinitelyIncomingBindings(childGroup,
                                new LinkedHashSet<IVariable<?>>());

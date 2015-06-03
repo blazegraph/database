@@ -32,7 +32,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -44,6 +43,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
@@ -127,11 +127,14 @@ public class ASTUnknownTermOptimizer implements IASTOptimizer {
             .getLogger(ASTUnknownTermOptimizer.class);
 
     @Override
-    public ASTOptimizerResult optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
 
         if (!(queryNode instanceof QueryRoot))
-           return new ASTOptimizerResult(queryNode, bindingSets);
+           return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -179,7 +182,7 @@ public class ASTUnknownTermOptimizer implements IASTOptimizer {
 
         // log.error("\nafter rewrite:\n" + queryNode);
 
-        return new ASTOptimizerResult(queryNode, bindingSets);
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
     }
 

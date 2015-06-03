@@ -42,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -247,7 +248,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
         final IASTOptimizer rewriter = new ASTRunFirstRunLastOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -467,7 +468,7 @@ public class TestASTRunFirstRunLastOptimizer extends AbstractASTEvaluationTestCa
         final IASTOptimizer rewriter = new ASTRunFirstRunLastOptimizer();
         
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 

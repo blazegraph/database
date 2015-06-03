@@ -30,8 +30,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IValueExpression;
-import com.bigdata.journal.ITx;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
@@ -46,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.RangeNode;
@@ -53,7 +52,6 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 
 /**
  * Test suite for {@link ASTRangeOptimizer}.
@@ -191,7 +189,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -310,7 +308,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -428,7 +426,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -541,7 +539,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -652,7 +650,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -796,7 +794,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -999,7 +997,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         final IASTOptimizer rewriter = new ASTRangeOptimizer();
         
         final IQueryNode actual = rewriter.optimize(
-        		ctx, given/* queryNode */, bsets).getOptimizedQueryNode();
+        		ctx, new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 

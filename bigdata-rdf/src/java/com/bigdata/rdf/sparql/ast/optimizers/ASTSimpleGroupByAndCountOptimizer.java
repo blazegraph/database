@@ -36,7 +36,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -51,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -93,8 +93,12 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
    }
 
    @Override
-   public ASTOptimizerResult optimize(final AST2BOpContext context,
-         final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+   public QueryNodeWithBindingSet optimize(
+      final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+      final IQueryNode queryNode = input.getQueryNode();
+      final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
       if (context.getAbstractTripleStore().
             getSPORelation().indicesHaveDeleteMarkers()) {
@@ -113,7 +117,7 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
          * rewrite the query.
          */
 
-         return new ASTOptimizerResult(queryNode, bindingSets);
+         return new QueryNodeWithBindingSet(queryNode, bindingSets);
      }
       
       final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -132,7 +136,7 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
          }
 
          if (!ok) {
-            return new ASTOptimizerResult(queryNode, bindingSets);
+            return new QueryNodeWithBindingSet(queryNode, bindingSets);
          }
       }
 
@@ -158,7 +162,7 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
       // rewrite the top-level select
       doSelectQuery(context, sa, (QueryRoot) queryNode, (QueryBase) queryNode);
 
-      return new ASTOptimizerResult(queryNode, bindingSets);
+      return new QueryNodeWithBindingSet(queryNode, bindingSets);
    }
 
    /**

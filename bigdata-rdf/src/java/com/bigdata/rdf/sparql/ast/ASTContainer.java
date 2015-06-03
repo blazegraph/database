@@ -91,7 +91,7 @@ public class ASTContainer extends ASTBase {
          * The incoming binding set associated with the query plan, as
          * resulting from the query optimization phase.
          */
-        String QUERY_PLAN_BS = "queryPlanBS";
+        String OPTIMIZED_AST_BINDING_SET = "optimizedASTBindingSet";
 
     }
 
@@ -224,22 +224,20 @@ public class ASTContainer extends ASTBase {
 
     
     /**
-     * Set the incoming binding sets associated with the optimized
-     * query plan (after running the optimizers).
+     * Set the incoming binding sets associated with the optimized AST.
      */
-    public void setQueryPlanBS(final IBindingSet[] bindingSets) {
+    public void setOptimizedASTBindingSet(final IBindingSet[] bindingSets) {
         
-        setProperty(Annotations.QUERY_PLAN_BS, bindingSets);
+        setProperty(Annotations.OPTIMIZED_AST_BINDING_SET, bindingSets);
 
     }
     
     /**
-     * Return the incoming binding sets associated with the optimized
-     * query plan (after running the optimizers).
+     * Return the incoming binding sets associated with the optimized AST.
      */
-    public IBindingSet[] getQueryPlanBS() {
+    public IBindingSet[] getOptimizedASTBindingSet() {
 
-        return (IBindingSet[]) getProperty(Annotations.QUERY_PLAN_BS);
+        return (IBindingSet[]) getProperty(Annotations.OPTIMIZED_AST_BINDING_SET);
 
     }
 

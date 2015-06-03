@@ -30,7 +30,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.Collections;
 import java.util.List;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.model.BigdataURI;
@@ -47,6 +46,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase.Annotations;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -164,7 +164,7 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -177,8 +177,8 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
          * as well.
          */
         final IQueryNode actual2 = rewriter.optimize(context,
-                BOpUtility.deepCopy(expected)/* queryNode */, bsets)
-                .getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(BOpUtility.deepCopy(expected), bsets))
+                .getQueryNode();
 
         assertSameAST(expected, actual2);
         
@@ -275,8 +275,9 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
         
         final IQueryNode qIntermediate = 
         	valueExpRewriter.optimize(
-        		contextValueExpRewriter, qUnoptimized, bsetsValueExpRewriter)
-        		.getOptimizedQueryNode();
+        		contextValueExpRewriter, 
+        		new QueryNodeWithBindingSet(qUnoptimized, bsetsValueExpRewriter))
+        		.getQueryNode();
         
         // the join rewriter is what we want to test
         final IASTOptimizer joinRewriter = 
@@ -289,8 +290,9 @@ public class TestASTAttachJoinFiltersOptimizer extends AbstractASTEvaluationTest
 
         
         final IQueryNode qOptimized = joinRewriter.optimize(
-        	contextJoinRewriter, qIntermediate, bsetsJoinRewriter)
-        	.getOptimizedQueryNode();
+        	contextJoinRewriter,
+        	new QueryNodeWithBindingSet(qIntermediate, bsetsJoinRewriter))
+        	.getQueryNode();
         
         /** This is the output we expect
          * QueryType: SELECT

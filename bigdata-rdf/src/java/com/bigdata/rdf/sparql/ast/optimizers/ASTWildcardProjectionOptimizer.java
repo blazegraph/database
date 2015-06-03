@@ -36,7 +36,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -45,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -64,11 +64,15 @@ import cutthecrap.utils.striterators.Striterator;
 public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
 
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
         if(!(queryNode instanceof QueryRoot))
-           return new ASTOptimizerResult(queryNode, bindingSets);
+           return new QueryNodeWithBindingSet(queryNode, bindingSets);
         
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -133,7 +137,7 @@ public class ASTWildcardProjectionOptimizer implements IASTOptimizer {
         rewriteProjection(
            sa, queryRoot, context.getSolutionSetStats().getUsedVars());
 
-        return new ASTOptimizerResult(queryRoot, bindingSets);
+        return new QueryNodeWithBindingSet(queryRoot, bindingSets);
     
     }
 

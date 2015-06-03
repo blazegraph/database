@@ -28,8 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -44,30 +44,32 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  */
 public class AskOptimizer implements IASTOptimizer {
 
-	public ASTOptimizerResult optimize(final AST2BOpContext context, 
-			final IQueryNode queryNode, //final DatasetNode dataset, 
-			final IBindingSet[] bindingSet) {
-		
+	public QueryNodeWithBindingSet optimize(
+	      final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+	   
+      final IQueryNode queryNode = input.getQueryNode();
+      final IBindingSet[] bindingSet = input.getBindingSets();
+      
 		final QueryRoot queryRoot = (QueryRoot) queryNode;
 		
 		if (queryRoot.getQueryType() != QueryType.ASK) {
 			
 		    // Not a query that we will rewrite.
-		    return new ASTOptimizerResult(queryRoot, bindingSet);
+		    return new QueryNodeWithBindingSet(queryRoot, bindingSet);
 		    
 		}
 
         if (queryRoot.getGroupBy() != null && !queryRoot.getGroupBy().isEmpty()) {
             
             // Do not modify an aggregation query.
-            return new ASTOptimizerResult(queryRoot, bindingSet);
+            return new QueryNodeWithBindingSet(queryRoot, bindingSet);
             
         }
         
         if (queryRoot.getHaving() != null && !queryRoot.getHaving().isEmpty()) {
             
             // Do not modify an aggregation query.
-            return new ASTOptimizerResult(queryRoot, bindingSet);
+            return new QueryNodeWithBindingSet(queryRoot, bindingSet);
             
         }
 
@@ -85,7 +87,7 @@ public class AskOptimizer implements IASTOptimizer {
             
         }        
         
-		return new ASTOptimizerResult(queryRoot, bindingSet);
+		return new QueryNodeWithBindingSet(queryRoot, bindingSet);
 		
 	}
 	

@@ -33,7 +33,7 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -102,11 +102,15 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 public class ASTExistsOptimizer implements IASTOptimizer {
 
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
+          
 
         if (!(queryNode instanceof QueryRoot))
-           return new ASTOptimizerResult(queryNode, bindingSets);
+           return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -142,7 +146,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
         rewrite(sa, exogenousVars, queryRoot, whereClause);
 
-        return new ASTOptimizerResult(queryRoot, bindingSets);
+        return new QueryNodeWithBindingSet(queryRoot, bindingSets);
         
     }
 

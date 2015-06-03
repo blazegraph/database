@@ -48,7 +48,6 @@ import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -63,6 +62,7 @@ import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -150,8 +150,12 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
    @Override
-   public ASTOptimizerResult optimize(AST2BOpContext context, IQueryNode queryNode,
-         IBindingSet[] bindingSets) {
+   public QueryNodeWithBindingSet optimize(
+      final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+      final IQueryNode queryNode = input.getQueryNode();
+      final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
       /**
        * We collect statically enforced bindings in this binding set, which
@@ -166,7 +170,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
        * only applicable to top-level queries.
        */
       if (bindingSets == null || !(queryNode instanceof QueryRoot)) {
-         return new ASTOptimizerResult(queryNode, bindingSets);
+         return new QueryNodeWithBindingSet(queryNode, bindingSets);
       }
 
       final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -211,7 +215,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
        */
       context.setSolutionSetStats(SolutionSetStatserator.get(bindingSetsOut));
       
-      return new ASTOptimizerResult(queryRoot, bindingSetsOut);
+      return new QueryNodeWithBindingSet(queryRoot, bindingSetsOut);
    }
    
    

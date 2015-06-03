@@ -27,9 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
-import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -45,15 +43,13 @@ public interface IASTOptimizer {
      * 
      * @param context
      *            The evaluation context.
-     * @param queryNode
-     *            The AST (in).
-     * @param bindingSet
-     *            Optional array of zero or more input solutions.
+     * @param input
+     *            The input to the optimizer, consisting of a queryNode and
+     *            input binding set.
      * 
-     * @return An instance of type ASTOptimizerResult.
+     * @return An instance of type QueryNodeWithBindingSet.
      */
-    ASTOptimizerResult optimize(AST2BOpContext context, IQueryNode queryNode,
-            IBindingSet[] bindingSets);
-
+    QueryNodeWithBindingSet optimize(
+        AST2BOpContext context, QueryNodeWithBindingSet input);
 
 }

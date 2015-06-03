@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
+import static org.junit.Assert.assertThat;
+
 import java.util.Iterator;
 
 import org.openrdf.model.impl.URIImpl;
@@ -60,6 +64,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
@@ -69,9 +74,6 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
-
-import static org.junit.Assert.*;
-import static org.hamcrest.CoreMatchers.*;
 
 /**
  * Test suite for {@link ASTBottomUpOptimizer}.
@@ -154,12 +156,12 @@ public class TestASTBottomUpOptimizer extends
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
         QueryRoot queryRoot = astContainer.getOriginalAST();
-        
+
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
         
@@ -321,10 +323,12 @@ public class TestASTBottomUpOptimizer extends
         context.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, bindingSets).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, bindingSets)).
+                getQueryNode();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, bindingSets).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, bindingSets)).
+                getQueryNode();
 
         assertNull("should not have rewritten the query",
                 queryRoot.getNamedSubqueries());
@@ -433,10 +437,12 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
         
@@ -619,10 +625,12 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
         
@@ -752,12 +760,14 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         final QueryRoot expected = BOpUtility.deepCopy(queryRoot); 
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         // Verify NO transform.
         assertEquals(expected, queryRoot);
@@ -804,12 +814,14 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         final QueryRoot expected = BOpUtility.deepCopy(queryRoot); 
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         // Verify NO transform.
         assertEquals(expected, queryRoot);
@@ -856,12 +868,14 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         final QueryRoot expected = BOpUtility.deepCopy(queryRoot); 
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         // Verify NO transform.
         assertEquals(expected, queryRoot);
@@ -918,8 +932,8 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().
-            optimize(context, queryRoot, null/* bindingSets */)
-            .getOptimizedQueryNode();
+            optimize(context, new QueryNodeWithBindingSet(queryRoot, null))
+            .getQueryNode();
 
         final Iterator<NamedSubqueryInclude> itr = BOpUtility.visitAll(
             queryRoot.getWhereClause(), NamedSubqueryInclude.class);
@@ -977,7 +991,8 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         /*
          * Create the expected AST for the WHERE clause.
@@ -1079,7 +1094,8 @@ public class TestASTBottomUpOptimizer extends
         context.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, bindingSets).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, bindingSets)).
+                getQueryNode();
 
         diff(expected, queryRoot);
 
@@ -1124,7 +1140,8 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
 
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         /*
          * Create the expected AST for the WHERE clause.
@@ -1236,12 +1253,14 @@ public class TestASTBottomUpOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
 
         final QueryRoot expected = BOpUtility.deepCopy(queryRoot);
         
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */).getOptimizedQueryNode();
+                context, new QueryNodeWithBindingSet(queryRoot, null)).
+                getQueryNode();
         
         diff(expected,queryRoot);
         
@@ -1331,7 +1350,7 @@ public class TestASTBottomUpOptimizer extends
         final IASTOptimizer rewriter = new ASTBottomUpOptimizer();
 
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -1420,7 +1439,7 @@ public class TestASTBottomUpOptimizer extends
         final IASTOptimizer rewriter = new ASTBottomUpOptimizer();
 
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
-                given/* queryNode */, bsets).getOptimizedQueryNode();
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 

@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ASTOptimizerResult;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
@@ -46,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.JoinSetUtil;
 import com.bigdata.rdf.sparql.ast.JoinSetUtil.VertexJoinSet;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -69,8 +69,11 @@ public class ASTHashJoinOptimizer implements IASTOptimizer {
             .getLogger(ASTHashJoinOptimizer.class);
     
     @Override
-    public ASTOptimizerResult optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -97,7 +100,7 @@ public class ASTHashJoinOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         optimizeJoinGroups(context, sa, queryRoot.getWhereClause());
 
-        return new ASTOptimizerResult(queryRoot, bindingSets);
+        return new QueryNodeWithBindingSet(queryRoot, bindingSets);
         
     }
 
