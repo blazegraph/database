@@ -606,7 +606,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     	/*
     	 * Start by adding the exogenous variables.
     	 */
-    	if (evaluationContext != null && inToplevelQueryScope(node)) {
+    	if (evaluationContext != null && locatedInToplevelQuery(node)) {
     		
     		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
     		
@@ -683,37 +683,40 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
     /**
      * Returns true if the current node is located (recursively) inside the
-     * top-level query's scope, false if it is nested inside a subquery or a
-     * named subquery. 
+     * top-level query, false if it is nested inside a subquery or a
+     * named subquery. The method does not look into {@link FilterNode}s,
+     * but only recurses into {@link GroupNodeBase} nodes. 
      * 
      * @param node
      * @return
      */
-    public boolean inToplevelQueryScope(IGroupMemberNode node) {
+    public boolean locatedInToplevelQuery(IGroupMemberNode node) {
        
-       return inGroupScope(queryRoot.getWhereClause(), node);
+       return locatedInGroupNode(queryRoot.getWhereClause(), node);
 
    }
 
     /**
      * Returns true if the current node is identical or (recursively) located
-     * inside the given group's scope, false if it is nested inside a subquery
-     * or a named subquery. 
+     * inside the given group scope or is the group node itself, but not a
+     * subquery referenced in the node. The method does not look into
+     * {@link FilterNode}s, but only recurses into {@link GroupNodeBase} nodes.
      * 
-     * @param node
+     * @param theNode the group we're looking in
+     * @param theNode the node we're looking for
      * @return
      */
-   public boolean inGroupScope(
-      final GroupNodeBase<?> group, IGroupMemberNode node) {
+   public boolean locatedInGroupNode(
+      final GroupNodeBase<?> theGroup, IGroupMemberNode theNode) {
       
-      if (group==node)
+      if (theGroup==theNode)
          return true;
       
-      for (IGroupMemberNode child : group) {
+      for (IGroupMemberNode child : theGroup) {
          
          if (child instanceof GroupNodeBase<?>) {
             
-            if (inGroupScope((GroupNodeBase<?>)child, node))
+            if (locatedInGroupNode((GroupNodeBase<?>)child, theNode))
                return true;
          }
       }
@@ -759,7 +762,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     	/*
     	 * Start by adding the exogenous variables.
     	 */
-    	if (evaluationContext != null && inToplevelQueryScope(node)) {
+    	if (evaluationContext != null && locatedInToplevelQuery(node)) {
     		
     		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
     		
