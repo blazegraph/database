@@ -1,3 +1,29 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on May 14, 2015
+ */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
@@ -33,6 +59,7 @@ import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
@@ -142,57 +169,40 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          return new ASTOptimizerResult(queryNode, bindingSets);
       }
 
-
       final QueryRoot queryRoot = (QueryRoot) queryNode;
-
-      /* TODO: move somewhere else
-       * We maintain a map of variables used inside FILTERs; if a variable
-       * used inside a static binding is queries in such an ancestor filter,
-       * the binding must not be considered global. As an example, consider
-       * the following query:
-       * 
-       * <pre>
-       * SELECT * WHERE {
-       *    FILTER(!bound(?x))
-       *    {
-       *      BIND(1 AS ?x)
-       *    }
-       *  } 
-       * 
-       * Expected result is the empty set, according to bottom-up semantics.
-       * We must *not* rewrite this query as 
-       * 
-       * SELECT * WHERE {
-       *   FILTER(!bound(?x))
-       *  } VALUES ?x { 1 }
-       *  
-       * The reason is that in this case the FILTER will pass, while ?x in the
-       * original query the BIND(1 AS ?x) is in scope and the filter fails.
-       *  
-       * The same holds for queries where the FILTER is at the same level
-       * as the BIND/VALUES clause, such as:
-       * 
-       * SELECT * WHERE {
-       *    FILTER(!bound(?x))
-       *    {
-       *      BIND(1 AS ?x)
-       *    }
-       *  } 
-       *  
-       */
+      
       final VariableUsageInfo varUsageInfo = new VariableUsageInfo();
 
+      final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
+      final Set<InlineTasks> inlineTasks = new HashSet<InlineTasks>();
+      
+      /**
+       * Setup inlining tasks for existing bindings in the binding set
+       */
+      ISolutionSetStats stats = SolutionSetStatserator.get(bindingSets);
+      final Set<IVariable<?>> usedVars = stats.getUsedVars();
+      if (!usedVars.isEmpty()) {
+         // extract information about used vars from a top-level perspective
+         final VariableUsageInfo childVarUsageInfo = new VariableUsageInfo();
+         childVarUsageInfo.extractVarSPUsageInfoChildrenOrSelf(queryRoot.getWhereClause());
+
+         // set up inlining task
+         for (IVariable<?> var : usedVars) {
+            if (childVarUsageInfo.varUsed(var)) {
+               inlineTasks.add(
+                  new InlineTasks(var, childVarUsageInfo.getVarUsages(var)));
+            }
+         }         
+      }
+      
       /**
        * Apply the optimization (eliminating static binding producing constructs
        * from the query and collecting the staticBindings set)
        */
-      final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
-      final Set<InlineTasks> inlineTask =
-         new HashSet<InlineTasks>();
       final IBindingSet[] bindingSetsOut =
-         optimizeGloballyScopedStaticBindings(
+         optimize(
             sa, queryRoot, staticBindingInfo, varUsageInfo,
-            inlineTask, true /* isRootQuery */, 
+            inlineTasks, true /* isRootQuery */, 
             queryRoot.getBindingsClause());
       
      /**
@@ -204,45 +214,17 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       return new ASTOptimizerResult(queryRoot, bindingSetsOut);
    }
    
-   /**
-    * Applies the optimization to all subqueries.
-    */
-   private IBindingSet[] optimizeGloballyScopedStaticBindings(
-         final StaticAnalysis sa, final SubqueryRoot subqueryRoot, 
-         final StaticBindingInfo staticBindingInfo,
-         final VariableUsageInfo ancestorVarUsageInfo,
-         final Set<InlineTasks> inlineTasks) {
-      
-      final IBindingSet[] staticBindings =
-         optimizeGloballyScopedStaticBindings(
-            sa, subqueryRoot, staticBindingInfo, ancestorVarUsageInfo,
-            inlineTasks, false /* isRootQuery */, 
-            subqueryRoot.getBindingsClause());
-
-
-      // record static bindings in subquery VALUES clause, if any
-      final LinkedHashSet<IVariable<?>> bcVars = new LinkedHashSet<IVariable<?>>();
-      bcVars.addAll(SolutionSetStatserator.get(staticBindings).getUsedVars());
-         
-      final List<IBindingSet> bcBindings = Arrays.asList(staticBindings);
-
-      if (!bcVars.isEmpty()) {
-         final BindingsClause bc = new BindingsClause(bcVars,bcBindings);
-         
-         subqueryRoot.setBindingsClause(bc);
-      }
-      
-      return staticBindings;
-   }
    
+   /**
+    * Applies the optimization (main entry point).
+    */
    @SuppressWarnings({ "unchecked", "rawtypes" })
-   private IBindingSet[] optimizeGloballyScopedStaticBindings(
+   private IBindingSet[] optimize(
          final StaticAnalysis sa,
          final QueryBase queryRoot, final StaticBindingInfo staticBindingInfo,
          final VariableUsageInfo ancestorVarUsageInfo,
          final Set<InlineTasks> inlineTasks, boolean isRootQuery,
          final BindingsClause bindingsClause) {
-      
       
       /**
        * First, collect static bindings from the VALUES clause. In case of
@@ -259,13 +241,13 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
          // remove the bindings clause
          queryRoot.setBindingsClause(null);
+
+         // extract information about used vars from a top-level perspective
+         final VariableUsageInfo childVarUsageInfo = new VariableUsageInfo();
+         childVarUsageInfo.extractVarSPUsageInfoChildrenOrSelf(queryRoot.getWhereClause());
          
          // set up inlining task
-         final VariableUsageInfo childVarUsageInfo = new VariableUsageInfo();
-         childVarUsageInfo.extractVarSPUsageInfoChildren(queryRoot.getWhereClause());
-         
          final Set<IVariable<?>> usedVars = SolutionSetStatserator.get(bsList).getUsedVars();
-         
          for (IVariable<?> var : usedVars) {
             if (childVarUsageInfo.varUsed(var)) {
                inlineTasks.add(
@@ -275,7 +257,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
       }
       
-      optimizeGloballyScopedStaticBindings(
+      optimize(
          sa, queryRoot.getWhereClause(), staticBindingInfo,
          ancestorVarUsageInfo, inlineTasks);
 
@@ -306,6 +288,37 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
    }
    
    /**
+    * Applies the optimization to a given subquery root.
+    */
+   private IBindingSet[] optimize(
+         final StaticAnalysis sa, final SubqueryRoot subqueryRoot, 
+         final StaticBindingInfo staticBindingInfo,
+         final VariableUsageInfo ancestorVarUsageInfo,
+         final Set<InlineTasks> inlineTasks) {
+      
+      final IBindingSet[] staticBindings =
+         optimize(
+            sa, subqueryRoot, staticBindingInfo, ancestorVarUsageInfo,
+            inlineTasks, false /* isRootQuery */, 
+            subqueryRoot.getBindingsClause());
+
+
+      // record static bindings in subquery VALUES clause, if any
+      final LinkedHashSet<IVariable<?>> bcVars = new LinkedHashSet<IVariable<?>>();
+      bcVars.addAll(SolutionSetStatserator.get(staticBindings).getUsedVars());
+         
+      final List<IBindingSet> bcBindings = Arrays.asList(staticBindings);
+
+      if (!bcVars.isEmpty()) {
+         final BindingsClause bc = new BindingsClause(bcVars,bcBindings);
+         
+         subqueryRoot.setBindingsClause(bc);
+      }
+      
+      return staticBindings;
+   }
+
+   /**
     * Applies the optimization to all constructs delivering definitely produced
     * bindings, namely (i) eliminates these constructs while (ii) recording the
     * static bindings as List<IBindingSet> in the staticBindings parameter.
@@ -315,7 +328,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
     * @return
     */
    @SuppressWarnings({ "rawtypes", "unchecked" })
-   private void optimizeGloballyScopedStaticBindings(
+   private void optimize(
       final StaticAnalysis sa, final GroupNodeBase<?> group, 
       final StaticBindingInfo staticBindingInfo,
       final VariableUsageInfo ancestorVarUsageInfo,
@@ -563,7 +576,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
          if (child instanceof GroupNodeBase) {
             
-            optimizeGloballyScopedStaticBindings(sa,
+            optimize(sa,
                (GroupNodeBase<?>) child, staticBindingInfo, 
                ancOrSelfVarUsageInfo, inlineTasks);
             
@@ -573,7 +586,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
              * Apply to subquery, voiding all collected information to acocunt
              * for the new scope induced by the subquery.
              */
-            optimizeGloballyScopedStaticBindings(sa,
+            optimize(sa,
                   (SubqueryRoot) child, 
                   new StaticBindingInfo(), 
                   new VariableUsageInfo(), 
@@ -613,8 +626,39 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       
       /**
        * Returns true if a usage record for the given variable inside a FILTER
-       * or BIND/VALUES node has been recorded.
+       * or BIND/VALUES node has been recorded. The rationale of this check is
+       * as follows: if a variable used inside a static binding is queries in
+       * such an ancestor filter, the binding must not be considered global.
+       * As an example, consider the following query:
        * 
+       * <pre>
+       * SELECT * WHERE {
+       *    FILTER(!bound(?x))
+       *    {
+       *      BIND(1 AS ?x)
+       *    }
+       *  } 
+       * 
+       * Expected result is the empty set, according to bottom-up semantics.
+       * We must *not* rewrite this query as 
+       * 
+       * SELECT * WHERE {
+       *   FILTER(!bound(?x))
+       *  } VALUES ?x { 1 }
+       *  
+       * The reason is that in this case the FILTER will pass, while ?x in the
+       * original query the BIND(1 AS ?x) is in scope and the filter fails.
+       *  
+       * The same holds for queries where the FILTER is at the same level
+       * as the BIND/VALUES clause, such as:
+       * 
+       * SELECT * WHERE {
+       *    FILTER(!bound(?x))
+       *    {
+       *      BIND(1 AS ?x)
+       *    }
+       *  } 
+       *  
        * @param var
        * @return
        */
@@ -687,18 +731,9 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                final GroupMemberValueExpressionNodeBase filter = 
                      (GroupMemberValueExpressionNodeBase) node;
       
-               final Set<IVariable<?>> filterVars = filter.getConsumedVars();
-      
-               for (IVariable<?> filterVar : filterVars) {
-      
-                  // init list, if necessary
-                  if (!usageMap.containsKey(filterVar)) {
-                     usageMap.put(filterVar, new ArrayList<IQueryNode>());
-                  }
-      
-                  // add node to list
-                  usageMap.get(filterVar).add(node);
-               }
+               final IValueExpressionNode vexpr = filter.getValueExpressionNode();
+               
+               extractVarUsageInfo(node, (IValueExpressionNode)vexpr);
                
             } else if (node instanceof StatementPatternNode) {
                
@@ -719,6 +754,35 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
          }
       }
+      
+      private void extractVarUsageInfo(IQueryNode toRewrite, IValueExpressionNode node) {
+
+         final BOp nodeAsBop = (BOp)node;
+         final int arity = nodeAsBop.arity();
+         for (int i=0; i<arity; i++) {
+            
+            final BOp child = nodeAsBop.get(i);
+            if (child instanceof VarNode) {
+               
+               final VarNode varNode = (VarNode)child;
+               final IVariable<?> iVar = varNode.getValueExpression();
+               if (!usageMap.containsKey(iVar)) {
+                  usageMap.put(iVar, new ArrayList<IQueryNode>());
+               }
+   
+               // add node to list
+               usageMap.get(iVar).add(toRewrite);
+               
+            } else if (child instanceof IValueExpressionNode) {
+               
+               // recurse
+               extractVarUsageInfo(toRewrite, (IValueExpressionNode)child);
+               
+            }
+         }
+      }
+
+
 
       /**
        * Extracts usage information for the variable inside statement patterns
@@ -758,7 +822,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
        * @param group
        */
       @SuppressWarnings("rawtypes")
-      private void extractVarSPUsageInfoChildrenOrSelf(GroupNodeBase<?> group) {
+      public void extractVarSPUsageInfoChildrenOrSelf(GroupNodeBase<?> group) {
          
          // abort for optional patterns
          if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
