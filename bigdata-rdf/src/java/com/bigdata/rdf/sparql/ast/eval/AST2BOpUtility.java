@@ -5398,29 +5398,50 @@ public class AST2BOpUtility extends AST2BOpRTO {
     /**
      * Appends a distinct projection to the current pipeline
      * 
-     * @param left
-     * @param ctx
-     * @param node
-     * @param projectInVars
-     * @return
+     * @param left the current pipeline
+     * @param ctx the context
+     * @param node the node associated with the distinct projection
+     * @param projectionVars the variables to distinct-project
+     * 
+     * @return the pipeline extended by a disctint binding sets op
      */
     private static PipelineOp addDistinctProjectionOp(PipelineOp left,
        final AST2BOpContext ctx, final ASTBase node,
        final IVariable<?>[] projectionVars) {
       
-       final List<NV> anns = new LinkedList<NV>();
-       anns.add(new NV(
-           JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
-       anns.add(new NV(
-           JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectionVars));
-       anns.add(new NV(
-           JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
-           BOpEvaluationContext.CONTROLLER));
-       anns.add(new NV(
-           JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
-  
-       left = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
-           anns.toArray(new NV[anns.size()]));
+       if (!ctx.nativeDistinctSolutions) {
+          
+          final List<NV> anns = new LinkedList<NV>();
+          anns.add(new NV(
+              JVMDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
+          anns.add(new NV(
+              JVMDistinctBindingSetsOp.Annotations.VARIABLES, projectionVars));
+          anns.add(new NV(
+              JVMDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
+              BOpEvaluationContext.CONTROLLER));
+          anns.add(new NV(
+              JVMDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
+     
+          left = new JVMDistinctBindingSetsOp(leftOrEmpty(left),//
+              anns.toArray(new NV[anns.size()]));
+          
+       } else {
+
+          final List<NV> anns = new LinkedList<NV>();
+          anns.add(new NV(
+              HTreeDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
+          anns.add(new NV(
+              HTreeDistinctBindingSetsOp.Annotations.VARIABLES, projectionVars));
+          anns.add(new NV(
+              HTreeDistinctBindingSetsOp.Annotations.EVALUATION_CONTEXT,
+              BOpEvaluationContext.CONTROLLER));
+          anns.add(new NV(
+              HTreeDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
+     
+          left = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
+              anns.toArray(new NV[anns.size()]));
+
+       }
       
        return left;
    }
