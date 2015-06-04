@@ -34,15 +34,8 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.KeywordAnalyzer;
-import org.apache.lucene.analysis.SimpleAnalyzer;
-import org.apache.lucene.analysis.StopAnalyzer;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.WhitespaceAnalyzer;
-import org.apache.lucene.analysis.miscellaneous.PatternAnalyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 import org.apache.lucene.util.Version;
 
 /**
@@ -289,29 +282,7 @@ c.b.s.C.analyzer.en.like=eng
 	public Analyzer getAnalyzer(final String languageCode, boolean filterStopwords) {
 
 		final Analyzer unlogged = delegate.getAnalyzer(languageCode, filterStopwords);
-		if (log.isDebugEnabled()) {
-			return new Analyzer() {
-				@Override
-				public TokenStream tokenStream(final String fieldName, final Reader reader) {
-					final int id = loggerIdCounter++;
-					final String term = TermCompletionAnalyzer.getStringReaderContents((StringReader)reader);
-					log.debug(id + " " + languageCode +" **"+term+"**");
-					return new TokenFilter(unlogged.tokenStream(fieldName, reader)){
-						
-						TermAttribute attr = addAttribute(TermAttribute.class);
-						@Override
-						public boolean incrementToken() throws IOException {
-							if (input.incrementToken()) {
-								log.debug(id + " |"+attr.term()+"|");
-								return true;
-							}
-							return false;
-						}};
-				}
-			};
-		} else {
-			return unlogged;
-		}
+		return unlogged;
 		
 	}
 

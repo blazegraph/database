@@ -1046,8 +1046,6 @@ ${postInstallMessage}</echo>
             tofile="${dist.lib}/icu4j-charset.jar" />
       <copy file="${bigdata.lib}/apache/log4j-${log4j.version}.jar"
             tofile="${dist.lib}/log4j.jar" />
-      <copy file="${bigdata.lib}/lucene/lucene-analyzers-${lucene.version}.jar"
-            tofile="${dist.lib}/lucene-analyzer.jar" />
       <copy file="${bigdata.lib}/lucene/lucene-core-${lucene.version}.jar"
             tofile="${dist.lib}/lucene-core.jar" />
 
@@ -2304,7 +2302,6 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/start.jar" />
         <pathelement location="${dist.lib}/reggie.jar" />
         <pathelement location="${dist.lib}/log4j.jar" />
-        <pathelement location="${dist.lib}/lucene-analyzer.jar" />
         <pathelement location="${dist.lib}/lucene-core.jar" />
         <pathelement location="${dist.lib}/openrdf-sesame.jar" />
         <pathelement location="${dist.lib}/slf4j.jar" />

@@ -32,6 +32,8 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
+import org.apache.lucene.search.similarities.DefaultSimilarity;
+import org.apache.lucene.search.similarities.Similarity;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -126,12 +128,14 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         final double termWeight = entry.getLocalTermWeight();
         
         /*
-         * See: http://lucene.apache.org/core/old_versioned_docs/versions/3_0_2/api/all/org/apache/lucene/search/Similarity.html
+         * See: http://lucene.apache.org/core/5_1_0/core/org/apache/lucene/search/similarities/DefaultSimilarity.html
          * 
          * For more information on the round-trip of normalized term weight.
          */
-        final byte termWeightCompact =
-        	org.apache.lucene.search.Similarity.encodeNorm((float) termWeight);
+        
+        final DefaultSimilarity similarity = new DefaultSimilarity();
+        
+        final long termWeightCompact = similarity.encodeNormValue((float) termWeight);
         
         final V docId = entry.getDocId();
 
@@ -247,12 +251,14 @@ public class FullTextIndexTupleSerializer<V extends Comparable<V>> extends
         final byte termWeightCompact = kbuf.getByte(termWeightOffset);
         
         /*
-         * See: http://lucene.apache.org/core/old_versioned_docs/versions/3_0_2/api/all/org/apache/lucene/search/Similarity.html
+         * See: http://lucene.apache.org/core/5_1_0/core/org/apache/lucene/search/similarities/DefaultSimilarity.html
          * 
          * For more information on the round-trip of normalized term weight.
          */
-        final double termWeight = 
-        	org.apache.lucene.search.Similarity.decodeNorm(termWeightCompact);
+        
+        final DefaultSimilarity similarity = new DefaultSimilarity();
+
+        final double termWeight = similarity.decodeNormValue(termWeightCompact);
 
         if (keyOnly) {
 

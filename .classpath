@@ -58,8 +58,9 @@
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/start.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/sun-util.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/tools.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-3.0.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-3.0.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-5.1.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-common-5.1.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-smartcn-5.1.0.jar"/>
 	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>

@@ -48,9 +48,9 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.apache.lucene.analysis.core.LowerCaseFilter;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
@@ -829,10 +829,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
 
             while (tokenStream.incrementToken()) {
                 
-                final TermAttribute term = tokenStream
-                        .getAttribute(TermAttribute.class);
+                final CharTermAttribute term = tokenStream
+                        .getAttribute(CharTermAttribute.class);
                 
-                buffer.add(docId, fieldId, term.term());
+                buffer.add(docId, fieldId, term.toString());
 
                 n++;
 
@@ -876,13 +876,21 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
          */
         final Analyzer a = getAnalyzer(languageCode, filterStopwords);
         
-        TokenStream tokenStream = a.tokenStream(null/* @todo field? */, r);
-        
-        // force to lower case.
-        tokenStream = new LowerCaseFilter(tokenStream);
-        
-        return tokenStream;
-        
+        TokenStream tokenStream;
+		try {
+			tokenStream = a.tokenStream(null/* @todo field? */, r);
+
+			// force to lower case.
+			tokenStream = new LowerCaseFilter(tokenStream);
+
+			return tokenStream;
+		} catch (IOException e) {
+			if(log.isDebugEnabled()) {
+				log.debug(e);
+			}
+		}
+		
+		return null;
     }
 
     /**

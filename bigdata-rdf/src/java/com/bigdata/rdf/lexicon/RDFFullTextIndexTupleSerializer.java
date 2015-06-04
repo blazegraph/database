@@ -33,6 +33,7 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
+import org.apache.lucene.search.similarities.DefaultSimilarity;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -41,9 +42,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
@@ -142,8 +141,8 @@ public class RDFFullTextIndexTupleSerializer extends
          * 
          * For more information on the round-trip of normalized term weight.
          */
-        final byte termWeightCompact =
-        	org.apache.lucene.search.Similarity.encodeNorm((float) termWeight);
+        final DefaultSimilarity similarity = new DefaultSimilarity(); 
+        final long termWeightCompact = similarity.encodeNormValue((float) termWeight);
         
         final IV docId = (IV)entry.getDocId();
 
@@ -258,8 +257,10 @@ public class RDFFullTextIndexTupleSerializer extends
          * 
          * For more information on the round-trip of normalized term weight.
          */
-        final double termWeight = 
-        	org.apache.lucene.search.Similarity.decodeNorm(termWeightCompact);
+        
+        final DefaultSimilarity similarity = new DefaultSimilarity(); 
+
+        final double termWeight = similarity.decodeNormValue(termWeightCompact);
 
         if (keyOnly) {
 

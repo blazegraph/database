@@ -26,11 +26,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.search;
 
-import java.io.Reader;
+import java.io.StringReader;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.miscellaneous.EmptyTokenStream;
+import org.apache.lucene.analysis.standard.StandardTokenizer;
 
 /**
  * An analyzer that always returns an {@link EmptyTokenStream}, this can
@@ -42,8 +43,9 @@ import org.apache.lucene.analysis.miscellaneous.EmptyTokenStream;
 public class EmptyAnalyzer extends Analyzer {
 
 	@Override
-	public TokenStream tokenStream(String arg0, Reader arg1) {
-		return new EmptyTokenStream();
+	protected TokenStreamComponents createComponents(String input) {
+		Tokenizer source = new StandardTokenizer();
+	     return new TokenStreamComponents(source);
 	}
 
 }

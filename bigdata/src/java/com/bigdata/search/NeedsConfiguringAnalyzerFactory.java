@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringReader;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -43,10 +44,14 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.StopAnalyzer;
-import org.apache.lucene.analysis.miscellaneous.PatternAnalyzer;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.core.LowerCaseFilter;
+import org.apache.lucene.analysis.core.StopAnalyzer;
+import org.apache.lucene.analysis.pattern.PatternTokenizer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.util.Version;
 
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -190,19 +195,42 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 	}
 	
 	/**
-	 * Special case code for {@link PatternAnalyzer}
+	 * Special case code for {@link PatternTokenizer}
 	 * @author jeremycarroll
 	 *
 	 */
-    private static class PatternAnalyzerPair extends AnalyzerPair {
-		public PatternAnalyzerPair(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
-			super(lro.languageRange, getConstructor(PatternAnalyzer.class,Version.class,Pattern.class,Boolean.TYPE,Set.class), 
-				Version.LUCENE_CURRENT, 
-				pattern,
-				true,
-				lro.getStopWords());
+    private static class PatternAnalyzer extends AnalyzerPair {
+		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
+
+			super(lro.languageRange, getConstructor(PatternAnalyzerImpl.class,Pattern.class), 
+				pattern);
 		}
 	}
+    
+    /**
+     * Helper class created for Lucene 5.1.0 migration.
+     * 
+     * @author beebs
+     *
+     */
+    private class PatternAnalyzerImpl extends Analyzer {
+    	
+    	private Pattern pattern = null;
+    
+    	@SuppressWarnings("unused")
+		public PatternAnalyzerImpl(Pattern pattern) {
+    		super();
+    		this.pattern = pattern;
+    	}
+    	
+    	@Override
+    	protected TokenStreamComponents createComponents(final String field) {
+    		//Use default grouping
+    		Tokenizer tokenizer = new PatternTokenizer(pattern,-1);
+    		TokenStream filter = new LowerCaseFilter(tokenizer);
+    		return new TokenStreamComponents(tokenizer, filter);
+    	}
+    }
     
 
 
@@ -312,10 +340,10 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 		 */
 		public void validate() {
 			if (pattern != null ) {
-				if ( className != null && className != PatternAnalyzer.class.getName()) {
+				if ( className != null && className != PatternTokenizer.class.getName()) {
 					throw new RuntimeException("Bad Option: Language range "+languageRange + " with pattern propety for class "+ className);
 				}
-				className = PatternAnalyzer.class.getName();
+				className = PatternTokenizer.class.getName();
 			}
 			if (this.wordBoundary != null  ) {
 				if ( className != null && className != TermCompletionAnalyzer.class.getName()) {
@@ -338,8 +366,8 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 				throw new RuntimeException("Bad option: Language range "+languageRange + ": must specify wordBoundary for TermCompletionAnalyzer");
 			}
 			
-			if (PatternAnalyzer.class.getName().equals(className) && pattern == null ) {
-				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify pattern for PatternAnalyzer.");
+			if (PatternTokenizer.class.getName().equals(className) && pattern == null ) {
+				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify pattern for PatternTokenizer.");
 			}
 			if ( (like != null) == (className != null) ) {
 				throw new RuntimeException("Bad Option: Language range "+languageRange + " must specify exactly one of implementation class or like.");
@@ -359,7 +387,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 				return null;
 			}
 			if (pattern != null) {
-				return new PatternAnalyzerPair(this, pattern);
+				return new PatternAnalyzer(this, pattern);
 			}
 			if (softHyphens != null) {
 				return new AnalyzerPair(
@@ -384,10 +412,10 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
             	// RussianAnalyzer is missing any way to access stop words.
             	if (RussianAnalyzer.class.equals(cls)) {
             		if (useDefaultStopWords()) {
-            		    return new AnalyzerPair(languageRange, new RussianAnalyzer(Version.LUCENE_CURRENT), new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));
+            		    return new AnalyzerPair(languageRange, new RussianAnalyzer(), new RussianAnalyzer(CharArraySet.EMPTY_SET));
             		}
             		if (doNotUseStopWords()) {
-            		    return new AnalyzerPair(languageRange,  new RussianAnalyzer(Version.LUCENE_CURRENT, Collections.EMPTY_SET));	
+            		    return new AnalyzerPair(languageRange,  new RussianAnalyzer(CharArraySet.EMPTY_SET));	
             		}
             	}
             	return new VersionSetAnalyzerPair(this, cls);

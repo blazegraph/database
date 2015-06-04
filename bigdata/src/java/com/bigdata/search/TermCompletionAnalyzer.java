@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.io.StringReader;
 import java.nio.CharBuffer;
 import java.util.regex.Matcher;
@@ -35,8 +34,8 @@ import java.util.regex.Pattern;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.KeywordAnalyzer;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.apache.lucene.analysis.core.KeywordAnalyzer;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 
 /**
@@ -128,12 +127,6 @@ public class TermCompletionAnalyzer extends Analyzer {
 		this(wordBoundary, subWordBoundary, null, true);
 	}
 
-
-	@Override
-	public TokenStream tokenStream(String ignoredFieldName, Reader reader) {
-		return new TermCompletionTokenStream((StringReader)reader);
-	}
-
 	/**
 	 * This classes has three processes going on
 	 * all driven from the {@link #increment()} method.
@@ -155,7 +148,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 	private class TermCompletionTokenStream extends TokenStream {
 
 		final String[] words;
-		final TermAttribute termAtt;
+		final CharTermAttribute termAtt;
 		
 		
 		
@@ -169,7 +162,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 		private CharBuffer found;
 		
 		public TermCompletionTokenStream(StringReader reader) {
-		    termAtt = addAttribute(TermAttribute.class);
+		    termAtt = addAttribute(CharTermAttribute.class);
 			words = wordBoundary.split(getStringReaderContents(reader));
 		}
 		
@@ -178,12 +171,12 @@ public class TermCompletionAnalyzer extends Analyzer {
 			if ( next() ) {
 				if (afterDiscard != null) {
 					int lg = afterDiscard.length();
-					afterDiscard.getChars(0, lg, termAtt.termBuffer(), 0);
-				    termAtt.setTermLength(lg);
+					afterDiscard.getChars(0, lg, termAtt.buffer(), 0);
+				    termAtt.setLength(lg);
 				} else {
 				    int lg = found.length();
-					found.get(termAtt.termBuffer(), 0, lg);
-				    termAtt.setTermLength(lg);
+					found.get(termAtt.buffer(), 0, lg);
+				    termAtt.setLength(lg);
 				}
 				return true;
 			} else {
@@ -227,7 +220,7 @@ public class TermCompletionAnalyzer extends Analyzer {
 				return false;
 			}
 			currentWord = words[currentWordIx].toCharArray();
-			termAtt.resizeTermBuffer(currentWord.length);
+			termAtt.resizeBuffer(currentWord.length);
 			charPos = 0;
 			softMatcher = subWordBoundary.matcher(words[currentWordIx]);
 			maybeDiscardHyphens();
@@ -248,5 +241,10 @@ public class TermCompletionAnalyzer extends Analyzer {
 		} catch (IOException e) {
 			throw new RuntimeException("Impossible",e);
 		}
+	}
+	@Override
+	protected TokenStreamComponents createComponents(String arg0) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }
