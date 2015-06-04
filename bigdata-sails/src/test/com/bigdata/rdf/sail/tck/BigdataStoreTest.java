@@ -571,7 +571,7 @@ public class BigdataStoreTest extends RDFStoreTest {
 		bindings.addBinding("Z", painter);
 		iter = evaluate("select ?X where { ?X <"+RDF.TYPE+"> ?Y . ?Y <"+RDF.TYPE+"> <"+RDFS.CLASS+"> . filter( ?Y = ?Z) }",con, bindings);
 		resultCount = verifyQueryResult(iter, 1);
-		assertEquals("Wrong number of query results", 1, resultCount);
+		assertEquals("Wrong number of query results", 0, resultCount);
 	}
 
 

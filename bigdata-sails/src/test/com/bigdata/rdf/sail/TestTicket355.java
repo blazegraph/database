@@ -133,10 +133,10 @@ public class TestTicket355 extends QuadsTestCase {
 				conn.commit();
 
 				String query = "SELECT ?subj WHERE { "
+				      + "BIND(\"notValue\" AS ?arg)"
 						+ "?subj <os:prop> ?val . "
 						+ "FILTER(STR(?val) != ?arg)}";
 				TupleQuery tq = conn.prepareTupleQuery(QueryLanguage.SPARQL, query);
-				tq.setBinding("arg", vf.createLiteral("notValue"));
 				TupleQueryResult tqr = tq.evaluate();
 				assertTrue(tqr.hasNext());
 				tqr.close();
