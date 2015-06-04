@@ -343,7 +343,9 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       }
               
       // only process non-optional patterns
-      if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
+      if (group instanceof JoinGroupNode && 
+            (((JoinGroupNode) group).isOptional() ||
+            ((JoinGroupNode) group).isMinus())) {
          return;
       }
       
