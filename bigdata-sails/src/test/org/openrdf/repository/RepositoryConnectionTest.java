@@ -1635,7 +1635,7 @@ public abstract class RepositoryConnectionTest extends TestCase {
 		
 		String SELECT_BY_DATE = 
 		   "SELECT ?s ?d WHERE { BIND(\"" + 
-		   vf.createLiteral(xcal).stringValue() + 
+		   vf.createLiteral(xcal).toString() + 
 		   "\" AS ?date) . ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> ?d . FILTER (?d <= ?date) }";
 
 		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, SELECT_BY_DATE);
