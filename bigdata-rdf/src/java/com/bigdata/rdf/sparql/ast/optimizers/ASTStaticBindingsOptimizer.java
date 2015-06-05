@@ -35,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.openrdf.model.URI;
@@ -149,6 +150,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  */
 public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
+   @SuppressWarnings({ "rawtypes", "unused", "unchecked" })
    @Override
    public QueryNodeWithBindingSet optimize(
       final AST2BOpContext context, final QueryNodeWithBindingSet input) {
@@ -183,19 +185,20 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       /**
        * Setup inlining tasks for existing bindings in the binding set
        */
-      ISolutionSetStats stats = SolutionSetStatserator.get(bindingSets);
-      final Set<IVariable<?>> usedVars = stats.getUsedVars();
-      if (!usedVars.isEmpty()) {
-         // extract information about used vars from a top-level perspective
-         final VariableUsageInfo childVarUsageInfo = new VariableUsageInfo();
-         childVarUsageInfo.extractVarSPUsageInfoChildrenOrSelf(queryRoot.getWhereClause());
-
-         // set up inlining task
-         for (IVariable<?> var : usedVars) {
-            if (childVarUsageInfo.varUsed(var)) {
-               inlineTasks.add(
-                  new InlineTasks(var, childVarUsageInfo.getVarUsages(var)));
-            }
+      // extract information about used vars from a top-level perspective
+      final VariableUsageInfo childVarUsageInfo = new VariableUsageInfo();
+      childVarUsageInfo.extractVarSPUsageInfoChildrenOrSelf(
+         queryRoot.getWhereClause());
+      
+      final ISolutionSetStats stats = SolutionSetStatserator.get(bindingSets);
+      final Map<IVariable<?>, IConstant<?>> staticVars = 
+            SolutionSetStatserator.get(bindingSets).getConstants();
+      for (IVariable var : staticVars.keySet()) {
+         
+         if (childVarUsageInfo.varUsed(var)) {
+            final IConstant value = staticVars.get(var);
+            inlineTasks.add(
+               new InlineTasks(var, value, childVarUsageInfo.getVarUsages(var)));
          }         
       }
       
@@ -251,34 +254,27 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          childVarUsageInfo.extractVarSPUsageInfoChildrenOrSelf(queryRoot.getWhereClause());
          
          // set up inlining task
-         final Set<IVariable<?>> usedVars = SolutionSetStatserator.get(bsList).getUsedVars();
-         for (IVariable<?> var : usedVars) {
+         final Map<IVariable<?>, IConstant<?>> staticVars = 
+            SolutionSetStatserator.get(bsList).getConstants();
+         for (IVariable<?> var : staticVars.keySet()) {
             if (childVarUsageInfo.varUsed(var)) {
-               inlineTasks.add(
-                  new InlineTasks(var, childVarUsageInfo.getVarUsages(var)));
+               final IConstant value = staticVars.get(var);
+               inlineTasks.add(new InlineTasks(
+                  var, value, childVarUsageInfo.getVarUsages(var)));
             }
          }
          
       }
       
+      // the optimization phase performs rewriting & extraction of static
+      // binding infos and inlining tasks
       optimize(
          sa, queryRoot.getWhereClause(), staticBindingInfo,
          ancestorVarUsageInfo, inlineTasks);
 
-
-      /**
-       * Apply inlining tasks
-       */
-      final Map<IVariable<?>, IConstant<?>> constantVars = 
-         SolutionSetStatserator.get(staticBindingInfo.joinAll()).getConstants();
+      // apply inline tasks
       for (InlineTasks inlineTask : inlineTasks) {
-         
-         final IVariable<IV> var = inlineTask.getVar();
-         if (constantVars.containsKey(var)) {
-
-            inlineTask.apply((Constant<IV>)constantVars.get(var));
-         
-         } // else: not applicable
+         inlineTask.apply();
       }
       
       /**
@@ -286,7 +282,6 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
        * do with it (i.e., adding it to the exogeneous bindings or constructing
        * a VALUES clause).
        */
-      
       final IBindingSet[] bindingSetsOut = staticBindingInfo.joinProduced();
       return bindingSetsOut;
    }
@@ -331,7 +326,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
     * @param staticBindings the list of detected static bindings
     * @return
     */
-   @SuppressWarnings({ "rawtypes", "unchecked" })
+   @SuppressWarnings({ "rawtypes", "unchecked", "unused" })
    private void optimize(
       final StaticAnalysis sa, final GroupNodeBase<?> group, 
       final StaticBindingInfo staticBindingInfo,
@@ -407,8 +402,11 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
             if (ve instanceof IConstant && 
                   an.args().get(1) instanceof ConstantNode) {
 
-               IVariable<?> boundVar = an.getVar();
+               final IVariable<?> boundVar = an.getVar();
                
+               // pull out the expression to the top of the query root, if
+               // possible (the check is necessary to avoid scoping problems
+               // caused by bottom-up semantics, i.e. unsafe filter expressions)
                if (!ancOrSelfVarUsageInfo.varUsedInFilterOrAssignment(boundVar)) {
                   
                   final IBindingSet bs = new ListBindingSet();
@@ -417,17 +415,23 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                   
                   toRemove.add(child);
                   
-                  final VariableUsageInfo usageInfo =
+               } 
+               
+               // next, we inline the task; note that inlining is possible, 
+               // no matter whether we pulled the expression to the top or not
+               final VariableUsageInfo usageInfo =
                      VariableUsageInfo.merge(
                         ancOrSelfVarUsageInfo, childVarUsageInfo);
                   
-                  // add inline tasks for variable
-                  if (usageInfo.varUsed(boundVar)) {
-                     inlineTasks.add(
-                        new InlineTasks(
-                           boundVar, usageInfo.getVarUsages(boundVar)));
-                  }
-               }               
+               // add inline tasks for variable
+               if (usageInfo.varUsed(boundVar)) {
+                  inlineTasks.add(
+                     new InlineTasks(
+                        boundVar,
+                        (IConstant) an.getValueExpression(),
+                        usageInfo.getVarUsages(boundVar)));
+               }
+               
             }
                         
          // case 2: optimize in-line bindings clauses
@@ -446,8 +450,9 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                
             }
             
-            boolean inline = !someVarUsedInFilter;
-            if (inline) {
+            // in case none of the vars is used in a filter below, we can
+            // safely pull it out
+            if (!someVarUsedInFilter) { 
 
                staticBindingInfo.addProduced(bc.getBindingSets());
                toRemove.add(child);
@@ -455,14 +460,25 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                final VariableUsageInfo usageInfo =
                      VariableUsageInfo.merge(
                         ancOrSelfVarUsageInfo, childVarUsageInfo);
-               
-               // add inline tasks for all variables, where applicable
-               for (IVariable<?> bssVar : bssVars) {
+            } 
+            
+            /*
+             * In the following, we set up inline tasks for vars with unique
+             * value in the specified binding set.
+             */
+            final VariableUsageInfo usageInfo =
+               VariableUsageInfo.merge(ancOrSelfVarUsageInfo, childVarUsageInfo);
                   
-                  if (usageInfo.varUsed(bssVar)) {
-                     inlineTasks.add(
-                        new InlineTasks(bssVar, usageInfo.getVarUsages(bssVar))); 
-                  }
+            final IBindingSet[] bs = bss.toArray(new IBindingSet[bss.size()]);
+            final Map<IVariable<?>, IConstant<?>> constantVars = 
+               SolutionSetStatserator.get(bs).getConstants();
+            
+            for (IVariable<?> var : constantVars.keySet()) {
+               
+               if (usageInfo.varUsed(var)) {
+                  final IConstant<?> constantVal = constantVars.get(var);
+                     inlineTasks.add(new InlineTasks(
+                        var, (IConstant)constantVal,usageInfo.getVarUsages(var)));     
                }
             }
             
@@ -516,11 +532,15 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
 
                }
                
-               if (!bs.isEmpty() && bs.size()==1) { // true by construction
+               /*
+                * In case the filter describes a single static mapping, we also
+                * schedule an inline task.
+                */
+               if (!bs.isEmpty() && bs.size()==1) {
 
-                  staticBindingInfo.addEnforced(bs);
-                  
-                  final IVariable<?> var = bs.vars().next();
+                  final Entry<IVariable,IConstant> entry = bs.iterator().next();
+                  final IVariable<IV> var = entry.getKey();
+                  final IConstant<IV> val = entry.getValue();
                   
                   final VariableUsageInfo usageInfo =
                         VariableUsageInfo.merge(
@@ -529,7 +549,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                   // add inline tasks for variable
                   if (usageInfo.varUsed(var)) {
                      inlineTasks.add(
-                        new InlineTasks(var, usageInfo.getVarUsages(var)));
+                        new InlineTasks(var, val, usageInfo.getVarUsages(var)));
                   }
                   
                } // just in case: can't handle, ignore
@@ -538,55 +558,38 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                
                final int arity = functionNode.arity();
                
-               final List<IBindingSet> bsList =
-                     new ArrayList<IBindingSet>(arity-1);
-               int i=0;
+               // we're only interested in single-valued IN expressions, 
+               // everything else will be ignored
+               if (arity==2) {
+               
+                  final BOp varNodeCandidate = functionNode.get(0);
+                  if (varNodeCandidate instanceof VarNode) {
+                  
+                     final VarNode varNode = (VarNode)varNodeCandidate;
+                     final IVariable<IV> var = 
+                           (IVariable<IV>)(varNode.getValueExpression());
 
-               final BOp varNodeCandidate = functionNode.get(i++);
-               if (varNodeCandidate instanceof VarNode) {
-                  final VarNode varNode = (VarNode)varNodeCandidate;
-                  final IVariable<IV> var = 
-                     (IVariable<IV>)(varNode.getValueExpression());
-
-                  // collect constants and check for literals
-                  final List<IConstant> constants = new ArrayList<IConstant>();
-                  boolean containsLiteral = false;
-                  while (i<arity) {
-
-                     final BOp inValue = functionNode.get(i++);
-                     if (inValue instanceof ConstantNode) {
-                        ConstantNode in = (ConstantNode)inValue;
-                        containsLiteral |= in.getValueExpression().get().isLiteral();
-                     }
-                  }
-
-                  // we only perform changes if there's no literal
-                  if (!containsLiteral) {
-                     for (IConstant c : constants) {
-                        IBindingSet bs = new ListBindingSet();
-                        bs.set(var,c);
-                        bsList.add(bs);                        
-                     }
-            
-                     staticBindingInfo.addEnforced(bsList);
-                     
-                     final VariableUsageInfo usageInfo =
-                           VariableUsageInfo.merge(
-                              ancOrSelfVarUsageInfo, childVarUsageInfo);
+                     final BOp valueBOp = functionNode.get(1);
+                     if (valueBOp instanceof ConstantNode) {
+                        final ConstantNode valueNode = (ConstantNode)valueBOp;
+                        final IConstant<IV> value = valueNode.getValueExpression();
                         
-                     // add inline tasks for variable
-                     if (usageInfo.varUsed(var)) {
-                        inlineTasks.add(
-                           new InlineTasks(var, usageInfo.getVarUsages(var))); 
+                        if (value.get().isURI()) {
+
+                           final VariableUsageInfo usageInfo =
+                                 VariableUsageInfo.merge(
+                                    ancOrSelfVarUsageInfo, childVarUsageInfo);
+                           
+                           if (usageInfo.varUsed(var)) {
+                              inlineTasks.add(new InlineTasks(
+                                 var, value, usageInfo.getVarUsages(var))); 
+                           }
+                        }
                      }
                   }                 
                }
-
-               
             } // else: there's nothing obvious we can do
-
          }
-      
       }  
       
       /**
@@ -626,9 +629,11 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
    private Set<IVariable<?>> varsInBindingSet(final List<IBindingSet> bss) {
       Set<IVariable<?>> bssVars = new HashSet<IVariable<?>>();
       for (int i=0; i<bss.size(); i++) {
-         IBindingSet bs = bss.get(i);
          
-         Iterator<IVariable> bsVars = bs.vars();
+         final IBindingSet bs = bss.get(i);
+         
+         final Iterator<IVariable> bsVars = bs.vars();
+         
          while (bsVars.hasNext()) {
             bssVars.add(bsVars.next());
          }
@@ -645,7 +650,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
     */
    public static class VariableUsageInfo {
       
-      Map<IVariable<?>,List<IQueryNode>> usageMap;
+      final Map<IVariable<?>,List<IQueryNode>> usageMap;
       
       public VariableUsageInfo() {
          usageMap = new HashMap<IVariable<?>,List<IQueryNode>>();
@@ -695,9 +700,9 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
             return false;
          }
          
-         List<IQueryNode> varOccurrences = usageMap.get(var);
+         final List<IQueryNode> varOccurrences = usageMap.get(var);
          for (int i=0; i<varOccurrences.size(); i++) {
-            IQueryNode n = varOccurrences.get(i);
+            final IQueryNode n = varOccurrences.get(i);
             if (n instanceof FilterNode || n instanceof AssignmentNode) {
                return true;
             }
@@ -764,7 +769,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                
             } else if (node instanceof StatementPatternNode) {
                
-               StatementPatternNode spn = (StatementPatternNode)node;
+               final StatementPatternNode spn = (StatementPatternNode)node;
 
                for (IVariable<?> spnVar : spn.getProducedBindings()) {
                   
@@ -864,7 +869,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                
             } else if (child instanceof StatementPatternNode) {
                
-               StatementPatternNode spn = (StatementPatternNode)child;
+               final StatementPatternNode spn = (StatementPatternNode)child;
 
                for (IVariable<?> spnVar : spn.getProducedBindings()) {
                   
@@ -925,22 +930,12 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
    }
    
    /**
-    * We distinguish between static bindings that are produced (via a BIND
-    * or VALUES node) and static bindings that are enforced (via FILTER nodes).
-    * 
-    * Constructs implying produced static bindings can be eliminated when
-    * moving static bindings to the query top-level, enforced static bindings
-    * cannot (removing them to the top-level may induce duplicates).
-    * 
-    * Both produced and enforced static bindings can be applied to variables
-    * in the query.
-    * 
+    * We keep track of static bindings that are produced
     * @author msc
     */
    public static class StaticBindingInfo {
       
       final List<List<IBindingSet>> produced;
-      final List<List<IBindingSet>> enforced;
       
       final IBindingSet[] queryInput;
 
@@ -950,7 +945,6 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       public StaticBindingInfo() {
          
          this.produced = new ArrayList<List<IBindingSet>>();
-         this.enforced = new ArrayList<List<IBindingSet>>();
          this.queryInput = new IBindingSet[] { new ListBindingSet() };
       }
 
@@ -960,7 +954,6 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       public StaticBindingInfo(IBindingSet[] queryInput) {
          
          this.produced = new ArrayList<List<IBindingSet>>();
-         this.enforced = new ArrayList<List<IBindingSet>>();
          this.queryInput = queryInput;
          
       }
@@ -973,42 +966,12 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          produced.add(bsList);
       }
 
-      public void addEnforced(IBindingSet bs) {
-         enforced.add(wrap(bs));
-      }
-
-      public void addEnforced(List<IBindingSet> bsList) {
-         enforced.add(bsList);
-      }
-
       public List<List<IBindingSet>> getProduced() {
          return produced;
       }
       
-      public List<List<IBindingSet>> getEnforced() {
-         return enforced;
-      }
-
-      /**
-       * @return both the produced and enforced static bindings
-       */
-      public List<List<IBindingSet>> getAll() {
-         List<List<IBindingSet>> all = new ArrayList<List<IBindingSet>>();
-         all.addAll(produced);
-         all.addAll(enforced);
-         return all;
-      }
-      
       public IBindingSet[] joinProduced() {
          return join(produced);
-      }
-
-      public IBindingSet[] joinEnforced() {
-         return join(enforced);
-      }
-
-      public IBindingSet[] joinAll() {
-         return join(getAll());         
       }
       
       private List<IBindingSet> wrap(IBindingSet bs) {
@@ -1074,35 +1037,47 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       
       @SuppressWarnings("rawtypes")
       final private IVariable var;
+      @SuppressWarnings("rawtypes")
+      final private IConstant<IV> val;
       final private List<IQueryNode> nodes;
-      
+
+
+      /**
+       * Construct an inline task with known constant value
+       * @param var
+       * @param nodes
+       */
       @SuppressWarnings("rawtypes")
       public InlineTasks(
          final IVariable var,    
+         final IConstant<IV> val,
          final List<IQueryNode> nodes) {
          
          this.var = var; 
          this.nodes = nodes;
+         this.val = val;
               
       }
       
+
       @SuppressWarnings("rawtypes")
       public IVariable getVar() {
          return var;
       }
+
       
       /**
        * Applies the {@link InlineTasks} for the variable through the given
        * constant to the patterns specified in the task.
        */
       @SuppressWarnings("rawtypes")
-      public void apply(IConstant<IV> constant) {
+      public void apply() {
          
-         final IV val = constant.get();
+         final IV valIV = val.get();
          
          for (IQueryNode node : nodes) {
             
-            apply(val, node);
+            apply(valIV, node);
          }
          
       }
@@ -1119,7 +1094,7 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
          if (node instanceof FilterNode) {
             
-            FilterNode filter = (FilterNode)node;
+            final FilterNode filter = (FilterNode)node;
             final IValueExpressionNode vexpr = filter.getValueExpressionNode();
             applyToValueExpressionNode(val, vexpr);
             
@@ -1165,47 +1140,43 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       private void applyToStatementPattern(
          final IV val, final StatementPatternNode spn) {
 
-         TermNode s = spn.s();
-         TermNode p = spn.p();
-         TermNode o = spn.o();
-         TermNode c = spn.c();
+         final TermNode s = spn.s();
+         final TermNode p = spn.p();
+         final TermNode o = spn.o();
+         final TermNode c = spn.c();
          
          if (s!=null && s instanceof VarNode && s.get(0).equals(var)) {
             
-            VarNode sVar = (VarNode)s;
-            final ConstantNode constNode = 
-                  new ConstantNode(
-                     new Constant<IV>(sVar.getValueExpression(),val));
+            final VarNode sVar = (VarNode)s;
+            final ConstantNode constNode = new ConstantNode(
+               new Constant<IV>(sVar.getValueExpression(),val));
             spn.setArg(0, constNode);
             
          }
          
          if (p!=null && p instanceof VarNode && p.get(0).equals(var)) {
 
-            VarNode pVar = (VarNode)p;
-            final ConstantNode constNode = 
-                  new ConstantNode(
-                     new Constant<IV>(pVar.getValueExpression(),val));
+            final VarNode pVar = (VarNode)p;
+            final ConstantNode constNode = new ConstantNode(
+               new Constant<IV>(pVar.getValueExpression(),val));
             spn.setArg(1, constNode);
             
          }
 
          if (o!=null && o instanceof VarNode && o.get(0).equals(var)) {
             
-            VarNode oVar = (VarNode)o;
-            final ConstantNode constNode = 
-                  new ConstantNode(
-                     new Constant<IV>(oVar.getValueExpression(),val));
+            final VarNode oVar = (VarNode)o;
+            final ConstantNode constNode = new ConstantNode(
+               new Constant<IV>(oVar.getValueExpression(),val));
             spn.setArg(2, constNode);
             
          }
 
          if (c!=null && c instanceof VarNode && c.get(0).equals(var)) {
             
-            VarNode cVar = (VarNode)c;
-            final ConstantNode constNode = 
-                  new ConstantNode(
-                     new Constant<IV>(cVar.getValueExpression(),val));
+            final VarNode cVar = (VarNode)c;
+            final ConstantNode constNode = new ConstantNode(
+               new Constant<IV>(cVar.getValueExpression(),val));
             spn.setArg(3, constNode);
             
          }
@@ -1227,39 +1198,25 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          
          final FunctionNode functionNode = (FunctionNode) vexpr;
 
-         // TODO: what about unary functions? will this crash -> test case
-         final IValueExpressionNode left = 
-            (IValueExpressionNode) functionNode.get(0);
-         final IValueExpressionNode right = 
-               (IValueExpressionNode) functionNode.get(1);
+         for (int i=0; i<functionNode.arity(); i++) {
 
-         if (left instanceof VarNode &&
-               ((VarNode)left).get(0).equals(var)) {
+            final IValueExpressionNode cur = 
+               (IValueExpressionNode) functionNode.get(i);
             
-            final ConstantNode constNode = 
-               new ConstantNode(
-                  new Constant<IV>(
-                     ((VarNode)left).getValueExpression(),val));
-            
-            functionNode.setArg(0, constNode);
-            
-         } else if (right instanceof VarNode && 
-                     ((VarNode)right).get(0).equals(var)) {
-
-            final ConstantNode constNode = 
-               new ConstantNode(
-                  new Constant<IV>(
-                     ((VarNode)right).getValueExpression(),val));
-            
-            functionNode.setArg(1, constNode);
-            
-         } else {
-            
-            // recurse (e.g. logical and, or, ...)
-            applyToValueExpressionNode(val, left);
-            applyToValueExpressionNode(val, right);
+            if (cur instanceof VarNode && ((VarNode)cur).get(0).equals(var)) {
+               
+               final ConstantNode constNode = 
+                  new ConstantNode(
+                     new Constant<IV>(((VarNode)cur).getValueExpression(),val));
+               
+               functionNode.setArg(i, constNode);
+               
+            } else {
+               
+               applyToValueExpressionNode(val, cur); // recurse
+               
+            }
          }
       }
    }
-   
 }
