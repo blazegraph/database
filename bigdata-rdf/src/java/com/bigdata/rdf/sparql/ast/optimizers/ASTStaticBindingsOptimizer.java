@@ -856,6 +856,10 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
       @SuppressWarnings("rawtypes")
       public void extractVarSPUsageInfoChildrenOrSelf(GroupNodeBase<?> group) {
          
+         if (group==null) {
+            return;
+         }
+         
          // abort for optional patterns
          if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
             return;
