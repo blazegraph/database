@@ -5427,6 +5427,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
           
        } else {
 
+          final INamedSolutionSetRef namedSolutionSet = 
+             NamedSolutionSetRefUtility.newInstance(
+                ctx.queryId, "--distinct-"+ctx.nextId(), projectionVars);
+          
           final List<NV> anns = new LinkedList<NV>();
           anns.add(new NV(
               HTreeDistinctBindingSetsOp.Annotations.BOP_ID, ctx.nextId()));
@@ -5437,7 +5441,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
               BOpEvaluationContext.CONTROLLER));
           anns.add(new NV(
               HTreeDistinctBindingSetsOp.Annotations.SHARED_STATE, true));
-     
+          anns.add(new NV(PipelineOp.Annotations.MAX_PARALLEL, 1));
+          anns.add(new NV(HTreeDistinctBindingSetsOp.Annotations.NAMED_SET_REF,
+                       namedSolutionSet));
+          
           left = new HTreeDistinctBindingSetsOp(leftOrEmpty(left),//
               anns.toArray(new NV[anns.size()]));
 
