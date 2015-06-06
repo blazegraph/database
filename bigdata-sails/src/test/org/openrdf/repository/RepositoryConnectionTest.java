@@ -1634,9 +1634,9 @@ public abstract class RepositoryConnectionTest extends TestCase {
 		xcal.setTimezone(OFFSET);
 		
 		String SELECT_BY_DATE = 
-		   "SELECT ?s ?d WHERE { BIND(\"" + 
-		   vf.createLiteral(xcal).toString() + 
-		   "\" AS ?date) . ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> ?d . FILTER (?d <= ?date) }";
+		   "SELECT ?s ?d WHERE { "
+		   + "?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> ?d . "
+		   + "FILTER (?d <= " + vf.createLiteral(xcal) + ") }";
 
 		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, SELECT_BY_DATE);
 		TupleQueryResult result = query.evaluate();
