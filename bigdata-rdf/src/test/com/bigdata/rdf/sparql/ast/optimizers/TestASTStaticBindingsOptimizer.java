@@ -2270,5 +2270,132 @@ public class TestASTStaticBindingsOptimizer extends AbstractASTEvaluationTestCas
       assertSameAST(expected, res.getQueryNode());
    }
 
-   
+   /**
+    * Tests rewriting of a modified form of ticket #653 (i.e., the 
+    * corresponding SELECT query). In particular, verify that the query
+    * 
+    * <pre>
+    * SELECT ?uri ?p ?o WHERE { 
+    *   BIND (CONST as ?uri ) 
+    *   ?uri ?p ?o . 
+    *   OPTIONAL { 
+    *     ?uri a ?type . 
+    *     ?type rdfs:label ?typelabel . 
+    *   } 
+    * }
+    * </pre>
+    * 
+    * is rewritten as
+    * 
+    * <pre>
+    * SELECT ?uri ?p ?o WHERE { 
+    *   CONST ?p ?o . 
+    *   OPTIONAL { 
+    *     ?uri a ?type . 
+    *     ?type rdfs:label ?typelabel . 
+    *   } 
+    * }
+    * </pre>
+    *  
+    *  where { ?uri -> CONST } is added to the exogenous mapping set.
+    */
+   public void testTicket653() {
+      
+      final BigdataValueFactory f = store.getValueFactory();
+      final BigdataURI cTestUri = f.createURI("http://www.yso.fi/onto/ysa/Y141994");
+      final BigdataURI rdfTypeUri = f.createURI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+      final BigdataURI rdfsLabelUri = f.createURI("http://www.w3.org/2000/01/rdf-schema#label");
+      
+      final IV cTest = makeIV(cTestUri);
+      final IV rdfType = makeIV(cTestUri);
+      final IV rdfsLabel = makeIV(rdfsLabelUri);
+      
+      final BigdataValue[] values = 
+         new BigdataValue[] { cTestUri, rdfTypeUri, rdfsLabelUri };
+      
+      store.getLexiconRelation()
+              .addTerms(values, values.length, false/* readOnly */);
+      
+      final IBindingSet[] bsetsGiven = 
+         new IBindingSet[] { new ListBindingSet() };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          projection.addProjectionVar(new VarNode("uri"));
+          projection.addProjectionVar(new VarNode("p"));          
+          projection.addProjectionVar(new VarNode("o"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          given.setWhereClause(whereClause);
+          
+          whereClause.addChild(
+                new AssignmentNode(new VarNode("uri"), new ConstantNode(cTest)));
+          whereClause.addChild(new StatementPatternNode(new VarNode("uri"),
+                  new VarNode("p"), new VarNode("type"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS));
+          
+          final JoinGroupNode jgn = new JoinGroupNode();
+          jgn.addChild(new StatementPatternNode(new VarNode("uri"),
+                  new ConstantNode(rdfType), new VarNode("o"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS));
+          jgn.addChild(new StatementPatternNode(new VarNode("type"),
+                new ConstantNode(rdfsLabel), new VarNode("typeLabel"), null/* c */,
+                Scope.DEFAULT_CONTEXTS));
+          jgn.setOptional(true);
+          
+          whereClause.addChild(jgn);
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+         final ProjectionNode projection = new ProjectionNode();
+         expected.setProjection(projection);
+         projection.addProjectionVar(new VarNode("uri"));
+         projection.addProjectionVar(new VarNode("p"));          
+         projection.addProjectionVar(new VarNode("o"));
+         
+         final JoinGroupNode whereClause = new JoinGroupNode();
+         expected.setWhereClause(whereClause);
+         
+         whereClause.addChild(
+            new StatementPatternNode(
+               new ConstantNode(new Constant((IVariable) Var.var("uri"),cTest)),
+               new VarNode("p"), new VarNode("type"), null/* c */,
+               Scope.DEFAULT_CONTEXTS));
+         
+         final JoinGroupNode jgn = new JoinGroupNode();
+         jgn.addChild(new StatementPatternNode(new VarNode("uri"),
+                 new ConstantNode(rdfType), new VarNode("o"), null/* c */,
+                 Scope.DEFAULT_CONTEXTS));
+         jgn.addChild(new StatementPatternNode(new VarNode("type"),
+               new ConstantNode(rdfsLabel), new VarNode("typeLabel"), null/* c */,
+               Scope.DEFAULT_CONTEXTS));
+         jgn.setOptional(true);
+         
+         whereClause.addChild(jgn);
+
+      }
+      
+      final ASTStaticBindingsOptimizer rewriter = 
+         new ASTStaticBindingsOptimizer();
+      
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final QueryNodeWithBindingSet res = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsetsGiven));
+
+      // assert that the bindings set has been modified as expected
+      IBindingSet[] resBs = res.getBindingSets();
+      assertTrue(resBs.length==1);
+      assertTrue(resBs[0].size()==1);
+      assertTrue(resBs[0].get(Var.var("uri")).equals(new Constant<IV>(cTest)));
+      
+      assertSameAST(expected, res.getQueryNode());      
+   }   
 }
