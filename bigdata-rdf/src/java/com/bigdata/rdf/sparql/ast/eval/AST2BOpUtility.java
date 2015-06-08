@@ -283,7 +283,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         astContainer.setQueryPlan(left);
         
         // Set the optimized binding set on the container.
-        astContainer.setOptimizedASTBindingSet(optRes.getBindingSets());
+        astContainer.setOptimizedASTBindingSets(optRes.getBindingSets());
 
         if (log.isInfoEnabled()) {
             log.info(astContainer);

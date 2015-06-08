@@ -781,7 +781,7 @@ public class ASTEvalHelper {
 
             // Submit query for evaluation.
             runningQuery = ctx.queryEngine.eval(queryPlan, 
-                  astContainer.getOptimizedASTBindingSet(), queryAttributes);
+                  astContainer.getOptimizedASTBindingSets(), queryAttributes);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
