@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -38,6 +39,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
@@ -2562,6 +2564,28 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         return false;
 
+    }
+    
+    /**
+     * Extract the set of variables contained in a binding set.
+     * @param bss
+     * @return
+     */
+    @SuppressWarnings("rawtypes")
+    public Set<IVariable<?>> getVarsInBindingSet(final List<IBindingSet> bss) {
+       Set<IVariable<?>> bssVars = new HashSet<IVariable<?>>();
+       for (int i=0; i<bss.size(); i++) {
+          
+          final IBindingSet bs = bss.get(i);
+          
+          final Iterator<IVariable> bsVars = bs.vars();
+          
+          while (bsVars.hasNext()) {
+             bssVars.add(bsVars.next());
+          }
+          
+       }
+       return bssVars;
     }
 
 }

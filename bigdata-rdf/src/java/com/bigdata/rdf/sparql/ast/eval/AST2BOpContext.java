@@ -846,6 +846,10 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     public void setGloballyScopedVariables(
        final Set<IVariable<?>> globallyScopedVariables) {
        
+       if (globallyScopedVariables==null) {
+          this.globallyScopedVariables = new HashSet<IVariable<?>>();
+       }
+       
        this.globallyScopedVariables = globallyScopedVariables;
     }
 
