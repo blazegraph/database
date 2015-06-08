@@ -149,7 +149,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param astContainer
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      *            
      * @return <code>true</code> if there are any solutions to the query.
@@ -158,7 +158,7 @@ public class ASTEvalHelper {
      */
     static public boolean evaluateBooleanQuery(
             final AbstractTripleStore store,
-            final ASTContainer astContainer, final BindingSet bs)
+            final ASTContainer astContainer, final BindingSet globallyScopedBS)
             throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -167,11 +167,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = 
-              new IBindingSet[] { batchResolveIVs(store, bs) };
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -211,7 +211,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      *            
      * @return An object from which the solutions may be drained.
@@ -220,7 +220,7 @@ public class ASTEvalHelper {
      */
     static public TupleQueryResult evaluateTupleQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs) throws QueryEvaluationException {
+            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -228,11 +228,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = 
-              new IBindingSet[] { batchResolveIVs(store, bs) };
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // Get the projection for the query.
         final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -281,7 +281,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      * @param materialize
      *            When <code>true</code>, {@link IV}s will be materialized
@@ -298,7 +298,7 @@ public class ASTEvalHelper {
      */
     static public ICloseableIterator<IBindingSet[]> evaluateTupleQuery2(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs, final boolean materialize)
+            final QueryBindingSet globallyScopedBS, final boolean materialize)
             throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -307,11 +307,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = 
-              new IBindingSet[] { batchResolveIVs(store, bs) };
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -355,7 +355,7 @@ public class ASTEvalHelper {
         try {
 
             // Submit query for evaluation.
-            runningQuery = context.queryEngine.eval(queryPlan, bindingSets);
+            runningQuery = context.queryEngine.eval(queryPlan, globallyScopedBSAsList);
 
             // The iterator draining the query solutions.
             final ICloseableIterator<IBindingSet[]> it1 = runningQuery
@@ -414,7 +414,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      *            
      * @return An optimized AST.
@@ -423,7 +423,7 @@ public class ASTEvalHelper {
      */
     static public QueryRoot optimizeQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs) throws QueryEvaluationException {
+            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -431,11 +431,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = 
-              new IBindingSet[] { batchResolveIVs(store, bs) };
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
 //        // Get the projection for the query.
 //        final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -462,7 +462,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param astContainer
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      * 
      * @throws QueryEvaluationException
@@ -472,7 +472,7 @@ public class ASTEvalHelper {
      */
     public static GraphQueryResult evaluateGraphQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs) throws QueryEvaluationException {
+            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -480,8 +480,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = 
-              new IBindingSet[] { batchResolveIVs(store, bs) };
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
@@ -522,7 +522,7 @@ public class ASTEvalHelper {
         }
         
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
