@@ -31,7 +31,9 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.assertThat;
 
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
@@ -1090,8 +1092,12 @@ public class TestASTBottomUpOptimizer extends
                 new IVariable[] { Var.var("v") },
                 new IConstant[] { new Constant(x.getIV()) })
         };
+        
+        Set<IVariable<?>> globallyScopedVars = new HashSet<IVariable<?>>();
+        globallyScopedVars.add(Var.var("v"));
 
         context.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
+        context.setGloballyScopedVariables(globallyScopedVars);
         
         queryRoot = 
            (QueryRoot) new ASTBottomUpOptimizer().optimize(
