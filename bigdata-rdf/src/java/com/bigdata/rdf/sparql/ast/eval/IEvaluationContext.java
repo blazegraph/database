@@ -160,7 +160,7 @@ public interface IEvaluationContext {
     /**
      * Returns all the variables with a global scope. This basically serves
      * the purpose of identifying variables that are injected through Sesame's
-     * Operation.setBinding() interface.
+     * Operation.setBinding() interface. Guaranteed to be not null.
      * 
      * @return
      */
