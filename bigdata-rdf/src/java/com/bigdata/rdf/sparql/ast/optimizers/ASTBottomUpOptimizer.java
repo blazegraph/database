@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -660,12 +661,17 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
      *      EXISTS, NOT EXISTS, and MINUS)
      */
-    private void handleFiltersWithVariablesNotInScope(
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+   private void handleFiltersWithVariablesNotInScope(
             final AST2BOpContext context,
             final StaticAnalysis sa,
             final QueryBase queryBase,
             final IBindingSet[] bindingSets) {
 
+        final Set<IVariable<?>> globallyScopedVars = 
+            (context == null ? 
+            (Set) Collections.emptySet() : context.getSolutionSetStats().getUsedVars());       
+       
         // Map for renamed variables.
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 
@@ -702,14 +708,21 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             
             /*
              * All variables potentially bound by joins in this group or a
-             * subgroup. Note that we do not want to add any exogeneous
-             * variables. By semantics, they are joined in *last*, so they're
-             * not visible in any scope.
+             * subgroup. 
              */
             final Set<IVariable<?>> maybeBound = sa
                     .getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */);
- 
+
+            /*
+             * Add globally scoped variables, we're not allowed to rewrite
+             * filters for them, as they are globally visible. Note that we do
+             * not want to add any exogeneous variables from the outer VALUES
+             * clause: by semantics, they are joined in *last*, so they're
+             * not visible in any scope.
+             */ 
+            maybeBound.addAll(globallyScopedVars);
+            
             if (group.isOptional()) {
 
                 /*

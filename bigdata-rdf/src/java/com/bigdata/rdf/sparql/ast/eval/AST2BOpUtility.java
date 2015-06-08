@@ -232,6 +232,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * for the case where the optimizer is (manually) disabled.
          */
         ctx.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
+        ctx.setGloballyScopedVariables(ctx.getSolutionSetStats().getAlwaysBound());
         
         // Run the AST query rewrites / query optimizers.
         final QueryNodeWithBindingSet optRes = 

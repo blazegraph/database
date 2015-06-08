@@ -1067,8 +1067,7 @@ public class TestASTBottomUpOptimizer extends
         final BigdataValueFactory f = store.getValueFactory();
         final BigdataURI x = f.createURI("http://example/x");
         final BigdataURI p = f.createURI("http://example/p");
-        final BigdataLiteral one = f.createLiteral("x");
-        final BigdataValue[] values = new BigdataValue[] { x, p, one };
+        final BigdataValue[] values = new BigdataValue[] { x, p };
         store.getLexiconRelation()
                 .addTerms(values, values.length, false/* readOnly */);
 
@@ -1078,6 +1077,8 @@ public class TestASTBottomUpOptimizer extends
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
     
         QueryRoot queryRoot = astContainer.getOriginalAST();
+        
+        final QueryRoot expected = BOpUtility.deepCopy(queryRoot);
 
         /*
          * A single solution with [v] bound. The value of the binding does not
@@ -1092,17 +1093,12 @@ public class TestASTBottomUpOptimizer extends
 
         context.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
         
-        queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
-                context, new QueryNodeWithBindingSet(queryRoot, bindingSets)).
-                getQueryNode();
+        queryRoot = 
+           (QueryRoot) new ASTBottomUpOptimizer().optimize(
+              context, new QueryNodeWithBindingSet(queryRoot, bindingSets))
+              .getQueryNode();
 
-        final JoinGroupNode filterParent =
-              (JoinGroupNode)queryRoot.getWhereClause().args().get(1);
-        FilterNode filter = (FilterNode)filterParent.args().get(0);
-        VarNode var = (VarNode)filter.get(0).get(0);
-        IVariable<IV> iVar = var.getValueExpression();
-        
-        assertTrue(iVar.getName().equals("-unbound-var-v-0"));
+        diff(expected, queryRoot);
 
     }
 

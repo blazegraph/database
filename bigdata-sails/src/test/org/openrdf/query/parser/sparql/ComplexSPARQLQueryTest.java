@@ -854,12 +854,20 @@ public abstract class ComplexSPARQLQueryTest extends TestCase {
 
 			int count = 0;
 			while (result.hasNext()) {
-				result.next();
+			   BindingSet bs = result.next();
 				count++;
+				assertNotNull(bs);
+				
+				System.out.println(bs);
+				
+				Value mbox = bs.getValue("mbox");
+				Value x = bs.getValue("x");
+				
+				assertTrue(mbox instanceof Literal || x instanceof URI);				
 			}
 			result.close();
 
-			assertEquals(0, count);
+			assertEquals(3, count);
 		}
 		catch (QueryEvaluationException e) {
 			e.printStackTrace();
