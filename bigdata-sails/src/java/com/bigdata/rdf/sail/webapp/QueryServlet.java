@@ -1029,7 +1029,7 @@ public class QueryServlet extends BigdataRDFServlet {
             if (q != null) {
 
                 final QueryRoot optimizedAST = astContainer.getOptimizedAST();
-                final IBindingSet[] bs = astContainer.getOptimizedASTBindingSet();
+                final IBindingSet[] bs = astContainer.getOptimizedASTBindingSets();
 
                 if (optimizedAST != null) {
 
