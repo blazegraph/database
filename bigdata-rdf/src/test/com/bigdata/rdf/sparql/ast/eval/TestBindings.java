@@ -38,20 +38,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a> * 
  * @version $Id$
- * 
- *          TODO Unit test to verify that static analysis correctly leverages
- *          when a variable is known bound to a constant across multiple
- *          solutions in the BINDINGS clause and when it takes on different
- *          values in different solutions in the BINDINGS clause.
- * 
- *          TODO Unit test when a variable is bound in some solutions in the
- *          BINDINGS clause but not in other solutions in that BINDINGS clause.
- *          The variable can not be treated as "known" bound in the latter case.
- * 
- *          TODO Unit test when a variable which is known bound in the BINDINGS
- *          clause is not projected into a sub-select. The test should verify
- *          that a variable by the same name in the sub-select is in fact a
- *          distinct variable.
  */
 public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
 

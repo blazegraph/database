@@ -669,8 +669,8 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             final IBindingSet[] bindingSets) {
 
         final Set<IVariable<?>> globallyScopedVars = 
-            (context == null ? 
-            (Set) Collections.emptySet() : context.getSolutionSetStats().getUsedVars());       
+            context == null ? 
+            (Set) Collections.emptySet() : context.getGloballyScopedVariables();       
        
         // Map for renamed variables.
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
