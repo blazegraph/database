@@ -1764,7 +1764,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                  * LexiconConfiguration.
                  */
                 final URI dt = ((BigdataLiteral) v).getDatatype();
-                if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
+                if (dt == null || dt.equals(XSD.STRING)) {
+                    // always text index strings, even inline ones
+                    textIndex.add(v);
+                } else if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
                     textIndex.add(v);
                 }
                 
