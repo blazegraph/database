@@ -825,7 +825,10 @@ public class FullTextIndex<V extends Comparable<V>> extends AbstractRelation {
         final TokenStream tokenStream = getTokenStream(languageCode, r,
                 filterStopwords);
 
+        
         try {
+
+            tokenStream.reset();   
 
             while (tokenStream.incrementToken()) {
                 

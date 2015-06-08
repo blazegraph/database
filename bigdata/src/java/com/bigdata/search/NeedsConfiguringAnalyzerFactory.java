@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.search;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.io.StringReader;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -87,7 +86,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 			"com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.*.like=eng\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.por.analyzerClass=org.apache.lucene.analysis.br.BrazilianAnalyzer\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.pt.like=por\n" +
-		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.zho.analyzerClass=org.apache.lucene.analysis.cn.ChineseAnalyzer\n" +
+		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.zho.analyzerClass=org.apache.lucene.analysis.cn.smart.SmartChineseAnalyzer\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.chi.like=zho\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.zh.like=zho\n" +
 		    "com.bigdata.search.ConfigurableAnalyzerFactory.analyzer.jpn.analyzerClass=org.apache.lucene.analysis.cjk.CJKAnalyzer\n" +
@@ -160,7 +159,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 			Object rslt[] = new Object[params.length];
 			for (int i=0; i<params.length; i++) {
 				if (params[i] instanceof Set) {
-					rslt[i] = Collections.EMPTY_SET;
+					rslt[i] = CharArraySet.EMPTY_SET;
 				} else {
 					rslt[i] = params[i];
 				}
@@ -200,10 +199,10 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 	 *
 	 */
     private static class PatternAnalyzer extends AnalyzerPair {
-		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
+		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern, CharArraySet stopWords) throws Exception {
 
-			super(lro.languageRange, getConstructor(PatternAnalyzerImpl.class,Pattern.class), 
-				pattern);
+			super(lro.languageRange, getConstructor(PatternAnalyzerImpl.class,Pattern.class, CharArraySet.class), 
+				pattern, stopWords);
 		}
 	}
     
@@ -216,11 +215,22 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
     private class PatternAnalyzerImpl extends Analyzer {
     	
     	private Pattern pattern = null;
+    	private boolean useStopWords = false;
+    	private CharArraySet stopWordList = null;
     
     	@SuppressWarnings("unused")
-		public PatternAnalyzerImpl(Pattern pattern) {
+		public PatternAnalyzerImpl(Pattern pattern, CharArraySet stopWordList) {
     		super();
+    		System.err.println("Pattern:  " + pattern);
     		this.pattern = pattern;
+    		this.stopWordList = stopWordList;
+    	}
+    	
+    	@SuppressWarnings("unused")
+		public PatternAnalyzerImpl(String range, CharArraySet topWordList,
+				boolean useStopWords) {
+    		this.useStopWords = useStopWords;
+    		this.stopWordList = stopWordList;
     	}
     	
     	@Override
@@ -276,7 +286,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 		public Set<?> getStopWords() {
 			
 			if (doNotUseStopWords()) 
-				return Collections.EMPTY_SET;
+				return CharArraySet.EMPTY_SET;
 			
 			if (useDefaultStopWords()) {
 				return getStopWordsForClass(className);
@@ -387,7 +397,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 				return null;
 			}
 			if (pattern != null) {
-				return new PatternAnalyzer(this, pattern);
+				return new PatternAnalyzer(this, pattern, CharArraySet.EMPTY_SET);
 			}
 			if (softHyphens != null) {
 				return new AnalyzerPair(

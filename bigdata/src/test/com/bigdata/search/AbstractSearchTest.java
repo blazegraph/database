@@ -122,6 +122,7 @@ public abstract class AbstractSearchTest  extends ProxyTestCase<IIndexManager>  
 	protected String getTokenStream(Analyzer a, String text) throws IOException {
 		StringBuffer sb = new StringBuffer();
 		TokenStream s = a.tokenStream(null, new StringReader(text));
+		s.reset();
 	    while (s.incrementToken()) {
 	        final CharTermAttribute term = s.getAttribute(CharTermAttribute.class);
 	        if (sb.length()!=0) {
@@ -129,18 +130,23 @@ public abstract class AbstractSearchTest  extends ProxyTestCase<IIndexManager>  
 	        }
 	        sb.append(term.toString());
 	    }
+		s.close();
 		return sb.toString();
 	}
 
 	private void compareTokenStream(Analyzer a, String text, String expected[]) throws IOException {
 		TokenStream s = a.tokenStream(null, new StringReader(text));
 		int ix = 0;
+		
+		s.reset();
+		
 		while (s.incrementToken()) {
 			final CharTermAttribute term = s.getAttribute(CharTermAttribute.class);
 			final String word = term.toString();
 			assertTrue(ix < expected.length);
 			assertEquals(expected[ix++], word);
 		}
+		s.close();
 		assertEquals(ix, expected.length);
 	}
 

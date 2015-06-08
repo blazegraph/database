@@ -113,7 +113,7 @@ public abstract class AbstractDefaultAnalyzerFactoryTest extends AbstractAnalyze
     }
     public void testConfiguredLanguages() {
     	checkConfig("BrazilianAnalyzer", "por", "pt"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-        checkConfig("ChineseAnalyzer", "zho", "chi", "zh"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+        checkConfig("SmartChineseAnalyzer", "zho", "chi", "zh"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
         checkConfig("CJKAnalyzer", "jpn", "ja", "kor", "ko"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$
         checkConfig("CzechAnalyzer", "ces", "cze", "cs"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
         checkConfig("DutchAnalyzer", "dut", "nld", "nl"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
