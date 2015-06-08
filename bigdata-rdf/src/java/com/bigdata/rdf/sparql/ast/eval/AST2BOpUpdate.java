@@ -316,9 +316,9 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     /**
      * MP: Make SPARQL Update an auto-commit operation by default.
      * 
-     * TODO FIXME Bryan please fix me.
+     * TODO:  Make this private once merged down.
      */
-    public static boolean AUTO_COMMIT = true;
+    public static boolean AUTO_COMMIT = Boolean.parseBoolean(System.getProperty(AST2BOpBase.Annotations.AUTO_COMMIT, "true"));
     
     /**
      * Commit.
