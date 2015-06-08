@@ -357,7 +357,7 @@ public class BSBMQ5Setup {
                     new ASTContainer(queryRoot), store);
 
             new ASTSetValueExpressionsOptimizer().optimize(context,
-                    queryRoot, bsets);
+                  new QueryNodeWithBindingSet(queryRoot, bsets));
         }
 
     } // ctor

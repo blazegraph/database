@@ -54,6 +54,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
@@ -114,8 +115,12 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
     
     @SuppressWarnings("unchecked")
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -148,7 +153,7 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         processGroup(context, queryRoot, queryRoot, queryRoot.getWhereClause());
 
-        return queryNode;
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
     }
 

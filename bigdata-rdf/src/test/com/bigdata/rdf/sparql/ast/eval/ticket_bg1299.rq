@@ -1,0 +1,2 @@
+select $a
+{ VALUES $a { 1 1  1 1 } }

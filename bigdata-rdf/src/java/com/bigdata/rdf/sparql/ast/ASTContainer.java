@@ -30,8 +30,10 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.Map;
 
 
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
@@ -79,12 +81,18 @@ public class ASTContainer extends ASTBase {
          * The AST as rewritten by the {@link IASTOptimizer}s.
          */
         String OPTIMIZED_AST = "optimizedAST";
-        
+
         /**
          * The physical query plan (pipeline bops).
          */
         String QUERY_PLAN = "queryPlan";
-        
+
+        /**
+         * The incoming binding set associated with the query plan, as
+         * resulting from the query optimization phase.
+         */
+        String OPTIMIZED_AST_BINDING_SETS = "optimizedASTBindingSets";
+
     }
 
     /**
@@ -211,6 +219,25 @@ public class ASTContainer extends ASTBase {
     public QueryRoot getOriginalAST() {
 
         return (QueryRoot) getProperty(Annotations.ORIGINAL_AST);
+
+    }
+
+    
+    /**
+     * Set the incoming binding sets associated with the optimized AST.
+     */
+    public void setOptimizedASTBindingSets(final IBindingSet[] bindingSets) {
+        
+        setProperty(Annotations.OPTIMIZED_AST_BINDING_SETS, bindingSets);
+
+    }
+    
+    /**
+     * Return the incoming binding sets associated with the optimized AST.
+     */
+    public IBindingSet[] getOptimizedASTBindingSets() {
+
+        return (IBindingSet[]) getProperty(Annotations.OPTIMIZED_AST_BINDING_SETS);
 
     }
 

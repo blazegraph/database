@@ -1,0 +1,6 @@
+SELECT ?s WHERE {
+  BIND(<http://example.com/o> AS ?o)
+  OPTIONAL { 
+    ?s ?p ?o
+  }
+}
