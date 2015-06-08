@@ -604,15 +604,18 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
     
     	/*
-    	 * Start by adding the exogenous variables.
+    	 * Start by adding globally scoped and exogenous variables.
     	 */
-    	if (evaluationContext != null && locatedInToplevelQuery(node)) {
+    	if (evaluationContext != null) {
+    	   
+    	   vars.addAll(evaluationContext.getGloballyScopedVariables());
     		
-    		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
-    		
-    		// only add the vars that are always bound
-    		vars.addAll(stats.getAlwaysBound());
-    		
+    	   if (locatedInToplevelQuery(node)) {
+       		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
+       		
+       		// only add the vars that are always bound
+       		vars.addAll(stats.getAlwaysBound());
+    	   }    		
     	}
     	
         final GraphPatternGroup<?> parent = node.getParentGraphPatternGroup();
@@ -709,6 +712,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
    public boolean locatedInGroupNode(
       final GroupNodeBase<?> theGroup, IGroupMemberNode theNode) {
       
+      if (theGroup==null || theNode==null) {
+         return false; // not found
+      }
+      
       if (theGroup==theNode)
          return true;
       
@@ -762,15 +769,18 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     	/*
     	 * Start by adding the exogenous variables.
     	 */
-    	if (evaluationContext != null && locatedInToplevelQuery(node)) {
-    		
-    		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
-    		
-    		// add the vars that are always bound
-    		vars.addAll(stats.getAlwaysBound());
-    		
-    		// also add the vars that might be bound
-    		vars.addAll(stats.getNotAlwaysBound());
+    	if (evaluationContext != null) {
+    	   
+    	   vars.addAll(evaluationContext.getGloballyScopedVariables());
+
+    	   if (locatedInToplevelQuery(node)) {
+    	      
+       		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
+       		
+       		// add the vars that are always bound and those that might be bound
+       		vars.addAll(stats.getAlwaysBound());
+       		vars.addAll(stats.getNotAlwaysBound());
+    	   }
     		
     	}
     	

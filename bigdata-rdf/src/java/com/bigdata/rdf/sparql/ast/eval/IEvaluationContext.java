@@ -27,7 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import java.util.Set;
+
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -153,5 +156,22 @@ public interface IEvaluationContext {
 //     *             if the named solution set can not be found.
 //     */
 //    ICloseableIterator<IBindingSet[]> getSolutionSet(String name);
+    
+    /**
+     * Returns all the variables with a global scope. This basically serves
+     * the purpose of identifying variables that are injected through Sesame's
+     * Operation.setBinding() interface.
+     * 
+     * @return
+     */
+    public Set<IVariable<?>> getGloballyScopedVariables();
+
+    /**
+     * Sets the variables with global scope. This basically serves the purpose
+     * of identifying 
+     * @param globallyScopedVariables
+     */
+    public void setGloballyScopedVariables(
+       final Set<IVariable<?>> globallyScopedVariables);
     
 }

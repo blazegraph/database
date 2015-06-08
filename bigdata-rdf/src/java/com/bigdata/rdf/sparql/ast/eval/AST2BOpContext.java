@@ -836,22 +836,13 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 //
 //    }
     
-    /**
-     * Returns all the variables with a global scope. This basically serves
-     * the purpose of identifying variables that are injected through Sesame's
-     * Operation.setBinding() interface.
-     * 
-     * @return
-     */
+
+    @Override
     public Set<IVariable<?>> getGloballyScopedVariables() {
        return globallyScopedVariables;
     }
 
-    /**
-     * Sets the variables with global scope. This basically serves the purpose
-     * of identifying 
-     * @param vars
-     */
+    @Override
     public void setGloballyScopedVariables(
        final Set<IVariable<?>> globallyScopedVariables) {
        
