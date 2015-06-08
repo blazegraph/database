@@ -195,9 +195,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * 
      * @param ctx
      *            The evaluation context.
-     * @param bset
-     *            The exogenous inputs to the query (variable bindings from
-     *            outside of the query evaluation).
+     * @param globallyScopedBindings
+     *            Bindings that are considered as "globally scoped", i.e.
+     *            are valid also in sub scopes.
      * 
      * @return The query plan which may be used to evaluate the query.
      * 
@@ -216,7 +216,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
      *         Interrupt of thread submitting a query for evaluation does not
      *         always terminate the AbstractRunningQuery </a>.
      */
-    static PipelineOp convert(final AST2BOpContext ctx, final IBindingSet[] bindingSets) {
+    static PipelineOp convert(final AST2BOpContext ctx, 
+       final IBindingSet[] globallyScopedBindings) {
 
         // The AST query model.
         final ASTContainer astContainer = ctx.astContainer;
@@ -225,19 +226,30 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final QueryRoot originalQuery = astContainer.getOriginalAST();
         
         /**
-         * The summary stats based on the exogeneous bindings are important
+         * The summary stats based on the globally scoped bindings are important
          * input to the join optimizer etc. Note that the 
-         * ASTStaticBindingsOptimzer might modify this set and update the
-         * solution set stats; however, we want to initialize it here, e.g.
-         * for the case where the optimizer is (manually) disabled.
+         * ASTStaticBindingsOptimzer might modify/extend this set and update the
+         * solution set stats.
          */
-        ctx.setSolutionSetStats(SolutionSetStatserator.get(bindingSets));
+        ctx.setSolutionSetStats(SolutionSetStatserator.get(globallyScopedBindings));
+        
+        /**
+         * By definition of the API, the mappings passed in from Sesame
+         * (i.e., the bindingSets input to this method) is having the special
+         * semantics of "globally scoped vars". We need to record and treat
+         * them separately in some places. See also the discussion at
+         * https://groups.google.com/forum/#!topic/sesame-devel/Di_ZLtTVuZA.
+         * 
+         * Also note that, unless the solution set stats (which might be
+         * adjusted by optimizers as the input binding set is modified),
+         * the globally scoped vars set is not intended to be modified.
+         */
         ctx.setGloballyScopedVariables(ctx.getSolutionSetStats().getAlwaysBound());
         
         // Run the AST query rewrites / query optimizers.
         final QueryNodeWithBindingSet optRes = 
            ctx.optimizers.optimize(ctx, 
-                 new QueryNodeWithBindingSet(originalQuery, bindingSets));
+                 new QueryNodeWithBindingSet(originalQuery, globallyScopedBindings));
         
         // Set the optimized AST model on the container.
         final QueryRoot optimizedQuery = (QueryRoot)optRes.getQueryNode();
