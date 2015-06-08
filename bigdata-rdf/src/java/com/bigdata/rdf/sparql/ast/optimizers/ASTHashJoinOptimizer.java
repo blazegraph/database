@@ -45,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.JoinSetUtil;
 import com.bigdata.rdf.sparql.ast.JoinSetUtil.VertexJoinSet;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -68,8 +69,11 @@ public class ASTHashJoinOptimizer implements IASTOptimizer {
             .getLogger(ASTHashJoinOptimizer.class);
     
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -96,7 +100,7 @@ public class ASTHashJoinOptimizer implements IASTOptimizer {
         // Now process the main where clause.
         optimizeJoinGroups(context, sa, queryRoot.getWhereClause());
 
-        return queryRoot;
+        return new QueryNodeWithBindingSet(queryRoot, bindingSets);
         
     }
 

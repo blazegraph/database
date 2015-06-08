@@ -29,7 +29,6 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import info.aduna.iteration.CloseableIteration;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -56,7 +55,6 @@ import org.openrdf.query.impl.TupleQueryResultImpl;
 import org.openrdf.sail.SailException;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -77,18 +75,12 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
-import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
-import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
-import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
-import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.cache.DescribeBindingsCollector;
@@ -157,7 +149,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param astContainer
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      *            
      * @return <code>true</code> if there are any solutions to the query.
@@ -166,7 +158,7 @@ public class ASTEvalHelper {
      */
     static public boolean evaluateBooleanQuery(
             final AbstractTripleStore store,
-            final ASTContainer astContainer, final BindingSet bs)
+            final ASTContainer astContainer, final BindingSet globallyScopedBS)
             throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -175,11 +167,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -193,9 +185,8 @@ public class ASTEvalHelper {
             itr = ASTEvalHelper.evaluateQuery(
                     astContainer,
                     context,
-                    bindingSets
-                    , materializeProjectionInQuery//
-                    , new IVariable[0]// required
+                    materializeProjectionInQuery,
+                    new IVariable[0]// required
                     );
             return itr.hasNext();
         } finally {
@@ -220,7 +211,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      *            
      * @return An object from which the solutions may be drained.
@@ -229,7 +220,7 @@ public class ASTEvalHelper {
      */
     static public TupleQueryResult evaluateTupleQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs) throws QueryEvaluationException {
+            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -237,11 +228,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // Get the projection for the query.
         final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -259,10 +250,8 @@ public class ASTEvalHelper {
                 && !optimizedQuery.hasSlice();
 
         final CloseableIteration<BindingSet, QueryEvaluationException> itr = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets,
-                        materializeProjectionInQuery//
-                        , projected//
-                );
+                .evaluateQuery(astContainer, context, 
+                        materializeProjectionInQuery, projected);
 
         TupleQueryResult r = null;
         try {
@@ -292,7 +281,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      * @param materialize
      *            When <code>true</code>, {@link IV}s will be materialized
@@ -309,7 +298,7 @@ public class ASTEvalHelper {
      */
     static public ICloseableIterator<IBindingSet[]> evaluateTupleQuery2(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs, final boolean materialize)
+            final QueryBindingSet globallyScopedBS, final boolean materialize)
             throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
@@ -318,11 +307,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -366,7 +355,7 @@ public class ASTEvalHelper {
         try {
 
             // Submit query for evaluation.
-            runningQuery = context.queryEngine.eval(queryPlan, bindingSets);
+            runningQuery = context.queryEngine.eval(queryPlan, globallyScopedBSAsList);
 
             // The iterator draining the query solutions.
             final ICloseableIterator<IBindingSet[]> it1 = runningQuery
@@ -425,7 +414,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param queryPlan
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      *            
      * @return An optimized AST.
@@ -434,7 +423,7 @@ public class ASTEvalHelper {
      */
     static public QueryRoot optimizeQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs) throws QueryEvaluationException {
+            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -442,11 +431,11 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
 
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
 //        // Get the projection for the query.
 //        final IVariable<?>[] projected = astContainer.getOptimizedAST()
@@ -473,7 +462,7 @@ public class ASTEvalHelper {
      *            The {@link AbstractTripleStore} having the data.
      * @param astContainer
      *            The {@link ASTContainer}.
-     * @param bs
+     * @param globallyScopedBS
      *            The initial solution to kick things off.
      * 
      * @throws QueryEvaluationException
@@ -483,7 +472,7 @@ public class ASTEvalHelper {
      */
     public static GraphQueryResult evaluateGraphQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
-            final QueryBindingSet bs) throws QueryEvaluationException {
+            final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -491,8 +480,8 @@ public class ASTEvalHelper {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = mergeBindingSets(astContainer,
-                batchResolveIVs(store, bs));
+        final IBindingSet[] globallyScopedBSAsList = 
+              new IBindingSet[] { batchResolveIVs(store, globallyScopedBS) };
 
         // true iff the original query was a DESCRIBE.
         final boolean isDescribe = astContainer.getOriginalAST().getQueryType() == QueryType.DESCRIBE;
@@ -533,7 +522,7 @@ public class ASTEvalHelper {
         }
         
         // Convert the query (generates an optimized AST as a side-effect).
-        AST2BOpUtility.convert(context, bindingSets);
+        AST2BOpUtility.convert(context, globallyScopedBSAsList);
 
         // The optimized AST.
         final QueryRoot optimizedQuery = astContainer.getOptimizedAST();
@@ -559,8 +548,7 @@ public class ASTEvalHelper {
         
         // Solutions to the WHERE clause (as projected).
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets//
-                        , materializeProjectionInQuery//
+                .evaluateQuery(astContainer, context, materializeProjectionInQuery//
                         , optimizedQuery.getProjection().getProjectionVars()//
                 );
 
@@ -777,7 +765,6 @@ public class ASTEvalHelper {
     CloseableIteration<BindingSet, QueryEvaluationException> evaluateQuery(
             final ASTContainer astContainer,
             final AST2BOpContext ctx,            
-            final IBindingSet[] bindingSets, 
             final boolean materializeProjectionInQuery,
             final IVariable<?>[] required) throws QueryEvaluationException {
 
@@ -793,8 +780,8 @@ public class ASTEvalHelper {
                     .getQueryAttributes();
 
             // Submit query for evaluation.
-            runningQuery = ctx.queryEngine.eval(queryPlan, bindingSets,
-                    queryAttributes);
+            runningQuery = ctx.queryEngine.eval(queryPlan, 
+                  astContainer.getOptimizedASTBindingSets(), queryAttributes);
 
             /*
              * Wrap up the native bigdata query solution iterator as Sesame
@@ -811,198 +798,6 @@ public class ASTEvalHelper {
             throw new QueryEvaluationException(t);
         }
 
-    }
-    
-    /**
-     * Convert a Sesame {@link BindingSet} into a bigdata {@link IBindingSet}
-     * and merges it with the BINDINGS clause (if any) attached to the
-     * {@link QueryRoot}.
-     * 
-     * @param astContainer
-     *            The query container.
-     * @param src
-     *            The {@link BindingSet}.
-     * 
-     * @return The {@link IBindingSet}.
-     */
-    //private Note: Exposed to CBD class.
-    static IBindingSet[] mergeBindingSets(
-            final ASTContainer astContainer, final IBindingSet src) {
-
-        if (astContainer == null)
-            throw new IllegalArgumentException();
-
-        if (src == null)
-            throw new IllegalArgumentException();
-        
-        final List<List<IBindingSet>> bindingsClauses;
-        {
-            
-//            final BindingsClause x = astContainer.getOriginalAST()
-//                    .getBindingsClause();
-            final List<BindingsClause> x = getDefinitelyProducedBindingsClauses(
-                    astContainer.getOriginalAST());
-         
-            if (x == null) {
-            
-                bindingsClauses = null;
-                
-            } else {
-                
-//                bindingsClause = x.getBindingSets();
-                bindingsClauses = new LinkedList<List<IBindingSet>>();
-                
-                for (BindingsClause bc : x) {
-                    
-                    bindingsClauses.add(bc.getBindingSets());
-                    
-                }
-                
-            }
-
-        }
-
-        if (bindingsClauses == null || bindingsClauses.isEmpty()) {
-
-            // Just the solution provided through the API.
-            return new IBindingSet[] { src };
-            
-        }
-        
-        if (src.isEmpty() && bindingsClauses.size() == 1) {
-
-            /*
-             * No source solution, so just use the BINDINGS clause solutions.
-             */
-            
-            return bindingsClauses.get(0)
-                    .toArray(new IBindingSet[bindingsClauses.get(0).size()]);
-            
-        }
-
-        bindingsClauses.add(0, Arrays.asList(src));
-        
-        /*
-         * We have to merge the source solution given through the openrdf API
-         * with the solutions in the BINDINGS clause. This "merge" is a join. If
-         * the join fails for any solution, then that solution is dropped. Since
-         * there is only one solution from the API, the cardinality of the join
-         * is at most [1 x |BINDINGS|].
-         */
-        List<IBindingSet> left = new LinkedList<IBindingSet>();
-        
-        for (List<IBindingSet> bindingsClause : bindingsClauses) {
-
-            final List<IBindingSet> tmp = new LinkedList<IBindingSet>();
-            
-            for (IBindingSet l : left) {
-            
-                final Iterator<IBindingSet> itr = bindingsClause.iterator();
-    
-                while (itr.hasNext()) {
-    
-                    final IBindingSet right = itr.next();
-    
-                    final IBindingSet join = BOpContext.bind(l/* left */, right,
-                            null/* constraints */, null/* varsToKeep */);
-    
-                    if (join != null) {
-    
-                        tmp.add(join);
-    
-                    }
-    
-                }
-                
-            }
-            
-            left = tmp;
-
-        }
-
-        // Return the results of that join.
-        return left.toArray(new IBindingSet[left.size()]);
-        
-    }
-    
-    static List<BindingsClause> getDefinitelyProducedBindingsClauses(final QueryRoot query) {
-        
-        final List<BindingsClause> bindingsClauses = new LinkedList<BindingsClause>();
-        
-        if (query.getBindingsClause() != null) {
-            
-            bindingsClauses.add(query.getBindingsClause());
-            
-        }
-
-//        final Map<String, BindingsClause> nsBindingsClauses = 
-//                new LinkedHashMap<String, List<BindingsClause>>();
-//        for (NamedSubqueryRoot ns : query.getNamedSubqueriesNotNull()) {
-//            if (ns.getBindingsClause() != null)
-//                nsBindingsClauses.put(ns.getName(), ns.getBindingsClause());
-//        }
-        
-        getDefinitelyProducedBindingsClauses(query.getWhereClause(), bindingsClauses);
-        
-        return bindingsClauses;
-        
-    }
-    
-    static void getDefinitelyProducedBindingsClauses(
-            final GroupNodeBase<?> group, 
-//            final Map<String, BindingsClause> nsBindingsClauses,
-            final List<BindingsClause> bindingsClauses) {
-        
-        if (group == null) {
-            return;
-        }
-        
-        if (group instanceof JoinGroupNode && ((JoinGroupNode) group).isOptional()) {
-            return;
-        }
-        
-        if (group instanceof UnionNode) {
-            return;
-        }
-        
-        for (IGroupMemberNode child : group) {
-            
-            if (child instanceof SubqueryRoot) {
-                
-                final SubqueryRoot subquery = (SubqueryRoot) child;
-                
-                if (subquery.getBindingsClause() != null) {
-                    
-                    bindingsClauses.add(subquery.getBindingsClause());
-                    
-                }
-                
-                getDefinitelyProducedBindingsClauses(subquery.getWhereClause(), bindingsClauses);
-                
-            } else if (child instanceof BindingsClause) {
-                
-                bindingsClauses.add((BindingsClause) child);
-                
-            }
-
-        }        
-        
-        // recurse into the childen
-        for (IGroupMemberNode child : group) {
-
-            if (child instanceof GroupNodeBase) {
-                
-                getDefinitelyProducedBindingsClauses((GroupNodeBase<?>) child, bindingsClauses);
-                
-            } 
-//            else if (child instanceof SubqueryRoot) {
-//                
-//                getDefinitelyBindingsClauses(((SubqueryRoot) child).getWhereClause(), bindingsClauses);
-//                
-//            }
-            
-        }
-        
     }
     
     /**

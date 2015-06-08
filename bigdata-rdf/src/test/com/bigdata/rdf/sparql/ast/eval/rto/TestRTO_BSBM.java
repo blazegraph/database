@@ -283,7 +283,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
          * Verify that the runtime optimizer produced the expected join path.
          */
 
-        final int[] expected = new int[] { 8, 7, 9, 5, 6, 10, 11 };
+        final int[] expected = new int[] { 9, 8, 10, 6, 7, 11, 12 };
 
         assertSameJoinOrder(expected, helper);
 

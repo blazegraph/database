@@ -50,13 +50,13 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTSimpleOptionalOptimizer.MockFilterNode;
 
 /**
  * Test suite for {@link ASTSimpleOptionalOptimizer}.
@@ -111,10 +111,12 @@ public class TestASTSimpleOptionalOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
 
         queryRoot = (QueryRoot) new ASTWildcardProjectionOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, new QueryNodeWithBindingSet(queryRoot, null))
+                .getQueryNode();
 
         queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, new QueryNodeWithBindingSet(queryRoot, null))
+                .getQueryNode();
 
         final GraphPatternGroup<?> whereClause = queryRoot.getWhereClause();
 
@@ -205,7 +207,8 @@ public class TestASTSimpleOptionalOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, new QueryNodeWithBindingSet(queryRoot, null))
+                .getQueryNode();
 
         /*
          * Create the expected AST.
@@ -289,12 +292,12 @@ public class TestASTSimpleOptionalOptimizer extends
         QueryRoot queryRoot = astContainer.getOriginalAST();
         
         queryRoot = (QueryRoot) new ASTSetValueExpressionsOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         queryRoot = BOpUtility.deepCopy(queryRoot);
         
         queryRoot = (QueryRoot) new ASTSimpleOptionalOptimizer().optimize(
-                context, queryRoot, null/* bindingSets */);
+                context, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
 
         /*
          * Create the expected AST.

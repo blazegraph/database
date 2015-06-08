@@ -65,6 +65,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -275,8 +276,9 @@ public abstract class AbstractOptimizerTestCase extends
 			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
 					given), store);
 
-			final IQueryNode actual = rewriter.optimize(context, given,
-					new IBindingSet[] {});
+			final IQueryNode actual = rewriter.optimize(context,
+			      new QueryNodeWithBindingSet(given, new IBindingSet[] {})).
+			      getQueryNode();
 
 			assertSameAST(expected, actual);
 			

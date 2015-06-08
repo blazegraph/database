@@ -1,0 +1,4 @@
+SELECT * WHERE {
+  BIND(1 AS ?a)
+  BIND(2 AS ?b)
+} VALUES ?c { "c1" "c2" }
