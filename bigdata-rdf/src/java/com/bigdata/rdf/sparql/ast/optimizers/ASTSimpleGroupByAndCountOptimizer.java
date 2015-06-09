@@ -53,6 +53,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -60,7 +61,6 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.spo.SPOPredicate;
 
 /**
  * Optimizes <code>
@@ -98,8 +98,12 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
    }
 
    @Override
-   public IQueryNode optimize(final AST2BOpContext context,
-         final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+   public QueryNodeWithBindingSet optimize(
+      final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+      final IQueryNode queryNode = input.getQueryNode();
+      final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
       if (context.getAbstractTripleStore().
             getSPORelation().indicesHaveDeleteMarkers()) {
@@ -118,7 +122,7 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
          * rewrite the query.
          */
 
-        return queryNode;
+         return new QueryNodeWithBindingSet(queryNode, bindingSets);
      }
       
       final QueryRoot queryRoot = (QueryRoot) queryNode;
@@ -137,7 +141,7 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
          }
 
          if (!ok) {
-            return queryNode;
+            return new QueryNodeWithBindingSet(queryNode, bindingSets);
          }
       }
 
@@ -163,7 +167,7 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
       // rewrite the top-level select
       doSelectQuery(context, sa, (QueryRoot) queryNode, (QueryBase) queryNode);
 
-      return queryNode;
+      return new QueryNodeWithBindingSet(queryNode, bindingSets);
    }
 
    /**

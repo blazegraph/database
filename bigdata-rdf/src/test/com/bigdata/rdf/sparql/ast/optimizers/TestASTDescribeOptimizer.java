@@ -49,6 +49,7 @@ import com.bigdata.rdf.sparql.ast.DescribeModeEnum;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -279,7 +280,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null)).
+                    getQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -496,7 +498,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null)).
+                    getQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -719,7 +722,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null)).
+                    getQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -971,7 +975,8 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
 //            }
             
             final IQueryNode actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null)).
+                    getQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -1191,10 +1196,12 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
             IQueryNode actual;
             
             actual = new ASTWildcardProjectionOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
             
             actual = new ASTDescribeOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
 
             assertSameAST(expected, actual);
 
@@ -1231,11 +1238,12 @@ public class TestASTDescribeOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             IQueryNode tmp = new ASTWildcardProjectionOptimizer().optimize(
-                    context, queryRoot, null/* bindingSet */);
+                    context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
 
             try {
                 new ASTDescribeOptimizer()
-                        .optimize(context, tmp, null/* bindingSet */);
+                    .optimize(context, new QueryNodeWithBindingSet(tmp, null));
                 fail("Expecting " + RuntimeException.class);
             } catch (RuntimeException ex) {
                 if (log.isInfoEnabled())

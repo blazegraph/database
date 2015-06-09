@@ -1,0 +1,8 @@
+SELECT ?s WHERE {
+  BIND(1 AS ?s)
+  OPTIONAL { 
+    OPTIONAL {
+      ?s ?p ?o
+    }
+  }
+} 

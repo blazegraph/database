@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -38,6 +39,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IValueExpression;
@@ -604,15 +606,18 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
     
     	/*
-    	 * Start by adding the exogenous variables.
+    	 * Start by adding globally scoped and exogenous variables.
     	 */
     	if (evaluationContext != null) {
+    	   
+    	   vars.addAll(evaluationContext.getGloballyScopedVariables());
     		
-    		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
-    		
-    		// only add the vars that are always bound
-    		vars.addAll(stats.getAlwaysBound());
-    		
+    	   if (locatedInToplevelQuery(node)) {
+       		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
+       		
+       		// only add the vars that are always bound
+       		vars.addAll(stats.getAlwaysBound());
+    	   }    		
     	}
     	
         final GraphPatternGroup<?> parent = node.getParentGraphPatternGroup();
@@ -682,6 +687,54 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
     }
 
     /**
+     * Returns true if the current node is located (recursively) inside the
+     * top-level query, false if it is nested inside a subquery or a
+     * named subquery. The method does not look into {@link FilterNode}s,
+     * but only recurses into {@link GroupNodeBase} nodes. 
+     * 
+     * @param node
+     * @return
+     */
+    public boolean locatedInToplevelQuery(IGroupMemberNode node) {
+       
+       return locatedInGroupNode(queryRoot.getWhereClause(), node);
+
+   }
+
+    /**
+     * Returns true if the current node is identical or (recursively) located
+     * inside the given group scope or is the group node itself, but not a
+     * subquery referenced in the node. The method does not look into
+     * {@link FilterNode}s, but only recurses into {@link GroupNodeBase} nodes.
+     * 
+     * @param theNode the group we're looking in
+     * @param theNode the node we're looking for
+     * @return
+     */
+   public boolean locatedInGroupNode(
+      final GroupNodeBase<?> theGroup, IGroupMemberNode theNode) {
+      
+      if (theGroup==null || theNode==null) {
+         return false; // not found
+      }
+      
+      if (theGroup==theNode)
+         return true;
+      
+      for (IGroupMemberNode child : theGroup) {
+         
+         if (child instanceof GroupNodeBase<?>) {
+            
+            if (locatedInGroupNode((GroupNodeBase<?>)child, theNode))
+               return true;
+         }
+      }
+      
+      return false; // not found
+   }
+
+   
+   /**
      * Return the set of variables which MIGHT be bound coming into this group
      * during top-down, left-to-right evaluation. The returned set is based on a
      * non-recursive analysis of the "maybe" bound variables in each of the
@@ -714,19 +767,22 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
      */
     public Set<IVariable<?>> getMaybeIncomingBindings(
             final IGroupMemberNode node, final Set<IVariable<?>> vars) {
-    
+
     	/*
     	 * Start by adding the exogenous variables.
     	 */
     	if (evaluationContext != null) {
-    		
-    		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
-    		
-    		// add the vars that are always bound
-    		vars.addAll(stats.getAlwaysBound());
-    		
-    		// also add the vars that might be bound
-    		vars.addAll(stats.getNotAlwaysBound());
+    	   
+    	   vars.addAll(evaluationContext.getGloballyScopedVariables());
+
+    	   if (locatedInToplevelQuery(node)) {
+    	      
+       		final ISolutionSetStats stats = evaluationContext.getSolutionSetStats();
+       		
+       		// add the vars that are always bound and those that might be bound
+       		vars.addAll(stats.getAlwaysBound());
+       		vars.addAll(stats.getNotAlwaysBound());
+    	   }
     		
     	}
     	
@@ -2508,6 +2564,28 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
         return false;
 
+    }
+    
+    /**
+     * Extract the set of variables contained in a binding set.
+     * @param bss
+     * @return
+     */
+    @SuppressWarnings("rawtypes")
+    public Set<IVariable<?>> getVarsInBindingSet(final List<IBindingSet> bss) {
+       Set<IVariable<?>> bssVars = new HashSet<IVariable<?>>();
+       for (int i=0; i<bss.size(); i++) {
+          
+          final IBindingSet bs = bss.get(i);
+          
+          final Iterator<IVariable> bsVars = bs.vars();
+          
+          while (bsVars.hasNext()) {
+             bssVars.add(bsVars.next());
+          }
+          
+       }
+       return bssVars;
     }
 
 }

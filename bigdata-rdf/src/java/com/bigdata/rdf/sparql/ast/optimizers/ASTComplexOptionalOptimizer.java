@@ -51,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -171,9 +172,12 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
 	private static boolean recurse = false;
     
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+       final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
+       
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
         final StaticAnalysis sa = new StaticAnalysis(queryRoot, context);
@@ -212,7 +216,7 @@ public class ASTComplexOptionalOptimizer implements IASTOptimizer {
         convertComplexOptionalGroups(context, sa, queryRoot,
                 queryRoot.getWhereClause(), exogenousVars);
 
-        return queryNode;
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
     }
 

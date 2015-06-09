@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.math.BigInteger;
-
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.Constant;
@@ -44,6 +42,7 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -160,7 +159,9 @@ public class TestASTSetValueExpressionOptimizer extends AbstractASTEvaluationTes
         final IASTOptimizer rewriter = new ASTSetValueExpressionsOptimizer();
         
         final IQueryNode actual = rewriter.optimize(new AST2BOpContext(
-                new ASTContainer(given), store), given/* queryNode */, bsets);
+                new ASTContainer(given), store), 
+                new QueryNodeWithBindingSet(given, bsets))
+                .getQueryNode();
 
         assertSameAST(expected, actual);
         
