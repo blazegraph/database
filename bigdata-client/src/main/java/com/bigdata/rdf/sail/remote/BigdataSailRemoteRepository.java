@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.remote;
 
 import java.io.File;
+import java.util.Collection;
+import java.util.UUID;
 
 import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.ValueFactoryImpl;
@@ -32,6 +34,7 @@ import org.openrdf.repository.Repository;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
@@ -241,6 +244,31 @@ public class BigdataSailRemoteRepository implements Repository {
 	@Override
 	public ValueFactory getValueFactory() {
 		return valueFactory;
+	}
+	
+	/**
+	 * Cancel the query specified by the UUID. 
+	 * 
+	 * @param queryId
+	 * @throws Exception
+	 */
+	public void cancel(UUID queryId) throws Exception {
+		
+		this.our_mgr.cancel(queryId);
+		
+	}
+	
+	/**
+	 * Return a collection containing Metadata objects about the
+	 * currently running queries. 
+	 * 
+	 * @return
+	 * @throws Exception
+	 */
+	public Collection<RunningQuery> showQueries() throws Exception {
+		
+		return this.our_mgr.showQueries();
+		
 	}
 
 }
