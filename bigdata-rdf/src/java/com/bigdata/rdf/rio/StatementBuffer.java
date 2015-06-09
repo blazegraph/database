@@ -425,6 +425,8 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     @Override
     public long flush() {
        
+        log.warn("");
+
         /*
          * Process deferred statements (NOP unless using statement identifiers).
          */
@@ -835,7 +837,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     log
                             .debug("adding term: "
                                     + values[i]
-                                    + " (termId="
+                                    + " (iv="
                                     + values[i].getIV()
                                     + ")"
                                     + ((values[i] instanceof BNode) ? "sid="
@@ -849,7 +851,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
                     log
                             .debug(" added term: "
                                     + values[i]
-                                    + " (termId="
+                                    + " (iv="
                                     + values[i].getIV()
                                     + ")"
                                     + ((values[i] instanceof BNode) ? "sid="
@@ -895,12 +897,17 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
             log.info("writing " + numTerms);
             
             for (int i = 0; i < numTerms; i++) {
-            	log.info("term: " + terms[i]);
+            	log.info("term: " + terms[i] + ", iv: " + terms[i].getIV());
             }
 
         }
         
-        database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
+        final long l =
+                database.getLexiconRelation().addTerms(terms, numTerms, readOnly);
+        
+        if (log.isInfoEnabled()) {
+            log.info("# reported from addTerms: " + l);
+        }
         
     }
     
