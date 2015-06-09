@@ -318,7 +318,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
      * 
      * TODO:  Make this private once merged down.
      */
-    public static boolean AUTO_COMMIT = Boolean.parseBoolean(System.getProperty(AST2BOpBase.Annotations.AUTO_COMMIT, "true"));
+	public static boolean AUTO_COMMIT = Boolean.parseBoolean(System
+			.getProperty(AST2BOpBase.Annotations.AUTO_COMMIT, "true"));
     
     /**
      * Commit.
