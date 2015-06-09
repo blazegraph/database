@@ -104,6 +104,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      */
     static public final transient String MIME_RDF_XML = "application/rdf+xml";
 
+    public static final String MIME_JSON = "application/json";
+    
 	public static final String MIME_SPARQL_QUERY = "application/sparql-query";
 
 	public static final String MIME_SPARQL_UPDATE = "application/sparql-update";
@@ -117,6 +119,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	public static final String OUTPUT_FORMAT_JSON_SHORT = "json";
 	
 	public static final String OUTPUT_FORMAT_XML_SHORT = "xml";
+	
+	
 	
 	/*
 	 * There are cases when a default namespace exists, but has not been
@@ -538,7 +542,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				req.getHeader("Accept")); 
 		
@@ -609,7 +613,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				req.getHeader("Accept")); 
         

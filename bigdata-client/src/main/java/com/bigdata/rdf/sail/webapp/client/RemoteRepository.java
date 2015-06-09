@@ -590,7 +590,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
        mgr.cancel(queryId);
             
     }
-
+    
     /**
     * Perform a fast range count on the statement indices for a given triple
     * (quad) pattern.

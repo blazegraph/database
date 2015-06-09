@@ -22,12 +22,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.blueprints;
 
+import java.util.Collection;
 import java.util.Properties;
+import java.util.UUID;
 
+import org.apache.log4j.Logger;
+
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.tinkerpop.blueprints.Features;
 
 /**
@@ -47,8 +55,11 @@ import com.tinkerpop.blueprints.Features;
  * 
  */
 public class BigdataGraphClient extends BigdataGraph {
+	
+    private static final transient Logger log = Logger.getLogger(BigdataGraphClient.class);
 
     private static final Properties props = new Properties();
+
     static {
         /*
          * We don't want the BigdataGraph to close our connection after every
@@ -217,5 +228,77 @@ public class BigdataGraphClient extends BigdataGraph {
         FEATURES.supportsTransactions = false; //BigdataGraph.FEATURES.supportsTransactions;
         
     }
+
+	@Override
+	protected UUID setupQuery(BigdataSailRepositoryConnection cxn,
+			ASTContainer astContainer, QueryType queryType, String extQueryId) {
+		//This is a NOOP when using the REST client as the query management is implemented
+		//in the rest client.
+		return null;
+	}
+
+	@Override
+	protected void tearDownQuery(UUID queryId) {
+		//This is a NOOP when using the REST client as the query management is implemented
+		//in the rest client.
+		
+	}
+
+	@Override
+	public Collection<RunningQuery> getRunningQueries() {
+		try {
+			return this.repo.showQueries();
+		} catch (Exception e) {
+			if(log.isDebugEnabled()){
+				log.debug(e);
+			}
+		}
+		
+		throw new RuntimeException("Error while showing queries.");
+	}
+
+	@Override
+	public void cancel(UUID queryId) {
+
+		assert(queryId != null);
+
+		try {
+			this.repo.cancel(queryId);
+		} catch (Exception e) {
+			if(log.isDebugEnabled()) {
+				log.debug(e);
+			}
+		}
+	}
+
+	@Override
+	public void cancel(String queryId) {
+		assert(queryId != null);
+		cancel(UUID.fromString(queryId));
+	}
+
+	@Override
+	public void cancel(RunningQuery r) {
+		assert(r != null);
+		cancel(r.getQueryUuid());
+	}
+
+	@Override
+	public RunningQuery getQueryById(UUID queryId2) {
+		//TODO:  Implement for REST API
+		return null;
+	}
+
+	@Override
+	public RunningQuery getQueryByExternalId(String extQueryId) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	protected boolean isQueryCancelled(UUID queryId) {
+		// TODO Auto-generated method stub
+		return false;
+	}
 
 }

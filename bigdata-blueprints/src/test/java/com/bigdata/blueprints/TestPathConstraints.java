@@ -509,10 +509,10 @@ public class TestPathConstraints extends TestCase {
         
     }
     
-    private void showOptimizedAST(final BigdataGraphEmbedded graph, 
+    private void showOptimizedAST(final BigdataGraph graph, 
             final String queryStr) throws Exception {
         
-        final BigdataSailRepositoryConnection cxn = graph.getReadConnection();
+        final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) graph.getReadConnection();
         try {
             final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
                     .prepareQuery(QueryLanguage.SPARQL, queryStr);
