@@ -37,7 +37,6 @@ import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
-import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -75,9 +74,8 @@ import com.tinkerpop.blueprints.TransactionalGraph;
  */
 public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalGraph, IChangeLog {
 	
-    private static final transient Logger log = Logger.getLogger(BigdataGraphEmbedded.class);
-
-
+    private final transient static Logger log = Logger.getLogger(BigdataGraphEmbedded.class);
+    
 	final BigdataSailRepository repo;
 	
 //	transient BigdataSailRepositoryConnection cxn;
@@ -245,6 +243,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	public StringBuilder dumpStore() {
 	    return repo.getDatabase().dumpStore();
 	}
+	
 	
     protected static final Features FEATURES = new Features();
 

@@ -473,27 +473,29 @@ public abstract class BigdataGraph implements Graph {
      */
     public void setProperty(final URI s, final String prop, final Object val) {
 
+        setProperty(s, factory.toPropertyURI(prop), toLiterals(val));
+        
+    }
+    
+    protected Collection<Literal> toLiterals(final Object val) {
+        
+        final Collection<Literal> literals = new LinkedList<Literal>();
+        
         if (val instanceof Collection) {
             
             @SuppressWarnings("unchecked")
             final Collection<Object> vals = (Collection<Object>) val;
                     
-            final Collection<Literal> literals = new LinkedList<Literal>();
-            
             for (Object o : vals) {
                 
                 literals.add(factory.toLiteral(o));
                 
             }
             
-            setProperty(s, factory.toPropertyURI(prop), literals);
-            
         } else if (val.getClass().isArray()) {
 
             final int len = Array.getLength(val);
 
-            final Collection<Literal> literals = new LinkedList<Literal>();
-            
             for (int i = 0; i < len; i++) {
                 
                 final Object o = Array.get(val, i);
@@ -502,45 +504,45 @@ public abstract class BigdataGraph implements Graph {
                 
             }
             
-            setProperty(s, factory.toPropertyURI(prop), literals);
-            
         } else {
         
-            setProperty(s, factory.toPropertyURI(prop), factory.toLiteral(val));
+            literals.add(factory.toLiteral(val));
             
         }
-
+        
+        return literals;
+        
     }
     
-    /**
-     * Set a single-value property on an edge or vertex (remove the old
-     * value first).
-     * 
-     * @see {@link BigdataElement}
-     */
-    public void setProperty(final URI uri, final URI prop, final Literal val) {
-        
-        try {
-
-            final RepositoryConnection cxn = getWriteConnection();
-            
-            if (!laxProperties) {
-                
-                // remove the old value
-                cxn.remove(uri, prop, null);
-                
-            }
-            
-            // add the new value
-            cxn.add(uri, prop, val);
-            
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        
-    }
+//    /**
+//     * Set a single-value property on an edge or vertex (remove the old
+//     * value first).
+//     * 
+//     * @see {@link BigdataElement}
+//     */
+//    public void setProperty(final URI uri, final URI prop, final Literal val) {
+//        
+//        try {
+//
+//            final RepositoryConnection cxn = getWriteConnection();
+//            
+//            if (!laxProperties) {
+//                
+//                // remove the old value
+//                cxn.remove(uri, prop, null);
+//                
+//            }
+//            
+//            // add the new value
+//            cxn.add(uri, prop, val);
+//            
+//        } catch (RuntimeException e) {
+//            throw e;
+//        } catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
+//        
+//    }
     
     /**
      * Set a multi-value property on an edge or vertex (remove the old
@@ -633,6 +635,26 @@ public abstract class BigdataGraph implements Graph {
     public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
             final String label) {
         
+        return addEdge(key, from, to, label, false);
+        
+    }
+        
+    /**
+     * Add an edge.
+     */
+    public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
+            final boolean anonymous) {
+        
+        return addEdge(key, from, to, null, anonymous);
+        
+    }
+        
+    /**
+     * Add an edge.
+     */
+    public Edge addEdge(final Object key, final Vertex from, final Vertex to, 
+            final String label, final boolean anonymous) {
+        
         if (log.isInfoEnabled())
             log.info("("+key+", "+from+", "+to+", "+label+")");
         
@@ -673,14 +695,13 @@ public abstract class BigdataGraph implements Graph {
             final RepositoryConnection cxn = getWriteConnection();
             
             cxn.add(fromURI, edgeURI, toURI);
+            
             if (label != null) {
-                /*
-                 * TODO FIXME Add an "anonymous" argument to specify that we
-                 * don't want the (e, TYPE, EDGE) statement rather than
-                 * bundling that decision with a null label. 
-                 */
-                cxn.add(edgeURI, TYPE, EDGE);
                 cxn.add(edgeURI, LABEL, factory.toLiteral(label));
+            }
+            
+            if (!anonymous) {
+                cxn.add(edgeURI, TYPE, EDGE);
             }
             
             return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);

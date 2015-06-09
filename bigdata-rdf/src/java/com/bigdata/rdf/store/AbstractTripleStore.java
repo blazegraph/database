@@ -2505,7 +2505,7 @@ abstract public class AbstractTripleStore extends
     @Override
     public void addTerms(final BigdataValue[] terms) {
 
-        getLexiconRelation().addTerms( terms, terms.length, false/*readOnly*/);
+        getLexiconRelation().addTerms(terms, terms.length, false/*readOnly*/);
         
     }
 
@@ -3614,7 +3614,7 @@ abstract public class AbstractTripleStore extends
             final boolean justifications) {
 
         return dumpStore(resolveTerms, explicit, inferred, axioms, true,
-                justifications, getSPORelation().getPrimaryKeyOrder());
+                justifications, true, getSPORelation().getPrimaryKeyOrder());
 
     }
  
@@ -3624,7 +3624,7 @@ abstract public class AbstractTripleStore extends
             final boolean history, final boolean justifications) {
 
         return dumpStore(resolveTerms, explicit, inferred, axioms, history,
-                justifications, getSPORelation().getPrimaryKeyOrder());
+                justifications, true, getSPORelation().getPrimaryKeyOrder());
 
     }
  
@@ -3650,7 +3650,8 @@ abstract public class AbstractTripleStore extends
     public StringBuilder dumpStore(
             final AbstractTripleStore resolveTerms, final boolean explicit,
             final boolean inferred, final boolean axioms, final boolean history,
-            final boolean justifications, final IKeyOrder<ISPO> keyOrder) {
+            final boolean justifications, final boolean sids,
+            final IKeyOrder<ISPO> keyOrder) {
 
         final StringBuilder sb = new StringBuilder();
         
@@ -3676,6 +3677,10 @@ abstract public class AbstractTripleStore extends
 
                     final BigdataStatement stmt = itr.next();
 
+                    if (!sids && stmt.getSubject().getIV().isStatement()) {
+                        continue;
+                    }
+                    
                     switch (stmt.getStatementType()) {
 
                     case Explicit:
