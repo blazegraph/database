@@ -493,7 +493,8 @@ public class TestAsynchronousStatementBufferFactory extends
                                 + store.dumpStore(store/* resolveTerms */,
                                         true/* explicit */, true/* inferred */,
                                         true/* axioms */, true/* history */,
-                                        true/* justifications */, keyOrder));
+                                        true/* justifications */, true/* sids */,
+                                        keyOrder));
 
                     }
 

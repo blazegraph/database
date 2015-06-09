@@ -185,32 +185,32 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		throw new UnsupportedOperationException();
 	}
 
-	/**
-	 * Set a single-value property on an edge or vertex (remove the old value
-	 * first).
-	 * 
-	 * @see {@link BigdataElement}
-	 */
-	@Override
-	public void setProperty(final URI uri, final URI prop, final Literal val) {
-
-		try {
-
-			final RepositoryConnection cxn = getWriteConnection();
-
-			// // remove the old value
-			// cxn.remove(uri, prop, null);
-
-			// add the new value
-			cxn.add(uri, prop, val);
-
-		} catch (RuntimeException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
-	}
+//	/**
+//	 * Set a single-value property on an edge or vertex (remove the old value
+//	 * first).
+//	 * 
+//	 * @see {@link BigdataElement}
+//	 */
+//	@Override
+//	public void setProperty(final URI uri, final URI prop, final Literal val) {
+//
+//		try {
+//
+//			final RepositoryConnection cxn = getWriteConnection();
+//
+//			// // remove the old value
+//			// cxn.remove(uri, prop, null);
+//
+//			// add the new value
+//			cxn.add(uri, prop, val);
+//
+//		} catch (RuntimeException e) {
+//			throw e;
+//		} catch (Exception e) {
+//			throw new RuntimeException(e);
+//		}
+//
+//	}
 
 	/**
 	 * Set a multi-value property on an edge or vertex (remove the old values
