@@ -43,9 +43,6 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.Tokenizer;
-import org.apache.lucene.analysis.core.LowerCaseFilter;
 import org.apache.lucene.analysis.core.StopAnalyzer;
 import org.apache.lucene.analysis.pattern.PatternTokenizer;
 import org.apache.lucene.analysis.ru.RussianAnalyzer;
@@ -200,51 +197,19 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 	 */
     private static class PatternAnalyzer extends AnalyzerPair {
 		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern, CharArraySet stopWords) throws Exception {
-
+			/*
 			super(lro.languageRange, getConstructor(PatternAnalyzerImpl.class,Pattern.class, CharArraySet.class), 
 				pattern, stopWords);
+				*/
+			super(lro.languageRange, new PatternAnalyzerImpl(pattern, stopWords), new PatternAnalyzerImpl(pattern, CharArraySet.EMPTY_SET));
+		}
+
+		public PatternAnalyzer(ConfigOptionsToAnalyzer lro, Pattern pattern) throws Exception {
+			super(lro.languageRange, new PatternAnalyzerImpl(pattern, CharArraySet.EMPTY_SET));
 		}
 	}
     
     /**
-     * Helper class created for Lucene 5.1.0 migration.
-     * 
-     * @author beebs
-     *
-     */
-    private class PatternAnalyzerImpl extends Analyzer {
-    	
-    	private Pattern pattern = null;
-    	private boolean useStopWords = false;
-    	private CharArraySet stopWordList = null;
-    
-    	@SuppressWarnings("unused")
-		public PatternAnalyzerImpl(Pattern pattern, CharArraySet stopWordList) {
-    		super();
-    		System.err.println("Pattern:  " + pattern);
-    		this.pattern = pattern;
-    		this.stopWordList = stopWordList;
-    	}
-    	
-    	@SuppressWarnings("unused")
-		public PatternAnalyzerImpl(String range, CharArraySet topWordList,
-				boolean useStopWords) {
-    		this.useStopWords = useStopWords;
-    		this.stopWordList = stopWordList;
-    	}
-    	
-    	@Override
-    	protected TokenStreamComponents createComponents(final String field) {
-    		//Use default grouping
-    		Tokenizer tokenizer = new PatternTokenizer(pattern,-1);
-    		TokenStream filter = new LowerCaseFilter(tokenizer);
-    		return new TokenStreamComponents(tokenizer, filter);
-    	}
-    }
-    
-
-
-	/**
 	 * This class is initialized with the config options, using the {@link #setProperty(String, String)}
 	 * method, for a particular language range and works out which pair of {@link Analyzer}s
 	 * to use for that language range.
@@ -397,7 +362,7 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 				return null;
 			}
 			if (pattern != null) {
-				return new PatternAnalyzer(this, pattern, CharArraySet.EMPTY_SET);
+				return new PatternAnalyzer(this, pattern);
 			}
 			if (softHyphens != null) {
 				return new AnalyzerPair(
@@ -588,6 +553,9 @@ class NeedsConfiguringAnalyzerFactory implements IAnalyzerFactory {
 		try {
 			return cls.getConstructor(parameterTypes);
 		} catch (NoSuchMethodException | SecurityException e) {
+			if(log.isDebugEnabled()) {
+				log.debug(e);
+			}
 			return null;
 		}
 	}
