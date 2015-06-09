@@ -36,7 +36,6 @@ import java.util.Map;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations;
 
 /**
  * The solutions declared by a BINDINGS clause.

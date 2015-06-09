@@ -1,0 +1,4 @@
+select $a
+{
+}
+VALUES ($a) { (1) (2) }

@@ -136,11 +136,24 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
+       
+       /**
+        * Optimizes various constructs that lead to global static bindings 
+        * for query execution, such as BIND/VALUES clauses involving constants,
+        * but also FILTER expressions binding a variable via sameTerm() or
+        * IN to one ore more constants. These constructs are removed from
+        * the query and added to the binding set we start out with.
+        * 
+        * IMPORTANT NOTE: setting up the starting binding set, this optimizer
+        * is an important prerequisite for others and should be run early in
+        * the optimzer pipeline.
+        */
+       add(new ASTStaticBindingsOptimizer());       
+       
 
     	/**
     	 * Converts a BDS.SEARCH_IN_SEARCH function call (inside a filter)
-    	 * into an7 full text index to determine the IN
-    	 * set.
+    	 * into a full text index to determine the IN set.
     	 * 
     	 * Convert:
     	 * 
@@ -161,15 +174,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * the value expressions.
          */
         add(new ASTPropertyPathOptimizer());
-        
-        /**
-         * If we have a singleton BindingsClause inside the main where clause
-         * and no BindingsClause attached to the QueryRoot, we can promote the
-         * BC from inline to top-level and avoid an extra hash index / hash join
-         * later.
-         */
-        add(new ASTValuesOptimizer());
-        
+
         /**
          * Visit all the value expression nodes and convert them into value
          * expressions. If a value expression can be evaluated to a constant,
@@ -230,6 +235,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTEmptyGroupOptimizer());
         
+        
         /**
          * Rewrites any {@link ProjectionNode} with a wild card into the set of
          * variables visible to the {@link QueryBase} having that projection.
@@ -242,40 +248,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTWildcardProjectionOptimizer());
         
-        /**
-         * 
-         */
         
-        /**
-         * Makes implicit bindings in the query explicit, in order to make them
-         * amenable to subsequent optimization through the 
-         * {@link ASTBindingAssigner}. Implicit bindings are those
-         */
-        // currently outcommented, see ticket 
-//        add(new ASTSimpleBindingsOptimizer());
-        
-        /**
-         * Propagates bindings from an input solution into the query, replacing
-         * variables with constants while retaining the constant / variable
-         * association.
-         * 
-         * TODO Other optimizations are possible when the {@link IBindingSet}[]
-         * has multiple solutions. In particular, the possible values which a
-         * variable may take on can be written into an IN constraint and
-         * associated with the query in the appropriate scope. Those are not
-         * being handled yet. Also, if a variable takes on the same value in ALL
-         * source solutions, then it can be replaced by a constant.
-         * <p>
-         * The analysis of the source IBindingSet[] should be refactored into a
-         * central location, perhaps on the {@link AST2BOpContext}. We could
-         * collect which variables have bindings ("maybe bound") as well as
-         * statistics about those bindings. This is related to how we will
-         * handle BindingsClause once we support that federation extension.
-         * <p>
-         * Note: {@link ASTBottomUpOptimizer} currently examines the
-         * IBindingSet[].
-         */ 
-        add(new ASTBindingAssigner());
 
         /**
          * Translate {@link BD#SEARCH} and associated magic predicates into a a

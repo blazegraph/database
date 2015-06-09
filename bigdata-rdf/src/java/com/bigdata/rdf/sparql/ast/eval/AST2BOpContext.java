@@ -24,10 +24,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -295,6 +297,12 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      */
     private ISolutionSetStats sss = null;
     
+    /**
+     * Globally scoped variables, as injected through Sesame's
+     * Operation.setBindings() method.
+     */
+   private Set<IVariable<?>> globallyScopedVariables;
+    
     @Override
     public ISolutionSetStats getSolutionSetStats() {
     
@@ -320,9 +328,6 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         
         if (stats == null)
             throw new IllegalArgumentException();
-        
-        if(sss != null)
-            throw new IllegalStateException();
         
         this.sss = stats;
         
@@ -500,6 +505,8 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         }
 
         this.context = new BOpContextBase(queryEngine);
+        
+        this.globallyScopedVariables = new HashSet<IVariable<?>>();
 
     }
 
@@ -828,5 +835,22 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 //                );
 //
 //    }
+    
+
+    @Override
+    public Set<IVariable<?>> getGloballyScopedVariables() {
+       return globallyScopedVariables;
+    }
+
+    @Override
+    public void setGloballyScopedVariables(
+       final Set<IVariable<?>> globallyScopedVariables) {
+       
+       if (globallyScopedVariables==null) {
+          this.globallyScopedVariables = new HashSet<IVariable<?>>();
+       }
+       
+       this.globallyScopedVariables = globallyScopedVariables;
+    }
 
 }

@@ -55,6 +55,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -264,7 +265,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
         
@@ -425,7 +426,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -558,7 +559,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -696,7 +697,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -830,7 +831,7 @@ public class TestASTSparql11SubqueryOptimizer extends AbstractASTEvaluationTestC
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         /*
          * FIXME This failing because we are not computing the join variables

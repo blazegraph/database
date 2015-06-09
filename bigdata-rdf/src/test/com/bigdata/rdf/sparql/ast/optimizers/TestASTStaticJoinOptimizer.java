@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.DISTINCT;
+import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.OPTIONAL;
+
 import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
@@ -42,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -49,7 +53,6 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BDS;
-import static com.bigdata.rdf.sparql.ast.optimizers.AbstractOptimizerTestCase.HelperFlag.*;
 /**
  * Test suite for {@link ASTStaticJoinOptimizer}.
  */
@@ -181,7 +184,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
         
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -284,7 +287,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         assertSameAST(expected, actual);
 
@@ -399,7 +402,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -548,7 +551,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -684,7 +687,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -802,7 +805,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -961,7 +964,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1098,7 +1101,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1186,7 +1189,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1323,7 +1326,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1478,7 +1481,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1621,7 +1624,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -1717,7 +1720,7 @@ public class TestASTStaticJoinOptimizer extends AbstractOptimizerTestCase
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 
@@ -2024,7 +2027,7 @@ where {
                 given), store);
 
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
         
         assertSameAST(expected, actual);
 

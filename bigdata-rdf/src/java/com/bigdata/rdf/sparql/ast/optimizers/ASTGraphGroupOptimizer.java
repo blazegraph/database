@@ -31,6 +31,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
@@ -159,11 +160,15 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
     // .getLogger(ASTGraphGroupOptimizer.class);
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
+
 
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+           return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -191,7 +196,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
 
         }
 
-        return queryNode;
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
         
     }
 
