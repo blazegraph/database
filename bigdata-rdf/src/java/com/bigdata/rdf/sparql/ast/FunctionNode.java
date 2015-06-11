@@ -20,7 +20,7 @@ import com.bigdata.bop.NV;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class FunctionNode extends ValueExpressionNode {
+public class FunctionNode extends ValueExpressionNode implements Comparable<FunctionNode> {
 
     /**
      * 
@@ -194,6 +194,16 @@ public class FunctionNode extends ValueExpressionNode {
                 new ValueExpressionNode[] { t1, t2 });
 
     }
+    
+    /**
+     * Return <code>t1 OR t2</code>.
+     */
+    static public FunctionNode NOT(final ValueExpressionNode inner) {
+
+        return new FunctionNode(FunctionRegistry.NOT, null/* scalarValues */,
+                new ValueExpressionNode[] { inner });
+
+    }
 
     /**
      * Return <code>t1 + t2</code> (aka ADD).
@@ -264,6 +274,26 @@ public class FunctionNode extends ValueExpressionNode {
                 new ValueExpressionNode[] { t1, t2 });
 
     }
+    
+    /**
+     * Return <code>t1 <= t2</code>
+     */
+    static public FunctionNode LE(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.LE, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
+
+    /**
+     * Return <code>t1 >= t2</code>
+     */
+    static public FunctionNode GE(final TermNode t1, final TermNode t2) {
+
+        return new FunctionNode(FunctionRegistry.GE, null/* scalarValues */,
+                new ValueExpressionNode[] { t1, t2 });
+
+    }
 
     /**
      * Return <code>min(v1,v2)</code>
@@ -329,4 +359,14 @@ public class FunctionNode extends ValueExpressionNode {
         annotationsToString(sb, i);
         return sb.toString();
 	}
+
+   @Override
+   public int compareTo(FunctionNode o) {
+
+      if (o==null) {
+         return 1;
+      } else {
+         return toString().compareTo(o.toString());
+      }
+   }
 }
