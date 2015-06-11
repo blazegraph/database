@@ -29,12 +29,9 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.openrdf.model.URI;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
