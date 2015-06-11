@@ -29,9 +29,12 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.openrdf.model.URI;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
@@ -1513,5 +1516,447 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
 
       assertSameAST(expected, actual);   
    }
+   
+   /**
+    * Test removal of duplicate filter.
+    */
+   public void testRemoveDuplicateFilter() {
+      
+      final ASTFilterNormalizationOptimizer rewriter = new ASTFilterNormalizationOptimizer();
+
+      /*
+       * Note: DO NOT share structures in this test!!!!
+       */
+
+      final IBindingSet[] bsets = new IBindingSet[] { new ListBindingSet() };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          projection.addProjectionVar(new VarNode("s"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          given.setWhereClause(whereClause);
+
+          whereClause.addChild(new StatementPatternNode(new VarNode("s1"),
+                  new VarNode("p1"), new VarNode("o1"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS)); // just noise
+
+          
+          // two times exactly the same pattern
+          final FunctionNode simpleFunctionNode1 =
+             FunctionNode.NE(new VarNode("s1"), new VarNode("s2"));
+          final FunctionNode simpleFunctionNode2 =
+             FunctionNode.NE(new VarNode("s1"), new VarNode("s2"));
+          
+          // three times the same pattern
+          final FunctionNode complexFunctionNode1 =
+             FunctionNode.OR(
+                FunctionNode.NE(new VarNode("s1"), new VarNode("s2")),
+                FunctionNode.NOT(
+                   new FunctionNode(
+                      FunctionRegistry.BOUND,
+                      null, new ValueExpressionNode[] { new VarNode("s1") })));
+          final FunctionNode complexFunctionNode2 =
+             FunctionNode.OR(
+                FunctionNode.NE(new VarNode("s1"), new VarNode("s2")),
+                FunctionNode.NOT(
+                   new FunctionNode(
+                      FunctionRegistry.BOUND,
+                      null, new ValueExpressionNode[] { new VarNode("s1") })));
+          final FunctionNode complexFunctionNode3 =
+             FunctionNode.OR(
+                FunctionNode.NE(new VarNode("s1"), new VarNode("s2")),
+                FunctionNode.NOT(
+                   new FunctionNode(
+                      FunctionRegistry.BOUND,
+                      null, new ValueExpressionNode[] { new VarNode("s1") })));
+          
+          whereClause.addChild(new FilterNode(simpleFunctionNode1));
+          whereClause.addChild(new FilterNode(simpleFunctionNode2));
+          whereClause.addChild(new FilterNode(complexFunctionNode1));
+          whereClause.addChild(new FilterNode(complexFunctionNode2));
+
+          whereClause.addChild(new StatementPatternNode(new VarNode("s2"),
+                new VarNode("p2"), new VarNode("o2"), null/* c */,
+                Scope.DEFAULT_CONTEXTS)); // just noise
+
+          whereClause.addChild(new FilterNode(complexFunctionNode3));
+
+          assertTrue(StaticAnalysis.isCNF(simpleFunctionNode1));
+          assertTrue(StaticAnalysis.isCNF(simpleFunctionNode2));
+          assertTrue(StaticAnalysis.isCNF(complexFunctionNode1));
+          assertTrue(StaticAnalysis.isCNF(complexFunctionNode2));
+          assertTrue(StaticAnalysis.isCNF(complexFunctionNode3));
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection = new ProjectionNode();
+         expected.setProjection(projection);
+         projection.addProjectionVar(new VarNode("s"));
+         
+         final JoinGroupNode whereClause = new JoinGroupNode();
+         expected.setWhereClause(whereClause);
+
+         whereClause.addChild(new StatementPatternNode(new VarNode("s1"),
+                 new VarNode("p1"), new VarNode("o1"), null/* c */,
+                 Scope.DEFAULT_CONTEXTS)); // just noise
+
+         
+         // the simple function node
+         final FunctionNode simpleFunctionNode =
+            FunctionNode.NE(new VarNode("s1"), new VarNode("s2"));
+         
+         // the complex function node
+         final FunctionNode complexFunctionNode =
+            FunctionNode.OR(
+               FunctionNode.NE(new VarNode("s1"), new VarNode("s2")),
+               FunctionNode.NOT(
+                  new FunctionNode(
+                     FunctionRegistry.BOUND,
+                     null, new ValueExpressionNode[] { new VarNode("s1") })));
+
+         
+         whereClause.addChild(new FilterNode(simpleFunctionNode));
+
+         whereClause.addChild(new StatementPatternNode(new VarNode("s2"),
+               new VarNode("p2"), new VarNode("o2"), null/* c */,
+               Scope.DEFAULT_CONTEXTS)); // just noise
+
+         whereClause.addChild(new FilterNode(complexFunctionNode));
+
+         assertTrue(StaticAnalysis.isCNF(simpleFunctionNode));
+         assertTrue(StaticAnalysis.isCNF(complexFunctionNode));
+
+      }
+
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final IQueryNode actual = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsets)).
+            getQueryNode();
+
+      assertSameAST(expected, actual);      
+   }
+   
+   /**
+    * Test removal of duplicate filter, where the duplicate is introduced
+    * through the CNF based decomposition process. This is a variant of test
+    * {@link TestASTFilterNormalizationOptimizer#testSimpleConjunctiveFilter()},
+    * where we just add a duplicate.
+    */
+   public void testRemoveDuplicateGeneratedFilter() {
+
+      /*
+       * Note: DO NOT share structures in this test!!!!
+       */
+      final BigdataValueFactory f = store.getValueFactory();
+      final BigdataURI testUri = f.createURI("http://www.test.com");
+
+      final IV test = makeIV(testUri);
+      
+      final BigdataValue[] values = new BigdataValue[] { testUri };
+      store.getLexiconRelation()
+              .addTerms(values, values.length, false/* readOnly */);
+      
+      final IBindingSet[] bsets = new IBindingSet[] { new ListBindingSet() };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          projection.addProjectionVar(new VarNode("s"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          given.setWhereClause(whereClause);
+
+          whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                  new VarNode("p"), new VarNode("o"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS));
+
+          final FilterNode filterNode =
+             new FilterNode(
+                FunctionNode.AND(
+                    FunctionNode.EQ(new VarNode("s"), new VarNode("o")),
+                    FunctionNode.NE(new VarNode("s"), new ConstantNode(test)))); 
+          
+          // difference towards base test: this is the duplicate to be dropped
+          whereClause.addChild(
+                new FilterNode(
+                   FunctionNode.EQ(new VarNode("s"), new VarNode("o"))));
+          
+          assertTrue(StaticAnalysis.isCNF(filterNode));
+
+          whereClause.addChild(filterNode);
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection = new ProjectionNode();
+         expected.setProjection(projection);
+         projection.addProjectionVar(new VarNode("s"));
+         
+         final JoinGroupNode whereClause = new JoinGroupNode();
+         expected.setWhereClause(whereClause);
+
+         whereClause.addChild(new StatementPatternNode(new VarNode("s"),
+                 new VarNode("p"), new VarNode("o"), null/* c */,
+                 Scope.DEFAULT_CONTEXTS));
+         whereClause.addChild(
+            new FilterNode(
+               FunctionNode.EQ(new VarNode("s"), new VarNode("o"))));
+         whereClause.addChild(
+               new FilterNode(
+                  FunctionNode.NE(new VarNode("s"), new ConstantNode(test))));
+
+      }
+
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final ASTFilterNormalizationOptimizer rewriter =
+         new ASTFilterNormalizationOptimizer();
+      
+      final IQueryNode actual = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsets)).
+            getQueryNode();
+
+      assertSameAST(expected, actual);      
+   }
+   
+   /**
+    * Test removal of unsatisfiable filters. More precisely, the query
+    * 
+    * SELECT ?s WHERE {
+    *   ?s ?p ?o1 .
+    *   { ?s ?p ?o2 }
+    *   OPTIONAL { ?s ?p ?o3 }
+    *   
+    *   FILTER(bound(?o1))
+    *   FILTER(bound(?o2))
+    *   FILTER(bound(?o3))
+    *   
+    *   FILTER(!bound(?o1))
+    *   FILTER(!bound(?o2))
+    *   FILTER(!bound(?o3))
+    *   FILTER(!bound(?o4))
+    *   
+    *   // some duplicates (which should be dropped)
+    *   FILTER(!bound(?o2))
+    *   FILTER(!bound(?o3))
+    * }
+    * 
+    * will be rewritten to
+    * 
+    * SELECT ?s WHERE {
+    *   ?s ?p ?o1 .
+    *   { ?s ?p ?o2 }
+    *   OPTIONAL { ?s ?p ?o3 }
+    *   
+    *   // ?o1 and ?o2 are definitely bound, so we can't optimize away
+    *   FILTER(bound(?o3))
+    *   
+    *   // ?o4 is the only variable that is definitely not bound
+    *   FILTER(!bound(?o1))
+    *   FILTER(!bound(?o2))
+    *   FILTER(!bound(?o3))
+    * }
+    * 
+    */
+   public void testRemoveUnsatisfiableFilters() {
+
+      /*
+       * Note: DO NOT share structures in this test!!!!
+       */
+      
+      final IBindingSet[] bsets = new IBindingSet[] { new ListBindingSet() };
+
+      // The source AST.
+      final QueryRoot given = new QueryRoot(QueryType.SELECT);
+      {
+
+          final ProjectionNode projection = new ProjectionNode();
+          given.setProjection(projection);
+          projection.addProjectionVar(new VarNode("s"));
+          
+          final JoinGroupNode whereClause = new JoinGroupNode();
+          given.setWhereClause(whereClause);
+          
+          final StatementPatternNode spo1 =
+             new StatementPatternNode(new VarNode("s"),
+                new VarNode("p"), new VarNode("o1"), null/* c */,
+                Scope.DEFAULT_CONTEXTS);
+
+          final StatementPatternNode spo2 =
+                new StatementPatternNode(new VarNode("s"),
+                   new VarNode("p"), new VarNode("o2"), null/* c */,
+                   Scope.DEFAULT_CONTEXTS);       
+          final JoinGroupNode jgn = new JoinGroupNode(spo2);
+
+          final StatementPatternNode spo3 =
+             new StatementPatternNode(new VarNode("s"),
+                new VarNode("p"), new VarNode("o3"), null/* c */,
+                Scope.DEFAULT_CONTEXTS);
+          spo3.setOptional(true);
+
+          whereClause.addChild(spo1);
+          whereClause.addChild(jgn);
+          whereClause.addChild(spo3);
+     
+
+          final FunctionNode filterBound1 = 
+             new FunctionNode(
+                FunctionRegistry.BOUND, null/* scalarValues */,
+                new ValueExpressionNode[] {
+                   new VarNode("o1")});
+          
+          final FunctionNode filterBound2 = 
+             new FunctionNode(
+                FunctionRegistry.BOUND, null/* scalarValues */,
+                new ValueExpressionNode[] {
+                   new VarNode("o2")});
+          
+          final FunctionNode filterBound3 = 
+             new FunctionNode(
+                FunctionRegistry.BOUND, null/* scalarValues */,
+                new ValueExpressionNode[] {
+                   new VarNode("o3")});
+          
+          final FunctionNode filterNotBound1 = 
+             FunctionNode.NOT(
+                new FunctionNode(
+                   FunctionRegistry.BOUND, null/* scalarValues */,
+                   new ValueExpressionNode[] {
+                      new VarNode("o1")}));
+             
+          final FunctionNode filterNotBound2 = 
+             FunctionNode.NOT(
+                new FunctionNode(
+                   FunctionRegistry.BOUND, null/* scalarValues */,
+                   new ValueExpressionNode[] {
+                      new VarNode("o2")}));
+             
+          final FunctionNode filterNotBound3 = 
+             FunctionNode.NOT(
+                new FunctionNode(
+                   FunctionRegistry.BOUND, null/* scalarValues */,
+                   new ValueExpressionNode[] {
+                      new VarNode("o3")}));  
+ 
+          final FunctionNode filterNotBound4 = 
+             FunctionNode.NOT(
+                new FunctionNode(
+                   FunctionRegistry.BOUND, null/* scalarValues */,
+                   new ValueExpressionNode[] {
+                      new VarNode("o4")}));  
+          
+          whereClause.addChild(new FilterNode(filterBound1));
+          whereClause.addChild(new FilterNode(filterBound2));
+          whereClause.addChild(new FilterNode(filterBound3));
+          whereClause.addChild(new FilterNode(filterNotBound1));
+          whereClause.addChild(new FilterNode(filterNotBound2));
+          whereClause.addChild(new FilterNode(filterNotBound3));
+          whereClause.addChild(new FilterNode(filterNotBound4));
+
+          // add some duplicates (they should be removed)
+          whereClause.addChild(new FilterNode(filterNotBound2));
+          whereClause.addChild(new FilterNode(filterNotBound3));
+
+      }
+
+      // The expected AST after the rewrite.
+      final QueryRoot expected = new QueryRoot(QueryType.SELECT);
+      {
+
+         final ProjectionNode projection = new ProjectionNode();
+         expected.setProjection(projection);
+         projection.addProjectionVar(new VarNode("s"));
+         
+         final JoinGroupNode whereClause = new JoinGroupNode();
+         expected.setWhereClause(whereClause);
+         
+         final StatementPatternNode spo1 =
+            new StatementPatternNode(new VarNode("s"),
+               new VarNode("p"), new VarNode("o1"), null/* c */,
+               Scope.DEFAULT_CONTEXTS);
+
+         final StatementPatternNode spo2 =
+               new StatementPatternNode(new VarNode("s"),
+                  new VarNode("p"), new VarNode("o2"), null/* c */,
+                  Scope.DEFAULT_CONTEXTS);       
+         final JoinGroupNode jgn = new JoinGroupNode(spo2);
+
+         final StatementPatternNode spo3 =
+            new StatementPatternNode(new VarNode("s"),
+               new VarNode("p"), new VarNode("o3"), null/* c */,
+               Scope.DEFAULT_CONTEXTS);
+         spo3.setOptional(true);
+
+         whereClause.addChild(spo1);
+         whereClause.addChild(jgn);
+         whereClause.addChild(spo3);
+    
+         final FunctionNode filterBound3 = 
+            new FunctionNode(
+               FunctionRegistry.BOUND, null/* scalarValues */,
+               new ValueExpressionNode[] {
+                  new VarNode("o3")});
+         
+         final FunctionNode filterNotBound1 = 
+            FunctionNode.NOT(
+               new FunctionNode(
+                  FunctionRegistry.BOUND, null/* scalarValues */,
+                  new ValueExpressionNode[] {
+                     new VarNode("o1")}));
+            
+         final FunctionNode filterNotBound2 = 
+            FunctionNode.NOT(
+               new FunctionNode(
+                  FunctionRegistry.BOUND, null/* scalarValues */,
+                  new ValueExpressionNode[] {
+                     new VarNode("o2")}));
+            
+         final FunctionNode filterNotBound3 = 
+            FunctionNode.NOT(
+               new FunctionNode(
+                  FunctionRegistry.BOUND, null/* scalarValues */,
+                  new ValueExpressionNode[] {
+                     new VarNode("o3")}));  
+
+         
+         whereClause.addChild(new FilterNode(filterBound3));
+         whereClause.addChild(new FilterNode(filterNotBound1));
+         whereClause.addChild(new FilterNode(filterNotBound2));
+         whereClause.addChild(new FilterNode(filterNotBound3));
+
+      }
+
+      final AST2BOpContext context = 
+            new AST2BOpContext(new ASTContainer(given), store);
+      
+      final ASTFilterNormalizationOptimizer rewriter =
+            new ASTFilterNormalizationOptimizer();
+
+      final IQueryNode actual = 
+         rewriter.optimize(context, new QueryNodeWithBindingSet(given, bsets)).
+            getQueryNode();
+
+      assertSameAST(expected, actual);          
+      
+   }
+
 
 }
