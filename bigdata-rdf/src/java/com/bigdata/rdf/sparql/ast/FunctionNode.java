@@ -20,7 +20,7 @@ import com.bigdata.bop.NV;
  * @author <a href="mailto:mrpersonick@users.sourceforge.net">Mike Personick</a>
  * @version $Id$
  */
-public class FunctionNode extends ValueExpressionNode implements Comparable<FunctionNode> {
+public class FunctionNode extends ValueExpressionNode {
 
     /**
      * 
@@ -359,14 +359,5 @@ public class FunctionNode extends ValueExpressionNode implements Comparable<Func
         annotationsToString(sb, i);
         return sb.toString();
 	}
-
-   @Override
-   public int compareTo(FunctionNode o) {
-
-      if (o==null) {
-         return 1;
-      } else {
-         return toString().compareTo(o.toString());
-      }
-   }
+	
 }
