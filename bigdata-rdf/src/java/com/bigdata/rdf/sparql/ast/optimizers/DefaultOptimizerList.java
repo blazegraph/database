@@ -138,6 +138,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     public DefaultOptimizerList() {
        
        /**
+        * Brings complex filter expressions into CNF, decomposes them to
+        * allow for more exact placement and reasoning on individual filter
+        * components, and eliminates duplicate and simple redundant filter
+        * expressions.
+        */
+       add(new ASTFilterNormalizationOptimizer());       
+       
+       /**
         * Optimizes various constructs that lead to global static bindings 
         * for query execution, such as BIND/VALUES clauses involving constants,
         * but also FILTER expressions binding a variable via sameTerm() or
