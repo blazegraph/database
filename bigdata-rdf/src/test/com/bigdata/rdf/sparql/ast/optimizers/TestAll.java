@@ -67,6 +67,11 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestASTSetValueExpressionOptimizer.class);
 
         /*
+         * Test suite for FILTER normalization optimizer
+         */
+        suite.addTestSuite(TestASTFilterNormalizationOptimizer.class);
+        
+        /*
          * Test suite for AST rewrite which replaces a variable bound to a
          * constant in an input solution with that constant.
          */

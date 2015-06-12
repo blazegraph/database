@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
@@ -2587,5 +2589,419 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
        }
        return bssVars;
     }
+    
+    /**
+     * Checks whether the filter node's value expression node is in CNF.
+     */
+    static public boolean isCNF(final FilterNode filter) {
+       return isCNF(filter.getValueExpressionNode());
+    }
 
+    /**
+     * Checks whether the given value expression node is in CNF.
+     * 
+     * @param vexpr
+     * 
+     */
+    static public boolean isCNF(final IValueExpressionNode vexpr) {
+       
+       if(!(vexpr instanceof FunctionNode)) {
+          return true; 
+       }
+       
+       final FunctionNode functionNode = (FunctionNode)vexpr;
+       final URI functionURI = functionNode.getFunctionURI();
+       
+       if (functionURI.equals(FunctionRegistry.NOT)) {
+          
+          return isCNFNegationOrTerminal(functionNode);
+          
+       } else if (functionURI.equals(FunctionRegistry.OR)) {
+          
+          return isCNFDisjunct(functionNode);
+          
+       } else if (functionURI.equals(FunctionRegistry.AND)) {
+          
+          return isCNF((ValueExpressionNode)functionNode.get(0)) &&
+                   isCNF((ValueExpressionNode)functionNode.get(1));
+          
+       } else {
+
+          return true;  // everything else is a terminal
+
+       }
+    }
+
+
+    /**
+     * Check if filter node is an inner disjunct within a CNF. In particular,
+     * it must not contain any other conjunctive nodes.
+     * 
+     * @param functionNode
+     * @return
+     */
+    static public boolean isCNFDisjunct(final FunctionNode functionNode) {
+
+       final URI functionURI = functionNode.getFunctionURI();
+       
+       if (functionURI.equals(FunctionRegistry.NOT)) {
+          
+          return isCNFNegationOrTerminal(functionNode);
+          
+       } else if (functionURI.equals(FunctionRegistry.OR)) {
+          
+          boolean isCNFDisjunct = 
+             !(functionNode.get(0) instanceof FunctionNode) ||
+             isCNFDisjunct((FunctionNode)functionNode.get(0));
+          
+          isCNFDisjunct &= 
+                !(functionNode.get(1) instanceof FunctionNode) ||
+                isCNFDisjunct((FunctionNode)functionNode.get(1));
+          
+          return isCNFDisjunct;        
+          
+       } else if (functionURI.equals(FunctionRegistry.AND)) {
+          
+          return false; // not allowed
+          
+       } else {
+          
+          return true; // everything else is a terminal
+       }
+    }
+
+
+    /**
+     * Check if filter node is a negation (possibly recursive) or terminal
+     * within a CNF. In particular, it must not contain any other disjuncts
+     * or conjuncts.
+     * 
+     * @param functionNode
+     */
+    static public boolean isCNFNegationOrTerminal(final FunctionNode functionNode) {
+
+       final URI functionURI = functionNode.getFunctionURI();
+       if (functionURI.equals(FunctionRegistry.AND) || 
+           functionURI.equals(FunctionRegistry.OR)) {
+          
+          return false;
+          
+       } else if (functionURI.equals(FunctionRegistry.NOT)) {
+          
+          final BOp bop = functionNode.get(0);
+          if (!(bop instanceof FunctionNode)) {
+
+             return true; // terminal
+             
+          } else {
+          
+             return isCNFNegationOrTerminal((FunctionNode)bop);
+             
+          }
+          
+       } else {
+          
+          return true;  // everything else is a terminal
+       }
+    }
+
+
+    /**
+     * Returns the corresponding (equivalent) value expression in CNF. Makes
+     * a copy of the original value expression, leaving it unmodified.
+     * 
+     * @param vexpr
+     * @return null if the value expression is already in CNF, an equivalent
+     *         value expression in CNF otherwise
+     */
+    static public IValueExpressionNode toCNF(final IValueExpressionNode vexpr) {
+       
+       final IValueExpressionNode copy = 
+          (IValueExpressionNode)BOpUtility.deepCopy((BOp) vexpr);
+       
+       return pushDisjuncts(pushNegations(copy));
+    }
+
+
+    /**
+     * Recursively pushes negations down the operator tree, such that in the
+     * returned node, negations are always at the bottom of the tree. In
+     * particular, all AND and OR value expressions will be situated above
+     * negations. 
+     * 
+     * The resulting {@link IValueExpressionNode} is logically equivalent.
+     */
+    static public IValueExpressionNode pushNegations(IValueExpressionNode vexp) {
+
+       if(!(vexp instanceof FunctionNode)) {
+          return vexp;
+       }
+       
+       final FunctionNode functionNode = (FunctionNode)vexp;
+       final URI functionURI = functionNode.getFunctionURI();
+       
+       if (functionURI.equals(FunctionRegistry.NOT)) {
+          
+          final IValueExpressionNode inner = 
+             (IValueExpressionNode) functionNode.get(0);
+          
+          if(inner instanceof FunctionNode) {
+             
+             final FunctionNode innerFunctionNode = (FunctionNode)inner;
+             final URI innerFunctionURI = innerFunctionNode.getFunctionURI();
+             
+             if (innerFunctionURI.equals(FunctionRegistry.AND)) {
+
+                final IValueExpressionNode negLeft = 
+                   pushNegations(
+                      FunctionNode.NOT(
+                         (ValueExpressionNode)innerFunctionNode.get(0)));
+                final IValueExpressionNode negRight = 
+                   pushNegations(
+                      FunctionNode.NOT(
+                         (ValueExpressionNode)innerFunctionNode.get(1)));
+                
+                return FunctionNode.OR(
+                   (ValueExpressionNode)negLeft, 
+                   (ValueExpressionNode)negRight);
+                
+             } else if (innerFunctionURI.equals(FunctionRegistry.OR)) {
+
+                final IValueExpressionNode negLeft = 
+                   pushNegations(
+                      FunctionNode.NOT(
+                         (ValueExpressionNode)innerFunctionNode.get(0)));
+                final IValueExpressionNode negRight = 
+                   pushNegations(
+                      FunctionNode.NOT(
+                         (ValueExpressionNode)innerFunctionNode.get(1)));
+                   
+                return FunctionNode.AND(
+                   (ValueExpressionNode)negLeft, 
+                   (ValueExpressionNode)negRight);
+                   
+             } else if (innerFunctionURI.equals(FunctionRegistry.NOT)) {
+               
+                // drop double negation
+                final BOp innerInner = innerFunctionNode.get(0);
+                functionNode.setArg(0, innerInner);
+                
+                // recurse if necessary
+                if (innerInner instanceof IValueExpressionNode) {
+                   return pushNegations((IValueExpressionNode)innerInner);
+                }
+                
+             } else if (innerFunctionURI.equals(FunctionRegistry.EQ)) {
+                
+                // invert: = -> !=
+                return FunctionNode.NE(
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
+                
+             } else if (innerFunctionURI.equals(FunctionRegistry.NE)) {
+                
+                // invert: != -> =
+                return FunctionNode.EQ(
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
+                              
+             } else if (innerFunctionURI.equals(FunctionRegistry.LE)) {
+                
+                // invert: <= -> >
+                return FunctionNode.GT(
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
+
+                
+             } else if (innerFunctionURI.equals(FunctionRegistry.LT)) {
+                
+                // invert: < -> >=
+                return FunctionNode.GE(
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
+                
+             } else if (innerFunctionURI.equals(FunctionRegistry.GE)) {
+                
+                // invert: >= -> <
+                return FunctionNode.LT(
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
+                
+             } else if (innerFunctionURI.equals(FunctionRegistry.GT)) {
+                
+                // invert: > -> <=
+                return FunctionNode.LE(
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
+
+             }
+          }
+          
+       } else if (functionURI.equals(FunctionRegistry.AND)) {
+
+          return FunctionNode.AND(
+                (ValueExpressionNode)pushNegations(
+                   (IValueExpressionNode) functionNode.get(0)),
+                (ValueExpressionNode)pushNegations(
+                   (IValueExpressionNode) functionNode.get(1)));  
+          
+       } else if (functionURI.equals(FunctionRegistry.OR)) {
+
+          return FunctionNode.OR(
+             (ValueExpressionNode)pushNegations(
+                (IValueExpressionNode) functionNode.get(0)),
+             (ValueExpressionNode)pushNegations(
+                (IValueExpressionNode) functionNode.get(1)));  
+          
+       } // else: nothing to be done
+       
+       return vexp;
+    }
+
+    
+    /**
+     * Recursively pushes logical ORs below logical ANDs in the operator tree, 
+     * such that in the returned node all OR expressions are situated below 
+     * AND expressions. Expectes that all NOT expressions have been pushed
+     * down to the bottom already (otherwise, the behavior is undertermined).
+     * 
+     * The resulting {@link IValueExpressionNode} is logically equivalent.
+     */
+    static public IValueExpressionNode pushDisjuncts(
+       final IValueExpressionNode vexp) {
+       
+       if(!(vexp instanceof FunctionNode)) {
+          return vexp;
+       }
+       
+       final FunctionNode functionNode = (FunctionNode)vexp;
+       final URI functionURI = functionNode.getFunctionURI();
+       
+       if (functionURI.equals(FunctionRegistry.OR)) {
+
+          // first, recurse, making sure that AND is propagated up in the subtrees
+          final IValueExpressionNode left = 
+             pushNegations(
+                pushDisjuncts((IValueExpressionNode) functionNode.get(0)));
+          final IValueExpressionNode right =
+             pushNegations(
+                pushDisjuncts((IValueExpressionNode) functionNode.get(1)));
+          
+          /*
+           * New conjuncts are basically the cross product disjuncts of the left
+           * and right subtree. Note that the special case (where neither the
+           * left nor the right subtree has an AND at the top nicely fits in:
+           * in that case, leftConjuncts and rightConjuncts have one element,
+           * say x and y, and we compute x OR y as the one and only conjunct
+           * (thus not changing the tree).
+           */
+          final List<IValueExpressionNode> leftConjuncts = 
+             extractToplevelConjuncts(
+                left, new ArrayList<IValueExpressionNode>());
+          final List<IValueExpressionNode> rightConjuncts = 
+             extractToplevelConjuncts(
+                right, new ArrayList<IValueExpressionNode>());
+          
+          final List<IValueExpressionNode> newConjuncts = 
+             new ArrayList<IValueExpressionNode>();
+          for (IValueExpressionNode leftConjunct : leftConjuncts) {
+             for (IValueExpressionNode rightConjunct : rightConjuncts) {
+                
+                final IValueExpressionNode newConjunct = 
+                   FunctionNode.OR(
+                      (ValueExpressionNode)leftConjunct,
+                      (ValueExpressionNode)rightConjunct);
+                newConjuncts.add(newConjunct);
+             }
+          }
+          
+          return toConjunctiveValueExpression(newConjuncts);
+          
+       } else if (functionURI.equals(FunctionRegistry.AND)) {
+          
+          // just recurse
+          return FunctionNode.AND(
+             (ValueExpressionNode)pushDisjuncts(
+                (IValueExpressionNode) functionNode.get(0)),
+             (ValueExpressionNode)pushDisjuncts(
+                (IValueExpressionNode) functionNode.get(1)));
+          
+       }  // we're done recursing, no disjuncts will be found below this point
+
+
+       return vexp; // return the (possibly modified) vexp
+    }
+    
+
+    /** 
+     * Extracts all AND-connected conjuncts located at the top of a given
+     * value expression node (recursively, unless an operator different from
+     * AND is encountered). 
+     * 
+     * @param vexpNode the value expression node
+     * @param nodes set where to store the top level conjuncts in
+     * 
+     * @return the array of filters
+     */
+    static public List<IValueExpressionNode> extractToplevelConjuncts(
+          final IValueExpressionNode vexp, List<IValueExpressionNode> nodes) {
+       
+       if (vexp instanceof FunctionNode) {
+
+          final FunctionNode functionNode = (FunctionNode)vexp;
+          final URI functionURI = functionNode.getFunctionURI();
+          
+          if (functionURI.equals(FunctionRegistry.AND)) {
+             
+             extractToplevelConjuncts(
+                (ValueExpressionNode)functionNode.get(0), nodes);
+             extractToplevelConjuncts(
+                (ValueExpressionNode)functionNode.get(1), nodes);
+             
+             return nodes; // don't record this (complex AND) node
+          }
+       }
+
+       nodes.add(vexp); // record conjunct (don't recurse)
+       return nodes;
+       
+    }
+    
+    
+    /**
+     * Constructs an (unbalanced) tree out of the list of conjuncts.
+     * If the conjuncts that are passed in are null or empty, null is returned.
+     * 
+     * @param conjuncts
+     * @return
+     */
+    static public IValueExpressionNode toConjunctiveValueExpression(
+          final List<IValueExpressionNode> conjuncts) {
+       
+       if (conjuncts==null || conjuncts.isEmpty()) {
+          return null; 
+       }
+
+       
+       // if the list is unary, we return the one and only conjunct
+       if (conjuncts.size()==1) {
+          
+          return conjuncts.get(0);
+          
+       } else {
+          
+          IValueExpressionNode tmp = 
+             FunctionNode.AND(
+                (ValueExpressionNode)conjuncts.get(0), 
+                (ValueExpressionNode)conjuncts.get(1));
+          
+          for (int i=2; i<conjuncts.size(); i++) {
+             tmp = FunctionNode.AND(
+                (ValueExpressionNode)tmp, 
+                (ValueExpressionNode)conjuncts.get(i));            
+          }
+          
+          return tmp;
+       }
+    }
 }
