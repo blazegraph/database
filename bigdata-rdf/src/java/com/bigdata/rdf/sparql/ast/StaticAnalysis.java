@@ -2795,44 +2795,44 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                 
                 // invert: = -> !=
                 return FunctionNode.NE(
-                   (TermNode)innerFunctionNode.get(0), 
-                   (TermNode)innerFunctionNode.get(1));
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
                 
              } else if (innerFunctionURI.equals(FunctionRegistry.NE)) {
                 
                 // invert: != -> =
                 return FunctionNode.EQ(
-                   (TermNode)innerFunctionNode.get(0), 
-                   (TermNode)innerFunctionNode.get(1));
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
                               
              } else if (innerFunctionURI.equals(FunctionRegistry.LE)) {
                 
                 // invert: <= -> >
                 return FunctionNode.GT(
-                   (TermNode)innerFunctionNode.get(0), 
-                   (TermNode)innerFunctionNode.get(1));
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
 
                 
              } else if (innerFunctionURI.equals(FunctionRegistry.LT)) {
                 
                 // invert: < -> >=
                 return FunctionNode.GE(
-                   (TermNode)innerFunctionNode.get(0), 
-                   (TermNode)innerFunctionNode.get(1));
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
                 
              } else if (innerFunctionURI.equals(FunctionRegistry.GE)) {
                 
                 // invert: >= -> <
                 return FunctionNode.LT(
-                   (TermNode)innerFunctionNode.get(0), 
-                   (TermNode)innerFunctionNode.get(1));
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
                 
              } else if (innerFunctionURI.equals(FunctionRegistry.GT)) {
                 
                 // invert: > -> <=
                 return FunctionNode.LE(
-                   (TermNode)innerFunctionNode.get(0), 
-                   (TermNode)innerFunctionNode.get(1));
+                   (ValueExpressionNode)innerFunctionNode.get(0), 
+                   (ValueExpressionNode)innerFunctionNode.get(1));
 
              }
           }

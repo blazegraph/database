@@ -208,7 +208,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 + t2</code> (aka ADD).
      */
-    static public FunctionNode add(final TermNode t1, final TermNode t2) {
+    static public FunctionNode add(final ValueExpressionNode t1, 
+             final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.ADD, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -218,7 +219,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 - t2</code> (aka SUBTRACT).
      */
-    static public FunctionNode subtract(final TermNode t1, final TermNode t2) {
+    static public FunctionNode subtract(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.SUBTRACT, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -228,7 +230,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>sameTerm(t1,t2)</code> (aka EQ).
      */
-    static public FunctionNode sameTerm(final TermNode t1, final TermNode t2) {
+    static public FunctionNode sameTerm(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.SAME_TERM, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -238,7 +241,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 = t2</code> (aka EQ aka RDFTERM-EQUALS).
      */
-    static public FunctionNode EQ(final TermNode t1, final TermNode t2) {
+    static public FunctionNode EQ(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.EQ, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -248,7 +252,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 != t2</code>
      */
-    static public FunctionNode NE(final TermNode t1, final TermNode t2) {
+    static public FunctionNode NE(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.NE, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -258,7 +263,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 < t2</code>
      */
-    static public FunctionNode LT(final TermNode t1, final TermNode t2) {
+    static public FunctionNode LT(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.LT, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -268,7 +274,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 > t2</code>
      */
-    static public FunctionNode GT(final TermNode t1, final TermNode t2) {
+    static public FunctionNode GT(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.GT, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -278,7 +285,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 <= t2</code>
      */
-    static public FunctionNode LE(final TermNode t1, final TermNode t2) {
+    static public FunctionNode LE(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.LE, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
@@ -288,7 +296,8 @@ public class FunctionNode extends ValueExpressionNode {
     /**
      * Return <code>t1 >= t2</code>
      */
-    static public FunctionNode GE(final TermNode t1, final TermNode t2) {
+    static public FunctionNode GE(final ValueExpressionNode t1, 
+          final ValueExpressionNode t2) {
 
         return new FunctionNode(FunctionRegistry.GE, null/* scalarValues */,
                 new ValueExpressionNode[] { t1, t2 });
