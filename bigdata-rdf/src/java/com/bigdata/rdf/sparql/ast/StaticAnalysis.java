@@ -2611,11 +2611,6 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
        
        final FunctionNode functionNode = (FunctionNode)vexpr;
        final URI functionURI = functionNode.getFunctionURI();
-       if (!(functionURI.equals(FunctionRegistry.AND) ||
-             functionURI.equals(FunctionRegistry.OR) ||
-             functionURI.equals(FunctionRegistry.NOT))) {
-          return true;
-       }
        
        if (functionURI.equals(FunctionRegistry.NOT)) {
           
@@ -2627,18 +2622,8 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
           
        } else if (functionURI.equals(FunctionRegistry.AND)) {
           
-          boolean isConjunctOfDisjuncts = true;
-          
-          Iterator<BOp> bopIt = functionNode.argIterator();
-          while (bopIt.hasNext()) {
-             final BOp bop = bopIt.next();
-             if (bop instanceof FunctionNode) {
-                final FunctionNode childFunctionNode = (FunctionNode)bop;
-                isConjunctOfDisjuncts &= isCNF(childFunctionNode);
-             }
-          }
-          
-          return isConjunctOfDisjuncts;
+          return isCNF((ValueExpressionNode)functionNode.get(0)) &&
+                   isCNF((ValueExpressionNode)functionNode.get(1));
           
        } else {
 
@@ -2665,18 +2650,15 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
           
        } else if (functionURI.equals(FunctionRegistry.OR)) {
           
-          boolean isDisjunct = true;
+          boolean isCNFDisjunct = 
+             !(functionNode.get(0) instanceof FunctionNode) ||
+             isCNFDisjunct((FunctionNode)functionNode.get(0));
           
-          final Iterator<BOp> bopIt = functionNode.argIterator();
-          while (bopIt.hasNext()) {
-             final BOp bop = bopIt.next();
-             if (bop instanceof FunctionNode) {
-                final FunctionNode childFunctionNode = (FunctionNode)bop;
-                isDisjunct &= isCNFDisjunct(childFunctionNode);
-             }
-          }
+          isCNFDisjunct &= 
+                !(functionNode.get(1) instanceof FunctionNode) ||
+                isCNFDisjunct((FunctionNode)functionNode.get(1));
           
-          return isDisjunct;         
+          return isCNFDisjunct;        
           
        } else if (functionURI.equals(FunctionRegistry.AND)) {
           
@@ -2914,11 +2896,14 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
            * (thus not changing the tree).
            */
           final List<IValueExpressionNode> leftConjuncts = 
-             extractToplevelConjuncts(left, new ArrayList<IValueExpressionNode>());
+             extractToplevelConjuncts(
+                left, new ArrayList<IValueExpressionNode>());
           final List<IValueExpressionNode> rightConjuncts = 
-             extractToplevelConjuncts(right, new ArrayList<IValueExpressionNode>());
+             extractToplevelConjuncts(
+                right, new ArrayList<IValueExpressionNode>());
           
-          List<IValueExpressionNode> newConjuncts = new ArrayList<IValueExpressionNode>();
+          final List<IValueExpressionNode> newConjuncts = 
+             new ArrayList<IValueExpressionNode>();
           for (IValueExpressionNode leftConjunct : leftConjuncts) {
              for (IValueExpressionNode rightConjunct : rightConjuncts) {
                 
