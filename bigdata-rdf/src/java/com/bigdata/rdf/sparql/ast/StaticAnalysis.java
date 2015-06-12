@@ -2599,6 +2599,9 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
     /**
      * Checks whether the given value expression node is in CNF.
+     * 
+     * @param vexpr
+     * 
      */
     static public boolean isCNF(final IValueExpressionNode vexpr) {
        
@@ -2614,27 +2617,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
           return true;
        }
        
-       return isConjunctOfDisjuncts(functionNode);
-    }
-
-
-
-    /**
-     * Check if filter node is a conjunct of disjuncts.
-     * 
-     * @param fn
-     * @return
-     */
-    static public boolean isConjunctOfDisjuncts(final FunctionNode functionNode) {
-       
-       final URI functionURI = functionNode.getFunctionURI();
        if (functionURI.equals(FunctionRegistry.NOT)) {
           
-          return isNegationOrTerminal(functionNode);
+          return isCNFNegationOrTerminal(functionNode);
           
        } else if (functionURI.equals(FunctionRegistry.OR)) {
           
-          return isDisjunct(functionNode);
+          return isCNFDisjunct(functionNode);
           
        } else if (functionURI.equals(FunctionRegistry.AND)) {
           
@@ -2642,10 +2631,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
           
           Iterator<BOp> bopIt = functionNode.argIterator();
           while (bopIt.hasNext()) {
-             BOp bop = bopIt.next();
+             final BOp bop = bopIt.next();
              if (bop instanceof FunctionNode) {
                 final FunctionNode childFunctionNode = (FunctionNode)bop;
-                isConjunctOfDisjuncts &= isConjunctOfDisjuncts(childFunctionNode);
+                isConjunctOfDisjuncts &= isCNF(childFunctionNode);
              }
           }
           
@@ -2660,29 +2649,30 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
 
     /**
-     * Check if filter node is a disjunct (without nested conjuncts).
+     * Check if filter node is an inner disjunct within a CNF. In particular,
+     * it must not contain any other conjunctive nodes.
      * 
-     * @param fn
+     * @param functionNode
      * @return
      */
-    static public boolean isDisjunct(final FunctionNode functionNode) {
+    static public boolean isCNFDisjunct(final FunctionNode functionNode) {
 
        final URI functionURI = functionNode.getFunctionURI();
        
        if (functionURI.equals(FunctionRegistry.NOT)) {
           
-          return isNegationOrTerminal(functionNode);
+          return isCNFNegationOrTerminal(functionNode);
           
        } else if (functionURI.equals(FunctionRegistry.OR)) {
           
           boolean isDisjunct = true;
           
-          Iterator<BOp> bopIt = functionNode.argIterator();
+          final Iterator<BOp> bopIt = functionNode.argIterator();
           while (bopIt.hasNext()) {
-             BOp bop = bopIt.next();
+             final BOp bop = bopIt.next();
              if (bop instanceof FunctionNode) {
                 final FunctionNode childFunctionNode = (FunctionNode)bop;
-                isDisjunct &= isDisjunct(childFunctionNode);
+                isDisjunct &= isCNFDisjunct(childFunctionNode);
              }
           }
           
@@ -2700,12 +2690,13 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
 
     /**
-     * Check if filter node is a negation (possibly recursive) or terminal.
+     * Check if filter node is a negation (possibly recursive) or terminal
+     * within a CNF. In particular, it must not contain any other disjuncts
+     * or conjuncts.
      * 
-     * @param fn
-     * @return
+     * @param functionNode
      */
-    static public boolean isNegationOrTerminal(final FunctionNode functionNode) {
+    static public boolean isCNFNegationOrTerminal(final FunctionNode functionNode) {
 
        final URI functionURI = functionNode.getFunctionURI();
        if (functionURI.equals(FunctionRegistry.AND) || 
@@ -2722,7 +2713,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
              
           } else {
           
-             return isNegationOrTerminal((FunctionNode)bop);
+             return isCNFNegationOrTerminal((FunctionNode)bop);
              
           }
           
