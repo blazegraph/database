@@ -29,6 +29,7 @@ import java.util.TimeZone;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.rdf.internal.constraints.IMathOpHandler;
 import com.bigdata.rdf.internal.impl.AbstractInlineExtensionIV;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
@@ -51,42 +52,42 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * the statement indices. This applies to blank node IDs, literal labels
      * (including the {@link XSDStringExtension}), local names of {@link URI}s,
      * etc.
-     * 
+     *
      * @see AbstractTripleStore.Options#MAX_INLINE_TEXT_LENGTH
      */
     public int getMaxInlineStringLength();
-    
+
     /**
-     * 
+     *
      * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
      */
     public boolean isInlineTextLiterals();
-    
+
     /**
      * Return <code>true</code> if datatype literals are being inlined into
      * the statement indices.
      */
     public boolean isInlineLiterals();
-    
+
     /**
      * Return <code>true</code> if xsd:datetime literals are being inlined into
      * the statement indices.
      */
     public boolean isInlineDateTimes();
-    
+
     /**
      * Return the default time zone to be used for inlining.
      */
     public TimeZone getInlineDateTimesTimeZone();
-    
+
     /**
      * Return the threshold at which a literal would be stored in the
      * {@link LexiconKeyOrder#BLOBS} index.
-     * 
+     *
      * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
      */
     public int getBlobsThreshold();
-    
+
     /**
      * Create an inline {@link IV} for the supplied RDF value if inlining is
      * supported for the supplied RDF value.
@@ -94,10 +95,10 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Note: If the supplied RDF value is a {@link BigdataValue} then <em>the
      * {@link IV} will be set as a side-effect</em> and will be available from
      * {@link BigdataValue#getIV()}.
-     * 
+     *
      * @param value
      *            The RDF value
-     * 
+     *
      * @return The inline {@link IV} -or- <code>null</code> if the {@link Value}
      *         can not be represented by an {@link IV}.
      */
@@ -120,10 +121,10 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * {@link IExtension}s to find one that knows how to handle the extension
      * datatype from the supplied {@link LiteralExtensionIV}. This is the
      * historical use case.
-     * 
+     *
      * @param iv
      *            the extension IV
-     * 
+     *
      * @return The RDF {@link Value}
      */
     V asValue(final LiteralExtensionIV<?> iv);
@@ -131,15 +132,15 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
     /**
      * Return the {@link Value} for that {@link IV} iff the {@link IV} is
      * declared in the {@link Vocabulary}.
-     * 
+     *
      * @param iv
      *            The {@link IV}.
-     *            
+     *
      * @return The {@link Value} -or- <code>null</code> if the {@link IV} was
      *         not declared in the {@link Vocabulary}.
      */
     V asValueFromVocab(final IV<?,?> iv);
-    
+
     /**
      * Initialize the extensions, which need to resolve their datatype URIs into
      * term ids.
@@ -150,5 +151,10 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * Return the value factory for the lexicon.
      */
     BigdataValueFactory getValueFactory();
+
+    /**
+     * Get iterator over registered type handlers.
+     */
+    Iterable<IMathOpHandler> getTypeHandlers();
 
 }

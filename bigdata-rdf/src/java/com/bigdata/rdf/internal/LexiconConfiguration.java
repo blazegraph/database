@@ -29,6 +29,8 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigInteger;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TimeZone;
@@ -42,6 +44,9 @@ import org.openrdf.model.Value;
 import org.openrdf.model.datatypes.XMLDatatypeUtil;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.internal.constraints.DateTimeUtility;
+import com.bigdata.rdf.internal.constraints.MathUtility;
+import com.bigdata.rdf.internal.constraints.IMathOpHandler;
 import com.bigdata.rdf.internal.impl.AbstractInlineIV;
 import com.bigdata.rdf.internal.impl.bnode.FullyInlineUnicodeBNodeIV;
 import com.bigdata.rdf.internal.impl.bnode.NumericBNodeIV;
@@ -76,14 +81,14 @@ import com.bigdata.util.InnerCause;
 /**
  * An object which describes which kinds of RDF Values are inlined into the
  * statement indices and how other RDF Values are coded into the lexicon.
- * 
+ *
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public class LexiconConfiguration<V extends BigdataValue> 
+public class LexiconConfiguration<V extends BigdataValue>
         implements ILexiconConfiguration<V> {
 
-    private static final Logger log = 
+    private static final Logger log =
         Logger.getLogger(LexiconConfiguration.class);
 
     /**
@@ -91,49 +96,49 @@ public class LexiconConfiguration<V extends BigdataValue>
      * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
      * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
      * indices.
-     * 
+     *
      * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
      */
     private final int blobsThreshold;
-    
+
     private final long MAX_UNSIGNED_BYTE = 1 << 9 - 1;
     private final long MAX_UNSIGNED_SHORT = 1 << 17 -1;
     private final long MAX_UNSIGNED_INT = 1L << 33 - 1;
     private final BigInteger MAX_UNSIGNED_LONG = BigInteger.valueOf(1L << 33)
     	.multiply(BigInteger.valueOf(1L << 33).subtract(BigInteger.valueOf(1)));
-    
+
 	/**
 	 * <code>true</code> if xsd primitive and numeric xsd datatype literals will
 	 * be inlined.
-	 * 
+	 *
 	 * @see AbstractTripleStore.Options#INLINE_XSD_DATATYPE_LITERALS
 	 */
     private final boolean inlineXSDDatatypeLiterals;
 
     /**
      * <code>true</code> if textual literals will be inlined.
-     *  
+     *
      * @see AbstractTripleStore.Options#INLINE_TEXT_LITERALS
      */
     final private boolean inlineTextLiterals;
-    
+
     /**
      * The maximum length of a Unicode string which may be inlined into the
      * statement indices. This applies to blank node IDs, literal labels
      * (including the {@link XSDStringExtension}), local names of {@link URI}s,
      * etc.
-     * 
+     *
      * @see AbstractTripleStore.Options#MAX_INLINE_TEXT_LENGTH
      */
     final private int maxInlineTextLength;
 
     /**
      * <code>true</code> if (conforming) blank nodes will inlined.
-     * 
+     *
      * @see AbstractTripleStore.Options#INLINE_BNODES
      */
     private final boolean inlineBNodes;
-    
+
 	/**
 	 * @see AbstractTripleStore.Options#INLINE_DATE_TIMES
 	 */
@@ -153,22 +158,22 @@ public class LexiconConfiguration<V extends BigdataValue>
      * @see AbstractTripleStore.Options#EXTENSION_FACTORY_CLASS
      */
     private final IExtensionFactory xFactory;
-    
+
     /**
      * @see AbstractTripleStore.Options#VOCABULARY_CLASS
      */
     private final Vocabulary vocab;
-    
+
     /**
      * The value factory for the lexicon.
      */
     private final BigdataValueFactory valueFactory;
-    
+
     /**
      * The inline URI factory for the lexicon.
      */
     private final IInlineURIFactory uriFactory;
-    
+
     /**
      * Mapping from the {@link IV} for the datatype URI of a registered
      * extension to the {@link IExtension}.
@@ -182,29 +187,34 @@ public class LexiconConfiguration<V extends BigdataValue>
      */
     private final Map<String, IExtension<BigdataValue>> datatype2ext;
 
+    /**
+     * The set of registered {@link IMathOpHandler}s.
+     */
+    private static final ArrayList<IMathOpHandler> typeHandlers = new ArrayList<IMathOpHandler>();
+
     public final BigdataValueFactory getValueFactory() {
-        
+
         return valueFactory;
-        
+
     }
-    
+
     public int getMaxInlineStringLength() {
 
         return maxInlineTextLength;
-        
+
     }
 
     public boolean isInlineTextLiterals() {
-    	
+
         return inlineTextLiterals;
-    	
+
     }
 
     @Override
     public boolean isInlineLiterals() {
 
         return inlineXSDDatatypeLiterals;
-        
+
     }
 
     @Override
@@ -216,26 +226,26 @@ public class LexiconConfiguration<V extends BigdataValue>
     public TimeZone getInlineDateTimesTimeZone() {
 
         return inlineDateTimesTimeZone;
-        
+
     }
-    
+
     @Override
     public int getBlobsThreshold() {
-        
+
         return blobsThreshold;
-        
+
     }
 
     public String toString() {
-    	
+
     	final StringBuilder sb = new StringBuilder();
-    	
+
     	sb.append(getClass().getName());
-    	
+
         sb.append("{ "
                 + AbstractTripleStore.Options.BLOBS_THRESHOLD
                 + "=" + blobsThreshold);
-        
+
 		sb.append(", "
 				+ AbstractTripleStore.Options.INLINE_XSD_DATATYPE_LITERALS
 				+ "=" + inlineXSDDatatypeLiterals);
@@ -265,11 +275,11 @@ public class LexiconConfiguration<V extends BigdataValue>
                 + uriFactory.getClass().getName());
 
 		sb.append("}");
-		
+
     	return sb.toString();
-    	
+
     }
-    
+
     @SuppressWarnings("rawtypes")
     public LexiconConfiguration(//
             final int blobsThreshold,
@@ -317,7 +327,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 		 */
 
         iv2ext = new LinkedHashMap<IV, IExtension<BigdataValue>>();
-        
+
         datatype2ext = new LinkedHashMap<String, IExtension<BigdataValue>>();
 
     }
@@ -334,23 +344,29 @@ public class LexiconConfiguration<V extends BigdataValue>
 
 	            if (datatype == null)
 	                continue;
-	            
+
 	            if (log.isDebugEnabled()) {
 	            	log.debug("adding extension for: " + datatype);
 	            }
-	            
+
 	            if (iv2ext.containsKey(datatype.getIV())) {
 	            	log.warn("multiple IExtension implementations for: " + datatype);
 	            }
-	
+
 	            iv2ext.put(datatype.getIV(), extension);
-	
+
 	            datatype2ext.put(datatype.stringValue(), extension);
-	            
+
+        	}
+
+        	if (extension instanceof IMathOpHandler) {
+        	    typeHandlers.add((IMathOpHandler)extension);
         	}
 
         }
 
+        typeHandlers.add(new DateTimeUtility());
+        typeHandlers.add(new MathUtility());
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -398,17 +414,17 @@ public class LexiconConfiguration<V extends BigdataValue>
              * then return the IV from the Vocabulary. It will be either an
              * URIByteIV or an URIShortIV.
              */
-            
+
             final IV tmp = vocab.get(value);
 
             if (tmp != null) {
 
                 iv = tmp;
-                
+
             } else {
 
                 iv = createInlineURIIV((URI) value);
-                
+
             }
 
         } else if (value instanceof Literal) {
@@ -420,19 +436,19 @@ public class LexiconConfiguration<V extends BigdataValue>
             iv = createInlineBNodeIV((BNode) value);
 
         } else {
-            
+
             // Note: SIDs are handled elsewhere.
             iv = null;
-            
+
         }
 
         if (iv != null && value instanceof BigdataValue) {
-         
+
             // Cache the IV on the BigdataValue.
             ((BigdataValue) value).setIV(iv);
-            
+
         }
-       
+
         return iv;
 
     }
@@ -440,10 +456,10 @@ public class LexiconConfiguration<V extends BigdataValue>
 	/**
 	 * If the {@link URI} can be inlined into the statement indices for this
 	 * {@link LexiconConfiguration}, then return its inline {@link IV}.
-	 * 
+	 *
 	 * @param value
 	 *            The {@link URI}.
-	 * 
+	 *
 	 * @return The inline {@link IV} -or- <code>null</code> if the {@link URI}
 	 *         can not be inlined into the statement indices.
 	 */
@@ -452,17 +468,17 @@ public class LexiconConfiguration<V extends BigdataValue>
 
 // deprecated in favor of the extensible InlineURIFactory mechanism
 //    	try {
-//    		
+//
 //    		final String s = value.stringValue();
-//    		
+//
 //	    	if (s.startsWith("ip:")) {
 //	    		return new IPAddrIV(s.substring(3));
 //	    	}
-//	    	
-//    	} catch (UnknownHostException ex) { 
-//    		
+//
+//    	} catch (UnknownHostException ex) {
+//
 //    		log.warn("unknown host exception, will not inline: " + value);
-//    		
+//
 //    	}
 
         /*
@@ -471,17 +487,17 @@ public class LexiconConfiguration<V extends BigdataValue>
         @SuppressWarnings("rawtypes")
         final URIExtensionIV inline = uriFactory.createInlineURIIV(value);
         if (inline != null) {
-            
+
             return inline;
-            
+
         }
-        
+
         if (maxInlineTextLength == 0) {
-            
+
             return null;
-            
+
         }
-        
+
         if (value.stringValue().length() <= maxInlineTextLength) {
 
             return new FullyInlineURIIV<BigdataURI>(value);
@@ -499,7 +515,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
             if (namespaceIV != null) {
 
-                final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV = 
+                final FullyInlineTypedLiteralIV<BigdataLiteral> localNameIV =
                         new FullyInlineTypedLiteralIV<BigdataLiteral>(
                                 localName);
 
@@ -529,10 +545,10 @@ public class LexiconConfiguration<V extends BigdataValue>
     /**
      * If the {@link Literal} can be inlined into the statement indices for this
      * {@link LexiconConfiguration}, then return its inline {@link IV}.
-     * 
+     *
      * @param value
      *            The {@link Literal}.
-     * 
+     *
      * @return The inline {@link IV} -or- <code>null</code> if the
      *         {@link Literal} can not be inlined into the statement indices.
      */
@@ -541,26 +557,26 @@ public class LexiconConfiguration<V extends BigdataValue>
         final URI datatype = value.getDatatype();
 
         IV<BigdataLiteral, ?> iv = null;
-        
+
         if (datatype != null && datatype2ext.containsKey(datatype.stringValue())) {
 
             /*
              * Check the registered extension factories first.
-             * 
+             *
              * Note: optimized xsd:string support is provided via a registered
              * extension. See XSDStringExtension.
              */
-        
+
             if ((iv = createExtensionIV(value, datatype)) != null)
                 return iv;
-            
+
         }
 
         /*
          * Attempt to inline an xsd datatype corresponding to either a java
          * primitive (int, long, float, etc.) or to one of the special cases
          * (BigDecimal, BigInteger).
-         * 
+         *
          * Note: Optimized xsd:string inlining is handled by the
          * XSDStringExtension (above).
          */
@@ -568,7 +584,7 @@ public class LexiconConfiguration<V extends BigdataValue>
             return iv;
 
         if (inlineTextLiterals && maxInlineTextLength > 0) {
-         
+
             /*
              * Attempt to fully inline the literal.
              */
@@ -586,17 +602,17 @@ public class LexiconConfiguration<V extends BigdataValue>
     /**
      * Test the registered {@link IExtension} handlers. If one handles this
      * datatype, then delegate to that {@link IExtension}.
-     * 
+     *
      * @return The {@link LiteralExtensionIV} -or- <code>null</code> if no
      *         {@link IExtension} was registered for that datatype.
-     * 
+     *
      *         TODO Should we explicitly disallow extensions which override the
      *         basic inlining behavior for xsd datatypes?
      */
     private AbstractInlineIV<BigdataLiteral, ?> createExtensionIV(
             final Literal value, final URI datatype) {
 
-        final IExtension<BigdataValue> xFactory = 
+        final IExtension<BigdataValue> xFactory =
             datatype2ext.get(datatype.stringValue());
 
         try {
@@ -613,9 +629,9 @@ public class LexiconConfiguration<V extends BigdataValue>
 
                 // Propagate interrupt.
                 throw new RuntimeException(t);
-                
+
             }
-            
+
             if(InnerCause.isInnerCause(t, Error.class)) {
 
                 // Propagate error to preserve a stable encoding behavior.
@@ -628,12 +644,12 @@ public class LexiconConfiguration<V extends BigdataValue>
 			 * returning [null], it will be inserted into the lexicon indices
 			 * instead of being inlined.
 			 */
-            
+
             log.error(t.getMessage() + ": value=" + value.stringValue());// t);
 
             // fall through.
             return null;
-            
+
         }
 
     }
@@ -642,10 +658,10 @@ public class LexiconConfiguration<V extends BigdataValue>
      * If the total length of the Unicode components of the {@link Literal} is
      * less than {@link #maxInlineTextLength} then return an fully inline
      * version of the {@link Literal}.
-     * 
+     *
      * @param value
      *            The literal.
-     *            
+     *
      * @return The fully inline IV -or- <code>null</code> if the {@link Literal}
      *         could not be inlined within the configured constraints.
      */
@@ -670,22 +686,22 @@ public class LexiconConfiguration<V extends BigdataValue>
             }
 
         }
-        
+
         // Will not inline as Unicode.
         return null;
-        
+
     }
 
     /**
      * Attempt to inline an xsd datatype corresponding to either a java
      * primitive (int, long, float, etc.) or to one of the special cases
      * (BigDecimal, BigInteger).
-     * 
+     *
      * @param value
      *            The RDF {@link Value}.
      * @param datatype
      *            The XSD datatype {@link URI}.
-     *            
+     *
      * @return The {@link IV} -or- <code>null</code> if the value could not be
      *         inlined.
      */
@@ -703,7 +719,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 //             */
 //            return null;
 //        }
-        
+
         if (dte == null) {
             return null;
         }
@@ -747,16 +763,16 @@ public class LexiconConfiguration<V extends BigdataValue>
                 return new UUIDLiteralIV<BigdataLiteral>(UUID.fromString(v));
             case XSDUnsignedByte:
                 return new XSDUnsignedByteIV<BigdataLiteral>(parseUnsignedByte(v));
-            case XSDUnsignedShort: 
+            case XSDUnsignedShort:
                 return new XSDUnsignedShortIV<BigdataLiteral>(parseUnsignedShort(v));
            case XSDUnsignedInt:
                 return new XSDUnsignedIntIV<BigdataLiteral>(parseUnsignedInt(v));
-            case XSDUnsignedLong: 
+            case XSDUnsignedLong:
                 return new XSDUnsignedLongIV<BigdataLiteral>(parseUnsignedLong(v));
             case Extension:
                 /*
                  * Hijacking DTE.Extension for IPv4.  Throws UnknownHostException
-                 * if not parseable as an IPv4. 
+                 * if not parseable as an IPv4.
                  */
                 return new IPv4AddrIV<BigdataLiteral>(v);
             default:
@@ -767,9 +783,9 @@ public class LexiconConfiguration<V extends BigdataValue>
         } catch (NumberFormatException ex) {
 
             if (rejectInvalidXSDValues) {
-            
+
                 throw new RuntimeException(ex + ": value=" + v, ex);
-                
+
             }
 
             /*
@@ -781,86 +797,86 @@ public class LexiconConfiguration<V extends BigdataValue>
                 log.warn("Value does not validate against datatype: " + value);
 
             return null;
-            
+
         } catch (UnknownHostException ex) {
-    
+
             if (rejectInvalidXSDValues) {
-            
+
                 throw new RuntimeException(ex + ": value=" + v, ex);
-                
+
             }
-    
+
             /*
              * Note: By falling through here, we wind up accepting the Value,
              * but it gets handled as a TermId instead of being inlined.
              */
-    
+
             if (log.isInfoEnabled())
                 log.warn("Value does not validate against datatype: " + value);
-    
+
             return null;
-            
+
         }
-    
+
 
     }
-    
+
     /**
      * The unsigned parse must range check since it uses a parser for a higher value type
      * before casting.
      */
     private byte parseUnsignedByte(final String v) {
     	short pv = XMLDatatypeUtil.parseShort(v);
-    	
+
     	if (pv < 0 || pv > MAX_UNSIGNED_BYTE) {
     		throw new NumberFormatException("Value out of range for unsigned byte");
     	}
     	pv += Byte.MIN_VALUE;
-    	
+
     	return (byte) pv;
     }
-    
+
     private short parseUnsignedShort(final String v) {
     	int pv = XMLDatatypeUtil.parseInt(v);
-    	
+
     	if (pv < 0 || pv > MAX_UNSIGNED_SHORT) {
     		throw new NumberFormatException("Value out of range for unsigned short");
     	}
-    	
+
     	pv += Short.MIN_VALUE;
-    	
+
     	return (short) pv;
     }
-    
+
     private int parseUnsignedInt(final String v) {
     	long pv = XMLDatatypeUtil.parseLong(v);
-    	
+
     	if (pv < 0 || pv > MAX_UNSIGNED_INT) {
     		throw new NumberFormatException("Value out of range for unsigned int");
     	}
-    	
+
     	pv += Integer.MIN_VALUE;
-    	
+
     	return (int) pv;
     }
-    
+
     private long parseUnsignedLong(final String v) {
     	final BigInteger pv = XMLDatatypeUtil.parseInteger(v);
-    	
+
     	if (pv.signum() == -1 || pv.compareTo(MAX_UNSIGNED_LONG) > 0) {
     		throw new NumberFormatException("Value out of range for unsigned long");
     	}
-    	   	
+
     	return pv.subtract(BigInteger.valueOf(Long.MIN_VALUE)).longValue();
     }
-    
+
     /**
      * If the {@link BNode} can be inlined into the statement indices for this
      * {@link LexiconConfiguration}, then return its inline {@link IV}.
-     * 
+     *
      * @param value
      *            The {@link BNode}.
-     * 
+     *
      * @return The inline {@link IV} -or- <code>null</code> if the {@link BNode}
      *         can not be inlined into the statement indices.
      */
@@ -874,12 +890,12 @@ public class LexiconConfiguration<V extends BigdataValue>
          * Note: UUID.toString() is 36 bytes. If it has the 'u' prefix we can
          * recognize it, so that is a total of 37 bytes.
          */
-        if (c == 'u' && 
+        if (c == 'u' &&
                 id.length() == 37 && isInline(VTE.BNODE, DTE.UUID)) {
 
             /*
              * Inline as [UUID].
-             * 
+             *
              * Note: We cannot normalize IDs, they need to remain syntactically
              * identical.
              */
@@ -887,13 +903,13 @@ public class LexiconConfiguration<V extends BigdataValue>
             try {
 
                 final String subStr = id.substring(1);
-                
+
                 final UUID uuid = UUID.fromString(subStr);
 
                 if (uuid.toString().equals(subStr)) {
 
                     return new UUIDBNodeIV<BigdataBNode>(uuid);
-                    
+
                 }
 
             } catch (Exception ex) {
@@ -903,16 +919,16 @@ public class LexiconConfiguration<V extends BigdataValue>
                  */
 
             }
-            
+
         } else if (c == 'i' && isInline(VTE.BNODE, DTE.XSDInt)) {
 
             /*
              * Inline as [int].
-             * 
+             *
              * Note: We cannot normalize IDs, they need to remain syntactically
              * identical.
              */
-            
+
             try {
 
                 final String subStr = id.substring(1);
@@ -933,9 +949,9 @@ public class LexiconConfiguration<V extends BigdataValue>
                  */
 
             }
-            
+
         }
-        
+
         if (maxInlineTextLength > 0 && id.length() <= maxInlineTextLength) {
 
             /*
@@ -948,7 +964,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
         // The blank node was not inlined.
         return null;
-        
+
     }
 
     /**
@@ -976,10 +992,10 @@ public class LexiconConfiguration<V extends BigdataValue>
     /**
      * Hack for supported {@link DTE}s (this is here because we do not support
      * the unsigned variants yet).
-     * 
+     *
      * @param dte
      *            The {@link DTE}.
-     * 
+     *
      * @return <code>true</code> if the {@link DTE} has native inline support
      *         (versus support via an {@link IExtension} handler or inline
      *         support via a {@link FullyInlineTypedLiteralIV} (a catch all)).
@@ -1008,7 +1024,7 @@ public class LexiconConfiguration<V extends BigdataValue>
              */
                 return true;
             case XSDUnsignedByte:
-            case XSDUnsignedShort: 
+            case XSDUnsignedShort:
             case XSDUnsignedInt:
             case XSDUnsignedLong:
                 return true; // enable supporting XSD unsigned types!
@@ -1018,4 +1034,7 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
 
+    public Iterable<IMathOpHandler> getTypeHandlers() {
+        return Collections.unmodifiableList(typeHandlers);
+    }
 }
