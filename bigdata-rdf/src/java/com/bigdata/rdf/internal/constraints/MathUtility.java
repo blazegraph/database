@@ -18,33 +18,49 @@ import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.internal.impl.literal.XSDDecimalIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
 import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
+import com.bigdata.rdf.model.BigdataValueFactory;
 
-public class MathUtility {
+public class MathUtility implements IMathOpHandler {
 
-	public static boolean checkNumericDatatype(final Literal... args) {
+    public static boolean checkNumericDatatype(final Literal... args) {
     	for (Literal lit : args) {
     		final URI dt = lit.getDatatype();
-    
+
     		if (dt == null || !XMLDatatypeUtil.isNumericDatatype(dt))
     			return false;
     	}
     	return true;
     }
-    
-    public static NumericIV literalMath(final Literal l1, final Literal l2, 
-            final MathOp op)
+
+    @Override
+    public boolean canInvokeMathOp(final Literal... args) {
+        return checkNumericDatatype(args);
+    }
+
+    @Override
+    public NumericIV doMathOp(final Literal l1, final IV iv1,
+            final Literal l2, final IV iv2,
+            final MathOp op,
+            final BigdataValueFactory vf)
+    {
+        return literalMath(l1, l2, op);
+    }
+
+
+    public static NumericIV literalMath(final Literal l1, final Literal l2,
+                        final MathOp op)
     {
     	if (!checkNumericDatatype(l1, l2))
     		throw new IllegalArgumentException("Not numbers: " + l1 + ", " + l2);
-        
+
     	final URI dt1 = l1.getDatatype();
         final URI dt2 = l2.getDatatype();
-    
+
         // Determine most specific datatype that the arguments have in common,
         // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
         // per the SPARQL/XPATH spec
         URI commonDatatype;
-    
+
         if (dt1.equals(XMLSchema.DOUBLE) || dt2.equals(XMLSchema.DOUBLE)) {
             commonDatatype = XMLSchema.DOUBLE;
         } else if (dt1.equals(XMLSchema.FLOAT) || dt2.equals(XMLSchema.FLOAT)) {
@@ -59,12 +75,12 @@ public class MathUtility {
         } else {
             commonDatatype = XMLSchema.INTEGER;
         }
-    
+
         // Note: Java already handles cases like divide-by-zero appropriately
         // for floats and doubles, see:
         // http://www.particle.kth.se/~lindsey/JavaCourse/Book/Part1/Tech/
         // Chapter02/floatingPt2.html
-    
+
         try {
             if (commonDatatype.equals(XMLSchema.DOUBLE)) {
                 double left = l1.doubleValue();
@@ -91,23 +107,23 @@ public class MathUtility {
         } catch (ArithmeticException e) {
             throw new SparqlTypeErrorException();
         }
-        
+
     }
-    
-//    public static final IV numericalMath(final Literal l1, final IV iv2, 
+
+//    public static final IV numericalMath(final Literal l1, final IV iv2,
 //            final MathOp op) {
-//        
+//
 //        final URI dt1 = l1.getDatatype();
-//    
+//
 //        // Only numeric value can be used in math expressions
 //        if (dt1 == null || !XMLDatatypeUtil.isNumericDatatype(dt1)) {
 //            throw new IllegalArgumentException("Not a number: " + l1);
 //        }
-//    
+//
 //        if (!iv2.isInline())
 //            throw new IllegalArgumentException(
 //                    "right term is not inline: left=" + l1 + ", right=" + iv2);
-//        
+//
 //        if (!iv2.isLiteral())
 //            throw new IllegalArgumentException(
 //                    "right term is not literal: left=" + l1 + ", right=" + iv2);
@@ -119,7 +135,7 @@ public class MathUtility {
 //                    "right term is not numeric: left=" + l1 + ", right=" + iv2);
 //
 //        final AbstractLiteralIV<BigdataLiteral, ?> num2 = (AbstractLiteralIV<BigdataLiteral, ?>) iv2;
-//        
+//
 //        // Determine most specific datatype that the arguments have in common,
 //        // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
 //        // per the SPARQL/XPATH spec
@@ -140,7 +156,7 @@ public class MathUtility {
 //        }
 //
 //    }
-//    
+//
 //    public static final IV numericalMath(final Literal l1, final Literal l2,
 //            final MathOp op) {
 //
@@ -179,9 +195,9 @@ public class MathUtility {
 //
 //    }
 //
-//    public static final IV numericalMath(final IV iv1, final IV iv2, 
+//    public static final IV numericalMath(final IV iv1, final IV iv2,
 //            final MathOp op) {
-//        
+//
 //        if (!iv1.isInline())
 //            throw new IllegalArgumentException(
 //                    "left term is not inline: left=" + iv1 + ", right=" + iv2);
@@ -189,7 +205,7 @@ public class MathUtility {
 //        if (!iv2.isInline())
 //            throw new IllegalArgumentException(
 //                    "right term is not inline: left=" + iv1 + ", right=" + iv2);
-//        
+//
 //        if (!iv1.isLiteral())
 //            throw new IllegalArgumentException(
 //                    "left term is not literal: left=" + iv1 + ", right=" + iv2);
@@ -209,13 +225,13 @@ public class MathUtility {
 //            throw new IllegalArgumentException(
 //                    "left term is not numeric: left=" + iv1 + ", right=" + iv2);
 //
-//        final Literal num1 = (Literal) iv1; 
-//        final Literal num2 = (Literal) iv2; 
-//        
+//        final Literal num1 = (Literal) iv1;
+//        final Literal num2 = (Literal) iv2;
+//
 //        // Determine most specific datatype that the arguments have in common,
 //        // choosing from xsd:integer, xsd:decimal, xsd:float and xsd:double as
 //        // per the SPARQL/XPATH spec
-//        
+//
 //        if (dte1 == DTE.XSDDouble || dte2 == DTE.XSDDouble) {
 //            return numericalMath(num1.doubleValue(), num2.doubleValue(), op);
 //        } else if (dte1 == DTE.XSDFloat || dte2 == DTE.XSDFloat) {
@@ -230,17 +246,17 @@ public class MathUtility {
 //        } else {
 //            return numericalMath(num1.integerValue(), num2.integerValue(), op);
 //        }
-//            
+//
 ////        // if one's a BigDecimal we should use the BigDecimal comparator for both
 ////        if (dte1 == DTE.XSDDecimal || dte2 == DTE.XSDDecimal) {
 ////            return numericalMath(num1.decimalValue(), num2.decimalValue(), op);
 ////        }
-////        
+////
 ////        // same for BigInteger
 ////        if (dte1 == DTE.XSDInteger || dte2 == DTE.XSDInteger) {
 ////            return numericalMath(num1.integerValue(), num2.integerValue(), op);
 ////        }
-////        
+////
 ////        // fixed length numerics
 ////        if (dte1.isFloatingPointNumeric() || dte2.isFloatingPointNumeric()) {
 ////            // non-BigDecimal floating points
@@ -255,28 +271,28 @@ public class MathUtility {
 ////            else
 ////                return numericalMath(num1.longValue(), num2.longValue(), op);
 ////        }
-//        
+//
 //    }
-    
+
     /**
      * The XPath numeric functions: abs, ceiling, floor, and round.
-     * 
+     *
      * @param iv1
      *            The operand.
      * @param op
      *            The operation.
 
      * @return The result.
-     * 
+     *
      * @see XPathMathFunctions
      */
-    public static final NumericIV numericalFunc(final Literal lit, final NumericOp op) {
+    public final static NumericIV numericalFunc(final Literal lit, final NumericOp op) {
 
     	if (!checkNumericDatatype(lit))
     		throw new IllegalArgumentException("not numeric: " + lit);
-    	
+
     	final URI dte1 = lit.getDatatype();
-    	
+
         /*
          * FIXME These xpath functions have very custom semantics. They need to
          * be lifted out of this class and put into their own static methods
@@ -294,7 +310,7 @@ public class MathUtility {
 //        default:
 //            throw new UnsupportedOperationException(op.toString());
 //        }
-        
+
         if (dte1.equals(XMLSchema.DECIMAL)) {
             return numericalFunc(lit.decimalValue(), op);
         } else if (dte1.equals(XMLSchema.INTEGER)) {
@@ -309,7 +325,7 @@ public class MathUtility {
             return numericalFunc(lit.longValue(), op);
         }
     }
-    
+
     @Deprecated
     private static final NumericIV numericalFunc(final BigDecimal left, final NumericOp op) {
         switch(op) {
@@ -325,7 +341,7 @@ public class MathUtility {
             throw new UnsupportedOperationException();
         }
     }
-    
+
     @Deprecated
     private static final NumericIV numericalFunc(final BigInteger left, final NumericOp op) {
         switch(op) {
@@ -357,7 +373,7 @@ public class MathUtility {
             throw new UnsupportedOperationException();
         }
     }
-    
+
     @Deprecated
     private static final NumericIV numericalFunc(final int left, final NumericOp op) {
         switch(op) {
@@ -373,7 +389,7 @@ public class MathUtility {
             throw new UnsupportedOperationException();
         }
     }
-    
+
     @Deprecated
     private static final NumericIV numericalFunc(final long left, final NumericOp op) {
         switch(op) {
@@ -405,10 +421,10 @@ public class MathUtility {
             throw new UnsupportedOperationException();
         }
     }
-    
-    private static final NumericIV numericalMath(final BigDecimal left, 
+
+    private static final NumericIV numericalMath(final BigDecimal left,
             final BigDecimal right, final MathOp op) {
-        
+
         switch(op) {
         case PLUS:
             return new XSDDecimalIV(left.add(right));
@@ -437,12 +453,12 @@ public class MathUtility {
         default:
             throw new UnsupportedOperationException();
         }
-        
+
     }
-    
-    private static final NumericIV numericalMath(final BigInteger left, 
+
+    private static final NumericIV numericalMath(final BigInteger left,
             final BigInteger right, final MathOp op) {
-        
+
         switch(op) {
         case PLUS:
             return new XSDIntegerIV(left.add(right));
@@ -459,12 +475,12 @@ public class MathUtility {
         default:
             throw new UnsupportedOperationException();
         }
-        
+
     }
-    
-    private static final NumericIV numericalMath(final float left, 
+
+    private static final NumericIV numericalMath(final float left,
             final float right, final MathOp op) {
-        
+
         switch(op) {
         case PLUS:
             return new XSDNumericIV(left+right);
@@ -481,12 +497,12 @@ public class MathUtility {
         default:
             throw new UnsupportedOperationException();
         }
-        
+
     }
-    
-    private static final NumericIV numericalMath(final double left, 
+
+    private static final NumericIV numericalMath(final double left,
             final double right, final MathOp op) {
-        
+
         switch(op) {
         case PLUS:
             return new XSDNumericIV(left+right);
@@ -503,7 +519,7 @@ public class MathUtility {
         default:
             throw new UnsupportedOperationException();
         }
-        
+
     }
-    
+
 }
