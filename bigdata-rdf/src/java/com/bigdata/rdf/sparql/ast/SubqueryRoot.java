@@ -29,7 +29,6 @@ import java.util.Map;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase.Annotations;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSparql11SubqueryOptimizer;
 
 /**

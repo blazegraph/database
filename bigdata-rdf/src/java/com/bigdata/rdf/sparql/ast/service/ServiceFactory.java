@@ -27,6 +27,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.util.Set;
+
+import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.IVariableBindingRequirements;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+
+
 /**
  * Factory for creating objects which can talk to SPARQL service end points.
  */
@@ -48,4 +55,27 @@ public interface ServiceFactory {
      */
     ServiceCall<?> create(ServiceCallCreateParams params);
 
+    /**
+     * Returns, for the given service node, the variables that must be
+     * bound prior to start executing the service. This information is 
+     * important to reason about the position where to place the service
+     * within the execution proccess.
+
+     * 
+     * See 
+     * {@link IVariableBindingRequirements#getRequiredBound(StaticAnalysis)}.
+     */
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode);
+
+    /**
+     * Returns, for the given service node, the variables that are desired
+     * to be bound prior to start executing the service. This information is 
+     * important to reason about the position where to place the service
+     * within the execution proccess.
+     * 
+     * See 
+     * {@link IVariableBindingRequirements#getDesiredBound(StaticAnalysis)}.
+     */
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode);    
+    
 }

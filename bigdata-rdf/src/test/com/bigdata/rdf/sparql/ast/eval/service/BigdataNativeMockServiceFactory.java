@@ -27,14 +27,20 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval.service;
 
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
+import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -99,5 +105,15 @@ public class BigdataNativeMockServiceFactory implements ServiceFactory {
         }
 
     }
+    
+    @Override
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();       
+    }        
 
 }

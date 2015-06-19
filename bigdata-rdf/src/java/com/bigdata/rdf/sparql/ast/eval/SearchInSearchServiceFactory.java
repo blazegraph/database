@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,6 +42,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
@@ -715,5 +717,15 @@ public class SearchInSearchServiceFactory implements ServiceFactory {
         }
         
     }
+
+    @Override
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();       
+    }        
 
 }

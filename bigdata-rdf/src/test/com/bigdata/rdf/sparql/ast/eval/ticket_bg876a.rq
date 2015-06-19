@@ -1,0 +1,8 @@
+SELECT * { 
+  ?s ?p ?o .
+  BIND( substr(?o, 3) as ?oo )
+  SERVICE <http://example.com:9999/sparql> {
+     ?ss ?pp ?oo
+  }
+
+} LIMIT 10

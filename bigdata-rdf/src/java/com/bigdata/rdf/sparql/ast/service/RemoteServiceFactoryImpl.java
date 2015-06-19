@@ -27,6 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+import org.openrdf.model.URI;
+
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+
 /**
  * A factory for service calls against remote SPARQL end points. You can control
  * the way in which bigdata handles SPARQL 1.1 Federated Query for a remote
@@ -86,5 +97,39 @@ public class RemoteServiceFactoryImpl implements ServiceFactory {
         return serviceOptions;
 
     }
+    
+    /**
+     * In order to be able to evaluate the SPARQL 1.1 remote service, the
+     * endpoint URIs must be known. Everything else is desired, but not
+     * required, and nothing is forbidden.
+     */
+    @Override
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+       
+       final Set<IVariable<?>> requiredBound = new HashSet<IVariable<?>>();
+       
+       final IVariableOrConstant<?> serviceRef = 
+          serviceNode.getServiceRef().getValueExpression();
+
+       if (serviceRef!=null && serviceRef instanceof IVariable) {
+          requiredBound.add((IVariable<?>)serviceRef);
+       }
+          
+       return requiredBound;
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+       
+       final Set<IVariable<?>> desiredBound = new HashSet<IVariable<?>>();
+       
+       final Iterator<IVariable<?>> varIt = 
+          BOpUtility.getSpannedVariables(serviceNode.getGraphPattern());
+       while (varIt.hasNext()) {
+          desiredBound.add(varIt.next());
+       }
+       
+       return desiredBound;
+    }        
 
 }
