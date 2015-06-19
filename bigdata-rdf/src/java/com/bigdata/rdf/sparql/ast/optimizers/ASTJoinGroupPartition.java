@@ -33,8 +33,8 @@ import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfo;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupOrderOptimizer.VariableBindingInfo;
 
 /**
  * Partition of a join group, defined by a (possibly empty) list of
@@ -51,7 +51,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupOrderOptimizer.Variable
 public class ASTJoinGroupPartition {
 
    
-   final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo;
+   final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo;
    
    final List<IGroupMemberNode> nonOptionalNonMinusNodes;
    final IGroupMemberNode optionalOrMinus;
@@ -70,7 +70,7 @@ public class ASTJoinGroupPartition {
    ASTJoinGroupPartition(
       final List<IGroupMemberNode> nonOptionalNonMinusNodes,
       final IGroupMemberNode optionalOrMinus,
-      final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,         
+      final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo,         
       final Set<IVariable<?>> externallyBound) {
 
       this.nonOptionalNonMinusNodes = nonOptionalNonMinusNodes;
@@ -103,7 +103,7 @@ public class ASTJoinGroupPartition {
     */
    void addNonOptionalNonMinusNodeToPartition(IGroupMemberNode node) {
       nonOptionalNonMinusNodes.add(node);
-      definitelyProduced.addAll(bindingInfo.get(node).definitelyProduced);
+      definitelyProduced.addAll(bindingInfo.get(node).getDefinitelyProduced());
    }
    
    /**
@@ -124,7 +124,7 @@ public class ASTJoinGroupPartition {
     */
    public static List<ASTJoinGroupPartition> partition(
       final List<IGroupMemberNode> nodes,
-      final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,
+      final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo,
       final Set<IVariable<?>> externallyKnownProduced) {
       
       final List<ASTJoinGroupPartition> partitions = 
@@ -210,7 +210,7 @@ public class ASTJoinGroupPartition {
       definitelyProduced = new HashSet<IVariable<?>>();
       definitelyProduced.addAll(externallyBound);
       for (IGroupMemberNode node : nonOptionalNonMinusNodes) {
-         definitelyProduced.addAll(bindingInfo.get(node).definitelyProduced);
+         definitelyProduced.addAll(bindingInfo.get(node).getDefinitelyProduced());
       }
       
    }
