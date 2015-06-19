@@ -113,24 +113,4 @@ public class TestJoinOrder extends AbstractDataDrivenSPARQLTestCase {
 
     }
     
-    
-
-    /**
-     * Testing proper use of VALUES clause inside named subqueries.
-     * 
-     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
-     * named subquery and VALUES expression</a>.
-     */
-    // TODO: this is a duplicate, same test also in TestBindings. Remove
-    // once refactoring has been finished.
-    public void test_ticket_bg1296c() throws Exception {
-       new TestHelper("ticket_bg1296c",// testURI,
-             "ticket_bg1296c.rq",// queryFileURL
-             "empty.trig",// dataFileURL
-             "ticket_bg1296.srx"// resultFileURL
-       ).runTest();
-    }    
-
-    
-    
 }
