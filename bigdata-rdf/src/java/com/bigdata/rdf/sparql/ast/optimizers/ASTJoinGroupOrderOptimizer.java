@@ -42,9 +42,8 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
-import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
+import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfo;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
-import com.bigdata.rdf.sparql.ast.IVariableBindingRequirements;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
@@ -70,7 +69,6 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 public class ASTJoinGroupOrderOptimizer extends AbstractJoinGroupOptimizer 
 implements IASTOptimizer {
    
-   // TODO: optimize join group is called too often when having nested join groups, why?
    @Override
    protected void optimizeJoinGroup(AST2BOpContext ctx, StaticAnalysis sa,
          IBindingSet[] bSets, JoinGroupNode joinGroup) {
@@ -81,8 +79,8 @@ implements IASTOptimizer {
       /**
        * Initialize summary containers with a single pass over the children.
        */
-      final Map<IGroupMemberNode, VariableBindingInfo> bindingInfo = 
-         new HashMap<IGroupMemberNode, VariableBindingInfo>();
+      final Map<IGroupMemberNode, GroupNodeVarBindingInfo> bindingInfo = 
+         new HashMap<IGroupMemberNode, GroupNodeVarBindingInfo>();
 
       final NodeClassification nodeClassification = new NodeClassification();
             
@@ -90,8 +88,8 @@ implements IASTOptimizer {
          sa.getDefinitelyIncomingBindings(joinGroup, new HashSet<IVariable<?>>());
       for (IGroupMemberNode child : joinGroup) {
          
-         final VariableBindingInfo vbc = 
-            new VariableBindingInfo(child, sa, externallyIncoming);
+         final GroupNodeVarBindingInfo vbc = 
+            new GroupNodeVarBindingInfo(child, sa);
          bindingInfo.put(child,vbc); 
          nodeClassification.registerNode(child,vbc);
          
@@ -132,7 +130,7 @@ implements IASTOptimizer {
       final Set<IVariable<?>> knownBoundSomewhere =
          new HashSet<IVariable<?>>(externallyIncoming);
       for (final IGroupMemberNode node : nodeList) {
-         knownBoundSomewhere.addAll(bindingInfo.get(node).definitelyProduced);
+         knownBoundSomewhere.addAll(bindingInfo.get(node).getDefinitelyProduced());
       }
       
       final List<AssignmentNode> bindNodesOrdered = 
@@ -185,7 +183,7 @@ implements IASTOptimizer {
     */
    List<AssignmentNode> orderBindNodesByDependencies(
       final List<AssignmentNode> bindNodes,
-      final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,
+      final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo,
       final Set<IVariable<?>> knownBoundSomewhere) {
       
       final List<AssignmentNode> ordered = 
@@ -201,7 +199,7 @@ implements IASTOptimizer {
          for (int i=0 ; i<toBePlaced.size(); i++) {
             
             final AssignmentNode node = toBePlaced.get(i);
-            final VariableBindingInfo nodeBindingInfo = bindingInfo.get(node);
+            final GroupNodeVarBindingInfo nodeBindingInfo = bindingInfo.get(node);
             
             /**
              * The first condition is that the node can be safely placed. The
@@ -218,7 +216,7 @@ implements IASTOptimizer {
                toBePlaced.remove(i);
                
                // add its bound variables to the known bound set
-               knownBound.addAll(nodeBindingInfo.definitelyProduced);
+               knownBound.addAll(nodeBindingInfo.getDefinitelyProduced());
                
                break;
             }
@@ -241,20 +239,54 @@ implements IASTOptimizer {
     */
   LinkedList<IGroupMemberNode> reorderNodes(
       final LinkedList<IGroupMemberNode> nodeList, 
-      final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,
+      final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo,
       final Set<IVariable<?>> externallyKnownProduced) {
       
-     
      
      /**
       * Compute the partitions.
       */
-     // TODO: make the bindingInfo a class and create a utility method to
-     //       populate it
      final List<ASTJoinGroupPartition> partitions = 
         ASTJoinGroupPartition.partition(
            nodeList, bindingInfo, externallyKnownProduced);
+
+     /**
+      * First, optimize across partitions.
+      */
+      // first, move the statement patterns to the beginning wherever possible
+      optimizeAcrossPartitions(
+         partitions, bindingInfo, externallyKnownProduced);
+
+      /**
+       * Second, optimize within partitions.
+       */
+      optimizeWithinPartitions(partitions);
       
+      /**
+       * Generate the output node list through iteration over partitions.
+       */
+      LinkedList<IGroupMemberNode> res = new LinkedList<IGroupMemberNode>();
+      for (int i=0; i<partitions.size(); i++) {
+         res.addAll(partitions.get(i).extractNodeList());
+      }
+      return res;
+      
+   }
+
+
+  /**
+   * Moves the nodes contained in the set as far to the beginning of the join
+   * group as possible without violating the semantics. In particular, this
+   * function takes care to not "skip" OPTIONAL and MINUS constructs when
+   * it would change the outcome of the query.
+   * 
+   * @param set a set of nodes
+   */
+  void optimizeAcrossPartitions(
+     final List<ASTJoinGroupPartition> partitions,
+     final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo,      
+     final Set<IVariable<?>> externallyKnownProduced) {      
+
      /**
       * In the following list, we store the variables that are definitely
       * produced *before* evaluating a partition. We maintain this set
@@ -312,10 +344,10 @@ implements IASTOptimizer {
                  conflictingVars = 
                     new HashSet<IVariable<?>>(
                        bindingInfo.get(
-                          candPartition.optionalOrMinus).maybeProduced);
+                          candPartition.optionalOrMinus).getMaybeProduced());
               }
 
-              conflictingVars.retainAll(bindingInfo.get(candidate).maybeProduced);
+              conflictingVars.retainAll(bindingInfo.get(candidate).getMaybeProduced());
               
               conflictingVars.removeAll(
                  definitelyProducedUpToPartition.get(j));
@@ -348,7 +380,7 @@ implements IASTOptimizer {
                */
              for (int k=partitionForCandidate+1; k<=i; k++) {
                  definitelyProducedUpToPartition.get(k).addAll(
-                    bindingInfo.get(candidate).definitelyProduced);
+                    bindingInfo.get(candidate).getDefinitelyProduced());
               }
               
               // the node will be removed from the current partition at the end
@@ -362,61 +394,6 @@ implements IASTOptimizer {
         // the nodes that remain in this position are the unmovable nodes
         partition.replaceNonOptionalNonMinusNodesWith(unmovableNodes, true);
      }
-     
-
-     /**
-      * First, optimize across partitions.
-      */
-      // first, move the statement patterns to the beginning wherever possible
-      optimizeAcrossPartitions(
-         partitions, bindingInfo, externallyKnownProduced);
-
-      /**
-       * Second, optimize within partitions.
-       */
-      optimizeWithinPartitions(partitions);
-      
-      /**
-       * Generate the output node list through iteration over partitions.
-       */
-      LinkedList<IGroupMemberNode> res = new LinkedList<IGroupMemberNode>();
-      for (int i=0; i<partitions.size(); i++) {
-         res.addAll(partitions.get(i).extractNodeList());
-      }
-      return res;
-      
-   }
-
-
-  /**
-   * Moves the nodes contained in the set as far to the beginning of the join
-   * group as possible without violating the semantics. In particular, this
-   * function takes care to not "skip" OPTIONAL and MINUS constructs when
-   * it would change the outcome of the query.
-   * 
-   * @param set a set of nodes
-   */
-  void optimizeAcrossPartitions(
-     final List<ASTJoinGroupPartition> partitions,
-     final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,      
-     final Set<IVariable<?>> externallyIncoming) {      
-
-     /**
-      * We follow a bubble sort approach, where we iteratively move nodes
-      * across partitions until a fixed point is reached.
-      * 
-      * In case the last partition becomes empty, remove it from the list of
-      * partitions. // TODO: test case
-      * 
-      * The condition for moving nodes into prior partitions is made solely
-      * based on variables shared across nodes and subgroups. More precisely,
-      * we are allowed to move a node n from a partition to its predecessor 
-      * partition p if and only if the following holds:
-      * 
-      * TBD
-      * 
-      */
-     // TODO: implement
      
   }
 
@@ -455,7 +432,7 @@ implements IASTOptimizer {
    void placeAtFirstContributingPosition(
          final LinkedList<IGroupMemberNode> nodeList, 
          final IGroupMemberNode node,
-         final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo, 
+         final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo, 
          final Set<IVariable<?>> externallyIncoming) {
 
          final Integer firstPossiblePosition = 
@@ -473,9 +450,9 @@ implements IASTOptimizer {
          /**
           * The binding requirements for the given node
           */
-         final VariableBindingInfo bindingInfoForNode = bindingInfo.get(node);
+         final GroupNodeVarBindingInfo bindingInfoForNode = bindingInfo.get(node);
          final Set<IVariable<?>> maybeProducedByNode = 
-            bindingInfoForNode.maybeProduced;
+            bindingInfoForNode.getMaybeProduced();
          
          /**
           * If there is some overlap between the known bound variables and the
@@ -501,7 +478,7 @@ implements IASTOptimizer {
          for (int i=0; i<nodeList.size(); i++) {
 
             final Set<IVariable<?>> desiredBound = 
-               bindingInfo.get(nodeList.get(i)).desiredBound;
+               bindingInfo.get(nodeList.get(i)).getDesiredBound();
                
             final Set<IVariable<?>> intersection = new HashSet<IVariable<?>>();
             intersection.addAll(desiredBound);
@@ -542,7 +519,7 @@ implements IASTOptimizer {
    void placeAtFirstPossiblePosition(
          final LinkedList<IGroupMemberNode> nodeList, 
          final IGroupMemberNode node,
-         final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo, 
+         final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo, 
          final Set<IVariable<?>> externallyIncoming) {
       
       final Integer positionToPlace = 
@@ -582,7 +559,7 @@ implements IASTOptimizer {
    Integer getFirstPossiblePosition(
          final LinkedList<IGroupMemberNode> nodeList, 
          final IGroupMemberNode node,
-         final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo, 
+         final Map<IGroupMemberNode,GroupNodeVarBindingInfo> bindingInfo, 
          final Set<IVariable<?>> externallyIncoming) {
 
       final HashSet<IVariable<?>> knownBound = 
@@ -591,7 +568,8 @@ implements IASTOptimizer {
          /**
           * The binding requirements for the given node
           */
-         final VariableBindingInfo bindingInfoForNode = bindingInfo.get(node);
+         final GroupNodeVarBindingInfo bindingInfoForNode = 
+            bindingInfo.get(node);
          
          for (int i=0; i<nodeList.size(); i++) {
 
@@ -602,7 +580,8 @@ implements IASTOptimizer {
             
             // add the child's definitely produced bindings to the variables
             // that are known to be bound
-            knownBound.addAll(bindingInfo.get(nodeList.get(i)).definitelyProduced);
+            knownBound.addAll(
+               bindingInfo.get(nodeList.get(i)).getDefinitelyProduced());
          }
          
          /**
@@ -680,7 +659,7 @@ implements IASTOptimizer {
       }
       
       public void registerNode(
-         final IGroupMemberNode node, final VariableBindingInfo vbc) {
+         final IGroupMemberNode node, final GroupNodeVarBindingInfo vbc) {
          
          final ServiceFactory defaultSF = 
             ServiceRegistry.getInstance().getDefaultServiceFactory();
@@ -699,13 +678,10 @@ implements IASTOptimizer {
 
          } else if (node instanceof StatementPatternNode) {
             
-            final StatementPatternNode spn = (StatementPatternNode)node;
             noneSpecialNodes.add(node);
             
          } else if (node instanceof NamedSubqueryInclude) {
             
-            final NamedSubqueryInclude nsi = (NamedSubqueryInclude)node;
-
             noneSpecialNodes.add(node);
             
          } else if (node instanceof ArbitraryLengthPathNode ||
@@ -753,83 +729,5 @@ implements IASTOptimizer {
       }      
 
    }
-   
-
-   /**
-    * Class summarizing the variable binding requirements for a given node
-    * (used for children in the join group).
-    */
-   protected static class VariableBindingInfo {
-
-      /**
-       * The node for which the information is valid.
-       */
-      final IGroupMemberNode node;
-      
-      /**
-       * Variables that must not be bound upon evaluation of this node,
-       * see {@link IVariableBindingRequirements} for detailed documentation.
-       */
-      Set<IVariable<?>> requiredBound;
-      
-      /**
-       * Variables that are desired to be bound upon evaluation of this node,
-       * see {@link IVariableBindingRequirements} for detailed documentation.
-       */
-      Set<IVariable<?>> desiredBound;
-
-      /**
-       * Variables that are possibly bound by this node.
-       */
-      Set<IVariable<?>> maybeProduced;
-
-      /**
-       * Variables that are definitely bound by this node.
-       */
-      Set<IVariable<?>> definitelyProduced;
-
-      
-      public VariableBindingInfo(
-         final IGroupMemberNode node, final StaticAnalysis sa,
-         final Set<IVariable<?>> definitelyIncomingBindings) {
-         
-         this.node = node;
-         this.requiredBound = node.getRequiredBound(sa);
-         this.desiredBound = node.getDesiredBound(sa);
-         
-         this.maybeProduced = new HashSet<IVariable<?>>();
-         if (node instanceof IBindingProducerNode) {
-            this.maybeProduced = 
-               sa.getMaybeProducedBindings(
-                  (IBindingProducerNode)node, maybeProduced, true);
-         }
-         
-         this.definitelyProduced = new HashSet<IVariable<?>>();
-         if (node instanceof IBindingProducerNode) {
-            this.definitelyProduced = 
-               sa.getDefinitelyProducedBindings(
-                  (IBindingProducerNode)node, definitelyProduced, true);
-         }
-         
-         System.out.println();
-      }
-
-      /**
-       * Get variables that remain to be bound, assuming that the definitely
-       * incoming variables plus the variables passed as parameter are bound
-       * already.
-       */
-      public Set<IVariable<?>> leftToBeBound(Set<IVariable<?>> knownBound) {
-         
-         HashSet<IVariable<?>> toBeBound = new HashSet<IVariable<?>>();
-         toBeBound.addAll(requiredBound);
-         toBeBound.removeAll(knownBound);
-         
-         return toBeBound;
-         
-      }
-      
-   }
-
 
 }
