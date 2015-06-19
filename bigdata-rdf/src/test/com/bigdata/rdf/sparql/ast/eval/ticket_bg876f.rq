@@ -1,0 +1,10 @@
+SELECT * { 
+ { select ?s ?p ?o ( substr(?o, 3) as ?oo )
+   {  ?s ?p ?o .
+   }
+  }
+  SERVICE <http://example.com:666/sparql> {
+     ?ss ?pp ?oo
+  }
+
+} LIMIT 10

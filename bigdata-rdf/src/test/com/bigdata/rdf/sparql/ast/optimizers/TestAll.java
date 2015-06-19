@@ -158,6 +158,9 @@ public class TestAll extends TestCase {
         
         suite.addTestSuite(TestALPPinTrac773.class);
         
+        // unit tests for the TestIVariableBindingRequirements interface
+        suite.addTestSuite(TestIVariableBindingRequirements.class);
+        
         /**
 		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
 		 * count mechanisms when that feature would produce exact results for

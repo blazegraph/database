@@ -1,0 +1,10 @@
+SELECT * {
+ SERVICE <http://localhost:2333/sparql> {
+    FILTER (true)
+    { 
+    SELECT * {
+       ?s ?p ?o 
+      } LIMIT 1
+    } 
+  }
+} LIMIT 1

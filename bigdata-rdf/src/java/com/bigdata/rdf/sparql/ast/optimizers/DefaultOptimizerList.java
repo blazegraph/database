@@ -456,14 +456,21 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * Join Order Optimization
          */
         
-        /**
-         * Rearranges the children in group nodes in order to put the same types
-         * of join nodes together. It also puts the type groups into the order
-         * in which they should be evaluated.  After this optimizer runs, the
-         * group node order is also the evaluation order.
-         */
-        add(new ASTJoinOrderByTypeOptimizer());
+//        /**
+//         * Rearranges the children in group nodes in order to put the same types
+//         * of join nodes together. It also puts the type groups into the order
+//         * in which they should be evaluated.  After this optimizer runs, the
+//         * group node order is also the evaluation order.
+//         */
 
+        /**
+         * Brings the children in group nodes into an order that implements
+         * the SPARQL 1.1 semantics, trying to optimize this order based on
+         * various heuristics.
+         */
+        add(new ASTJoinGroupOrderOptimizer());
+
+        
         /**
          * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
          */

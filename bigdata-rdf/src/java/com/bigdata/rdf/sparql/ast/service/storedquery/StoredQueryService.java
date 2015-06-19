@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.service.storedquery;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
@@ -31,6 +34,8 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 
+import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
@@ -339,5 +344,15 @@ abstract public class StoredQueryService implements ServiceFactory {
         } // StoredQueryApiTask
 
     } // StoredQueryServiceCall
+    
+    @Override
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();       
+    }        
 
 } // StoredQueryService

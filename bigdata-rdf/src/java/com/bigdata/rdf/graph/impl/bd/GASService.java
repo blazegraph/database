@@ -26,11 +26,11 @@ package com.bigdata.rdf.graph.impl.bd;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -1184,4 +1184,13 @@ public class GASService implements CustomServiceFactory {
 
     }
 
+    @Override
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();       
+    }
 }

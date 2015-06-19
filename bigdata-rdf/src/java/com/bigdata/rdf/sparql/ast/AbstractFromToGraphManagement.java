@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * Any of the operations which has a FROM and/or TO graph.
@@ -169,6 +172,16 @@ abstract public class AbstractFromToGraphManagement extends GraphManagement {
 
         return sb.toString();
 
+    }
+    
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
     }
 
 }

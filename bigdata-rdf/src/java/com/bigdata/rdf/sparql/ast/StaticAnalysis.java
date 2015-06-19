@@ -3004,4 +3004,19 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
           return tmp;
        }
     }
+    
+    
+    /**
+     * Resolves the {@link NamedSubqueryInclude} in the given context,
+     * returning the associated {@link NamedSubqueryRoot} object. Returns
+     * null if resolval fails.
+     */
+    public NamedSubqueryRoot resolveNamedSubqueryInclude(
+          final NamedSubqueryInclude nsi,
+          final StaticAnalysis sa) {
+       
+       return sa==null || nsi==null || nsi.getName()==null ?
+          null : sa.getNamedSubqueryRoot(nsi.getName());
+       
+    }
 }

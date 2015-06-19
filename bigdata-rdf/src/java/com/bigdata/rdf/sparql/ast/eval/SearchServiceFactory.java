@@ -28,8 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -70,15 +69,11 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
-import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.SingleValueChunkedIterator;
 
-import cutthecrap.utils.striterators.ArrayIterator;
-import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
-import cutthecrap.utils.striterators.SingleValueIterator;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -767,5 +762,15 @@ public class SearchServiceFactory implements ServiceFactory {
         }
         
     }
+
+    @Override
+    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
+       return new HashSet<IVariable<?>>();       
+    }        
 
 }
