@@ -94,7 +94,7 @@ implements IASTJoinGroupPartitionReorderer {
       addNodesOfType(ordered, nodeTypeInfo, NodeType.OTHER);
 
       // just replace the order in the partition
-      partition.replaceNonOptionalNonMinusNodesWith(ordered);
+      partition.replaceNonOptionalNonMinusNodesWith(ordered, false);
       
    }
    

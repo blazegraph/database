@@ -686,7 +686,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933a",// testURI,
              "ticket_933a.rq",// queryFileURL
              "empty.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933ac.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -699,7 +699,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933b",// testURI,
              "ticket_933b.rq",// queryFileURL
              "empty.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933bd.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -712,7 +712,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933c",// testURI,
              "ticket_933c.rq",// queryFileURL
              "ticket_933cd.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933ac.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -725,7 +725,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933d",// testURI,
              "ticket_933d.rq",// queryFileURL
              "ticket_933cd.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933bd.srx"// resultFileURL
        ).runTest();    
     } 
 
