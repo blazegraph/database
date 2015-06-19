@@ -244,6 +244,8 @@ implements IASTOptimizer {
       final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,
       final Set<IVariable<?>> externallyKnownProduced) {
       
+     
+     
      /**
       * Compute the partitions.
       */
@@ -253,6 +255,115 @@ implements IASTOptimizer {
         ASTJoinGroupPartition.partition(
            nodeList, bindingInfo, externallyKnownProduced);
       
+     /**
+      * In the following list, we store the variables that are definitely
+      * produced *before* evaluating a partition. We maintain this set
+      * for fast lookup.
+      */
+     final List<Set<IVariable<?>>> definitelyProducedUpToPartition =
+         new ArrayList<Set<IVariable<?>>>(partitions.size());
+     
+     final Set<IVariable<?>> producedUpToPartition =
+        new HashSet<IVariable<?>>(externallyKnownProduced);
+     for (int i=0; i<partitions.size();i++) {
+
+        // we start out with the second partitions, so this will succeed
+        if (i>0) {
+           producedUpToPartition.addAll(
+              partitions.get(i-1).getDefinitelyProduced());
+        }        
+        
+        definitelyProducedUpToPartition.add(
+           new HashSet<IVariable<?>>(producedUpToPartition));
+        
+     }
+     
+     /**
+      * Having initialized the map now, we iterate over the patterns in the
+      * partitions and try to shift them to the first possible partition.
+      * My intuition is that the algorithm is optimal in the sense that,
+      * after running it, every node is in the firstmost partition where
+      * it can be safely placed.
+      */
+     for (int i=1; i<partitions.size(); i++) {
+        
+        final ASTJoinGroupPartition partition = partitions.get(i);
+        
+        final List<IGroupMemberNode> unmovableNodes = 
+              new ArrayList<IGroupMemberNode>();
+        for (IGroupMemberNode candidate : partition.nonOptionalNonMinusNodes) {
+           
+           // find the firstmost partition in which the node can be moved
+           Integer partitionForCandidate = null;
+           for (int j=i-1; j>=0; j--) {
+              
+              final ASTJoinGroupPartition candPartition = partitions.get(j);
+              
+              /**
+               * Calculate the conflicting vars as the intersection of the
+               * maybe vars of the bordering OPTIONAL or MINUS with the maybe
+               * vars of the node to move around, minus the nodes that are
+               * known to be bound upfront.
+               */
+              final Set<IVariable<?>> conflictingVars;
+              if (candPartition.optionalOrMinus == null) {
+                 conflictingVars = new HashSet<IVariable<?>>();
+              } else {
+                 conflictingVars = 
+                    new HashSet<IVariable<?>>(
+                       bindingInfo.get(
+                          candPartition.optionalOrMinus).maybeProduced);
+              }
+
+              conflictingVars.retainAll(bindingInfo.get(candidate).maybeProduced);
+              
+              conflictingVars.removeAll(
+                 definitelyProducedUpToPartition.get(j));
+              
+              if (conflictingVars.isEmpty()) {
+                 partitionForCandidate = j;
+              } else {
+                 // can't place here, abort
+                 break;
+              }
+              
+           }
+           
+           if (partitionForCandidate!=null) {
+
+              // add the node to the partition (removal will be done later on)
+              final ASTJoinGroupPartition partitionToMove = 
+                 partitions.get(partitionForCandidate);
+              partitionToMove.addNonOptionalNonMinusNodeToPartition(candidate);
+              
+              /**
+               * Given that the node has been moved to partitionForCandidate,
+               * the definitelyProducedUpToPartition needs to be updated for
+               * all partitions starting at the partition following the 
+               * partitionForCandidate, up to the partition i, which contained
+               * the node before (later partitions carry this info already).
+               * 
+               * Note that k<=i<partitions.size() guarantees that we don't run
+               * into an index out of bound exception.
+               */
+             for (int k=partitionForCandidate+1; k<=i; k++) {
+                 definitelyProducedUpToPartition.get(k).addAll(
+                    bindingInfo.get(candidate).definitelyProduced);
+              }
+              
+              // the node will be removed from the current partition at the end
+              
+           } else {
+              unmovableNodes.add(candidate);
+           }
+           
+        }
+
+        // the nodes that remain in this position are the unmovable nodes
+        partition.replaceNonOptionalNonMinusNodesWith(unmovableNodes, true);
+     }
+     
+
      /**
       * First, optimize across partitions.
       */

@@ -50,10 +50,13 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupOrderOptimizer.Variable
  */
 public class ASTJoinGroupPartition {
 
+   
    final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo;
    
    final List<IGroupMemberNode> nonOptionalNonMinusNodes;
    final IGroupMemberNode optionalOrMinus;
+   
+   final Set<IVariable<?>> externallyBound;
    Set<IVariable<?>> definitelyProduced;
    
    /**
@@ -65,22 +68,19 @@ public class ASTJoinGroupPartition {
     * @param externallyBound
     */
    ASTJoinGroupPartition(
-      final List<IGroupMemberNode> nonOptionalOrMinusNodes,
+      final List<IGroupMemberNode> nonOptionalNonMinusNodes,
       final IGroupMemberNode optionalOrMinus,
       final Map<IGroupMemberNode,VariableBindingInfo> bindingInfo,         
       final Set<IVariable<?>> externallyBound) {
 
-      this.nonOptionalNonMinusNodes = nonOptionalOrMinusNodes;
+      this.nonOptionalNonMinusNodes = nonOptionalNonMinusNodes;
       this.optionalOrMinus = optionalOrMinus;
       this.bindingInfo = bindingInfo;
+      this.externallyBound = externallyBound;
       
-      definitelyProduced = new HashSet<IVariable<?>>();
-      definitelyProduced.addAll(externallyBound);
-      for (IGroupMemberNode node : nonOptionalOrMinusNodes) {
-         definitelyProduced.addAll(bindingInfo.get(node).definitelyProduced);
-      }
+      recomputeDefinitelyProduced();
+      
    }
-
 
    /**
     * @return the flat (ordered) list of nodes in the partition
@@ -98,9 +98,10 @@ public class ASTJoinGroupPartition {
    }
 
    /**
-    * Adds a (non-optional non-minus) node to a join group partition.
+    * Adds a (non-optional non-minus) node to a join group partition and
+    * updates the set of definitely produced variables accordingly.
     */
-   void addNodeToPartition(IGroupMemberNode node) {
+   void addNonOptionalNonMinusNodeToPartition(IGroupMemberNode node) {
       nonOptionalNonMinusNodes.add(node);
       definitelyProduced.addAll(bindingInfo.get(node).definitelyProduced);
    }
@@ -182,13 +183,35 @@ public class ASTJoinGroupPartition {
    }
 
 
+   /**
+    * The new ordered list of non-optional non-minus nodes. If 
+    * recomputedDefinitelyProduced variables is set to false, the definitely
+    * produced variables will not be recomputed (this is a performance tweak
+    * which can be exploited when reordering the nodes only, for instance).
+    * 
+    * @param ordered
+    * @param recomputeDefinitelyProduced
+    */
    public void replaceNonOptionalNonMinusNodesWith(
-      final List<IGroupMemberNode> ordered) {
+      final List<IGroupMemberNode> ordered,
+      final boolean recomputeDefinitelyProduced) {
       
       nonOptionalNonMinusNodes.clear();
       nonOptionalNonMinusNodes.addAll(ordered);      
+
+      if (recomputeDefinitelyProduced) {
+         recomputeDefinitelyProduced();
+      }
+   }
+   
+
+   private void recomputeDefinitelyProduced() {
       
-      // note: there is no need to update any other information (such as
-      // binding info or definitely produced vars), as we only changed order
+      definitelyProduced = new HashSet<IVariable<?>>();
+      definitelyProduced.addAll(externallyBound);
+      for (IGroupMemberNode node : nonOptionalNonMinusNodes) {
+         definitelyProduced.addAll(bindingInfo.get(node).definitelyProduced);
+      }
+      
    }
 }
