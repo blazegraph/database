@@ -554,23 +554,19 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCase {
             select(varNode(x), 
             where (
                stmtPatternWithVarOptional("x1"),
-               stmtPatternWithVarOptional("x2"),
                stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("x2"),
                stmtPatternWithVarOptional("x2"),
                stmtPatternWithVarOptional("bound"),
                assignmentWithVar("bound", "x1")
             ));
          
-         /**
-          * Only the second UNION expression bounds x1 for sure. The BIND node
-          * is placed at the first "useful" position after that one.
-          */
          expected = 
             select(varNode(x), 
             where (
                stmtPatternWithVarOptional("x1"),
-               stmtPatternWithVarOptional("x2"),
                stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("x2"),
                stmtPatternWithVarOptional("x2"),
                assignmentWithVar("bound", "x1"),
                stmtPatternWithVarOptional("bound")
