@@ -246,13 +246,12 @@ implements IASTOptimizer {
       final LinkedList<IGroupMemberNode> nodeList, 
       final GroupNodeVarBindingInfoMap bindingInfoMap,
       final Set<IVariable<?>> externallyKnownProduced) {
-      
      
      /**
-      * Compute the partitions.
+      * Set up the partitions object.
       */
-     final List<ASTJoinGroupPartition> partitions = 
-        ASTJoinGroupPartition.partition(
+     final ASTJoinGroupPartitions partitions = 
+        new ASTJoinGroupPartitions(
            nodeList, bindingInfoMap, externallyKnownProduced);
 
      /**
@@ -270,11 +269,7 @@ implements IASTOptimizer {
       /**
        * Generate the output node list through iteration over partitions.
        */
-      LinkedList<IGroupMemberNode> res = new LinkedList<IGroupMemberNode>();
-      for (int i=0; i<partitions.size(); i++) {
-         res.addAll(partitions.get(i).extractNodeList());
-      }
-      return res;
+      return partitions.extractNodeList();
       
    }
 
@@ -288,10 +283,13 @@ implements IASTOptimizer {
    * @param set a set of nodes
    */
   void optimizeAcrossPartitions(
-     final List<ASTJoinGroupPartition> partitions,
+     final ASTJoinGroupPartitions partitions2,
      final GroupNodeVarBindingInfoMap bindingInfoMap,      
      final Set<IVariable<?>> externallyKnownProduced) {      
 
+     
+     List<ASTJoinGroupPartition> partitions = partitions2.getPartitionList();
+     
      /**
       * In the following list, we store the variables that are definitely
       * produced *before* evaluating a partition. We maintain this set
@@ -408,11 +406,14 @@ implements IASTOptimizer {
     * non-minus nodes within them. 
     */
    private void optimizeWithinPartitions(
-      final List<ASTJoinGroupPartition> partitions) {
+      final ASTJoinGroupPartitions partitions) {
  
+      final List<ASTJoinGroupPartition> partitionList = 
+         partitions.getPartitionList();
+
       IASTJoinGroupPartitionReorderer reorderer =
          new TypeBasedASTJoinGroupPartitionReorderer();
-      for (ASTJoinGroupPartition partition : partitions) {
+      for (ASTJoinGroupPartition partition : partitionList) {
          reorderer.reorderNodes(partition);
       }
    }
