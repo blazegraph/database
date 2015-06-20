@@ -963,5 +963,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCase {
    }
    
    // TODO: test case with named subquery
+   // TODO: verify case of ASK subqueries
+
    
 }
