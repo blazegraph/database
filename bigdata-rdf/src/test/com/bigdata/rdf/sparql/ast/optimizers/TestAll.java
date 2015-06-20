@@ -165,7 +165,7 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestASTJoinGroupOrderOptimizer.class);
         
         // test partitioning utility classes
-        suite.addTestSuite(TestASTJoinGroupPartition.class);
+        suite.addTestSuite(TestASTJoinGroupPartitioning.class);
         
         /**
 		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range
