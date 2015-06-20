@@ -52,7 +52,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCase  {
+public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUtilityMethods  {
    
    public TestGroupNodeVarBindingInfo() {
    }
@@ -174,12 +174,5 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCase  {
        assertEquals(jgn, biJgn.getNode());
    }
 
-   Set<IVariable<?>> varSet(String... varNames) {
-      final Set<IVariable<?>> varSet = new HashSet<IVariable<?>>();
-      for (String varName : varNames) {
-         varSet.add(Var.var(varName));
-      }
-      return varSet;
-   }
    
 }

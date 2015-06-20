@@ -283,12 +283,13 @@ implements IASTOptimizer {
    * @param set a set of nodes
    */
   void optimizeAcrossPartitions(
-     final ASTJoinGroupPartitions partitions2,
+     final ASTJoinGroupPartitions partitions,
      final GroupNodeVarBindingInfoMap bindingInfoMap,      
      final Set<IVariable<?>> externallyKnownProduced) {      
 
      
-     List<ASTJoinGroupPartition> partitions = partitions2.getPartitionList();
+     final List<ASTJoinGroupPartition> partitionList = 
+        partitions.getPartitionList();
      
      /**
       * In the following list, we store the variables that are definitely
@@ -296,16 +297,16 @@ implements IASTOptimizer {
       * for fast lookup.
       */
      final List<Set<IVariable<?>>> definitelyProducedUpToPartition =
-         new ArrayList<Set<IVariable<?>>>(partitions.size());
+         new ArrayList<Set<IVariable<?>>>(partitionList.size());
      
      final Set<IVariable<?>> producedUpToPartition =
         new HashSet<IVariable<?>>(externallyKnownProduced);
-     for (int i=0; i<partitions.size();i++) {
+     for (int i=0; i<partitionList.size();i++) {
 
         // we start out with the second partitions, so this will succeed
         if (i>0) {
            producedUpToPartition.addAll(
-              partitions.get(i-1).getDefinitelyProduced());
+              partitionList.get(i-1).getDefinitelyProduced());
         }        
         
         definitelyProducedUpToPartition.add(
@@ -320,9 +321,9 @@ implements IASTOptimizer {
       * after running it, every node is in the firstmost partition where
       * it can be safely placed.
       */
-     for (int i=1; i<partitions.size(); i++) {
+     for (int i=1; i<partitionList.size(); i++) {
         
-        final ASTJoinGroupPartition partition = partitions.get(i);
+        final ASTJoinGroupPartition partition = partitionList.get(i);
         
         final List<IGroupMemberNode> unmovableNodes = 
               new ArrayList<IGroupMemberNode>();
@@ -332,7 +333,7 @@ implements IASTOptimizer {
            Integer partitionForCandidate = null;
            for (int j=i-1; j>=0; j--) {
               
-              final ASTJoinGroupPartition candPartition = partitions.get(j);
+              final ASTJoinGroupPartition candPartition = partitionList.get(j);
               
               /**
                * Calculate the conflicting vars as the intersection of the
@@ -368,7 +369,7 @@ implements IASTOptimizer {
 
               // add the node to the partition (removal will be done later on)
               final ASTJoinGroupPartition partitionToMove = 
-                 partitions.get(partitionForCandidate);
+                 partitionList.get(partitionForCandidate);
               partitionToMove.addNonOptionalNonMinusNodeToPartition(candidate);
               
               /**
@@ -411,7 +412,7 @@ implements IASTOptimizer {
       final List<ASTJoinGroupPartition> partitionList = 
          partitions.getPartitionList();
 
-      IASTJoinGroupPartitionReorderer reorderer =
+      final IASTJoinGroupPartitionReorderer reorderer =
          new TypeBasedASTJoinGroupPartitionReorderer();
       for (ASTJoinGroupPartition partition : partitionList) {
          reorderer.reorderNodes(partition);
