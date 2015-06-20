@@ -49,8 +49,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
  */
 public class ASTJoinGroupPartition {
 
-   
-   final GroupNodeVarBindingInfoMap bindingInfo;
+   final GroupNodeVarBindingInfoMap bindingInfoMap;
    
    final List<IGroupMemberNode> nonOptionalNonMinusNodes;
    final IGroupMemberNode optionalOrMinus;
@@ -63,18 +62,18 @@ public class ASTJoinGroupPartition {
     * 
     * @param nonOptionalOrMinusNodes
     * @param optionalOrMinus
-    * @param bindingInfo
+    * @param bindingInfoMap
     * @param externallyBound
     */
    ASTJoinGroupPartition(
       final List<IGroupMemberNode> nonOptionalNonMinusNodes,
       final IGroupMemberNode optionalOrMinus,
-      final GroupNodeVarBindingInfoMap bindingInfo,         
+      final GroupNodeVarBindingInfoMap bindingInfoMap,         
       final Set<IVariable<?>> externallyBound) {
 
       this.nonOptionalNonMinusNodes = nonOptionalNonMinusNodes;
       this.optionalOrMinus = optionalOrMinus;
-      this.bindingInfo = bindingInfo;
+      this.bindingInfoMap = bindingInfoMap;
       this.externallyBound = externallyBound;
       
       recomputeDefinitelyProduced();
@@ -102,7 +101,7 @@ public class ASTJoinGroupPartition {
     */
    void addNonOptionalNonMinusNodeToPartition(IGroupMemberNode node) {
       nonOptionalNonMinusNodes.add(node);
-      definitelyProduced.addAll(bindingInfo.get(node).getDefinitelyProduced());
+      definitelyProduced.addAll(bindingInfoMap.get(node).getDefinitelyProduced());
    }
    
    /**
@@ -111,76 +110,6 @@ public class ASTJoinGroupPartition {
    Set<IVariable<?>> getDefinitelyProduced() {
       return definitelyProduced;
    }
-   
-   /**
-    * TODO: test cases, incl. OPTIONAL & MINUS
-    * 
-    * Partitions a join group node list along OPTIONAL and MINUS nodes.
-    * 
-    * @param nodes
-    * @param bindingInfo
-    * @return
-    */
-   public static List<ASTJoinGroupPartition> partition(
-      final List<IGroupMemberNode> nodes,
-      final GroupNodeVarBindingInfoMap bindingInfo,
-      final Set<IVariable<?>> externallyKnownProduced) {
-      
-      final List<ASTJoinGroupPartition> partitions = 
-         new ArrayList<ASTJoinGroupPartition>();
-      
-      final Set<IVariable<?>> tmpKnownProduced = 
-         new HashSet<IVariable<?>>(externallyKnownProduced);
-      final List<IGroupMemberNode> tmpNonOptionalOrMinusNodes = 
-         new ArrayList<IGroupMemberNode>();
-      IGroupMemberNode tmpOptionalOrMinus = null;
-      
-      for (int i=0; i<nodes.size(); i++) {
-         
-         final IGroupMemberNode node = nodes.get(i);
-         
-         // TODO: verify with Bryan
-         final Boolean isOptionalOrMinus = 
-            node.getProperty("optional", false) || 
-            node.getProperty("minus", false);
-            
-         /**
-          * Either add the node to the non-optional non-minus node list or
-          * assign it to the temporary tmpOptionalOrMinus variable.
-          */
-         if (!isOptionalOrMinus) {
-            tmpNonOptionalOrMinusNodes.add(node);
-         } else {
-            tmpOptionalOrMinus = node;
-         }
-         
-         /**
-          * If the tmpOptionalOrMinus node has been set or we reached the end,
-          * we build and record the partition and reset the temporary variables.
-          */
-         if (tmpOptionalOrMinus!=null || i+1==nodes.size()) {
-            
-            // create partition
-            final ASTJoinGroupPartition partition = 
-               new ASTJoinGroupPartition(
-                  new ArrayList<IGroupMemberNode>(tmpNonOptionalOrMinusNodes),
-                  tmpOptionalOrMinus /* may be null */, bindingInfo, 
-                  new HashSet<IVariable<?>>(tmpKnownProduced));
-            
-            // record partition
-            partitions.add(partition);
-               
-            // re-initialize the tmp arrays for future iterations
-            tmpKnownProduced.addAll(partition.definitelyProduced);
-            tmpNonOptionalOrMinusNodes.clear();
-            tmpOptionalOrMinus = null;
-         }
-         
-      }
-      
-      return partitions;
-   }
-
 
    /**
     * The new ordered list of non-optional non-minus nodes. If 
@@ -209,7 +138,7 @@ public class ASTJoinGroupPartition {
       definitelyProduced = new HashSet<IVariable<?>>();
       definitelyProduced.addAll(externallyBound);
       for (IGroupMemberNode node : nonOptionalNonMinusNodes) {
-         definitelyProduced.addAll(bindingInfo.get(node).getDefinitelyProduced());
+         definitelyProduced.addAll(bindingInfoMap.get(node).getDefinitelyProduced());
       }
       
    }
