@@ -98,7 +98,7 @@ public class ASTJoinGroupPartitions {
 
             // create partition
             final ASTJoinGroupPartition partition = new ASTJoinGroupPartition(
-                  new ArrayList<IGroupMemberNode>(tmpNonOptionalOrMinusNodes),
+                  new LinkedList<IGroupMemberNode>(tmpNonOptionalOrMinusNodes),
                   tmpOptionalOrMinus /* may be null */, bindingInfo,
                   new HashSet<IVariable<?>>(tmpKnownProduced));
 
@@ -131,6 +131,25 @@ public class ASTJoinGroupPartitions {
       }
       
       return res;
+      
+   }
+
+   /**
+    * Places the node at the first possible position across all partitions.
+    * 
+    * @param node
+    */
+   public void placeAtFirstPossiblePosition(IGroupMemberNode node) {
+      
+      for (int i=0; i<partitions.size(); i++) {
+         
+         final ASTJoinGroupPartition partition = partitions.get(i);
+         Integer position = partition.getFirstPossiblePosition(node);
+         
+         if (position!=null || i+1==partitions.size()) {
+            partition.placeAtFirstPossiblePosition(node);
+         }
+      }
       
    }
 }
