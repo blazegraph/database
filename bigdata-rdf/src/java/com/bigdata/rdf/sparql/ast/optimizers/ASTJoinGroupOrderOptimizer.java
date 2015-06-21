@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -82,196 +84,77 @@ implements IASTOptimizer {
        */
             
       final Set<IVariable<?>> externallyIncoming = 
-         sa.getDefinitelyIncomingBindings(joinGroup, new HashSet<IVariable<?>>());
+         sa.getDefinitelyIncomingBindings(
+            joinGroup, new HashSet<IVariable<?>>());
       
       final GroupNodeVarBindingInfoMap bindingInfoMap =
          new GroupNodeVarBindingInfoMap(joinGroup, sa);
       
-      final NodeClassification nodeClassification = 
-            new NodeClassification(joinGroup, bindingInfoMap);
       
+      /**
+       * Filter out the filter nodes from the join group, they will receive
+       * special handling in the end.
+       */
+      final TypeBasedNodeClassifier filterNodeClassifier = 
+         new TypeBasedNodeClassifier(
+            new Class<?>[]{ FilterNode.class }, joinGroup.getChildren());
+
+      
+      // special handling: if there are no non-filter nodes, we can skip all
+      // the rest
+      if (filterNodeClassifier.getUnclassifiedNodes().isEmpty()) {
+         return;
+      }
+      
+      /**
+       * Set up the partitions, ignoring the FILTER nodes (they'll be added
+       * in the end, after having flattened the partitions again).
+       */
+      final ASTJoinGroupPartitions partitions = 
+         new ASTJoinGroupPartitions(
+            filterNodeClassifier.getUnclassifiedNodes() /* non filter nodes */,
+            bindingInfoMap, externallyIncoming);
+      
+      /**
+       * First, optimize across the partitions, trying to move forward
+       * non-optional non-minus patterns wherever possible. It is important to
+       * do this first, before reordering within partitions, as it shifts
+       * nodes around across them.
+       */
+      optimizeAcrossPartitions(
+            partitions, bindingInfoMap, externallyIncoming);
+      
+      /** 
+       * Second, optimize within the individual partitions.
+       */
+      optimizeWithinPartitions(partitions);
+
 
       /**
-       * First, add all nodes that do not require special handling
+       * ... finally place the filters ...
        */
-      LinkedList<IGroupMemberNode> nodeList = new LinkedList<IGroupMemberNode>();
-      for (IGroupMemberNode node : nodeClassification.noneSpecialNodes) {
-         nodeList.add(node);
-      }
-      
-      // basic reordering
-      nodeList = reorderNodes(nodeList, bindingInfoMap, externallyIncoming);
-      
-      
-      /**
-       * Place the special handled SERVICE nodes.
-       */
-      for (IGroupMemberNode node : nodeClassification.serviceNodesWithSpecialHandling) {
-         placeAtFirstContributingPosition(
-            nodeList, node, bindingInfoMap, externallyIncoming);
-      }
-
-      /**
-       * Place the VALUES nodes.
-       */
-      for (IGroupMemberNode node : nodeClassification.valuesNodes) {
-         placeAtFirstContributingPosition(
-            nodeList, node, bindingInfoMap, externallyIncoming);
-      }
-
-      /**
-       * Place the BIND nodes: it is important that we bring them into the
-       * right order, e.g. if bind node 1 uses variables bound by bind node 2,
-       * then we must insert node 2 first in order to be able to place node 1
-       * after the first bind node.
-       */
-      // calculate variables that are known to be bound after the join group ...
-      final Set<IVariable<?>> knownBoundSomewhere =
-         new HashSet<IVariable<?>>(externallyIncoming);
-      for (final IGroupMemberNode node : nodeList) {
-         knownBoundSomewhere.addAll(bindingInfoMap.get(node).getDefinitelyProduced());
-      }
-      
-      // ... order the bind nodes according to dependencies
-      final List<AssignmentNode> bindNodesOrdered = 
-         orderBindNodesByDependencies(
-            nodeClassification.bindNodes, bindingInfoMap, knownBoundSomewhere);
-      
-      // ... and place the bind nodes
-      for (AssignmentNode node : bindNodesOrdered) {
-         placeAtFirstContributingPosition(
-            nodeList, node, bindingInfoMap, externallyIncoming);
+      for (IGroupMemberNode node : 
+            filterNodeClassifier.get(FilterNode.class)) {
+         partitions.placeAtFirstPossiblePosition(node);
       }
       
       
       /**
-       * Place the JOIN filters.
+       * Now, flatten the partitions again and replace the children of the
+       * join group with the new list.
        */
-      for (IGroupMemberNode node : nodeClassification.filters) {
-         placeAtFirstPossiblePosition(
-            nodeList, node, bindingInfoMap, externallyIncoming);
-      }
-      
-      /**
-       * Replace the children of the join group with the new list.
-       */
+      final LinkedList<IGroupMemberNode> nodeList = 
+         partitions.extractNodeList();
       for (int i = 0; i < joinGroup.arity(); i++) {
           joinGroup.setArg(i, (BOp) nodeList.get(i));
       }
 
       
       // TODO: creation of subgroups at "borders"
-      // TODO: make sure that the placement is performed correctly at the end!
+
    }
 
 
-   /**
-    * Brings the BIND nodes in a correct order according to the dependencies
-    * that they have. Note that this is a best effort approach, which may
-    * fail in cases where we allow for liberate patterns that do not strictly
-    * follow the restriction of SPARQL semantics (e.g., for cyclic patterns
-    * such as BIND(?x AS ?y) . BIND(?y AS ?x)). We may want to check the query
-    * for such patterns statically and throw a pre-runtime exception, as the
-    * SPARQL 1.1 standard suggests.
-    * 
-    * Failing means we return an order that is not guaranteed to be "safe", 
-    * which might give us unexpected results in some exceptional cases.
-    * However, whenever the pattern is valid according to the SPARQL 1.1
-    * semantics, this method should return nodes in a valid order.
-    * 
-    * @param bindNodes the list of BIND nodes to reorder
-    * @param bindingInfoMap hash map for binding info lookup
-    * @param knownBoundSomewhere variables that are known to be bound somewhere
-    *        in the node list where we want to place the BIND nodes
-    *        
-    * @return the ordered node set if exists, otherwise a "best effort" order
-    */
-   List<AssignmentNode> orderBindNodesByDependencies(
-      final List<AssignmentNode> bindNodes,
-      final GroupNodeVarBindingInfoMap bindingInfoMap,
-      final Set<IVariable<?>> knownBoundSomewhere) {
-      
-      final List<AssignmentNode> ordered = 
-         new ArrayList<AssignmentNode>(bindNodes.size());
-
-      final LinkedList<AssignmentNode> toBePlaced = 
-         new LinkedList<AssignmentNode>(bindNodes);
-
-      final Set<IVariable<?>> knownBound =
-         new HashSet<IVariable<?>>(knownBoundSomewhere);
-      while (!toBePlaced.isEmpty()) {
-         
-         for (int i=0 ; i<toBePlaced.size(); i++) {
-            
-            final AssignmentNode node = toBePlaced.get(i);
-            final GroupNodeVarBindingInfo nodeBindingInfo = bindingInfoMap.get(node);
-            
-            /**
-             * The first condition is that the node can be safely placed. The
-             * second condition is a fallback, where we randomly pick the last
-             * node (even if it does not satisfy the condition).
-             */
-            if (nodeBindingInfo.leftToBeBound(knownBound).isEmpty() ||
-                i+1==toBePlaced.size()) {
-
-               // add the node to the ordered set
-               ordered.add(node);
-               
-               // remove it from the toBePlaced array
-               toBePlaced.remove(i);
-               
-               // add its bound variables to the known bound set
-               knownBound.addAll(nodeBindingInfo.getDefinitelyProduced());
-               
-               break;
-            }
-            
-         }
-         
-      }
-      
-      return ordered;
-      
-   }
-
-
-   /**
-    * Perform basic reordering, trying to find a good order obeying the
-    * SPARQL semantics based on the types of nodes contained in the list.
-    * 
-    * @param nodeList
-    * @param nodesByType 
-    */
-  LinkedList<IGroupMemberNode> reorderNodes(
-      final LinkedList<IGroupMemberNode> nodeList, 
-      final GroupNodeVarBindingInfoMap bindingInfoMap,
-      final Set<IVariable<?>> externallyKnownProduced) {
-     
-     /**
-      * Set up the partitions object.
-      */
-     final ASTJoinGroupPartitions partitions = 
-        new ASTJoinGroupPartitions(
-           nodeList, bindingInfoMap, externallyKnownProduced);
-
-     /**
-      * First, optimize across partitions.
-      */
-      // first, move the statement patterns to the beginning wherever possible
-      optimizeAcrossPartitions(
-         partitions, bindingInfoMap, externallyKnownProduced);
-
-      /**
-       * Second, optimize within partitions.
-       */
-      optimizeWithinPartitions(partitions);
-      
-      /**
-       * Generate the output node list through iteration over partitions.
-       */
-      return partitions.extractNodeList();
-      
-   }
 
 
   /**
@@ -406,196 +289,149 @@ implements IASTOptimizer {
     * about partitions is that we can freely reorder the non-optional
     * non-minus nodes within them. 
     */
-   private void optimizeWithinPartitions(
-      final ASTJoinGroupPartitions partitions) {
+   void optimizeWithinPartitions(final ASTJoinGroupPartitions partitions) {
  
       final List<ASTJoinGroupPartition> partitionList = 
          partitions.getPartitionList();
-
-      final IASTJoinGroupPartitionReorderer reorderer =
-         new TypeBasedASTJoinGroupPartitionReorderer();
+      
       for (ASTJoinGroupPartition partition : partitionList) {
+         
+         final TypeBasedNodeClassifier classifier = 
+            new TypeBasedNodeClassifier(
+               new Class<?>[] { 
+                  ServiceNode.class,AssignmentNode.class,BindingsClause.class }, 
+               partition.extractNodeList());
+         
+         /**
+          * In a first step, we remove service nodes, assignment nodes, and
+          * bindings clauses from the partition. They will be handled in a
+          * special way.
+          */
+         final List<IGroupMemberNode> toRemove = 
+            new ArrayList<IGroupMemberNode>();
+         toRemove.addAll(classifier.get(ServiceNode.class));
+         toRemove.addAll(classifier.get(AssignmentNode.class));
+         toRemove.addAll(classifier.get(BindingsClause.class));
+         partition.removeNodesFromPartition(toRemove);
+         
+         // the remaining elements will be reordered based on their type
+         final IASTJoinGroupPartitionReorderer reorderer =
+               new TypeBasedASTJoinGroupPartitionReorderer();
          reorderer.reorderNodes(partition);
+         
+         /**
+          * Place the special handled SERVICE nodes.
+          */
+         for (IGroupMemberNode node : classifier.get(ServiceNode.class)) {
+            partition.placeAtFirstPossiblePosition(node);
+         }
+
+         /**
+          * Place the VALUES nodes.
+          */
+         for (IGroupMemberNode node : classifier.get(BindingsClause.class)) {
+            partition.placeAtFirstContributingPosition(node);
+         }
+
+         /**
+          * Place the BIND nodes: it is important that we bring them into the
+          * right order, e.g. if bind node 1 uses variables bound by bind node 2,
+          * then we must insert node 2 first in order to be able to place node 1
+          * after the first bind node.
+          */
+         final Set<IVariable<?>> knownBoundSomewhere =
+            new HashSet<IVariable<?>>(partition.definitelyProduced);
+
+         
+         // ... order the bind nodes according to dependencies
+         final List<AssignmentNode> bindNodesOrdered = 
+            orderBindNodesByDependencies(
+                  classifier.get(AssignmentNode.class), 
+                  partition.bindingInfoMap, knownBoundSomewhere);
+         
+         // ... and place the bind nodes
+         for (AssignmentNode node : bindNodesOrdered) {
+            partition.placeAtFirstContributingPosition(node);
+         }         
       }
    }
 
 
    /**
-    * Places the given node at the first position where, for the subsequent
-    * child, at least one of the variables bound through the node is used.
-    * Also considers the fact that this node must not be placed *before*
-    * its first possible position according to the binding requirements.
+    * Brings the BIND nodes in a correct order according to the dependencies
+    * that they have. Note that this is a best effort approach, which may
+    * fail in cases where we allow for liberate patterns that do not strictly
+    * follow the restriction of SPARQL semantics (e.g., for cyclic patterns
+    * such as BIND(?x AS ?y) . BIND(?y AS ?x)). We may want to check the query
+    * for such patterns statically and throw a pre-runtime exception, as the
+    * SPARQL 1.1 standard suggests.
     * 
-    * @param nodeList the list of nodes in which to place the given node
-    * @param node the node to place
-    * @param bindingRequirements the binding requirements for the node to place
-    * @param externallyIncoming variables that are known to be bound from the
-    *        join groups parent
+    * Failing means we return an order that is not guaranteed to be "safe", 
+    * which might give us unexpected results in some exceptional cases.
+    * However, whenever the pattern is valid according to the SPARQL 1.1
+    * semantics, this method should return nodes in a valid order.
     * 
-    * @return a new list containing the node, placed at the first position
-    *         where, for the subsequent child, at least one of the variables 
-    *         bound through the node is used
+    * @param bindNodes the list of BIND nodes to reorder
+    * @param bindingInfoMap hash map for binding info lookup
+    * @param knownBoundSomewhere variables that are known to be bound somewhere
+    *        in the node list in which  we want to place the BIND nodes
+    *        
+    * @return the ordered node set if exists, otherwise a "best effort" order
     */
-   void placeAtFirstContributingPosition(
-         final LinkedList<IGroupMemberNode> nodeList, 
-         final IGroupMemberNode node,
-         final GroupNodeVarBindingInfoMap bindingInfoMap, 
-         final Set<IVariable<?>> externallyIncoming) {
-
-         final Integer firstPossiblePosition = 
-            getFirstPossiblePosition(nodeList,node,bindingInfoMap,externallyIncoming);
-
-         /**
-          * Special case (which simplifies subsequent code, as it asserts that
-          * firstPossiblePosition indeed exists; if not, we skip analysis).
-          */
-         if (firstPossiblePosition==null) {
-            placeAtPosition(nodeList, node, firstPossiblePosition); // place at end
-            return;
-         }
-         
-         /**
-          * The binding requirements for the given node
-          */
-         final GroupNodeVarBindingInfo bindingInfo = bindingInfoMap.get(node);
-         final Set<IVariable<?>> maybeProducedByNode = 
-            bindingInfo.getMaybeProduced();
-         
-         /**
-          * If there is some overlap between the known bound variables and the
-          * maybe produced variables by this node, than it might be good to
-          * place this node right at the beginning, as this implies a join
-          * that could restrict the intermediate result set.
-          */
-         final Set<IVariable<?>> intersectionWithExternallyIncomings = 
-            new HashSet<IVariable<?>>();
-         intersectionWithExternallyIncomings.addAll(externallyIncoming);
-         intersectionWithExternallyIncomings.retainAll(maybeProducedByNode);
-         
-         if (!intersectionWithExternallyIncomings.isEmpty()) {
-            placeAtPosition(nodeList, node, firstPossiblePosition);
-         }
-         
-         /**
-          * If this is not the case, we watch out for the first construct using
-          * one of the variables that may be produced by this node and place
-          * the node right in front of it. This is a heuristics, of course,
-          * which may be refined based on experiences that we make over time.
-          */
-         for (int i=0; i<nodeList.size(); i++) {
-
-            final Set<IVariable<?>> desiredBound = 
-               bindingInfoMap.get(nodeList.get(i)).getDesiredBound();
-               
-            final Set<IVariable<?>> intersection = new HashSet<IVariable<?>>();
-            intersection.addAll(desiredBound);
-            intersection.retainAll(maybeProducedByNode);
-            
-            // if no more variables need to be bound, place the node
-            if (!intersection.isEmpty()) {
-               
-               /**
-                * If the first possible position differs from null and is
-                * larger than i, then place it there; if it is
-                * smaller than i, then i is where we place the node. So we're
-                * looking for the maximum of both.
-                */
-               placeAtPosition(nodeList, node, Math.max(i, firstPossiblePosition));
-               return;
-            }
-            
-         }
-         
-         /**
-          * As a fallback, we add the node at the end.
-          */
-         nodeList.addLast(node);    
-   }
-
-   /**
-    * Places the given node at the first possible position in the nodeList
-    * according to the binding requirements.
-    * 
-    * @param nodeList the list of nodes in which to place the given node
-    * @param node the node to place
-    * @param bindingReq the binding requirements for the node to place
-    * 
-    * @return a new list containing the node, placed at the first position
-    *         that is possible according to the binding requirements
-    */
-   void placeAtFirstPossiblePosition(
-         final LinkedList<IGroupMemberNode> nodeList, 
-         final IGroupMemberNode node,
-         final GroupNodeVarBindingInfoMap bindingInfoMap, 
-         final Set<IVariable<?>> externallyIncoming) {
+   List<AssignmentNode> orderBindNodesByDependencies(
+      final List<IGroupMemberNode> bindNodes,
+      final GroupNodeVarBindingInfoMap bindingInfoMap,
+      final Set<IVariable<?>> knownBoundSomewhere) {
       
-      final Integer positionToPlace = 
-         getFirstPossiblePosition(
-            nodeList,node,bindingInfoMap,externallyIncoming);
-      
-      placeAtPosition(nodeList, node, positionToPlace);
-     
-   }
+      final List<AssignmentNode> ordered = 
+         new ArrayList<AssignmentNode>(bindNodes.size());
 
-   /**
-    * Places the node at the specified position in the list. If the position
-    * is null, the node is added at the end.
-    * 
-    * @param nodeList
-    * @param node
-    * @param positionToPlace
-    */
-   void placeAtPosition(final LinkedList<IGroupMemberNode> nodeList,
-         final IGroupMemberNode node, final Integer positionToPlace) {
-      if (positionToPlace == null) {
-         nodeList.addLast(node);
-      } else {
-         nodeList.add(positionToPlace, node);
+      final LinkedList<AssignmentNode> toBePlaced = 
+         new LinkedList<AssignmentNode>();
+      for (int i=0; i<bindNodes.size(); i++) {
+         final IGroupMemberNode assNodeCandidate = bindNodes.get(i);
+         if (assNodeCandidate instanceof AssignmentNode) {
+            toBePlaced.add((AssignmentNode)assNodeCandidate);
+         }
       }
-   }
-   
-   /**
-    * Computes for the given node, the first possible position in the nodeList
-    * according to the binding requirements.
-    * 
-    * @param nodeList the list of nodes in which to place the given node
-    * @param node the node to place
-    * @param bindingReq the binding requirements for the node to place
-    * 
-    * @return the position ID is integer, null if no matching position was found
-    */
-   Integer getFirstPossiblePosition(
-         final LinkedList<IGroupMemberNode> nodeList, 
-         final IGroupMemberNode node,
-         final GroupNodeVarBindingInfoMap bindingInfoMap, 
-         final Set<IVariable<?>> externallyIncoming) {
 
-      final HashSet<IVariable<?>> knownBound = 
-            new HashSet<IVariable<?>>(externallyIncoming);
-
-         /**
-          * The binding requirements for the given node
-          */
-         final GroupNodeVarBindingInfo bindingInfo = bindingInfoMap.get(node);
+      final Set<IVariable<?>> knownBound =
+         new HashSet<IVariable<?>>(knownBoundSomewhere);
+      while (!toBePlaced.isEmpty()) {
          
-         for (int i=0; i<nodeList.size(); i++) {
+         for (int i=0 ; i<toBePlaced.size(); i++) {
+            
+            final AssignmentNode node = toBePlaced.get(i);
+            final GroupNodeVarBindingInfo nodeBindingInfo = bindingInfoMap.get(node);
+            
+            /**
+             * The first condition is that the node can be safely placed. The
+             * second condition is a fallback, where we randomly pick the last
+             * node (even if it does not satisfy the condition).
+             */
+            if (nodeBindingInfo.leftToBeBound(knownBound).isEmpty() ||
+                i+1==toBePlaced.size()) {
 
-            // if no more variables need to be bound, we can place the node
-            if (bindingInfo.leftToBeBound(knownBound).isEmpty()) {
-               return i;
+               // add the node to the ordered set
+               ordered.add(node);
+               
+               // remove it from the toBePlaced array
+               toBePlaced.remove(i);
+               
+               // add its bound variables to the known bound set
+               knownBound.addAll(nodeBindingInfo.getDefinitelyProduced());
+               
+               break;
             }
             
-            // add the child's definitely produced bindings to the variables
-            // that are known to be bound
-            knownBound.addAll(
-               bindingInfoMap.get(nodeList.get(i)).getDefinitelyProduced());
          }
          
-         /**
-          * No suitable position found:
-          */
-         return null;   
+      }
+      
+      return ordered;
+      
    }
+
 
 
 
@@ -751,6 +587,83 @@ implements IASTOptimizer {
          }
       }      
 
+   }
+   
+   /**
+    * Classification of {@link IGroupMemberNode}s along a set of specified
+    * types. For nodes matching a given type, lookup is possible (returning
+    * an ordered list of nodes), all other nodes are stored in a dedicated list.
+    * @author msc
+    *
+    */
+   protected static class TypeBasedNodeClassifier {
+      
+      Class<?>[] clazzez;
+      
+      List<IGroupMemberNode> unclassifiedNodes;
+      
+      Map<Class<?>,List<IGroupMemberNode>> classifiedNodes;
+      
+      /**
+       * Constructor, receiving as an argument a list of types based on
+       * which classification is done. 
+       * 
+       * @param types
+       */
+      public TypeBasedNodeClassifier(
+         final Class<?>[] clazzez, final List<IGroupMemberNode> nodeList) {
+         
+         this.clazzez = clazzez;
+         unclassifiedNodes = new LinkedList<IGroupMemberNode>();
+         classifiedNodes = new HashMap<Class<?>, List<IGroupMemberNode>>();
+         
+         registerNodes(nodeList);
+      }
+      
+
+      public void registerNodes(final List<IGroupMemberNode> nodeList) {
+         
+         // initialize map with empty arrays
+         for (Class<?> clazz : clazzez) {
+            classifiedNodes.put(clazz, new LinkedList<IGroupMemberNode>());
+         }
+
+         // and popuplate it
+         for (IGroupMemberNode node : nodeList) {
+
+            boolean classified = false;
+            for (int i=0; i<clazzez.length && !classified; i++) {
+               
+               Class<?> clazz = clazzez[i];
+               if (clazz.isInstance(node)) {
+                  classifiedNodes.get(clazz).add(node);
+                  classified = true;
+               }               
+            }
+            
+            if (!classified) {
+               unclassifiedNodes.add(node);
+            }
+         }
+      }
+      
+      /**
+       * Return all those nodes for which classification failed.
+       */
+      public List<IGroupMemberNode> getUnclassifiedNodes() {
+         return unclassifiedNodes;
+      }
+      
+      /**
+       * Returns the list of nodes that are classified with the given type.
+       * If the type was passed when constructing the object, the result
+       * is the (possibly empty) list of nodes with the given type. If the
+       * type was not provided, null is returned.
+       */
+      public List<IGroupMemberNode> get(Class<?> clazz) {
+         return classifiedNodes.get(clazz);
+      }
+      
    }
 
 }
