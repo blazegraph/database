@@ -149,15 +149,44 @@ public class ASTJoinGroupPartitions {
          final Integer position = 
             partition.getFirstPossiblePosition(
                node, knownBoundFromPrevPartitions);
-         
-         if (position!=null || i+1==partitions.size()) {
-            partition.placeAtFirstPossiblePosition(
-               node,knownBoundFromPrevPartitions);
+
+         // if position found:
+         if (position!=null) {
+            
+            partition.placeAtPosition(node,null);
+            return;
+            
+         // if reached the end:
+         } else if (i+1==partitions.size()) {
+            
+            if (partition.optionalOrMinus==null) {
+               
+               // in this case it is safe to place the node at the end
+               partition.placeAtPosition(node,null);
+               
+            } else {
+
+               // append a dummy partition containing the node
+               final LinkedList<IGroupMemberNode> listWithNode =
+                  new LinkedList<IGroupMemberNode>();
+               listWithNode.add(node);
+               
+               final ASTJoinGroupPartition dummyPartition = 
+                  new ASTJoinGroupPartition(listWithNode, null,
+                     partition.bindingInfoMap, partition.externallyBound);
+               partitions.add(dummyPartition);
+               
+            }
+            
+            return;
          }
          
          knownBoundFromPrevPartitions.addAll(
             partition.getDefinitelyProduced());
       }
+      
+      // if the node has not been succesfully placed, at it into a new
+      // partition at the end
       
    }
 }
