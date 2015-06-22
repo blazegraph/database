@@ -294,6 +294,8 @@ implements IASTOptimizer {
       final List<ASTJoinGroupPartition> partitionList = 
          partitions.getPartitionList();
       
+      final Set<IVariable<?>> knownBoundFromPrevPartitions =
+         new HashSet<IVariable<?>>();
       for (ASTJoinGroupPartition partition : partitionList) {
          
          final TypeBasedNodeClassifier classifier = 
@@ -323,14 +325,16 @@ implements IASTOptimizer {
           * Place the special handled SERVICE nodes.
           */
          for (IGroupMemberNode node : classifier.get(ServiceNode.class)) {
-            partition.placeAtFirstPossiblePosition(node);
+            partition.placeAtFirstPossiblePosition(
+               node,knownBoundFromPrevPartitions);
          }
 
          /**
           * Place the VALUES nodes.
           */
          for (IGroupMemberNode node : classifier.get(BindingsClause.class)) {
-            partition.placeAtFirstContributingPosition(node);
+            partition.placeAtFirstContributingPosition(
+               node,knownBoundFromPrevPartitions);
          }
 
          /**
@@ -351,8 +355,11 @@ implements IASTOptimizer {
          
          // ... and place the bind nodes
          for (AssignmentNode node : bindNodesOrdered) {
-            partition.placeAtFirstContributingPosition(node);
-         }         
+            partition.placeAtFirstContributingPosition(
+               node,knownBoundFromPrevPartitions);
+         }       
+         
+         knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
       }
    }
 
