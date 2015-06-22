@@ -149,7 +149,6 @@ implements IASTOptimizer {
           joinGroup.setArg(i, (BOp) nodeList.get(i));
       }
 
-      
       // TODO: creation of subgroups at "borders"
 
    }

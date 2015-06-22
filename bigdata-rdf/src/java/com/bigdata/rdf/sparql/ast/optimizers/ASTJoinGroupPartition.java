@@ -55,6 +55,12 @@ public class ASTJoinGroupPartition {
    
    final LinkedList<IGroupMemberNode> nonOptionalNonMinusNodes;
    
+   /**
+    * Variables that are bound externally, i.e. from prior parts of the query
+    * plan. Note that this does not include variables that are bound by prior
+    * partitions (in case this partition is part of an 
+    * {@link ASTJoinGroupPartitions} object.
+    */
    final Set<IVariable<?>> externallyBound;
    
    IGroupMemberNode optionalOrMinus;
