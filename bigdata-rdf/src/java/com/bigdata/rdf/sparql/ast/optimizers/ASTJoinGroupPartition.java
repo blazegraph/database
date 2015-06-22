@@ -165,9 +165,12 @@ public class ASTJoinGroupPartition {
     * NOTE: currently, this methods requires the node to be contained in the
     * binding info map.
     */
-   void placeAtFirstContributingPosition(final IGroupMemberNode node) {
+   void placeAtFirstContributingPosition(
+         final IGroupMemberNode node, 
+         final Set<IVariable<?>> additionalKnownBound) {
 
-         final Integer firstPossiblePosition = getFirstPossiblePosition(node);
+         final Integer firstPossiblePosition = 
+            getFirstPossiblePosition(node, additionalKnownBound);
 
          /**
           * Special case (which simplifies subsequent code, as it asserts that
@@ -246,9 +249,10 @@ public class ASTJoinGroupPartition {
     * NOTE: currently, this methods requires the node to be contained in the
     * binding info map.
     */
-   void placeAtFirstPossiblePosition(final IGroupMemberNode node) {
+   void placeAtFirstPossiblePosition(
+      final IGroupMemberNode node, final Set<IVariable<?>> additionalKnownBound) {
       
-      placeAtPosition(node, getFirstPossiblePosition(node));
+      placeAtPosition(node, getFirstPossiblePosition(node, additionalKnownBound));
       definitelyProduced.addAll(bindingInfoMap.get(node).getDefinitelyProduced());
    }
 
@@ -273,11 +277,14 @@ public class ASTJoinGroupPartition {
     * 
     * @return the position ID as integer, null if no matching position was found
     */
-   Integer getFirstPossiblePosition(final IGroupMemberNode node) {
+   Integer getFirstPossiblePosition(
+         final IGroupMemberNode node, 
+         final Set<IVariable<?>> additionalKnownBound) {
 
-      final HashSet<IVariable<?>> knownBound = 
-            new HashSet<IVariable<?>>(definitelyProduced);
-
+         final HashSet<IVariable<?>> knownBound = 
+            new HashSet<IVariable<?>>(externallyBound);
+         knownBound.addAll(additionalKnownBound);
+         
          /**
           * The binding requirements for the given node
           */

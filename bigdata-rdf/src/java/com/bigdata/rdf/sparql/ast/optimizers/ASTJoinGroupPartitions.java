@@ -141,14 +141,22 @@ public class ASTJoinGroupPartitions {
     */
    public void placeAtFirstPossiblePosition(IGroupMemberNode node) {
       
+      final Set<IVariable<?>> knownBoundFromPrevPartitions =
+            new HashSet<IVariable<?>>();
       for (int i=0; i<partitions.size(); i++) {
          
          final ASTJoinGroupPartition partition = partitions.get(i);
-         Integer position = partition.getFirstPossiblePosition(node);
+         final Integer position = 
+            partition.getFirstPossiblePosition(
+               node, knownBoundFromPrevPartitions);
          
          if (position!=null || i+1==partitions.size()) {
-            partition.placeAtFirstPossiblePosition(node);
+            partition.placeAtFirstPossiblePosition(
+               node,knownBoundFromPrevPartitions);
          }
+         
+         knownBoundFromPrevPartitions.addAll(
+            partition.getDefinitelyProduced());
       }
       
    }
