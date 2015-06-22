@@ -770,5 +770,35 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_blzg_1331b.srx"// resultFileURL
        ).runTest();    
     }
+    
+    /**
+     * Double nesting of FILTER NOT EXISTS.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1281">
+     * FILTER FILTER != not working</a>
+     */
+    public void test_ticket_blzg_1281a() throws Exception {
+       new TestHelper("ticket_blzg_1281a",// testURI,
+             "ticket_blzg_1281a.rq",// queryFileURL
+             "ticket_blzg_1281a.trig",// dataFileURL
+             "ticket_blzg_1281a.srx"// resultFileURL
+       ).runTest();    
+
+    }
+    
+    /**
+     * Double nesting of FILTER NOT EXISTS.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1281">
+     * FILTER FILTER != not working</a>
+     */
+    public void test_ticket_blzg_1281b() throws Exception {
+       new TestHelper("ticket_blzg_1281b",// testURI,
+             "ticket_blzg_1281b.rq",// queryFileURL
+             "ticket_blzg_1281b.trig",// dataFileURL
+             "ticket_blzg_1281b.srx"// resultFileURL
+       ).runTest();    
+
+    }
 
 }
