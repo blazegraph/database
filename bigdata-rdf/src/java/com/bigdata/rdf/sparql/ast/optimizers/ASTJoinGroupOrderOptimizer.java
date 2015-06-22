@@ -27,35 +27,24 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.FilterNode;
-import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfo;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfoMap;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
-import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
-import com.bigdata.rdf.sparql.ast.ZeroLengthPathNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
-import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 
 /**
@@ -66,7 +55,6 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-@SuppressWarnings("deprecation")
 public class ASTJoinGroupOrderOptimizer extends AbstractJoinGroupOptimizer 
 implements IASTOptimizer {
    
@@ -95,8 +83,8 @@ implements IASTOptimizer {
        * Filter out the filter nodes from the join group, they will receive
        * special handling in the end.
        */
-      final TypeBasedNodeClassifier filterNodeClassifier = 
-         new TypeBasedNodeClassifier(
+      final ASTTypeBasedNodeClassifier filterNodeClassifier = 
+         new ASTTypeBasedNodeClassifier(
             new Class<?>[]{ FilterNode.class }, joinGroup.getChildren());
 
       
@@ -297,8 +285,8 @@ implements IASTOptimizer {
          new HashSet<IVariable<?>>();
       for (ASTJoinGroupPartition partition : partitionList) {
          
-         final TypeBasedNodeClassifier classifier = 
-            new TypeBasedNodeClassifier(
+         final ASTTypeBasedNodeClassifier classifier = 
+            new ASTTypeBasedNodeClassifier(
                new Class<?>[] { 
                   ServiceNode.class,AssignmentNode.class,BindingsClause.class }, 
                partition.extractNodeList());
@@ -437,239 +425,4 @@ implements IASTOptimizer {
       return ordered;
       
    }
-
-
-
-
-
-   /**
-    * Classification of nodes. This class maintains
-    * 
-    * - Lists of nodes classified by types that are treated differently
-    *   according to the standard, in particular (in original order)
-    *   - One list for filter nodes.
-    *   - One list of BIND and VALUES node.
-    *   - One list containing other nodes with binding requirements.
-    *   - One list containing the remaining nodes.
-    *   
-    * Note that, according to the SPARQL 1.1 semantics, use of BIND ends the
-    * preceding graph pattern. Here, we place BIND nodes at the first position
-    * where it can be evaluated, i.e. treat them the same way as we do with
-    * FILTERs (giving priority to FILTERs). This might not always be 100%
-    * inline with the standard, but is probably the most efficient way to
-    * deal with them.
-    *   
-    * - A map, mapping from node type to a set of nodes with the respective type
-    */
-   protected static class NodeClassification {
-
-      /**
-       * Filter nodes.
-       */
-      List<FilterNode> filters;
-      
-      /**
-       * SPARQL 1.1 bindings clause such as VALUES (?x ?y) { (1 2) (3 4) }
-       */
-      List<BindingsClause> valuesNodes;
-
-      /**
-       * SPARQL 1.1 BIND nodes.
-       */
-      List<AssignmentNode> bindNodes;
-      
-      /**
-       * Can be freely reordered in the join group as long as 
-       */
-      List<ServiceNode> serviceNodesWithSpecialHandling;
-      
-      /**
-       * All nodes that have binding requirements, i.e. must not be evaluated
-       * before certain variables are bound. 
-       */
-      List<IGroupMemberNode> noneSpecialNodes;
-      
-            
-      /**
-       * Constructor. The first parameter is the list of nodes, the second
-       * one the {@link GroupNodeVarBindingInfoMap} for all the methods
-       * (which can be obtained by calling the constructor for the 
-       * {@link GroupNodeVarBindingInfo} object).
-       */
-      public NodeClassification(
-         final Iterable<IGroupMemberNode> nodes, 
-         final GroupNodeVarBindingInfoMap bindingInfoMap) {
-
-         filters = new ArrayList<FilterNode>();
-         valuesNodes = new ArrayList<BindingsClause>();
-         bindNodes = new ArrayList<AssignmentNode>();
-         serviceNodesWithSpecialHandling = new ArrayList<ServiceNode>();
-         noneSpecialNodes = new ArrayList<IGroupMemberNode>();
-         
-         for (IGroupMemberNode node : nodes) {
-            registerNode(node, bindingInfoMap.get(node));
-         }
-      }
-
-      
-      /**
-       * Registers an additional node to the {@link NodeClassification} object.
-       * Requires the {@link GroupNodeVarBindingInfo} associated to the node.
-       * 
-       * @param node
-       * @param bindingInfo
-       */
-      void registerNode(
-         final IGroupMemberNode node, 
-         final GroupNodeVarBindingInfo bindingInfo) {
-                  
-         if (bindingInfo==null) {
-            throw new RuntimeException("No GroupNodeVarBindingInfo provided.");
-         }
-         
-         final ServiceFactory defaultSF = 
-            ServiceRegistry.getInstance().getDefaultServiceFactory();
-         
-         if (node instanceof AssignmentNode) {
-
-            bindNodes.add((AssignmentNode)node);
-            
-         } else if (node instanceof BindingsClause) {
-            
-            valuesNodes.add((BindingsClause)node);
-
-         } else if (node instanceof FilterNode) {
-            
-            filters.add((FilterNode)node);
-
-         } else if (node instanceof StatementPatternNode) {
-            
-            noneSpecialNodes.add(node);
-            
-         } else if (node instanceof NamedSubqueryInclude) {
-            
-            noneSpecialNodes.add(node);
-            
-         } else if (node instanceof ArbitraryLengthPathNode ||
-            node instanceof ZeroLengthPathNode || 
-            node instanceof PropertyPathUnionNode) {
-            
-            noneSpecialNodes.add(node);
-            
-         } else if (node instanceof SubqueryRoot) {
-            
-            noneSpecialNodes.add(node);
-               
-         } else if (node instanceof ServiceNode) {
-
-            final ServiceNode serviceNode = (ServiceNode)node;
-            
-            // add service node to the list it belongs to
-            if (!bindingInfo.leftToBeBound(new HashSet<IVariable<?>>()).isEmpty() ||
-                  !serviceNode.getResponsibleServiceFactory().equals(defaultSF)) {
-               
-               serviceNodesWithSpecialHandling.add((ServiceNode)node);
-               
-            } else {
-               
-               // only SPARQL 1.1 SERVICE nodes with constant go here (they
-               // can be treated strictly according to the semantics); note
-               // that the SPARQL 1.1 standard doesn't give a concise semantics
-               // for SPARQL 1.1 queries with variable endpoint
-               noneSpecialNodes.add(node);
-               
-            }
-            
-         // NOTE: don't move around, this is in the end in purpose to allow
-         // the treatment of more specialized cases
-         } else if (node instanceof GraphPatternGroup<?>) {
-            
-            noneSpecialNodes.add(node);
-
-         } else {
-            
-            noneSpecialNodes.add(node);
-            
-         }
-      }      
-
-   }
-   
-   /**
-    * Classification of {@link IGroupMemberNode}s along a set of specified
-    * types. For nodes matching a given type, lookup is possible (returning
-    * an ordered list of nodes), all other nodes are stored in a dedicated list.
-    * @author msc
-    *
-    */
-   protected static class TypeBasedNodeClassifier {
-      
-      Class<?>[] clazzez;
-      
-      List<IGroupMemberNode> unclassifiedNodes;
-      
-      Map<Class<?>,List<IGroupMemberNode>> classifiedNodes;
-      
-      /**
-       * Constructor, receiving as an argument a list of types based on
-       * which classification is done. 
-       * 
-       * @param types
-       */
-      public TypeBasedNodeClassifier(
-         final Class<?>[] clazzez, final List<IGroupMemberNode> nodeList) {
-         
-         this.clazzez = clazzez;
-         unclassifiedNodes = new LinkedList<IGroupMemberNode>();
-         classifiedNodes = new HashMap<Class<?>, List<IGroupMemberNode>>();
-         
-         registerNodes(nodeList);
-      }
-      
-
-      public void registerNodes(final List<IGroupMemberNode> nodeList) {
-         
-         // initialize map with empty arrays
-         for (Class<?> clazz : clazzez) {
-            classifiedNodes.put(clazz, new LinkedList<IGroupMemberNode>());
-         }
-
-         // and popuplate it
-         for (IGroupMemberNode node : nodeList) {
-
-            boolean classified = false;
-            for (int i=0; i<clazzez.length && !classified; i++) {
-               
-               Class<?> clazz = clazzez[i];
-               if (clazz.isInstance(node)) {
-                  classifiedNodes.get(clazz).add(node);
-                  classified = true;
-               }               
-            }
-            
-            if (!classified) {
-               unclassifiedNodes.add(node);
-            }
-         }
-      }
-      
-      /**
-       * Return all those nodes for which classification failed.
-       */
-      public List<IGroupMemberNode> getUnclassifiedNodes() {
-         return unclassifiedNodes;
-      }
-      
-      /**
-       * Returns the list of nodes that are classified with the given type.
-       * If the type was passed when constructing the object, the result
-       * is the (possibly empty) list of nodes with the given type. If the
-       * type was not provided, null is returned.
-       */
-      public List<IGroupMemberNode> get(Class<?> clazz) {
-         return classifiedNodes.get(clazz);
-      }
-      
-   }
-
 }
