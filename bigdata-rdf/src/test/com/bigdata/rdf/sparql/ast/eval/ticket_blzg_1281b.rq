@@ -1,0 +1,11 @@
+SELECT *
+WHERE {
+
+  <http://s> <http://p1> ?x .
+  {
+    FILTER NOT EXISTS { 
+      $x <http://p2> ?y
+      FILTER ( $x != ?y )
+      }
+  }
+}
