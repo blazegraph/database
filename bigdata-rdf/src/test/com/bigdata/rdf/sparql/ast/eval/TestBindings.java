@@ -1372,41 +1372,13 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();
     }
 
-    /**
-     * Isues with placement of BIND.
-     * 
-     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
-     * BIND not executed before SERVICE call.</a>
-     */
-    // TODO
-//    public void test_ticket_bg876a() throws Exception {
-//       new TestHelper("ticket_bg876a",// testURI,
-//             "ticket_bg876a.rq",// queryFileURL
-//             "empty.trig",// dataFileURL
-//             "ticket_bg876a.srx"// resultFileURL
-//       ).runTest();       
-//    }
-
-    /**
-     * Isues with placement of BIND.
-     * 
-     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
-     * BIND not executed before SERVICE call.</a>
-     */
-    // TODO
-//    public void test_ticket_bg876b() throws Exception {
-//       new TestHelper("ticket_bg876b",// testURI,
-//             "ticket_bg876b.rq",// queryFileURL
-//             "ticket_bg876b.trig",// dataFileURL
-//             "ticket_bg876b.srx"// resultFileURL
-//       ).runTest();       
-//    }
     
     /**
      * Isues with placement of BIND.
      * 
      * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
-     * BIND not executed before SERVICE call.</a>
+     * BIND not executed before SERVICE call</a>, comment from
+     * 07/Jan/14 7:42 PM.
      */
     public void test_ticket_bg876c() throws Exception {
        new TestHelper("ticket_bg876c",// testURI,
@@ -1420,7 +1392,8 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
      * Isues with placement of BIND.
      * 
      * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
-     * BIND not executed before SERVICE call.</a>
+     * BIND not executed before SERVICE call</a>, comment from
+     * 07/Jan/14 7:42 PM.
      */
     public void test_ticket_bg876d() throws Exception {
        new TestHelper("ticket_bg876d",// testURI,
@@ -1434,7 +1407,8 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
      * Isues with placement of BIND.
      * 
      * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
-     * BIND not executed before SERVICE call.</a>
+     * BIND not executed before SERVICE call</a>, comment from
+     * 07/Jan/14 7:43 PM.
      */
     public void test_ticket_bg876e() throws Exception {
        new TestHelper("ticket_bg876e",// testURI,
@@ -1443,23 +1417,6 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
              "ticket_bg876e.srx"// resultFileURL
        ).runTest();       
     }    
-    
-    
-    /**
-     * Isues with placement of BIND.
-     * 
-     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
-     * BIND not executed before SERVICE call.</a>
-     */
-    // TODO
-//    public void test_ticket_bg876f() throws Exception {
-//       new TestHelper("ticket_bg876f",// testURI,
-//             "ticket_bg876f.rq",// queryFileURL
-//             "ticket_bg876f.trig",// dataFileURL
-//             "ticket_bg876f.srx"// resultFileURL
-//       ).runTest();       
-//    }    
-//    
     
     /**
      * Some of the test cases require the FTS index, so we need a custom
