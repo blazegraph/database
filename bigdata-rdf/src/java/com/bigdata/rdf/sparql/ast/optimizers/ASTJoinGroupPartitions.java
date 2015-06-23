@@ -153,7 +153,7 @@ public class ASTJoinGroupPartitions {
          // if position found:
          if (position!=null) {
             
-            partition.placeAtPosition(node,null);
+            partition.placeAtPosition(node,position);
             return;
             
          // if reached the end:

@@ -92,6 +92,23 @@ extends AbstractOptimizerTestCase {
       return stmtPatternWithVar(varName, false);
    }
 
+   
+   /** 
+    * Returns a fresh statement pattern with the specified variables bound.
+    */
+   StatementPatternNode stmtPatternWithVars(
+      final String varName1, final String varName2) {
+      
+      final StatementPatternNode spn = 
+         (StatementPatternNode) new Helper(){{
+            tmp = statementPatternNode(
+               varNode(varName1),constantNode(a),varNode(varName2));
+         }}.getTmp();
+            
+       return spn;
+   }
+
+   
    /** 
     * Returns a fresh optional statement pattern with the specified variable bound.
     */
