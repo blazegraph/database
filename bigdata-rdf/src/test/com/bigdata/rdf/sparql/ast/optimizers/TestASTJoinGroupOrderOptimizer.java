@@ -166,6 +166,43 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
          
       }}.test();
    }
+   
+   /**
+    * Test filter placement where one filter variables is bound in the first,
+    * one in the join group
+    */
+   public void testFilterPlacement04() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("x2"),
+               stmtPatternWithVarOptional("x2"),
+               stmtPatternWithVar("x2"),               
+               stmtPatternWithVars("x2","x3"),
+               stmtPatternWithVarOptional("y2"),
+               filterWithVars("x1","x2"),
+               filterWithVar("y2")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("x2"),
+               stmtPatternWithVarOptional("x2"),
+               stmtPatternWithVar("x2"),               
+               filterWithVars("x1","x2"),
+               stmtPatternWithVars("x2","x3"),
+               stmtPatternWithVarOptional("y2"),
+               filterWithVar("y2")
+            ));
+         
+      }}.test();
+   }
 
    public void testBindPlacement01() {
 
