@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 
 
 /**
@@ -45,42 +47,6 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
    @Override
    IASTOptimizer newOptimizer() {
       return new ASTOptimizerList(new ASTJoinGroupOrderOptimizer());
-   }
-
-
-   /**
-    * Complex test case where we have a mix of all possible constructs
-    * within a join group.
-    */
-   public void testAllConstructs() {
-
-      // TODO: implement complex test case
-//      new Helper(){{
-//         
-//         given = 
-//            select(varNode(x), 
-//            where (
-//               stmtPatternWithVar("x1"), /* non optional stmt pattern */
-//               stmtPatternWithVarOptional("x2"),  /* optional stmt pattern */
-//               filterWithVar("x3"),
-//               filterWithVars("x4","x5"),
-//               filterExistsWithVars("x6","x7"),
-//               filterExistsWithVars("x8","x9","x10"),
-//               joinGroupWithVars("x11","x12"),
-//               serviceSparql11WithConstant("x13","x14"),
-//               serviceSparql11WithVariable("x15","x16","x17"),
-//               serviceBDSWithVariable("x18"),
-//               serviceFTSWithVariable("x19","x20","x21","x22"),
-//               alpNodeWithVars("x23","x24","x25"),
-//               unionWithVars("x26","x27"),
-//               assignmentWithVar("x28","x29"),
-//               bindingsClauseWithVars("x32","x33","x34"),
-//               subqueryWithVars("x35","x36")
-//            ));
-//         
-//         
-//      }}.test();
-//      
    }
 
    public void testFilterPlacement01() {
@@ -260,6 +226,37 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
+   /**
+    * Test complex pattern, including inter- and intra-partition reordering,
+    * with focus on BIND and ASSIGNMENT nodes.
+    */
+   public void testBindPlacement03() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("y1"),
+               stmtPatternWithVar("y1"),
+               stmtPatternWithVars("y1","z1"),
+               assignmentWithVar("z1","y1")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("y1"),
+               stmtPatternWithVar("y1"),
+               assignmentWithVar("z1","y1"),
+               stmtPatternWithVars("y1","z1")
+           ));
+         
+      }}.test();
+      
+   }   
    
    public void testValuesPlacement01() {
 
@@ -577,9 +574,132 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();   
    }
 
-   
-   // TODO: test case with named subquery
-   // TODO: verify case of ASK subqueries
+   /**
+    * Test complex pattern, including inter- and intra-partition reordering,
+    * excluding BIND and ASSIGNMENT nodes.
+    */
+   public void testComplexOptimization01() {
 
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               joinGroupWithVars("x1","x2"),
+               alpNodeWithVars("x1","x2"),
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("y1"),
+               unionWithVars("y2","y1","y2"), 
+               stmtPatternWithVar("y1"),
+               subqueryWithVars("y1","y4","y5"),
+               stmtPatternWithVarOptional("z1"),
+               joinGroupWithVars("a1","a2"),
+               joinGroupWithVars("z1","z2"),
+               filterWithVar("x1"),
+               filterWithVars("x1","y1"),
+               filterWithVars("x1","z1")               
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               filterWithVar("x1"),
+               joinGroupWithVars("x1","x2"),
+               joinGroupWithVars("a1","a2"), /* can be moved to the front */
+               alpNodeWithVars("x1","x2"),
+               stmtPatternWithVarOptional("y1"),
+               stmtPatternWithVar("y1"),
+               filterWithVars("x1","y1"),
+               unionWithVars("y2","y1","y2"), 
+               subqueryWithVars("y1","y4","y5"),
+               stmtPatternWithVarOptional("z1"),
+               joinGroupWithVars("z1","z2"),
+               filterWithVars("x1","z1")      
+           ));
+         
+      }}.test();
+      
+   }
    
+   /**
+    * Test complex pattern, including inter- and intra-partition reordering,
+    * with focus on BIND and ASSIGNMENT nodes.
+    */
+   public void testComplexOptimization02() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               alpNodeWithVars("x1","x2"),
+               joinGroupWithVars("x1","x2"),
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarOptional("y1"),
+               unionWithVars("y2","y1","y2"), 
+               subqueryWithVars("y1","y4","y5"),
+               stmtPatternWithVar("y1"),
+               bindingsClauseWithVars("x1","z1"),
+               assignmentWithVar("bound","y1")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               bindingsClauseWithVars("x1","z1"),
+               stmtPatternWithVar("x1"),
+               joinGroupWithVars("x1","x2"),
+               alpNodeWithVars("x1","x2"),
+               stmtPatternWithVarOptional("y1"),
+               stmtPatternWithVar("y1"),
+               unionWithVars("y2","y1","y2"), 
+               subqueryWithVars("y1","y4","y5"),
+               assignmentWithVar("bound","y1")
+           ));
+         
+      }}.test();
+      
+   }   
+
+   /**
+    * Test placement of named subquery at the beginning of the associated
+    * partition.
+    */
+   public void testNamedSubqueryPlacement() {
+      throw new NotImplementedException();
+   }
+   
+   /**
+    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+    * clauses.
+    */
+   public void testAskSubquery01() {
+      throw new NotImplementedException();
+   }
+   
+   /**
+    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+    * clauses. This test case focuses on the interaction with simple FILTERs.
+    */
+   public void testAskSubquery02() {
+      throw new NotImplementedException();
+   }
+
+//given = 
+//select(varNode(x), 
+//where (
+// filterExistsWithVars("x6","x7"),
+// filterExistsWithVars("x8","x9","x10"),
+// joinGroupWithVars("x11","x12"),
+// serviceSparql11WithConstant("x13","x14"),
+// serviceSparql11WithVariable("x15","x16","x17"),
+// serviceBDSWithVariable("x18"),
+// serviceFTSWithVariable("x19","x20","x21","x22"),
+// alpNodeWithVars("x23","x24","x25"),
+// unionWithVars("x26","x27"),
+// assignmentWithVar("x28","x29"),
+// bindingsClauseWithVars("x32","x33","x34"),
+// subqueryWithVars("x35","x36")
+//));
 }
