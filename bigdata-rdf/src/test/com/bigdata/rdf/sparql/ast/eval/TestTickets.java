@@ -846,4 +846,34 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 //               ).runTest();
 //    }
     
+    /**
+     * Placement of filters in presence of other FILTER NOT EXISTS
+     * clauses.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1284">
+     * optional / filter ! bound interaction malfunction</a>
+     */
+    public void test_ticket_blzg_1284a() throws Exception {
+       new TestHelper("ticket_blzg_1284a",// testURI,
+             "ticket_blzg_1284a.rq",// queryFileURL
+             "ticket_blzg_1284.trig",// dataFileURL
+             "ticket_blzg_1284a.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * Placement of filters in presence of other FILTER NOT EXISTS
+     * clauses.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1284">
+     * optional / filter ! bound interaction malfunction</a>
+     */
+    public void test_ticket_blzg_1284b() throws Exception {
+       new TestHelper("ticket_blzg_1284b",// testURI,
+             "ticket_blzg_1284b.rq",// queryFileURL
+             "ticket_blzg_1284.trig",// dataFileURL
+             "ticket_blzg_1284b.srx"// resultFileURL
+       ).runTest();
+    }   
+    
 }
