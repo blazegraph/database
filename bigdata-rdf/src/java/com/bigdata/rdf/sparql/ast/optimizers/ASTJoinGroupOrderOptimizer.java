@@ -42,7 +42,9 @@ import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfo;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfoMap;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
+import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
@@ -319,7 +321,11 @@ implements IASTOptimizer {
          final ASTTypeBasedNodeClassifier classifier = 
             new ASTTypeBasedNodeClassifier(
                new Class<?>[] { 
-                  ServiceNode.class,AssignmentNode.class,BindingsClause.class });
+                  ServiceNode.class,
+                  AssignmentNode.class,
+                  BindingsClause.class,
+                  SubqueryRoot.class
+               });
          
          /**
           * We only consider special service nodes for placement, all other
@@ -356,7 +362,26 @@ implements IASTOptimizer {
                   
                }
             });
-         
+         classifier.addConstraintForType(SubqueryRoot.class, 
+               new ASTTypeBasedNodeClassifierConstraint() {
+                  @Override
+                  boolean appliesTo(final IGroupMemberNode node) {
+                     
+                     if (node instanceof SubqueryRoot) {
+
+                        /**
+                         * ASK subqueries (associated with FILTER [NOT] EXIST
+                         * nodes) desire special handling as well.
+                         */
+                        final SubqueryRoot sn = (SubqueryRoot)node;
+                        return sn.getQueryType().equals(QueryType.ASK);
+                     }
+                     
+                     // as a fallback return false
+                     return false; 
+                     
+                  }
+               });         
          classifier.registerNodes(partition.extractNodeList());
          
          /**
@@ -369,6 +394,7 @@ implements IASTOptimizer {
          toRemove.addAll(classifier.get(ServiceNode.class));
          toRemove.addAll(classifier.get(AssignmentNode.class));
          toRemove.addAll(classifier.get(BindingsClause.class));
+         toRemove.addAll(classifier.get(SubqueryRoot.class));
          partition.removeNodesFromPartition(toRemove);
          
          // the remaining elements will be reordered based on their type
@@ -381,7 +407,7 @@ implements IASTOptimizer {
           */
          for (IGroupMemberNode node : classifier.get(ServiceNode.class)) {
             partition.placeAtFirstPossiblePosition(
-               node,knownBoundFromPrevPartitions);
+               node,knownBoundFromPrevPartitions,false /* requires all bound */);
          }
 
          /**
@@ -389,7 +415,7 @@ implements IASTOptimizer {
           */
          for (IGroupMemberNode node : classifier.get(BindingsClause.class)) {
             partition.placeAtFirstContributingPosition(
-               node,knownBoundFromPrevPartitions);
+               node,knownBoundFromPrevPartitions,false /* requires all bound */);
          }
 
          /**
@@ -400,7 +426,6 @@ implements IASTOptimizer {
           */
          final Set<IVariable<?>> knownBoundSomewhere =
             new HashSet<IVariable<?>>(partition.definitelyProduced);
-
          
          // ... order the bind nodes according to dependencies
          final List<AssignmentNode> bindNodesOrdered = 
@@ -411,8 +436,17 @@ implements IASTOptimizer {
          // ... and place the bind nodes
          for (AssignmentNode node : bindNodesOrdered) {
             partition.placeAtFirstContributingPosition(
-               node,knownBoundFromPrevPartitions);
+               node,knownBoundFromPrevPartitions, false /* requiresAllBound */);
          }       
+         
+
+         /**
+          * Place the SubqueryRoot ASK nodes.
+          */
+         for (IGroupMemberNode node : classifier.get(SubqueryRoot.class)) {
+            partition.placeAtFirstContributingPosition(
+               node,knownBoundFromPrevPartitions,false /* requires all bound */);
+         }
          
          knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
       }

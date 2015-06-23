@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 
@@ -93,13 +95,13 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
          expected = 
             select(varNode(x), 
             where (
+               filterWithVar("x4"), /* can't be bound anyway */
                joinGroupWithVars("x1"),
                filterExistsWithVars("x1","x2"),
                filterWithVar("x1"),
                joinGroupWithVars("x2"),
                joinGroupWithVars("x1","x3"),
-               filterNotExistsWithVars("x3"),
-               filterWithVar("x4")
+               filterNotExistsWithVars("x3")
             ));
          
       }}.test();
@@ -409,14 +411,15 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
    
    public void testServicePlacementSparqlFTS02() {
 
+
+      final JoinGroupNode jgnOpt = joinGroupWithVars("inParams2","z");
+      jgnOpt.setOptional(true);
+      
       new Helper(){{
          
          given = 
             select(varNode(x), 
             where (
-               serviceFTSWithVariable(
-                  "outRes", "outScore", "outSnippet", 
-                  "inSearch", "inEndpoint", "inParams2"),
                serviceFTSWithVariable(
                   "outRes", "outScore", "outSnippet", 
                   "inSearch", "inEndpoint", "inParams"), 
@@ -426,7 +429,13 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                stmtPatternWithVar("inParams"),
                stmtPatternWithVar("x"),
                stmtPatternWithVar("outScore"),
-               stmtPatternWithVar("outSnippet")
+               stmtPatternWithVar("outSnippet"),
+               jgnOpt,
+               stmtPatternWithVar("z"),
+               serviceFTSWithVariable(
+                  "outRes", "outScore", "outSnippet", 
+                  "inSearch", "inEndpoint", "inParams2")
+                
             ));
          
          expected = 
@@ -442,9 +451,11 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                stmtPatternWithVar("x"),
                stmtPatternWithVar("outScore"),
                stmtPatternWithVar("outSnippet"),
-               serviceFTSWithVariable(
-                  "outRes", "outScore", "outSnippet", 
-                  "inSearch", "inEndpoint", "inParams2")
+               jgnOpt,
+               serviceFTSWithVariable( /* inParams2 can't be bound at a later time */
+                     "outRes", "outScore", "outSnippet", 
+                     "inSearch", "inEndpoint", "inParams2"),
+               stmtPatternWithVar("z")
            ));
          
       }}.test();
@@ -627,7 +638,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
     * with focus on BIND and ASSIGNMENT nodes.
     */
    public void testComplexOptimization02() {
-
+      
       new Helper(){{
          
          given = 
