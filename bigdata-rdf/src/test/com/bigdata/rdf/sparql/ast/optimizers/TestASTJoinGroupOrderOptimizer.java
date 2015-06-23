@@ -666,25 +666,85 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
     * Test placement of named subquery at the beginning of the associated
     * partition.
     */
-   public void testNamedSubqueryPlacement() {
-      throw new NotImplementedException();
+   public void testNamedSubqueryPlacement01() {
+      
+      new Helper(){{
+         
+         given = 
+            select(
+               varNode(x), 
+               namedSubQuery("_set1",varNode("y1"),where(statementPatternNode(varNode("y1"), constantNode(a), constantNode(b),1))),
+               where (
+                  stmtPatternWithVar("x1"),
+                  stmtPatternWithVarOptional("y1"),
+                  stmtPatternWithVar("y1"),
+                  namedSubQueryInclude("_set1")
+            ));
+         
+         expected = 
+            select(
+               varNode(x), 
+               namedSubQuery("_set1",varNode("y1"),where(statementPatternNode(varNode("y1"), constantNode(a), constantNode(b),1))),
+               where (
+                  stmtPatternWithVar("x1"),
+                  stmtPatternWithVarOptional("y1"),
+                  namedSubQueryInclude("_set1"),
+                  stmtPatternWithVar("y1")
+           ));
+         
+      }}.test();
+
    }
    
    /**
-    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
-    * clauses.
+    * Test placement of named subquery at the beginning of the previous
+    * partition (where intra-partition optimization is possible).
     */
-   public void testAskSubquery01() {
-      throw new NotImplementedException();
-   }
+   public void testNamedSubqueryPlacement02() {
+      
+      new Helper(){{
+         
+         given = 
+            select(
+               varNode(x), 
+               namedSubQuery("_set1",varNode("x1"),where(statementPatternNode(varNode("x1"), constantNode(a), constantNode(b),1))),
+               where (
+                  stmtPatternWithVar("x1"),
+                  stmtPatternWithVarOptional("y1"),
+                  stmtPatternWithVar("y1"),
+                  namedSubQueryInclude("_set1")
+            ));
+         
+         expected = 
+            select(
+               varNode(x), 
+               namedSubQuery("_set1",varNode("x1"),where(statementPatternNode(varNode("x1"), constantNode(a), constantNode(b),1))),
+               where (
+                  namedSubQueryInclude("_set1"),
+                  stmtPatternWithVar("x1"),
+                  stmtPatternWithVarOptional("y1"),
+                  stmtPatternWithVar("y1")
+           ));
+         
+      }}.test();
+
+   }   
    
    /**
-    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
-    * clauses. This test case focuses on the interaction with simple FILTERs.
-    */
-   public void testAskSubquery02() {
-      throw new NotImplementedException();
-   }
+//    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+//    * clauses.
+//    */
+//   public void testAskSubquery01() {
+//      throw new NotImplementedException();
+//   }
+//   
+//   /**
+//    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+//    * clauses. This test case focuses on the interaction with simple FILTERs.
+//    */
+//   public void testAskSubquery02() {
+//      throw new NotImplementedException();
+//   }
 
 //given = 
 //select(varNode(x), 
