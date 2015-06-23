@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
@@ -50,10 +51,15 @@ import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNodeContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
@@ -64,6 +70,10 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.service.fts.FTS;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Striterator;
 
 
 /**
@@ -160,7 +170,7 @@ extends AbstractOptimizerTestCase {
          tmp = filter(FunctionNode.EQ(varNode(varName),constantNode(a)));
       }}.getTmp();
       
-      return resolveVEs(fn);
+      return (FilterNode)resolveVEs(fn);
    }
 
    /**
@@ -174,7 +184,7 @@ extends AbstractOptimizerTestCase {
          tmp = filter(FunctionNode.NE(varNode(varName1),varNode(varName2)));
       }}.getTmp();
       
-      return resolveVEs(fn);
+      return (FilterNode)resolveVEs(fn);
    }
    
    /**
@@ -196,7 +206,7 @@ extends AbstractOptimizerTestCase {
                   joinGroupNode((Object[])statementPatterns)));
          }}.getTmp();
          
-      return resolveVEs(fn);
+      return (FilterNode)resolveVEs(fn);
    }
    
    
@@ -219,7 +229,7 @@ extends AbstractOptimizerTestCase {
                   joinGroupNode((Object[])statementPatterns)));
          }}.getTmp();
          
-      return resolveVEs(fn);
+      return (FilterNode)resolveVEs(fn);
    }
    
    /**
@@ -348,20 +358,12 @@ extends AbstractOptimizerTestCase {
     * body, where the first parameter specified the 
     * {@link ArbitraryLengthPathNode}s internal variable.
     */
-   ArbitraryLengthPathNode alpNodeWithVars(
-      final String alpVar, final String... varNames) {
+   PropertyPathNode alpNodeWithVars(
+      final String varName1, final String varName2) {
 
-      final StatementPatternNode[] statementPatterns = 
-            stmtPatternsWithVars(varNames);
-      
-      final ArbitraryLengthPathNode alpNode = 
-            (ArbitraryLengthPathNode) new Helper() {{
-               tmp = 
-                  arbitartyLengthPropertyPath(
-                     varNode(alpVar), 
-                     constantNode(b), 
-                     HelperFlag.ZERO_OR_MORE,
-                     joinGroupNode((Object[])statementPatterns));
+      final PropertyPathNode alpNode = 
+         (PropertyPathNode) new Helper() {{
+            tmp = propertyPathNode(varNode(varName1), "c*", varNode(varName2));
          }}.getTmp();
          
       return alpNode;
@@ -479,13 +481,14 @@ extends AbstractOptimizerTestCase {
       }
       return varSet;
    }
+   
    /**
-    * Properly resolves the value expressions in the {@link FilterNode}.
+    * Properly resolves the value expressions in the {@link IGroupMemberNode}.
     */
-   FilterNode resolveVEs(FilterNode fn) {
+   IGroupMemberNode resolveVEs(final IGroupMemberNode groupNode) {
       
       final QueryRoot query = new QueryRoot(QueryType.SELECT);
-      final JoinGroupNode jgn = new JoinGroupNode(fn);
+      final JoinGroupNode jgn = new JoinGroupNode(groupNode);
       query.setWhereClause(jgn);
       
       final AST2BOpContext context = 
@@ -493,10 +496,68 @@ extends AbstractOptimizerTestCase {
       final GlobalAnnotations globals = 
          new GlobalAnnotations(
             context.getLexiconNamespace(), context.getTimestamp());
-      AST2BOpUtility.toVE(globals, fn.getValueExpressionNode());
       
-      return fn;
-   }
+      /*
+       * Visit nodes that require modification.
+       */
+      final IStriterator it = new Striterator(
+        BOpUtility.preOrderIteratorWithAnnotations(groupNode))
+        .addFilter(new Filter() {
+
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public boolean isValid(Object obj) {
+       
+               if (obj instanceof IValueExpressionNodeContainer)
+                  return true;
+               if (obj instanceof HavingNode)
+                  return true;
+               if (obj instanceof StatementPatternNode)
+                  return true;
+               return false;
+            }
+      });
+
+      while (it.hasNext()) {
+
+          final Object op = it.next();
+
+          if (op instanceof IValueExpressionNodeContainer) {
+
+              // AssignmentNode, FilterNode, OrderByExpr
+          AST2BOpUtility.toVE(globals, 
+                ((IValueExpressionNodeContainer) op).getValueExpressionNode());
+              
+          } else if (op instanceof HavingNode) {
+              
+              final HavingNode havingNode = (HavingNode)op;
+              
+              for(IValueExpressionNode node : havingNode) {
+              
+                  AST2BOpUtility.toVE(globals, node);
+                  
+              }
+              
+          } else if (op instanceof StatementPatternNode) {
+              
+             final StatementPatternNode sp = (StatementPatternNode) op;
+             
+             final RangeNode range = sp.getRange();
+             
+             if (range != null) {
+                
+                if (range.from() != null)
+                   AST2BOpUtility.toVE(globals, range.from());
+                   
+                if (range.to() != null)
+                   AST2BOpUtility.toVE(globals, range.to());
+             }
+          }          
+      }
+      
+      return groupNode;
+  }
    
    
    /**

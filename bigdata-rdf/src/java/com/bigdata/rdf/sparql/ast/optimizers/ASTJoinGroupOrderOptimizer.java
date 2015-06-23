@@ -222,12 +222,16 @@ implements IASTOptimizer {
                           candPartition.optionalOrMinus).getMaybeProduced());
               }
 
-              conflictingVars.retainAll(bindingInfoMap.get(candidate).getMaybeProduced());
+              final GroupNodeVarBindingInfo candidateBindingInfo = 
+                 bindingInfoMap.get(candidate);
+              conflictingVars.retainAll(candidateBindingInfo.getMaybeProduced());
               
               conflictingVars.removeAll(
                  definitelyProducedUpToPartition.get(j));
               
-              if (conflictingVars.isEmpty()) {
+              if (conflictingVars.isEmpty() && 
+                    definitelyProducedUpToPartition.get(j).containsAll(
+                       candidateBindingInfo.getRequiredBound())) {
                  partitionForCandidate = j;
               } else {
                  // can't place here, abort
