@@ -26,11 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -80,107 +77,36 @@ implements IASTJoinGroupPartitionReorderer {
    @Override
    public void reorderNodes(ASTJoinGroupPartition partition) {
       
-      final Map<NodeType,List<IGroupMemberNode>> nodeTypeInfo = 
-         classifyNodes(partition.nonOptionalNonMinusNodes);
+      final ASTTypeBasedNodeClassifier nodeClassifier = 
+            new ASTTypeBasedNodeClassifier(
+               new Class<?>[]{ 
+                  NamedSubqueryInclude.class,
+                  StatementPatternNode.class,
+                  ZeroLengthPathNode.class,
+                  PropertyPathUnionNode.class,
+                  ArbitraryLengthPathNode.class,
+                  SubqueryRoot.class,
+                  ServiceNode.class,
+                  GraphPatternGroup.class
+               }, 
+               partition.nonOptionalNonMinusNodes);
 
+      // TODO: special handling of ASK subqueries that act as filters,
+      // i.e. place them as early as possible
       final List<IGroupMemberNode> ordered = new LinkedList<IGroupMemberNode>();
-      
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.NAMED_SUBQUERY_INCLUDE);
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.STMT_PATTERN);
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.SUBGROUP);
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.ALP_NODE);
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.SUBQUERY);
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.SERVICE);
-      addNodesOfType(ordered, nodeTypeInfo, NodeType.OTHER);
+      ordered.addAll(nodeClassifier.get(NamedSubqueryInclude.class));
+      ordered.addAll(nodeClassifier.get(StatementPatternNode.class));
+      ordered.addAll(nodeClassifier.get(GraphPatternGroup.class));
+      ordered.addAll(nodeClassifier.get(ZeroLengthPathNode.class));
+      ordered.addAll(nodeClassifier.get(PropertyPathUnionNode.class));
+      ordered.addAll(nodeClassifier.get(ArbitraryLengthPathNode.class));
+      ordered.addAll(nodeClassifier.get(SubqueryRoot.class));
+      ordered.addAll(nodeClassifier.get(ServiceNode.class));
+      ordered.addAll(nodeClassifier.getUnclassifiedNodes());
 
       // just replace the order in the partition
       partition.replaceNonOptionalNonMinusNodesWith(ordered, false);
       
    }
-   
-   /**
-    * Adds the node of the specified type recorded in the nodeTypeInfo variable
-    * to the set of nodes.
-    * 
-    * @param ordered the set of nodes where to add
-    * @param nodeTypeInfo the node type info map
-    * @param nodeType the type of nodes to add
-    */
-   private void addNodesOfType(List<IGroupMemberNode> ordered,
-         Map<NodeType, List<IGroupMemberNode>> nodeTypeInfo,
-         NodeType nodeType) {
-      
-      if (ordered==null || nodeTypeInfo==null) {
-         return; // nothing we can do (should not happen though)
-      }
-      
-      final List<IGroupMemberNode> nodesOfType = nodeTypeInfo.get(nodeType);
-      if (nodesOfType!=null) {
-         ordered.addAll(nodesOfType);
-      }
-      
-   }
 
-   Map<NodeType,List<IGroupMemberNode>> classifyNodes(
-      final List<IGroupMemberNode> nodes) {
-      
-      final Map<NodeType,List<IGroupMemberNode>> nodeTypeInfo =
-         new HashMap<NodeType,List<IGroupMemberNode>>();
-      
-      for (IGroupMemberNode node : nodes) {
-         
-         if (node instanceof StatementPatternNode) {
-            
-            classifyNode(node, NodeType.STMT_PATTERN, nodeTypeInfo);
-            
-         } else if (node instanceof NamedSubqueryInclude) {
-            
-            classifyNode(node, NodeType.NAMED_SUBQUERY_INCLUDE, nodeTypeInfo);
-            
-         } else if (node instanceof ArbitraryLengthPathNode ||
-            node instanceof ZeroLengthPathNode || 
-            node instanceof PropertyPathUnionNode) {
-            
-            classifyNode(node, NodeType.ALP_NODE, nodeTypeInfo);
-            
-         // TODO: verify case of ASK subqueries
-         } else if (node instanceof SubqueryRoot) {
-            
-            classifyNode(node, NodeType.SUBQUERY, nodeTypeInfo);
-               
-         } else if (node instanceof ServiceNode) {
-
-            classifyNode(node, NodeType.SERVICE, nodeTypeInfo);
-            
-         // NOTE: don't move around, this is in the end in purpose to allow
-         // the treatment of more specialized cases
-         } else if (node instanceof GraphPatternGroup<?>) {
-            
-            classifyNode(node, NodeType.SUBGROUP, nodeTypeInfo);
-
-         } else {
-            
-            classifyNode(node, NodeType.OTHER, nodeTypeInfo);
-            
-         }
-      }
-         
-      return nodeTypeInfo;
-   }
-   
-   /**
-    * Classifies the node with the given type, recording it in the given map.
-    */
-   void classifyNode(
-      final IGroupMemberNode node, final NodeType classification,
-      final Map<NodeType,List<IGroupMemberNode>> nodeTypePartition) {
-      
-      // record in map for lookup
-      if (!nodeTypePartition.containsKey(classification)) {
-         nodeTypePartition.put(
-            classification,new ArrayList<IGroupMemberNode>());
-      }            
-      nodeTypePartition.get(classification).add(node);
-      
-   }
 }
