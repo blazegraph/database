@@ -365,8 +365,8 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
          expected = 
             select(varNode(x), 
             where (
+               serviceBDSWithVariable("x2"), /* first possible position */
                stmtPatternWithVar("x1"),
-               serviceBDSWithVariable("x2"),
                stmtPatternWithVar("x2"),
                stmtPatternWithVar("x3"),
                stmtPatternWithVar("x4")
@@ -570,8 +570,8 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                stmtPatternWithVar("x1"),
                stmtPatternWithVarOptional("x2"),
                stmtPatternWithVarOptional("x2"),
-               assignmentWithVar("bound", "x1"),
-               stmtPatternWithVarOptional("bound")
+               stmtPatternWithVarOptional("bound"),
+               assignmentWithVar("bound", "x1")
            ));
          
       }}.test();   
