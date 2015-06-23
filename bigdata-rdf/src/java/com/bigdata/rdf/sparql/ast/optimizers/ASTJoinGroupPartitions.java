@@ -146,9 +146,17 @@ public class ASTJoinGroupPartitions {
       for (int i=0; i<partitions.size(); i++) {
          
          final ASTJoinGroupPartition partition = partitions.get(i);
+         
+         /**
+          * Try to place the node in the partition. As long as we do not reach
+          * the last partition (i<partitions.size()-1), we must require that 
+          * all required variables of the node are bound, i.e. the "right"
+          * position might be in a later partition.
+          */
          final Integer position = 
             partition.getFirstPossiblePosition(
-               node, knownBoundFromPrevPartitions);
+               node, knownBoundFromPrevPartitions, 
+               i<partitions.size()-1 /* requireAllBound */);
 
          // if position found:
          if (position!=null) {
@@ -181,8 +189,7 @@ public class ASTJoinGroupPartitions {
             return;
          }
          
-         knownBoundFromPrevPartitions.addAll(
-            partition.getDefinitelyProduced());
+         knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
       }
       
       // if the node has not been succesfully placed, at it into a new

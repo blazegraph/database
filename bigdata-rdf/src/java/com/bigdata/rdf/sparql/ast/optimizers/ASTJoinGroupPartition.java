@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.IVariable;
@@ -173,10 +175,11 @@ public class ASTJoinGroupPartition {
     */
    void placeAtFirstContributingPosition(
          final IGroupMemberNode node, 
-         final Set<IVariable<?>> additionalKnownBound) {
+         final Set<IVariable<?>> additionalKnownBound,
+         final boolean requiresAllBound) {
 
          final Integer firstPossiblePosition = 
-            getFirstPossiblePosition(node, additionalKnownBound);
+            getFirstPossiblePosition(node, additionalKnownBound, requiresAllBound);
 
          /**
           * Special case (which simplifies subsequent code, as it asserts that
@@ -256,9 +259,13 @@ public class ASTJoinGroupPartition {
     * binding info map.
     */
    void placeAtFirstPossiblePosition(
-      final IGroupMemberNode node, final Set<IVariable<?>> additionalKnownBound) {
+      final IGroupMemberNode node, 
+      final Set<IVariable<?>> additionalKnownBound,
+      final boolean requiresAllBound) {
       
-      placeAtPosition(node, getFirstPossiblePosition(node, additionalKnownBound));
+      placeAtPosition(node, 
+         getFirstPossiblePosition(
+            node, additionalKnownBound, requiresAllBound));
       definitelyProduced.addAll(bindingInfoMap.get(node).getDefinitelyProduced());
    }
 
@@ -281,39 +288,138 @@ public class ASTJoinGroupPartition {
     * Computes for the given node, the first possible position in the partition
     * according to its binding requirements.
     * 
+    * @param the node to place
+    * @param additional variables that are known to be bound
+    * @param requiresAllBound requires that all variables are bound, i.e. when
+    *          set to true it is not sufficient that unbound variables can't
+    *          be bound anymore
+    * 
     * @return the position ID as integer, null if no matching position was found
     */
    Integer getFirstPossiblePosition(
-         final IGroupMemberNode node, 
-         final Set<IVariable<?>> additionalKnownBound) {
+      final IGroupMemberNode node, 
+      final Set<IVariable<?>> additionalKnownBound,
+      final boolean requiresAllBound) {
 
-         final HashSet<IVariable<?>> knownBound = 
-            new HashSet<IVariable<?>>(externallyBound);
-         knownBound.addAll(additionalKnownBound);
-         
-         /**
-          * The binding requirements for the given node
-          */
-         final GroupNodeVarBindingInfo bindingInfo = bindingInfoMap.get(node);
-         
-         for (int i=0; i<nonOptionalNonMinusNodes.size(); i++) {
+      /**
+       * The binding requirements for the given node
+       */
+      final GroupNodeVarBindingInfo bindingInfo = bindingInfoMap.get(node);
+      
+      /**
+       * knownBound is the set of variables that are known to be bound at 
+       * a certain point in time. Initially, it contains the externallyBound
+       * variables plus additionalKnownBound variable which can be passed in.
+       * Variables will be added as we iterate over the non-optional non-minus
+       * nodes in the partition,
+       */
+      final HashSet<IVariable<?>> knownBound = 
+         new HashSet<IVariable<?>>(externallyBound);
+      knownBound.addAll(additionalKnownBound);
 
-            // if no more variables need to be bound, we can place the node
-            if (bindingInfo.leftToBeBound(knownBound).isEmpty()) {
-               return i;
-            }
-            
-            // add the child's definitely produced bindings to the variables
-            // that are known to be bound
-            knownBound.addAll(
-               bindingInfoMap.get(
-                  nonOptionalNonMinusNodes.get(i)).getDefinitelyProduced());
+      /**
+       * remainingPossiblyBound is a multi set (where the integer represents
+       * the cardinality) initially counting, for each variable, how often
+       * it is maybe bound in the partition. Variables counts will be decreased
+       * (and entries will be removed once we reach 0) as we iterate over the
+       * non-optional non-minus nodes in the partition.
+       */
+      final Map<IVariable<?>,Integer> remainingMaybeBound = 
+          new HashMap<IVariable<?>,Integer>();
+      if (!requiresAllBound) { // save initialization effort if not used
+         
+         // both non-optional non-minus nodes generate maybe bound mappings ...
+         for (final IGroupMemberNode nonmNode : nonOptionalNonMinusNodes) {
+            addMaybeProducedToMultiset(remainingMaybeBound, nonmNode);
          }
          
-         /**
-          * No suitable position found:
-          */
-         return null;   
+         // ... as well as the optional or minus node in the partition
+         if (optionalOrMinus!=null) {
+            addMaybeProducedToMultiset(remainingMaybeBound, optionalOrMinus);
+         }
+      }
+      
+      /**
+       * Now let's iterate over the non-optional and non-minus nodes and try
+       * to iterate the first possible position for the node based on its
+       * binding requirements. We are allowed to place the node at the first
+       * position for which we know that either all of the node's required
+       * variables are bound or no more of it required variables can be bound.
+       * If no such position exists, the method returns null (in that case,
+       * only the end of the partition may be a safe place for the node).
+       */
+      for (int i=0; i<nonOptionalNonMinusNodes.size(); i++) {
+         
+         final IGroupMemberNode cur = nonOptionalNonMinusNodes.get(i);
+
+         // if no more variables need to be bound, we can place the node
+         final Set<IVariable<?>> leftToBeBound = 
+            bindingInfo.leftToBeBound(knownBound);
+         if (leftToBeBound.isEmpty()) {
+            return i;
+         }
+         
+         // another case in which we can place the node is if *none* of the
+         // remaining variables can be bound anymore; so we try to identify
+         // a witness that *can* be bound
+         if (!requiresAllBound) {
+            boolean moreCanBeBound = false;
+            final Set<IVariable<?>> canBeBound = remainingMaybeBound.keySet();
+            for (IVariable<?> leftToBeBoundVar : leftToBeBound) {
+               moreCanBeBound |= canBeBound.contains(leftToBeBoundVar);
+               if (moreCanBeBound) {
+                  break;
+               }
+            }
+            if (!moreCanBeBound) {
+               return i;
+            }
+         }
+            
+         // updade knownBound
+         final Set<IVariable<?>> definitelyProducedByCur = 
+            bindingInfoMap.get(cur).getDefinitelyProduced();
+         knownBound.addAll(definitelyProducedByCur);
+         
+         // update remainingMaybeBound
+         if (!requiresAllBound) {
+            final Set<IVariable<?>> maybeProducedByCur = 
+               bindingInfoMap.get(cur).getMaybeProduced();
+            for (final IVariable<?> var : maybeProducedByCur) {
+               if (remainingMaybeBound.containsKey(var)) { 
+                  // decrease counter
+                  remainingMaybeBound.put(var, remainingMaybeBound.get(var) - 1);
+                  
+                  // and fully remove var if counter reached zero
+                  if (remainingMaybeBound.get(var)<=0) {
+                     remainingMaybeBound.remove(var);
+                  }
+               }
+            }
+         }
+      }
+         
+      /**
+       * No suitable position found:
+       */
+      return null;   
+   }
+
+   /**
+    * Adds the variables that are maybe produced in the node to the multi set.
+    */
+   private void addMaybeProducedToMultiset(
+         final Map<IVariable<?>, Integer> multiset,
+         IGroupMemberNode node) {
+      
+      final GroupNodeVarBindingInfo bi = bindingInfoMap.get(node);
+      for (IVariable<?> var : bi.getMaybeProduced()) {
+         if (!multiset.containsKey(var)) {
+            multiset.put(var, 1);
+         } else {
+            multiset.put(var, multiset.get(var) + 1);               
+         }
+      }
    }
    
 
