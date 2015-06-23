@@ -114,10 +114,9 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUt
              new GlobalAnnotations(
                 context.getLexiconNamespace(), context.getTimestamp());
           AST2BOpUtility.toVE(globals, fn.getValueExpressionNode());
-       
-       
+          
        final GroupNodeVarBindingInfo biSpn = 
-          new GroupNodeVarBindingInfo(spn, sa);     
+          new GroupNodeVarBindingInfo(spn, sa,null);     
        assertEquals(varSet("x"), biSpn.getDefinitelyProduced());
        assertEquals(varSet("x"), biSpn.getDesiredBound());
        assertEquals(varSet(), biSpn.getRequiredBound());
@@ -128,7 +127,7 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUt
        
 
        final GroupNodeVarBindingInfo biSpnOpt = 
-          new GroupNodeVarBindingInfo(spnOpt, sa);
+          new GroupNodeVarBindingInfo(spnOpt, sa, null);
        assertEquals(varSet(), biSpnOpt.getDefinitelyProduced());
        assertEquals(varSet("y"), biSpnOpt.getDesiredBound());
        assertEquals(varSet(), biSpnOpt.getRequiredBound());
@@ -138,7 +137,7 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUt
        assertEquals(spnOpt, biSpnOpt.getNode());       
 
        final GroupNodeVarBindingInfo biUnionNode = 
-          new GroupNodeVarBindingInfo(unionNode, sa);
+          new GroupNodeVarBindingInfo(unionNode, sa, null);
        assertEquals(varSet(), biUnionNode.getDefinitelyProduced());
        assertEquals(varSet("w","z"), biUnionNode.getDesiredBound());
        assertEquals(varSet("req"), biUnionNode.getRequiredBound());
@@ -148,7 +147,7 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUt
        assertEquals(unionNode, biUnionNode.getNode());
        
        final GroupNodeVarBindingInfo biFn = 
-          new GroupNodeVarBindingInfo(fn, sa);
+          new GroupNodeVarBindingInfo(fn, sa, null);
        assertEquals(varSet(), biFn.getDefinitelyProduced());
        assertEquals(varSet(), biFn.getDesiredBound());
        assertEquals(varSet("filterVar"), biFn.getRequiredBound());
@@ -159,7 +158,7 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUt
        assertEquals(fn, biFn.getNode());
        
        final GroupNodeVarBindingInfo biJgn = 
-          new GroupNodeVarBindingInfo(jgn, sa);
+          new GroupNodeVarBindingInfo(jgn, sa, null);
        assertEquals(varSet("x"), biJgn.getDefinitelyProduced());
        assertEquals(varSet("x", "y", "z", "w"), biJgn.getDesiredBound());
        assertEquals(varSet("filterVar", "req"), biJgn.getRequiredBound());
