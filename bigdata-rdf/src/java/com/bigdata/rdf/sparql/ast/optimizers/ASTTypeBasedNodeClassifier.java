@@ -37,30 +37,50 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
  * Classification of {@link IGroupMemberNode}s along a set of specified
  * types. For nodes matching a given type, lookup is possible (returning
  * an ordered list of nodes), all other nodes are stored in a dedicated list.
- * @author msc
- *
+ * 
+ * There is an additional method to inject custom constraints for the individual
+ * classes. In case a constraint is set for a class, the node is only added
+ * to the type cluster if the
+ * {@link ASTTypeBasedNodeClassifierConstraint#applies()} 
+ * returns true for the node of the given type.
+ * 
+ * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */
 class ASTTypeBasedNodeClassifier {
    
    Class<?>[] clazzez;
-   
+
+   Map<Class<?>,ASTTypeBasedNodeClassifierConstraint> clazzConstraints;
+
    List<IGroupMemberNode> unclassifiedNodes;
    
    Map<Class<?>,List<IGroupMemberNode>> classifiedNodes;
-   
+
+
    /**
     * Constructor, receiving as an argument a list of types based on
     * which classification is done. 
     * 
     * @param types
     */
-   public ASTTypeBasedNodeClassifier(
-      final Class<?>[] clazzez, final List<IGroupMemberNode> nodeList) {
+   public ASTTypeBasedNodeClassifier(final Class<?>[] clazzez) {
       
       this.clazzez = clazzez;
       unclassifiedNodes = new LinkedList<IGroupMemberNode>();
       classifiedNodes = new HashMap<Class<?>, List<IGroupMemberNode>>();
+      clazzConstraints = new HashMap<Class<?>,ASTTypeBasedNodeClassifierConstraint>();
+   }
+   
+   /**
+    * Constructor, receiving as an argument a list of types based on
+    * which classification is done, and a list of nodes to be classified.
+    * 
+    * @param types
+    */
+   public ASTTypeBasedNodeClassifier(
+      final Class<?>[] clazzez, final List<IGroupMemberNode> nodeList) {
       
+      this(clazzez);      
       registerNodes(nodeList);
    }
    
@@ -80,8 +100,14 @@ class ASTTypeBasedNodeClassifier {
             
             Class<?> clazz = clazzez[i];
             if (clazz.isInstance(node)) {
-               classifiedNodes.get(clazz).add(node);
-               classified = true;
+               
+               final ASTTypeBasedNodeClassifierConstraint constraint = 
+                  clazzConstraints.get(clazz);
+               
+               if (constraint==null || constraint.appliesTo(node)) {
+                  classifiedNodes.get(clazz).add(node);
+                  classified = true;
+               }
             }               
          }
          
@@ -108,4 +134,9 @@ class ASTTypeBasedNodeClassifier {
       return classifiedNodes.get(clazz);
    }
    
+   public void addConstraintForType(
+      final Class<?> clazz, final ASTTypeBasedNodeClassifierConstraint c) {
+      clazzConstraints.put(clazz, c);
+   }
+
 }

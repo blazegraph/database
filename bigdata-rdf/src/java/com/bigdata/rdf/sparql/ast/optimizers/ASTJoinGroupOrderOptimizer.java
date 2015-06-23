@@ -45,6 +45,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
 
 /**
@@ -288,8 +289,45 @@ implements IASTOptimizer {
          final ASTTypeBasedNodeClassifier classifier = 
             new ASTTypeBasedNodeClassifier(
                new Class<?>[] { 
-                  ServiceNode.class,AssignmentNode.class,BindingsClause.class }, 
-               partition.extractNodeList());
+                  ServiceNode.class,AssignmentNode.class,BindingsClause.class });
+         
+         /**
+          * We only consider special service nodes for placement, all other
+          * service nodes are treated through a standard reorder.
+          */
+         classifier.addConstraintForType(ServiceNode.class, 
+            new ASTTypeBasedNodeClassifierConstraint() {
+               @Override
+               boolean appliesTo(final IGroupMemberNode node) {
+                  
+                  if (node instanceof ServiceNode) {
+
+                     /**
+                      * Return true if the service is not a SPARQL 1.1 SERVICE.
+                      */
+                     final ServiceNode sn = (ServiceNode)node;
+                     if (!sn.getResponsibleServiceFactory().equals(
+                           ServiceRegistry.getInstance().
+                           getDefaultServiceFactory())) {
+                        return true;
+                     }
+                     
+                     /**
+                      * Return true if it is a SPARQL 1.1 SERVICE, but the
+                      * constant is not bound.
+                      */
+                     if (!sn.getServiceRef().isConstant()) {
+                        return true;
+                     }
+                  }
+                  
+                  // as a fallback return false
+                  return false; 
+                  
+               }
+            });
+         
+         classifier.registerNodes(partition.extractNodeList());
          
          /**
           * In a first step, we remove service nodes, assignment nodes, and
