@@ -29,6 +29,8 @@ package com.bigdata.rdf.sparql.ast;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupFilterExistsInfo;
+
 
 
 /**
@@ -42,6 +44,7 @@ public class GroupNodeVarBindingInfoMap {
    
    private Map<IGroupMemberNode, GroupNodeVarBindingInfo> bindingInfo;
    
+   
    /**
     * Constructor, setting up an object given a list of {@link IGroupMemberNode}
     * objects and the associated {@link StaticAnalysis} object as input.
@@ -49,16 +52,19 @@ public class GroupNodeVarBindingInfoMap {
     * @param nodes
     */
    public GroupNodeVarBindingInfoMap(
-      final Iterable<IGroupMemberNode> nodes, final StaticAnalysis sa) {
-      
+      final Iterable<IGroupMemberNode> nodes, 
+      final StaticAnalysis sa,
+      final ASTJoinGroupFilterExistsInfo fExInfo) {
+
       bindingInfo = new HashMap<IGroupMemberNode, GroupNodeVarBindingInfo>();
       for (IGroupMemberNode node : nodes) {
          
          final GroupNodeVarBindingInfo vbc = 
-            new GroupNodeVarBindingInfo(node, sa);
+            new GroupNodeVarBindingInfo(node, sa, fExInfo);
          bindingInfo.put(node,vbc); 
          
       }
+      
             
    }
    /**
@@ -68,7 +74,5 @@ public class GroupNodeVarBindingInfoMap {
    public GroupNodeVarBindingInfo get(IGroupMemberNode node) {
       return bindingInfo.get(node);
    }
-
-   
    
 }

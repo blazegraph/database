@@ -68,7 +68,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       final List<IGroupMemberNode> nodes = new ArrayList<IGroupMemberNode>();
       final GroupNodeVarBindingInfoMap bindingInfo =
          new GroupNodeVarBindingInfoMap(
-            nodes, statisAnalysisForNodes(nodes));
+            nodes, statisAnalysisForNodes(nodes), null);
       final Set<IVariable<?>> external = new HashSet<IVariable<?>>();
       
       final ASTJoinGroupPartitions partitions = 
@@ -90,7 +90,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       
       final GroupNodeVarBindingInfoMap bindingInfo =
          new GroupNodeVarBindingInfoMap(
-            nodes, statisAnalysisForNodes(nodes));
+            nodes, statisAnalysisForNodes(nodes), null);
       
       final Set<IVariable<?>> external = new HashSet<IVariable<?>>();
       external.add(Var.var("y"));
@@ -134,7 +134,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       
       final GroupNodeVarBindingInfoMap bindingInfo =
          new GroupNodeVarBindingInfoMap(
-            nodes, statisAnalysisForNodes(nodes));
+            nodes, statisAnalysisForNodes(nodes), null);
       
       final Set<IVariable<?>> external = new HashSet<IVariable<?>>();
       external.add(Var.var("y"));
@@ -182,7 +182,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       
       final GroupNodeVarBindingInfoMap bindingInfo =
          new GroupNodeVarBindingInfoMap(
-            nodes, statisAnalysisForNodes(nodes));
+            nodes, statisAnalysisForNodes(nodes), null);
 
       final ASTJoinGroupPartitions partitions = 
          new ASTJoinGroupPartitions(
@@ -238,7 +238,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       
       final GroupNodeVarBindingInfoMap bindingInfo =
          new GroupNodeVarBindingInfoMap(
-            nodes, statisAnalysisForNodes(nodes));
+            nodes, statisAnalysisForNodes(nodes), null);
 
       final Set<IVariable<?>> external = new HashSet<IVariable<?>>();
       external.add(Var.var("y"));
@@ -322,7 +322,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       
       final GroupNodeVarBindingInfoMap bindingInfo =
          new GroupNodeVarBindingInfoMap(
-            nodes, statisAnalysisForNodes(nodes));
+            nodes, statisAnalysisForNodes(nodes), null);
 
       final ASTJoinGroupPartitions partitions = 
          new ASTJoinGroupPartitions(

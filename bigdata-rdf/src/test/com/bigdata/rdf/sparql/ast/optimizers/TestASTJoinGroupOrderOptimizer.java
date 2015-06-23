@@ -731,20 +731,20 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
    }   
    
    /**
-//    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
-//    * clauses.
-//    */
-//   public void testAskSubquery01() {
-//      throw new NotImplementedException();
-//   }
-//   
-//   /**
-//    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
-//    * clauses. This test case focuses on the interaction with simple FILTERs.
-//    */
-//   public void testAskSubquery02() {
-//      throw new NotImplementedException();
-//   }
+    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+    * clauses.
+    */
+   public void testAskSubquery01() {
+      throw new NotImplementedException();
+   }
+   
+   /**
+    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+    * clauses. This test case focuses on the interaction with simple FILTERs.
+    */
+   public void testAskSubquery02() {
+      throw new NotImplementedException();
+   }
 
 //given = 
 //select(varNode(x), 

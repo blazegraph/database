@@ -75,10 +75,15 @@ implements IASTOptimizer {
       final Set<IVariable<?>> externallyIncoming = 
          sa.getDefinitelyIncomingBindings(
             joinGroup, new HashSet<IVariable<?>>());
-      
+
+      final ASTJoinGroupFilterExistsInfo fExInfo = 
+            new ASTJoinGroupFilterExistsInfo(joinGroup);
+
       final GroupNodeVarBindingInfoMap bindingInfoMap =
-         new GroupNodeVarBindingInfoMap(joinGroup, sa);
+         new GroupNodeVarBindingInfoMap(joinGroup, sa, fExInfo);
       
+      
+      // TODO: replace the node list through dummy nodes
       
       /**
        * Filter out the filter nodes from the join group, they will receive
@@ -122,8 +127,29 @@ implements IASTOptimizer {
       /**
        * ... finally place the filters ...
        */
-      for (IGroupMemberNode node : 
-            filterNodeClassifier.get(FilterNode.class)) {
+      final List<IGroupMemberNode> filterNodes =
+         filterNodeClassifier.get(FilterNode.class);
+      
+      // partition them into FILTER (NOT) EXISTS and other filters
+      final List<IGroupMemberNode> existsNonExistsFilters = 
+         new LinkedList<IGroupMemberNode>();
+      final List<IGroupMemberNode> otherFilters = 
+            new LinkedList<IGroupMemberNode>();
+      for (final IGroupMemberNode node : filterNodes) {
+         if (fExInfo.containsFilter((FilterNode)node)) {
+            existsNonExistsFilters.add(node);
+         } else {
+            otherFilters.add(node);
+         }
+      }
+      
+      for (final IGroupMemberNode node : otherFilters) {
+         partitions.placeAtFirstPossiblePosition(node);
+      }
+      // the FILTER (NOT) EXISTS must be placed last, as they *must* be
+      // placed directly attached to the ASK query they belong to (no
+      // interleaving with other FILTERs allowed)
+      for (final IGroupMemberNode node : existsNonExistsFilters) {
          partitions.placeAtFirstPossiblePosition(node);
       }
       
