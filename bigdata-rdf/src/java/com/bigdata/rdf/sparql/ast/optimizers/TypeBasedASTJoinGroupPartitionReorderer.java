@@ -56,21 +56,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 @SuppressWarnings("deprecation")
 public class TypeBasedASTJoinGroupPartitionReorderer 
 implements IASTJoinGroupPartitionReorderer {
-   
-   /**
-    * Node types for non-special handled nodes in join groups. I.e., we do
-    * not include FILTERs, BIND, VALUES, etc.
-    */
-   public enum NodeType {
-      ALP_NODE,                   /* Property path nodes */
-      NAMED_SUBQUERY_INCLUDE,     /* INCLUDE %NAMED_QUERY% */
-      SUBGROUP,                   /* Subgroup, such as { ... } or UNIONs */
-      SUBQUERY,                   /* { SELECT ... WHERE { ... } } */
-      STMT_PATTERN,               /* (s p o) */
-      SERVICE,                    /* SERVICE ... { } */
-      OTHER                       /* Any construct we forgot to list */
-   }
-   
+
    /**
     * Reorders the given partition in a semantics-preserving way.
     */
