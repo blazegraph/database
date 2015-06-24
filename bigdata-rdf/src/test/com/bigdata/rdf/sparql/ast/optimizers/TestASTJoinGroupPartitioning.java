@@ -74,7 +74,8 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       final ASTJoinGroupPartitions partitions = 
          new ASTJoinGroupPartitions(nodes, bindingInfo, external);
       
-      assertTrue(partitions.getPartitionList().isEmpty());
+      assertTrue(partitions.getPartitionList().size()==1);
+      assertTrue(partitions.getPartitionList().get(0).nonOptionalNonMinusNodes.isEmpty());
       assertTrue(partitions.extractNodeList().isEmpty());
    }
 
