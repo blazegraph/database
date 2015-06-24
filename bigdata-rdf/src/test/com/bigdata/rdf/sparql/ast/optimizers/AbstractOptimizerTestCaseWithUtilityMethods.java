@@ -56,7 +56,9 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNodeContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.RangeNode;
@@ -65,6 +67,7 @@ import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
@@ -192,17 +195,20 @@ extends AbstractOptimizerTestCase {
     * in their body.
     */
    FilterNode filterExistsWithVars(
-      final String internalVar, final String... varNames) {
+      final String anonymousVar, final String... varNames) {
 
       final StatementPatternNode[] statementPatterns = 
             stmtPatternsWithVars(varNames);
       
+      final VarNode askVar = new VarNode(anonymousVar);
+      askVar.setAnonymous(true);
+
       final FilterNode fn = 
          (FilterNode) new Helper(){{
          tmp = 
             filter(
                notExists(
-                  varNode(internalVar), 
+                  askVar, 
                   joinGroupNode((Object[])statementPatterns)));
          }}.getTmp();
          
@@ -215,22 +221,65 @@ extends AbstractOptimizerTestCase {
     * their body.
     */
    FilterNode filterNotExistsWithVars(
-      final String internalVar, final String... varNames) {
+      final String anonymousVar, final String... varNames) {
 
       final StatementPatternNode[] statementPatterns = 
          stmtPatternsWithVars(varNames);
       
+      final VarNode askVar = new VarNode(anonymousVar);
+      askVar.setAnonymous(true);
+
       final FilterNode fn = 
          (FilterNode) new Helper(){{
          tmp = 
             filter(
                exists(
-                  varNode(internalVar), 
+                  askVar, 
                   joinGroupNode((Object[])statementPatterns)));
          }}.getTmp();
          
       return (FilterNode)resolveVEs(fn);
    }
+   
+   
+   SubqueryRoot filterExistsOrNotExistsSubqueryWithVars(
+         final String anonymousVar, final String... varNames) {
+          
+      final SubqueryRoot sqr  = new SubqueryRoot(QueryType.ASK);
+      
+      /**
+       * Projection contains all variables
+       */
+      final ProjectionNode projection = new ProjectionNode();
+      sqr.setProjection(projection);
+      projection.addProjectionExpression(
+         new AssignmentNode(
+            new VarNode(anonymousVar), new VarNode(anonymousVar)));
+      for (final String varName : varNames) {
+         projection.addProjectionExpression(
+            new AssignmentNode(new VarNode(varName), new VarNode(varName)));
+      }
+      
+      /**
+       * Set the anonymous variable
+       */
+      final VarNode askVar = new VarNode(anonymousVar);
+      askVar.setAnonymous(true);
+      sqr.setAskVar(askVar.getValueExpression());
+
+      /**
+       * Set the WHERE clause
+       */
+      sqr.setWhereClause(joinGroupWithVars(varNames));
+      
+      /**
+       * And the MODE
+       */
+      sqr.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
+      
+      return sqr;
+   }
+      
    
    /**
     * Returns a {@link JoinGroupNode} binding the specified vars.

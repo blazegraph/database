@@ -111,6 +111,14 @@ public class ASTJoinGroupPartitions {
             tmpOptionalOrMinus = null;
          }
       }
+      
+      // special handling: there's no node -> create a dummy partition
+      if (partitions.isEmpty()) {
+         final ASTJoinGroupPartition partition = new ASTJoinGroupPartition(
+               new LinkedList<IGroupMemberNode>(tmpNonOptionalOrMinusNodes),
+               null, bindingInfo, new HashSet<IVariable<?>>(tmpKnownProduced));         
+         partitions.add(partition);
+      }
    }
 
    /**

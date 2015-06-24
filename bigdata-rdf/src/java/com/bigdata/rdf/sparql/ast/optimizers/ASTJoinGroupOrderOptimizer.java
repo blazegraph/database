@@ -42,7 +42,6 @@ import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfo;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfoMap;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
-import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -85,22 +84,37 @@ implements IASTOptimizer {
          new GroupNodeVarBindingInfoMap(joinGroup, sa, fExInfo);
       
       
-      // TODO: replace the node list through dummy nodes
-      
       /**
        * Filter out the filter nodes from the join group, they will receive
-       * special handling in the end.
+       * special handling in the end. Note that this includes ASK subqueries
+       * which belong to FILTER expressions.
        */
       final ASTTypeBasedNodeClassifier filterNodeClassifier = 
          new ASTTypeBasedNodeClassifier(
-            new Class<?>[]{ FilterNode.class }, joinGroup.getChildren());
-
+            new Class<?>[]{ FilterNode.class, SubqueryRoot.class });
       
-      // special handling: if there are no non-filter nodes, we can skip all
-      // the rest
-      if (filterNodeClassifier.getUnclassifiedNodes().isEmpty()) {
-         return;
-      }
+      /**
+       * We're interested in the ASK subquery roots associated with some
+       * EXISTS or NOT EXISTS filter, as recoreded in the fExInfo map.
+       */
+      filterNodeClassifier.addConstraintForType(SubqueryRoot.class, 
+         new ASTTypeBasedNodeClassifierConstraint() {
+         
+            @Override
+            boolean appliesTo(final IGroupMemberNode node) {
+                  
+               if (node instanceof SubqueryRoot) {
+                  return fExInfo.containsSubqueryRoot((SubqueryRoot)node);
+               }
+                  
+               // as a fallback return false
+               return false; 
+                  
+            }
+         });       
+      
+      filterNodeClassifier.registerNodes(joinGroup.getChildren());
+
       
       /**
        * Set up the partitions, ignoring the FILTER nodes (they'll be added
@@ -127,34 +141,33 @@ implements IASTOptimizer {
 
 
       /**
-       * ... finally place the filters ...
+       * Finally place the filters ans the associated ASK subqueries.
        */
       final List<IGroupMemberNode> filterNodes =
          filterNodeClassifier.get(FilterNode.class);
+      final List<IGroupMemberNode> askSubqueries =
+            filterNodeClassifier.get(SubqueryRoot.class);
+
+      // first, place the ASK subqueries
+      for (final IGroupMemberNode askSubquery : askSubqueries) {
+         partitions.placeAtFirstPossiblePosition(askSubquery);
+      }
       
-      // partition them into FILTER (NOT) EXISTS and other filters
-      final List<IGroupMemberNode> existsNonExistsFilters = 
-         new LinkedList<IGroupMemberNode>();
-      final List<IGroupMemberNode> otherFilters = 
-            new LinkedList<IGroupMemberNode>();
-      for (final IGroupMemberNode node : filterNodes) {
-         if (fExInfo.containsFilter((FilterNode)node)) {
-            existsNonExistsFilters.add(node);
-         } else {
-            otherFilters.add(node);
+      // second, place the (non-related) simple filters
+      for (final IGroupMemberNode filerNode : filterNodes) {
+         if (!fExInfo.containsFilter((FilterNode)filerNode)) {
+            partitions.placeAtFirstPossiblePosition(filerNode);
+            
          }
       }
       
-      for (final IGroupMemberNode node : otherFilters) {
-         partitions.placeAtFirstPossiblePosition(node);
+      // third, place the FILTERs associated with the ASK subqueries, to
+      // make sure that these FILTERs are directly following the ASK subqueries
+      // (in order to avoid interaction with other FILTERs)
+      for (final IGroupMemberNode askSubquery : askSubqueries) {
+         partitions.placeAtFirstPossiblePosition(
+            fExInfo.filterMap.get(askSubquery));
       }
-      // the FILTER (NOT) EXISTS must be placed last, as they *must* be
-      // placed directly attached to the ASK query they belong to (no
-      // interleaving with other FILTERs allowed)
-      for (final IGroupMemberNode node : existsNonExistsFilters) {
-         partitions.placeAtFirstPossiblePosition(node);
-      }
-      
       
       /**
        * Now, flatten the partitions again and replace the children of the
@@ -324,7 +337,6 @@ implements IASTOptimizer {
                   ServiceNode.class,
                   AssignmentNode.class,
                   BindingsClause.class,
-                  SubqueryRoot.class
                });
          
          /**
@@ -362,26 +374,7 @@ implements IASTOptimizer {
                   
                }
             });
-         classifier.addConstraintForType(SubqueryRoot.class, 
-               new ASTTypeBasedNodeClassifierConstraint() {
-                  @Override
-                  boolean appliesTo(final IGroupMemberNode node) {
-                     
-                     if (node instanceof SubqueryRoot) {
-
-                        /**
-                         * ASK subqueries (associated with FILTER [NOT] EXIST
-                         * nodes) desire special handling as well.
-                         */
-                        final SubqueryRoot sn = (SubqueryRoot)node;
-                        return sn.getQueryType().equals(QueryType.ASK);
-                     }
-                     
-                     // as a fallback return false
-                     return false; 
-                     
-                  }
-               });         
+  
          classifier.registerNodes(partition.extractNodeList());
          
          /**
@@ -394,7 +387,6 @@ implements IASTOptimizer {
          toRemove.addAll(classifier.get(ServiceNode.class));
          toRemove.addAll(classifier.get(AssignmentNode.class));
          toRemove.addAll(classifier.get(BindingsClause.class));
-         toRemove.addAll(classifier.get(SubqueryRoot.class));
          partition.removeNodesFromPartition(toRemove);
          
          // the remaining elements will be reordered based on their type
@@ -438,16 +430,7 @@ implements IASTOptimizer {
             partition.placeAtFirstContributingPosition(
                node,knownBoundFromPrevPartitions, false /* requiresAllBound */);
          }       
-         
 
-         /**
-          * Place the SubqueryRoot ASK nodes.
-          */
-         for (IGroupMemberNode node : classifier.get(SubqueryRoot.class)) {
-            partition.placeAtFirstContributingPosition(
-               node,knownBoundFromPrevPartitions,false /* requires all bound */);
-         }
-         
          knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
       }
    }

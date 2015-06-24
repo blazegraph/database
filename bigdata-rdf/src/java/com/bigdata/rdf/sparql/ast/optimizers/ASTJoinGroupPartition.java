@@ -350,33 +350,14 @@ public class ASTJoinGroupPartition {
        */
       for (int i=0; i<nonOptionalNonMinusNodes.size(); i++) {
          
-         final IGroupMemberNode cur = nonOptionalNonMinusNodes.get(i);
-
-         // if no more variables need to be bound, we can place the node
-         final Set<IVariable<?>> leftToBeBound = 
-            bindingInfo.leftToBeBound(knownBound);
-         if (leftToBeBound.isEmpty()) {
-            return i;
-         }
-         
-         // another case in which we can place the node is if *none* of the
-         // remaining variables can be bound anymore; so we try to identify
-         // a witness that *can* be bound
-         if (!requiresAllBound) {
-            boolean moreCanBeBound = false;
-            final Set<IVariable<?>> canBeBound = remainingMaybeBound.keySet();
-            for (IVariable<?> leftToBeBoundVar : leftToBeBound) {
-               moreCanBeBound |= canBeBound.contains(leftToBeBoundVar);
-               if (moreCanBeBound) {
-                  break;
-               }
-            }
-            if (!moreCanBeBound) {
-               return i;
-            }
+         if (canBePlacedAtPosition(
+               requiresAllBound, bindingInfo, knownBound,remainingMaybeBound, i)) {
+            return i; // we're done
          }
             
          // updade knownBound
+         final IGroupMemberNode cur = nonOptionalNonMinusNodes.get(i);
+
          final Set<IVariable<?>> definitelyProducedByCur = 
             bindingInfoMap.get(cur).getDefinitelyProduced();
          knownBound.addAll(definitelyProducedByCur);
@@ -399,10 +380,54 @@ public class ASTJoinGroupPartition {
          }
       }
          
+      Integer lastPosition = nonOptionalNonMinusNodes.size();
+      if (canBePlacedAtPosition(
+            requiresAllBound, bindingInfo, knownBound, remainingMaybeBound,
+            lastPosition)) {
+         return lastPosition; // we're done
+      }
+
+      
       /**
        * No suitable position found:
        */
       return null;   
+   }
+
+   private boolean canBePlacedAtPosition(final boolean requiresAllBound,
+         final GroupNodeVarBindingInfo bindingInfo,
+         final HashSet<IVariable<?>> knownBound,
+         final Map<IVariable<?>, Integer> remainingMaybeBound, int i) {
+      
+      try {
+         
+      // if no more variables need to be bound, we can place the node
+      final Set<IVariable<?>> leftToBeBound = 
+         bindingInfo.leftToBeBound(knownBound);
+      if (leftToBeBound.isEmpty()) {
+         return true;
+      }
+      
+      // another case in which we can place the node is if *none* of the
+      // remaining variables can be bound anymore; so we try to identify
+      // a witness that *can* be bound
+      if (!requiresAllBound) {
+         boolean moreCanBeBound = false;
+         final Set<IVariable<?>> canBeBound = remainingMaybeBound.keySet();
+         for (IVariable<?> leftToBeBoundVar : leftToBeBound) {
+            moreCanBeBound |= canBeBound.contains(leftToBeBoundVar);
+            if (moreCanBeBound) {
+               break;
+            }
+         }
+         if (!moreCanBeBound) {
+            return true;
+         }
+      }
+      
+      } catch (Exception e) { 
+         System.err.println(); }
+      return false;
    }
 
    /**
