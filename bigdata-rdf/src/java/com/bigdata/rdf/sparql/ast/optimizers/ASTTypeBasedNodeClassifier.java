@@ -85,7 +85,7 @@ class ASTTypeBasedNodeClassifier {
    }
    
 
-   public void registerNodes(final List<IGroupMemberNode> nodeList) {
+   public void registerNodes(final Iterable<IGroupMemberNode> nodeList) {
       
       // initialize map with empty arrays
       for (Class<?> clazz : clazzez) {
