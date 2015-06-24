@@ -525,7 +525,22 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
             }
 
             final JoinGroupNode whereClause = new JoinGroupNode();
-            expected.setWhereClause(whereClause);
+            expected.setWhereClause(whereClause);           
+            {
+               final JoinGroupNode group = whereClause;
+   
+               final StatementPatternNode sp1 = new StatementPatternNode(
+                     new VarNode("ar"), new ConstantNode(rdfType.getIV()),
+                     new ConstantNode(AnalysisResults.getIV()));
+               group.addChild(sp1);
+   
+               sp1.setProperty(
+                     "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.estimatedCardinality",
+                     3L);
+               sp1.setProperty(
+                     "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.originalIndex",
+                     SPOKeyOrder.POCS);
+            }
             
             /**
              * <pre>
@@ -585,6 +600,32 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
             } // not-exists-2
 
+            whereClause.addChild(notExistsSubquery2);
+
+
+
+            /**
+             * <pre>
+             *     FILTER( com.bigdata.rdf.sparql.ast.NotExistsNode(VarNode(-exists-2))[
+             *     com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.bigdata.com/sparql-1.1-undefined-functionsnot-exists,
+             *     graphPattern=JoinGroupNode,
+             *     valueExpr=com.bigdata.rdf.internal.constraints.NotBOp(com.bigdata.rdf.internal.constraints.EBVBOp(-exists-2))
+             *     ] )
+             * </pre>
+             */
+            {
+                @SuppressWarnings("unchecked")
+                final NotExistsNode notExistsNode2 = new NotExistsNode(askVar2,
+                        notExistsSubquery2.getWhereClause());
+
+                final FilterNode filter2 = new FilterNode(notExistsNode2);
+                
+                whereClause.addChild(filter2);
+                
+                AST2BOpUtility.toVE(globals, filter2.getValueExpressionNode());
+                
+            }            
+            
             /**
              * <pre>
              *     JoinGroupNode {
@@ -610,20 +651,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
             final SubqueryRoot notExistsSubquery1;
             {
 
-                final JoinGroupNode group = whereClause; //new JoinGroupNode();
-//                whereClause.addChild(group);
-
-                final StatementPatternNode sp1 = new StatementPatternNode(
-                        new VarNode("ar"), new ConstantNode(rdfType.getIV()),
-                        new ConstantNode(AnalysisResults.getIV()));
-                group.addChild(sp1);
-                
-                sp1.setProperty(
-                        "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.estimatedCardinality",
-                        3L);
-                sp1.setProperty(
-                        "com.bigdata.rdf.sparql.ast.eval.AST2BOpBase.originalIndex",
-                        SPOKeyOrder.POCS);
+                final JoinGroupNode group = whereClause;
 
                 /**
                  * <pre>
@@ -678,47 +706,10 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
        
                 } // not-exists-1
 
-//                /**
-//                 * <pre>
-//                 *       FILTER( com.bigdata.rdf.sparql.ast.NotExistsNode(VarNode(-exists-1))[
-//                 *       com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.bigdata.com/sparql-1.1-undefined-functionsnot-exists,
-//                 *       graphPattern=JoinGroupNode,
-//                 *       valueExpr=com.bigdata.rdf.internal.constraints.NotBOp(com.bigdata.rdf.internal.constraints.EBVBOp(-exists-1))
-//                 *       ] )
-//                 * </pre>
-//                 */
-//                {
-//
-//                    @SuppressWarnings("unchecked")
-//                    final NotExistsNode notExistsNode1 = new NotExistsNode(
-//                            askVar1, notExistsSubquery1.getWhereClause());
-//                    
-//                    final FilterNode filter1 = new FilterNode(notExistsNode1);
-//                    
-//                    group.addChild(filter1);
-//
-//                    AST2BOpUtility.toVE(globals, filter1.getValueExpressionNode());
-//
-//                }
-
-                /*
-                 * Note: The join variable (ar) is no longer predicted once the
-                 * ASK Subquery is moved to after the child join group.
-                 */
-//                /** 
-//                 * <pre>
-//                 * JOIN ON (ar)
-//                 * </pre>
-//                 */
-//
-//              group.setJoinVars(new IVariable[]{Var.var("ar")});
-//                group.setJoinVars(new IVariable[]{});
-//                group.setProjectInVars(new IVariable[]{});
 
             } // end group
 
-            whereClause.addChild(notExistsSubquery2);
-
+            
             /**
              * <pre>
              *       FILTER( com.bigdata.rdf.sparql.ast.NotExistsNode(VarNode(-exists-1))[
@@ -740,29 +731,8 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
                 AST2BOpUtility.toVE(globals, filter1.getValueExpressionNode());
 
-            }
+            }            
 
-            /**
-             * <pre>
-             *     FILTER( com.bigdata.rdf.sparql.ast.NotExistsNode(VarNode(-exists-2))[
-             *     com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.bigdata.com/sparql-1.1-undefined-functionsnot-exists,
-             *     graphPattern=JoinGroupNode,
-             *     valueExpr=com.bigdata.rdf.internal.constraints.NotBOp(com.bigdata.rdf.internal.constraints.EBVBOp(-exists-2))
-             *     ] )
-             * </pre>
-             */
-            {
-                @SuppressWarnings("unchecked")
-                final NotExistsNode notExistsNode2 = new NotExistsNode(askVar2,
-                        notExistsSubquery2.getWhereClause());
-
-                final FilterNode filter2 = new FilterNode(notExistsNode2);
-                
-                whereClause.addChild(filter2);
-                
-                AST2BOpUtility.toVE(globals, filter2.getValueExpressionNode());
-                
-            }
 
         }
 

@@ -28,8 +28,6 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 
 
 /**
@@ -746,31 +744,135 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
     * clauses.
     */
    public void testAskSubquery01() {
-      throw new NotImplementedException();
+      
+      final String anonFilterVar1 = "--exists-1";
+      final String[] filterVars1 = new String[] { "x1" };
+      final String anonFilterVar2 = "--not-exists-1";
+      final String[] filterVars2 = new String[] { "y1", "y2", "y3" };
+      
+      new Helper(){{
+         
+         given = 
+            select(
+               varNode(x), 
+               where (
+                  filterExistsWithVars(anonFilterVar1, filterVars1),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar1, filterVars1),
+                  filterExistsWithVars(anonFilterVar2, filterVars2),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar2, filterVars2),
+                  stmtPatternWithVar("x1"),
+                  stmtPatternWithVar("y1"),
+                  stmtPatternWithVar("y2"),
+                  stmtPatternWithVar("y3")
+            ));
+         
+         expected = 
+            select(
+               varNode(x), 
+               where (
+                  stmtPatternWithVar("x1"),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar1, filterVars1),
+                  filterExistsWithVars(anonFilterVar1, filterVars1),
+                  stmtPatternWithVar("y1"),
+                  stmtPatternWithVar("y2"),
+                  stmtPatternWithVar("y3"),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar2, filterVars2),
+                  filterExistsWithVars(anonFilterVar2, filterVars2)
+           ));
+         
+      }}.test();
+      
    }
    
    /**
     * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
-    * clauses. This test case focuses on the interaction with simple FILTERs.
+    * clauses. This test case focuses on the placement in the context of
+    * OPTIONAL patterns.
     */
    public void testAskSubquery02() {
-      throw new NotImplementedException();
+      
+      
+      final String anonFilterVar1 = "--exists-1";
+      final String[] filterVars1 = new String[] { "x1" };
+      final String anonFilterVar2 = "--not-exists-1";
+      final String[] filterVars2 = new String[] { "y1", "y2", "y3" };
+
+      final JoinGroupNode optJG = joinGroupWithVars("y1","y3");
+      optJG.setOptional(true);
+      
+      new Helper(){{
+         
+         given = 
+            select(
+               varNode(x), 
+               where (
+                  filterExistsWithVars(anonFilterVar1, filterVars1),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar1, filterVars1),
+                  filterExistsWithVars(anonFilterVar2, filterVars2),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar2, filterVars2),
+                  stmtPatternWithVar("x1"),
+                  stmtPatternWithVarOptional("y1"),
+                  joinGroupWithVars("y1","y2"),
+                  optJG,
+                  joinGroupWithVars("y1","y3"),
+                  joinGroupWithVars("y2","y3")
+            ));
+         
+         expected = 
+            select(
+               varNode(x), 
+               where (
+                  stmtPatternWithVar("x1"),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar1, filterVars1),                  
+                  filterExistsWithVars(anonFilterVar1, filterVars1),
+                  stmtPatternWithVarOptional("y1"),
+                  joinGroupWithVars("y1","y2"),
+                  optJG,
+                  joinGroupWithVars("y1","y3"),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar2, filterVars2),
+                  filterExistsWithVars(anonFilterVar2, filterVars2),
+                  joinGroupWithVars("y2","y3")
+           ));
+         
+      }}.test();      
    }
 
-//given = 
-//select(varNode(x), 
-//where (
-// filterExistsWithVars("x6","x7"),
-// filterExistsWithVars("x8","x9","x10"),
-// joinGroupWithVars("x11","x12"),
-// serviceSparql11WithConstant("x13","x14"),
-// serviceSparql11WithVariable("x15","x16","x17"),
-// serviceBDSWithVariable("x18"),
-// serviceFTSWithVariable("x19","x20","x21","x22"),
-// alpNodeWithVars("x23","x24","x25"),
-// unionWithVars("x26","x27"),
-// assignmentWithVar("x28","x29"),
-// bindingsClauseWithVars("x32","x33","x34"),
-// subqueryWithVars("x35","x36")
-//));
+   /**
+    * Test case for ASK subqueries, as they emerge from FILTER (NOT) EXISTS
+    * clauses. This test case focuses on the interaction with simple FILTERs.
+    */
+   public void testAskSubquery03() {
+      
+      final String anonFilterVar1 = "--exists-1";
+      final String[] filterVars1 = new String[] { "x1" };
+      
+      new Helper(){{
+         
+         given = 
+            select(
+               varNode(x), 
+               where (
+                  filterExistsWithVars(anonFilterVar1, filterVars1),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar1, filterVars1),
+                  stmtPatternWithVar("x1"),
+                  filterWithVar("x1"),
+                  stmtPatternWithVar("x2"),
+                  stmtPatternWithVar("x3")
+            ));
+         
+         expected = 
+            select(
+               varNode(x), 
+               where (
+                  stmtPatternWithVar("x1"),
+                  filterWithVar("x1"),
+                  filterExistsOrNotExistsSubqueryWithVars(anonFilterVar1, filterVars1),
+                  filterExistsWithVars(anonFilterVar1, filterVars1),
+                  stmtPatternWithVar("x2"),
+                  stmtPatternWithVar("x3")
+
+           ));
+         
+      }}.test();      
+   }
 }
