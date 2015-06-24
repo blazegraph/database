@@ -399,8 +399,6 @@ public class ASTJoinGroupPartition {
          final HashSet<IVariable<?>> knownBound,
          final Map<IVariable<?>, Integer> remainingMaybeBound, int i) {
       
-      try {
-         
       // if no more variables need to be bound, we can place the node
       final Set<IVariable<?>> leftToBeBound = 
          bindingInfo.leftToBeBound(knownBound);
@@ -425,8 +423,6 @@ public class ASTJoinGroupPartition {
          }
       }
       
-      } catch (Exception e) { 
-         System.err.println(); }
       return false;
    }
 

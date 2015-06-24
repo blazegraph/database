@@ -37,13 +37,11 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
-import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfo;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfoMap;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
@@ -59,6 +57,23 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  */
 public class ASTJoinGroupOrderOptimizer extends AbstractJoinGroupOptimizer 
 implements IASTOptimizer {
+   
+   private boolean assertCorrectnessOnly;
+
+   /**
+    * Default constructor, running the optimizer with optimizations turned on.
+    */
+   public ASTJoinGroupOrderOptimizer() {
+      this(false);
+   }
+   
+   /**
+    * Constructor allowing to run the optimizer in an "assert-correctness-only"
+    * mode that makes only minor modifications to the join order.
+    */
+   public ASTJoinGroupOrderOptimizer(final boolean assertCorrectnessOnly) {
+      this.assertCorrectnessOnly = assertCorrectnessOnly;
+   }
    
    @Override
    protected void optimizeJoinGroup(AST2BOpContext ctx, StaticAnalysis sa,
@@ -82,39 +97,11 @@ implements IASTOptimizer {
 
       final GroupNodeVarBindingInfoMap bindingInfoMap =
          new GroupNodeVarBindingInfoMap(joinGroup, sa, fExInfo);
-      
-      
-      /**
-       * Filter out the filter nodes from the join group, they will receive
-       * special handling in the end. Note that this includes ASK subqueries
-       * which belong to FILTER expressions.
-       */
-      final ASTTypeBasedNodeClassifier filterNodeClassifier = 
-         new ASTTypeBasedNodeClassifier(
-            new Class<?>[]{ FilterNode.class, SubqueryRoot.class });
-      
-      /**
-       * We're interested in the ASK subquery roots associated with some
-       * EXISTS or NOT EXISTS filter, as recoreded in the fExInfo map.
-       */
-      filterNodeClassifier.addConstraintForType(SubqueryRoot.class, 
-         new ASTTypeBasedNodeClassifierConstraint() {
-         
-            @Override
-            boolean appliesTo(final IGroupMemberNode node) {
-                  
-               if (node instanceof SubqueryRoot) {
-                  return fExInfo.containsSubqueryRoot((SubqueryRoot)node);
-               }
-                  
-               // as a fallback return false
-               return false; 
-                  
-            }
-         });       
-      
-      filterNodeClassifier.registerNodes(joinGroup.getChildren());
 
+      /**
+       * Setup helper class for proper placement of FILTER nodes in join group.
+       */
+      final ASTFilterPlacer filterPlacer = new ASTFilterPlacer(joinGroup, fExInfo);
       
       /**
        * Set up the partitions, ignoring the FILTER nodes (they'll be added
@@ -122,7 +109,7 @@ implements IASTOptimizer {
        */
       final ASTJoinGroupPartitions partitions = 
          new ASTJoinGroupPartitions(
-            filterNodeClassifier.getUnclassifiedNodes() /* non filter nodes */,
+            filterPlacer.getNonFilterNodes(), 
             bindingInfoMap, externallyIncoming);
       
       /**
@@ -131,44 +118,17 @@ implements IASTOptimizer {
        * do this first, before reordering within partitions, as it shifts
        * nodes around across them.
        */
-      optimizeAcrossPartitions(
-            partitions, bindingInfoMap, externallyIncoming);
+      if (!assertCorrectnessOnly) {
+         optimizeAcrossPartitions(partitions, bindingInfoMap, externallyIncoming);
+      }
       
       /** 
        * Second, optimize within the individual partitions.
        */
-      optimizeWithinPartitions(partitions);
-
-
-      /**
-       * Finally place the filters ans the associated ASK subqueries.
-       */
-      final List<IGroupMemberNode> filterNodes =
-         filterNodeClassifier.get(FilterNode.class);
-      final List<IGroupMemberNode> askSubqueries =
-            filterNodeClassifier.get(SubqueryRoot.class);
-
-      // first, place the ASK subqueries
-      for (final IGroupMemberNode askSubquery : askSubqueries) {
-         partitions.placeAtFirstPossiblePosition(askSubquery);
-      }
+      optimizeWithinPartitions(partitions, assertCorrectnessOnly);
       
-      // second, place the (non-related) simple filters
-      for (final IGroupMemberNode filerNode : filterNodes) {
-         if (!fExInfo.containsFilter((FilterNode)filerNode)) {
-            partitions.placeAtFirstPossiblePosition(filerNode);
-            
-         }
-      }
-      
-      // third, place the FILTERs associated with the ASK subqueries, to
-      // make sure that these FILTERs are directly following the ASK subqueries
-      // (in order to avoid interaction with other FILTERs)
-      for (final IGroupMemberNode askSubquery : askSubqueries) {
-         partitions.placeAtFirstPossiblePosition(
-            fExInfo.filterMap.get(askSubquery));
-      }
-      
+      filterPlacer.placeFiltersInPartitions(partitions);
+
       /**
        * Now, flatten the partitions again and replace the children of the
        * join group with the new list.
@@ -322,7 +282,9 @@ implements IASTOptimizer {
     * about partitions is that we can freely reorder the non-optional
     * non-minus nodes within them. 
     */
-   void optimizeWithinPartitions(final ASTJoinGroupPartitions partitions) {
+   void optimizeWithinPartitions(
+      final ASTJoinGroupPartitions partitions,
+      final boolean assertCorrectnessOnly) {
  
       final List<ASTJoinGroupPartition> partitionList = 
          partitions.getPartitionList();
@@ -389,10 +351,17 @@ implements IASTOptimizer {
          toRemove.addAll(classifier.get(BindingsClause.class));
          partition.removeNodesFromPartition(toRemove);
          
-         // the remaining elements will be reordered based on their type
-         final IASTJoinGroupPartitionReorderer reorderer =
-               new TypeBasedASTJoinGroupPartitionReorderer();
-         reorderer.reorderNodes(partition);
+         /**
+          * The remaining elements will be reordered based on their type.
+          * This is only done if optimization was turned on though. Otherwise,
+          * this method just asserts correct placement of nodes with binding
+          * requirements.
+          */
+         if (!assertCorrectnessOnly) {
+            final IASTJoinGroupPartitionReorderer reorderer =
+                  new TypeBasedASTJoinGroupPartitionReorderer();
+            reorderer.reorderNodes(partition);
+         }
          
          /**
           * Place the special handled SERVICE nodes.

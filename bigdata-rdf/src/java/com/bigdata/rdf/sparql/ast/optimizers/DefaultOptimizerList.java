@@ -580,6 +580,12 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTStaticJoinOptimizer());
 
+        /**
+         * No optimization, just guarantee that the order of FILTERs and nodes
+         * with special semantics gets right.
+         */
+        add(new ASTJoinGroupOrderOptimizer(true /* assertCorrectnessOnly */));
+
         /*
          * The joins are now ordered. Everything from here down MUST NOT change
          * the join order when making changes to the join groups and MAY rely on
