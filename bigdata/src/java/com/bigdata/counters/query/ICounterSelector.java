@@ -45,7 +45,7 @@ public interface ICounterSelector {
      * Selects and returns a collection of performance counters with history.
      * 
      * @param depth
-     *            When non-ZERO, this specifies a constraint on the maximum
+     *            When GT ZERO, this specifies a constraint on the maximum
      *            depth for a counter may can be selected.
      * @param pattern
      *            A regular expression which must be satisified (optional).
