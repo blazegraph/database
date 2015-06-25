@@ -66,7 +66,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
- * Test suite for 
+ * Test suite for the {@link ASTStaticBindingsOptimizer} class.
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  */

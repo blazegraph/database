@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.internal.NotMaterializedException;
+
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
  * trac </a>.
@@ -740,4 +742,33 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_933e.srx"// resultFileURL
        ).runTest();    
     } 
+    
+    /**
+     * {@link NotMaterializedException} in combination with LET expressions.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1331">
+     * Duplicate LET expression leading to NotMaterializedException</a>. 
+     */
+    public void test_ticket_blzg_1331a() throws Exception {
+       new TestHelper("ticket_blzg_1331a",// testURI,
+             "ticket_blzg_1331a.rq",// queryFileURL
+             "ticket_blzg_1331.trig",// dataFileURL
+             "ticket_blzg_1331a.srx"// resultFileURL
+       ).runTest();    
+    }
+    
+    /**
+     * {@link NotMaterializedException} in combination with LET expressions.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1331">
+     * Duplicate LET expression leading to NotMaterializedException</a>. 
+     */
+    public void test_ticket_blzg_1331b() throws Exception {
+       new TestHelper("ticket_blzg_1331b",// testURI,
+             "ticket_blzg_1331b.rq",// queryFileURL
+             "ticket_blzg_1331.trig",// dataFileURL
+             "ticket_blzg_1331b.srx"// resultFileURL
+       ).runTest();    
+    }
+
 }

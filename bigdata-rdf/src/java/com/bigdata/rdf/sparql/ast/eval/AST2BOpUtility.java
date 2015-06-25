@@ -3822,11 +3822,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
        left = addVariableUnificationOp(
                 left, assignmentNode.getVar(), freshVar, ctx);
        
-       /**
-        * The assignment node var is definitely resolved now
-        */
-       doneSet.add(assignmentNode.getVar());
-       
        return left;       
 
    }
