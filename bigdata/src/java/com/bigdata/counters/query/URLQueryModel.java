@@ -86,7 +86,10 @@ public class URLQueryModel {
      */
     public static final String DEPTH = "depth";
     
-    public static final String DEFAULT_DEPTH = "2";
+    /**
+     * @see BLZG-1318
+     */
+    public static final String DEFAULT_DEPTH = "0";
     
     /**
      * URL query parameter whose value is the type of report to generate.
