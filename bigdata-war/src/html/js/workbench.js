@@ -460,17 +460,17 @@ function createNamespace(e) {
 function getDefaultNamespace() {
    var settings = {
       async: false,
-      url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false&describe-default-namespace=true',
+      url: RO_URL_PREFIX + 'namespace?describe-each-named-graph=false',
       success: function(data) {
         // Chrome does not work with rdf\:Description, so look for Description too
         var defaultDataset = $(data).find('rdf\\:Description, Description');
-	var ELEMENT = defaultDataset.find('title');
-	 if(ELEMENT == null )
-	 {
-         	DEFAULT_NAMESPACE = "kb";
-	 } else {
-         	DEFAULT_NAMESPACE = ELEMENT[0].textContent;
-	 } 
+        var ELEMENT = defaultDataset.find('title');
+	
+        // select the default namespace if there's only a single namespace avlb.
+        if (ELEMENT.length == 1) 
+        {
+        	DEFAULT_NAMESPACE = ELEMENT[0].textContent;
+        }
       }
    };
    $.ajax(settings);
@@ -1926,7 +1926,7 @@ function startup() {
    // load namespaces, default namespace, HA status
    useLBS(false); // Note: default to false. Otherwise workbench breaks when not deployed into jetty container.
    getNamespaces(true/*synchronous*/); // Note: 'synchronous' is slow if there are a lot of namespaces. Only used on startup.
-   //getDefaultNamespace();
+   getDefaultNamespace();
    changeNamespaceMode(); // Note: Appears to be required to hide error message on load.
    showHealthTab();
 
