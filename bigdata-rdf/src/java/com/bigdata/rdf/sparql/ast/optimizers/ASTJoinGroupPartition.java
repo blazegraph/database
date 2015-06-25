@@ -61,11 +61,22 @@ public class ASTJoinGroupPartition {
     * Variables that are bound externally, i.e. from prior parts of the query
     * plan. Note that this does not include variables that are bound by prior
     * partitions (in case this partition is part of an 
-    * {@link ASTJoinGroupPartitions} object.
+    * {@link ASTJoinGroupPartitions} object. Once initialized, this should
+    * never be changed.
     */
    final Set<IVariable<?>> externallyBound;
-   
+
+   /**
+    * The optional of minus node marking the "border" (i.e., last node) of
+    * the partition.
+    */
    IGroupMemberNode optionalOrMinus;
+   
+   /**
+    * The variables that are definitely produced by this partition, i.e.
+    * can be assumed being bound in subsequent partitions. This includes
+    * variables that are externally bound.
+    */
    Set<IVariable<?>> definitelyProduced;
    
    /**
@@ -144,7 +155,7 @@ public class ASTJoinGroupPartition {
    }
    
    /**
-    * Removes the given set of nodes and updates the internal datastructures.
+    * Removes the given set of nodes and updates the internal data structures.
     */
    public void removeNodesFromPartition(List<IGroupMemberNode> nodesToRemove) {
       
@@ -170,8 +181,7 @@ public class ASTJoinGroupPartition {
     * Also considers the fact that this node must not be placed *before*
     * its first possible position according to the binding requirements.
     * 
-    * NOTE: currently, this methods requires the node to be contained in the
-    * binding info map.
+    * NOTE: requires the node to be contained in the partitions binding info map.
     */
    void placeAtFirstContributingPosition(
          final IGroupMemberNode node, 
@@ -255,8 +265,7 @@ public class ASTJoinGroupPartition {
     * non-minus list of the partition, where the first possible position is
     * derived from the binding requirements of the node.
     * 
-    * NOTE: currently, this methods requires the node to be contained in the
-    * binding info map.
+    * NOTE: requires the node to be contained in the partitions binding info map.
     */
    void placeAtFirstPossiblePosition(
       final IGroupMemberNode node, 
@@ -271,8 +280,8 @@ public class ASTJoinGroupPartition {
 
    /**
     * Places the node at the specified position in the list of non-optional
-    * non-minus nodes. If the position is null, the node is added at the end.
-    * Must be a valid position within the list.
+    * non-minus nodes. If the position is null, the node is added at the end
+    * (this is, right in front of the bordering optional or minus node).
     */
    void placeAtPosition(
       final IGroupMemberNode node, final Integer positionToPlace) {
@@ -286,7 +295,13 @@ public class ASTJoinGroupPartition {
    
    /**
     * Computes for the given node, the first possible position in the partition
-    * according to its binding requirements.
+    * according to its binding requirements. The first possible position is
+    * either the first position where all required variables of the node are
+    * known to be bound or where we know that none of its required variables
+    * may be bound anymore. The flag requiresAllBound can be used to turn off
+    * the last condition, requiring that all variables need to be bound (and
+    * returning null in case this condition is never satisfied). This flag
+    * is useful when distributing FILTERs across partitions.
     * 
     * @param the node to place
     * @param additional variables that are known to be bound
@@ -380,13 +395,15 @@ public class ASTJoinGroupPartition {
          }
       }
          
+      /**
+       * Check again for the last position (not covered by the for loop)
+       */
       Integer lastPosition = nonOptionalNonMinusNodes.size();
       if (canBePlacedAtPosition(
             requiresAllBound, bindingInfo, knownBound, remainingMaybeBound,
             lastPosition)) {
          return lastPosition; // we're done
       }
-
       
       /**
        * No suitable position found:
@@ -394,6 +411,10 @@ public class ASTJoinGroupPartition {
       return null;   
    }
 
+   /**
+    * Internal helper function to check whether a node can be placed at
+    * a given position if the passed parameter constellation is satisfied.
+    */
    private boolean canBePlacedAtPosition(final boolean requiresAllBound,
          final GroupNodeVarBindingInfo bindingInfo,
          final HashSet<IVariable<?>> knownBound,
@@ -450,12 +471,13 @@ public class ASTJoinGroupPartition {
    private void recomputeDefinitelyProduced() {
       
       definitelyProduced = new HashSet<IVariable<?>>();
+      
       definitelyProduced.addAll(externallyBound);
+      
       for (IGroupMemberNode node : nonOptionalNonMinusNodes) {
          definitelyProduced.addAll(bindingInfoMap.get(node).getDefinitelyProduced());
       }
       
    }
 
-   
 }

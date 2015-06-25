@@ -88,13 +88,17 @@ implements IASTOptimizer {
        * following.
        */
             
+      // variables incoming externally (i.e. those variables definitely bound
+      // when evaluating this join group)
       final Set<IVariable<?>> externallyIncoming = 
          sa.getDefinitelyIncomingBindings(
             joinGroup, new HashSet<IVariable<?>>());
 
+      // easy-access information to FILTER [NOT] EXISTS constructs in this group
       final ASTJoinGroupFilterExistsInfo fExInfo = 
             new ASTJoinGroupFilterExistsInfo(joinGroup);
 
+      // easy-access information about variable bindings for nodes in this group
       final GroupNodeVarBindingInfoMap bindingInfoMap =
          new GroupNodeVarBindingInfoMap(joinGroup, sa, fExInfo);
 
@@ -104,8 +108,9 @@ implements IASTOptimizer {
       final ASTFilterPlacer filterPlacer = new ASTFilterPlacer(joinGroup, fExInfo);
       
       /**
-       * Set up the partitions, ignoring the FILTER nodes (they'll be added
-       * in the end, after having flattened the partitions again).
+       * Set up the partitions, ignoring the FILTER nodes. FILTER nodes apply
+       * to the whole join group by semantics, so they are not considered here
+       * but will be added in the end. 
        */
       final ASTJoinGroupPartitions partitions = 
          new ASTJoinGroupPartitions(
@@ -116,17 +121,28 @@ implements IASTOptimizer {
        * First, optimize across the partitions, trying to move forward
        * non-optional non-minus patterns wherever possible. It is important to
        * do this first, before reordering within partitions, as it shifts
-       * nodes around across them.
+       * nodes around across them. See 
+       * https://docs.google.com/document/d/1Fu0QLj1ML6CdaysREDFsJt8fT048zBWp0ssMDITAYt8
+       * for a formal explanation and justification of our approach.
        */
       if (!assertCorrectnessOnly) {
          optimizeAcrossPartitions(partitions, bindingInfoMap, externallyIncoming);
       }
       
       /** 
-       * Second, optimize within the individual partitions.
+       * Second, optimize within the individual partitions. This optimization
+       * is based on both hard constraints (w.r.t. the placement of nodes
+       * that require bindings) and heuristics (e.g. an order based on node
+       * types).
+       * 
+       * Note: we may want to pass in (and use) information about existing
+       * filters, which might be valuable information for the optimizer.
        */
       optimizeWithinPartitions(partitions, assertCorrectnessOnly);
       
+      /**
+       * Third, place the FILTERs at appropriate positions (across partitions).
+       */
       filterPlacer.placeFiltersInPartitions(partitions);
 
       /**
@@ -138,12 +154,7 @@ implements IASTOptimizer {
       for (int i = 0; i < joinGroup.arity(); i++) {
           joinGroup.setArg(i, (BOp) nodeList.get(i));
       }
-
-      // TODO: creation of subgroups at "borders"
-
    }
-
-
 
 
   /**
@@ -233,15 +244,19 @@ implements IASTOptimizer {
               if (conflictingVars.isEmpty() && 
                     definitelyProducedUpToPartition.get(j).containsAll(
                        candidateBindingInfo.getRequiredBound())) {
+                 
+                 // record candidate and continue, maybe we can do even better...
                  partitionForCandidate = j;
+                 
               } else {
-                 // can't place here, abort
-                 break;
+                 
+                 // stop here, definitely can't place in prior part. as well
+                 break; 
               }
               
            }
            
-           if (partitionForCandidate!=null) {
+           if (partitionForCandidate!=null) { // if can be moved:
 
               // add the node to the partition (removal will be done later on)
               final ASTJoinGroupPartition partitionToMove = 
@@ -266,7 +281,9 @@ implements IASTOptimizer {
               // the node will be removed from the current partition at the end
               
            } else {
+              
               unmovableNodes.add(candidate);
+              
            }
            
         }
@@ -355,7 +372,7 @@ implements IASTOptimizer {
           * The remaining elements will be reordered based on their type.
           * This is only done if optimization was turned on though. Otherwise,
           * this method just asserts correct placement of nodes with binding
-          * requirements.
+          * requirements. This is where the optimization takes place.
           */
          if (!assertCorrectnessOnly) {
             final IASTJoinGroupPartitionReorderer reorderer =
@@ -450,7 +467,8 @@ implements IASTOptimizer {
          for (int i=0 ; i<toBePlaced.size(); i++) {
             
             final AssignmentNode node = toBePlaced.get(i);
-            final GroupNodeVarBindingInfo nodeBindingInfo = bindingInfoMap.get(node);
+            final GroupNodeVarBindingInfo nodeBindingInfo = 
+               bindingInfoMap.get(node);
             
             /**
              * The first condition is that the node can be safely placed. The

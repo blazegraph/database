@@ -59,7 +59,7 @@ public class ASTJoinGroupFilterExistsInfo {
    /**
     * Mapping from the subqueries to the filter nodes.
     */
-   Map<SubqueryRoot, FilterNode> filterMap;
+   final Map<SubqueryRoot, FilterNode> filterMap;
    
    public ASTJoinGroupFilterExistsInfo(final Iterable<IGroupMemberNode> nodeList) {
 
