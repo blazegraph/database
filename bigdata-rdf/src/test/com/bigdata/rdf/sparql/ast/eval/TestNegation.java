@@ -598,33 +598,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 notExistsSubquery2.setAskVar(askVar2.getValueExpression());
                 notExistsSubquery2.setFilterExistsMode(QueryHints.DEFAULT_FILTER_EXISTS);
 
-            } // not-exists-2
-
-            whereClause.addChild(notExistsSubquery2);
-
-
-
-            /**
-             * <pre>
-             *     FILTER( com.bigdata.rdf.sparql.ast.NotExistsNode(VarNode(-exists-2))[
-             *     com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.bigdata.com/sparql-1.1-undefined-functionsnot-exists,
-             *     graphPattern=JoinGroupNode,
-             *     valueExpr=com.bigdata.rdf.internal.constraints.NotBOp(com.bigdata.rdf.internal.constraints.EBVBOp(-exists-2))
-             *     ] )
-             * </pre>
-             */
-            {
-                @SuppressWarnings("unchecked")
-                final NotExistsNode notExistsNode2 = new NotExistsNode(askVar2,
-                        notExistsSubquery2.getWhereClause());
-
-                final FilterNode filter2 = new FilterNode(notExistsNode2);
-                
-                whereClause.addChild(filter2);
-                
-                AST2BOpUtility.toVE(globals, filter2.getValueExpressionNode());
-                
-            }            
+            } // not-exists-2   
             
             /**
              * <pre>
@@ -731,7 +705,33 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
 
                 AST2BOpUtility.toVE(globals, filter1.getValueExpressionNode());
 
-            }            
+            }           
+            
+            whereClause.addChild(notExistsSubquery2);
+
+
+
+            /**
+             * <pre>
+             *     FILTER( com.bigdata.rdf.sparql.ast.NotExistsNode(VarNode(-exists-2))[
+             *     com.bigdata.rdf.sparql.ast.FunctionNode.functionURI=http://www.bigdata.com/sparql-1.1-undefined-functionsnot-exists,
+             *     graphPattern=JoinGroupNode,
+             *     valueExpr=com.bigdata.rdf.internal.constraints.NotBOp(com.bigdata.rdf.internal.constraints.EBVBOp(-exists-2))
+             *     ] )
+             * </pre>
+             */
+            {
+                @SuppressWarnings("unchecked")
+                final NotExistsNode notExistsNode2 = new NotExistsNode(askVar2,
+                        notExistsSubquery2.getWhereClause());
+
+                final FilterNode filter2 = new FilterNode(notExistsNode2);
+                
+                whereClause.addChild(filter2);
+                
+                AST2BOpUtility.toVE(globals, filter2.getValueExpressionNode());
+                
+            }         
 
 
         }
