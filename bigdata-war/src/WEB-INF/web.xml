@@ -13,7 +13,7 @@
    installation, e.g., by specifying an absolution path.  Also, it is a good
    idea to review the RWStore.properties file as well and specify the location
    of the database file on which it will persist your data.
-   
+
    Note: You MAY override this parameter using
    "-Dcom.bigdata.rdf.sail.webapp.ConfigParams.propertyFile=FILE"
    when starting the servlet container.
@@ -69,6 +69,11 @@
    <param-name>warmupThreadPoolSize</param-name>
    <param-value>20</param-value>
   </context-param>
+  <!-- <context-param>
+   <description>List of allowed services.</description>
+   <param-name>serviceWhitelist</param-name>
+   <param-value>http://www.bigdata.com/rdf/search#search,http://www.bigdata.com/rdf#describe</param-value>
+  </context-param> -->
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
   </listener>
@@ -127,7 +132,7 @@
   <!-- Mapping for access to non-default KB namespaces.
   <servlet-mapping>
   <servlet-name>REST API</servlet-name>
-  <url-pattern>/sparql/*</url-pattern> 
+  <url-pattern>/sparql/*</url-pattern>
   </servlet-mapping> -->
   <!-- Mappings for the multi-tenancy API. -->
   <servlet-mapping>
