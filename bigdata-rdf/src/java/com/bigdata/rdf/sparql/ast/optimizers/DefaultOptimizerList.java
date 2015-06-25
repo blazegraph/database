@@ -451,17 +451,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * when it is invoked).
          */
         add(new ASTServiceNodeOptimizer());
-        
-        /*
-         * Join Order Optimization
-         */
-        
-//        /**
-//         * Rearranges the children in group nodes in order to put the same types
-//         * of join nodes together. It also puts the type groups into the order
-//         * in which they should be evaluated.  After this optimizer runs, the
-//         * group node order is also the evaluation order.
-//         */
 
         /**
          * Brings the children in group nodes into an order that implements
@@ -469,7 +458,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * various heuristics.
          */
         add(new ASTJoinGroupOrderOptimizer());
-
         
         /**
          * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.

@@ -692,8 +692,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
             final JoinGroupNode group = itr.next();
 
-            IQueryNode parent = sa.findParent(group);
-            if (parent instanceof FilterNode) {
+            if (sa.findParent(group) instanceof FilterNode) {
                 /*
                  * Skip EXISTS and NOT EXISTS graph patterns when they are
                  * visited directly. These are handled when we visit the join
