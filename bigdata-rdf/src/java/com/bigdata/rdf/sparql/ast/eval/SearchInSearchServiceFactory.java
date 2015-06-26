@@ -88,7 +88,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * text index with the supplied search string.  If there are no incoming
  * bindings (or none that have ?s bound), this service will produce no output.
  */
-public class SearchInSearchServiceFactory implements ServiceFactory {
+public class SearchInSearchServiceFactory extends AbstractServiceFactoryBase {
 
     private static final Logger log = Logger
             .getLogger(SearchInSearchServiceFactory.class);
@@ -717,15 +717,5 @@ public class SearchInSearchServiceFactory implements ServiceFactory {
         }
         
     }
-
-    @Override
-    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();
-    }
-
-    @Override
-    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();       
-    }        
 
 }

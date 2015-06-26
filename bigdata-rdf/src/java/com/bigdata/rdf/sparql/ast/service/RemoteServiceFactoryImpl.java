@@ -31,12 +31,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.openrdf.model.URI;
-
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactoryBase;
 
 /**
  * A factory for service calls against remote SPARQL end points. You can control
@@ -51,7 +49,7 @@ import com.bigdata.bop.IVariableOrConstant;
  * @version $Id: RemoteServiceFactoryImpl.java 6068 2012-03-03 21:34:31Z
  *          thompsonbry $
  */
-public class RemoteServiceFactoryImpl implements ServiceFactory {
+public class RemoteServiceFactoryImpl extends AbstractServiceFactoryBase {
 
     private final RemoteServiceOptions serviceOptions;
 

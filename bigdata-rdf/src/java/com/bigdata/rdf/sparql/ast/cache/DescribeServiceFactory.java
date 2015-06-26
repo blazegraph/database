@@ -1,25 +1,20 @@
 package com.bigdata.rdf.sparql.ast.cache;
 
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sparql.ast.eval.CustomServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
-import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
@@ -35,7 +30,7 @@ import com.bigdata.rdf.store.BD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class DescribeServiceFactory implements CustomServiceFactory {
+public class DescribeServiceFactory extends CustomServiceFactoryBase {
 
     static private transient final Logger log = Logger
             .getLogger(DescribeServiceFactory.class);
@@ -249,15 +244,5 @@ public class DescribeServiceFactory implements CustomServiceFactory {
         }
 
     } // class DescribeCacheChangeLogListener
-    
-    @Override
-    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();
-    }
-
-    @Override
-    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();       
-    }        
 
 } // class DescribeServiceFactory

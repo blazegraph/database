@@ -27,10 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
@@ -42,7 +38,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * predicates that configure the service) in a standardized manner using the
  * {@link ServiceParams} helper class.
  */
-public abstract class AbstractServiceFactory implements ServiceFactory {
+public abstract class AbstractServiceFactory extends AbstractServiceFactoryBase {
 
     public AbstractServiceFactory() {
     
@@ -81,31 +77,5 @@ public abstract class AbstractServiceFactory implements ServiceFactory {
     public abstract BigdataServiceCall create(
     		final ServiceCallCreateParams params,
     		final ServiceParams serviceParams);
-
-    /**
-     * Default implementation for method
-     * {@link ServiceFactory#getRequiredBound(ServiceNode)}, allowing for
-     * simple services where all variables used inside the service are
-     * considered "outgoing". As a consequence, when building upon this
-     * default implementation, the Service will be executed *before* the
-     * variables used inside the Service body are bound.
-     */
-    @Override
-    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();
-    }
-
-    /**
-     * Default implementation for method
-     * {@link ServiceFactory#getDesiredBound(ServiceNode)}, allowing for
-     * simple services where all variables used inside the service are
-     * considered "outgoing". As a consequence, when building upon this
-     * default implementation, the Service will be executed *before* the
-     * variables used inside the Service body are bound.
-     */
-    @Override
-    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();       
-    }    
     
 }
