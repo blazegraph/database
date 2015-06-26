@@ -28,10 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
 
-import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
