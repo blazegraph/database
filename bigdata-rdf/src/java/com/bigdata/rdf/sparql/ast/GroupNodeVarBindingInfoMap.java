@@ -42,7 +42,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupFilterExistsInfo;
  */
 public class GroupNodeVarBindingInfoMap {
    
-   private Map<IGroupMemberNode, GroupNodeVarBindingInfo> bindingInfo;
+   final private Map<IGroupMemberNode, GroupNodeVarBindingInfo> bindingInfo;
    
    
    /**

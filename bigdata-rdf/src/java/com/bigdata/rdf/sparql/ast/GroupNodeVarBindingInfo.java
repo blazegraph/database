@@ -46,29 +46,29 @@ public class GroupNodeVarBindingInfo {
    /**
     * The node for which the information is valid.
     */
-   final IGroupMemberNode node;
+   final private IGroupMemberNode node;
    
    /**
     * Variables that must be bound upon evaluation of this node,
     * see {@link IVariableBindingRequirements} for detailed documentation.
     */
-   Set<IVariable<?>> requiredBound;
+   final private Set<IVariable<?>> requiredBound;
    
    /**
     * Variables that are desired to be bound upon evaluation of this node,
     * see {@link IVariableBindingRequirements} for detailed documentation.
     */
-   Set<IVariable<?>> desiredBound;
+   final private Set<IVariable<?>> desiredBound;
 
    /**
     * Variables that are possibly bound by this node.
     */
-   Set<IVariable<?>> maybeProduced;
+   final private Set<IVariable<?>> maybeProduced;
 
    /**
     * Variables that are definitely bound by this node.
     */
-   Set<IVariable<?>> definitelyProduced;
+   final private Set<IVariable<?>> definitelyProduced;
 
 
    /**
@@ -87,9 +87,8 @@ public class GroupNodeVarBindingInfo {
       
       this.maybeProduced = new HashSet<IVariable<?>>();
       if (node instanceof IBindingProducerNode) {
-         this.maybeProduced = 
-            sa.getMaybeProducedBindings(
-               (IBindingProducerNode)node, maybeProduced, true);
+         sa.getMaybeProducedBindings(
+            (IBindingProducerNode)node, maybeProduced, true);
       }
       
       this.definitelyProduced = new HashSet<IVariable<?>>();
@@ -98,9 +97,8 @@ public class GroupNodeVarBindingInfo {
          if (!(node.getProperty("optional", false) || 
                node.getProperty("minus", false))) {
             
-            this.definitelyProduced = 
-               sa.getDefinitelyProducedBindings(
-                  (IBindingProducerNode)node, definitelyProduced, true);
+            sa.getDefinitelyProducedBindings(
+               (IBindingProducerNode)node, definitelyProduced, true);
          }
       }
 
@@ -114,7 +112,7 @@ public class GroupNodeVarBindingInfo {
          final SubqueryRoot sqr = (SubqueryRoot)node;
 
          // there are no variables that are desired bound (all are required)
-         this.desiredBound = new HashSet<IVariable<?>>();
+         this.desiredBound.clear();
          
          // in addition to what's reported by getDefinitelyProducedBindings,
          // the askVar of the subquery must be considered
