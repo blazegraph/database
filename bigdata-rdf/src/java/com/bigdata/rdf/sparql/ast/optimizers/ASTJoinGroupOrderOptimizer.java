@@ -58,7 +58,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 public class ASTJoinGroupOrderOptimizer extends AbstractJoinGroupOptimizer 
 implements IASTOptimizer {
    
-   private boolean assertCorrectnessOnly;
+   private final boolean assertCorrectnessOnly;
 
    /**
     * Default constructor, running the optimizer with optimizations turned on.
@@ -216,7 +216,7 @@ implements IASTOptimizer {
            Integer partitionForCandidate = null;
            for (int j=i-1; j>=0; j--) {
               
-              final ASTJoinGroupPartition candPartition = partitionList.get(j);
+              final ASTJoinGroupPartition candidatePartition = partitionList.get(j);
               
               /**
                * Calculate the conflicting vars as the intersection of the
@@ -225,13 +225,13 @@ implements IASTOptimizer {
                * known to be bound upfront.
                */
               final Set<IVariable<?>> conflictingVars;
-              if (candPartition.optionalOrMinus == null) {
+              if (candidatePartition.optionalOrMinus == null) {
                  conflictingVars = new HashSet<IVariable<?>>();
               } else {
                  conflictingVars = 
                     new HashSet<IVariable<?>>(
                        bindingInfoMap.get(
-                          candPartition.optionalOrMinus).getMaybeProduced());
+                          candidatePartition.optionalOrMinus).getMaybeProduced());
               }
 
               final GroupNodeVarBindingInfo candidateBindingInfo = 
@@ -294,131 +294,146 @@ implements IASTOptimizer {
      
   }
 
+  /**
+   * Optimize the order of nodes within the single partitions. The nice thing
+   * about partitions is that we can freely reorder the non-optional
+   * non-minus nodes within them. 
+   */
+  void optimizeWithinPartitions(
+     final ASTJoinGroupPartitions partitions,
+     final boolean assertCorrectnessOnly) {
+     
+     final List<ASTJoinGroupPartition> partitionList = 
+           partitions.getPartitionList();
+        
+     final Set<IVariable<?>> knownBoundFromPrevPartitions =
+        new HashSet<IVariable<?>>();
+        
+     for (ASTJoinGroupPartition partition : partitionList) {
+        optimizeWithinPartition(
+           partition, assertCorrectnessOnly, knownBoundFromPrevPartitions);
+     }
+  }
+  
    /**
-    * Optimize the order of nodes within a single partition. The nice thing
+    * Optimize the order of nodes within the given partition. The nice thing
     * about partitions is that we can freely reorder the non-optional
     * non-minus nodes within them. 
     */
-   void optimizeWithinPartitions(
-      final ASTJoinGroupPartitions partitions,
-      final boolean assertCorrectnessOnly) {
- 
-      final List<ASTJoinGroupPartition> partitionList = 
-         partitions.getPartitionList();
-      
-      final Set<IVariable<?>> knownBoundFromPrevPartitions =
-         new HashSet<IVariable<?>>();
-      for (ASTJoinGroupPartition partition : partitionList) {
-         
-         final ASTTypeBasedNodeClassifier classifier = 
-            new ASTTypeBasedNodeClassifier(
-               new Class<?>[] { 
-                  ServiceNode.class,
-                  AssignmentNode.class,
-                  BindingsClause.class,
-               });
-         
-         /**
-          * We only consider special service nodes for placement, all other
-          * service nodes are treated through a standard reorder.
-          */
-         classifier.addConstraintForType(ServiceNode.class, 
-            new ASTTypeBasedNodeClassifierConstraint() {
-               @Override
-               boolean appliesTo(final IGroupMemberNode node) {
-                  
-                  if (node instanceof ServiceNode) {
+   void optimizeWithinPartition(
+      final ASTJoinGroupPartition partition,
+      final boolean assertCorrectnessOnly,
+      final Set<IVariable<?>> knownBoundFromPrevPartitions) {
+          
+      final ASTTypeBasedNodeClassifier classifier = 
+         new ASTTypeBasedNodeClassifier(
+            new Class<?>[] { 
+               ServiceNode.class, 
+               AssignmentNode.class,
+               BindingsClause.class, });
 
-                     /**
-                      * Return true if the service is not a SPARQL 1.1 SERVICE.
-                      */
-                     final ServiceNode sn = (ServiceNode)node;
-                     if (!sn.getResponsibleServiceFactory().equals(
-                           ServiceRegistry.getInstance().
-                           getDefaultServiceFactory())) {
-                        return true;
-                     }
-                     
-                     /**
-                      * Return true if it is a SPARQL 1.1 SERVICE, but the
-                      * constant is not bound.
-                      */
-                     if (!sn.getServiceRef().isConstant()) {
-                        return true;
-                     }
+      /**
+       * We only consider special service nodes for placement, all other service
+       * nodes are treated through a standard reorder.
+       */
+      classifier.addConstraintForType(
+         ServiceNode.class,
+          new ASTTypeBasedNodeClassifierConstraint() {
+         
+            @Override
+            boolean appliesTo(final IGroupMemberNode node) {
+
+               if (node instanceof ServiceNode) {
+
+                  /**
+                   * Return true if the service is not a SPARQL 1.1 SERVICE.
+                   */
+                  final ServiceNode sn = (ServiceNode) node;
+                  if (!sn.getResponsibleServiceFactory().equals(
+                        ServiceRegistry.getInstance()
+                              .getDefaultServiceFactory())) {
+                     return true;
                   }
-                  
-                  // as a fallback return false
-                  return false; 
-                  
+
+                  /**
+                    * Return true if it is a SPARQL 1.1 SERVICE, but the
+                    * constant is not bound.
+                    */
+                  if (!sn.getServiceRef().isConstant()) {
+                     return true;
+                  }
                }
-            });
-  
-         classifier.registerNodes(partition.extractNodeList());
-         
-         /**
-          * In a first step, we remove service nodes, assignment nodes, and
-          * bindings clauses from the partition. They will be handled in a
-          * special way.
-          */
-         final List<IGroupMemberNode> toRemove = 
-            new ArrayList<IGroupMemberNode>();
-         toRemove.addAll(classifier.get(ServiceNode.class));
-         toRemove.addAll(classifier.get(AssignmentNode.class));
-         toRemove.addAll(classifier.get(BindingsClause.class));
-         partition.removeNodesFromPartition(toRemove);
-         
-         /**
-          * The remaining elements will be reordered based on their type.
-          * This is only done if optimization was turned on though. Otherwise,
-          * this method just asserts correct placement of nodes with binding
-          * requirements. This is where the optimization takes place.
-          */
-         if (!assertCorrectnessOnly) {
-            final IASTJoinGroupPartitionReorderer reorderer =
-                  new TypeBasedASTJoinGroupPartitionReorderer();
-            reorderer.reorderNodes(partition);
-         }
-         
-         /**
-          * Place the special handled SERVICE nodes.
-          */
-         for (IGroupMemberNode node : classifier.get(ServiceNode.class)) {
-            partition.placeAtFirstPossiblePosition(
-               node,knownBoundFromPrevPartitions,false /* requires all bound */);
-         }
 
-         /**
-          * Place the VALUES nodes.
-          */
-         for (IGroupMemberNode node : classifier.get(BindingsClause.class)) {
-            partition.placeAtFirstContributingPosition(
-               node,knownBoundFromPrevPartitions,false /* requires all bound */);
-         }
+                  // as a fallback return false
+               return false;
 
-         /**
-          * Place the BIND nodes: it is important that we bring them into the
-          * right order, e.g. if bind node 1 uses variables bound by bind node 2,
-          * then we must insert node 2 first in order to be able to place node 1
-          * after the first bind node.
-          */
-         final Set<IVariable<?>> knownBoundSomewhere =
-            new HashSet<IVariable<?>>(partition.definitelyProduced);
-         
-         // ... order the bind nodes according to dependencies
-         final List<AssignmentNode> bindNodesOrdered = 
-            orderBindNodesByDependencies(
-                  classifier.get(AssignmentNode.class), 
-                  partition.bindingInfoMap, knownBoundSomewhere);
-         
-         // ... and place the bind nodes
-         for (AssignmentNode node : bindNodesOrdered) {
-            partition.placeAtFirstContributingPosition(
-               node,knownBoundFromPrevPartitions, false /* requiresAllBound */);
-         }       
+            }
+         });
 
-         knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
+      classifier.registerNodes(partition.extractNodeList());
+
+      /**
+       * In a first step, we remove service nodes, assignment nodes, and
+       * bindings clauses from the partition. They will be handled in a special
+       * way.
+       */
+      final List<IGroupMemberNode> toRemove = new ArrayList<IGroupMemberNode>();
+      toRemove.addAll(classifier.get(ServiceNode.class));
+      toRemove.addAll(classifier.get(AssignmentNode.class));
+      toRemove.addAll(classifier.get(BindingsClause.class));
+      partition.removeNodesFromPartition(toRemove);
+
+      /**
+       * The remaining elements will be reordered based on their type. This is
+       * only done if optimization was turned on though. Otherwise, this method
+       * just asserts correct placement of nodes with binding requirements. This
+       * is where the optimization takes place.
+       * 
+       * Note: this is the place where we want to integrate the StaticOptimizer.
+       */
+      if (!assertCorrectnessOnly) {
+         final IASTJoinGroupPartitionReorderer reorderer = 
+            new TypeBasedASTJoinGroupPartitionReorderer();
+         reorderer.reorderNodes(partition);
       }
+
+      /**
+       * Place the special handled SERVICE nodes.
+       */
+      for (IGroupMemberNode node : classifier.get(ServiceNode.class)) {
+         partition.placeAtFirstPossiblePosition(node,
+            knownBoundFromPrevPartitions, false /* requires all bound */);
+      }
+
+      /**
+       * Place the VALUES nodes.
+       */
+      for (IGroupMemberNode node : classifier.get(BindingsClause.class)) {
+         partition.placeAtFirstContributingPosition(node,
+            knownBoundFromPrevPartitions, false /* requires all bound */);
+      }
+
+      /**
+       * Place the BIND nodes: it is important that we bring them into the right
+       * order, e.g. if bind node 1 uses variables bound by bind node 2, then we
+       * must insert node 2 first in order to be able to place node 1 after the
+       * first bind node.
+       */
+      final Set<IVariable<?>> knownBoundSomewhere = new HashSet<IVariable<?>>(
+            partition.definitelyProduced);
+
+      // ... order the bind nodes according to dependencies
+      final List<AssignmentNode> bindNodesOrdered = orderBindNodesByDependencies(
+            classifier.get(AssignmentNode.class), partition.bindingInfoMap,
+            knownBoundSomewhere);
+
+      // ... and place the bind nodes
+      for (AssignmentNode node : bindNodesOrdered) {
+         partition.placeAtFirstContributingPosition(node,
+               knownBoundFromPrevPartitions, false /* requiresAllBound */);
+      }
+
+      knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
    }
 
 
