@@ -90,7 +90,7 @@ import cutthecrap.utils.striterators.Striterator;
  *          the hit relevance. {@link RangeBOp} would work on a cluster. None of
  *          this is perfectly satisfactory.
  */
-public class SearchServiceFactory implements ServiceFactory {
+public class SearchServiceFactory extends AbstractServiceFactoryBase {
 
     private static final Logger log = Logger
             .getLogger(SearchServiceFactory.class);
@@ -762,15 +762,5 @@ public class SearchServiceFactory implements ServiceFactory {
         }
         
     }
-
-    @Override
-    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();
-    }
-
-    @Override
-    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();       
-    }        
 
 }

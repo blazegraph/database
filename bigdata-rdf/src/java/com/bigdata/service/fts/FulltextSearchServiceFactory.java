@@ -65,11 +65,11 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.IHit;
@@ -87,7 +87,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class FulltextSearchServiceFactory implements ServiceFactory {
+public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
 
    private static final Logger log = Logger
          .getLogger(FulltextSearchServiceFactory.class);
@@ -1147,11 +1147,6 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
 
       return requiredBound;
    }
-
-   @Override
-   public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-      return new HashSet<IVariable<?>>();
-   } 
    
    /**
     * Returns the statement patterns contained in the service node.

@@ -24,9 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.service.storedquery;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
 import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
@@ -34,19 +31,17 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -117,7 +112,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *      the stored procedure is only used to JOIN into an outer query as in
  *      <code>SELECT * { SERVICE bsq:my-service {} }</code>
  */
-abstract public class StoredQueryService implements ServiceFactory {
+abstract public class StoredQueryService extends AbstractServiceFactoryBase {
 
     public interface Options {
         
@@ -344,15 +339,5 @@ abstract public class StoredQueryService implements ServiceFactory {
         } // StoredQueryApiTask
 
     } // StoredQueryServiceCall
-    
-    @Override
-    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();
-    }
-
-    @Override
-    public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-       return new HashSet<IVariable<?>>();       
-    }        
 
 } // StoredQueryService

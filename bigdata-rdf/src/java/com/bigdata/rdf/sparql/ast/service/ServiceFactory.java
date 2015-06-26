@@ -60,7 +60,6 @@ public interface ServiceFactory {
      * bound prior to start executing the service. This information is 
      * important to reason about the position where to place the service
      * within the execution proccess.
-
      * 
      * See 
      * {@link IVariableBindingRequirements#getRequiredBound(StaticAnalysis)}.

@@ -23,10 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.eval.service;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,8 +34,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.sail.SailException;
 
-import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.IVariable;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.BufferMode;
@@ -50,6 +46,7 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.sparql.AbstractBigdataExprBuilderTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.eval.CustomServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
@@ -464,7 +461,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
      * Private helper class used to verify that new mutable connections are
      * hooked.
      */
-    private static class MyCustomServiceFactory implements CustomServiceFactory {
+    private static class MyCustomServiceFactory extends CustomServiceFactoryBase {
 
         public final AtomicInteger nstarted = new AtomicInteger();
 
@@ -492,16 +489,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
             nstarted.incrementAndGet();
 
         }
-        
-        @Override
-        public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
-           return new HashSet<IVariable<?>>();
-        }
-
-        @Override
-        public Set<IVariable<?>> getDesiredBound(final ServiceNode serviceNode) {
-           return new HashSet<IVariable<?>>();       
-        }        
+           
     }
 
     
