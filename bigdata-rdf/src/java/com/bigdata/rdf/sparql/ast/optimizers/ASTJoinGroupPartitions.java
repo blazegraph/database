@@ -35,6 +35,7 @@ import java.util.Set;
 import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.GroupNodeVarBindingInfoMap;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 
 /**
  * Class representing an ordered list of {@link ASTJoinGroupPartition}s.
@@ -77,8 +78,7 @@ public class ASTJoinGroupPartitions {
          final IGroupMemberNode node = nodes.get(i);
 
          final Boolean isOptionalOrMinus = 
-            node.getProperty("optional", false)
-            || node.getProperty("minus", false);
+            StaticAnalysis.isMinusOrOptional(node);
 
          /**
           * Either add the node to the non-optional non-minus node list or

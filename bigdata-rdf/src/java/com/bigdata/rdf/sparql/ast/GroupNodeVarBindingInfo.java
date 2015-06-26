@@ -94,8 +94,7 @@ public class GroupNodeVarBindingInfo {
       this.definitelyProduced = new HashSet<IVariable<?>>();
       if (node instanceof IBindingProducerNode) {
          
-         if (!(node.getProperty("optional", false) || 
-               node.getProperty("minus", false))) {
+         if (!StaticAnalysis.isMinusOrOptional(node)) {
             
             sa.getDefinitelyProducedBindings(
                (IBindingProducerNode)node, definitelyProduced, true);
