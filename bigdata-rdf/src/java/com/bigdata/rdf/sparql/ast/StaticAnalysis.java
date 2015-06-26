@@ -3017,6 +3017,29 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
        
        return sa==null || nsi==null || nsi.getName()==null ?
           null : sa.getNamedSubqueryRoot(nsi.getName());
-       
     }
+    
+    /**
+     * Checks whether a given node is an OPTIONAL node.
+     */
+    public static boolean isOptional(BOp node) {
+       return node instanceof IJoinNode && ((IJoinNode)node).isOptional();
+    }
+    
+    /**
+     * Checks whether a given node is a MINUS node.
+     */
+    public static boolean isMinus(BOp node) {
+       return node instanceof IJoinNode && ((IJoinNode)node).isMinus();
+    }
+    
+    /**
+     * Checks whether a given node is a MINUS or OPTIONAL node.
+     */
+    public static boolean isMinusOrOptional(BOp node) {
+       return isOptional(node) || isMinus(node);
+    }
+    
+
+    
 }

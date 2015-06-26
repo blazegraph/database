@@ -620,9 +620,9 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
          }
          
          
-         if (child instanceof IBindingProducerNode &&
-               (child.getProperty("optional",false) || 
-                  child.getProperty("minus",false))) {
+         if (child instanceof IBindingProducerNode && 
+               StaticAnalysis.isMinusOrOptional(child)) {
+            
             sa.getMaybeProducedBindings(
                (IBindingProducerNode)child, optOrMinusVars, true);
          }
