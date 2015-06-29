@@ -457,8 +457,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * the SPARQL 1.1 semantics, trying to optimize this order based on
          * various heuristics.
          */
-        add(new ASTJoinGroupOrderOptimizer());
-        
+        if (!QueryHints.DEFAULT_OLD_JOIN_ORDER_OPTIMIZER)
+           add(new ASTJoinGroupOrderOptimizer());
+        else
+           add(new ASTJoinOrderByTypeOptimizer());
+           
         /**
          * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
          */
@@ -570,9 +573,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
 
         /**
          * No optimization, just guarantee that the order of FILTERs and nodes
-         * with special semantics gets right.
+         * with special semantics gets right. We apply this step only in case
+         * the query hint to enable the old optimizer is turned off.
          */
-        add(new ASTJoinGroupOrderOptimizer(true /* assertCorrectnessOnly */));
+        if (!QueryHints.DEFAULT_OLD_JOIN_ORDER_OPTIMIZER)
+           add(new ASTJoinGroupOrderOptimizer(true /* assertCorrectnessOnly */));
 
         /*
          * The joins are now ordered. Everything from here down MUST NOT change
