@@ -659,5 +659,16 @@ public interface QueryHints {
 
    String DEFAULT_AST_OPTIMIZER_CLASS = System.getProperty(
          AST_OPTIMIZER_CLASS, DefaultOptimizerList.class.getName());
+   
+   /**
+    * Switch to re-enable old, {@link ASTJoinOrderByTypeOptimizer} (which was
+    * the predecessor of the {@link ASTJoinGroupOrderOptimizer}. By default,
+    * the new strategy is enabled.
+    * 
+    * @see #OLD_JOIN_ORDER_OPTIMIZER
+    */
+   String OLD_JOIN_ORDER_OPTIMIZER = "OldJoinOrderOptimizer";
 
+   boolean DEFAULT_OLD_JOIN_ORDER_OPTIMIZER = Boolean.valueOf(
+         System.getProperty(OLD_JOIN_ORDER_OPTIMIZER, "false"));
 }

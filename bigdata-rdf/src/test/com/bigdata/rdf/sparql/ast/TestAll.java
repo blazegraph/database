@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 
+import com.bigdata.rdf.sparql.ast.optimizers.TestGroupNodeVarBindingInfo;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -107,6 +109,9 @@ public class TestAll extends TestCase {
         // Stored Query SERVICE.
         suite.addTest(com.bigdata.rdf.sparql.ast.service.storedquery.TestAll.suite());
 
+        // Test for group node var binding info utility class
+        suite.addTestSuite(TestGroupNodeVarBindingInfo.class);
+        
         return suite;
         
     }

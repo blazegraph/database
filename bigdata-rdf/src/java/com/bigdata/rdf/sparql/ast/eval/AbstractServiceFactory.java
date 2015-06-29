@@ -38,7 +38,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * predicates that configure the service) in a standardized manner using the
  * {@link ServiceParams} helper class.
  */
-public abstract class AbstractServiceFactory implements ServiceFactory {
+public abstract class AbstractServiceFactory extends AbstractServiceFactoryBase {
 
     public AbstractServiceFactory() {
     
@@ -77,5 +77,5 @@ public abstract class AbstractServiceFactory implements ServiceFactory {
     public abstract BigdataServiceCall create(
     		final ServiceCallCreateParams params,
     		final ServiceParams serviceParams);
-
+    
 }

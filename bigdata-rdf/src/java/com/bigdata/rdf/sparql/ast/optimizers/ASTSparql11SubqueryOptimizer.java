@@ -406,6 +406,7 @@ public class ASTSparql11SubqueryOptimizer implements IASTOptimizer {
         nsr.setProjection(subqueryRoot.getProjection());
         nsr.setSlice(subqueryRoot.getSlice());
         nsr.setWhereClause(subqueryRoot.getWhereClause());
+        nsr.setBindingsClause(subqueryRoot.getBindingsClause());
 
         sa.getQueryRoot().getNamedSubqueriesNotNull().add(nsr);
 
