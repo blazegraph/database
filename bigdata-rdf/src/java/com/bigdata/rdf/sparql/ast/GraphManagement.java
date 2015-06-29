@@ -27,9 +27,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * A Graph Management operation.
@@ -84,6 +87,16 @@ abstract public class GraphManagement extends Update {
 
         setProperty(Annotations.SILENT, silent);
 
+    }
+
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
     }
 
 }

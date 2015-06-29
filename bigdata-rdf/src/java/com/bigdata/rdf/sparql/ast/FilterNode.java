@@ -1,6 +1,8 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
@@ -102,4 +104,14 @@ public class FilterNode extends GroupMemberValueExpressionNodeBase implements
 
     }
 
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return getConsumedVars();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+    }    
+    
 }

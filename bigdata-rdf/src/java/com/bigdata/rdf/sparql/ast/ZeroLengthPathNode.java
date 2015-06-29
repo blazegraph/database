@@ -1,5 +1,6 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -152,5 +153,14 @@ public class ZeroLengthPathNode
 
 	}
 
+   @Override
+   public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+   }
+
+   @Override
+   public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return sa.getSpannedVariables(this, true, new HashSet<IVariable<?>>());
+   }
     
 }
