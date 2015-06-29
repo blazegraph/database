@@ -671,4 +671,19 @@ public interface QueryHints {
 
    boolean DEFAULT_OLD_JOIN_ORDER_OPTIMIZER = Boolean.valueOf(
          System.getProperty(OLD_JOIN_ORDER_OPTIMIZER, "false"));
+   
+   /**
+    * Switch to disable normalization/decomposition of FILTER expressions. There 
+    * might be two scenarios where decomposition of FILTER expressions comes 
+    * with a significant overhead: (i) whenever large complex FILTERs are used
+    * or (ii) when there are unselective parts of FILTERs that are evaluated too
+    * early when decomposing FILTERs (cd. SP2B Q6).
+    * 
+    * @see #DEFAULT_NORMALIZE_FILTER_EXPRESSIONS
+    */
+   String NORMALIZE_FILTER_EXPRESSIONS = "normalizeFilterExpressions";
+
+   boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
+         System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "true"));
+
 }
