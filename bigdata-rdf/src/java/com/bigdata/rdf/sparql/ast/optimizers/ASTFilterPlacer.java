@@ -98,9 +98,9 @@ class ASTFilterPlacer {
    public void placeFiltersInPartitions(
       final ASTJoinGroupPartitions partitions) {
 
-      final List<IGroupMemberNode> filterNodes =
+      final List<FilterNode> filterNodes =
          filterNodeClassifier.get(FilterNode.class);
-      final List<IGroupMemberNode> askSubqueries =
+      final List<SubqueryRoot> askSubqueries =
          filterNodeClassifier.get(SubqueryRoot.class);
 
       // first, place the ASK subqueries
