@@ -23,11 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.optimizers;
 
-import com.bigdata.rdf.sparql.ast.QueryHints;
-
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+
+import com.bigdata.rdf.sparql.ast.QueryHints;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -157,6 +157,15 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestASTFlattenJoinGroupsOptimizer.class);
         
         suite.addTestSuite(TestALPPinTrac773.class);
+        
+        // unit tests for the TestIVariableBindingRequirements interface
+        suite.addTestSuite(TestIVariableBindingRequirements.class);
+        
+        // unit tests for ASTJoinGroupOrderOptimizer
+        suite.addTestSuite(TestASTJoinGroupOrderOptimizer.class);
+        
+        // test partitioning utility classes
+        suite.addTestSuite(TestASTJoinGroupPartitioning.class);
         
         /**
 		 * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range

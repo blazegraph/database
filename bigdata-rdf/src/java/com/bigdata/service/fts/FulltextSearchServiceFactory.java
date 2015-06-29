@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.service.fts;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,6 +46,7 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.AbstractJournal;
@@ -61,11 +65,11 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.MockIVReturningServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.search.IHit;
@@ -83,7 +87,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class FulltextSearchServiceFactory implements ServiceFactory {
+public class FulltextSearchServiceFactory extends AbstractServiceFactoryBase {
 
    private static final Logger log = Logger
          .getLogger(FulltextSearchServiceFactory.class);
@@ -1114,6 +1118,56 @@ public class FulltextSearchServiceFactory implements ServiceFactory {
          return defaultSnippetField;
       }
    }
-   
 
+   @Override
+   public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+
+      /**
+       * This method extracts exactly those variables that are incoming,
+       * i.e. must be bound before executing the execution of the service.
+       */
+      final Set<IVariable<?>> requiredBound = new HashSet<IVariable<?>>();
+      for (StatementPatternNode sp : getStatementPatterns(serviceNode)) {
+            
+         final URI predicate = (URI) (sp.p()).getValue();
+         final IVariableOrConstant<?> object = sp.o().getValueExpression();
+            
+         if (object instanceof IVariable<?>) {
+            
+            if (predicate.equals(FTS.SEARCH) || predicate.equals(FTS.ENDPOINT)
+               || predicate.equals(FTS.ENDPOINT_TYPE) || predicate.equals(FTS.PARAMS)
+               || predicate.equals(FTS.SEARCH_RESULT_TYPE) || predicate.equals(FTS.SEARCH_FIELD)
+               || predicate.equals(FTS.SCORE_FIELD) || predicate.equals(FTS.SNIPPET_FIELD)
+               || predicate.equals(FTS.TIMEOUT)) {
+               
+               requiredBound.add((IVariable<?>)object); // the subject var is what we return                  
+            }
+         }
+      }
+
+      return requiredBound;
+   }
+   
+   /**
+    * Returns the statement patterns contained in the service node.
+    * 
+    * @param serviceNode
+    * @return
+    */
+   Collection<StatementPatternNode> getStatementPatterns(final ServiceNode serviceNode) {
+
+      final List<StatementPatternNode> statementPatterns = 
+         new ArrayList<StatementPatternNode>();
+      
+      for (IGroupMemberNode child : serviceNode.getGraphPattern()) {
+         
+         if (child instanceof StatementPatternNode) {      
+            statementPatterns.add((StatementPatternNode)child);
+         } else {
+            throw new FulltextSearchException("Nested groups are not allowed.");            
+         }
+      }
+      
+      return statementPatterns;
+   }
 }

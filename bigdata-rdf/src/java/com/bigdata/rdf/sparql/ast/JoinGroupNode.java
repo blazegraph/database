@@ -23,10 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
@@ -429,4 +431,28 @@ public class JoinGroupNode extends GraphPatternGroup<IGroupMemberNode> {
 //    ....
 //	}
 
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+
+       final Set<IVariable<?>> requiredBound = new HashSet<IVariable<?>>();
+       for (IGroupMemberNode child : getChildren()) {
+          requiredBound.addAll(child.getRequiredBound(sa));
+       }
+       
+       
+       return requiredBound;
+
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       
+       final Set<IVariable<?>> desiredBound = new HashSet<IVariable<?>>();
+       for (IGroupMemberNode child : getChildren()) {
+          desiredBound.addAll(child.getDesiredBound(sa));
+       }
+       
+       
+       return desiredBound;
+    }
 }

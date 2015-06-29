@@ -57,6 +57,7 @@ import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
@@ -392,8 +393,15 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
        * Collect the children that introduce static bindings for later removal.
        */
       final List<IGroupMemberNode> toRemove = new ArrayList<IGroupMemberNode>();
+      
+      // ticket 933b: the prerequisite for static binding of a variable is that
+      // there is no preceding OPTIONAL or MINUS possibly binding the variable
+      // within the join group, since the OPTIONAL or MINUS would be logically 
+      // evaluated first
+      final Set<IVariable<?>> optOrMinusVars = new HashSet<IVariable<?>>();
+      
       for (IGroupMemberNode child : group) {
-                  
+         
          if (child instanceof AssignmentNode) {
             
             final AssignmentNode an = (AssignmentNode)child;
@@ -421,7 +429,8 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                // pull out the expression to the top of the query root, if
                // possible (the check is necessary to avoid scoping problems
                // caused by bottom-up semantics, i.e. unsafe filter expressions)
-               if (!ancOrSelfVarUsageInfo.varUsedInFilterOrAssignment(boundVar)) {
+               if (!ancOrSelfVarUsageInfo.varUsedInFilterOrAssignment(boundVar)
+                     && !optOrMinusVars.contains(boundVar)) {
                   
                   final IBindingSet bs = new ListBindingSet();
                   bs.set(boundVar, (IConstant)an.getValueExpression());
@@ -456,17 +465,18 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
             final List<IBindingSet> bss = bc.getBindingSets();
             final Set<IVariable<?>> bssVars = sa.getVarsInBindingSet(bss);
             
-            boolean someVarUsedInFilter = false;
+            boolean someVarUsedInFilterOrPrevOptOrMinus = false;
             for (IVariable<?> bssVar : bssVars) {
                
-               someVarUsedInFilter |= 
-                  ancOrSelfVarUsageInfo.varUsedInFilterOrAssignment(bssVar);
+               someVarUsedInFilterOrPrevOptOrMinus |= 
+                  ancOrSelfVarUsageInfo.varUsedInFilterOrAssignment(bssVar)
+                  || optOrMinusVars.contains(bssVar);
                
             }
             
             // in case none of the vars is used in a filter below, we can
             // safely pull it out
-            if (!someVarUsedInFilter) { 
+            if (!someVarUsedInFilterOrPrevOptOrMinus) { 
 
                staticBindingInfo.addProduced(bc.getBindingSets());
                toRemove.add(child);
@@ -606,7 +616,18 @@ public class ASTStaticBindingsOptimizer implements IASTOptimizer {
                   }                 
                }
             } // else: there's nothing obvious we can do
+
          }
+         
+         
+         if (child instanceof IBindingProducerNode && 
+               StaticAnalysis.isMinusOrOptional(child)) {
+            
+            sa.getMaybeProducedBindings(
+               (IBindingProducerNode)child, optOrMinusVars, true);
+         }
+         
+         
       }  
       
       /**

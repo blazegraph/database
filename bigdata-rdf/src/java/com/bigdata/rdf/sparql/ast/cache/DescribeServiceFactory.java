@@ -10,8 +10,8 @@ import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sparql.ast.eval.CustomServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
-import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
@@ -30,7 +30,7 @@ import com.bigdata.rdf.store.BD;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-public class DescribeServiceFactory implements CustomServiceFactory {
+public class DescribeServiceFactory extends CustomServiceFactoryBase {
 
     static private transient final Logger log = Logger
             .getLogger(DescribeServiceFactory.class);
