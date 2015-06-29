@@ -104,8 +104,16 @@ public class TestConcurrentWeakValueCacheWithBatchingUpdates extends TestCase2 {
             assertEquals(innerSize, innerMap.size());
             assertEquals(outerSize, outerMap.size());
             assertEquals(outerSize + innerSize, fixture.size());
+            
+            if(log.isInfoEnabled()){
+            	log.info("Outer: " + outerMap.size() + " , Inner: " + innerMap.size());
+            }
 
             System.gc();
+
+            if(log.isInfoEnabled()){
+            	log.info("Outer: " + outerMap.size() + " , Inner: " + innerMap.size());
+            }
 
             assertEquals(outerSize + innerSize, fixture.size());
 

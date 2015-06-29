@@ -25,8 +25,6 @@ package com.bigdata.blueprints;
 
 import org.junit.Test;
 
-import com.tinkerpop.blueprints.Edge;
-import com.tinkerpop.blueprints.Vertex;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
@@ -44,7 +42,6 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 
 	public void setUp() throws Exception {
 		super.setUp();
-		super.getServiceURL();
 	}
 
 	@Test
@@ -110,24 +107,6 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 		}
 	}
 
-	protected void testBigdataGraph(BigdataGraph testGraph) throws Exception {
-
-		final String example = "graph-example-1.xml";
-
-		GraphMLReader.inputGraph(testGraph, this.getClass()
-				.getResourceAsStream(example));
-
-		for (Vertex v : testGraph.getVertices()) {
-			testPrint(v);
-		}
-		for (Edge e : testGraph.getEdges()) {
-			testPrint(e);
-		}
-
-		testGraph.shutdown();
-
-	}
-	
 	@Override
 	protected BigdataGraph getNewGraph(String file) throws Exception {
 		
@@ -136,12 +115,6 @@ public class TestBigdataGraphFactoryNSS extends  AbstractTestNSSBlueprintsClient
 		testPrint("Connecting to Remote Repository at " + testURL);
 
 		return new BigdataGraphClient(testURL);
-	}
-
-	@Override
-	protected BigdataGraph loadGraph(String file) throws Exception {
-		
-		return getNewGraph(file);
 	}
 
 }
