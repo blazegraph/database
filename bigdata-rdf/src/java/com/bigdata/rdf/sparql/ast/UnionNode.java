@@ -1,12 +1,14 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 import com.bigdata.rdf.sparql.ast.optimizers.StaticOptimizer;
-import com.bigdata.rdf.store.ITripleStore;
 
 /**
  * A special kind of group {@link IGroupNode} that represents the sparql union
@@ -143,4 +145,27 @@ public class UnionNode extends GraphPatternGroup<JoinGroupNode>  implements IReo
         assert newChild instanceof JoinGroupNode;
         return  super.replaceWith(oldChild, newChild);
     }
+
+
+   @Override
+   public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+      Set<IVariable<?>> requiredBound = new HashSet<IVariable<?>>();
+
+      for (JoinGroupNode jgn : getChildren()) {
+         requiredBound.addAll(jgn.getRequiredBound(sa));
+      }
+
+      return requiredBound;
+   }
+
+   @Override
+   public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+      Set<IVariable<?>> desiredBound = new HashSet<IVariable<?>>();
+
+      for (JoinGroupNode jgn : getChildren()) {
+         desiredBound.addAll(jgn.getDesiredBound(sa));
+      }
+
+      return desiredBound;
+   }
 }
