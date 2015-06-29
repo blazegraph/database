@@ -46,13 +46,19 @@ dependencies.
 
 --><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
    <modelVersion>4.0.0</modelVersion>
+   <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.2-SNAPSHOT</version>
+    <relativePath>blazegraph-parent/pom.xml</relativePath>
+   </parent>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.5.1-SNAPSHOT</version>
-   <packaging>pom</packaging>
-   <name>bigdata(R)</name>
-    <description>Bigdata(R) Maven Build</description>
-    <url>http://www.systap.com/bigdata.htm</url>
+   <version>${bigdata.version}</version>
+   <packaging>jar</packaging>
+   <name>Blazegraph(tm)</name>
+    <description>Blazegraph(tm) Maven Build</description>
+    <url>http://www.blazegraph.com/</url>
     <organization>
         <name>SYSTAP, LLC</name>
         <url>http://www.systap.com/</url>
@@ -64,52 +70,334 @@ dependencies.
             <url>http://www.gnu.org/licenses/gpl-2.0.html</url>
         </license>
     </licenses>
-    <properties>
-      <!--                                                            -->
-      <!-- Note: Dependency versions are declared in build.properties -->
-      <!-- This is a copy of that information. However, there are a   -->
-      <!-- few subtle differences.  See build.properties for details. -->
-      <!--                                                            -->
-      <icu.version>4.8</icu.version>
-      <zookeeper.version>3.4.5</zookeeper.version>
-      <sesame.version>2.7.13</sesame.version>
-      <slf4j.version>1.6.1</slf4j.version>
-      <jetty.version>9.2.3.v20140905</jetty.version>
-      <servlet.version>3.1.0</servlet.version>
-      <lucene.version>3.0.0</lucene.version>
-      <apache.commons_codec.version>1.4</apache.commons_codec.version>
-      <apache.commons_fileupload.version>1.3.1</apache.commons_fileupload.version>
-      <apache.commons_io.version>2.1</apache.commons_io.version>
-      <apache.commons_logging.version>1.1.1</apache.commons_logging.version>
-      <apache.httpclient.version>4.1.3</apache.httpclient.version>
-      <apache.httpclient_cache.version>4.1.3</apache.httpclient_cache.version>
-      <apache.httpcore.version>4.1.4</apache.httpcore.version>
-      <apache.httpmime.version>4.1.3</apache.httpmime.version>
-      <colt.version>1.2.0</colt.version>
-      <highscalelib.version>1.1.2</highscalelib.version>
-      <log4j.version>1.2.17</log4j.version>
-      <fastutil.version>6.5.16</fastutil.version>
-      <dsiutils.version>1.0.6-020610</dsiutils.version>
-      <lgplutils.version>1.0.7-270114</lgplutils.version>
-      <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
-      <jackson.version>2.3.1</jackson.version>
-      <blueprints.version>2.5.0</blueprints.version>
-      <jettison.version>1.3.3</jettison.version>
-      <rexster.version>2.5.0</rexster.version>
-    </properties>
-    <!-- TODO Can we declare the versions of the dependencies here as
-         properties and have them be substituted in for us? Can we pick
-         up those dependency versions from a properties file so we can
-         share the version declarations in build.properties?  If we do
-         that, will the version numbers be filled in when this POM is
-         deployed to the systap repository?
-         
-         TODO Add ant target to deploy the dependencies that we use that
-         are not widely (publicly) available to the systap repository.
-     -->
-    
+    <!-- properties are now in the parent POM. -->
     <build>
+      <sourceDirectory>bigdata/src/java</sourceDirectory>
+      <resources>
+        <resource>
+            <directory>bigdata/src/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-rdf/src/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.rdf</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <!-- Include the RIO parser configurations for OpenRDF -->
+        <resource>
+	   <directory>bigdata-rdf/src/resources/service-providers/</directory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-sails/src/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-gom/src/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata/src/test</directory>
+            <includes>
+                <include>**/*.csv</include>
+                <include>**/*.owl</include>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-rdf/src/test</directory>
+            <includes>
+                <include>**/*.n3</include>
+                <include>**/*.nt</include>
+                <include>**/*.owl</include>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.rdf</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-sails/src/test</directory>
+            <includes>
+                <include>**/*.n3</include>
+                <include>**/*.nt</include>
+                <include>**/*.owl</include>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-gom/src/test</directory>
+            <includes>
+                <include>**/*.n3</include>
+                <include>**/*.owl</include>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+        <resource>
+            <directory>bigdata-war/src</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+       </resources>
+
         <plugins>
+<!--
+TODO:  Break out into separate test class project.
+
+See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.html
+-->
+          <plugin>
+           <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.6</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+          <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <includes>
+     	    <include>com/bigdata/cache/TestAll.java</include>
+            <include>com/bigdata/io/TestAll.java</include>
+            <include>com/bigdata/net/TestAll.java</include>
+            <include>com/bigdata/config/TestAll.java</include>
+            <include>com/bigdata/util/TestAll.java</include>
+            <include>com/bigdata/util/concurrent/TestAll.java</include>
+            <include>com/bigdata/striterator/TestAll.java</include>
+            <include>com/bigdata/counters/TestAll.java</include>
+            <include>com/bigdata/rawstore/TestAll.java</include>
+            <include>com/bigdata/btree/TestAll.java</include>
+            <include>com/bigdata/htree/TestAll.java</include>
+            <include>com/bigdata/concurrent/TestAll.java</include>
+            <include>com/bigdata/quorum/TestAll.java</include>
+            <include>com/bigdata/ha/TestAll.java</include>
+            <include>com/bigdata/io/writecache/TestAll.java</include>
+            <include>com/bigdata/journal/TestAll.java</include>
+            <include>com/bigdata/rwstore/TestAll.java</include>
+            <include>com/bigdata/resources/TestAll.java</include>
+            <include>com/bigdata/relation/TestAll.java</include>
+            <include>com/bigdata/bop/TestAll.java</include>
+            <include>com/bigdata/relation/rule/eval/TestAll.java</include>
+            <include>com/bigdata/mdi/TestAll.java</include>
+    <!-- enabled until moved into maven scale-out project/ hopefully will not run out of CI resources now that jini is in its own project/ -->
+            <include>com/bigdata/service/TestAll.java</include>
+            <include>com/bigdata/bop/fed/TestAll.java</include>
+            <include>com/bigdata/sparse/TestAll.java</include>
+            <include>com/bigdata/search/TestAll.java</include>
+            <!-- not suppported yet/
+            <include>com/bigdata/bfs/TestAll.java</include>
+            -->
+            <include>com/bigdata/rdf/TestAll.java</include>
+            <include>com/bigdata/rdf/sail/TestAll.java</include>
+            <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
+            <include>com/bigdata/gom/TestAll.java</include>
+           </includes>
+           <excludes>
+    	    <exclude>com/bigdata/TestAll.java</exclude>
+	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
+	  </excludes>
+          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>1.9.1</version>
+        <executions>
+          <execution>
+            <id>add-test-resource</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-resource</goal>
+            </goals>
+            <configuration>
+              <resources>
+ 		<resource>
+                 <directory>bigdata/src/test</directory>
+                  <includes>
+                   <include>**/*.n3</include>
+                   <include>**/*.owl</include>
+                   <include>**/*.properties</include>
+                   <include>**/*.xml</include>
+                   <include>**/*.txt</include>
+                   <include>**/*.ttl</include>
+                   <include>**/*.rq</include>
+                   <include>**/*.srx</include>
+                   <include>**/*.trig</include>
+               </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-rdf/src/test</directory>
+                   <includes>
+                       <include>**/*.n3</include>
+                       <include>**/*.nt</include>
+                       <include>**/*.owl</include>
+                       <include>**/*.properties</include>
+                       <include>**/*.rdf</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-sails/src/test</directory>
+                   <includes>
+                       <include>**/*.n3</include>
+                       <include>**/*.nt</include>
+                       <include>**/*.owl</include>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-gom/src/test</directory>
+                   <includes>
+                       <include>**/*.n3</include>
+                       <include>**/*.owl</include>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+               <resource>
+                   <directory>bigdata-war/src</directory>
+                   <includes>
+                       <include>**/*.n3</include>
+                       <include>**/*.properties</include>
+                       <include>**/*.xml</include>
+                       <include>**/*.txt</include>
+                       <include>**/*.ttl</include>
+                       <include>**/*.rq</include>
+                       <include>**/*.srx</include>
+                       <include>**/*.trig</include>
+                   </includes>
+               </resource>
+              </resources>
+            </configuration>
+          </execution> 
+          <execution>
+            <id>add-source</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>bigdata/src/java</source>
+                <source>bigdata-rdf/src/java</source>
+                <source>bigdata-sails/src/java</source>
+                <source>bigdata-gom/src/java</source>
+              </sources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>add-test-source</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+            	<source>bigdata/src/test</source>
+                <source>bigdata-rdf/src/test</source>
+                <source>bigdata-sails/src/test</source>
+                <source>bigdata-gom/src/test</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+<!--
          <plugin>
            <artifactId>maven-antrun-plugin</artifactId>
            <version>1.6</version>
@@ -143,6 +431,7 @@ dependencies.
                 </execution>
            </executions>
          </plugin>
+-->
         </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
@@ -167,19 +456,18 @@ dependencies.
             <uniqueVersion>true</uniqueVersion>
         </snapshotRepository>
     </distributionManagement>
-    
+   <!-- 
    <repositories>
     <repository>
       <id>bigdata.releases</id>
       <url>http://www.systap.com/maven/releases/</url>
     </repository>
-    <!-- 
     <repository>
       <id>jetty.releases</id>
       <url>https://oss.sonatype.org/content/groups/jetty/</url>
     </repository>
-    -->
   </repositories>
+-->
 
    <!-- This declares the basic dependencies that you need to use     -->
    <!-- bigdata as an embedded database.  Use ant (build.xml) for     -->
@@ -289,11 +577,11 @@ dependencies.
            <artifactId>commons-logging</artifactId>
            <version>${apache.commons_logging.version}</version>
        </dependency>
-		<dependency>
-		   <groupId>com.fasterxml.jackson.core</groupId>
-		   <artifactId>jackson-core</artifactId>
-		   <version>${jackson.version}</version>
-		</dependency>
+       <dependency>
+ 	   <groupId>com.fasterxml.jackson.core</groupId>
+	   <artifactId>jackson-core</artifactId>
+	   <version>${jackson.version}</version>
+	</dependency>
         <dependency>
            <groupId>com.tinkerpop.blueprints</groupId>
            <artifactId>blueprints-core</artifactId>
@@ -304,130 +592,148 @@ dependencies.
           <artifactId>rexster-core</artifactId>
           <version>${rexster.version}</version>
         </dependency>
-       <!--                                                           -->
-       <!-- artifacts that we publish (because they are not readily   -->
-       <!-- available) but we do not maintain.                        -->
-       <!--                                                           -->
-       <dependency>
-           <!-- fastutil.fastutil & it.unimi.dsi.fastutil from central have different versions -->
-           <!-- fastutil 6.1.0+ is on maven central. -->
-           <!-- 
-mvn deploy:deploy-file \
-   -DgroupId=it.unimi \
-   -DartifactId=fastutil \
-   -Dversion=6.5.16 \
-   -Dpackaging=jar \
-   -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/unimi/fastutil-6.5.16.jar
-               -->
-           <groupId>it.unimi</groupId>
-           <artifactId>fastutil</artifactId>
-           <version>${fastutil.version}</version>
-       </dependency>
-       <dependency>
-           <!-- This ICU dependency is not widely available. -->
-           <!-- 
-mvn deploy:deploy-file \
-   -DgroupId=com.ibm.icu \
-   -DartifactId=icu4j-charset \
-   -Dversion=4.8 \
-   -Dpackaging=jar \
-   -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/icu/icu4j-charset-4.8.jar
-               -->
-           <groupId>com.ibm.icu</groupId>
-           <artifactId>icu4j-charset</artifactId>
-           <version>${icu.version}</version>
-       </dependency>
-       <dependency>
-           <!-- sesame-runtime will pull in the various openrdf compoents. -->
-           <groupId>org.openrdf.sesame</groupId>
-           <artifactId>sesame-runtime</artifactId>
-           <version>${sesame.version}</version>
-       </dependency>
-       <!--                                                           -->
-       <!-- artifacts maintained and published by the bigdata project -->
-       <dependency>
-       <!-- 
-mvn deploy:deploy-file \
-   -DgroupId=com.bigdata \
-   -DartifactId=bigdata-ganglia \
-   -Dversion=1.0.4 \
-   -Dpackaging=jar \
-   -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/bigdata-ganglia-1.0.4.jar
-        -->
-           <groupId>com.bigdata</groupId>
-           <artifactId>bigdata-ganglia</artifactId>
-           <version>${bigdata.ganglia.version}</version>
-           <optional>true</optional>
-       </dependency>
-       <!-- 
-mvn deploy:deploy-file \
-   -DgroupId=com.bigdata \
-   -DartifactId=dsi-utils \
-   -Dversion=1.0.6-020610 \
-   -Dpackaging=jar \
-   -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/dsi-utils-1.0.6-020610.jar
-        -->
-       <dependency>
-           <groupId>com.bigdata</groupId>
-           <artifactId>dsi-utils</artifactId>
-           <version>${dsiutils.version}</version>
-       </dependency>
-       <!-- 
-       <dependency>
-mvn deploy:deploy-file \
-   -DgroupId=org.cognitiveweb \
-   -DartifactId=cweb-junit-ext \
-   -Dversion=1.1-b3-dev \
-   -Dpackaging=jar \
-   -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/junit-ext-1.1-b3-dev.jar
-      <groupId>org.CognitiveWeb</groupId>
-         <artifactId>cweb-junit-ext</artifactId>
-         <version>1.1-b3-dev</version>
-       </dependency>
-        -->
-       <dependency>
-       <!-- 
-mvn deploy:deploy-file \
-   -DgroupId=com.bigdata \
-   -DartifactId=lgpl-utils \
-   -Dversion=1.0.7-270114 \
-   -Dpackaging=jar \
-   -DrepositoryId=bigdata.releases \
-   -Durl=scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases/ \
-   -Dfile=bigdata/lib/lgpl-utils-1.0.7-270114.jar
-           -->
-           <groupId>com.bigdata</groupId>
-           <artifactId>lgpl-utils</artifactId>
-           <version>${lgplutils.version}</version>
-       </dependency>
-    <!-- jetty dependencies for the REST API 
-    jetty-continuation
-    jetty-http
-    jetty-io
-    jetty-jmx
-    jetty-jndi
-    jetty-server
-    jetty-util
-    jetty-webapp
-    jetty-servlet
-    jetty-security
-    jetty-xml
-    jetty-rewrite
-    jetty-proxy
-    servlet-api
-    javax.servlet-api
-    
-      <dependency>
+  
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-runtime</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-rdfxml</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-queryresultio-sparqljson</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-testsuite</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-sparql-testsuite</artifactId>
+	<version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-store-testsuite</artifactId>
+	<version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jini-core</artifactId>
+        <version>2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>org.apache.river</groupId>
+        <artifactId>tools</artifactId>
+        <version>2.2.2</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+        <groupId>net.jini</groupId>
+        <artifactId>jini-ext</artifactId>
+        <version>2.1</version>
+        <type>jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>3.4.5</version>
+    </dependency>
+<!--
+-->
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-blueprints</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-client</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-client</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+       <scope>test</scope>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-ganglia</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-gas</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-gas</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+       <scope>test</scope>
+     </dependency>
+<!-- TODO: Factor out dependency on bigdata-jini
+-->
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-jini</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-jini</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+       <scope>test</scope>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>ctc-striterators</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>dsi-utils</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+<!--
+     <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit3.version}</version>
+     </dependency>
+-->
+     <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit3.version}</version>
+     </dependency>
+     <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit4.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>junit-ext</artifactId>
+      <version>${junit-ext.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>lgpl-utils</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+    <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-continuation</artifactId>
         <version>${jetty.version}</version>
@@ -452,11 +758,11 @@ mvn deploy:deploy-file \
         <artifactId>jetty-jndi</artifactId>
         <version>${jetty.version}</version>
       </dependency>
-	   <dependency>
-		  <groupId>org.eclipse.jetty</groupId>
-		  <artifactId>jetty-server</artifactId>
-		  <version>${jetty.version}</version>
-	   </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-util</artifactId>
@@ -497,17 +803,24 @@ mvn deploy:deploy-file \
         <artifactId>jetty-proxy</artifactId>
         <version>${jetty.version}</version>
       </dependency>
-		<dependency>
-			<groupId>javax.servlet</groupId>
-			<artifactId>javax.servlet-api</artifactId>
-			<version>${servlet-version}</version>
-         <scope>provided</scope>
-		</dependency>
-		-->
+       <dependency>
+        <groupId>javax.servlet</groupId>
+        <artifactId>javax.servlet-api</artifactId>
+        <version>${servlet.version}</version>
+      </dependency>
    </dependencies>
 <!--
   <modules>
+    <module>bigdata-blueprints</module>
     <module>bigdata-client</module>
+    <module>bigdata-ganglia</module>
+    <module>bigdata-gas</module>
+    <module>bigdata-jini</module>
+    <module>blazegraph-parent</module>
+    <module>ctc-striterators</module>
+    <module>dsi-utils</module>
+    <module>junit-ext</module>
+    <module>lgpl-utils</module>
   </modules>
 -->
 </project>
