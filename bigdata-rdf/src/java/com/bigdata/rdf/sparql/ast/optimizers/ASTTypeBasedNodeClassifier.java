@@ -85,6 +85,12 @@ class ASTTypeBasedNodeClassifier {
    }
    
 
+   /**
+    * Register the set of nodes to the classifier, making them available for
+    * lookup.
+    * 
+    * @param nodeList
+    */
    public void registerNodes(final Iterable<IGroupMemberNode> nodeList) {
       
       // initialize map with empty arrays
@@ -130,8 +136,9 @@ class ASTTypeBasedNodeClassifier {
     * is the (possibly empty) list of nodes with the given type. If the
     * type was not provided, null is returned.
     */
-   public List<IGroupMemberNode> get(Class<?> clazz) {
-      return classifiedNodes.get(clazz);
+   @SuppressWarnings("unchecked")
+   public <T> List<T> get(Class<T> clazz) {
+      return (List<T>)(List<?>)classifiedNodes.get(clazz);
    }
    
    public void addConstraintForType(
