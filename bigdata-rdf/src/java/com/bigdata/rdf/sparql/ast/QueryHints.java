@@ -681,7 +681,7 @@ public interface QueryHints {
     * 
     * @see #DEFAULT_NORMALIZE_FILTER_EXPRESSIONS
     */
-   String NORMALIZE_FILTER_EXPRESSIONS = "normalzeFilterExpressions";
+   String NORMALIZE_FILTER_EXPRESSIONS = "normalizeFilterExpressions";
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
          System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "true"));
