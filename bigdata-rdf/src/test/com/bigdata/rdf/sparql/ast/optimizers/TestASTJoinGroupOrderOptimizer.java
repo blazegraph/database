@@ -345,7 +345,34 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
-   public void testServicePlacementSparqlBDS() {
+   public void testServicePlacementSparql11c() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVar("x2"),
+               stmtPatternWithVar("x3"),
+               stmtPatternWithVar("x4"),
+               serviceSparql11WithConstant("x1")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVar("x2"),
+               stmtPatternWithVar("x3"),
+               stmtPatternWithVar("x4"),
+               serviceSparql11WithConstant("x1") /* SPARQL 1.1 service is placed as late as possible */
+           ));
+         
+      }}.test();
+   } 
+   
+   public void testServicePlacementServiceBDS() {
 
       new Helper(){{
          
@@ -362,7 +389,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
          expected = 
             select(varNode(x), 
             where (
-               serviceBDSWithVariable("x2"), /* first possible position */
+               serviceBDSWithVariable("x2"), /* BDS service is placed as early as possible */
                stmtPatternWithVar("x1"),
                stmtPatternWithVar("x2"),
                stmtPatternWithVar("x3"),
@@ -372,7 +399,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
-   public void testServicePlacementSparqlFTS01() {
+   public void testServicePlacementServiceFTS01() {
 
       new Helper(){{
          
@@ -407,7 +434,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
-   public void testServicePlacementSparqlFTS02() {
+   public void testServicePlacementServiceFTS02() {
 
 
       final JoinGroupNode jgnOpt = joinGroupWithVars("inParams2","z");
@@ -454,6 +481,48 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                      "outRes", "outScore", "outSnippet", 
                      "inSearch", "inEndpoint", "inParams2"),
                stmtPatternWithVar("z")
+           ));
+         
+      }}.test();
+   } 
+   
+   /**
+    * Interaction of BIND/SPARQL SERVICE keyword.
+    */
+   public void testServiceBindDependencyOrdering() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("X"),
+               stmtPatternWithVar("inEndpoint"),
+               stmtPatternWithVar("inParams"),
+               serviceFTSWithVariable(
+                     "outRes", "outScore", "outSnippet", 
+                     "inSearch", "inEndpoint", "inParams"),
+               stmtPatternWithVar("outRes"),
+               stmtPatternWithVar("outScore"),
+               stmtPatternWithVar("outSnippet"),
+               assignmentWithVar("inSearch", "X"),
+               assignmentWithVar("dummy", "Y")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("X"),
+               stmtPatternWithVar("inEndpoint"),
+               stmtPatternWithVar("inParams"),
+               stmtPatternWithVar("outRes"),
+               stmtPatternWithVar("outScore"),
+               stmtPatternWithVar("outSnippet"),
+               assignmentWithVar("inSearch", "X"),
+               serviceFTSWithVariable(
+                     "outRes", "outScore", "outSnippet", 
+                     "inSearch", "inEndpoint", "inParams"),
+               assignmentWithVar("dummy", "Y")
            ));
          
       }}.test();
