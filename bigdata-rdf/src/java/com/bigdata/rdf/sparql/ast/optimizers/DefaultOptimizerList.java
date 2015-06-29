@@ -451,19 +451,17 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * when it is invoked).
          */
         add(new ASTServiceNodeOptimizer());
-        
-        /*
-         * Join Order Optimization
-         */
-        
-        /**
-         * Rearranges the children in group nodes in order to put the same types
-         * of join nodes together. It also puts the type groups into the order
-         * in which they should be evaluated.  After this optimizer runs, the
-         * group node order is also the evaluation order.
-         */
-        add(new ASTJoinOrderByTypeOptimizer());
 
+        /**
+         * Brings the children in group nodes into an order that implements
+         * the SPARQL 1.1 semantics, trying to optimize this order based on
+         * various heuristics.
+         */
+        if (!QueryHints.DEFAULT_OLD_JOIN_ORDER_OPTIMIZER)
+           add(new ASTJoinGroupOrderOptimizer());
+        else
+           add(new ASTJoinOrderByTypeOptimizer());
+           
         /**
          * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
          */
@@ -572,6 +570,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          * and range constraint after the join order has been fixed.)
          */
         add(new ASTStaticJoinOptimizer());
+
+        /**
+         * No optimization, just guarantee that the order of FILTERs and nodes
+         * with special semantics gets right. We apply this step only in case
+         * the query hint to enable the old optimizer is turned off.
+         */
+        if (!QueryHints.DEFAULT_OLD_JOIN_ORDER_OPTIMIZER)
+           add(new ASTJoinGroupOrderOptimizer(true /* assertCorrectnessOnly */));
 
         /*
          * The joins are now ordered. Everything from here down MUST NOT change

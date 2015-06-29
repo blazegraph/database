@@ -629,6 +629,31 @@ public class TestFederatedQuery<S extends IIndexManager> extends
         execute(PREFIX+"service14.rq", PREFIX+"service14.srx", false);  
     }
     
+
+    /**
+     * Isues with SERVICE.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
+     * BIND not executed before SERVICE call</a>, see comment from
+     * 07/Jan/14 5:56 PM (original).
+     */
+    public void test_ticket_bg876a1() throws Exception {
+        prepareTest(null, Arrays.asList(PREFIX+"data01.ttl"));
+        execute(PREFIX+"ticket_bg876a1.rq", PREFIX+"ticket_bg876a1.srx", false);  
+    }
+
+    /**
+     * Isues with SERVICE.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
+     * BIND not executed before SERVICE call</a>, see comment from
+     * 07/Jan/14 5:56 PM (without FILTER(true)).
+     */
+    public void test_ticket_bg876a2() throws Exception {
+       prepareTest(null, Arrays.asList(PREFIX+"data01.ttl"));
+       execute(PREFIX+"ticket_bg876a2.rq", PREFIX+"ticket_bg876a1.srx", false);  
+   }
+    
     /**
      * Execute a testcase, both queryFile and expectedResultFile must be files 
      * located on the class path.
