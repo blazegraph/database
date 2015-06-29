@@ -136,6 +136,13 @@ public class DefaultOptimizerList extends ASTOptimizerList {
     private static final long serialVersionUID = 1L;
 
     public DefaultOptimizerList() {
+
+       /**
+        * Query hints are identified applied to AST nodes based on the
+        * specified scope and the location within the AST in which they are
+        * found.
+        */
+       add(new ASTQueryHintOptimizer());
        
        /**
         * Brings complex filter expressions into CNF, decomposes them to
@@ -190,12 +197,6 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTSetValueExpressionsOptimizer());
 
-        /**
-         * Query hints are identified applied to AST nodes based on the
-         * specified scope and the location within the AST in which they are
-         * found.
-         */
-        add(new ASTQueryHintOptimizer());
         
         /**
          * Flatten UNIONs where possible.

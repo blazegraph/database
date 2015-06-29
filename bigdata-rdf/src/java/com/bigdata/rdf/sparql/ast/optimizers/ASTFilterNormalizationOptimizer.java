@@ -44,6 +44,7 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -87,6 +88,14 @@ public class ASTFilterNormalizationOptimizer extends AbstractJoinGroupOptimizer 
    protected void optimizeJoinGroup(
          AST2BOpContext ctx, StaticAnalysis sa,
          IBindingSet[] bSets, JoinGroupNode group) {  
+      
+      /**
+       * The FILTER decomposition optimizer can be disabled with a query hint.
+       */
+      if (!group.getProperty(
+         QueryHints.NORMALIZE_FILTER_EXPRESSIONS, 
+         QueryHints.DEFAULT_NORMALIZE_FILTER_EXPRESSIONS))
+         return;
 
       normalizeAndDecomposeFilters(ctx, sa, bSets, group);
       removeDuplicatesAndTautologies(ctx, sa, bSets, group);
