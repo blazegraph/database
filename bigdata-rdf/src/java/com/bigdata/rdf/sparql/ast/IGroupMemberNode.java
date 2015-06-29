@@ -34,7 +34,7 @@ package com.bigdata.rdf.sparql.ast;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
  */
-public interface IGroupMemberNode extends IQueryNode {
+public interface IGroupMemberNode extends IQueryNode, IVariableBindingRequirements {
 
     /**
      * Return the group to which this node belongs.

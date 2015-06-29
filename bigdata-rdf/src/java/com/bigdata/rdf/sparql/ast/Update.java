@@ -27,11 +27,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * A SPARQL Update operation.
@@ -182,6 +185,16 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
         
         throw new UnsupportedOperationException();
         
+    }
+    
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
     }
     
 }

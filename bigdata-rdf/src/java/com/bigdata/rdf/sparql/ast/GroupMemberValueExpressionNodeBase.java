@@ -100,19 +100,17 @@ public abstract class GroupMemberValueExpressionNodeBase extends
     @Override
     public Set<IVariable<?>> getConsumedVars() {
 
-        final Set<IVariable<?>> consumedVars = new LinkedHashSet<IVariable<?>>();
+       final Set<IVariable<?>> consumedVars = new LinkedHashSet<IVariable<?>>();
 
-        final Iterator<IVariable<?>> it = BOpUtility
-                .getSpannedVariables(getRequiredValueExpression());
+       // collect variables from required value expression
+       final Iterator<IVariable<?>> it = 
+          BOpUtility.getSpannedVariables(getRequiredValueExpression());
 
-        while (it.hasNext()) {
-
-            consumedVars.add(it.next());
-
-        }
-
-        return consumedVars;
-
+       while (it.hasNext()) {
+          consumedVars.add(it.next());
+      }
+       
+       return consumedVars;
     }
 
     @Override

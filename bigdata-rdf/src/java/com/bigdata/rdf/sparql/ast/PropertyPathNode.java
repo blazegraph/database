@@ -1,10 +1,13 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTGraphGroupOptimizer;
 
@@ -241,4 +244,13 @@ public class PropertyPathNode extends
         return sb.toString();
     }
 
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+        return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+        return sa.getSpannedVariables(this, true, new HashSet<IVariable<?>>());
+    }
 }

@@ -1,12 +1,14 @@
 package com.bigdata.rdf.sail;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
@@ -30,6 +32,7 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
@@ -336,5 +339,21 @@ public class RDRHistoryServiceFactory implements CustomServiceFactory {
         }
         
     }
+
+    
+    //TODO:  See https://jira.blazegraph.com/browse/BLZG-1360
+	@Override
+	public Set<IVariable<?>> getRequiredBound(ServiceNode serviceNode) {
+		
+		throw new RuntimeException("Method not yet implemented.");
+
+	}
+
+    //TODO:  See https://jira.blazegraph.com/browse/BLZG-1360
+
+	@Override
+	public Set<IVariable<?>> getDesiredBound(ServiceNode serviceNode) {
+		throw new RuntimeException("Method not yet implemented.");
+	}
 
 } 

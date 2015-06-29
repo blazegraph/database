@@ -102,6 +102,7 @@ public class QueryHintRegistry {
         add(new RTOLimitQueryHint());
         add(new RTONEdgesQueryHint());
         add(new OptimisticQueryHint());
+        add(new NormalizeFilterExpressionHint());
 
         // Analytic query mode.
         add(new AnalyticQueryHint());

@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 
 /**
  * An AST node which provides a reference in an {@link IGroupNode} and indicates
@@ -286,6 +288,24 @@ public class NamedSubqueryInclude extends
 
         return sb.toString();
 
+    }
+
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+
+       final NamedSubqueryRoot nsr = sa.resolveNamedSubqueryInclude(this, sa);
+       return nsr==null ?
+          new HashSet<IVariable<?>>() : nsr.getRequiredBound(sa);
+          
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+
+       final NamedSubqueryRoot nsr = sa.resolveNamedSubqueryInclude(this, sa);
+       return nsr==null ?
+          new HashSet<IVariable<?>>() : nsr.getDesiredBound(sa);
+          
     }
 
 }

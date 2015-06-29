@@ -427,6 +427,24 @@ public class ServiceRegistry {
 //        return f.create(store, serviceURI, serviceNode);
 
     }
+    
+    /**
+     * Maps a URI to a service factory. If the URI is null or there is no custom
+     * service, the default service factory (SPARQL 1.1 service) is returned.
+     * 
+     * @param serviceUri the URI for which we look up the service
+     * @return the associated service factory or the default service factory
+     *         as fallback
+     */
+    public ServiceFactory getServiceFactoryByServiceURI(URI serviceUri) {
+       
+       final ServiceFactory serviceFactory = 
+          serviceUri==null ? 
+          getDefaultServiceFactory() : services.get(serviceUri);
+       
+       return serviceFactory==null ? getDefaultServiceFactory() : serviceFactory;
+       
+    }
 
     private static class ServiceCallCreateParamsImpl implements ServiceCallCreateParams {
 

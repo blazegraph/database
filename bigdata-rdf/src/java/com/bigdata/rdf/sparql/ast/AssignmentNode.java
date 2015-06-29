@@ -1,6 +1,8 @@
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IValueExpression;
@@ -191,5 +193,31 @@ public class AssignmentNode extends GroupMemberValueExpressionNodeBase
         assert index != 0 || newArg instanceof VarNode;
         return super.setArg(index, newArg);
     }
+    
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+
+       final IValueExpressionNode vexp = getValueExpressionNode();
+       
+       Set<IVariable<?>> requiredBound = new HashSet<IVariable<?>>();
+       if (vexp!=null && vexp instanceof ValueExpressionNode) {
+          
+          requiredBound = 
+             sa.getSpannedVariables(
+                (ValueExpressionNode)vexp, true, requiredBound);
+          
+       }
+
+       return requiredBound;
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       /*
+        * Nothing that helps us here (beyond the things we need) 
+        */
+       return new HashSet<IVariable<?>>();
+    }    
+
 
 }
