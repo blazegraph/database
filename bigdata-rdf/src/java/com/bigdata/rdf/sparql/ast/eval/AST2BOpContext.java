@@ -45,6 +45,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.SimpleIdFactory;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
@@ -298,6 +299,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     private ISolutionSetStats sss = null;
     
     /**
+     * Summary statistics for the static analysis phase.
+     */
+    private StaticAnalysisStats saStats = null;
+    
+    /**
      * Globally scoped variables, as injected through Sesame's
      * Operation.setBindings() method.
      */
@@ -313,6 +319,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         
     }
     
+    @Override
+    public StaticAnalysisStats getStaticAnalysisStats() {
+       return saStats;
+    }
+    
     /**
      * Set the statistics summary for the exogenous solution sets.
      * 
@@ -321,8 +332,6 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *            
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>
-     * @throws IllegalStateException
-     *             if the property has already been set.
      */
     public void setSolutionSetStats(final ISolutionSetStats stats) {
         
@@ -332,6 +341,23 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         this.sss = stats;
         
     }
+    
+    /**
+     * Set the statistics object for the static analysis phase.
+     * 
+     * @param saStats the static analysis stats object
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>
+     */
+    public void setStaticAnalysisStats(final StaticAnalysisStats saStats) {
+       
+       if (saStats == null)
+           throw new IllegalArgumentException();
+       
+       this.saStats = saStats;
+       
+   }
     
     /**
      * Static analysis object initialized once we apply the AST optimizers and

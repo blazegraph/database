@@ -50,6 +50,7 @@ import com.bigdata.bop.controller.Steps;
 import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.bop.join.HTreeHashIndexOp;
 import com.bigdata.bop.join.HTreeMergeJoin;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
@@ -232,6 +233,9 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * solution set stats.
          */
         ctx.setSolutionSetStats(SolutionSetStatserator.get(globallyScopedBindings));
+        
+        ctx.setStaticAnalysisStats(
+           new StaticAnalysisStats(astContainer.getQueryParseTime()));
         
         /**
          * By definition of the API, the mappings passed in from Sesame
