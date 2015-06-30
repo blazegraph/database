@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -90,8 +91,13 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
     public QueryNodeWithBindingSet optimize(
         final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+        final StaticAnalysisStats saStats = context.getStaticAnalysisStats();
+        
+        final long begin = System.currentTimeMillis();
+
         final IQueryNode queryNode = input.getQueryNode();
-        final IBindingSet[] bindingSets = input.getBindingSets();     
+        final IBindingSet[] bindingSets = input.getBindingSets();    
+        
 
         if (log.isDebugEnabled())
             log.debug("Original AST:\n" + queryNode);
@@ -102,6 +108,8 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
               (IQueryNode) BOpUtility.deepCopy((BOp) queryNode), bindingSets);
         
         for (IASTOptimizer opt : this) {
+           
+            final long startOpt = System.currentTimeMillis();
 
             if (log.isInfoEnabled())
                 log.info("Applying: " + opt);
@@ -113,11 +121,30 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
             if (log.isDebugEnabled())
                 log.debug("Rewritten AST:\n" + queryNode);
+
+            recordStatsForOptimizer(
+               saStats, opt.getClass().getSimpleName(), startOpt, 
+               System.currentTimeMillis());
       
         }
+
+        recordStatsForOptimizer(
+              saStats, this.getClass().getSimpleName(), begin, 
+              System.currentTimeMillis());
 
         return tmp;
 
     }
+
+    
+    private void recordStatsForOptimizer(
+         final StaticAnalysisStats saStats, final String optimizerName,
+         final long startTime, final long endTime) {
+        
+        saStats.registerOptimizerCall(optimizerName);
+        saStats.addElapsedToOptimizerStat(optimizerName, endTime - startTime);
+    }
+    
+    
 
 }

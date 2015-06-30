@@ -57,6 +57,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
@@ -1084,7 +1085,29 @@ public class QueryServlet extends BigdataRDFServlet {
                 // Fall through and paint the query stats table(s).
                 
             }
-
+            
+            current.node("h2", "Static Analysis Statistics");
+            {
+               if (q == null || q.getStaticAnalysisStats()==null) {
+                  
+                  /*
+                   * This can happen if we fail to get the IRunningQuery reference
+                   * before the query terminates. E.g., if the query runs too
+                   * quickly there is a data race and the reference may not be
+                   * available anymore.
+                   */
+                  current.node("p",
+                       "Static Analysis Statistics are not available.");
+               } else {
+                  
+                  final StaticAnalysisStats saStats = q.getStaticAnalysisStats();
+                  current.node("p").text(saStats.toString());
+                  
+               }
+            }
+            
+            
+            
 			current.node("h2", "Query Evaluation Statistics");
 			
             if (q == null) {
