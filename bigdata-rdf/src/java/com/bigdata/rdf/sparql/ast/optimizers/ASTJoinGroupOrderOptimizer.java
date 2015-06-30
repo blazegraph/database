@@ -27,9 +27,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -138,7 +140,7 @@ implements IASTOptimizer {
        * Note: we may want to pass in (and use) information about existing
        * filters, which might be valuable information for the optimizer.
        */
-      optimizeWithinPartitions(partitions, assertCorrectnessOnly);
+      optimizeWithinPartitions(partitions, bindingInfoMap, assertCorrectnessOnly);
       
       /**
        * Third, place the FILTERs at appropriate positions (across partitions).
@@ -301,6 +303,7 @@ implements IASTOptimizer {
    */
   void optimizeWithinPartitions(
      final ASTJoinGroupPartitions partitions,
+     final GroupNodeVarBindingInfoMap bindingInfoMap,
      final boolean assertCorrectnessOnly) {
      
      final List<ASTJoinGroupPartition> partitionList = 
@@ -311,7 +314,8 @@ implements IASTOptimizer {
         
      for (ASTJoinGroupPartition partition : partitionList) {
         optimizeWithinPartition(
-           partition, assertCorrectnessOnly, knownBoundFromPrevPartitions);
+           partition, assertCorrectnessOnly, 
+           bindingInfoMap, knownBoundFromPrevPartitions);
      }
   }
   
@@ -323,23 +327,27 @@ implements IASTOptimizer {
    void optimizeWithinPartition(
       final ASTJoinGroupPartition partition,
       final boolean assertCorrectnessOnly,
+      final GroupNodeVarBindingInfoMap bindingInfoMap,
       final Set<IVariable<?>> knownBoundFromPrevPartitions) {
           
       final ASTTypeBasedNodeClassifier classifier = 
          new ASTTypeBasedNodeClassifier(
             new Class<?>[] { 
-               ServiceNode.class, 
+               ServiceNode.class, /* see condition A */
                AssignmentNode.class,
-               BindingsClause.class, });
-
+               BindingsClause.class,
+               IGroupMemberNode.class /* see condition B */ });
+     
       /**
+       * ### Condition A:
+       * 
        * We only consider special service nodes for placement, all other service
        * nodes are treated through a standard reorder.
        */
       classifier.addConstraintForType(
          ServiceNode.class,
           new ASTTypeBasedNodeClassifierConstraint() {
-         
+            
             @Override
             boolean appliesTo(final IGroupMemberNode node) {
 
@@ -368,7 +376,38 @@ implements IASTOptimizer {
                return false;
 
             }
+
          });
+      
+      /**
+       * ### Condition B:
+       * 
+       * Additional nodes that have binding requirements (e.g.
+       * { BIND ?x AS ?y } UNION { ... } that can be satisified through
+       * this partition.
+       */
+      classifier.addConstraintForType(
+          IGroupMemberNode.class,
+          new ASTTypeBasedNodeClassifierConstraint() {
+         
+             @Override
+             boolean appliesTo(final IGroupMemberNode node) {
+
+                // get the variables that are required bound in the node ...
+                final Set<IVariable<?>> reqBoundInNode = 
+                   new HashSet<IVariable<?>>(
+                      bindingInfoMap.get(node).getRequiredBound());
+                // ... and substract those that are definitely prodcued inside
+                reqBoundInNode.removeAll(
+                    bindingInfoMap.get(node).getDefinitelyProduced());
+                
+                // -> if this set has not become empty, we need to aim at
+                //    binding variables of this node from this outside partition
+                return !reqBoundInNode.isEmpty();
+
+             }
+
+         });      
 
       classifier.registerNodes(partition.extractNodeList());
 
@@ -381,6 +420,7 @@ implements IASTOptimizer {
       toRemove.addAll(classifier.get(ServiceNode.class));
       toRemove.addAll(classifier.get(AssignmentNode.class));
       toRemove.addAll(classifier.get(BindingsClause.class));
+      toRemove.addAll(classifier.get(IGroupMemberNode.class));
       partition.removeNodesFromPartition(toRemove);
 
       /**
@@ -420,6 +460,7 @@ implements IASTOptimizer {
          new LinkedList<IGroupMemberNode>();
       remainingToBePlaced.addAll(classifier.get(AssignmentNode.class));
       remainingToBePlaced.addAll(classifier.get(ServiceNode.class));
+      remainingToBePlaced.addAll(classifier.get(IGroupMemberNode.class));
       
       final List<IGroupMemberNode> orderedNodes = 
          orderNodesByDependencies(
