@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
@@ -51,6 +50,7 @@ import org.openrdf.model.Value;
 import org.openrdf.model.impl.LinkedHashModel;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.BOpStats;
@@ -413,7 +413,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
 
-	private static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
+	static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
 		
 		private final String updateStr;
     	private final BigdataRDFContext context;
@@ -591,7 +591,7 @@ public class QueryServlet extends BigdataRDFServlet {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    private static class SparqlQueryTask extends AbstractRestApiTask<Void> {
+    static class SparqlQueryTask extends AbstractRestApiTask<Void> {
 
 		private final String queryStr;
 		private final BigdataRDFContext context;
@@ -815,19 +815,6 @@ public class QueryServlet extends BigdataRDFServlet {
 		return req.getParameter(ATTR_UPDATE);
 	}
 	
-	// Note: Referenced by the test suite. Should be moved to utility class.
-	static String readFully(final Reader reader) throws IOException {
-	    final char[] arr = new char[8*1024]; // 8K at a time
-		final StringBuffer buf = new StringBuffer();
-		int numChars;
-
-		while ((numChars = reader.read(arr, 0, arr.length)) > 0) {
-			buf.append(arr, 0, numChars);
-		}
-
-		return buf.toString();
-	}
-
     /**
      * Sends an explanation for the query rather than the query results. The
      * query is still run, but the query statistics are reported instead of the
@@ -1042,12 +1029,13 @@ public class QueryServlet extends BigdataRDFServlet {
             if (q != null) {
 
                 final QueryRoot optimizedAST = astContainer.getOptimizedAST();
+                final IBindingSet[] bs = astContainer.getOptimizedASTBindingSets();
 
                 if (optimizedAST != null) {
 
                     current.node("h2", "Optimized AST");
 
-                    current.node("pre", optimizedAST.toString());
+                    current.node("pre", optimizedAST.toString(0, bs));
 
                 }
 

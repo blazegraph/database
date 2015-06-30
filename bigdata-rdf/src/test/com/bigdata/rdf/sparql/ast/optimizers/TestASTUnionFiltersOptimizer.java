@@ -39,6 +39,7 @@ import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -253,10 +254,10 @@ public class TestASTUnionFiltersOptimizer extends AbstractOptimizerTestCase {
         
         final IQueryNode actual = opt2.optimize(
         		null/* AST2BOpContext */,
-        		opt1.optimize(null/* AST2BOpContext */, given/* queryNode */, bsets),
-        		bsets
-        		);
-
+        		new QueryNodeWithBindingSet(
+        		      opt1.optimize(null/* AST2BOpContext */, new QueryNodeWithBindingSet(given, bsets)).getQueryNode(),
+        		      bsets)
+        		).getQueryNode();
         assertSameAST(expected, actual);
 
     }

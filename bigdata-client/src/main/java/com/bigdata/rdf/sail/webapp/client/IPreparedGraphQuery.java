@@ -33,7 +33,6 @@ import org.openrdf.query.GraphQueryResult;
  * A prepared graph query for the {@link RemoteRepository}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IPreparedGraphQuery extends IPreparedQuery {
 

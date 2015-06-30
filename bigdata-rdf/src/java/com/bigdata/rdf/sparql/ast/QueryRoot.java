@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IBindingSet;
 
 /**
  * The top-level Query.
@@ -200,116 +201,136 @@ public class QueryRoot extends QueryBase implements IPrefixDecls, IDataSetNode {
     @Override
     public String toString(final int indent) {
         
-        final String s = indent(indent);
+       return toString(indent, null);
         
-        final StringBuilder sb = new StringBuilder();
+    }
+    
+    public String toString(final int indent, final IBindingSet[] bs) {
+       
+       final String s = indent(indent);
+       
+       final StringBuilder sb = new StringBuilder();
 
-//        final String queryString = getQueryString();
-//        
-//        final Object parseTree = getParseTree();
-        
-        final Properties queryHints = getQueryHints();
+//       final String queryString = getQueryString();
+//       
+//       final Object parseTree = getParseTree();
+       
+       final Properties queryHints = getQueryHints();
 
-        final Map<String/* prefix */, String/* uri */> prefixDecls = getPrefixDecls();
-        
-        final DatasetNode dataset = getDataset();
+       final Map<String/* prefix */, String/* uri */> prefixDecls = getPrefixDecls();
+       
+       final DatasetNode dataset = getDataset();
 
-//        final BindingsClause bindings = getBindingsClause();
+//       final BindingsClause bindings = getBindingsClause();
 
-        final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
+       final NamedSubqueriesNode namedSubqueries = getNamedSubqueries();
 
-//        if (queryString != null) {
+//       if (queryString != null) {
 //
-//            sb.append(s);
-//            sb.append(queryString);
-//            sb.append("\n");
+//           sb.append(s);
+//           sb.append(queryString);
+//           sb.append("\n");
 //
-//        }
-//        
-//        if (parseTree != null) {
+//       }
+//       
+//       if (parseTree != null) {
 //
-//            if(parseTree instanceof SimpleNode) {
+//           if(parseTree instanceof SimpleNode) {
 //
-//                // Dump parse tree for sparql.jjt grammar.
-//                sb.append(((SimpleNode)parseTree).dump(s));
-//                
-//            } else {
-//            
-//                /*
-//                 * Dump some other parse tree, assuming it implements toString()
-//                 * as pretty print.
-//                 */
-//                sb.append(s);
-//                sb.append(parseTree.toString());
-//                sb.append("\n");
-//                
-//            }
+//               // Dump parse tree for sparql.jjt grammar.
+//               sb.append(((SimpleNode)parseTree).dump(s));
+//               
+//           } else {
+//           
+//               /*
+//                * Dump some other parse tree, assuming it implements toString()
+//                * as pretty print.
+//                */
+//               sb.append(s);
+//               sb.append(parseTree.toString());
+//               sb.append("\n");
+//               
+//           }
 //
-//        }
-        
-        if (queryHints != null) {
+//       }
+       
+       if (queryHints != null) {
 
-            @SuppressWarnings({ "unchecked", "rawtypes" })
-            final Enumeration<String> eitr = (Enumeration) queryHints
-                    .propertyNames();
-            
-            while(eitr.hasMoreElements()) {
-                
-                final String key = eitr.nextElement();
+           @SuppressWarnings({ "unchecked", "rawtypes" })
+           final Enumeration<String> eitr = (Enumeration) queryHints
+                   .propertyNames();
+           
+           while(eitr.hasMoreElements()) {
+               
+               final String key = eitr.nextElement();
 
-                sb.append("\n");
-                sb.append(s);
-                sb.append("hint: [" + key + "]=[" + queryHints.getProperty(key)
-                        + "]");
-                
-            }
-            
-        }
+               sb.append("\n");
+               sb.append(s);
+               sb.append("hint: [" + key + "]=[" + queryHints.getProperty(key)
+                       + "]");
+               
+           }
+           
+       }
 
-        if (prefixDecls != null) {
+       if (prefixDecls != null) {
 
-            for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
+           for (Map.Entry<String, String> e : prefixDecls.entrySet()) {
 
-                sb.append("\n");
+               sb.append("\n");
 
-                sb.append(s);
-                
-                sb.append("PREFIX ");
-                
-                sb.append(e.getKey());
-                
-                sb.append(": <");
-                
-                sb.append(e.getValue());
-                
-                sb.append(">");
+               sb.append(s);
+               
+               sb.append("PREFIX ");
+               
+               sb.append(e.getKey());
+               
+               sb.append(": <");
+               
+               sb.append(e.getValue());
+               
+               sb.append(">");
 
-            }
+           }
 
-        }
-        
-        if (dataset != null) {
+       }
+       
+       if (dataset != null) {
 
-            sb.append(dataset.toString(indent+1));
-            
-        }
+           sb.append(dataset.toString(indent+1));
+           
+       }
 
-        if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
+       if (namedSubqueries != null && !namedSubqueries.isEmpty()) {
 
-            sb.append(namedSubqueries.toString(indent));
+           sb.append(namedSubqueries.toString(indent));
 
-        }
-        
-        sb.append(super.toString(indent));
+       }
+       
+       sb.append(super.toString(indent));
+       
+       if (bs!=null) {
+          sb.append("\n\nwith static (exogeneous) bindings defined as follows: \n");
+          sb.append("{");
+          for (int i=0; i<bs.length && i<=10; i++) {
+             if (i>0) {
+                sb.append(",");
+             } 
+             sb.append("\n  ");
+             sb.append(bs[i].toString());
+          }
+          if (bs.length>10) {
+             sb.append(",\n");
+             sb.append("  ... (");
+             sb.append(bs.length-10);
+             sb.append(" more)\n");
+          } else {
+             sb.append("\n");
+          }
+          sb.append("}\n");
+       }
 
-//        if (bindings != null) {
-//
-//            sb.append(bindings.toString(indent + 1));
-//
-//        }
-
-        return sb.toString();
-        
+       return sb.toString();       
     }
 
 }

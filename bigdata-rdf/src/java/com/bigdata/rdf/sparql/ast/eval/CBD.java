@@ -464,8 +464,8 @@ public class CBD {
         astContainer.clearOptimizedAST();
         
         // Batch resolve Values to IVs and convert to bigdata binding set.
-        final IBindingSet[] bindingSets = ASTEvalHelper.mergeBindingSets(astContainer,
-                ASTEvalHelper.batchResolveIVs(store, null/* no-bindings */));
+        final IBindingSet[] bindingSets = 
+              new IBindingSet[] { ASTEvalHelper.batchResolveIVs(store, null) };
 
         // Convert the query (generates an optimized AST as a side-effect).
         AST2BOpUtility.convert(context, bindingSets);
@@ -485,8 +485,7 @@ public class CBD {
 
         // Solutions to the WHERE clause (as projected).
         final CloseableIteration<BindingSet, QueryEvaluationException> solutions = ASTEvalHelper
-                .evaluateQuery(astContainer, context, bindingSets//
-                        , materializeProjectionInQuery//
+                .evaluateQuery(astContainer, context, materializeProjectionInQuery//
                         , optimizedQuery.getProjection().getProjectionVars()//
                 );
 

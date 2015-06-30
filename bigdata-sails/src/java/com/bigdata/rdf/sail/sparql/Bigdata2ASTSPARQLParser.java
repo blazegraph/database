@@ -60,6 +60,7 @@ import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.IDataSetNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
@@ -432,7 +433,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
             
             final QueryRoot queryRoot2 = (QueryRoot)
-            		opt.optimize(context2, queryRoot, null);
+          	    opt.optimize(context2, 
+           		     new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
             
             BigdataExprBuilder.verifyAggregate(queryRoot2);
 

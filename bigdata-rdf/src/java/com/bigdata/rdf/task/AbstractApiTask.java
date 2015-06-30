@@ -360,13 +360,26 @@ abstract public class AbstractApiTask<T> implements IApiTask<T>, IReadOnly {
          final FutureTask<T> ft = new FutureTask<T>(new ApiTaskForIndexManager(
                indexManager, task));
 
-         /*
-          * Caller runs (synchronous execution)
-          * 
-          * Note: By having the caller run the task here we avoid consuming
-          * another thread.
-          */
-         ft.run();
+//         /*
+//          * Caller runs (synchronous execution)
+//          * 
+//          * Note: By having the caller run the task here we avoid consuming
+//          * another thread.
+//          */
+//         ft.run();
+        /*
+         * Submit to an executor.
+         * 
+         * Note: The code was changed to submit to an executor so the caller
+         * does not block while inside of submitApiTask(). This makes it
+         * possible to support the StatusServlet's ability to list the
+         * running tasks.
+         * 
+         * @see <a href="http://trac.bigdata.com/ticket/1254" > All REST API
+         * operations should be cancelable from both REST API and workbench
+         * </a>
+         */
+         indexManager.getExecutorService().execute(ft);
 
          return ft;
 

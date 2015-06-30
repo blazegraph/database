@@ -576,11 +576,11 @@ public class BigdataSPARQLUpdateTest2 extends TestCase2 {
             sb.append("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n");
             sb.append("PREFIX foaf: <http://xmlns.com/foaf/0.1/>\n");
             sb.append("DELETE FROM %namedSet1\n");
-			sb.append("SELECT * \n");
-			sb.append("WHERE { \n");
-			sb.append("   BIND(<http://www.bigdata.com/Mike> as ?x)\n");
-			sb.append("   BIND(\"Mike\" as ?name)\n");
-			sb.append("}\n");
+            sb.append("SELECT * \n");
+            sb.append("WHERE { \n");
+            sb.append("   BIND(<http://www.bigdata.com/Mike> as ?x)\n");
+            sb.append("   BIND(\"Mike\" as ?name)\n");
+            sb.append("}\n");
 
             con.prepareUpdate(QueryLanguage.SPARQL,sb.toString()).execute();
             

@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.eval;
 
+import com.bigdata.rdf.internal.NotMaterializedException;
+
 /**
  * Test suite for tickets at <href a="http://sourceforge.net/apps/trac/bigdata">
  * trac </a>.
@@ -684,7 +686,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933a",// testURI,
              "ticket_933a.rq",// queryFileURL
              "empty.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933ac.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -697,7 +699,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933b",// testURI,
              "ticket_933b.rq",// queryFileURL
              "empty.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933bd.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -710,7 +712,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933c",// testURI,
              "ticket_933c.rq",// queryFileURL
              "ticket_933cd.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933ac.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -723,7 +725,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933d",// testURI,
              "ticket_933d.rq",// queryFileURL
              "ticket_933cd.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933bd.srx"// resultFileURL
        ).runTest();    
     } 
 
@@ -740,4 +742,138 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_933e.srx"// resultFileURL
        ).runTest();    
     } 
+    
+    /**
+     * {@link NotMaterializedException} in combination with LET expressions.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1331">
+     * Duplicate LET expression leading to NotMaterializedException</a>. 
+     */
+    public void test_ticket_blzg_1331a() throws Exception {
+       new TestHelper("ticket_blzg_1331a",// testURI,
+             "ticket_blzg_1331a.rq",// queryFileURL
+             "ticket_blzg_1331.trig",// dataFileURL
+             "ticket_blzg_1331a.srx"// resultFileURL
+       ).runTest();    
+    }
+    
+    /**
+     * {@link NotMaterializedException} in combination with LET expressions.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1331">
+     * Duplicate LET expression leading to NotMaterializedException</a>. 
+     */
+    public void test_ticket_blzg_1331b() throws Exception {
+       new TestHelper("ticket_blzg_1331b",// testURI,
+             "ticket_blzg_1331b.rq",// queryFileURL
+             "ticket_blzg_1331.trig",// dataFileURL
+             "ticket_blzg_1331b.srx"// resultFileURL
+       ).runTest();    
+    }
+    
+    /**
+     * Double nesting of FILTER NOT EXISTS.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1281">
+     * FILTER FILTER != not working</a>
+     */
+    public void test_ticket_blzg_1281a() throws Exception {
+       new TestHelper("ticket_blzg_1281a",// testURI,
+             "ticket_blzg_1281a.rq",// queryFileURL
+             "ticket_blzg_1281a.trig",// dataFileURL
+             "ticket_blzg_1281a.srx"// resultFileURL
+       ).runTest();    
+
+    }
+    
+    /**
+     * Double nesting of FILTER NOT EXISTS.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1281">
+     * FILTER FILTER != not working</a>
+     */
+    public void test_ticket_blzg_1281b() throws Exception {
+       new TestHelper("ticket_blzg_1281b",// testURI,
+             "ticket_blzg_1281b.rq",// queryFileURL
+             "ticket_blzg_1281b.trig",// dataFileURL
+             "ticket_blzg_1281b.srx"// resultFileURL
+       ).runTest();    
+
+    }
+
+//    /**
+//     * DistinctTermScanOp is not retrieving all data.
+//     * 
+//     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+//     * DistinctTermScanOp is not retrieving all data</a>
+//     */
+//    public void test_ticket_1346a() throws Exception {
+//
+//       new TestHelper("ticket_bg1346a",// testURI,
+//               "ticket_bg1346a.rq",// queryFileURL
+//               "ticket_bg1346.ttl",// dataFileURL
+//               "ticket_bg1346.srx"// resultFileURL
+//               ).runTest();
+//    }
+//
+//    /**
+//     * DistinctTermScanOp is not retrieving all data.
+//     * 
+//     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+//     * DistinctTermScanOp is not retrieving all data</a>
+//     */
+//    public void test_ticket_1346b() throws Exception {
+//
+//       new TestHelper("ticket_bg1346b",// testURI,
+//               "ticket_bg1346b.rq",// queryFileURL
+//               "ticket_bg1346.ttl",// dataFileURL
+//               "ticket_bg1346.srx"// resultFileURL
+//               ).runTest();
+//    }
+//    
+//    /**
+//     * DistinctTermScanOp is not retrieving all data.
+//     * 
+//     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+//     * DistinctTermScanOp is not retrieving all data</a>
+//     */
+//    public void test_ticket_1346c() throws Exception {
+//
+//       new TestHelper("ticket_bg1346c",// testURI,
+//               "ticket_bg1346c.rq",// queryFileURL
+//               "ticket_bg1346.ttl",// dataFileURL
+//               "ticket_bg1346.srx"// resultFileURL
+//               ).runTest();
+//    }
+    
+    /**
+     * Placement of filters in presence of other FILTER NOT EXISTS
+     * clauses.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1284">
+     * optional / filter ! bound interaction malfunction</a>
+     */
+    public void test_ticket_blzg_1284a() throws Exception {
+       new TestHelper("ticket_blzg_1284a",// testURI,
+             "ticket_blzg_1284a.rq",// queryFileURL
+             "ticket_blzg_1284.trig",// dataFileURL
+             "ticket_blzg_1284a.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * Placement of filters in presence of other FILTER NOT EXISTS
+     * clauses.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1284">
+     * optional / filter ! bound interaction malfunction</a>
+     */
+    public void test_ticket_blzg_1284b() throws Exception {
+       new TestHelper("ticket_blzg_1284b",// testURI,
+             "ticket_blzg_1284b.rq",// queryFileURL
+             "ticket_blzg_1284.trig",// dataFileURL
+             "ticket_blzg_1284b.srx"// resultFileURL
+       ).runTest();
+    }   
+    
 }

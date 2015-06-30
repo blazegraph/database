@@ -32,7 +32,6 @@ import java.util.Map;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
-import com.bigdata.rdf.sparql.ast.SubqueryRoot.Annotations;
 
 /**
  * A special function node for modeling value expression nodes which are

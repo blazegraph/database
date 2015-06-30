@@ -65,6 +65,7 @@ import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathUnionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -241,10 +242,15 @@ public abstract class AbstractOptimizerTestCase extends
 		 */
 		protected QueryRoot given;
 		
-		/**
+      /**
 		 * The expected AST output from the {@link IASTOptimizer}.
 		 */
 		protected QueryRoot expected;
+		
+		/**
+		 * Field for construction of arbitrary AST nodes.
+		 */
+		protected ASTBase tmp;
 		
 		/**
 		 * Variables
@@ -275,8 +281,9 @@ public abstract class AbstractOptimizerTestCase extends
 			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
 					given), store);
 
-			final IQueryNode actual = rewriter.optimize(context, given,
-					new IBindingSet[] {});
+			final IQueryNode actual = rewriter.optimize(context,
+			      new QueryNodeWithBindingSet(given, new IBindingSet[] {})).
+			      getQueryNode();
 
 			assertSameAST(expected, actual);
 			
@@ -843,9 +850,14 @@ public abstract class AbstractOptimizerTestCase extends
 		private IValueExpression<? extends IV> toValueExpression(FunctionNode n) {
 			return AST2BOpUtility.toVE(globals, n);
 		}
+		
 		protected NotExistsNode notExists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
 			return new NotExistsNode(v, jg);
 		}
+
+		protected ASTBase getTmp() {
+         return tmp;
+      }
 	}
 
 	protected static final class ASTPropertyPathOptimizerInTest extends ASTPropertyPathOptimizer {

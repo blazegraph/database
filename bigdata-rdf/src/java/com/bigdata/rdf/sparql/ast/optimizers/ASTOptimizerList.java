@@ -37,6 +37,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
@@ -86,22 +87,27 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
      * modifications.
      */
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+        final AST2BOpContext context, final QueryNodeWithBindingSet input) {
+
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();     
 
         if (log.isDebugEnabled())
             log.debug("Original AST:\n" + queryNode);
 
         // Avoid side-effects on the original AST!
-        queryNode = (IQueryNode) BOpUtility.deepCopy((BOp) queryNode);
+        QueryNodeWithBindingSet tmp = 
+           new QueryNodeWithBindingSet(
+              (IQueryNode) BOpUtility.deepCopy((BOp) queryNode), bindingSets);
         
         for (IASTOptimizer opt : this) {
 
             if (log.isInfoEnabled())
                 log.info("Applying: " + opt);
 
-            queryNode = opt.optimize(context, queryNode, bindingSets);
-
+            tmp = opt.optimize(context, tmp);
+            
             if (queryNode == null)
                 throw new AssertionError("Optimized discarded query: " + opt);
 
@@ -110,7 +116,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
       
         }
 
-        return queryNode;
+        return tmp;
 
     }
 

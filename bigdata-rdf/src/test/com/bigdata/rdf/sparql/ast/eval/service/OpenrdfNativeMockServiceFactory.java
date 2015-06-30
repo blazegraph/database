@@ -31,12 +31,12 @@ import java.util.List;
 
 import org.openrdf.query.BindingSet;
 
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCall;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -48,7 +48,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * to know the order in which the query will be evaluated in order to know the
  * correct response for the mock service.
  */
-public class OpenrdfNativeMockServiceFactory implements ServiceFactory {
+public class OpenrdfNativeMockServiceFactory extends AbstractServiceFactoryBase {
 
     private final OpenrdfNativeServiceOptions serviceOptions = new OpenrdfNativeServiceOptions();
 
