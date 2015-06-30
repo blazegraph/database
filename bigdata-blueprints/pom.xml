@@ -24,21 +24,20 @@
         <executions>
           <execution>
             <id>copy</id>
-            <phase>package</phase>
+            <phase>compile</phase>
             <goals>
               <goal>copy</goal>
             </goals>
             <configuration>
               <artifactItems>
                 <artifactItem>
-                  <groupId>[ groupId ]</groupId>
-                  <artifactId>[ artifactId ]</artifactId>
-                  <version>[ version ]</version>
-                  <type>[ packaging ]</type>
-                  <classifier> [classifier - optional] </classifier>
-                  <overWrite>[ true or false ]</overWrite>
-                  <outputDirectory>[ output directory ]</outputDirectory>
-                  <destFileName>[ filename ]</destFileName>
+      		  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war</artifactId>
+      		  <version>${bigdata.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
                 </artifactItem>
               </artifactItems>
               <!-- other configurations here -->
