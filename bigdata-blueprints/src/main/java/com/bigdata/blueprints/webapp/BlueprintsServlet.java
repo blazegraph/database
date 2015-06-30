@@ -33,15 +33,16 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.blueprints.BigdataGraphBulkLoad;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
-import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.bigdata.rdf.sail.webapp.AbstractRestApiTask;
+import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
+import com.bigdata.rdf.sail.webapp.BlueprintsServletProxy;
+import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
  * Helper servlet for the blueprints layer.
  */
-public class BlueprintsServlet extends BigdataRDFServlet {
+public class BlueprintsServlet extends BlueprintsServletProxy {
 
     /**
      * 
