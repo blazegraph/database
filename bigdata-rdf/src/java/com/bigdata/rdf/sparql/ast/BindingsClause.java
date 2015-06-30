@@ -29,14 +29,15 @@ package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations;
 
 /**
  * The solutions declared by a BINDINGS clause.
@@ -264,4 +265,13 @@ public class BindingsClause extends GroupMemberNodeBase<BindingsClause>
         return false;
     }
 
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return new HashSet<IVariable<?>>();
+    }    
 }

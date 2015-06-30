@@ -50,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -369,7 +370,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
 
             // Sort the args for comparison.
             {
@@ -590,7 +592,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
             
             assertSameAST(expected, actual);
 
@@ -868,7 +871,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
             
             assertSameAST(expected, actual);
 
@@ -1172,7 +1176,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
             
             assertSameAST(expected, actual);
 
@@ -1408,7 +1413,8 @@ public class TestASTConstructOptimizer extends AbstractASTEvaluationTestCase {
                     store);
 
             final QueryRoot actual = (QueryRoot) new ASTConstructOptimizer()
-                    .optimize(context, queryRoot, null/* bindingSet */);
+                    .optimize(context, new QueryNodeWithBindingSet(queryRoot, null))
+                    .getQueryNode();
             
             assertSameAST(expected, actual);
 

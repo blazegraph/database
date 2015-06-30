@@ -112,7 +112,7 @@ public class CounterSetSelector implements ICounterSelector {
                 
             }
             
-            if (depth != 0) {
+            if (depth > 0) {
 
                 final int counterDepth = c.getDepth();
 

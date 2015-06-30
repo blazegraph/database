@@ -64,7 +64,12 @@ import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
  * {@link JoinGroupNode} in the right order with respect to the other types.
  * 
  * TODO TEST SUITE!
+ * 
+ * This optimizer is deprecated. It can enabled using the query hint
+ * {@link QueryHints#DEFAULT_OLD_JOIN_ORDER_OPTIMIZER}. The new optimizer
+ * replacing this one is the {@link ASTJoinGroupOrderOptimizer}.
  */
+@Deprecated
 public class ASTJoinOrderByTypeOptimizer extends AbstractJoinGroupOptimizer 
 		implements IASTOptimizer {
 

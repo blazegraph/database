@@ -1611,6 +1611,7 @@ public abstract class RepositoryConnectionTest extends TestCase {
 		int OFFSET = TimeZone.getDefault().getOffset(
 				new GregorianCalendar(2007 - 1900, Calendar.NOVEMBER, 6).getTimeInMillis()) / 1000 / 60;
 		String SELECT_BY_DATE = "SELECT ?s ?d WHERE { ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> ?d . FILTER (?d <= ?date) }";
+
 		DatatypeFactory data = DatatypeFactory.newInstance();
 		for (int i = 1; i < 5; i++) {
 			URI uri = vf.createURI(NS, "date" + i);
@@ -1627,11 +1628,13 @@ public abstract class RepositoryConnectionTest extends TestCase {
 			xcal.setTimezone(OFFSET);
 			testCon.add(uriz, RDF.VALUE, vf.createLiteral(xcal));
 		}
+
 		XMLGregorianCalendar xcal = data.newXMLGregorianCalendar();
 		xcal.setYear(2007);
 		xcal.setMonth(11);
 		xcal.setDay(6);
 		xcal.setTimezone(OFFSET);
+		
 		TupleQuery query = testCon.prepareTupleQuery(QueryLanguage.SPARQL, SELECT_BY_DATE);
 		query.setBinding("date", vf.createLiteral(xcal));
 		TupleQueryResult result = query.evaluate();

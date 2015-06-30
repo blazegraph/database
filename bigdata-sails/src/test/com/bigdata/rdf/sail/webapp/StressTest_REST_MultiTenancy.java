@@ -48,8 +48,11 @@ import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**
  * Proxied test suite providing a stress test of the multitenancy API.
- *
+ * 
  * @param <S>
+ * 
+ * @see {@link StressTestConcurrentRestApiRequests} which provides full coverage of
+ *      the REST API within a parameterized workload.
  */
 public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
@@ -108,6 +111,9 @@ public class StressTest_REST_MultiTenancy<S extends IIndexManager> extends
     * better.
     * 
     * @throws Exception
+    * 
+    * @see {@link StressTestConcurrentRestApiRequests} which provides full coverage of
+    *      the REST API within a parameterized workload.
     */
    public void stressTest_multiTenancy_967() throws Exception {
 

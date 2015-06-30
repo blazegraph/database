@@ -81,10 +81,15 @@ public class URLQueryModel {
     public static final String PATH = "path";
 
     /**
-     * Depth to be displayed from the given path -or- zero (0) to display
+     * Depth to be displayed from the given path -or- ZERO (0) to display
      * all levels.
      */
     public static final String DEPTH = "depth";
+    
+    /**
+     * @see BLZG-1318
+     */
+    public static final String DEFAULT_DEPTH = "0";
     
     /**
      * URL query parameter whose value is the type of report to generate.
@@ -407,7 +412,7 @@ public class URLQueryModel {
     }
     
     /**
-     * Factory for {@link NanoHTTPD} integration.
+     * Factory for performance counter integration.
      * 
      * @param service
      *            The service object IFF one was specified when
@@ -561,13 +566,13 @@ public class URLQueryModel {
         if (log.isInfoEnabled())
             log.info(PATH + "=" + path);
 
-        this.depth = Integer.parseInt(getProperty(params, DEPTH, "2"));
+        this.depth = Integer.parseInt(getProperty(params, DEPTH, DEFAULT_DEPTH));
         
         if (log.isInfoEnabled())
             log.info(DEPTH + "=" + depth);
         
-        if (depth <= 0)
-            throw new IllegalArgumentException("depth must be GT ZERO(0)");
+        if (depth < 0)
+            throw new IllegalArgumentException("depth must be GTE ZERO(0)");
 
         /*
          * FIXME fromTime and toTime are not yet being parsed. They should

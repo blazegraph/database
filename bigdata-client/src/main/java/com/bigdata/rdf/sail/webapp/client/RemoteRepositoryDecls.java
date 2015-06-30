@@ -51,6 +51,12 @@ public class RemoteRepositoryDecls {
    static protected final String UTF8 = "UTF-8";
 
    /**
+    * The name of the URL request parameter used to assign a unique identifier
+    * to a REST API request.
+    */
+   static protected final String QUERYID = "queryId";
+   
+   /**
     * The name of the system property that may be used to specify the default
     * HTTP method (GET or POST) for a SPARQL QUERY or other indempotent
     * request. 

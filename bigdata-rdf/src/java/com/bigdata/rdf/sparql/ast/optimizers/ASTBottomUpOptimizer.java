@@ -51,24 +51,32 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNodeContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Rewrites aspects of queries where bottom-up evaluation would produce
@@ -177,11 +185,14 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
     }
 
     @Override
-    public IQueryNode optimize(final AST2BOpContext context,
-            final IQueryNode queryNode, final IBindingSet[] bindingSets) {
+    public QueryNodeWithBindingSet optimize(
+          final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+        final IQueryNode queryNode = input.getQueryNode();
+        final IBindingSet[] bindingSets = input.getBindingSets();
+       
         if (!(queryNode instanceof QueryRoot))
-            return queryNode;
+            return new QueryNodeWithBindingSet(queryNode, bindingSets);
 
         final QueryRoot queryRoot = (QueryRoot) queryNode;
 
@@ -296,7 +307,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
 
         }
 
-        return queryNode;
+        return new QueryNodeWithBindingSet(queryNode, bindingSets);
     
     }
 
@@ -657,17 +668,17 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/414 (SPARQL 1.1
      *      EXISTS, NOT EXISTS, and MINUS)
      */
-    private void handleFiltersWithVariablesNotInScope(
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+   private void handleFiltersWithVariablesNotInScope(
             final AST2BOpContext context,
             final StaticAnalysis sa,
             final QueryBase queryBase,
             final IBindingSet[] bindingSets) {
 
-        // All exogenous variables (given in the source solutions).
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        final Set<IVariable<?>> exogenous = (context == null ? (Set) Collections
-                .emptySet() : context.getSolutionSetStats().getUsedVars());
-
+        final Set<IVariable<?>> globallyScopedVars = 
+            context == null ? 
+            (Set) Collections.emptySet() : context.getGloballyScopedVariables();       
+       
         // Map for renamed variables.
         final Map<IVariable<?>/* old */, IVariable<?>/* new */> map = new LinkedHashMap<IVariable<?>, IVariable<?>>();
 
@@ -704,22 +715,21 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
             
             /*
              * All variables potentially bound by joins in this group or a
-             * subgroup.
+             * subgroup. 
              */
             final Set<IVariable<?>> maybeBound = sa
                     .getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */);
-            
-            /*
-             * All variables appearing in the source solutions.
-             * 
-             * TODO This is incorrectly considering all exogenous variables. It
-             * must consider only those which are in scope. Exogenous variables
-             * are NOT visible in a Sub-Select unless they are projected into
-             * that Sub-Select.
-             */
-            maybeBound.addAll(exogenous);
 
+            /*
+             * Add globally scoped variables, we're not allowed to rewrite
+             * filters for them, as they are globally visible. Note that we do
+             * not want to add any exogeneous variables from the outer VALUES
+             * clause: by semantics, they are joined in *last*, so they're
+             * not visible in any scope.
+             */ 
+            maybeBound.addAll(globallyScopedVars);
+            
             if (group.isOptional()) {
 
                 /*
@@ -798,17 +808,40 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     		context.getTimestamp()
                     		);
                     
-                    // re-generate the value expression.
-                    AST2BOpUtility.toVE(globals,
-                            filter.getValueExpressionNode());
-                    
-                }
-                    
-            }
+                    /**
+                     * Re-generate the value expression. Note that this must be
+                     * done recursively in the general case, e.g in the case
+                     * of nested FILTER [NOT] EXISTS nodes. See for instance
+                     * ticket BLZG-1281 for an example query.
+                     */
+                    // first set up an iterator detecting all
+                    // IValueExpressionNodeContainers
+                    final IStriterator it = new Striterator(
+                          BOpUtility.preOrderIteratorWithAnnotations(filter))
+                          .addFilter(new Filter() {
 
+                              private static final long serialVersionUID = 1L;
+
+                              @Override
+                              public boolean isValid(Object obj) {
+                                  return
+                                     obj instanceof IValueExpressionNodeContainer;
+                              }
+                          });
+                     while (it.hasNext()) {
+   
+                         AST2BOpUtility.toVE(
+                             globals, 
+                             ((IValueExpressionNodeContainer) it.next()).
+                                  getValueExpressionNode());
+                     }
+                }
+            }
         }
-        
     }
+    
+    
+    
 
     /**
      * If a FILTER depends on a variable which is not in scope for that filter
@@ -954,10 +987,9 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              */
             if(childGroup.isMinus()) {
 
-                // FIXME This should be an "in-scope" test (not MUST|MAYBE).
-                final Set<IVariable<?>> incomingBound = sa
-                        .getDefinitelyIncomingBindings(childGroup,
-                                new LinkedHashSet<IVariable<?>>());
+               final Set<IVariable<?>> incomingBound = sa
+                       .getDefinitelyIncomingBindings(childGroup,
+                               new LinkedHashSet<IVariable<?>>());
 
                 final Set<IVariable<?>> maybeProduced = sa
                         .getMaybeProducedBindings(childGroup,

@@ -47,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.OrderByExpr;
 import com.bigdata.rdf.sparql.ast.OrderByNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.SliceNode;
@@ -498,11 +499,13 @@ public class TestASTHashJoinOptimizer extends AbstractASTEvaluationTestCase {
                 given), store);
 
         // Cache the value expressions for both ASTs.
-        new ASTSetValueExpressionsOptimizer().optimize(context, given, bsets);
-        new ASTSetValueExpressionsOptimizer().optimize(context, expected, bsets);
+        new ASTSetValueExpressionsOptimizer().optimize(context, 
+              new QueryNodeWithBindingSet(given, bsets));
+        new ASTSetValueExpressionsOptimizer().optimize(context, 
+              new QueryNodeWithBindingSet(expected, bsets));
         
         final IQueryNode actual = rewriter.optimize(context,
-                given/* queryNode */, bsets);
+              new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
 
         /*
          * FIXME This is failing because the optimizer is not finished yet.

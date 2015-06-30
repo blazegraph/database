@@ -29,6 +29,7 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,6 +42,7 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
@@ -86,7 +88,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  * text index with the supplied search string.  If there are no incoming
  * bindings (or none that have ?s bound), this service will produce no output.
  */
-public class SearchInSearchServiceFactory implements ServiceFactory {
+public class SearchInSearchServiceFactory extends AbstractServiceFactoryBase {
 
     private static final Logger log = Logger
             .getLogger(SearchInSearchServiceFactory.class);

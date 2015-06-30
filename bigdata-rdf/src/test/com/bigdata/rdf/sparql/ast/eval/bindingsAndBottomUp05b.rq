@@ -1,0 +1,8 @@
+SELECT * WHERE {
+  BIND(5*?x AS ?y)
+  {
+    {
+      VALUES ?x { 1 }
+    }
+  }
+} 

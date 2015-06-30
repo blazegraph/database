@@ -33,7 +33,6 @@ import org.openrdf.query.TupleQueryResult;
  * A prepared tuple query against a {@link JettyeRemoteRepository}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  */
 public interface IPreparedTupleQuery extends IPreparedQuery {
 
