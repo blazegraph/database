@@ -1827,15 +1827,14 @@ public abstract class AbstractHA3JournalServerTestCase extends
              */
             {
                 final File webAppDir = serviceDir;
-                // webAppDir = new File(serviceDir, "bigdata-war/src");
+
                 if (!webAppDir.exists() && !webAppDir.mkdirs()) {
                     throw new IOException("Could not create directory: "
                             + webAppDir);
                 }
-                //FIXME:  This should be refactored to pick up the sources 
-                //from the maven depdency.  
-                //TODO: Refactor once bidata-war is a maven artifact
-                copyFiles(new File("src/test/resources/bigdata-war/"), webAppDir);
+
+				copyFile(new File(WAR_DIR + WAR_FILE_NAME), new File(webAppDir,
+						WAR_FILE_NAME), true);
             }
 
             // log4j configuration.
