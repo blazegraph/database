@@ -175,6 +175,8 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestTickets.class);
         
+        suite.addTestSuite(TestUnionMinus.class);
+        
         suite.addTestSuite(TestSubSelectFilterExist725.class);
         suite.addTestSuite(TestTwoPropertyPaths734.class);
         
