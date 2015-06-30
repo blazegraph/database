@@ -34,7 +34,6 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
-import com.bigdata.blueprints.webapp.BlueprintsServlet;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
@@ -67,7 +66,7 @@ public class RESTServlet extends BigdataRDFServlet {
     private DeleteServlet m_deleteServlet;
     private UpdateServlet m_updateServlet;
     private WorkbenchServlet m_workbenchServlet;
-    private BigdataRDFServlet m_blueprintsServlet;
+    private BlueprintsServletProxy m_blueprintsServlet;
     
     /**
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
@@ -93,7 +92,16 @@ public class RESTServlet extends BigdataRDFServlet {
         m_deleteServlet = new DeleteServlet();
         m_describeServlet = new DescribeCacheServlet();
         m_workbenchServlet = new WorkbenchServlet();
-        m_blueprintsServlet = new BlueprintsServlet();
+        
+        final String provider = this
+				.getInitParameter(ConfigParams.BLUEPRINTS_SERVLET_PROVIDER); 
+       
+		final String blueprintsProvider = provider == null
+				|| provider.equals("") ? ConfigParams.DEFAULT_BLUEPRINTS_SERVLET_PROVIDER
+				: provider;
+        
+		m_blueprintsServlet = BlueprintsServletProxy.BlueprintsServletFactory
+				.getInstance(blueprintsProvider);
 
         m_queryServlet.init(getServletConfig());
         m_insertServlet.init(getServletConfig());
@@ -259,7 +267,7 @@ public class RESTServlet extends BigdataRDFServlet {
         	
         	m_workbenchServlet.doPost(req, resp);
         	
-        } else if (req.getParameter(BigdataRDFServlet.ATTR_BLUEPRINTS) != null) {
+        } else if (req.getParameter(BlueprintsServletProxy.ATTR_BLUEPRINTS) != null) {
             
             m_blueprintsServlet.doPostRequest(req, resp);
             

@@ -665,9 +665,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     		uris[i] = new URIImpl(s[i]);
     		
     	}
-    	
+
     	return uris;
     	
     }
-    
+
 }
