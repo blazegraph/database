@@ -90,8 +90,6 @@ public class TestReificationDoneRightEval extends AbstractDataDrivenSPARQLTestCa
 	
 	public static final String TEST_RESOURCE_PREFIX = "/com/bigdata/rdf/sparql/ast/eval/reif/";
     
-	public static final String TEST_RESOURCE_PREFIX = "/com/bigdata/rdf/sparql/ast/eval/reif/";
-    
     /**
      * 
      */
