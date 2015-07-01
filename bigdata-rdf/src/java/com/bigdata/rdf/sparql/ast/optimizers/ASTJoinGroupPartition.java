@@ -105,13 +105,14 @@ public class ASTJoinGroupPartition {
    /**
     * @return the flat (ordered) list of nodes in the partition
     */
-   public List<IGroupMemberNode> extractNodeList() {
+   public List<IGroupMemberNode> extractNodeList(
+      final boolean includeOptionalOrMinusNode) {
       
       final List<IGroupMemberNode> nodeList =
          new ArrayList<IGroupMemberNode>();
       
       nodeList.addAll(nonOptionalNonMinusNodes);
-      if (optionalOrMinus!=null)
+      if (includeOptionalOrMinusNode && optionalOrMinus!=null)
          nodeList.add(optionalOrMinus);
       
       return nodeList;
