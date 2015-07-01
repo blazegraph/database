@@ -742,7 +742,8 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 //                    + OPTION_CREATE_KB_NAMESPACE);
 
         // Set the namespace property.
-        final Properties tmp = new Properties(properties);
+        final Properties tmp = new Properties();
+        tmp.putAll(properties);
         tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
         
         /*
