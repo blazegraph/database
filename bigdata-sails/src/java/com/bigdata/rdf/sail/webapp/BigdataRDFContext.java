@@ -33,6 +33,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -53,6 +54,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.http.protocol.Protocol;
+import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.MalformedQueryException;
@@ -1058,6 +1061,19 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
 
         }
+        
+        protected void setBindings(final AbstractOperation queryOrUpdate) {
+        	Enumeration<String> parameterNames = req.getParameterNames();
+        	while(parameterNames.hasMoreElements()) {
+        		String param = parameterNames.nextElement();
+        		if (param.startsWith("$")) {
+        			String name = param.substring(1);
+        			Value value = Protocol.decodeValue(req.getParameter(param), cxn.getValueFactory());
+        			queryOrUpdate.setBinding(name, value);
+        		}
+        	}
+        }
+
 
         /**
          * 
@@ -1081,6 +1097,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             // Override query if data set protocol parameters were used.
 			overrideDataset(query);
+
+			// Set bindings if protocol parameters were used.
+			setBindings(query);
 
             if (analytic) {
 

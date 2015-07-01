@@ -51,6 +51,7 @@ import org.openrdf.query.TupleQueryResult;
 import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
+import com.bigdata.rdf.sail.webapp.QueryServlet;
 
 /**
  * Java API to the Nano Sparql Server.
@@ -534,7 +535,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
          final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
          opts.addRequestParam("HASSTMT");
-         opts.addRequestParam("includeInferred",
+         opts.addRequestParam(QueryServlet.INCLUDE_INFERRED,
                Boolean.toString(includeInferred));
          if (s != null) {
             opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
@@ -1178,6 +1179,10 @@ public class RemoteRepository extends RemoteRepositoryBase {
             
         }
         
+    	public void addRequestParam(String name, String... val) {
+    		opts.addRequestParam(name, val);
+    	}
+
         /**
          * Setup the connection options.
          */
