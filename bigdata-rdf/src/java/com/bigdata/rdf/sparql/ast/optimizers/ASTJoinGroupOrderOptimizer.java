@@ -152,7 +152,7 @@ implements IASTOptimizer {
        * join group with the new list.
        */
       final LinkedList<IGroupMemberNode> nodeList = 
-         partitions.extractNodeList();
+         partitions.extractNodeList(true /* includeOptionalOrMinusNode */);
       for (int i = 0; i < joinGroup.arity(); i++) {
           joinGroup.setArg(i, (BOp) nodeList.get(i));
       }
@@ -392,7 +392,7 @@ implements IASTOptimizer {
          
              @Override
              boolean appliesTo(final IGroupMemberNode node) {
-
+                
                 // get the variables that are required bound in the node ...
                 final Set<IVariable<?>> reqBoundInNode = 
                    new HashSet<IVariable<?>>(
@@ -409,7 +409,8 @@ implements IASTOptimizer {
 
          });      
 
-      classifier.registerNodes(partition.extractNodeList());
+      classifier.registerNodes(
+         partition.extractNodeList(false /* includeOptionalOrMinus */));
 
       /**
        * In a first step, we remove service nodes, assignment nodes, and
