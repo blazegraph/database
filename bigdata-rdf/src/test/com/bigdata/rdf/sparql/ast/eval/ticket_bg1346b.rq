@@ -1,2 +1,2 @@
 SELECT ?People WHERE
-{ ?People a <http://semoss.org/ontologies/Person> } 
+{ GRAPH <http://mygraph> { ?People a <http://semoss.org/ontologies/Person> } }

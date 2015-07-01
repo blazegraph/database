@@ -31,6 +31,7 @@ import java.util.Set;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -56,6 +57,11 @@ public interface IEvaluationContext {
      */
     ISolutionSetStats getSolutionSetStats();
 
+    /**
+     * Summary statistics for the static analysis phase.
+     */
+    StaticAnalysisStats getStaticAnalysisStats();
+    
     /**
      * The timestamp or transaction identifier associated with the view.
      */

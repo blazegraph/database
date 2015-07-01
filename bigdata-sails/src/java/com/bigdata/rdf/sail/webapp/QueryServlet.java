@@ -29,6 +29,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -57,6 +58,8 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryLog;
+import com.bigdata.bop.engine.StaticAnalysisStat;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.ITransactionService;
@@ -1028,6 +1031,79 @@ public class QueryServlet extends BigdataRDFServlet {
              */
             if (q != null) {
 
+               current.node("h2", "Static Analysis Statistics");
+               {
+                  final StaticAnalysisStats saStats = q.getStaticAnalysisStats();
+                  
+                  if (saStats==null) {
+                     
+                     current.node("p",
+                          "Static Analysis Statistics are not available.");
+                     
+                  } else {
+                     
+                     current = current.node("table");
+                        
+                     // table header
+                     current = current.node("tr");
+                     current.node("th").text("object").close();
+                     current.node("th").text("category").close(); 
+                     current.node("th").text("elapsed [10^-3s]").close();
+                     current.node("th").text("elapsed [10^-6s]").close();
+                     current.node("th").text("numCalls").close();
+                     current = current.close(); // tr
+                        
+                     // parser stats
+                     final StaticAnalysisStat pStat = saStats.getParserStat();
+                     if (pStat!=null) {
+                        current = current.node("tr");
+                        current.node("td").text(pStat.getStatName()).close();
+                        current.node("td").text("Parser").close();
+                        current.node("td").text(String.valueOf(pStat.getElapsed()/1000000)).close();
+                        current.node("td").text(String.valueOf(pStat.getElapsed()/1000)).close();
+                        current.node("td").text(String.valueOf(pStat.getNrCalls())).close();
+                        current = current.close(); // tr
+                     }
+                        
+                     final StaticAnalysisStat lStat = saStats.getOptimizerLoopStat();
+                     if (lStat!=null) {
+                        current = current.node("tr");
+                        current.node("td").text(lStat.getStatName()).close();
+                        current.node("td").text("Optimizers (all)").close();                        
+                        current.node("td").text(String.valueOf(lStat.getElapsed()/1000000)).close();
+                        current.node("td").text(String.valueOf(lStat.getElapsed()/1000)).close();
+                        current.node("td").text(String.valueOf(lStat.getNrCalls())).close();
+                        current = current.close(); // tr
+                     }
+
+                     final Collection<StaticAnalysisStat> optimizerStats = 
+                        saStats.getOptimizerStats();
+                     for (StaticAnalysisStat oStat : optimizerStats) {
+                        current = current.node("tr");
+                        current.node("td").text(oStat.getStatName()).close();
+                        current.node("td").text("Optimizer").close();
+                        current.node("td").text(String.valueOf(oStat.getElapsed()/1000000)).close();
+                        current.node("td").text(String.valueOf(oStat.getElapsed()/1000)).close();
+                        current.node("td").text(String.valueOf(oStat.getNrCalls())).close();
+                        current = current.close(); // tr
+                     }
+                        
+                     final StaticAnalysisStat rStat = saStats.getRangeCountStat();
+                     if (rStat!=null) {
+                        current = current.node("tr");
+                        current.node("td").text(rStat.getStatName()).close();
+                        current.node("td").text("Range Count").close();                        
+                        current.node("td").text(String.valueOf(rStat.getElapsed()/1000000)).close();
+                        current.node("td").text(String.valueOf(rStat.getElapsed()/1000)).close();
+                        current.node("td").text(String.valueOf(rStat.getNrCalls())).close();
+                        current = current.close(); // tr
+                     }
+                        
+                     current.close(); // table
+                        
+                  }
+               } 
+
                 final QueryRoot optimizedAST = astContainer.getOptimizedAST();
                 final IBindingSet[] bs = astContainer.getOptimizedASTBindingSets();
 
@@ -1047,7 +1123,7 @@ public class QueryServlet extends BigdataRDFServlet {
                     
                     current.node("pre", BOpUtility.toString(queryPlan));
 
-                }
+                }               
 
             }
 
@@ -1084,7 +1160,8 @@ public class QueryServlet extends BigdataRDFServlet {
                 // Fall through and paint the query stats table(s).
                 
             }
-
+            
+            
 			current.node("h2", "Query Evaluation Statistics");
 			
             if (q == null) {
