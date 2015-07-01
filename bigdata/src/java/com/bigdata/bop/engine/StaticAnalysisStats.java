@@ -91,14 +91,14 @@ public class StaticAnalysisStats implements Serializable {
     * 
     * @param elapsed the elapsed time for the parsing phase.
     */
-   public void registerParserCall(final Long elapsed) {
+   public void registerParserCall(final Long elapsedNanoSec) {
       
       if (parserStat==null) {
          parserStat = new StaticAnalysisStat("Parse Time");
       }
 
       parserStat.incrementNrCalls();
-      parserStat.addElapsed(elapsed);
+      parserStat.addElapsed(elapsedNanoSec);
    }
    
    /**
@@ -107,16 +107,16 @@ public class StaticAnalysisStats implements Serializable {
     * @param optimizerName the name of the optimizer
     * @param elapsed the elapsed time for the optimizer loop
     */
-   public void registerOptimizerLoopCall(final Long elapsed) {
+   public void registerOptimizerLoopCall(final Long elapsedNanoSec) {
 
       optimizerLoopStat.incrementNrCalls();
-      optimizerLoopStat.addElapsed(elapsed);
+      optimizerLoopStat.addElapsed(elapsedNanoSec);
    }
    
-   public void registerRangeCountCall(final Long elapsed) {
+   public void registerRangeCountCall(final Long elapsedNanoSec) {
       
       rangeCountStat.incrementNrCalls();
-      rangeCountStat.addElapsed(elapsed);
+      rangeCountStat.addElapsed(elapsedNanoSec);
    }
    
    /**
@@ -126,7 +126,7 @@ public class StaticAnalysisStats implements Serializable {
     * @param elapsed the elapsed time for the optimizer loop
     */
    public void registerOptimizerCall(
-      final String optimizerName, final Long elapsed) {
+      final String optimizerName, final Long elapsedNanoSec) {
       
       if (optimizerStats.get(optimizerName)==null) {
          optimizerStats.put(optimizerName, new StaticAnalysisStat(optimizerName));
@@ -134,7 +134,7 @@ public class StaticAnalysisStats implements Serializable {
       
       StaticAnalysisStat stat = optimizerStats.get(optimizerName);
       stat.incrementNrCalls();
-      stat.addElapsed(elapsed);
+      stat.addElapsed(elapsedNanoSec);
    }
 
    @Override

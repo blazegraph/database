@@ -204,11 +204,11 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
 		
 
 		final StaticAnalysisStats saStats = ctx.getStaticAnalysisStats();
-		long start = System.currentTimeMillis();
+		long start = System.nanoTime();
 		
 		final long cardinality = ap.rangeCount(false/* exact */);
 
-      saStats.registerRangeCountCall(System.currentTimeMillis() - start);
+      saStats.registerRangeCountCall(System.nanoTime() - start);
 		
 		
 		// Annotate with the fast range count.

@@ -264,10 +264,7 @@ public class ASTContainer extends ASTBase {
     }
 
     /**
-     * Set the optimized AST model.
-     * <p>
-     * Note: You MUST deep copy the original AST to avoid destructive side
-     * effects when the {@link IASTOptimizer}s are run.
+     * Set the query parse time in nano seconds.
      */
     public void setQueryParseTime(final Long parseTime) {
         
@@ -276,7 +273,7 @@ public class ASTContainer extends ASTBase {
     }
     
     /**
-     * Return the optimized AST model.
+     * Get the query parse time in nano seconds.
      */
     public Long getQueryParseTime() {
 

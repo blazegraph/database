@@ -173,7 +173,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseUpdate2(final String updateStr,
             final String baseURI) throws MalformedQueryException {
 
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
 
         if (log.isInfoEnabled())
             log.info(updateStr);
@@ -323,7 +323,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                 
             } // foreach
 
-            astContainer.setQueryParseTime(System.currentTimeMillis() - startTime);
+            astContainer.setQueryParseTime(System.nanoTime() - startTime);
             return astContainer;
             
         } catch (ParseException e) {
@@ -351,7 +351,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     public ASTContainer parseQuery2(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
         
         if(log.isInfoEnabled())
             log.info(queryStr);
@@ -443,7 +443,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             
             BigdataExprBuilder.verifyAggregate(queryRoot2);
 
-            ast.setQueryParseTime(System.currentTimeMillis() - startTime);
+            ast.setQueryParseTime(System.nanoTime() - startTime);
             return ast;
 
         } catch (IllegalArgumentException e) {
