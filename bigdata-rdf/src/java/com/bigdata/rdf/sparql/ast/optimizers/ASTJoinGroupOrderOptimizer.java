@@ -397,9 +397,9 @@ implements IASTOptimizer {
                 final Set<IVariable<?>> reqBoundInNode = 
                    new HashSet<IVariable<?>>(
                       bindingInfoMap.get(node).getRequiredBound());
-                // ... and substract those that are definitely prodcued inside
+                // ... and substract those that maybe prodcued inside
                 reqBoundInNode.removeAll(
-                    bindingInfoMap.get(node).getDefinitelyProduced());
+                    bindingInfoMap.get(node).getMaybeProduced());
                 
                 // -> if this set has not become empty, we need to aim at
                 //    binding variables of this node from this outside partition
