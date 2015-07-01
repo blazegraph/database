@@ -131,11 +131,12 @@ public class ASTJoinGroupPartitions {
    /**
     * Extracts all nodes in all partitions, in order.
     */
-   public LinkedList<IGroupMemberNode> extractNodeList() {
+   public LinkedList<IGroupMemberNode> extractNodeList(
+      final boolean includeOptionalOrMinusNode) {
       
       LinkedList<IGroupMemberNode> res = new LinkedList<IGroupMemberNode>();
       for (int i=0; i<partitions.size(); i++) {
-         res.addAll(partitions.get(i).extractNodeList());
+         res.addAll(partitions.get(i).extractNodeList(includeOptionalOrMinusNode));
       }
       
       return res;
