@@ -93,6 +93,10 @@ public class ASTContainer extends ASTBase {
          */
         String OPTIMIZED_AST_BINDING_SETS = "optimizedASTBindingSets";
 
+        /**
+         * The parsing time for the query.
+         */
+        String QUERY_PARSE_TIME = "queryParseTime";
     }
 
     /**
@@ -256,6 +260,24 @@ public class ASTContainer extends ASTBase {
     public QueryRoot getOptimizedAST() {
 
         return (QueryRoot) getProperty(Annotations.OPTIMIZED_AST);
+
+    }
+
+    /**
+     * Set the query parse time in nano seconds.
+     */
+    public void setQueryParseTime(final Long parseTime) {
+        
+        setProperty(Annotations.QUERY_PARSE_TIME, parseTime);
+
+    }
+    
+    /**
+     * Get the query parse time in nano seconds.
+     */
+    public Long getQueryParseTime() {
+
+        return (Long) getProperty(Annotations.QUERY_PARSE_TIME);
 
     }
 
