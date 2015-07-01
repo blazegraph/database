@@ -72,18 +72,34 @@ public class StaticAnalysisStat implements Serializable {
       this.elapsed.add(elapsed);
    }
 
+
+   
    public void incrementNrCalls() {
       this.nrCalls.increment();
    }
+   
+   @Override
+   public String toString() {
+      final StringBuilder sb = new StringBuilder();
+      sb.append("Stats for " + statName + ":");
+      sb.append("{elapsed=" + elapsed.get());
+      sb.append(", nrCalls=" + nrCalls);
+      sb.append("}");
+      return sb.toString();
+   }
+    
 
-    @Override
-    public String toString() {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("Stats for " + statName + ":");
-        sb.append("{elapsed=" + elapsed.get());
-        sb.append(", nrCalls=" + nrCalls);
-        sb.append("}");
-        return sb.toString();
-    }
+   public long getNrCalls() {
+      return nrCalls.get();
+   }
+
+
+   public long getElapsed() {
+      return elapsed.get();
+   }
+   
+   public String getStatName() {
+      return statName;
+   }
 
 }

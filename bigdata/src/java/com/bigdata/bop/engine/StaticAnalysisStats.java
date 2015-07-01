@@ -28,8 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.engine;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
+import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 
 /**
  * Statistics associated with the Static Analysis phase, such as runtime for
@@ -44,74 +47,94 @@ public class StaticAnalysisStats implements Serializable {
    private static final long serialVersionUID = 3092439315838261120L;
 
    /**
-    * Parser statistics
+    * Parser statistics.
     */
    private StaticAnalysisStat parserStat;
+   
+   /**
+    * Parser statistics.
+    */
+   private StaticAnalysisStat optimizerLoopStat;
+   
+   /**
+    * Range count statistics.
+    */
+   private StaticAnalysisStat rangeCountStat;
 
    /**
-    * Map for the statistics of the individual optimizers.
+    * Map for the statistics of the individual (non-loop).
     */
    private final Map<String,StaticAnalysisStat> optimizerStats;
 
    /**
     * Create a new, initially empty stats object.
     * 
-    * @param name a descriptive, human understandable name for the stats object
+    * @param staticAnalysisParseTimeElapsed time needed for parsing (ignored
+    *          if left null)
     */
-   public StaticAnalysisStats(Long parseTimeElapsed) {
+   public StaticAnalysisStats(Long staticAnalysisParseTimeElapsed) {
       this.optimizerStats = new LinkedHashMap<String, StaticAnalysisStat>();
-
-      if (parseTimeElapsed!=null) {
-         parserStat = new StaticAnalysisStat("ParseTime");
-         parserStat.incrementNrCalls();
-         parserStat.addElapsed(parseTimeElapsed);
-      }
+     
+      if (staticAnalysisParseTimeElapsed!=null) {
+         registerParserCall(staticAnalysisParseTimeElapsed);
+      } 
+      // otherwise: delayed initialization, don't show parser stats if
+      //            for some reason not present in some mode
+      
+      rangeCountStat = new StaticAnalysisStat("RangeCount"); 
+      optimizerLoopStat = new StaticAnalysisStat(ASTOptimizerList.class.getName());
       
    }
 
-
    /**
-    * @return stats object associated with the parser
-    */
-   public StaticAnalysisStat getParserStat() {
-      return parserStat;
-   }
-
-
-   /**
-    * Sets the stats object associated with the parser.
+    * Registers a call of the parser.
     * 
-    * @param parserStat
+    * @param elapsed the elapsed time for the parsing phase.
     */
-   public void setParserStat(StaticAnalysisStat parserStat) {
-      this.parserStat = parserStat;
+   public void registerParserCall(final Long elapsed) {
+      
+      if (parserStat==null) {
+         parserStat = new StaticAnalysisStat("Parse Time");
+      }
+
+      parserStat.incrementNrCalls();
+      parserStat.addElapsed(elapsed);
    }
    
    /**
-    * Initializes an empty stats object for the optimizer with the given name.
-    * Increases the number of calls made to this optimizer.
+    * Registers a call for the key optimizer loop in {@link ASTOptimizerList}.
     * 
-    * @param optimizerName
+    * @param optimizerName the name of the optimizer
+    * @param elapsed the elapsed time for the optimizer loop
     */
-   public void registerOptimizerCall(String optimizerName) {
+   public void registerOptimizerLoopCall(final Long elapsed) {
+
+      optimizerLoopStat.incrementNrCalls();
+      optimizerLoopStat.addElapsed(elapsed);
+   }
+   
+   public void registerRangeCountCall(final Long elapsed) {
+      
+      rangeCountStat.incrementNrCalls();
+      rangeCountStat.addElapsed(elapsed);
+   }
+   
+   /**
+    * Registers a call to a specific AST optimizer (different the main loop).
+    * 
+    * @param optimizerName the name of the optimizer
+    * @param elapsed the elapsed time for the optimizer loop
+    */
+   public void registerOptimizerCall(
+      final String optimizerName, final Long elapsed) {
       
       if (optimizerStats.get(optimizerName)==null) {
          optimizerStats.put(optimizerName, new StaticAnalysisStat(optimizerName));
       }
       
       StaticAnalysisStat stat = optimizerStats.get(optimizerName);
-      stat.incrementNrCalls(); // this has just been called
-   }
-
-   /**
-    * Increments the elapsed time associated with the optimizerStats object.
-    * Object must exist.
-    * 
-    * @param optimizerName
-    * @param elapsed
-    */
-   public void addElapsedToOptimizerStat(String optimizerName, long elapsed) {
-      optimizerStats.get(optimizerName).addElapsed(elapsed);      
+      stat.incrementNrCalls();
+      stat.addElapsed(elapsed);
    }
 
    @Override
@@ -122,6 +145,10 @@ public class StaticAnalysisStats implements Serializable {
           sb.append(parserStat);
           sb.append(" ");
        }
+       if (optimizerLoopStat!=null) {
+          sb.append(optimizerLoopStat);
+          sb.append(" ");
+       }
        for (StaticAnalysisStat optimizerStat : optimizerStats.values()) {
           sb.append(optimizerStat);          
           sb.append(" ");
@@ -129,4 +156,33 @@ public class StaticAnalysisStats implements Serializable {
        
        return sb.toString();
    }
+
+   /**
+    * @return stat object associated with the parser
+    */
+   public StaticAnalysisStat getParserStat() {
+      return parserStat;
+   }
+   
+   /**
+    * @return stats object associated with the optimizer loop class
+    */
+   public StaticAnalysisStat getOptimizerLoopStat() {
+      return optimizerLoopStat;
+   }
+   
+   /**
+    * @return stat object associated with range count operations
+    */
+   public StaticAnalysisStat getRangeCountStat() {
+      return rangeCountStat;
+   }
+   
+   /**
+    * @return stats object associated with the optimizer loop class
+    */
+   public Collection<StaticAnalysisStat> getOptimizerStats() {
+      return optimizerStats.values();
+   }
+
 }
