@@ -199,6 +199,8 @@ public class ChunkedRunningQuery extends AbstractRunningQuery {
      *            other than the query controller itself.
      * @param query
      *            The query.
+     * @param saStats
+     *            Statistics object containing static analysis statistics
      * 
      * @throws IllegalArgumentException
      *             if any argument is <code>null</code>.

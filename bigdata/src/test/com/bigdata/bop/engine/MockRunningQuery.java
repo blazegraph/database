@@ -226,4 +226,15 @@ public class MockRunningQuery implements IRunningQuery {
         
     }
 
+   @Override
+   public void setStaticAnalysisStats(StaticAnalysisStats saStats) {
+      // not supported by mock query
+   }
+
+   @Override
+   public StaticAnalysisStats getStaticAnalysisStats() {
+      // not supported by mock query
+      return null;
+   }
+
 }

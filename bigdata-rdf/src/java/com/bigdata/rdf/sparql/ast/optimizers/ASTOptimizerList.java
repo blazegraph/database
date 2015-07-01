@@ -36,6 +36,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
@@ -90,8 +91,13 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
     public QueryNodeWithBindingSet optimize(
         final AST2BOpContext context, final QueryNodeWithBindingSet input) {
 
+        final StaticAnalysisStats saStats = context.getStaticAnalysisStats();
+        
+        final long startLoop = System.nanoTime();
+
         final IQueryNode queryNode = input.getQueryNode();
-        final IBindingSet[] bindingSets = input.getBindingSets();     
+        final IBindingSet[] bindingSets = input.getBindingSets();    
+        
 
         if (log.isDebugEnabled())
             log.debug("Original AST:\n" + queryNode);
@@ -102,6 +108,8 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
               (IQueryNode) BOpUtility.deepCopy((BOp) queryNode), bindingSets);
         
         for (IASTOptimizer opt : this) {
+           
+            final long startOpt = System.nanoTime();
 
             if (log.isInfoEnabled())
                 log.info("Applying: " + opt);
@@ -113,11 +121,17 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
             if (log.isDebugEnabled())
                 log.debug("Rewritten AST:\n" + queryNode);
+
+            saStats.registerOptimizerCall(
+               opt.getClass().getSimpleName(), 
+               System.nanoTime() - startOpt);
       
         }
+
+        saStats.registerOptimizerLoopCall(
+           System.nanoTime() - startLoop);
 
         return tmp;
 
     }
-
 }
