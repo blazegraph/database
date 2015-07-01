@@ -321,6 +321,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     
     @Override
     public StaticAnalysisStats getStaticAnalysisStats() {
+       
+       if (saStats==null) { 
+          // hack to avoid optimizers from crashing when this is not set
+          saStats = new StaticAnalysisStats(null);
+       }
        return saStats;
     }
     
