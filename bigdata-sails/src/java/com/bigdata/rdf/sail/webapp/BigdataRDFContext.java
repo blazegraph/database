@@ -1159,6 +1159,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
             // Override query if data set protocol parameters were used.
             overrideDataset(update);
 
+			// Set bindings if protocol parameters were used.
+			setBindings(update);
+
             if (analytic) {
 
                 // Turn analytic query on/off as requested.
@@ -2221,9 +2224,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
             ) throws MalformedQueryException, IOException {
 
         /*
-         * Setup the baseURI for this request. It will be set to the requestURI.
+         * Setup the baseURI for this request. It will be set to request parameter "baseURI" or defaults to requestURI if parameter was not specified.
          */
-        final String baseURI = req.getRequestURL().toString();
+        String baseURI = req.getParameter(Protocol.BASEURI_PARAM_NAME);
+        if (baseURI==null) {
+        	baseURI = req.getRequestURL().toString();
+        }
 
         /*
          * Parse the query so we can figure out how it will need to be executed.
