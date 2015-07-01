@@ -811,7 +811,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
        new TestHelper("ticket_bg1346a",// testURI,
                "ticket_bg1346a.rq",// queryFileURL
-               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.trig",// dataFileURL
                "ticket_bg1346.srx"// resultFileURL
                ).runTest();
     }
@@ -826,7 +826,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
        new TestHelper("ticket_bg1346b",// testURI,
                "ticket_bg1346b.rq",// queryFileURL
-               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.trig",// dataFileURL
                "ticket_bg1346.srx"// resultFileURL
                ).runTest();
     }
@@ -841,6 +841,51 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
 
        new TestHelper("ticket_bg1346c",// testURI,
                "ticket_bg1346c.rq",// queryFileURL
+               "ticket_bg1346.trig",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346d() throws Exception {
+
+       new TestHelper("ticket_bg1346d",// testURI,
+               "ticket_bg1346d.rq",// queryFileURL
+               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346e() throws Exception {
+
+       new TestHelper("ticket_bg1346e",// testURI,
+               "ticket_bg1346e.rq",// queryFileURL
+               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346f() throws Exception {
+
+       new TestHelper("ticket_bg1346f",// testURI,
+               "ticket_bg1346f.rq",// queryFileURL
                "ticket_bg1346.ttl",// dataFileURL
                "ticket_bg1346.srx"// resultFileURL
                ).runTest();
