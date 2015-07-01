@@ -106,6 +106,11 @@ public class QueryServlet extends BigdataRDFServlet {
     static final transient String ATTR_QUERY = "query";
 
     /**
+     * The name of the parameter/attribute that contains boolean flag to include inferred statements while evaluating queries or returning statements.
+     */
+    public static final transient String INCLUDE_INFERRED = "includeInferred";
+
+    /**
      * The name of the URL query parameter that contains the SPARQL UPDATE
      * request.
      */
@@ -1300,7 +1305,7 @@ public class QueryServlet extends BigdataRDFServlet {
          return;
       }
 
-      final boolean includeInferred = getBooleanValue(req, "includeInferred",
+      final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
             true/* default */);
       final Resource s;
       final URI p;
