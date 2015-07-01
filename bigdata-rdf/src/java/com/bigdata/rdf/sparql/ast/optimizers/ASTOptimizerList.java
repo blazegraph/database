@@ -93,7 +93,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
 
         final StaticAnalysisStats saStats = context.getStaticAnalysisStats();
         
-        final long begin = System.currentTimeMillis();
+        final long startLoop = System.currentTimeMillis();
 
         final IQueryNode queryNode = input.getQueryNode();
         final IBindingSet[] bindingSets = input.getBindingSets();    
@@ -122,29 +122,16 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
             if (log.isDebugEnabled())
                 log.debug("Rewritten AST:\n" + queryNode);
 
-            recordStatsForOptimizer(
-               saStats, opt.getClass().getSimpleName(), startOpt, 
-               System.currentTimeMillis());
+            saStats.registerOptimizerCall(
+               opt.getClass().getSimpleName(), 
+               System.currentTimeMillis() - startOpt);
       
         }
 
-        recordStatsForOptimizer(
-              saStats, this.getClass().getSimpleName(), begin, 
-              System.currentTimeMillis());
+        saStats.registerOptimizerLoopCall(
+           System.currentTimeMillis() - startLoop);
 
         return tmp;
 
     }
-
-    
-    private void recordStatsForOptimizer(
-         final StaticAnalysisStats saStats, final String optimizerName,
-         final long startTime, final long endTime) {
-        
-        saStats.registerOptimizerCall(optimizerName);
-        saStats.addElapsedToOptimizerStat(optimizerName, endTime - startTime);
-    }
-    
-    
-
 }
