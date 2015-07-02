@@ -174,7 +174,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                 // rewrite filter.
                 rewrite(sa, exogenousVars, query, p, filter,
-                        filter.getValueExpressionNode());
+                        filter.getValueExpressionNode(), i);
 
             }
 
@@ -216,7 +216,8 @@ public class ASTExistsOptimizer implements IASTOptimizer {
             final QueryBase query,
             final GraphPatternGroup<IGroupMemberNode> p,
             final FilterNode filter,
-            final IValueExpressionNode ve) {
+            final IValueExpressionNode ve,
+            final int curPosition) {
 
         if (ve instanceof SubqueryFunctionNodeBase) {
 
@@ -299,7 +300,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
                     subquery.setWhereClause(graphPattern);
 
                     // lift the SubqueryRoot into the parent.
-                    p.addChild(subquery);
+                    p.addArg(curPosition,subquery);
 
                 }
 
@@ -317,7 +318,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                 // Recursion.
                 rewrite(sa, exogenousVars, query, p, filter,
-                        (IValueExpressionNode) child);
+                        (IValueExpressionNode) child, i);
 
             }
 
