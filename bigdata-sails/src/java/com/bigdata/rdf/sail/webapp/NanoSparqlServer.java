@@ -170,7 +170,7 @@ public class NanoSparqlServer {
          * classpath. If there are multiple such resources on the classpath, the
          * first such resource will be discovered and used.</li>
          * <li>An attempt is made to locate the resource
-         * <code>bigdata-war/src/WEB-INF/web.xml</code> using the classpath
+         * <code>bigdata-war/src/main/webapp/WEB-INF/web.xml</code> using the classpath
          * (this handles the case when running from the command line using a
          * bigdata JAR). If found, the the <code>jetty.resourceBase</code> is
          * set to the URL formed by the trailing <code>WEB-INF/web.xml</code>
@@ -312,7 +312,7 @@ public class NanoSparqlServer {
          */
         String jettyXml = System.getProperty(//
                 SystemProperties.JETTY_XML,//
-                "bigdata-war/src/jetty.xml"//
+                "bigdata-sails/src/resources/jetty.xml"//
 //                SystemProperties.DEFAULT_JETTY_XML
                 );
 
@@ -817,7 +817,7 @@ public class NanoSparqlServer {
              */
 
             // The default location to check in the file system.
-            final File file = new File("bigdata-war/src");
+            final File file = new File("bigdata-war/src/main/webapp");
 
             final URL resourceBaseURL;
             if (file.exists()) {
@@ -871,7 +871,7 @@ public class NanoSparqlServer {
                      * </pre>
                      */
                     tmp = ClassLoader.getSystemClassLoader().getResource(
-                            src = "bigdata-war/src/WEB-INF/web.xml");
+                            src = "bigdata-war/src/main/webapp/WEB-INF/web.xml");
                 }
                 if (tmp != null) {
                     if (src != null) {
