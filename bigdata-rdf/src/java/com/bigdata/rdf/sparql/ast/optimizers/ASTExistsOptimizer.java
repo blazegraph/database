@@ -164,7 +164,9 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
         final int arity = p.size();
 
-        for (int i = 0; i < arity; i++) {
+        // iterate in reverse order, so we can dynamically insert the
+        // subqueries without harm
+        for (int i = arity-1; i >= 0; i--) {
 
             final IGroupMemberNode child = (IGroupMemberNode) p.get(i);
 
@@ -310,7 +312,9 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
         final int arity = ((BOp) ve).arity();
 
-        for (int i = 0; i < arity; i++) {
+        // iterate in reverse order, so we can dynamically insert the
+        // subqueries without harm
+        for (int i = arity-1; i >= 0; i--) {
 
             final BOp child = ((BOp) ve).get(i);
 

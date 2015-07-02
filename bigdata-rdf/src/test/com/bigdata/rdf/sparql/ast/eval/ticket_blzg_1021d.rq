@@ -1,0 +1,7 @@
+select * { 
+  ?s <eg:p>  ?o .
+  FILTER NOT EXISTS {
+    ?s <eg:apX> ?oo
+  }
+  hint:Query hint:optimizer "None" .
+}
