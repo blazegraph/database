@@ -977,4 +977,60 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();
     }
     
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021e() throws Exception {
+       new TestHelper("ticket_blzg_1021e",// testURI,
+             "ticket_blzg_1021e.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021f() throws Exception {
+       new TestHelper("ticket_blzg_1021f",// testURI,
+             "ticket_blzg_1021f.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021g() throws Exception {
+       new TestHelper("ticket_blzg_1021g",// testURI,
+             "ticket_blzg_1021g.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021gh.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021h() throws Exception {
+       new TestHelper("ticket_blzg_1021h",// testURI,
+             "ticket_blzg_1021h.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021gh.srx"// resultFileURL
+       ).runTest();
+    }
+    
 }
