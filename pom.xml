@@ -109,6 +109,12 @@ dependencies.
             </includes>
         </resource>
         <resource>
+            <directory>bigdata-sails/src/resources</directory>
+            <includes>
+                <include>**/*.xml</include>
+	    </includes>
+        </resource>
+        <resource>
             <directory>bigdata-sails/src/java</directory>
             <includes>
                 <include>**/*.properties</include>
@@ -229,7 +235,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
           </execution>
         </executions>
       </plugin>
-          <plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.18.1</version>
@@ -397,41 +403,34 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
           </execution>
         </executions>
       </plugin>
-<!--
-         <plugin>
-           <artifactId>maven-antrun-plugin</artifactId>
-           <version>1.6</version>
-           <executions>
-             <execution>
-               <goals>
-                 <goal>run</goal>
-               </goals>
-               <phase>process-resources</phase>
-               <configuration>
-                 <target>
-                   <property name="build.ver" value="${project.version}"/>
-                   <property name="build.ver.osgi" value="${project.version}"/>
-                   <property name="snapshot" value="false"/>
-                   <ant antfile="build.xml" target="clean"/>
-                   <ant antfile="build.xml" target="jar"/>
-                 </target>
-               </configuration>
-             </execution>
-             <execution>
-                  <id>attach-artifact</id>
-                  <phase>package</phase>
-                  <goals>
-                    <goal>run</goal>
-                  </goals>
-                  <configuration>
-                    <target>
-                      <attachartifact file="ant-build/bigdata-${project.version}.jar" type="jar"/>
-                    </target>
-                  </configuration>
-                </execution>
-           </executions>
-         </plugin>
--->
+       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war</artifactId>
+                  <version>${bigdata.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <!-- other configurations here -->
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
         </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
