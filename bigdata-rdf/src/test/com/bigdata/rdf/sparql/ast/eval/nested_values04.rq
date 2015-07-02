@@ -1,0 +1,8 @@
+SELECT ?o
+{
+  SELECT DISTINCT ?o WHERE
+  {
+    VALUES ?s { <http://s> }
+    ?s a ?o .
+  }
+}
