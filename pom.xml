@@ -216,14 +216,51 @@ dependencies.
             </includes>
         </resource>
        </resources>
-
         <plugins>
+          <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+               <id>build-info</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>process-resources</phase>
+               <configuration>
+                 <target>
+        		<property name="buildinfo.file" 
+            			value="bigdata/src/java/com/bigdata/BuildInfo.java"/>
+			<property name="build.ver" value = "${bigdata.version}"/>
+        		<tstamp>
+            			<format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
+        		</tstamp>
+        		<property environment="env" />
+        		<echo file="${buildinfo.file}">
+package com.bigdata;
+public class BuildInfo {
+    public static final String buildVersion="${build.ver}";
+    public static final String buildTimestamp="${build.timestamp}";
+    public static final String buildUser="${user.name}";
+    public static final String osArch="${os.arch}";
+    public static final String osName="${os.name}";
+    public static final String osVersion="${os.version}";
+}
+</echo>
+    			<loadfile property="buildinfo" srcFile="${buildinfo.file}"/>
+    			<echo message="${buildinfo}"/>
+                 </target>
+               </configuration>
+             </execution>
+            </executions>
+          </plugin>
+
 <!--
 TODO:  Break out into separate test class project.
 
 See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.html
 -->
-          <plugin>
+         <plugin>
            <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <version>2.6</version>
@@ -581,6 +618,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	   <artifactId>jackson-core</artifactId>
 	   <version>${jackson.version}</version>
 	</dependency>
+	<dependency>
+           <groupId>org.codehaus.jettison</groupId>
+           <artifactId>jettison</artifactId>
+           <version>${jettison.version}</version>
+    	</dependency>	
+<!--
         <dependency>
            <groupId>com.tinkerpop.blueprints</groupId>
            <artifactId>blueprints-core</artifactId>
@@ -591,6 +634,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
           <artifactId>rexster-core</artifactId>
           <version>${rexster.version}</version>
         </dependency>
+-->
   
      <dependency>
       <groupId>org.openrdf.sesame</groupId>
@@ -646,12 +690,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <version>3.4.5</version>
     </dependency>
 <!--
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-blueprints</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
