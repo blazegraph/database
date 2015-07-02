@@ -767,6 +767,16 @@ public class NanoSparqlServer {
             // jettyXmlUrl =
             // classLoader.getResource("bigdata-war/src/jetty.xml");
             isClassPath = true;
+            //Set the resource base
+            /*
+			final String resourceBase = new URL(jettyXmlUrl.getPath().substring(0,
+					jettyXmlUrl.getPath().length() - "jetty.xml".length())).toExternalForm();
+            if(log.isInfoEnabled()) {
+				log.info("Setting " + SystemProperties.JETTY_RESOURCE_BASE
+						+ " to " + resourceBase);
+            }
+            System.setProperty(SystemProperties.JETTY_RESOURCE_BASE, resourceBase);
+            */
 
         }
 
@@ -852,6 +862,7 @@ public class NanoSparqlServer {
                      */
                     tmp = classLoader.getResource(src = "/WEB-INF/web.xml");
                 }
+                
 //                if (tmp == null)// Eclipse IDE class path (system class loader).
 //                    tmp = ClassLoader.getSystemClassLoader().getResource(
 //                            src = "WEB-INF/web.xml");
@@ -873,17 +884,23 @@ public class NanoSparqlServer {
                     tmp = ClassLoader.getSystemClassLoader().getResource(
                             src = "bigdata-war/src/main/webapp/WEB-INF/web.xml");
                 }
+                
                 if (tmp != null) {
                     if (src != null) {
                         if(log.isInfoEnabled())
                             log.info("Found: src=" + src + ", url=" + tmp);
                     }
-                    final String s = tmp.toExternalForm();
-                    final int endIndex = s.lastIndexOf("WEB-INF/web.xml");
-                    final String t = s.substring(0, endIndex);
-                    resourceBaseURL = new URL(t);
+                   	resourceBaseURL = new URL(trimURISubstring(tmp,"WEB-INF/web.xml"));
                 } else {
-                    resourceBaseURL = null;
+					// Check to see if we picked up jetty.xml from the classpath
+					tmp = ClassLoader.getSystemClassLoader().getResource(
+							"jetty.xml");
+					if (tmp != null) {
+						resourceBaseURL = new URL(trimURISubstring(tmp,
+								"jetty.xml"));
+					} else {
+						resourceBaseURL = null;
+					}
                 }
                 isClassPath = resourceBaseURL != null;
 
@@ -935,6 +952,22 @@ public class NanoSparqlServer {
                     + System.getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML));
         
     }
+    
+    /**
+     * Convenience method to prune last substring occurance from URL.
+     * @param src
+     * @param sub
+     * @return
+     */
+    final static String trimURISubstring(URL src, String sub) {
+    	final String s = src.toExternalForm();
+        final int endIndex = s.lastIndexOf(sub);
+        final String t = s.substring(0, endIndex);
+        
+        return t;
+    	
+    }
+    
     
     /**
      * Configure the webapp (overrides, IIndexManager, etc.)
