@@ -145,6 +145,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
     /** The unique identifier for this query. */
     final private UUID queryId;
+    
+    /**
+     * Stats associated with static analysis
+     */
+    private StaticAnalysisStats saStats = null;
 
 //    /**
 //     * The query deadline. The value is the system clock time in milliseconds
@@ -1865,5 +1870,16 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 		}
 		return false;
 	}
+	
+   @Override
+   public void setStaticAnalysisStats(StaticAnalysisStats saStats) {
+      this.saStats = saStats;
+   }
+
+   @Override
+   public StaticAnalysisStats getStaticAnalysisStats() {
+      return saStats;
+   }
+
 
 }

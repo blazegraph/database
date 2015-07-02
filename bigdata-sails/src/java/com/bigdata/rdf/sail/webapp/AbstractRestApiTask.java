@@ -56,7 +56,7 @@ import com.bigdata.util.NV;
  * @see <a href="- http://sourceforge.net/apps/trac/bigdata/ticket/566" >
  *      Concurrent unisolated operations against multiple KBs </a>
  */
-abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
+public abstract class AbstractRestApiTask<T> extends AbstractApiTask<T> {
 
     private static final Logger log = Logger.getLogger(AbstractRestApiTask.class);
 
