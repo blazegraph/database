@@ -623,19 +623,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
            <artifactId>jettison</artifactId>
            <version>${jettison.version}</version>
     	</dependency>	
-<!--
-        <dependency>
-           <groupId>com.tinkerpop.blueprints</groupId>
-           <artifactId>blueprints-core</artifactId>
-           <version>${blueprints.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>com.tinkerpop.rexster</groupId>
-          <artifactId>rexster-core</artifactId>
-          <version>${rexster.version}</version>
-        </dependency>
--->
-  
      <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
@@ -689,12 +676,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <artifactId>zookeeper</artifactId>
       <version>3.4.5</version>
     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-blueprints</artifactId>
-       <version>${bigdata.version}</version>
-       <scope>test</scope>
-     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
