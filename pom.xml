@@ -689,13 +689,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <artifactId>zookeeper</artifactId>
       <version>3.4.5</version>
     </dependency>
-<!--
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-blueprints</artifactId>
        <version>${bigdata.version}</version>
+       <scope>test</scope>
      </dependency>
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
