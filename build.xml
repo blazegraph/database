@@ -2151,10 +2151,12 @@ ${postInstallMessage}</echo>
       <antcall target="startLookup"/>
       -->
       <!-- Run the tests -->
+      <antcall target="run-junit" />
+      <!--
       <antcall target="stopTestServices"/>
       <antcall target="startTestServices"/>
-      <antcall target="run-junit" />
       <antcall target="stopTestServices"/>
+      -->
       <!--
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
