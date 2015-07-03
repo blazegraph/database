@@ -236,10 +236,22 @@ dependencies.
             			<format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
         		</tstamp>
         		<property environment="env" />
+			<loadfile property="git.branch" srcFile=".git/HEAD">
+			   <filterchain>
+    			     <linecontainsregexp>
+      				<regexp pattern="^ref: (.*)$"/>
+    			     </linecontainsregexp>
+    			     <replaceregex 
+      				pattern="^ref: (.*)$"
+         			replace="\1" />
+				<striplinebreaks />
+  			     </filterchain>
+		 	</loadfile>  
         		<echo file="${buildinfo.file}">
 package com.bigdata;
 public class BuildInfo {
     public static final String buildVersion="${build.ver}";
+    public static final String gitBranch = "${git.branch}";
     public static final String buildTimestamp="${build.timestamp}";
     public static final String buildUser="${user.name}";
     public static final String osArch="${os.arch}";
@@ -317,6 +329,8 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
     	    <exclude>com/bigdata/TestAll.java</exclude>
 	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
 	  </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
           <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
         </configuration>
       </plugin>
