@@ -27,11 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -81,8 +79,8 @@ implements IASTOptimizer {
    protected void optimizeJoinGroup(AST2BOpContext ctx, StaticAnalysis sa,
          IBindingSet[] bSets, JoinGroupNode joinGroup) {
 
-      if (!ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup))
-         return;
+      final boolean reorderNodes = 
+         ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup);
 
       /**
        * Initialize summary containers with a single pass over the children;
@@ -127,7 +125,7 @@ implements IASTOptimizer {
        * https://docs.google.com/document/d/1Fu0QLj1ML6CdaysREDFsJt8fT048zBWp0ssMDITAYt8
        * for a formal explanation and justification of our approach.
        */
-      if (!assertCorrectnessOnly) {
+      if (reorderNodes && !assertCorrectnessOnly) {
          optimizeAcrossPartitions(partitions, bindingInfoMap, externallyIncoming);
       }
       
@@ -140,10 +138,15 @@ implements IASTOptimizer {
        * Note: we may want to pass in (and use) information about existing
        * filters, which might be valuable information for the optimizer.
        */
-      optimizeWithinPartitions(partitions, bindingInfoMap, assertCorrectnessOnly);
+      if (reorderNodes) {
+         optimizeWithinPartitions(partitions, bindingInfoMap, assertCorrectnessOnly);
+      }
       
       /**
        * Third, place the FILTERs at appropriate positions (across partitions).
+       * Note that this is required for correctness, and hence done even if
+       * reorderNodes is set to false (i.e., reordering is disabled through
+       * the query hint).
        */
       filterPlacer.placeFiltersInPartitions(partitions);
 

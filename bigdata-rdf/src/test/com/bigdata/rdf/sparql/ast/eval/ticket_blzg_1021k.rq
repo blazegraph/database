@@ -1,0 +1,5 @@
+select * { 
+   FILTER (?a = ?b)
+   OPTIONAL { <http://s> <http://p> ?a }
+   <http://s> <http://p> ?b .
+}
