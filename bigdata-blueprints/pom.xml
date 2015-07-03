@@ -135,6 +135,7 @@ ga('send', 'pageview');
       <artifactId>bigdata</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
+<!--
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-war</artifactId>
@@ -142,6 +143,7 @@ ga('send', 'pageview');
       <type>war</type>
       <scope>test</scope>
     </dependency>
+-->
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
