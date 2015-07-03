@@ -921,4 +921,171 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();
     }   
     
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021a() throws Exception {
+       new TestHelper("ticket_blzg_1021a",// testURI,
+             "ticket_blzg_1021a.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }   
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021b() throws Exception {
+       new TestHelper("ticket_blzg_1021b",// testURI,
+             "ticket_blzg_1021b.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021c() throws Exception {
+       new TestHelper("ticket_blzg_1021c",// testURI,
+             "ticket_blzg_1021c.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }   
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021d() throws Exception {
+       new TestHelper("ticket_blzg_1021d",// testURI,
+             "ticket_blzg_1021d.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021e() throws Exception {
+       new TestHelper("ticket_blzg_1021e",// testURI,
+             "ticket_blzg_1021e.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021f() throws Exception {
+       new TestHelper("ticket_blzg_1021f",// testURI,
+             "ticket_blzg_1021f.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021g() throws Exception {
+       new TestHelper("ticket_blzg_1021g",// testURI,
+             "ticket_blzg_1021g.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021gh.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021h() throws Exception {
+       new TestHelper("ticket_blzg_1021h",// testURI,
+             "ticket_blzg_1021h.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021gh.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021i() throws Exception {
+       new TestHelper("ticket_blzg_1021i",// testURI,
+             "ticket_blzg_1021i.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021j() throws Exception {
+       new TestHelper("ticket_blzg_1021j",// testURI,
+             "ticket_blzg_1021j.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021k() throws Exception {
+       new TestHelper("ticket_blzg_1021k",// testURI,
+             "ticket_blzg_1021k.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021l() throws Exception {
+       new TestHelper("ticket_blzg_1021l",// testURI,
+             "ticket_blzg_1021l.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
 }

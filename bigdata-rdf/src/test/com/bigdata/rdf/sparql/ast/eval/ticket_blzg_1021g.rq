@@ -1,0 +1,4 @@
+select * { 
+   FILTER (?a != ?b)
+   <http://s> ?a ?b .
+}
