@@ -189,7 +189,7 @@ dependencies.
     <module>../junit-ext</module>
     <module>../lgpl-utils</module>
     <module>../bigdata-war</module>
-    <!-- <module>../bigdata-jar</module> -->
+    <module>../bigdata-jar</module>
   </modules>
 
 
