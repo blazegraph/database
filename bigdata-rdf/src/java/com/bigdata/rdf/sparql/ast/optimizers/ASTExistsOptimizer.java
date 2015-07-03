@@ -33,7 +33,6 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -44,6 +43,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -164,9 +164,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
         final int arity = p.size();
 
-        // iterate in reverse order, so we can dynamically insert the
-        // subqueries without harm
-        for (int i = arity-1; i >= 0; i--) {
+        for (int i = 0; i < arity; i++) {
 
             final IGroupMemberNode child = (IGroupMemberNode) p.get(i);
 
@@ -176,7 +174,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                 // rewrite filter.
                 rewrite(sa, exogenousVars, query, p, filter,
-                        filter.getValueExpressionNode(), i);
+                        filter.getValueExpressionNode());
 
             }
 
@@ -218,8 +216,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
             final QueryBase query,
             final GraphPatternGroup<IGroupMemberNode> p,
             final FilterNode filter,
-            final IValueExpressionNode ve,
-            final int curPosition) {
+            final IValueExpressionNode ve) {
 
         if (ve instanceof SubqueryFunctionNodeBase) {
 
@@ -302,8 +299,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
                     subquery.setWhereClause(graphPattern);
 
                     // lift the SubqueryRoot into the parent.
-                    p.addArg(curPosition,subquery);
-
+                    p.addChild(subquery);
                 }
 
             }
@@ -312,9 +308,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
         final int arity = ((BOp) ve).arity();
 
-        // iterate in reverse order, so we can dynamically insert the
-        // subqueries without harm
-        for (int i = arity-1; i >= 0; i--) {
+        for (int i = 0; i < arity; i++) {
 
             final BOp child = ((BOp) ve).get(i);
 
@@ -322,7 +316,7 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                 // Recursion.
                 rewrite(sa, exogenousVars, query, p, filter,
-                        (IValueExpressionNode) child, i);
+                        (IValueExpressionNode) child);
 
             }
 
