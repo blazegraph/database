@@ -33,7 +33,6 @@ import java.util.Set;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
-import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.ExistsNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -44,6 +43,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.NotExistsNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -300,7 +300,6 @@ public class ASTExistsOptimizer implements IASTOptimizer {
 
                     // lift the SubqueryRoot into the parent.
                     p.addChild(subquery);
-
                 }
 
             }
