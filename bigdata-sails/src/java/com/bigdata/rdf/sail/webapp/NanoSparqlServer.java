@@ -892,15 +892,7 @@ public class NanoSparqlServer {
                     }
                    	resourceBaseURL = new URL(trimURISubstring(tmp,"WEB-INF/web.xml"));
                 } else {
-					// Check to see if we picked up jetty.xml from the classpath
-					tmp = ClassLoader.getSystemClassLoader().getResource(
-							"jetty.xml");
-					if (tmp != null) {
-						resourceBaseURL = new URL(trimURISubstring(tmp,
-								"jetty.xml"));
-					} else {
-						resourceBaseURL = null;
-					}
+					resourceBaseURL = null;
                 }
                 isClassPath = resourceBaseURL != null;
 
