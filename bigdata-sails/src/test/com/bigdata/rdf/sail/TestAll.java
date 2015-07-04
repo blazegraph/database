@@ -33,8 +33,6 @@ import junit.framework.TestSuite;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.rdf.sail.remote.BigdataSailFactoryTest;
-
 /**
  * Test suite.
  * 
