@@ -667,24 +667,14 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	<artifactId>sesame-store-testsuite</artifactId>
 	<version>${sesame.version}</version>
     </dependency>
-    <dependency>
-        <groupId>net.jini</groupId>
-        <artifactId>jini-core</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>org.apache.river</groupId>
-        <artifactId>tools</artifactId>
-        <version>2.2.2</version>
-        <type>jar</type>
-    </dependency>
+<!--
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-ext</artifactId>
         <version>2.1</version>
         <type>jar</type>
     </dependency>
+-->
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
@@ -710,12 +700,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <scope>test</scope>
      </dependency>
 <!-- TODO: Factor out dependency on bigdata-jini
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
