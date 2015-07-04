@@ -188,6 +188,8 @@ dependencies.
     <module>../dsi-utils</module>
     <module>../junit-ext</module>
     <module>../lgpl-utils</module>
+    <module>../bigdata-war</module>
+    <module>../bigdata-jar</module>
   </modules>
 
 

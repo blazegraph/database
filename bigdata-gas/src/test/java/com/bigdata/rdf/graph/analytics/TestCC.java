@@ -111,7 +111,7 @@ public class TestCC extends AbstractSailGraphTestCase {
                     final AtomicInteger ai = labels.get(label);
                     final int count = ai!=null?ai.get():-1;
 
-                    assertEquals(5, labels.get(label).get());
+                    assertEquals(5, count);
                 }
 
                 if (false) {

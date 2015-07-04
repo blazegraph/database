@@ -170,7 +170,7 @@ public class NanoSparqlServer {
          * classpath. If there are multiple such resources on the classpath, the
          * first such resource will be discovered and used.</li>
          * <li>An attempt is made to locate the resource
-         * <code>bigdata-war/src/WEB-INF/web.xml</code> using the classpath
+         * <code>bigdata-war/src/main/webapp/WEB-INF/web.xml</code> using the classpath
          * (this handles the case when running from the command line using a
          * bigdata JAR). If found, the the <code>jetty.resourceBase</code> is
          * set to the URL formed by the trailing <code>WEB-INF/web.xml</code>
@@ -312,7 +312,7 @@ public class NanoSparqlServer {
          */
         String jettyXml = System.getProperty(//
                 SystemProperties.JETTY_XML,//
-                "bigdata-war/src/jetty.xml"//
+                "bigdata-sails/src/resources/jetty.xml"//
 //                SystemProperties.DEFAULT_JETTY_XML
                 );
 
@@ -767,6 +767,16 @@ public class NanoSparqlServer {
             // jettyXmlUrl =
             // classLoader.getResource("bigdata-war/src/jetty.xml");
             isClassPath = true;
+            //Set the resource base
+            /*
+			final String resourceBase = new URL(jettyXmlUrl.getPath().substring(0,
+					jettyXmlUrl.getPath().length() - "jetty.xml".length())).toExternalForm();
+            if(log.isInfoEnabled()) {
+				log.info("Setting " + SystemProperties.JETTY_RESOURCE_BASE
+						+ " to " + resourceBase);
+            }
+            System.setProperty(SystemProperties.JETTY_RESOURCE_BASE, resourceBase);
+            */
 
         }
 
@@ -817,7 +827,7 @@ public class NanoSparqlServer {
              */
 
             // The default location to check in the file system.
-            final File file = new File("bigdata-war/src");
+            final File file = new File("bigdata-war/src/main/webapp");
 
             final URL resourceBaseURL;
             if (file.exists()) {
@@ -852,6 +862,7 @@ public class NanoSparqlServer {
                      */
                     tmp = classLoader.getResource(src = "/WEB-INF/web.xml");
                 }
+                
 //                if (tmp == null)// Eclipse IDE class path (system class loader).
 //                    tmp = ClassLoader.getSystemClassLoader().getResource(
 //                            src = "WEB-INF/web.xml");
@@ -871,19 +882,17 @@ public class NanoSparqlServer {
                      * </pre>
                      */
                     tmp = ClassLoader.getSystemClassLoader().getResource(
-                            src = "bigdata-war/src/WEB-INF/web.xml");
+                            src = "bigdata-war/src/main/webapp/WEB-INF/web.xml");
                 }
+                
                 if (tmp != null) {
                     if (src != null) {
                         if(log.isInfoEnabled())
                             log.info("Found: src=" + src + ", url=" + tmp);
                     }
-                    final String s = tmp.toExternalForm();
-                    final int endIndex = s.lastIndexOf("WEB-INF/web.xml");
-                    final String t = s.substring(0, endIndex);
-                    resourceBaseURL = new URL(t);
+                   	resourceBaseURL = new URL(trimURISubstring(tmp,"WEB-INF/web.xml"));
                 } else {
-                    resourceBaseURL = null;
+					resourceBaseURL = null;
                 }
                 isClassPath = resourceBaseURL != null;
 
@@ -935,6 +944,22 @@ public class NanoSparqlServer {
                     + System.getProperty(SystemProperties.JETTY_OVERRIDE_WEB_XML));
         
     }
+    
+    /**
+     * Convenience method to prune last substring occurance from URL.
+     * @param src
+     * @param sub
+     * @return
+     */
+    final static String trimURISubstring(URL src, String sub) {
+    	final String s = src.toExternalForm();
+        final int endIndex = s.lastIndexOf(sub);
+        final String t = s.substring(0, endIndex);
+        
+        return t;
+    	
+    }
+    
     
     /**
      * Configure the webapp (overrides, IIndexManager, etc.)
