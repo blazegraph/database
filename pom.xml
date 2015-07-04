@@ -690,20 +690,13 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
       <artifactId>zookeeper</artifactId>
       <version>3.4.5</version>
     </dependency>
-<!--
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
-       <type>test-jar</type>
-       <scope>test</scope>
-     </dependency>
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
+<!-- TODO: Factor out dependency on bigdata-gas BLZG-1272
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
@@ -843,18 +836,4 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <version>${servlet.version}</version>
       </dependency>
    </dependencies>
-<!--
-  <modules>
-    <module>bigdata-blueprints</module>
-    <module>bigdata-client</module>
-    <module>bigdata-ganglia</module>
-    <module>bigdata-gas</module>
-    <module>bigdata-jini</module>
-    <module>blazegraph-parent</module>
-    <module>ctc-striterators</module>
-    <module>dsi-utils</module>
-    <module>junit-ext</module>
-    <module>lgpl-utils</module>
-  </modules>
--->
 </project>
