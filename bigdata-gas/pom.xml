@@ -78,7 +78,8 @@ ga('send', 'pageview');
       <version>${junit3.version}</version>
       <scope>test</scope>
     </dependency>
-    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. -->
+    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. 
+ 	-->
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
