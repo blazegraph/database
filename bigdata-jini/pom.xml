@@ -131,6 +131,34 @@
              </execution>
            </executions>
          </plugin>
+        <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war</artifactId>
+                  <version>${bigdata.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <!-- other configurations here -->
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
     </plugins>
   </build>
 
@@ -191,6 +219,12 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+     <groupId>com.blazegraph</groupId>
+     <artifactId>bigdata-war</artifactId>
+     <version>${bigdata.version}</version>
+     <type>war</type> 
     </dependency>
     <dependency>
       <groupId>com.bigdata</groupId>

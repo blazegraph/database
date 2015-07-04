@@ -142,12 +142,14 @@
                     <Arg>
                         <!-- This is the bigdata web application. -->
                         <New id="WebAppContext" class="org.eclipse.jetty.webapp.WebAppContext">
-                         <Set name="war"><SystemProperty name="jetty.resourceBase" default="bigdata-war/src"/></Set>
+                         <Set name="war"><SystemProperty name="jetty.resourceBase" default="bigdata-war/src/main/webapp/"/></Set>
                          <Set name="contextPath">/bigdata</Set>
                          <Set name="descriptor">WEB-INF/web.xml</Set>
                          <Set name="parentLoaderPriority">true</Set>
                          <Set name="extractWAR">false</Set>
-                         <Set name="overrideDescriptor"><SystemProperty name="jetty.overrideWebXml" default="bigdata-war/src/WEB-INF/override-web.xml"/></Set>
+<!--
+                         <Set name="overrideDescriptor"><SystemProperty name="jetty.overrideWebXml" default="/WEB-INF/override-web.xml"/></Set>
+-->
                          <Set name="maxFormContentSize">10485760</Set>
                         </New>
                     </Arg>

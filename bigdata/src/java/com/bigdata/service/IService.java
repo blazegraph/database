@@ -33,8 +33,6 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.UUID;
 
-import com.sun.jini.admin.DestroyAdmin;
-
 /**
  * Common service interface.
  * 

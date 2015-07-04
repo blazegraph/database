@@ -19,12 +19,13 @@
    when starting the servlet container.
    </description>
    <!-- Note: This path is relative to the directory in which you start -->
-   <!-- the servlet container. For the IDE, this is generally the root  -->
+   <!-- the servlet container or within the classpath as a resource.    -->
+   <!-- For the IDE, this is generally the root  -->
    <!-- of the bigdata project. For the WAR, it depends where you start -->
    <!-- the servlet container. The "ant war" target rewrites this to be -->
    <!-- relative to the root of the servlet container by default.       -->
    <param-name>propertyFile</param-name>
-   <param-value>WEB-INF/RWStore.properties</param-value>
+   <param-value>RWStore.properties</param-value>
   </context-param>
   <context-param>
    <description>The default bigdata namespace of for the triple or quad store
@@ -68,6 +69,11 @@
    <description>The number of parallel threads to use for the warmup period.  At most one thread will be used per index.</description>
    <param-name>warmupThreadPoolSize</param-name>
    <param-value>20</param-value>
+  </context-param>
+  <context-param>
+   <description>The name of the class to use for the Blueprints Servlet instance</description>
+   <param-name>blueprintsServletProvider</param-name>
+   <param-value>com.bigdata.blueprints.webapp.BlueprintsServlet</param-value>
   </context-param>
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>

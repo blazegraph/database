@@ -38,7 +38,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
-public abstract class BlueprintsServletProxy extends BigdataRDFServlet {
+public class BlueprintsServletProxy extends BigdataRDFServlet {
 	
 	private static final String DEFAULT_PROVIDER = "com.bigdata.blueprints.webapp.BlueprintsServlet";
 	
@@ -55,7 +55,10 @@ public abstract class BlueprintsServletProxy extends BigdataRDFServlet {
 	 */
 	private static final long serialVersionUID = 6037374358611489293L;
 	
-	public abstract void doPostRequest(HttpServletRequest req, HttpServletResponse resp) throws IOException; 
+	public void doPostRequest(HttpServletRequest req, HttpServletResponse resp) throws IOException
+	{
+		throw new RuntimeException("Running without the Blueprints package.");
+	}
 	
 	public static String getDefaultProvider() {
 		
@@ -84,8 +87,9 @@ public abstract class BlueprintsServletProxy extends BigdataRDFServlet {
 				if (log.isDebugEnabled()) {
 					log.debug(e.toString());
 				}
+				//If we're running without the blueprint package, just return a proxy.
+				return new BlueprintsServletProxy();
 				
-				throw new RuntimeException(e);
 			}
 
 		}

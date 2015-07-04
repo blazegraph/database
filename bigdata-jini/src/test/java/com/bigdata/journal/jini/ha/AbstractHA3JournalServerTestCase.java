@@ -1827,15 +1827,14 @@ public abstract class AbstractHA3JournalServerTestCase extends
              */
             {
                 final File webAppDir = serviceDir;
-                // webAppDir = new File(serviceDir, "bigdata-war/src");
+
                 if (!webAppDir.exists() && !webAppDir.mkdirs()) {
                     throw new IOException("Could not create directory: "
                             + webAppDir);
                 }
-                //FIXME:  This should be refactored to pick up the sources 
-                //from the maven depdency.  
-                //TODO: Refactor once bidata-war is a maven artifact
-                copyFiles(new File("src/test/resources/bigdata-war/"), webAppDir);
+
+				copyFile(new File(WAR_DIR + WAR_FILE_NAME), new File(webAppDir,
+						WAR_FILE_NAME), true);
             }
 
             // log4j configuration.
@@ -2299,10 +2298,10 @@ public abstract class AbstractHA3JournalServerTestCase extends
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
 
                 // Override the location of the webapp as deployed.
-                cmds.add("-D" + JETTY_RESOURCE_BASE + "=.");
+                cmds.add("-D" + JETTY_RESOURCE_BASE + "=" + WAR_FILE_NAME);
 
                 // Override the location of the override-web.xml file as deployed.
-                cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
+                //cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
 
                 // Override the jetty.dump.start.
                 cmds.add("-D" + TEST_JETTY_DUMP_START + "=" + jettyDumpStart);

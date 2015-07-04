@@ -13,7 +13,8 @@ See 'bundleJar'.
 Webapp. Bigdata can be deployed as a web application exposing a SPARQL end point
 with a RESTful API.
 
-See 'war'.
+See 'war'.  Starting with the 1.5.2 release, this is deprecated and the bigdata-war maven
+artifact should be used:  cd bigdata-war; mvn package
 
 Executable jar.  Bigdata can be built as an executable jar file.  This is a fully-
 bundled single jar distribution that may be run as "java -jar <jarfile>".  You may 
@@ -602,7 +603,7 @@ ga('send', 'pageview');
             preservelastmodified="true" 
             description="Stage the webapp to a temporary directory."
             >
-            <fileset dir="bigdata-war/src">
+            <fileset dir="bigdata-war/src/main/webapp">
               <include name="**/*"/>
             <!-- The jetty.xml file is not used when deploying to a servlet container. -->
               <exclude name="**/jetty.xml"/>
@@ -612,7 +613,7 @@ ga('send', 'pageview');
           summary="true"
           description="Override the default location of the RWStore.properties file.">
         <replacefilter 
-         token="WEB-INF/RWStore.properties"
+         token="RWStore.properties"
             value="../webapps/bigdata/WEB-INF/RWStore.properties"
         />
       </replace>
@@ -2728,10 +2729,10 @@ ${postInstallMessage}</echo>
             <classpath refid="runtime.classpath" />
             <jvmarg value="-server"/>
             <jvmarg value="-Xmx4G"/>
-            <jvmarg value="-Dlog4j.configuration=bigdata-war/src/WEB-INF/classes/log4j.properties"/>
+            <jvmarg value="-Dlog4j.configuration=bigdata-war/src/main/webapp/WEB-INF/classes/log4j.properties"/>
             <arg value="9999"/>
             <arg value="kb"/>
-            <arg value="bigdata-war/src/WEB-INF/GraphStore.properties"/>
+            <arg value="bigdata-war/src/main/webapp/WEB-INF/GraphStore.properties"/>
         </java>
     </target>
 

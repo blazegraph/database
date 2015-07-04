@@ -123,6 +123,17 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     // static final protected String TGT_PATH = "/Volumes/SSDData/bigdata/"+FEDNAME+"/CI-HAJournal-1/";
     static final protected String TGT_PATH = FEDNAME + "/CI-HAJournal-1/";
+    
+    /**
+     * Path to the war file
+     */
+    static final protected String WAR_DIR = "target/";
+    
+    /**
+     * Name of the war file to be used for testing.
+     */
+    static final protected String WAR_FILE_NAME = "bigdata.war";
+    
 
     /**
      * The timeout used to await quorum meet or break.

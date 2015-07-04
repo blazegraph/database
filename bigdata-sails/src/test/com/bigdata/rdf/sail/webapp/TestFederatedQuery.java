@@ -327,7 +327,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 			log.info("datasetUri: " + datasetUri);
 		}
       
-       rep.add(new AddOp(datasetUri.toExternalForm()));
+       		rep.add(new AddOp(datasetUri.toExternalForm()));
 
 //        final InputStream dataset = TestFederatedQuery.class
 //                .getResourceAsStream(datasetFile);
