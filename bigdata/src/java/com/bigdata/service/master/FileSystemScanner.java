@@ -25,15 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jul 11, 2009
  */
 
-package com.bigdata.service.jini.master;
+package com.bigdata.service.master;
 
 import java.io.File;
 import java.io.FilenameFilter;
 import java.util.Queue;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.master.AbstractResourceScanner;
-import com.bigdata.service.master.IResourceScannerFactory;
 
 /**
  * Adds all files accepted by the filter to the {@link Queue}.

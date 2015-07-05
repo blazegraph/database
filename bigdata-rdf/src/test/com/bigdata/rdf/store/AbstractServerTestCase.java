@@ -30,28 +30,17 @@ package com.bigdata.rdf.store;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase2;
-import net.jini.core.discovery.LookupLocator;
-import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceRegistrar;
-import net.jini.core.lookup.ServiceTemplate;
 
 import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.service.DataService;
-import com.bigdata.service.IDataService;
-import com.bigdata.service.MetadataService;
-import com.bigdata.service.jini.AbstractServer;
-import com.bigdata.util.config.NicUtil;
-import com.sun.jini.tool.ClassServer;
 
 /**
  * Abstract base class for tests of remote services.
@@ -71,7 +60,7 @@ import com.sun.jini.tool.ClassServer;
  * <code>build.xml</code> in the root of this module to update that JAR.
  * </p>
  * <p>
- * Note: A {@link ClassServer} will be started on port 8081 by default. If that
+ * Note: A ClassServer will be started on port 8081 by default. If that
  * port is in use then you MUST specify another port.
  * </p>
  * 
@@ -145,7 +134,7 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      * will return iff the port is available at the time that this method was
      * called. The method will retry a few times since sometimes it takes a bit
      * for a socket to get released and we are reusing the same socket for the
-     * {@link ClassServer} for each test.
+     * ClassServer for each test.
      * 
      * @param port
      *            The port to try.
@@ -197,11 +186,12 @@ public abstract class AbstractServerTestCase extends TestCase2 {
         
     }
 
-    private ClassServer classServer;
+    //BLZG-1730 remove bigdata-jini dependencies
+    //private ClassServer classServer;
     
     /**
      * The name of the System property that may be used to change the port on which
-     * the {@link ClassServer} will be started.
+     * the ClassServer will be started.
      */
     public static final String PORT_OPTION = "bigdata.test.port";
     
@@ -211,8 +201,8 @@ public abstract class AbstractServerTestCase extends TestCase2 {
     public static final String DEFAULT_PORT = "8081";
     
     /**
-     * Starts a {@link ClassServer} that supports downloadable code for the unit
-     * test. The {@link ClassServer} will start on the port named by the System
+     * Starts a ClassServer that supports downloadable code for the unit
+     * test. The ClassServer will start on the port named by the System
      * property {@link #PORT_OPTION} and on port {@link #DEFAULT_PORT} if that
      * system property is not set.
      * 
@@ -262,15 +252,16 @@ public abstract class AbstractServerTestCase extends TestCase2 {
             ;
         
         assertOpenPort(port);
+
+//BLZG-1370        
+//        classServer = new ClassServer(
+//                port,
+//                dirlist,
+//                true, // trees - serve up files inside of JARs,
+//                true // verbose
+//                );
         
-        classServer = new ClassServer(
-                port,
-                dirlist,
-                true, // trees - serve up files inside of JARs,
-                true // verbose
-                );
-        
-        classServer.start();
+//        classServer.start();
 
     }
     
@@ -287,11 +278,12 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      */
     public void tearDown() throws Exception {
         
-        if(classServer!=null) {
-
-            classServer.terminate();
-            
-        }
+//BLZG-1370 bigdata-jini    	
+//        if(classServer!=null) {
+//
+//            classServer.terminate();
+//            
+//        }
         
         super.tearDown();
 
@@ -310,43 +302,44 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      * @exception InterruptedException
      *                if the thread is interrupted while it is waiting to retry.
      */
-    static public ServiceID getServiceID(AbstractServer server) throws AssertionFailedError, InterruptedException {
-
-        ServiceID serviceID = null;
-
-        for(int i=0; i<10 && serviceID == null; i++) {
+    //BLZG-1370  Commented out unused code to remove dependencies
+//    static public ServiceID getServiceID(AbstractServer server) throws AssertionFailedError, InterruptedException {
+//
+//       ServiceID serviceID = null;
+//
+//       for(int i=0; i<10 && serviceID == null; i++) {
 
             /*
              * Note: This can be null since the serviceID is not assigned
              * synchonously by the registrar.
              */
 
-            serviceID = server.getServiceID();
+//            serviceID = server.getServiceID();
             
-            if(serviceID == null) {
+//            if(serviceID == null) {
                 
                 /*
                  * We wait a bit and retry until we have it or timeout.
                  */
                 
-                Thread.sleep(200);
+//               Thread.sleep(200);
                 
-            }
+//            }
             
-        }
+//       }
         
-        assertNotNull("serviceID",serviceID);
+//        assertNotNull("serviceID",serviceID);
         
         /*
          * Verify that we have discovered the _correct_ service. This is a
          * potential problem when starting a stopping services for the test
          * suite.
          */
-        assertEquals("serviceID", server.getServiceID(), serviceID);
+//        assertEquals("serviceID", server.getServiceID(), serviceID);
 
-        return serviceID;
+//        return serviceID;
         
-    }
+//    }
     
     /**
      * Lookup a {@link DataService} by its {@link ServiceID} using unicast
@@ -364,81 +357,82 @@ public abstract class AbstractServerTestCase extends TestCase2 {
      *       that carries most of the functionality but allows us to make
      *       distinctions easily during discovery).
      */
-    public IDataService lookupDataService(ServiceID serviceID)
-            throws IOException, ClassNotFoundException, InterruptedException {
-
-        /* 
-         * Lookup the discover service (unicast on localhost).
-         */
-
-        // get the hostname.
-        String hostname = NicUtil.getIpAddress("default.nic", "default", true);
-
-        // Find the service registrar (unicast protocol).
-        final int timeout = 4*1000; // seconds.
-        System.err.println("hostname: "+hostname);
-        LookupLocator lookupLocator = new LookupLocator("jini://"+hostname);
-        ServiceRegistrar serviceRegistrar = lookupLocator.getRegistrar( timeout );
-
-        /*
-         * Prepare a template for lookup search.
-         * 
-         * Note: The client needs a local copy of the interface in order to be
-         * able to invoke methods on the service without using reflection. The
-         * implementation class will be downloaded from the codebase identified
-         * by the server.
-         */
-        ServiceTemplate template = new ServiceTemplate(//
-                /*
-                 * use this to request the service by its serviceID.
-                 */
-                serviceID,
-                /*
-                 * Use this to filter services by an interface that they expose.
-                 */
-//                new Class[] { IDataService.class },
-                null,
-                /*
-                 * use this to filter for services by Entry attributes.
-                 */
-                null);
-
-        /*
-         * Lookup a service. This can fail if the service registrar has not
-         * finished processing the service registration. If it does, you can
-         * generally just retry the test and it will succeed. However this
-         * points out that the client may need to wait and retry a few times if
-         * you are starting everthing up at once (or just register for
-         * notification events for the service if it is not found and enter a
-         * wait state).
-         */
-        
-        IDataService service = null;
-        
-        for (int i = 0; i < 10 && service == null; i++) {
-        
-            service = (IDataService) serviceRegistrar
-                    .lookup(template /* , maxMatches */);
-            
-            if (service == null) {
-            
-                System.err.println("Service not found: sleeping...");
-                
-                Thread.sleep(200);
-                
-            }
-            
-        }
-
-        if(service!=null) {
-
-            System.err.println("Service found.");
-            
-        }
-        
-        return service;
-        
-    }
+    //BLZG-1370  Commented out unused code to remove dependencies
+//    public IDataService lookupDataService(ServiceID serviceID)
+//            throws IOException, ClassNotFoundException, InterruptedException {
+//
+//        /* 
+//         * Lookup the discover service (unicast on localhost).
+//         */
+//
+//        // get the hostname.
+//        String hostname = NicUtil.getIpAddress("default.nic", "default", true);
+//
+//        // Find the service registrar (unicast protocol).
+//        final int timeout = 4*1000; // seconds.
+//        System.err.println("hostname: "+hostname);
+//        LookupLocator lookupLocator = new LookupLocator("jini://"+hostname);
+//        ServiceRegistrar serviceRegistrar = lookupLocator.getRegistrar( timeout );
+//
+//        /*
+//         * Prepare a template for lookup search.
+//         * 
+//         * Note: The client needs a local copy of the interface in order to be
+//         * able to invoke methods on the service without using reflection. The
+//         * implementation class will be downloaded from the codebase identified
+//         * by the server.
+//         */
+//        ServiceTemplate template = new ServiceTemplate(//
+//                /*
+//                 * use this to request the service by its serviceID.
+//                 */
+//                serviceID,
+//                /*
+//                 * Use this to filter services by an interface that they expose.
+//                 */
+////                new Class[] { IDataService.class },
+//                null,
+//                /*
+//                 * use this to filter for services by Entry attributes.
+//                 */
+//                null);
+//
+//        /*
+//         * Lookup a service. This can fail if the service registrar has not
+//         * finished processing the service registration. If it does, you can
+//         * generally just retry the test and it will succeed. However this
+//         * points out that the client may need to wait and retry a few times if
+//         * you are starting everthing up at once (or just register for
+//         * notification events for the service if it is not found and enter a
+//         * wait state).
+//         */
+//        
+//        IDataService service = null;
+//        
+//        for (int i = 0; i < 10 && service == null; i++) {
+//        
+//            service = (IDataService) serviceRegistrar
+//                    .lookup(template /* , maxMatches */);
+//            
+//            if (service == null) {
+//            
+//                System.err.println("Service not found: sleeping...");
+//                
+//                Thread.sleep(200);
+//                
+//            }
+//            
+//        }
+//
+//        if(service!=null) {
+//
+//            System.err.println("Service found.");
+//            
+//        }
+//        
+//        return service;
+//        
+//    }
 
     /**
      * Compares two representations of the {@link PartitionLocator}
