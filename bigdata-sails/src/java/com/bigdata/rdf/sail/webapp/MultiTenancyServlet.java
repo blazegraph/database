@@ -48,9 +48,8 @@ import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.PropertyUtil;
 
 /**
@@ -312,7 +311,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
             } else {
 
-                final JiniFederation<?> fed = (JiniFederation<?>) indexManager;
+                final AbstractFederation<?> fed = (AbstractFederation<?>) indexManager;
 
                 defaults = fed.getClient().getProperties();
 

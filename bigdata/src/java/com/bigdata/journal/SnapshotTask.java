@@ -25,15 +25,20 @@ package com.bigdata.journal;
 
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.journal.AbstractJournal.ISnapshotData;
-import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -46,10 +51,22 @@ import com.bigdata.quorum.Quorum;
  * @see <a href="http://trac.bigdata.com/ticket/1172"> Online backup for Journal
  *      </a>
  */
-class SnapshotTask implements Callable<ISnapshotResult> {
+public class SnapshotTask implements Callable<ISnapshotResult> {
 
    private final Journal journal;
    private final ISnapshotFactory snapshotFactory;
+   
+   protected static final Logger log = Logger.getLogger(SnapshotTask.class);
+   
+   /**
+    * The prefix for the temporary files used to generate snapshots.
+    */
+   public final static String SNAPSHOT_TMP_PREFIX = "snapshot";
+   
+   /**
+    * The suffix for the temporary files used to generate snapshots.
+    */
+   public final static String SNAPSHOT_TMP_SUFFIX = ".tmp";
 
    public SnapshotTask(final Journal journal,
          final ISnapshotFactory snapshotFactory) {
@@ -116,8 +133,8 @@ class SnapshotTask implements Callable<ISnapshotResult> {
           * successfully written.
           */
          final File tmp = File.createTempFile(
-               SnapshotManager.SNAPSHOT_TMP_PREFIX,
-               SnapshotManager.SNAPSHOT_TMP_SUFFIX, parentDir);
+               SNAPSHOT_TMP_PREFIX,
+               SNAPSHOT_TMP_SUFFIX, parentDir);
 
          OutputStream osx = null;
          DataOutputStream os = null;
@@ -213,6 +230,89 @@ class SnapshotTask implements Callable<ISnapshotResult> {
          // Release the read lock.
          journal.abort(txId);
       }
+   }
+   
+   /**
+    * Copy the input stream to the output stream.
+    * 
+    * @param content
+    *            The input stream.
+    * @param outstr
+    *            The output stream.
+    * 
+    * @throws IOException
+    */
+   static private void copyStream(final InputStream content,
+           final OutputStream outstr) throws IOException {
+
+       final byte[] buf = new byte[1024];
+
+       while (true) {
+
+           final int rdlen = content.read(buf);
+
+           if (rdlen <= 0) {
+
+               break;
+
+           }
+
+           outstr.write(buf, 0, rdlen);
+
+       }
+
+   }
+   
+   /**
+    * Decompress a snapshot onto the specified file. The original file is not
+    * modified.
+    * 
+    * @param src
+    *            The snapshot.
+    * @param dst
+    *            The file onto which the decompressed snapshot will be written.
+    * 
+    * @throws IOException
+    *             if the source file does not exist.
+    * @throws IOException
+    *             if the destination file exists and is not empty.
+    * @throws IOException
+    *             if there is a problem decompressing the source file onto the
+    *             destination file.
+    */
+   public static void decompress(final File src, final File dst)
+           throws IOException {
+
+       if (!src.exists())
+           throw new FileNotFoundException(src.getAbsolutePath());
+
+       if (dst.exists() && dst.length() != 0)
+           throw new IOException("Output file exists and is not empty: "
+                   + dst.getAbsolutePath());
+
+       if (log.isInfoEnabled())
+           log.info("src=" + src + ", dst=" + dst);
+
+       InputStream is = null;
+       OutputStream os = null;
+       try {
+           is = new GZIPInputStream(new FileInputStream(src));
+           os = new FileOutputStream(dst);
+           copyStream(is, os);
+           os.flush();
+       } finally {
+           if (is != null)
+               try {
+                   is.close();
+               } catch (IOException ex) {
+               }
+           if (os != null)
+               try {
+                   os.close();
+               } catch (IOException ex) {
+               }
+       }
+
    }
    
 } // class SnapshotTask

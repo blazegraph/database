@@ -480,17 +480,16 @@ public class StatusServlet extends BigdataRDFServlet {
     	
         if (req.getParameter(HA) != null
                 && getIndexManager() instanceof AbstractJournal
-               //  && ((AbstractJournal) getIndexManager()).isHighlyAvailable()) {
         		&& ((AbstractJournal) getIndexManager()).getQuorum() != null) { // for HA1
 
-            new HAStatusServletUtil(getIndexManager()).doHAStatus(req, resp);
+            HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doHAStatus(req, resp);
 
             return;
         }
 
       if (req.getParameter(HEALTH) != null) {
 
-         new HAStatusServletUtil(getIndexManager()).doHealthStatus(req, resp);
+    	  HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doHealthStatus(req, resp);
 
          return;
       }
@@ -614,7 +613,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
                 if (quorum != null) {//&& quorum.isHighlyAvailable()) {
 
-                    new HAStatusServletUtil(getIndexManager()).doGet(req, resp,
+                	HAStatusServletUtilProxy.HAStatusServletUtilFactory.getInstance(getIndexManager()).doGet(req, resp,
                             current);
 
                 }

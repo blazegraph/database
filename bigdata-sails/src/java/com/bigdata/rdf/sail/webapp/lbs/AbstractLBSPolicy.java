@@ -35,23 +35,19 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import net.jini.core.lookup.ServiceID;
-
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
-import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.jini.ha.HAJournal;
-import com.bigdata.journal.jini.ha.HAJournalServer;
+import com.bigdata.journal.IRemoteJournal;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
 import com.bigdata.quorum.QuorumListener;
 import com.bigdata.rdf.sail.webapp.BigdataServlet;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
+import com.bigdata.concurrent.FutureTaskMon;
 
 /**
  * Abstract base class establishes a listener for quorum events, tracks the
@@ -84,10 +80,10 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * A {@link WeakReference} to the {@link HAJournal} avoids pinning the
      * {@link HAJournal}.
      */
-    protected final AtomicReference<WeakReference<HAJournal>> journalRef = new AtomicReference<WeakReference<HAJournal>>();
+    protected final AtomicReference<WeakReference<IRemoteJournal>> journalRef = new AtomicReference<WeakReference<IRemoteJournal>>();
 
     /**
-     * The {@link UUID} of the {@link HAJournalServer}.
+     * The {@link UUID} of the HAJournalServer.
      */
     protected final AtomicReference<UUID> serviceIDRef = new AtomicReference<UUID>();
 
@@ -146,9 +142,9 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * @return The reference or <code>null</code> iff the reference has been
      *         cleared or has not yet been set.
      */
-    protected HAJournal getJournal() {
+    protected IRemoteJournal getJournal() {
 
-        final WeakReference<HAJournal> ref = journalRef.get();
+        final WeakReference<IRemoteJournal> ref = journalRef.get();
 
         if (ref == null)
             return null;
@@ -176,18 +172,16 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         contextPath.set(servletContext.getContextPath());
 
-        final HAJournal journal = (HAJournal) BigdataServlet
+        final IRemoteJournal journal = (IRemoteJournal) BigdataServlet
                 .getIndexManager(servletContext);
 
         if (journal == null)
             throw new ServletException("No journal?");
 
-        final ServiceID tmp = journal.getHAJournalServer().getServiceID();
-
         serviceIDRef.compareAndSet(null/* expect */,
-                JiniUtil.serviceID2UUID(tmp)/* update */);
+                journal.getServiceID()/* update */);
 
-        this.journalRef.set(new WeakReference<HAJournal>(journal));
+        this.journalRef.set(new WeakReference<IRemoteJournal>(journal));
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
                 .getQuorum();
@@ -208,7 +202,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
          * Figure out whether the quorum is met and if this is the quorum
          * leader.
          */
-        final HAJournal journal = getJournal();
+        final IRemoteJournal journal = getJournal();
         Quorum<HAGlue, QuorumService<HAGlue>> quorum = null;
         QuorumService<HAGlue> quorumService = null;
         long token = Quorum.NO_QUORUM; // assume no quorum.
@@ -304,7 +298,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         final ServletContext servletContext = request.getServletContext();
 
-        final HAJournal journal = (HAJournal) BigdataServlet
+        final IRemoteJournal journal = (IRemoteJournal) BigdataServlet
                 .getIndexManager(servletContext);
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
@@ -425,7 +419,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * 
      * FIXME The {@link QuorumListener} is unregistered by
      * {@link AbstractQuorum#terminate()}. This happens any time the
-     * {@link HAJournalServer} goes into the error state. When this occurs, we
+     *  HAJournalServer goes into the error state. When this occurs, we
      * stop getting {@link QuorumEvent}s and the policy stops being responsive
      * (it can not proxy the request to a service that is still up because it
      * does not know what services are up, or maybe it just can not learn if
@@ -503,7 +497,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      */
     protected void updateServiceTable() {
 
-        final HAJournal journal = getJournal();
+        final IRemoteJournal journal = getJournal();
 
         if (journal == null) {
             // Can't do anything if there is no journal.

@@ -46,7 +46,6 @@ import com.bigdata.ha.msg.IHASnapshotDigestResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
 import com.bigdata.journal.AbstractJournal;
-import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.quorum.AsynchronousQuorumCloseException;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rdf.task.IApiTask;

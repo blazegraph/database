@@ -29,7 +29,7 @@ import com.bigdata.counters.CAT;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.jini.ha.HAJournal;
+import com.bigdata.journal.IRemoteJournal;
 import com.bigdata.quorum.Quorum;
 
 /**
@@ -192,7 +192,7 @@ public class ServiceScore {
         if (serviceUUID == null)
             throw new IllegalArgumentException();
 
-        final HAJournal journal = (HAJournal) indexManager;
+        final IRemoteJournal journal = (IRemoteJournal) indexManager;
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
                 .getQuorum();
