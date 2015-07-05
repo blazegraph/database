@@ -699,13 +699,17 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-client</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
 <!-- TODO: Factor out dependency on bigdata-jini
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-jini</artifactId>
@@ -713,6 +717,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>

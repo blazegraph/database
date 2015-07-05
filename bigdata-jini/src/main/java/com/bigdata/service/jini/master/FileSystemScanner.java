@@ -32,6 +32,8 @@ import java.io.FilenameFilter;
 import java.util.Queue;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.master.AbstractResourceScanner;
+import com.bigdata.service.master.IResourceScannerFactory;
 
 /**
  * Adds all files accepted by the filter to the {@link Queue}.

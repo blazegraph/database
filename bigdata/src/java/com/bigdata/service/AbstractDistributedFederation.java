@@ -68,6 +68,16 @@ abstract public class AbstractDistributedFederation<T> extends AbstractScaleOutF
     }
     
     /**
+     * Convenience method to remove linkage for bigdata-jini
+     * 
+     * BLZG-1370
+     * @return
+     */
+    public boolean isJiniFederation () {
+    	return false;
+    }
+    
+    /**
      * Assumes that the federation is stable through failover services if
      * nothing else.
      */

@@ -33,7 +33,6 @@ import java.util.Formatter;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.halog.IHALogReader;
-import com.bigdata.journal.jini.ha.SnapshotManager;
 
 /**
  * Utility class for operations on files that are named using a commit counter.

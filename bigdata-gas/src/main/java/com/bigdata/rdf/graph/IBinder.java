@@ -20,8 +20,8 @@ import java.util.List;
 import org.openrdf.model.Value;
 import org.openrdf.model.ValueFactory;
 
-import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IVariable;
+//import com.bigdata.bop.IBindingSet;
+//import com.bigdata.bop.IVariable;
 
 /**
  * An interface that may be used to extract variable bindings for the

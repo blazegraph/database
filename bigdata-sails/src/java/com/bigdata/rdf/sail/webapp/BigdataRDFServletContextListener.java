@@ -70,10 +70,11 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.CreateKBTask;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.DefaultClientDelegate;
+import com.bigdata.service.ScaleOutClientFactory;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**
@@ -89,7 +90,7 @@ public class BigdataRDFServletContextListener implements
             .getLogger(BigdataRDFServletContextListener.class);
 
     private Journal jnl = null;
-    private JiniClient<?> jiniClient = null;
+    private AbstractScaleOutClient<?> jiniClient = null;
     private ITransactionService txs = null;
     private Long readLock = null;
     private long readLockTx;
@@ -752,7 +753,7 @@ public class BigdataRDFServletContextListener implements
                  * resource.
                  */
 
-                jiniClient = new JiniClient(new String[] { propertyFile });
+                jiniClient = ScaleOutClientFactory.getJiniClient(new String[] { propertyFile });
 
                 jiniClient.setDelegate(new NanoSparqlServerFederationDelegate(
                         jiniClient, this));

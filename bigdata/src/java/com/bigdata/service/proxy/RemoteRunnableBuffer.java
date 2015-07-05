@@ -32,14 +32,12 @@ import java.io.IOException;
 import java.rmi.Remote;
 import java.util.concurrent.Future;
 
-import net.jini.export.Exporter;
-
 import com.bigdata.relation.accesspath.IRunnableBuffer;
 
 /**
  * {@link Remote} interface declaring the API of {@link IRunnableBuffer} but
  * also declaring that each methods throws {@link IOException} in order to be
- * compatible with {@link Remote} and {@link Exporter}. Of course, this means
+ * compatible with {@link Remote} and Exporter. Of course, this means
  * that this interface can not extend {@link IRunnableBuffer}!
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

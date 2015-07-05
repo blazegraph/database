@@ -360,4 +360,11 @@ public interface IBigdataFederation<T> extends IIndexManager,
      */
     public long getLastCommitTime();
 
+    /**
+     * Convenience method to return whether the Federation is a Jini Federation.
+     * Created in BLZG-1370 to factor our bigdata-jini dependency.
+     * @return
+     */
+	public boolean isJiniFederation();
+
 }

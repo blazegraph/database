@@ -84,7 +84,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
  * @see https://sourceforge.net/apps/trac/bigdata/ticket/612 (Bigdata scale-up
  *      depends on zookeper)
  */
-public class HAStatusServletUtil {
+public class HAStatusServletUtil extends HAStatusServletUtilProxy {
 
     private static final boolean debug = true;
     
@@ -115,8 +115,10 @@ public class HAStatusServletUtil {
 
     final private IIndexManager indexManager;
 
-    public HAStatusServletUtil(final IIndexManager indexManager) {
-
+    protected HAStatusServletUtil(final IIndexManager indexManager) {
+    	
+    	super(indexManager);
+    	
         if (indexManager == null)
             throw new IllegalArgumentException();
 
@@ -124,19 +126,11 @@ public class HAStatusServletUtil {
 
     }
 
-    /**
-     * Show the interesting things about the quorum.
-     * <ol>
-     * <li>QuorumState</li>
-     * <li>Who is the leader, who is a follower.</li>
-     * <li>What is the SPARQL end point for each leader and follower.</li>
-     * <li>Dump of the zookeeper state related to the quorum.</li>
-     * <li>listServices (into pre element).</li>
-     * </ol>
-     * 
-     * @throws IOException
-     */
-    public void doGet(final HttpServletRequest req,
+    /* (non-Javadoc)
+	 * @see com.bigdata.rdf.sail.webapp.IHAStatusServlet#doGet(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse, com.bigdata.rdf.sail.webapp.XMLBuilder.Node)
+	 */
+    @Override
+	public void doGet(final HttpServletRequest req,
             final HttpServletResponse resp, final XMLBuilder.Node current)
             throws IOException {
 
@@ -977,17 +971,11 @@ public class HAStatusServletUtil {
 
     }
 
-    /**
-     * Special reporting request for HA status.
-     * 
-     * @param req
-     * @param resp
-     * @throws TimeoutException
-     * @throws InterruptedException
-     * @throws AsynchronousQuorumCloseException
-     * @throws IOException
-     */
-    public void doHAStatus(final HttpServletRequest req,
+    /* (non-Javadoc)
+	 * @see com.bigdata.rdf.sail.webapp.IHAStatusServlet#doHAStatus(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)
+	 */
+    @Override
+	public void doHAStatus(final HttpServletRequest req,
             final HttpServletResponse resp) throws IOException {
 
         if (!(indexManager instanceof HAJournal))
@@ -1018,17 +1006,11 @@ public class HAStatusServletUtil {
 
     }
 
-   /**
-    * Basic server health info
-    * 
-    * @param req
-    * @param resp
-    * @throws TimeoutException
-    * @throws InterruptedException
-    * @throws AsynchronousQuorumCloseException
-    * @throws IOException
-    */
-   public void doHealthStatus(final HttpServletRequest req,
+   /* (non-Javadoc)
+ * @see com.bigdata.rdf.sail.webapp.IHAStatusServlet#doHealthStatus(javax.servlet.http.HttpServletRequest, javax.servlet.http.HttpServletResponse)
+ */
+   @Override
+public void doHealthStatus(final HttpServletRequest req,
          final HttpServletResponse resp) throws IOException {
 
       final StringWriter writer = new StringWriter();

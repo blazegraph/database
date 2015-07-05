@@ -1547,5 +1547,11 @@ public class JiniFederation<T> extends AbstractDistributedFederation<T> implemen
         }
         
     }
+    
+    @Override
+    public boolean isJiniFederation() {
+    	return true;
+    }
+    
 
 }

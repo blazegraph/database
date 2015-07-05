@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.jini.util;
 
-import com.bigdata.util.config.ConfigurationUtil;
+import com.bigdata.jini.util.ConfigurationUtil;
 import com.bigdata.util.config.LogUtil;
 import com.bigdata.util.config.NicUtil;
 
@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.NonActivatableServiceDescriptor.Created;
+
 import net.jini.admin.Administrable;
 import net.jini.config.AbstractConfiguration;
 import net.jini.config.ConfigurationException;

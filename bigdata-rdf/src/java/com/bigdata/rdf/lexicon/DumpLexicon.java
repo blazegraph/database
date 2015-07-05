@@ -31,7 +31,6 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
 
 /**
  * Utility class to dump the TERMS index of a triple store.
@@ -40,10 +39,10 @@ import com.bigdata.service.jini.JiniClient;
  */
 public class DumpLexicon {
 
-	private DumpLexicon() {
+	protected DumpLexicon() {
 	}
 
-	private static void usage() {
+	protected static void usage() {
         
         System.err.println("usage: (-tuples) <namespace> <filename>");
 
@@ -57,9 +56,12 @@ public class DumpLexicon {
      *            jini configuration file (for a bigdata federation). The file
      *            must end with either ".properties" or ".config".
      *            
+     *            Starting with 1.5.2 the remote dump lexicon capability
+     *            was moved into the bigdata-jini artifact.  See BLZG-1370.
+     *            
      * @return The {@link IIndexManager}.
      */
-    private static IIndexManager openIndexManager(final String propertyFile) {
+    protected static IIndexManager openIndexManager(final String propertyFile) {
 
         final File file = new File(propertyFile);
 
@@ -73,6 +75,10 @@ public class DumpLexicon {
         if (propertyFile.endsWith(".config")) {
             // scale-out.
             isJini = true;
+			throw new RuntimeException(
+					"Remote Lexicon dumping is not supported by this class."
+							+ "\nPlease use DumpRemoteLexicon in bigdata-jini."
+							+ "See BLZG-1370 \n");
         } else if (propertyFile.endsWith(".properties")) {
             // local journal.
             isJini = false;
@@ -87,55 +93,39 @@ public class DumpLexicon {
                             + file);
         }
 
-        final IIndexManager indexManager;
-        try {
+		final IIndexManager indexManager;
+		try {
 
-            if (isJini) {
+			/*
+			 * Note: we only need to specify the FILE when re-opening a journal
+			 * containing a pre-existing KB.
+			 */
+			final Properties properties = new Properties();
+			{
+				// Read the properties from the file.
+				final InputStream is = new BufferedInputStream(
+						new FileInputStream(propertyFile));
+				try {
+					properties.load(is);
+				} finally {
+					is.close();
+				}
+				if (System.getProperty(BigdataSail.Options.FILE) != null) {
+					// Override/set from the environment.
+					properties.setProperty(BigdataSail.Options.FILE,
+							System.getProperty(BigdataSail.Options.FILE));
+				}
+			}
 
-                /*
-                 * A bigdata federation.
-                 */
+			final Journal jnl = new Journal(properties);
 
-                @SuppressWarnings("unchecked")
-                final JiniClient<?> jiniClient = new JiniClient(
-                        new String[] { propertyFile });
+			indexManager = jnl;
 
-                indexManager = jiniClient.connect();
+		} catch (Exception ex) {
 
-            } else {
+			throw new RuntimeException(ex);
 
-                /*
-                 * Note: we only need to specify the FILE when re-opening a
-                 * journal containing a pre-existing KB.
-                 */
-                final Properties properties = new Properties();
-                {
-                    // Read the properties from the file.
-                    final InputStream is = new BufferedInputStream(
-                            new FileInputStream(propertyFile));
-                    try {
-                        properties.load(is);
-                    } finally {
-                        is.close();
-                    }
-                    if (System.getProperty(BigdataSail.Options.FILE) != null) {
-                        // Override/set from the environment.
-                        properties.setProperty(BigdataSail.Options.FILE, System
-                                .getProperty(BigdataSail.Options.FILE));
-                    }
-                }
-
-                final Journal jnl = new Journal(properties);
-                
-                indexManager = jnl;
-
-            }
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+		}
 
         return indexManager;
         

@@ -39,7 +39,6 @@ import com.bigdata.ganglia.IHostReport;
 import com.bigdata.journal.GangliaPlugIn;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
-import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.rdf.sail.webapp.lbs.AbstractHostLBSPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHostMetrics;

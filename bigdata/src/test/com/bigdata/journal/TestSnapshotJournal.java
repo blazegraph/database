@@ -40,7 +40,6 @@ import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.KV;
-import com.bigdata.journal.jini.ha.SnapshotManager;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -129,7 +128,7 @@ public class TestSnapshotJournal extends ProxyTestCase<Journal> {
              log.info("Decompressing " + in + " to " + out);
 
           // Decompress the snapshot.
-          SnapshotManager.decompress(in, out);
+          SnapshotTask.decompress(in, out);
 
           journalFile = out;
 

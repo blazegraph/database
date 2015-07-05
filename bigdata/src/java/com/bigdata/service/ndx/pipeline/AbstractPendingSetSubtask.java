@@ -36,8 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.IRemoteExecutor;
-import com.bigdata.service.jini.master.ClientLocator;
-import com.bigdata.service.jini.master.IAsynchronousClientTask;
+import com.bigdata.service.master.IAsynchronousClientTask;
 
 /**
  * Extended to assign chunks of work items to a remote
