@@ -44,9 +44,10 @@ import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.vocab.NoVocabulary;
+import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.ScaleOutClientFactory;
 
 /**
  * A version of the test suite that is intended for local debugging and is NOT
@@ -318,8 +319,8 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
                  */
 
 				@SuppressWarnings("rawtypes")
-                final JiniClient<?> jiniClient = new JiniClient(
-						new String[] { propertyFile });
+				final AbstractScaleOutClient<?> jiniClient = ScaleOutClientFactory
+						.getJiniClient(new String[] { propertyFile });
 
                 indexManager = jiniClient.connect();
 
@@ -460,9 +461,9 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
         	
         } finally {
 
-			if (indexManager instanceof JiniFederation<?>) {
+        	if (indexManager instanceof AbstractDistributedFederation<?>) {
 				// disconnect
-				((JiniFederation<?>) indexManager).shutdownNow();
+				((AbstractDistributedFederation<?>) indexManager).shutdownNow();
 			} else {
 				// destroy journal.
 				((Journal) indexManager).destroy();

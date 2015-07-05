@@ -32,7 +32,6 @@ import java.util.Properties;
 import junit.extensions.proxy.ProxyTestSuite;
 import junit.framework.Test;
 import junit.framework.TestSuite;
-import net.jini.config.ConfigurationException;
 
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -205,15 +204,7 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
     @Override
     protected BigdataSail getSail(final Properties properties) {
 
-        try {
-
-            return new BigdataSail(openTripleStore(NAMESPACE, properties));
-
-        } catch (ConfigurationException e) {
-
-            throw new RuntimeException(e);
-
-        }
+		return new BigdataSail(openTripleStore(NAMESPACE, properties));
 
     }
 
@@ -328,7 +319,7 @@ public class TestBigdataSailEmbeddedFederationWithQuads extends
      * Create/re-open the repository.
      */
     private AbstractTripleStore openTripleStore(final String namespace,
-            final Properties properties) throws ConfigurationException {
+            final Properties properties) {
 
         // locate the resource declaration (aka "open").
         AbstractTripleStore tripleStore = (AbstractTripleStore) fed
