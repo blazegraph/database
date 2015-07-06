@@ -113,9 +113,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 		properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,
 				bufferMode.toString());
 
-      // Enable GROUP_COMMIT. See #566.
+      // Enable GROUP_COMMIT. See BLZG-192
       properties.setProperty(com.bigdata.journal.Journal.Options.GROUP_COMMIT,
-            "true");
+            "false");
 
 		if (bufferMode.isStable()) {
 			
