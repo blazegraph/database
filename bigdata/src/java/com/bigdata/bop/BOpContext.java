@@ -674,7 +674,7 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
-     * Return the {@link ClientConnectionManager} used to make remote SERVICE
+     * Return the {@link HttpClient} used to make remote SERVICE
      * call requests.
      */
     public HttpClient getClientConnectionManager() {
@@ -1106,7 +1106,7 @@ public class BOpContext<E> extends BOpContextBase {
 //    *            The array of distinct variables (no duplicates) to be
 //    *            extracted from the visited {@link IElement}s.
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static public ICloseableIterator<IBindingSet[]> solutions(
+    public ICloseableIterator<IBindingSet[]> solutions(
             final IChunkedIterator<?> src, //
             final IPredicate<?> pred,//
 //            final IVariable<?>[] varsx, 
@@ -1147,7 +1147,7 @@ public class BOpContext<E> extends BOpContextBase {
 
                         final IElement e = (IElement) obj;
 
-                        final IBindingSet bset = new ListBindingSet();
+                        final IBindingSet bset = new ContextBindingSet(BOpContext.this, new ListBindingSet());
 
                         /*
                          * Propagate bindings from the element to the binding
