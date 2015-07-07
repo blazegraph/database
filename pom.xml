@@ -703,11 +703,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
