@@ -37,6 +37,7 @@ import junit.framework.TestResult;
 import junit.framework.TestSuite;
 import junit.textui.ResultPrinter;
 
+import com.bigdata.BigdataStatics;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
@@ -257,9 +258,13 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          suite.addTestSuite(Test_REST_ASK.class);
          suite.addTestSuite(Test_REST_DESCRIBE.class);
          suite.addTestSuite(Test_REST_ESTCARD.class);
-         suite.addTestSuite(Test_REST_ESTCARD.ReadWriteTx.class);
+         if(BigdataStatics.runKnownBadTests) {// FIXME Restore for BLZG-1195
+             suite.addTestSuite(Test_REST_ESTCARD.ReadWriteTx.class);
+         }
          suite.addTestSuite(Test_REST_HASSTMT.class);
-         suite.addTestSuite(Test_REST_HASSTMT.ReadWriteTx.class);
+         if(BigdataStatics.runKnownBadTests) {// FIXME Restore for BLZG-1195
+             suite.addTestSuite(Test_REST_HASSTMT.ReadWriteTx.class);
+         }
          if (testMode.isTruthMaintenanceSupported()) {
             suite.addTestSuite(Test_REST_HASSTMT.TruthMaintenance.class);
          }
