@@ -51,9 +51,9 @@ public class FileChannelUtility {
 
     private static final Logger log = Logger.getLogger(FileChannelUtility.class);
 
-//    private static final boolean INFO = log.isInfoEnabled();
-//
-//    private static final boolean DEBUG = log.isDebugEnabled();
+    private static final boolean INFO = log.isInfoEnabled();
+
+    private static final boolean DEBUG = log.isDebugEnabled();
 
     /**
      * Reads {@link ByteBuffer#remaining()} bytes into the caller's
@@ -144,7 +144,7 @@ public class FileChannelUtility {
         if (nbytes == 0)
             throw new IllegalArgumentException();
 
-        if (log.isDebugEnabled()) {
+        if (DEBUG) {
 
             log.debug("pos=" + pos + ", #bytes=" + nbytes);
             
@@ -258,7 +258,7 @@ public class FileChannelUtility {
 
         }
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("read " + nbytes + " bytes from offset=" + pos + " in "
                     + nreads + " IOs");
@@ -466,7 +466,7 @@ public class FileChannelUtility {
 
         final long elapsed = System.nanoTime() - begin;
 
-        if (log.isInfoEnabled()) {
+        if (INFO) {
 
             log.info("wrote on disk: address: " + pos + ", bytes=" + nbytes + ", elapsed="
                     + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms");
@@ -564,7 +564,7 @@ public class FileChannelUtility {
          * for at least some implementations.
          */
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("fromPosition=" + fromPosition + ", count=" + count
                     + ", toPosition=" + toPosition);
 
@@ -630,7 +630,7 @@ public class FileChannelUtility {
 
         final long elapsed = System.currentTimeMillis() - begin;
 
-        if (log.isInfoEnabled())
+        if (INFO)
             log.info("Transferred " + count
                     + " bytes from disk channel at offset " + fromPosition
                     + " to disk channel at offset=" + toPosition + " in "
