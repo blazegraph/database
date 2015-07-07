@@ -27,6 +27,7 @@ import info.aduna.io.IOUtil;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.http.entity.ByteArrayEntity;
@@ -50,8 +52,11 @@ import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.rio.RDFFormat;
 
+import com.bigdata.rdf.properties.PropertiesFormat;
+import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.webapp.QueryServlet;
+import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Java API to the Nano Sparql Server.
@@ -478,9 +483,82 @@ public class RemoteRepository extends RemoteRepositoryBase {
             final Value obj, final boolean includeInferred,
             final Resource... contexts) throws Exception {
 
-        return getStatements2(subj, pred, obj, includeInferred, contexts).evaluate();
-                
+    	if (contexts == null) {
+            // Note: May not be a null Resource[] reference.
+            // MAY be Resource[null], which is the openrdf nullGraph.
+            // See #1177
+            throw new IllegalArgumentException();
+         }
+         
+            final UUID uuid = UUID.randomUUID();
+            final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
+
+            opts.addRequestParam("GETSTMT");
+            opts.addRequestParam(QueryServlet.INCLUDE_INFERRED,
+                  Boolean.toString(includeInferred));
+            if (subj != null) {
+               opts.addRequestParam("s", EncodeDecodeValue.encodeValue(subj));
+            }
+            if (pred != null) {
+               opts.addRequestParam("p", EncodeDecodeValue.encodeValue(pred));
+            }
+            if (obj != null) {
+               opts.addRequestParam("o", EncodeDecodeValue.encodeValue(obj));
+            }
+           	opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(contexts));
+
+           	if(isQuardMode()) {
+            	
+            	opts.addRequestParam("Content-Type", RDFFormat.NQUADS.getDefaultMIMEType());
+            	
+            } else {
+            	
+            	opts.addRequestParam("Content-Type", RDFFormat.NTRIPLES.getDefaultMIMEType());
+            	
+            }
+
+            JettyResponseListener resp = null;
+            try {
+
+               checkResponseCode(resp = doConnect(opts));
+               
+              GraphQueryResult result = mgr.graphResults(opts, null, null);
+              
+              return result;
+
+            } finally {
+
+               if (resp != null)
+                  resp.abort();
+
+            }
+
     }
+    
+    private boolean isQuardMode() throws IOException, Exception{
+		
+		JettyResponseListener resp = null;
+		
+		try{
+			
+			ConnectOptions opts = new ConnectOptions(sparqlEndpointURL + "/properties");
+			
+			opts.method = "GET";
+			
+			resp = mgr.doConnect(opts);
+			
+			Properties x = PropertiesParserRegistry.getInstance().get(PropertiesFormat.XML).getParser().parse(resp.getInputStream());
+			
+			return Boolean.parseBoolean(x.get(AbstractTripleStore.Options.QUADS).toString());
+			
+		} finally {
+			
+			if (resp != null)
+	               resp.abort();
+		}
+
+   }
+    
 
    /**
     * Method to line up with the Sesame interface.
