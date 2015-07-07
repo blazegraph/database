@@ -26,6 +26,7 @@
         <resource>
             <directory>src/main/resources</directory>
             <includes>
+		<include>**/*.xml</include>
 		<include>**/*.properties</include>
 		<include>**/org.openrdf.rio.*</include>
 	    </includes>
@@ -120,6 +121,7 @@
                     <exclude>**/*.rq</exclude>
                     <exclude>**/*.srx</exclude>
                     <exclude>**/*.trig</exclude>
+                    <exclude>**/sesame*testsuite/**</exclude>
                   </excludes>
                 </filter>
                </filters>

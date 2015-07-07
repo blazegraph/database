@@ -109,6 +109,7 @@ dependencies.
       <junit3.version>3.8.1</junit3.version>
       <servlet.version>3.1.0</servlet.version>
       <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <build>
     <plugins>
@@ -119,6 +120,7 @@ dependencies.
         <configuration>
           <source>1.7</source>
           <target>1.7</target>
+	  <encoding>${project.build.sourceEncoding}</encoding>
         </configuration>
       </plugin>
       <plugin>
