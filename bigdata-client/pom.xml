@@ -111,6 +111,16 @@ ga('send', 'pageview');
        <artifactId>log4j</artifactId>
        <version>${log4j.version}</version>
      </dependency>
+     <dependency>
+       <groupId>org.apache.httpcomponents</groupId>
+       <artifactId>httpclient</artifactId>
+       <version>${apache.httpclient.version}</version>
+      </dependency>
+      <dependency>
+           <groupId>org.apache.httpcomponents</groupId>
+           <artifactId>httpmime</artifactId>
+           <version>${apache.httpmime.version}</version>
+       </dependency>
   </dependencies>
 
   </project>
