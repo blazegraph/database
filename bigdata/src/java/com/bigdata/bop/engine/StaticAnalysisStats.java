@@ -72,19 +72,17 @@ public class StaticAnalysisStats implements Serializable {
     * @param staticAnalysisParseTimeElapsed time needed for parsing (ignored
     *          if left null)
     */
-   public StaticAnalysisStats(Long staticAnalysisParseTimeElapsed) {
+   public StaticAnalysisStats() {
       this.optimizerStats = new LinkedHashMap<String, StaticAnalysisStat>();
      
-      if (staticAnalysisParseTimeElapsed!=null) {
-         registerParserCall(staticAnalysisParseTimeElapsed);
-      } 
-      // otherwise: delayed initialization, don't show parser stats if
-      //            for some reason not present in some mode
+      // for parserStat object: delayed initialization, don't show parser stats 
+      // if for some reason not present in some mode
       
       rangeCountStat = new StaticAnalysisStat("RangeCount"); 
       optimizerLoopStat = new StaticAnalysisStat(ASTOptimizerList.class.getName());
       
    }
+
 
    /**
     * Registers a call of the parser.
@@ -107,13 +105,13 @@ public class StaticAnalysisStats implements Serializable {
     * @param optimizerName the name of the optimizer
     * @param elapsed the elapsed time for the optimizer loop
     */
-   public void registerOptimizerLoopCall(final Long elapsedNanoSec) {
+   public void registerOptimizerLoopCall(final long elapsedNanoSec) {
 
       optimizerLoopStat.incrementNrCalls();
       optimizerLoopStat.addElapsed(elapsedNanoSec);
    }
    
-   public void registerRangeCountCall(final Long elapsedNanoSec) {
+   public void registerRangeCountCall(final long elapsedNanoSec) {
       
       rangeCountStat.incrementNrCalls();
       rangeCountStat.addElapsed(elapsedNanoSec);
@@ -126,7 +124,7 @@ public class StaticAnalysisStats implements Serializable {
     * @param elapsed the elapsed time for the optimizer loop
     */
    public void registerOptimizerCall(
-      final String optimizerName, final Long elapsedNanoSec) {
+      final String optimizerName, final long elapsedNanoSec) {
       
       if (optimizerStats.get(optimizerName)==null) {
          optimizerStats.put(optimizerName, new StaticAnalysisStat(optimizerName));
