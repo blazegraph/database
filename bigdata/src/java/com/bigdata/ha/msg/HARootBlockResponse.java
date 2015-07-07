@@ -27,9 +27,9 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 import com.bigdata.btree.BytesUtil;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.util.ChecksumUtility;
 
 public class HARootBlockResponse implements IHARootBlockResponse, Serializable {
 

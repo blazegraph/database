@@ -33,7 +33,7 @@ import java.util.Random;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BytesUtil;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for {@link FixedByteArrayBuffer}.

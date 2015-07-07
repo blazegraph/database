@@ -25,11 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Nov 5, 2006
  */
 
-package com.bigdata.util;
+package com.bigdata.io;
 
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.zip.Adler32;
+
+import com.bigdata.io.ChecksumUtility;
 
 import junit.framework.TestCase;
 

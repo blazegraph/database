@@ -77,10 +77,12 @@ import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.MergeStreamWithSnapshotData;
 import com.bigdata.io.compression.CompressorRegistry;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.writecache.BufferedWrite;
@@ -109,8 +111,6 @@ import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.MergeStreamWithSnapshotData;
 import com.bigdata.util.StackInfoReport;
 
 /**

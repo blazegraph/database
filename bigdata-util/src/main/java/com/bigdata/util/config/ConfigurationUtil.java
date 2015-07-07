@@ -25,13 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.util.config;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import java.io.IOException;
 
-import com.sun.jini.config.ConfigUtil;
 import net.jini.url.httpmd.HttpmdUtil;
 
-import java.io.IOException;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 /**
  * Utility class that provides a set of static convenience methods

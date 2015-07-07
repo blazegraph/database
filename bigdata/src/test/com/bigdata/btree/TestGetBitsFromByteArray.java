@@ -32,7 +32,7 @@ import java.io.IOException;
 import java.util.Formatter;
 import java.util.Random;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 import junit.framework.TestCase2;
 

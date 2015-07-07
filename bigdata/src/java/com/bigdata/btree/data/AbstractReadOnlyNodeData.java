@@ -32,7 +32,7 @@ import java.nio.ByteBuffer;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.Leaf;
 import com.bigdata.btree.Node;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Abstract base class for a read-only view of the data for B+Tree node or leaf.

@@ -96,6 +96,11 @@ ga('send', 'pageview');
        <version>${bigdata.version}</version>
     </dependency>
      <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
       <version>${sesame.version}</version>

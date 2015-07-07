@@ -45,7 +45,6 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.search.FullTextIndexTupleSerializer;
@@ -54,6 +53,7 @@ import com.bigdata.search.ITermDocRecord;
 import com.bigdata.search.ITermDocVal;
 import com.bigdata.search.ReadOnlyTermDocKey;
 import com.bigdata.search.ReadOnlyTermDocRecord;
+import com.bigdata.util.Bytes;
 
 /**
  * Replaces the {@link FullTextIndexTupleSerializer} to support {@link IV}s as

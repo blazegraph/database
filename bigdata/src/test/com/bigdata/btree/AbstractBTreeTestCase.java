@@ -56,10 +56,10 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.RandomKeysGenerator;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.util.Bytes;
 
 /**
  * Abstract test case for {@link BTree} tests.

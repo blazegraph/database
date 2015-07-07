@@ -39,7 +39,6 @@ import junit.textui.ResultPrinter;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -47,6 +46,7 @@ import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.Bytes;
 
 /**
  * A version of the test suite that is intended for local debugging and is NOT

@@ -69,11 +69,11 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 

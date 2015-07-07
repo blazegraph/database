@@ -1,4 +1,4 @@
-package com.bigdata.util;
+package com.bigdata.io;
 
 import java.io.IOException;
 import java.io.InputStream;

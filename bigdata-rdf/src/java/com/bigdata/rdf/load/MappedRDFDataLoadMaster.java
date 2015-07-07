@@ -42,7 +42,6 @@ import org.openrdf.rio.RDFParser;
 
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.ServiceProviderHook;
 import com.bigdata.rdf.inf.ClosureStats;
 import com.bigdata.rdf.rio.RDFParserOptions;
@@ -59,6 +58,7 @@ import com.bigdata.service.jini.master.ClientLocator;
 import com.bigdata.service.jini.master.INotifyOutcome;
 import com.bigdata.service.jini.master.MappedTaskMaster;
 import com.bigdata.service.jini.master.TaskMaster;
+import com.bigdata.util.Bytes;
 
 /**
  * Distributed bulk loader for RDF data. Creates/(re-)opens the

@@ -48,9 +48,9 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.CommitRecordIndex.Entry;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.TupleObjectResolver;
+import com.bigdata.util.Bytes;
 
 import cutthecrap.utils.striterators.Striterator;
 

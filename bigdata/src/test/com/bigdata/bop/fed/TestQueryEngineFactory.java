@@ -35,7 +35,7 @@ import junit.framework.TestCase2;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Stress test for correct shutdown of query controllers as allocated by the

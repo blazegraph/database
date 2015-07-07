@@ -5,12 +5,12 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.filter.TupleUpdater;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.sparse.IRowStoreConstants;
 import com.bigdata.sparse.KeyDecoder;
 import com.bigdata.sparse.TimestampChooser;
 import com.bigdata.sparse.ValueType;
 import com.bigdata.sparse.TPS.TPV;
+import com.bigdata.util.Bytes;
 
 /**
  * A procedure that performs a key range scan, marking all non-deleted

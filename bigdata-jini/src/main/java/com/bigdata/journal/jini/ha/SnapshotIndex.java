@@ -39,13 +39,13 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.AbstractCommitTimeIndex;
 import com.bigdata.journal.ICommitTimeEntry;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.Bytes;
 
 /**
  * {@link BTree} mapping <em>commitTime</em> (long integers) to

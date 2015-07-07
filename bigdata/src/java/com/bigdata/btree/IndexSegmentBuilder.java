@@ -55,6 +55,7 @@ import com.bigdata.btree.view.FusedView;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.NOPReopener;
@@ -66,12 +67,11 @@ import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.Bytes;
 
 /**
  * Builds an {@link IndexSegment} given a source btree and a target branching

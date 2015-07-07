@@ -35,7 +35,6 @@ import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.mdi.MetadataIndex;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.relation.AbstractResource;
@@ -52,6 +51,7 @@ import com.bigdata.sparse.ITPV;
 import com.bigdata.sparse.LogicalRowSplitHandler;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.Bytes;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

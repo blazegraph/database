@@ -29,7 +29,7 @@ package com.bigdata.journal;
 
 import java.nio.ByteBuffer;
 
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.io.ChecksumUtility;
 
 /**
  * Test the ability to rollback a commit.

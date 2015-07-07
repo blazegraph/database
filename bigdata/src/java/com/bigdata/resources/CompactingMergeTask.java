@@ -24,7 +24,6 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.OverflowManager.ResourceScores;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
@@ -32,6 +31,7 @@ import com.bigdata.service.EventResource;
 import com.bigdata.service.ILoadBalancerService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.util.Bytes;
 
 /**
  * Task builds an {@link IndexSegment} from the fused view of an index partition

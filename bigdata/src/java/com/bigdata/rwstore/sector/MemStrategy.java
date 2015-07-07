@@ -33,6 +33,7 @@ import java.util.concurrent.locks.Lock;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.counters.CounterSet;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ForceEnum;
@@ -48,7 +49,6 @@ import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rwstore.IRWStrategy;
 import com.bigdata.rwstore.IRawTx;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * A buffer implementation backed by an {@link IMemoryManager}.
