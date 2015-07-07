@@ -50,12 +50,12 @@ public class StaticAnalysisStat implements Serializable {
    /**
     * The number of calls to this optimizer.
     */
-    final public CAT nrCalls = new CAT();
+   private final CAT nrCalls = new CAT();
     
     /**
      * The elapsed time (milliseconds) for the statistics object.
      */
-     final public CAT elapsed = new CAT();
+    private final CAT elapsed = new CAT();
     
    /**
     * Create a new, initially empty statistics object.
