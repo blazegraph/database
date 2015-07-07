@@ -49,7 +49,7 @@ import com.bigdata.btree.raba.ReadOnlyKeysRaba;
 import com.bigdata.btree.raba.ReadOnlyValuesRaba;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder.AbstractCodingSetup;
 import com.bigdata.btree.raba.codec.CanonicalHuffmanRabaCoder.RabaCodingSetup;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for the {@link CanonicalHuffmanRabaCoder}.

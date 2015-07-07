@@ -38,15 +38,15 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.AssertionFailedError;
 
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
 import com.bigdata.io.writecache.WriteCache;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test suite for the {@link WriteCache}.

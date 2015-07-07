@@ -45,7 +45,7 @@ import com.bigdata.counters.IHostCounters;
 import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.IRequiredHostCounters;
 import com.bigdata.counters.ProcessReaderHelper;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Collects some counters using <code>iostat</code> under OSX. Unfortunately,

@@ -76,10 +76,10 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
 import cutthecrap.utils.striterators.IStriterator;

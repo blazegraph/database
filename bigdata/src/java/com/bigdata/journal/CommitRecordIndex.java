@@ -41,8 +41,8 @@ import com.bigdata.cache.LRUCache;
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * BTree mapping commit times to {@link ICommitRecord}s. The keys are the long

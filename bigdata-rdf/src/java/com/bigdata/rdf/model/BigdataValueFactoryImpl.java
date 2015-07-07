@@ -53,7 +53,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
-import com.bigdata.util.CanonicalFactory;
+import com.bigdata.util.concurrent.CanonicalFactory;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.

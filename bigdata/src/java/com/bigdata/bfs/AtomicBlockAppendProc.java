@@ -24,7 +24,7 @@ import com.bigdata.btree.view.FusedView;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Atomic append of a single block to a file version.

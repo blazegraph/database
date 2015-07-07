@@ -68,7 +68,6 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.compression.RecordCompressor;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.uri.PartlyInlineURIIV;
@@ -80,6 +79,7 @@ import com.bigdata.rdf.vocab.BaseVocabulary;
 import com.bigdata.rdf.vocab.DefaultBigdataVocabulary;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.concurrent.Latch;
 
 /**

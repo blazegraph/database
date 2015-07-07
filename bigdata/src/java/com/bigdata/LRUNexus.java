@@ -51,10 +51,10 @@ import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.rawstore.AbstractRawStore;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.Bytes;
 
 /**
  * Static singleton factory used to configure the record level cache behavior

@@ -42,7 +42,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BaseIndexStats;
 import com.bigdata.btree.ICheckpointProtocol;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 

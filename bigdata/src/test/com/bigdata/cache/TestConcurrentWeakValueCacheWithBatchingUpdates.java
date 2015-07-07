@@ -33,7 +33,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 import junit.framework.TestCase2;
 

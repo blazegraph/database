@@ -62,7 +62,6 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.counters.CAT;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
@@ -74,6 +73,7 @@ import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;

@@ -20,7 +20,7 @@ import com.bigdata.counters.OneShotInstrument;
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.journal.TransientBufferStrategy;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * An instance of this class manages a JVM-wide pool of direct (aka native)

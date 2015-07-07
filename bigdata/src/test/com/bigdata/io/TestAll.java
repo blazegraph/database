@@ -82,6 +82,9 @@ public class TestAll extends TestCase {
         suite.addTest(TestAll_Packers.suite());
         
         suite.addTest(com.bigdata.io.compression.TestAll.suite());
+        
+        // test checksum computations (used by serialization).
+        suite.addTestSuite( TestChecksumUtility.class );
 
 //        /*
 //         * Note: This is added into the test suite at a different location since

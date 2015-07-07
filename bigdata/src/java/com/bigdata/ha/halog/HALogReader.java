@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -47,7 +48,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
 
 /**

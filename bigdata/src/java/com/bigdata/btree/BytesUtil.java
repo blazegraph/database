@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Class supporting operations on variable length byte[] keys.

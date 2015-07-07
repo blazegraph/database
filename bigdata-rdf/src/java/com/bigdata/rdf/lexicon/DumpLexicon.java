@@ -19,7 +19,6 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -32,6 +31,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniClient;
+import com.bigdata.util.Bytes;
 
 /**
  * Utility class to dump the TERMS index of a triple store.

@@ -51,12 +51,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IMRMW;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.NV;
 import com.bigdata.util.concurrent.DaemonThreadFactory;

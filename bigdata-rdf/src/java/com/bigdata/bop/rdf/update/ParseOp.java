@@ -65,7 +65,6 @@ import com.bigdata.bop.ILocatableResourceAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -83,6 +82,7 @@ import com.bigdata.rdf.store.DataLoader.ClosureEnum;
 import com.bigdata.rdf.store.DataLoader.CommitEnum;
 import com.bigdata.rdf.store.DataLoader.Options;
 import com.bigdata.relation.accesspath.UnsyncLocalOutputBuffer;
+import com.bigdata.util.Bytes;
 
 /**
  * Operator parses a RDF data source, writing bindings which represent

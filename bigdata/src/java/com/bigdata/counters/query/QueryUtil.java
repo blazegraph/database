@@ -64,11 +64,11 @@ import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.counters.httpd.DummyEventReportingService;
 import com.bigdata.journal.ConcurrencyManager.IConcurrencyManagerCounters;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.resources.StoreManager.IStoreManagerCounters;
 import com.bigdata.service.Event;
 import com.bigdata.service.DataService.IDataServiceCounters;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.concurrent.IQueueCounters.IThreadPoolExecutorTaskCounters;
 
 /**

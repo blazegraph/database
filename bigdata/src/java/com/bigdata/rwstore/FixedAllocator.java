@@ -35,12 +35,12 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BytesUtil;
 import com.bigdata.cache.ConcurrentWeakValueCache;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * FixedAllocator

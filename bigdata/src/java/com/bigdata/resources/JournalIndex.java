@@ -41,8 +41,8 @@ import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.ICommitRecord;
 import com.bigdata.journal.IJournal;
 import com.bigdata.mdi.JournalMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * {@link BTree} mapping {@link IJournal} <em>createTimes</em> (long integers)

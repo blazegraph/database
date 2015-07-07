@@ -51,7 +51,7 @@ import com.bigdata.counters.linux.StatisticsCollectorForLinux;
 import com.bigdata.counters.osx.StatisticsCollectorForOSX;
 import com.bigdata.counters.win.StatisticsCollectorForWindows;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.util.httpd.AbstractHTTPD;
 

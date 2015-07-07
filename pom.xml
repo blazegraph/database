@@ -324,6 +324,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             <include>com/bigdata/rdf/sail/TestAll.java</include>
             <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
             <include>com/bigdata/gom/TestAll.java</include>
+            <include>com/bigdata/util/httpd/TestAll.java</include>
            </includes>
            <excludes>
     	    <exclude>com/bigdata/TestAll.java</exclude>
@@ -753,6 +754,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>rdf-properties</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
     <dependency>

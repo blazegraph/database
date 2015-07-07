@@ -71,8 +71,7 @@ public class TestAll extends TestCase {
         // Note: class is not debugged and is marked as deprecated, test is commented out.
 //        suite.addTestSuite( TestHybridTimestampFactory.class );
         
-        // test checksum computations (used by serialization).
-        suite.addTestSuite( TestChecksumUtility.class );
+
 
         // test suite for a pseudo random number generator.
         suite.addTestSuite( TestPseudoRandom.class );
@@ -81,8 +80,6 @@ public class TestAll extends TestCase {
 
         suite.addTestSuite( TestCSVReader.class );
         
-        suite.addTest(com.bigdata.util.httpd.TestAll.suite());
-
         suite.addTestSuite( TestBits.class );
         
         return suite;
