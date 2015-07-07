@@ -77,7 +77,6 @@ ga('send', 'pageview');
       <version>${junit-ext.version}</version>
     </dependency>
     <!-- FIXME Remove bigdata dependency. bigdata-client should not depend on bigdata module.  See BLZG-1271. 
-	-->
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
@@ -90,10 +89,16 @@ ga('send', 'pageview');
     <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+	-->
     <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>rdf-properties</artifactId>
        <version>${bigdata.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-runtime</artifactId>
+      <version>${sesame.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
