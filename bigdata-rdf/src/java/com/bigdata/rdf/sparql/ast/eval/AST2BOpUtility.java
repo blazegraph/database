@@ -233,9 +233,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * solution set stats.
          */
         ctx.setSolutionSetStats(SolutionSetStatserator.get(globallyScopedBindings));
+
+        final StaticAnalysisStats stats = new StaticAnalysisStats();
         
-        ctx.setStaticAnalysisStats(
-           new StaticAnalysisStats(astContainer.getQueryParseTime()));
+        stats.registerParserCall(astContainer.getQueryParseTime());
+
+        ctx.setStaticAnalysisStats(stats);
         
         /**
          * By definition of the API, the mappings passed in from Sesame
