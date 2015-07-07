@@ -1048,8 +1048,8 @@ public class QueryServlet extends BigdataRDFServlet {
                      current = current.node("tr");
                      current.node("th").text("object").close();
                      current.node("th").text("category").close(); 
-                     current.node("th").text("elapsed [10^-3s]").close();
-                     current.node("th").text("elapsed [10^-6s]").close();
+                     current.node("th").text("elapsed [ms]").close();
+                     current.node("th").text("elapsed [us]").close();
                      current.node("th").text("numCalls").close();
                      current = current.close(); // tr
                         
