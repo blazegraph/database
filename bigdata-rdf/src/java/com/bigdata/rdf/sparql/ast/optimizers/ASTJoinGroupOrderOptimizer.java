@@ -79,8 +79,8 @@ implements IASTOptimizer {
    protected void optimizeJoinGroup(AST2BOpContext ctx, StaticAnalysis sa,
          IBindingSet[] bSets, JoinGroupNode joinGroup) {
 
-      if (!ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup))
-         return;
+      final boolean reorderNodes = 
+         ASTStaticJoinOptimizer.isStaticOptimizer(ctx, joinGroup);
 
       /**
        * Initialize summary containers with a single pass over the children;
@@ -125,7 +125,7 @@ implements IASTOptimizer {
        * https://docs.google.com/document/d/1Fu0QLj1ML6CdaysREDFsJt8fT048zBWp0ssMDITAYt8
        * for a formal explanation and justification of our approach.
        */
-      if (!assertCorrectnessOnly) {
+      if (reorderNodes && !assertCorrectnessOnly) {
          optimizeAcrossPartitions(partitions, bindingInfoMap, externallyIncoming);
       }
       
@@ -138,10 +138,15 @@ implements IASTOptimizer {
        * Note: we may want to pass in (and use) information about existing
        * filters, which might be valuable information for the optimizer.
        */
-      optimizeWithinPartitions(partitions, assertCorrectnessOnly);
+      if (reorderNodes) {
+         optimizeWithinPartitions(partitions, bindingInfoMap, assertCorrectnessOnly);
+      }
       
       /**
        * Third, place the FILTERs at appropriate positions (across partitions).
+       * Note that this is required for correctness, and hence done even if
+       * reorderNodes is set to false (i.e., reordering is disabled through
+       * the query hint).
        */
       filterPlacer.placeFiltersInPartitions(partitions);
 
@@ -150,7 +155,7 @@ implements IASTOptimizer {
        * join group with the new list.
        */
       final LinkedList<IGroupMemberNode> nodeList = 
-         partitions.extractNodeList();
+         partitions.extractNodeList(true /* includeOptionalOrMinusNode */);
       for (int i = 0; i < joinGroup.arity(); i++) {
           joinGroup.setArg(i, (BOp) nodeList.get(i));
       }
@@ -301,6 +306,7 @@ implements IASTOptimizer {
    */
   void optimizeWithinPartitions(
      final ASTJoinGroupPartitions partitions,
+     final GroupNodeVarBindingInfoMap bindingInfoMap,
      final boolean assertCorrectnessOnly) {
      
      final List<ASTJoinGroupPartition> partitionList = 
@@ -311,7 +317,8 @@ implements IASTOptimizer {
         
      for (ASTJoinGroupPartition partition : partitionList) {
         optimizeWithinPartition(
-           partition, assertCorrectnessOnly, knownBoundFromPrevPartitions);
+           partition, assertCorrectnessOnly, 
+           bindingInfoMap, knownBoundFromPrevPartitions);
      }
   }
   
@@ -323,23 +330,27 @@ implements IASTOptimizer {
    void optimizeWithinPartition(
       final ASTJoinGroupPartition partition,
       final boolean assertCorrectnessOnly,
+      final GroupNodeVarBindingInfoMap bindingInfoMap,
       final Set<IVariable<?>> knownBoundFromPrevPartitions) {
           
       final ASTTypeBasedNodeClassifier classifier = 
          new ASTTypeBasedNodeClassifier(
             new Class<?>[] { 
-               ServiceNode.class, 
+               ServiceNode.class, /* see condition A */
                AssignmentNode.class,
-               BindingsClause.class, });
-
+               BindingsClause.class,
+               IGroupMemberNode.class /* see condition B */ });
+     
       /**
+       * ### Condition A:
+       * 
        * We only consider special service nodes for placement, all other service
        * nodes are treated through a standard reorder.
        */
       classifier.addConstraintForType(
          ServiceNode.class,
           new ASTTypeBasedNodeClassifierConstraint() {
-         
+            
             @Override
             boolean appliesTo(final IGroupMemberNode node) {
 
@@ -368,9 +379,41 @@ implements IASTOptimizer {
                return false;
 
             }
-         });
 
-      classifier.registerNodes(partition.extractNodeList());
+         });
+      
+      /**
+       * ### Condition B:
+       * 
+       * Additional nodes that have binding requirements (e.g.
+       * { BIND ?x AS ?y } UNION { ... } that can be satisified through
+       * this partition.
+       */
+      classifier.addConstraintForType(
+          IGroupMemberNode.class,
+          new ASTTypeBasedNodeClassifierConstraint() {
+         
+             @Override
+             boolean appliesTo(final IGroupMemberNode node) {
+                
+                // get the variables that are required bound in the node ...
+                final Set<IVariable<?>> reqBoundInNode = 
+                   new HashSet<IVariable<?>>(
+                      bindingInfoMap.get(node).getRequiredBound());
+                // ... and substract those that maybe prodcued inside
+                reqBoundInNode.removeAll(
+                    bindingInfoMap.get(node).getMaybeProduced());
+                
+                // -> if this set has not become empty, we need to aim at
+                //    binding variables of this node from this outside partition
+                return !reqBoundInNode.isEmpty();
+
+             }
+
+         });      
+
+      classifier.registerNodes(
+         partition.extractNodeList(false /* includeOptionalOrMinus */));
 
       /**
        * In a first step, we remove service nodes, assignment nodes, and
@@ -381,6 +424,7 @@ implements IASTOptimizer {
       toRemove.addAll(classifier.get(ServiceNode.class));
       toRemove.addAll(classifier.get(AssignmentNode.class));
       toRemove.addAll(classifier.get(BindingsClause.class));
+      toRemove.addAll(classifier.get(IGroupMemberNode.class));
       partition.removeNodesFromPartition(toRemove);
 
       /**
@@ -395,14 +439,6 @@ implements IASTOptimizer {
          final IASTJoinGroupPartitionReorderer reorderer = 
             new TypeBasedASTJoinGroupPartitionReorderer();
          reorderer.reorderNodes(partition);
-      }
-
-      /**
-       * Place the special handled SERVICE nodes.
-       */
-      for (IGroupMemberNode node : classifier.get(ServiceNode.class)) {
-         partition.placeAtFirstPossiblePosition(node,
-            knownBoundFromPrevPartitions, false /* requires all bound */);
       }
 
       /**
@@ -422,15 +458,40 @@ implements IASTOptimizer {
       final Set<IVariable<?>> knownBoundSomewhere = new HashSet<IVariable<?>>(
             partition.definitelyProduced);
 
-      // ... order the bind nodes according to dependencies
-      final List<AssignmentNode> bindNodesOrdered = orderBindNodesByDependencies(
-            classifier.get(AssignmentNode.class), partition.bindingInfoMap,
+      // ... order the bind and SERVICE nodes according to dependencies,
+      // essentially constructing a dependency graph over these nodes
+      final List<IGroupMemberNode> remainingToBePlaced =
+         new LinkedList<IGroupMemberNode>();
+      remainingToBePlaced.addAll(classifier.get(AssignmentNode.class));
+      remainingToBePlaced.addAll(classifier.get(ServiceNode.class));
+      remainingToBePlaced.addAll(classifier.get(IGroupMemberNode.class));
+      
+      final List<IGroupMemberNode> orderedNodes = 
+         orderNodesByDependencies(
+            remainingToBePlaced, partition.bindingInfoMap,
             knownBoundSomewhere);
 
       // ... and place the bind nodes
-      for (AssignmentNode node : bindNodesOrdered) {
-         partition.placeAtFirstContributingPosition(node,
+      for (IGroupMemberNode node : orderedNodes) {
+
+         /**
+          * We run service with runFirst query hint first (=as early as possible)
+          */
+         boolean runFirst = false;
+         if (node instanceof ServiceNode) {
+            final ServiceNode sn = (ServiceNode)node;
+            runFirst = 
+               sn.getResponsibleServiceFactory().
+                  getServiceOptions().isRunFirst();
+         }
+         
+         if (runFirst) {
+            partition.placeAtFirstPossiblePosition(node,
+                  knownBoundFromPrevPartitions, false /* requiresAllBound */);            
+         } else {
+            partition.placeAtFirstContributingPosition(node,
                knownBoundFromPrevPartitions, false /* requiresAllBound */);
+         }
       }
 
       knownBoundFromPrevPartitions.addAll(partition.getDefinitelyProduced());
@@ -438,7 +499,7 @@ implements IASTOptimizer {
 
 
    /**
-    * Brings the BIND nodes in a correct order according to the dependencies
+    * Brings the nodes in a correct order according to binding req dependencies
     * that they have. Note that this is a best effort approach, which may
     * fail in cases where we allow for liberate patterns that do not strictly
     * follow the restriction of SPARQL semantics (e.g., for cyclic patterns
@@ -458,22 +519,19 @@ implements IASTOptimizer {
     *        
     * @return the ordered node set if exists, otherwise a "best effort" order
     */
-   List<AssignmentNode> orderBindNodesByDependencies(
-      final List<IGroupMemberNode> bindNodes,
+   List<IGroupMemberNode> orderNodesByDependencies(
+      final List<IGroupMemberNode> nodes,
       final GroupNodeVarBindingInfoMap bindingInfoMap,
       final Set<IVariable<?>> knownBoundSomewhere) {
       
-      final List<AssignmentNode> ordered = 
-         new ArrayList<AssignmentNode>(bindNodes.size());
+      final List<IGroupMemberNode> ordered = 
+         new ArrayList<IGroupMemberNode>(nodes.size());
 
-      final LinkedList<AssignmentNode> toBePlaced = 
-         new LinkedList<AssignmentNode>();
-      for (int i=0; i<bindNodes.size(); i++) {
-         final IGroupMemberNode assNodeCandidate = bindNodes.get(i);
-         if (assNodeCandidate instanceof AssignmentNode) {
-            toBePlaced.add((AssignmentNode)assNodeCandidate);
-         }
-      }
+      /**
+       * Initially, all nodes must be placed
+       */
+      final LinkedList<IGroupMemberNode> toBePlaced = 
+         new LinkedList<IGroupMemberNode>(nodes);
 
       final Set<IVariable<?>> knownBound =
          new HashSet<IVariable<?>>(knownBoundSomewhere);
@@ -481,7 +539,7 @@ implements IASTOptimizer {
          
          for (int i=0 ; i<toBePlaced.size(); i++) {
             
-            final AssignmentNode node = toBePlaced.get(i);
+            final IGroupMemberNode node = toBePlaced.get(i);
             final GroupNodeVarBindingInfo nodeBindingInfo = 
                bindingInfoMap.get(node);
             

@@ -114,6 +114,17 @@ public interface IRunningQuery extends IHaltable<Void>, IQueryContext {
     Map<Integer/* bopId */, BOpStats> getStats();
     
     /**
+     * Set the static analysis stats associated with this query.
+     */
+    void setStaticAnalysisStats(StaticAnalysisStats saStats);
+    
+    /**
+     * Return statistics associated with the static analysis phase of this
+     * query.
+     */
+    StaticAnalysisStats getStaticAnalysisStats();
+    
+    /**
      * Return the query deadline in milliseconds (the time at which it will
      * terminate regardless of its run state).
      * 

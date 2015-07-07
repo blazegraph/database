@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.optimizers;
 
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.UnionNode;
 
 
 
@@ -345,7 +346,34 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
-   public void testServicePlacementSparqlBDS() {
+   public void testServicePlacementSparql11c() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVar("x2"),
+               stmtPatternWithVar("x3"),
+               stmtPatternWithVar("x4"),
+               serviceSparql11WithConstant("x1")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVar("x2"),
+               stmtPatternWithVar("x3"),
+               stmtPatternWithVar("x4"),
+               serviceSparql11WithConstant("x1") /* SPARQL 1.1 service is placed as late as possible */
+           ));
+         
+      }}.test();
+   } 
+   
+   public void testServicePlacementServiceBDS() {
 
       new Helper(){{
          
@@ -362,7 +390,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
          expected = 
             select(varNode(x), 
             where (
-               serviceBDSWithVariable("x2"), /* first possible position */
+               serviceBDSWithVariable("x2"), /* BDS service is placed as early as possible */
                stmtPatternWithVar("x1"),
                stmtPatternWithVar("x2"),
                stmtPatternWithVar("x3"),
@@ -372,7 +400,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
-   public void testServicePlacementSparqlFTS01() {
+   public void testServicePlacementServiceFTS01() {
 
       new Helper(){{
          
@@ -407,7 +435,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
       }}.test();
    } 
    
-   public void testServicePlacementSparqlFTS02() {
+   public void testServicePlacementServiceFTS02() {
 
 
       final JoinGroupNode jgnOpt = joinGroupWithVars("inParams2","z");
@@ -454,6 +482,48 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                      "outRes", "outScore", "outSnippet", 
                      "inSearch", "inEndpoint", "inParams2"),
                stmtPatternWithVar("z")
+           ));
+         
+      }}.test();
+   } 
+   
+   /**
+    * Interaction of BIND/SPARQL SERVICE keyword.
+    */
+   public void testServiceBindDependencyOrdering() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("X"),
+               stmtPatternWithVar("inEndpoint"),
+               stmtPatternWithVar("inParams"),
+               serviceFTSWithVariable(
+                     "outRes", "outScore", "outSnippet", 
+                     "inSearch", "inEndpoint", "inParams"),
+               stmtPatternWithVar("outRes"),
+               stmtPatternWithVar("outScore"),
+               stmtPatternWithVar("outSnippet"),
+               assignmentWithVar("inSearch", "X"),
+               assignmentWithVar("dummy", "Y")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("X"),
+               stmtPatternWithVar("inEndpoint"),
+               stmtPatternWithVar("inParams"),
+               stmtPatternWithVar("outRes"),
+               stmtPatternWithVar("outScore"),
+               stmtPatternWithVar("outSnippet"),
+               assignmentWithVar("inSearch", "X"),
+               serviceFTSWithVariable(
+                     "outRes", "outScore", "outSnippet", 
+                     "inSearch", "inEndpoint", "inParams"),
+               assignmentWithVar("dummy", "Y")
            ));
          
       }}.test();
@@ -874,5 +944,148 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
            ));
          
       }}.test();      
+   }
+   
+
+   
+   /**
+    * A UNION node usually has precedence over subqueries.
+    */
+   public void testTicket1363a() {
+      
+      final JoinGroupNode jgn1a = new JoinGroupNode();
+      final JoinGroupNode jgn1b = new JoinGroupNode();
+      jgn1a.addChild(stmtPatternWithVar("y1"));
+      jgn1b.addChild(stmtPatternWithVar("y1"));
+      
+      final JoinGroupNode jgn2a = new JoinGroupNode();
+      final JoinGroupNode jgn2b = new JoinGroupNode();
+      jgn2a.addChild(stmtPatternWithVar("y2"));
+      jgn2b.addChild(stmtPatternWithVar("y2"));
+      
+      final UnionNode unA = new UnionNode();
+      unA.addChild(jgn1a);
+      unA.addChild(jgn2a);
+      
+      final UnionNode unB = new UnionNode();
+      unB.addChild(jgn1b);
+      unB.addChild(jgn2b);
+
+      
+      new Helper(){{
+          
+         given = 
+            select(varNode(x), 
+            where (
+               unA,
+               subqueryWithVars("x1", "x2")
+            ));
+            
+         expected = 
+           select(varNode(x), 
+           where (
+               unB,
+               subqueryWithVars("x1", "x2")
+            ));
+
+            
+      }}.test();   
+      
+   }
+   
+   /**
+    * In case the UNION node has binding requirements that cannot be satisified
+    * internally, it must be evaluated after the subquery.
+    */
+   public void testTicket1363b() {
+      
+      final JoinGroupNode jgn1a = new JoinGroupNode();
+      final JoinGroupNode jgn1b = new JoinGroupNode();
+      jgn1a.addChild(assignmentWithVar("z", "x1"));
+      jgn1b.addChild(assignmentWithVar("z", "x1"));
+      
+      final JoinGroupNode jgn2a = new JoinGroupNode();
+      final JoinGroupNode jgn2b = new JoinGroupNode();
+      jgn2a.addChild(stmtPatternWithVar("y1"));
+      jgn2b.addChild(stmtPatternWithVar("y1"));
+      
+      final UnionNode unA = new UnionNode();
+      unA.addChild(jgn1a);
+      unA.addChild(jgn2a);
+      
+      final UnionNode unB = new UnionNode();
+      unB.addChild(jgn1b);
+      unB.addChild(jgn2b);
+
+      
+      new Helper(){{
+          
+         given = 
+            select(varNode(x), 
+            where (
+               unA,
+               subqueryWithVars("x1", "x2")
+            ));
+            
+         expected = 
+           select(varNode(x), 
+           where (
+               subqueryWithVars("x1", "x2"),
+               unB
+            ));
+
+            
+      }}.test();   
+      
+   }
+   
+   /**
+    * In the following variant, the union node has binding requirements but
+    * can (and does) internally satisfy them.
+    */
+   public void testTicket1363c() {
+      
+      final JoinGroupNode jgn1a = new JoinGroupNode();
+      jgn1a.addChild(assignmentWithVar("z", "x1"));
+      jgn1a.addChild(stmtPatternWithVar("x1"));
+      
+      // same as a1, but reordered to satisfy binding requirements
+      final JoinGroupNode jgn1b = new JoinGroupNode();
+      jgn1b.addChild(stmtPatternWithVar("x1"));
+      jgn1b.addChild(assignmentWithVar("z", "x1"));
+      
+      final JoinGroupNode jgn2a = new JoinGroupNode();
+      final JoinGroupNode jgn2b = new JoinGroupNode();
+      jgn2a.addChild(stmtPatternWithVar("x1"));
+      jgn2b.addChild(stmtPatternWithVar("x1"));
+      
+      final UnionNode unA = new UnionNode();
+      unA.addChild(jgn1a);
+      unA.addChild(jgn2a);
+      
+      final UnionNode unB = new UnionNode();
+      unB.addChild(jgn1b);
+      unB.addChild(jgn2b);
+
+      
+      new Helper(){{
+          
+         given = 
+            select(varNode(x), 
+            where (
+               unA,
+               subqueryWithVars("x1", "x2")
+            ));
+            
+         expected = 
+           select(varNode(x), 
+           where (
+               unB,
+               subqueryWithVars("x1", "x2")
+            ));
+
+            
+      }}.test();   
+      
    }
 }
