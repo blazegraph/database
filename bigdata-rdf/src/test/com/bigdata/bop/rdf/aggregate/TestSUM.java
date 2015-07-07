@@ -26,11 +26,9 @@ package com.bigdata.bop.rdf.aggregate;
 import java.math.BigInteger;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.ContextBindingSet;
@@ -38,7 +36,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
@@ -46,6 +43,7 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
+import com.bigdata.bop.solutions.MockQuery;
 import com.bigdata.bop.solutions.MockQueryContext;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
@@ -181,13 +179,7 @@ public class TestSUM extends TestCase2 {
         );
         
         final BOpStats stats = new BOpStats();
-        final PipelineOp mockQuery = new PipelineOp(new BOp[]{},NV.asMap(new NV[]{})) {
-            private static final long serialVersionUID = 1L;
-            @Override
-            public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
-                return null;
-            }
-        };
+        final PipelineOp mockQuery = new MockQuery();
         final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
                 new IBindingSet[][] { });
         final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(

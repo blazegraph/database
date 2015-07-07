@@ -159,7 +159,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * Factory for resolving relations and access paths used primarily by
      * {@link AST2BOpJoins}s.
      */
-    final BOpContextBase context;
+    public final BOpContextBase context;
     
     /**
      * When <code>true</code>, may use the version of DISTINCT which operates on
