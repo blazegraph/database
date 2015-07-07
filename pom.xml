@@ -330,7 +330,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
 	  </excludes>
           <printSummary>false</printSummary>
-          <disableXmlReport>true</disableXmlReport>
+          <disableXmlReport>false</disableXmlReport>
           <forkCount>2</forkCount>
           <reuseForks>true</reuseForks>
           <argLine>-server -ea -Xms512m -Xmx2g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
