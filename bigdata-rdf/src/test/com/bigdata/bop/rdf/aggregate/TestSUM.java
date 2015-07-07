@@ -24,16 +24,32 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.rdf.aggregate;
 
 import java.math.BigInteger;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.FutureTask;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IQueryContext;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.NV;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.BlockingBufferWithStats;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.MockRunningQuery;
+import com.bigdata.bop.solutions.MockQueryContext;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
@@ -46,6 +62,11 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -118,6 +139,20 @@ public class TestSUM extends TestCase2 {
 
     public void test_sum_with_complex_inner_value_expression() {
         
+        final String namespace = getName();
+        final String lexiconNamespace;
+        final Properties properties = new Properties();
+        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,BufferMode.MemStore.name());
+        final Journal store = new Journal(properties);
+        try {
+            {
+                final AbstractTripleStore kb = new LocalTripleStore(store,
+                        namespace, ITx.UNISOLATED, properties);
+                kb.create();
+                store.commit();
+                lexiconNamespace = kb.getLexiconRelation().getNamespace();
+            }
+
         final IVariable<IV> org = Var.var("org");
         final IVariable<IV> auth = Var.var("auth");
         final IVariable<IV> book = Var.var("book");
@@ -139,6 +174,30 @@ public class TestSUM extends TestCase2 {
         final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
                 new XSDNumericIV<BigdataLiteral>(9));
 
+        final UUID queryId = UUID.randomUUID();
+        final IQueryContext queryContext = new MockQueryContext(queryId);
+        final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+        , store/* indexManager */,queryContext
+        );
+        
+        final BOpStats stats = new BOpStats();
+        final PipelineOp mockQuery = new PipelineOp(new BOp[]{},NV.asMap(new NV[]{})) {
+            private static final long serialVersionUID = 1L;
+            @Override
+            public FutureTask<Void> eval(BOpContext<IBindingSet> context) {
+                return null;
+            }
+        };
+        final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                new IBindingSet[][] { });
+        final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                mockQuery, stats);
+        final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
+                runningQuery, -1/* partitionId */
+                , stats, mockQuery/* op */, true/* lastInvocation */, source, sink,
+                null/* sink2 */
+        );
+
         /**
          * The test data:
          * 
@@ -152,15 +211,15 @@ public class TestSUM extends TestCase2 {
          */
         final IBindingSet data [] = new IBindingSet []
         {
-            new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
-          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
-          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
-          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
+            new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } ))
+          , new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } ))
+          , new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } ))
+          , new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } ))
         };
 
         // SUM(lprice+1)
         final SUM op = new SUM(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS, new GlobalAnnotations(getName(), ITx.READ_COMMITTED)));
+                new Constant<IV>(new XSDNumericIV(1)), MathBOp.MathOp.PLUS, new GlobalAnnotations(lexiconNamespace, ITx.READ_COMMITTED)));
         assertFalse(op.isDistinct());
         assertFalse(op.isWildcard());
 
@@ -171,7 +230,9 @@ public class TestSUM extends TestCase2 {
         assertEquals(
                 new XSDIntegerIV(BigInteger.valueOf(9 + 1 + 5 + 1 + 7 + 1 + 7
                         + 1)), op.done());
-
+        } finally {
+            store.destroy();
+        }
     }
 
     public void test_sum_with_null() {
