@@ -72,7 +72,7 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
-import com.bigdata.util.InnerCause;
+//import com.bigdata.util.InnerCause;
 
 /**
  * A manager for connections to one or more REST API / SPARQL end points for the
