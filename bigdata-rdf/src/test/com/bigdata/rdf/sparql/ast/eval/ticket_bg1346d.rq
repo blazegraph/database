@@ -1,0 +1,2 @@
+SELECT DISTINCT ?People WHERE
+{ ?People a <http://semoss.org/ontologies/Person> }

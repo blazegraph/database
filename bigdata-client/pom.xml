@@ -66,6 +66,11 @@ ga('send', 'pageview');
       <version>${bigdata.version}</version>
     </dependency>
     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>rdf-properties</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-client</artifactId>
       <version>${jetty.version}</version>

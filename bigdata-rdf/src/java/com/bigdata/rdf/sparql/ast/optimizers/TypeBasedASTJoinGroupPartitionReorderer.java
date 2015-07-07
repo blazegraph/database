@@ -77,9 +77,20 @@ implements IASTJoinGroupPartitionReorderer {
                }, 
                partition.nonOptionalNonMinusNodes);
 
-      // TODO: special handling of ASK subqueries that act as filters,
-      // i.e. place them as early as possible
+      // split service nodes into runFirst and runLast service nodes
+      final List<ServiceNode> runFirstSNs = new LinkedList<ServiceNode>();
+      final List<ServiceNode> runLastSNs = new LinkedList<ServiceNode>();
+      for (ServiceNode sn : nodeClassifier.get(ServiceNode.class)) {
+         if (sn.getResponsibleServiceFactory().getServiceOptions().isRunFirst()) {
+            runFirstSNs.add(sn);
+         } else {
+            runLastSNs.add(sn);            
+         }
+      }
+
+      // order the nodes based on their types
       final List<IGroupMemberNode> ordered = new LinkedList<IGroupMemberNode>();
+      ordered.addAll(runFirstSNs);
       ordered.addAll(nodeClassifier.get(NamedSubqueryInclude.class));
       ordered.addAll(nodeClassifier.get(StatementPatternNode.class));
       ordered.addAll(nodeClassifier.get(GraphPatternGroup.class));
@@ -87,7 +98,7 @@ implements IASTJoinGroupPartitionReorderer {
       ordered.addAll(nodeClassifier.get(PropertyPathUnionNode.class));
       ordered.addAll(nodeClassifier.get(ArbitraryLengthPathNode.class));
       ordered.addAll(nodeClassifier.get(SubqueryRoot.class));
-      ordered.addAll(nodeClassifier.get(ServiceNode.class));
+      ordered.addAll(runLastSNs);
       ordered.addAll(nodeClassifier.getUnclassifiedNodes());
 
       // just replace the order in the partition
