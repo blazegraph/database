@@ -1316,21 +1316,19 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();
     }    
 
-    // TODO: this one is currently not working, it will be addressed as
-    // part of the join order rewriting, please add againg
-//    /**
-//     * Testing proper use of VALUES clause inside named subqueries.
-//     * 
-//     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
-//     * named subquery and VALUES expression</a>.
-//     */
-//    public void test_ticket_bg1296c() throws Exception {
-//       new TestHelper("ticket_bg1296c",// testURI,
-//             "ticket_bg1296c.rq",// queryFileURL
-//             "empty.trig",// dataFileURL
-//             "ticket_bg1296.srx"// resultFileURL
-//       ).runTest();
-//    }    
+    /**
+     * Testing proper use of VALUES clause inside named subqueries.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1296">
+     * named subquery and VALUES expression</a>.
+     */
+    public void test_ticket_bg1296c() throws Exception {
+       new TestHelper("ticket_bg1296c",// testURI,
+             "ticket_bg1296c.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_bg1296.srx"// resultFileURL
+       ).runTest();
+    }    
 
     /**
      * Testing proper use of VALUES clause inside named subqueries.
@@ -1372,8 +1370,93 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
              "empty.trig",// dataFileURL
              "ticket_bg1141.srx"// resultFileURL
        ).runTest();
-    }   
+    }
 
+    
+    /**
+     * Isues with placement of BIND.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
+     * BIND not executed before SERVICE call</a>, comment from
+     * 07/Jan/14 7:42 PM.
+     */
+    public void test_ticket_bg876c() throws Exception {
+       new TestHelper("ticket_bg876c",// testURI,
+             "ticket_bg876c.rq",// queryFileURL
+             "ticket_bg876c.trig",// dataFileURL
+             "ticket_bg876c.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    /**
+     * Isues with placement of BIND.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
+     * BIND not executed before SERVICE call</a>, comment from
+     * 07/Jan/14 7:42 PM.
+     */
+    public void test_ticket_bg876d() throws Exception {
+       new TestHelper("ticket_bg876d",// testURI,
+             "ticket_bg876d.rq",// queryFileURL
+             "ticket_bg876d.trig",// dataFileURL
+             "ticket_bg876d.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    /**
+     * Isues with placement of BIND.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-876">
+     * BIND not executed before SERVICE call</a>, comment from
+     * 07/Jan/14 7:43 PM.
+     */
+    public void test_ticket_bg876e() throws Exception {
+       new TestHelper("ticket_bg876e",// testURI,
+             "ticket_bg876e.rq",// queryFileURL
+             "ticket_bg876e.trig",// dataFileURL
+             "ticket_bg876e.srx"// resultFileURL
+       ).runTest();       
+    }    
+    
+    public void test_nested_values01() throws Exception {
+       new TestHelper("nested_values01",// testURI,
+             "nested_values01.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values01.srx"// resultFileURL
+       ).runTest();           
+    }
+    
+    public void test_nested_values02() throws Exception {
+       new TestHelper("nested_values02",// testURI,
+             "nested_values02.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values02.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    public void test_nested_values03() throws Exception {
+       new TestHelper("nested_values03",// testURI,
+             "nested_values03.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values03.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    public void test_nested_values04() throws Exception {
+       new TestHelper("nested_values04",// testURI,
+             "nested_values04.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values04.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    public void test_nested_values05() throws Exception {
+       new TestHelper("nested_values05",// testURI,
+             "nested_values05.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values05.srx"// resultFileURL
+       ).runTest();          
+    }
     
     /**
      * Some of the test cases require the FTS index, so we need a custom

@@ -46,6 +46,7 @@ import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
 import com.bigdata.rdf.sail.sparql.AbstractBigdataExprBuilderTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.eval.CustomServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.service.CustomServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
@@ -460,7 +461,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
      * Private helper class used to verify that new mutable connections are
      * hooked.
      */
-    private static class MyCustomServiceFactory implements CustomServiceFactory {
+    private static class MyCustomServiceFactory extends CustomServiceFactoryBase {
 
         public final AtomicInteger nstarted = new AtomicInteger();
 
@@ -488,7 +489,8 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
             nstarted.incrementAndGet();
 
         }
-
+           
     }
 
+    
 }

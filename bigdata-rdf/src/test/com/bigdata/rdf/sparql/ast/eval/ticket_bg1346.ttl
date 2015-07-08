@@ -1,0 +1,35 @@
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix vas: <http://va.gov/ontologies/semoss#> .
+@prefix vac: <http://va.gov/ontologies/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix semoss: <http://semoss.org/ontologies/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+
+<http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Alex> semoss:knows <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Harold> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Jennifer> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Pramodh> ;
+a semoss:Person ;
+rdfs:label "Alex" .
+
+<http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Harold> semoss:knows <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Alex> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Jennifer> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Pramodh> ;
+a semoss:Person ;
+rdfs:label "Harold" .
+
+<http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Jennifer> semoss:knows <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Alex> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Harold> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Pramodh> ;
+a semoss:Person ;
+rdfs:label "Jennifer" .
+
+<http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/name1> semoss:knows <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Alex> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Jennifer> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/name2> ;
+a semoss:Person ;
+rdfs:label "name1" .
+
+<http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/name2> semoss:knows <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Harold> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/name1> ;
+a semoss:Person ;
+rdfs:label "name2" .
+
+<http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Pramodh> semoss:knows <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Alex> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Harold> , <http://semoss.va.gov/database/vffa62a57-96c1-48f3-b853-201c18938d12/Jennifer> ;
+a semoss:Person ;
+rdfs:label "Pramodh" .

@@ -36,12 +36,12 @@ import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.eval.ASTEvalHelper;
+import com.bigdata.rdf.sparql.ast.eval.AbstractServiceFactoryBase;
 import com.bigdata.rdf.sparql.ast.eval.ServiceParams;
 import com.bigdata.rdf.sparql.ast.service.ExternalServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.OpenrdfNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
-import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -112,7 +112,7 @@ import cutthecrap.utils.striterators.ICloseableIterator;
  *      the stored procedure is only used to JOIN into an outer query as in
  *      <code>SELECT * { SERVICE bsq:my-service {} }</code>
  */
-abstract public class StoredQueryService implements ServiceFactory {
+abstract public class StoredQueryService extends AbstractServiceFactoryBase {
 
     public interface Options {
         

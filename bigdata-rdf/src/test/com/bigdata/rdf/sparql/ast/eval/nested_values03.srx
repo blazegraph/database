@@ -4,12 +4,12 @@
      xmlns:xs="http://www.w3.org/2001/XMLSchema#"
      xmlns="http://www.w3.org/2005/sparql-results#" >
    <head>
-    <variable name="?x"/>
+    <variable name="o"/>
    </head>
    <results>
      <result>
-      <binding name="x">
-          <literal>4</literal>
+      <binding name="o">
+         <uri>http://o</uri>
       </binding>
      </result>
    </results>

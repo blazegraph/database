@@ -686,7 +686,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933a",// testURI,
              "ticket_933a.rq",// queryFileURL
              "empty.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933ac.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -699,7 +699,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933b",// testURI,
              "ticket_933b.rq",// queryFileURL
              "empty.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933bd.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -712,7 +712,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933c",// testURI,
              "ticket_933c.rq",// queryFileURL
              "ticket_933cd.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933ac.srx"// resultFileURL
        ).runTest();    
     } 
     
@@ -725,7 +725,7 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
        new TestHelper("ticket_933d",// testURI,
              "ticket_933d.rq",// queryFileURL
              "ticket_933cd.trig",// dataFileURL
-             "ticket_933abcd.srx"// resultFileURL
+             "ticket_933bd.srx"// resultFileURL
        ).runTest();    
     } 
 
@@ -770,5 +770,322 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_blzg_1331b.srx"// resultFileURL
        ).runTest();    
     }
+    
+    /**
+     * Double nesting of FILTER NOT EXISTS.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1281">
+     * FILTER FILTER != not working</a>
+     */
+    public void test_ticket_blzg_1281a() throws Exception {
+       new TestHelper("ticket_blzg_1281a",// testURI,
+             "ticket_blzg_1281a.rq",// queryFileURL
+             "ticket_blzg_1281a.trig",// dataFileURL
+             "ticket_blzg_1281a.srx"// resultFileURL
+       ).runTest();    
 
+    }
+    
+    /**
+     * Double nesting of FILTER NOT EXISTS.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1281">
+     * FILTER FILTER != not working</a>
+     */
+    public void test_ticket_blzg_1281b() throws Exception {
+       new TestHelper("ticket_blzg_1281b",// testURI,
+             "ticket_blzg_1281b.rq",// queryFileURL
+             "ticket_blzg_1281b.trig",// dataFileURL
+             "ticket_blzg_1281b.srx"// resultFileURL
+       ).runTest();    
+
+    }
+
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346a() throws Exception {
+
+       new TestHelper("ticket_bg1346a",// testURI,
+               "ticket_bg1346a.rq",// queryFileURL
+               "ticket_bg1346.trig",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346b() throws Exception {
+
+       new TestHelper("ticket_bg1346b",// testURI,
+               "ticket_bg1346b.rq",// queryFileURL
+               "ticket_bg1346.trig",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346c() throws Exception {
+
+       new TestHelper("ticket_bg1346c",// testURI,
+               "ticket_bg1346c.rq",// queryFileURL
+               "ticket_bg1346.trig",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346d() throws Exception {
+
+       new TestHelper("ticket_bg1346d",// testURI,
+               "ticket_bg1346d.rq",// queryFileURL
+               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346e() throws Exception {
+
+       new TestHelper("ticket_bg1346e",// testURI,
+               "ticket_bg1346e.rq",// queryFileURL
+               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * DistinctTermScanOp is not retrieving all data.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1346">
+     * DistinctTermScanOp is not retrieving all data</a>
+     */
+    public void test_ticket_1346f() throws Exception {
+
+       new TestHelper("ticket_bg1346f",// testURI,
+               "ticket_bg1346f.rq",// queryFileURL
+               "ticket_bg1346.ttl",// dataFileURL
+               "ticket_bg1346.srx"// resultFileURL
+               ).runTest();
+    }
+    
+    /**
+     * Placement of filters in presence of other FILTER NOT EXISTS
+     * clauses.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1284">
+     * optional / filter ! bound interaction malfunction</a>
+     */
+    public void test_ticket_blzg_1284a() throws Exception {
+       new TestHelper("ticket_blzg_1284a",// testURI,
+             "ticket_blzg_1284a.rq",// queryFileURL
+             "ticket_blzg_1284.trig",// dataFileURL
+             "ticket_blzg_1284a.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+    /**
+     * Placement of filters in presence of other FILTER NOT EXISTS
+     * clauses.
+     * 
+     * @see <a href="http://jira.blazegraph.com/browse/BLZG-1284">
+     * optional / filter ! bound interaction malfunction</a>
+     */
+    public void test_ticket_blzg_1284b() throws Exception {
+       new TestHelper("ticket_blzg_1284b",// testURI,
+             "ticket_blzg_1284b.rq",// queryFileURL
+             "ticket_blzg_1284.trig",// dataFileURL
+             "ticket_blzg_1284b.srx"// resultFileURL
+       ).runTest();
+    }   
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021a() throws Exception {
+       new TestHelper("ticket_blzg_1021a",// testURI,
+             "ticket_blzg_1021a.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }   
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021b() throws Exception {
+       new TestHelper("ticket_blzg_1021b",// testURI,
+             "ticket_blzg_1021b.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021c() throws Exception {
+       new TestHelper("ticket_blzg_1021c",// testURI,
+             "ticket_blzg_1021c.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }   
+    
+    /**
+     * Unsound translation of FILTER (NOT) EXISTS.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021d() throws Exception {
+       new TestHelper("ticket_blzg_1021d",// testURI,
+             "ticket_blzg_1021d.rq",// queryFileURL
+             "ticket_blzg_1021.trig",// dataFileURL
+             "ticket_blzg_1021.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021e() throws Exception {
+       new TestHelper("ticket_blzg_1021e",// testURI,
+             "ticket_blzg_1021e.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021f() throws Exception {
+       new TestHelper("ticket_blzg_1021f",// testURI,
+             "ticket_blzg_1021f.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021g() throws Exception {
+       new TestHelper("ticket_blzg_1021g",// testURI,
+             "ticket_blzg_1021g.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021gh.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021h() throws Exception {
+       new TestHelper("ticket_blzg_1021h",// testURI,
+             "ticket_blzg_1021h.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021gh.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021i() throws Exception {
+       new TestHelper("ticket_blzg_1021i",// testURI,
+             "ticket_blzg_1021i.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021j() throws Exception {
+       new TestHelper("ticket_blzg_1021j",// testURI,
+             "ticket_blzg_1021j.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021k() throws Exception {
+       new TestHelper("ticket_blzg_1021k",// testURI,
+             "ticket_blzg_1021k.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * Translation of complex FILTER expressions.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1021">
+     * optimizer = None and FILTER EXISTS problem</a>
+     */
+    public void test_ticket_blzg_1021l() throws Exception {
+       new TestHelper("ticket_blzg_1021l",// testURI,
+             "ticket_blzg_1021l.rq",// queryFileURL
+             "ticket_blzg_1021efgh.trig",// dataFileURL
+             "ticket_blzg_1021ef.srx"// resultFileURL
+       ).runTest();
+    }
 }

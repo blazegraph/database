@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -737,5 +738,17 @@ public class StatementPatternNode extends
 		return getProperty(AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, -1l);
         
 	}
+	
+   @Override
+   public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+      return new HashSet<IVariable<?>>();
+   }
+
+   @Override
+   public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+      return sa.getSpannedVariables(this, true, new HashSet<IVariable<?>>());
+   }
+   
+   
 
 }

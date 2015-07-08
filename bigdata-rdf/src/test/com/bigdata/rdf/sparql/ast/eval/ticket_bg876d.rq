@@ -1,0 +1,8 @@
+SELECT * {
+  ?s ?p ?o
+  FILTER (strlen(?o)> 10)
+  FILTER (strstarts(?o,"n"))
+  BIND ( concat("banana ", ?o) as ?banana )
+  FILTER NOT EXISTS { ?s ?p ?banana }
+
+} LIMIT 1

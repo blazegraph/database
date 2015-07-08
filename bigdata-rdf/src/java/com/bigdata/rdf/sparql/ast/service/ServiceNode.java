@@ -32,8 +32,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.openrdf.model.URI;
+
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
+import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
@@ -42,6 +48,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -396,4 +403,44 @@ public class ServiceNode extends GroupMemberNodeBase<IGroupMemberNode>
 
     }
 
+    @Override
+    public Set<IVariable<?>> getRequiredBound(StaticAnalysis sa) {
+       return getResponsibleServiceFactory().getRequiredBound(this);
+    }
+
+    @Override
+    public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
+       return getResponsibleServiceFactory().getDesiredBound(this);
+    }
+    
+    /**
+     * Returns the service factory that is responsible for handling this
+     * service node.
+     * 
+     * @return the associated {@link ServiceFactory}
+     */
+    public ServiceFactory getResponsibleServiceFactory() {
+       
+       final ServiceRegistry serviceRegistry = ServiceRegistry.getInstance();
+       
+       final IVariableOrConstant<?> serviceRef = 
+          getServiceRef().getValueExpression();
+       
+       URI serviceUri = null; // will be set if there is a URI
+       if (serviceRef!=null && serviceRef instanceof IConstant) {
+          final IConstant<?> serviceRefConst = (IConstant<?>)serviceRef;
+          final Object val = serviceRefConst.get();
+          
+          if (val instanceof TermId<?>) {
+             final TermId<?> valTerm = (TermId<?>)val;
+             final BigdataValue bdVal = valTerm.getValue();
+             if (bdVal!=null && bdVal instanceof URI) {
+                serviceUri = (URI)bdVal;
+             }
+          }
+       }
+       
+       return serviceRegistry.getServiceFactoryByServiceURI(serviceUri);
+    }
+    
 }
