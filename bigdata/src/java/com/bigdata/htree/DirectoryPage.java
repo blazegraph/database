@@ -34,7 +34,6 @@ import java.util.concurrent.FutureTask;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.Node;
@@ -43,6 +42,7 @@ import com.bigdata.htree.AbstractHTree.LoadChildRequest;
 import com.bigdata.htree.data.IDirectoryData;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.Memoizer;
 
 import cutthecrap.utils.striterators.EmptyIterator;

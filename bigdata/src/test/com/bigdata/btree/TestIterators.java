@@ -31,6 +31,7 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.TestKeyBuilder;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for iterators. The tests are presented from the least dependencies

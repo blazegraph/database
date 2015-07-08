@@ -45,7 +45,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BaseIndexStats;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DumpIndex;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.ITupleIterator;
@@ -63,6 +62,7 @@ import com.bigdata.sparse.ITPS;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.stream.Stream;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 
 /**

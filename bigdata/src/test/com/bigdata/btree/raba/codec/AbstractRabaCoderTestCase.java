@@ -43,8 +43,6 @@ import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.btree.raba.IRaba;
@@ -54,6 +52,8 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.util.BytesUtil;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Abstract test suite for {@link IRabaCoder} implementations.

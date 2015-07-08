@@ -47,7 +47,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.BOpStats;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.HTreeIndexMetadata;
@@ -74,6 +73,7 @@ import com.bigdata.relation.accesspath.IBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.Expander;

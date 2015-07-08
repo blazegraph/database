@@ -29,12 +29,15 @@ package com.bigdata.rdf;
 
 import info.aduna.lang.service.ServiceRegistry;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.ServiceLoader;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.resultio.TupleQueryResultParserFactory;
 import org.openrdf.query.resultio.TupleQueryResultParserRegistry;
 import org.openrdf.query.resultio.TupleQueryResultWriterFactory;
 import org.openrdf.query.resultio.TupleQueryResultWriterRegistry;
@@ -43,15 +46,6 @@ import org.openrdf.rio.RDFParserFactory;
 import org.openrdf.rio.RDFParserRegistry;
 import org.openrdf.rio.RDFWriterFactory;
 import org.openrdf.rio.RDFWriterRegistry;
-
-import com.bigdata.rdf.model.StatementEnum;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactory;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory;
-import com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterForConstructFactory;
-import com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory;
-import com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory;
-import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
 
 /**
  * This static class provides a hook which allows the replacement of services
@@ -74,7 +68,7 @@ import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
  * <p>
  * This effects things such as the bigdata extension for the RDF/XML parser
  * which adds support for SIDs mode interchange and the interchange of
- * {@link StatementEnum} metadata.
+ * {@link com.bigdata.rdf.model.StatementEnum} metadata.
  * <p>
  * This class is used to "hook" the various service registeries and force the
  * use of the bigdata extension when it adds semantics not present in the base
@@ -90,6 +84,22 @@ import com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory;
 public class ServiceProviderHook {
 
 	private static final Logger log = Logger.getLogger(ServiceProviderHook.class);
+	
+	public static final String NTRIPLES_PARSER_FACTORY = "com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory";
+
+	public static final String TURTLE_PARSER_FACTORY = "com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory";
+
+	public static final String TURTLE_WRITER_FACTORY = "com.bigdata.rdf.rio.turtle.BigdataTurtleWriterFactory";
+	
+	public static final String JSON_WRITER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterFactory";
+	
+	public static final String JSON_CONSTRUCT_WRITER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterForConstructFactory";
+	
+	public static final String JSON_PARSER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory";
+	
+	public static final String JSON_CONSTRUCT_PARSER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactory";
+	
+	
 	
     static private boolean loaded = false;
     static {
@@ -216,18 +226,18 @@ public class ServiceProviderHook {
             final RDFParserRegistry r = RDFParserRegistry.getInstance();
 			
 			// RDR-enabled
-			r.add(new BigdataNTriplesParserFactory());
-			assert r.has(new BigdataNTriplesParserFactory().getRDFFormat());
+			r.add((RDFParserFactory) getInstanceForClass(NTRIPLES_PARSER_FACTORY));
+			assert r.has(((RDFParserFactory) getInstanceForClass(NTRIPLES_PARSER_FACTORY)).getRDFFormat());
             
             // RDR-enabled
-            r.add(new BigdataTurtleParserFactory());
-            assert r.has(new BigdataTurtleParserFactory().getRDFFormat());
+			r.add((RDFParserFactory) getInstanceForClass(TURTLE_PARSER_FACTORY));
+			assert r.has(((RDFParserFactory) getInstanceForClass(TURTLE_PARSER_FACTORY)).getRDFFormat());
             
             /*
              * Allows parsing of JSON SPARQL Results with an {s,p,o,[c]} header.
              * RDR-enabled.
              */
-            r.add(new BigdataSPARQLResultsJSONParserForConstructFactory());
+            r.add((RDFParserFactory) getInstanceForClass(JSON_CONSTRUCT_PARSER_FACTORY));
             
         }
         
@@ -236,7 +246,7 @@ public class ServiceProviderHook {
         	final TupleQueryResultWriterRegistry r = TupleQueryResultWriterRegistry.getInstance();
 
         	// add our custom RDR-enabled JSON writer for SPARQL result sets.
-        	r.add(new BigdataSPARQLResultsJSONWriterFactory());
+        	r.add((TupleQueryResultWriterFactory) getInstanceForClass(JSON_WRITER_FACTORY));
         	
         }
 
@@ -245,7 +255,7 @@ public class ServiceProviderHook {
             final TupleQueryResultParserRegistry r = TupleQueryResultParserRegistry.getInstance();
 
             // add our custom RDR-enabled JSON parser for SPARQL result sets.
-            r.add(new BigdataSPARQLResultsJSONParserFactory());
+            r.add(getInstanceClassName(JSON_PARSER_FACTORY));
             
         }
 
@@ -256,10 +266,10 @@ public class ServiceProviderHook {
 //            r.add(new BigdataRDFXMLWriterFactory());
             
             // RDR-enabled
-            r.add(new BigdataTurtleWriterFactory());
+			r.add((RDFWriterFactory) getInstanceForClass(TURTLE_WRITER_FACTORY));
 
             // RDR-enabled
-            r.add(new BigdataSPARQLResultsJSONWriterForConstructFactory());
+            r.add((RDFWriterFactory) getInstanceForClass(JSON_CONSTRUCT_WRITER_FACTORY));
             
         }
 
@@ -298,6 +308,30 @@ public class ServiceProviderHook {
 
         loaded = true;
         
+    }
+    
+    private static TupleQueryResultParserFactory getInstanceClassName(
+			String jsonParserFactory) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	protected static Object getInstanceForClass(final String className) {
+    	
+		try {
+			final Class <?> c = Class.forName(className);
+			final Constructor<?> cons = c.getConstructor();
+			final Object classInstance = cons.newInstance();
+
+		return classInstance;
+		} catch (NoSuchMethodException | SecurityException
+				| ClassNotFoundException | InstantiationException
+				| IllegalAccessException | IllegalArgumentException
+				| InvocationTargetException e) {
+			
+			throw new RuntimeException(className + " is not found in the classpath.");
+		}
+    	
     }
 
 //    private static void registerFactory

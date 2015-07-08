@@ -2,7 +2,7 @@ package com.bigdata.rdf.internal;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * This class represents an Internet Protocol version 4 (IPv4) address.

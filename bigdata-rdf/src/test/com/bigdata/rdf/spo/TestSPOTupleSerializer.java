@@ -50,13 +50,13 @@ package com.bigdata.rdf.spo;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractTuple;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for {@link SPOTupleSerializer}.

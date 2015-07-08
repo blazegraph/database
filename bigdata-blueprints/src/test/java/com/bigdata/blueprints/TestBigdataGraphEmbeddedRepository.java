@@ -92,7 +92,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			 * location. Create a new store. (If journal== null an in-memory
 			 * store will be created.
 			 */
-			repo = BigdataSailFactory.createRepository(props, journalFile,
+			repo = (BigdataSailRepository) BigdataSailFactory.createRepository(props, journalFile,
 					Option.TextIndex);// , Option.RDR);
 
 		} else {
@@ -101,7 +101,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			 * Journal already exists at specified location. Open existing
 			 * store.
 			 */
-			repo = BigdataSailFactory.openRepository(journalFile);
+			repo = (BigdataSailRepository) BigdataSailFactory.openRepository(journalFile);
 
 		}
 

@@ -38,7 +38,6 @@ import net.jini.config.ConfigurationException;
 
 import org.apache.zookeeper.KeeperException;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexMetadata;
@@ -64,6 +63,7 @@ import com.bigdata.service.jini.master.TaskMaster;
 import com.bigdata.service.ndx.IScaleOutClientIndex;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Utility class for benchmarking index operations on a federation. This test

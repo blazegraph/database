@@ -33,7 +33,6 @@ import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
@@ -47,6 +46,7 @@ import com.bigdata.sparse.KeyType;
 import com.bigdata.sparse.LogicalRowSplitHandler;
 import com.bigdata.sparse.Schema;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Tetst suite for {@link LogicalRowSplitHandler}.

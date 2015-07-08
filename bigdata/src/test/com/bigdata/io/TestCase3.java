@@ -38,8 +38,8 @@ import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.TestHelper;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Base class for some <code>assertEquals</code> methods not covered by

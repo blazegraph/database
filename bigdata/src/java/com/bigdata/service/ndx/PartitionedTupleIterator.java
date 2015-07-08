@@ -29,7 +29,6 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DelegateTuple;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -42,6 +41,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.StaleLocatorException;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 
 import cutthecrap.utils.striterators.IFilter;

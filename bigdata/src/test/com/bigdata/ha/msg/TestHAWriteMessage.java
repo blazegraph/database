@@ -28,9 +28,9 @@ import java.util.UUID;
 
 import junit.framework.TestCase;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.StoreTypeEnum;
+import com.bigdata.util.BytesUtil;
 
 public class TestHAWriteMessage extends TestCase {
 

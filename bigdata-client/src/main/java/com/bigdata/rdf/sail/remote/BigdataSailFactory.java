@@ -23,18 +23,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.remote;
 
 import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-import com.bigdata.BigdataStatics;
-import com.bigdata.journal.BufferMode;
-import com.bigdata.journal.Journal;
-import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.axioms.OwlAxioms;
-import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.sail.Sail;
+
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 
 /**
@@ -46,6 +44,18 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
  *      moved to the client package </a>
  */
 public class BigdataSailFactory {
+	
+	/**
+	 * The default bigdata SAIL_PROVIDER.
+	 */
+	public static final String BIGDATA_SAIL_INSTANCE = "com.bigdata.rdf.sail.BigdataSail";
+	
+	/**
+	 * The name of the property to set with the class that will provide the Sail.
+	 * 
+	 * It must have a constructor that takes a single properties file as the parameter.
+	 */
+	public static final String SAIL_PROVIDER = "com.bigdata.rdf.sail.remote.Provider";
 
     /**
      * A handy list of common Options you might want to specify when creating
@@ -93,7 +103,7 @@ public class BigdataSailFactory {
     * Connect to a remote bigdata instance.
     * 
     * FIXME This does not parameterize the value of the ContextPath. See
-    * {@link BigdataStatics#getContextPath()}.
+    * {@link com.bigdata.BigdataStatics#getContextPath()}.
     */
    public static BigdataSailRemoteRepository connect(final String host,
          final int port) {
@@ -111,7 +121,7 @@ public class BigdataSailFactory {
 	 * FIXME This does not support the HA load balancer pattern. See #1148.
 	 * 
 	 * FIXME This does not parameterize the value of the ContextPath. See
-	 * {@link BigdataStatics#getContextPath()}.
+	 * {@link com.bigdata.BigdataStatics#getContextPath()}.
 	 * 
 	 * FIXME This MIGHT leak HttpClient or Executor resources.
 	 */
@@ -189,9 +199,9 @@ public class BigdataSailFactory {
      * Open an existing persistent bigdata instance. If a journal does
      * not exist at the specified location then an exception will be thrown.
      */
-    public static BigdataSailRepository openRepository(final String file) {
+    public static SailRepository openRepository(final String file) {
         
-        return new BigdataSailRepository(openSail(file, false));
+        return new SailRepository(openSail(file, false));
         
     }
         
@@ -201,10 +211,10 @@ public class BigdataSailFactory {
      * a journal will be created at that location with the default set of
      * options.
      */
-    public static BigdataSailRepository openRepository(final String file, 
+    public static SailRepository openRepository(final String file, 
             final boolean create) {
         
-        return new BigdataSailRepository(openSail(file, create));
+        return new SailRepository(openSail(file, create));
         
     }
         
@@ -212,7 +222,7 @@ public class BigdataSailFactory {
      * Open an existing persistent bigdata instance. If a journal does
      * not exist at the specified location then an exception will be thrown.
      */
-    public static BigdataSail openSail(final String file) {
+    public static Sail openSail(final String file) {
         
         return openSail(file, false);
         
@@ -224,7 +234,7 @@ public class BigdataSailFactory {
      * a journal will be created at that location with the default set of
      * options.
      */
-    public static BigdataSail openSail(final String file, final boolean create) {
+    public static Sail openSail(final String file, final boolean create) {
         
         if (!new File(file).exists()) {
             
@@ -237,9 +247,9 @@ public class BigdataSailFactory {
         } else {
         
             final Properties props = new Properties();
-            props.setProperty(BigdataSail.Options.FILE, file);
+            props.setProperty("com.bigdata.journal.AbstractJournal", file);
             
-            final BigdataSail sail = new BigdataSail(props);
+            final Sail sail = getSailProviderInstance(props);
             
             return sail;
             
@@ -251,7 +261,7 @@ public class BigdataSailFactory {
      * Create a new bigdata instance using the specified options.  Since no
      * journal file is specified this must be an in-memory instance.
      */
-    public static BigdataSailRepository createRepository(final Option... args) {
+    public static SailRepository createRepository(final Option... args) {
         
         return createRepository(new Properties(), null, args);
         
@@ -261,7 +271,7 @@ public class BigdataSailFactory {
      * Create a new bigdata instance using the specified options.  Since no
      * journal file is specified this must be an in-memory instance.
      */
-    public static BigdataSailRepository createRepository(final Properties props,
+    public static SailRepository createRepository(final Properties props,
             final Option... args) {
         
         return createRepository(props, null, args);
@@ -271,7 +281,7 @@ public class BigdataSailFactory {
     /**
      * Create a new bigdata instance using the specified options.
      */
-    public static BigdataSailRepository createRepository(final String file,
+    public static SailRepository createRepository(final String file,
             final Option... args) {
         
         return createRepository(new Properties(), file, args);
@@ -282,10 +292,10 @@ public class BigdataSailFactory {
      * Create a new bigdata instance using the specified options.  Since no
      * journal file is specified this must be an in-memory instance.
      */
-    public static BigdataSailRepository createRepository(final Properties props,
+    public static SailRepository createRepository(final Properties props,
             final String file, final Option... args) {
         
-        return new BigdataSailRepository(createSail(props, file, args));
+        return new SailRepository(createSail(props, file, args));
         
     }
     
@@ -293,7 +303,7 @@ public class BigdataSailFactory {
      * Create a new bigdata instance using the specified options.  Since no
      * journal file is specified this must be an in-memory instance.
      */
-    public static BigdataSail createSail(final Option... args) {
+    public static Sail createSail(final Option... args) {
         
         return createSail(new Properties(), null, args);
         
@@ -302,7 +312,7 @@ public class BigdataSailFactory {
     /**
      * Create a new bigdata instance using the specified options and filename.  
      */
-    public static BigdataSail createSail(final String file, 
+    public static Sail createSail(final String file, 
             final Option... args) {
     
     	//Ticket #1185: BigdataGraphFactory create not working. 
@@ -314,7 +324,7 @@ public class BigdataSailFactory {
     /**
      * Create a new bigdata instance using the specified options.
      */
-    public static BigdataSail createSail(final Properties props,
+    public static Sail createSail(final Properties props,
             final String file, final Option... args) {
         
         final List<Option> options = args != null ? 
@@ -323,7 +333,8 @@ public class BigdataSailFactory {
         checkArgs(file, options);
                 
 //        final Properties props = new Properties();
-        
+       //FIXME:  Changed these to String Values to remove package / artifact dependency
+       /* 
         if (file != null) {
             props.setProperty(BigdataSail.Options.FILE, file);
             props.setProperty(Journal.Options.BUFFER_MODE, BufferMode.DiskRW.toString());
@@ -349,6 +360,32 @@ public class BigdataSailFactory {
         
         props.setProperty(BigdataSail.Options.QUADS, 
                 String.valueOf(options.contains(Option.Quads)));
+        */
+
+        if (file != null) {
+            props.setProperty("com.bigdata.journal.AbstractJournal", file);
+            props.setProperty("com.bigdata.journal.AbstractJournal.bufferMode", "DiskRW");
+        } else {
+            props.setProperty("com.bigdata.journal.AbstractJournal.bufferMode", "MemStore");
+        }
+        if (options.contains(Option.Inference)) {
+        	props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.axiomsClass","com.bigdata.rdf.axioms.OwlAxioms");
+            props.setProperty("com.bigdata.rdf.sail.truthMaintenance","true");
+            props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.justify", "true");
+        } else {
+        	props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.axiomsClass","com.bigdata.rdf.axioms.NoAxioms");
+            props.setProperty("com.bigdata.rdf.sail.truthMaintenance","false");
+            props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.justify", "false");
+        }
+        
+        props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.textIndex", 
+                String.valueOf(options.contains("TextIndex"))); 
+
+        props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers",
+                String.valueOf(options.contains("RDR")));
+        
+        props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.quads",
+                String.valueOf(options.contains("Quads")));
         
         // Setup for the RWStore recycler rather than session protection.
         props.setProperty("com.bigdata.service.AbstractTransactionService.minReleaseAge","1");
@@ -359,11 +396,34 @@ public class BigdataSailFactory {
         // Bump up the branching factor for the statement indices on the default kb.
         props.setProperty("com.bigdata.namespace.kb.spo.com.bigdata.btree.BTree.branchingFactor","1024");
         
-        final BigdataSail sail = new BigdataSail(props);
+        final Sail sail = getSailProviderInstance(props);
         
         return sail;
         
     }
+    
+    protected static Sail getSailProviderInstance(Properties props) {
+    
+		final String providerClass = System.getProperty(SAIL_PROVIDER,
+				BIGDATA_SAIL_INSTANCE);
+
+		try {
+			final Class<?> c = Class.forName(providerClass);
+			final Constructor<?> cons = c.getConstructor();
+			final Object object = cons.newInstance(props);
+			final Sail proxy = (Sail) object;
+			return proxy;
+		} catch (ClassNotFoundException | NoSuchMethodException
+				| SecurityException | InstantiationException
+				| IllegalAccessException | IllegalArgumentException
+				| InvocationTargetException e) {
+			
+			throw new RuntimeException(providerClass + " is not found in the classpath.");
+		}
+			
+	}
+
+
     
     protected static void checkArgs(final String file, final List<Option> options) {
         

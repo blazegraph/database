@@ -60,7 +60,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree.Counter;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -110,6 +109,7 @@ import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IPSOutputStream;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.StackInfoReport;
 
