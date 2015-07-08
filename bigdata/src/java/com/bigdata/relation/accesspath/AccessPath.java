@@ -771,13 +771,13 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      *      should visit solutions for high level query).
      */
     @Override
-    public ICloseableIterator<IBindingSet[]> solutions(final long limit,
+    public ICloseableIterator<IBindingSet[]> solutions(final BOpContext context, final long limit,
     		final BaseJoinStats stats) {
 
 //        final IVariable<?>[] vars = BOpUtility
 //                .getDistinctArgumentVariables(predicate);
 
-        return BOpContext.solutions(
+        return context.solutions(
                 iterator(0L/* offset */, limit, 0/* capacity */), predicate,
                 stats);
 
