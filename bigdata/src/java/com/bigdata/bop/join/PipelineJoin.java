@@ -1782,7 +1782,7 @@ public class PipelineJoin<E> extends PipelineOp implements
             	
                 // Obtain the iterator for the current join dimension.
                 final ICloseableIterator<IBindingSet[]> itr = ((IBindingSetAccessPath<?>) accessPath)
-                        .solutions(cutoffLimit, stats);
+                      .solutions(context, cutoffLimit, stats);
 
                 try {
 

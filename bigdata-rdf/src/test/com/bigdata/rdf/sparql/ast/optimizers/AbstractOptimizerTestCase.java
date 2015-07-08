@@ -844,11 +844,11 @@ public abstract class AbstractOptimizerTestCase extends
 		}
 
 		private IVariable<? extends IV> toValueExpression(VarNode v) {
-			return (IVariable<? extends IV>) AST2BOpUtility.toVE(globals, v);
+			return (IVariable<? extends IV>) AST2BOpUtility.toVE(getBOpContext(), globals, v);
 		}
 
 		private IValueExpression<? extends IV> toValueExpression(FunctionNode n) {
-			return AST2BOpUtility.toVE(globals, n);
+			return AST2BOpUtility.toVE(getBOpContext(), globals, n);
 		}
 		
 		protected NotExistsNode notExists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
