@@ -12,7 +12,7 @@ echo "${CURRENT_SNAPSHOT}-${CURRENT_BRANCH}"
 
 for file in `find . -name "pom.xml" -maxdepth 2 -print`; do
 
-	cat $file | sed "s/$CURRENT_SNAPSHOT}/${CURRENT_SNAPSHOT}-${CURRENT_BRANCH}/" > /tmp/$$
+	cat $file | sed "s/${CURRENT_SNAPSHOT}/${CURRENT_SNAPSHOT}-${CURRENT_BRANCH}/" > /tmp/$$
 	cat /tmp/$$ > $file
 	rm -f /tmp/$$
 
