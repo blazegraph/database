@@ -48,6 +48,7 @@ import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.journal.Journal;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.Memoizer;
 

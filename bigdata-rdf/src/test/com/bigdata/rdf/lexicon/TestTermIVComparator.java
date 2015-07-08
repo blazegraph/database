@@ -32,8 +32,6 @@ import java.util.Comparator;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.TermIVComparator;
 import com.bigdata.rdf.internal.VTE;
@@ -42,6 +40,8 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.util.BytesUtil;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Test suite for {@link TermIVComparator}.

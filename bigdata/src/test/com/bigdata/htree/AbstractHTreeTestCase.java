@@ -34,7 +34,6 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.HTreeIndexMetadata;
@@ -51,6 +50,7 @@ import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.cache.HardReferenceQueue;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 public class AbstractHTreeTestCase extends TestCase2 {
 

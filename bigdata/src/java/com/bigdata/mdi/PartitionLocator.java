@@ -29,11 +29,10 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.UUID;
 
-
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.util.BytesUtil;
 
 /**
  * An immutable object that may be used to locate an index partition. Instances

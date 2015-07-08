@@ -34,11 +34,11 @@ import java.io.ObjectOutput;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * This class does not offer any compression. It merely stores the byte[][] in a

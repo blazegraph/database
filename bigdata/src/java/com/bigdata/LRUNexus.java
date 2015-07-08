@@ -35,7 +35,6 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentBuilder;
@@ -55,6 +54,7 @@ import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Static singleton factory used to configure the record level cache behavior

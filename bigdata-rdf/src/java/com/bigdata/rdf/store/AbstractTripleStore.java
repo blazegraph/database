@@ -69,7 +69,6 @@ import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -175,6 +174,7 @@ import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PropertyUtil;
 

@@ -12,7 +12,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
@@ -25,6 +24,7 @@ import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Atomic append of a single block to a file version.

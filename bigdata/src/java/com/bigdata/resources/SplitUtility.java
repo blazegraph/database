@@ -36,7 +36,6 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISimpleSplitHandler;
@@ -48,6 +47,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.service.Event;
 import com.bigdata.service.Split;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
 /**

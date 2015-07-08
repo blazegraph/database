@@ -48,7 +48,6 @@ import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBTreeStatistics;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
@@ -84,6 +83,7 @@ import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.ICloseableIterator;

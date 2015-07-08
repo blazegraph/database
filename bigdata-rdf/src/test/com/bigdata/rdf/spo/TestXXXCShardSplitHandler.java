@@ -31,7 +31,6 @@ import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.FixedLengthPrefixSplits;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -50,6 +49,7 @@ import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.resources.AbstractTestSegSplitter;
 import com.bigdata.resources.SplitUtility;
 import com.bigdata.service.Split;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for the {@link XXXCShardSplitHandler}.

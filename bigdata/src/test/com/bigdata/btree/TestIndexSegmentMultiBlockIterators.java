@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import com.bigdata.btree.IndexSegmentBuilder.BuildEnum;
 import com.bigdata.io.DirectBufferPool;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for {@link IndexSegmentMultiBlockIterator}.

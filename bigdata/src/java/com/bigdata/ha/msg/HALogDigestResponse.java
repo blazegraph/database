@@ -25,7 +25,7 @@ package com.bigdata.ha.msg;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 public class HALogDigestResponse implements IHALogDigestResponse, Serializable {
 

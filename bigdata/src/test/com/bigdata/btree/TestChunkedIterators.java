@@ -38,6 +38,7 @@ import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.IFilter;
 

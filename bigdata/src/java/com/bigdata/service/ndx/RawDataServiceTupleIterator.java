@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import com.bigdata.btree.AbstractChunkedTupleIterator;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ResultSet;
 import com.bigdata.btree.proc.BatchRemove.BatchRemoveConstructor;
 import com.bigdata.journal.IIndexStore;
@@ -41,6 +40,7 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IBlock;
 import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.IFilter;
 

@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.MutableNodeData;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.ICodedRaba;
@@ -44,6 +43,7 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Default implementation for immutable {@link INodeData} records.

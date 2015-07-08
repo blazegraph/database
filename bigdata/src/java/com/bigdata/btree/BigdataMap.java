@@ -40,6 +40,7 @@ import java.util.SortedMap;
 import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.ConcurrencyManager;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A flyweight {@link SortedMap} wrapping an {@link IIndex}.

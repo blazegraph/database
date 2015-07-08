@@ -28,7 +28,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.btree.AbstractBTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.journal.AbstractTask;
 import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
@@ -56,6 +55,7 @@ import com.bigdata.service.DataService;
 import com.bigdata.service.IDataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.LatchedExecutor;
 

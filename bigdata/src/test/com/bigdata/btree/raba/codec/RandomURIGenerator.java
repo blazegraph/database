@@ -30,8 +30,8 @@ package com.bigdata.btree.raba.codec;
 import java.util.Arrays;
 import java.util.Random;
 
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.TestKeyBuilder;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Generate <i>n</i> random and distinct URIs. This distribution has a shared

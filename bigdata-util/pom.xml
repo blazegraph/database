@@ -88,9 +88,14 @@ ga('send', 'pageview');
         <version>${sesame.version}</version>
     </dependency>
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>${dsiutils.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>dsi-utils</artifactId>
+      <version>${bigdata.version}</version>
+   </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>lgpl-utils</artifactId>
+      <version>${bigdata.version}</version>
    </dependency>
    <dependency>
            <groupId>com.github.stephenc.high-scale-lib</groupId>
