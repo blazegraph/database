@@ -114,8 +114,8 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestHAJournalServerOverride.class); 
 
         // Test suite for concurrent writers and group commit. See #1136
-        suite.addTestSuite(TestHA1GroupCommit.class);
-        suite.addTestSuite(TestHA3GroupCommit.class);
+//        suite.addTestSuite(TestHA1GroupCommit.class);
+//        suite.addTestSuite(TestHA3GroupCommit.class);
 
         // FIXME TX TEST SUITE & TX TEST SUITE WITH LBS. See #1156 and #1189.
         

@@ -129,6 +129,11 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	public static final String UNDEFINED_WORKBENCH_NAMESPACE = "undefined";
 
 
+	/**
+	 * Flag to signify a blueprints operation.
+	 */
+	public static final transient String ATTR_BLUEPRINTS = "blueprints";
+
     /**
      * 
      */
@@ -682,9 +687,9 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
     		uris[i] = new URIImpl(s[i]);
     		
     	}
-    	
+
     	return uris;
     	
     }
-    
+
 }

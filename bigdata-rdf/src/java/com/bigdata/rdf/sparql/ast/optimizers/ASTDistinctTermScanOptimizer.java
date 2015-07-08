@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -479,6 +480,21 @@ public class ASTDistinctTermScanOptimizer implements IASTOptimizer {
                unconstrainedPosBuf.append("C");
          }
       }
+      
+      /**
+       * There's some bug if all but one of the positions are constrained,
+       * we do *not* want to apply the optimization in that case (though it
+       * should be possible). For now, the fix is to not optimize, while in
+       * future we may want to address the root cause of the issue.
+       * 
+       * See https://jira.blazegraph.com/browse/BLZG-1346.
+       */
+      final int maxLength = isQuads ? 2 : 1;
+      if (constantPosBuf.length() > maxLength) {
+         return new LinkedHashSet<SPOKeyOrder>();
+      }
+
+      
 
       final String prefix = constantPosBuf.toString();
       final Set<String> allPossibleConstPrefixes = new LinkedHashSet<String>();

@@ -45,6 +45,8 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupOrderOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -694,6 +696,6 @@ public interface QueryHints {
    String NORMALIZE_FILTER_EXPRESSIONS = "normalizeFilterExpressions";
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
-         System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "true"));
+         System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
 
 }
