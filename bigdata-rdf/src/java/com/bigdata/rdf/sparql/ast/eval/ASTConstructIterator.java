@@ -91,6 +91,14 @@ public class ASTConstructIterator implements
     private static final Logger log = Logger
             .getLogger(ASTConstructIterator.class);
     
+    /**
+     * When <code>false</code>, no DISTINCT SPO filter will be imposed.
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1341 (performance of dumping
+     *      single graph)
+     */
+    private final boolean constructDistinctSPO;
+
     private final BigdataValueFactory f;
 
     /**
@@ -221,12 +229,15 @@ public class ASTConstructIterator implements
      *            The solutions that will be used to construct the triples.
      */
     public ASTConstructIterator(//
+            final AST2BOpContext context,//
             final AbstractTripleStore tripleStore,//
             final ConstructNode construct,//
             final GraphPatternGroup<?> whereClause,//
             final Map<String, BigdataBNode> bnodesIn,//
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
+        this.constructDistinctSPO = context.constructDistinctSPO;
+        
         this.f = tripleStore.getValueFactory();
 
         // Note: MAY be null (MUST be null for CONSTRUCT).
@@ -305,7 +316,17 @@ public class ASTConstructIterator implements
 			flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = true;
 		}
 		
-        final boolean isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(), templates, whereClause);
+        final boolean isObviouslyDistinct;
+        if (!constructDistinctSPO) {
+            // DISTINCT SPO filter was disabled by a query hint.
+            // @see BLZG-1341
+            isObviouslyDistinct = false;
+        } else {
+            // Test the CONSTRUCT clause and WHERE clause to see if we need to
+            // impose a DISTINCT SPO filter.
+            isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(),
+                    templates, whereClause);
+        }
 
 		if (isObviouslyDistinct) {
 
@@ -314,7 +335,6 @@ public class ASTConstructIterator implements
             return null;
             
         }
-		
 
 		if (distinctQuads) {
 			
@@ -547,11 +567,13 @@ public class ASTConstructIterator implements
 //        if (!sp1.o().equals(sp2.o()))
 //            return false;
 
-        /*
+        /**
          * CONSTRUCT always produces triples, but the access path for the
          * statement pattern in the WHERE clause may visit multiple named
          * graphs. If it does, then duplicate triples can result unless the
          * access path is the RDF MERGE (default graph access path).
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1341 (do not de-dup for very large graphs)
          */
 
         if (quads && sp2.c() == null && sp2.getScope() == Scope.NAMED_CONTEXTS) {
@@ -574,6 +596,7 @@ public class ASTConstructIterator implements
         
     }
 
+    @Override
     public boolean hasNext() throws QueryEvaluationException {
 
         while (true) {
@@ -631,6 +654,7 @@ public class ASTConstructIterator implements
         
     }
 
+    @Override
     public void close() throws QueryEvaluationException {
 
         if (open) {
@@ -658,6 +682,7 @@ public class ASTConstructIterator implements
 
     }
 
+    @Override
     public void remove() throws QueryEvaluationException {
 
         throw new UnsupportedOperationException();
