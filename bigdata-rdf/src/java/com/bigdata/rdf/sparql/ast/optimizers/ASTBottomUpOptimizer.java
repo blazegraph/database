@@ -51,12 +51,14 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.GroupMemberValueExpressionNodeBase;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
+import com.bigdata.rdf.sparql.ast.HavingNode;
 import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IGroupNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
+import com.bigdata.rdf.sparql.ast.IValueExpressionNodeContainer;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryInclude;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
@@ -65,11 +67,16 @@ import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
+import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
+
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.IStriterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * Rewrites aspects of queries where bottom-up evaluation would produce
@@ -800,18 +807,40 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     		context.getLexiconNamespace(),
                     		context.getTimestamp()
                     		);
-                    
-                    // re-generate the value expression.
-                    AST2BOpUtility.toVE(context.context, globals,
-                            filter.getValueExpressionNode());
-                    
-                }
-                    
-            }
+                     
+                    /**
+                     * Re-generate the value expression. Note that this must be
+                     * done recursively in the general case, e.g in the case
+                     * of nested FILTER [NOT] EXISTS nodes. See for instance
+                     * ticket BLZG-1281 for an example query.
+                     */
+                    // first set up an iterator detecting all
+                    // IValueExpressionNodeContainers
+                    final IStriterator it = new Striterator(
+                          BOpUtility.preOrderIteratorWithAnnotations(filter))
+                          .addFilter(new Filter() {
 
+                              private static final long serialVersionUID = 1L;
+
+                              @Override
+                              public boolean isValid(Object obj) {
+                                  return
+                                     obj instanceof IValueExpressionNodeContainer;
+                              }
+                          });
+                     while (it.hasNext()) {
+   
+						AST2BOpUtility.toVE(context.getBOpContext(), globals,
+								((IValueExpressionNodeContainer) it.next())
+										.getValueExpressionNode());
+                     }
+                }
+            }
         }
-        
     }
+    
+    
+    
 
     /**
      * If a FILTER depends on a variable which is not in scope for that filter
@@ -957,8 +986,15 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              */
             if(childGroup.isMinus()) {
 
+               /**
+                * The static condition under which we can drop the MINUS is
+                * that the left and right variables do not overlap, satisfying 
+                * the condition that the intersection of the left and right
+                * variables is empty; for a justification, see 
+                * http://www.w3.org/TR/sparql11-query/#sparqlAlgebra
+                */
                final Set<IVariable<?>> incomingBound = sa
-                       .getDefinitelyIncomingBindings(childGroup,
+                       .getMaybeIncomingBindings(childGroup,
                                new LinkedHashSet<IVariable<?>>());
 
                 final Set<IVariable<?>> maybeProduced = sa

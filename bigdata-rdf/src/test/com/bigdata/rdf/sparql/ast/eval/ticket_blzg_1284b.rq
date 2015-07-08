@@ -1,0 +1,16 @@
+prefix skos: <http://www.w3.org/2004/02/skos/core#>
+prefix syapse: <http://localhost:8000/graph/syapse#>
+
+select * 
+where {
+    ?vocabProp <eg:special> ?literalProp .
+    ?s ?literalProp ?term .
+    OPTIONAL {
+       ?s ?vocabProp ?concept .
+    }
+    FILTER NOT EXISTS {
+       ?concept skos:prefLabel 
+                ?term
+   }
+   FILTER (!bound(?concept))
+}

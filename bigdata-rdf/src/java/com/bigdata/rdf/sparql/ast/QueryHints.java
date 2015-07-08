@@ -45,6 +45,8 @@ import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupOrderOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -659,5 +661,31 @@ public interface QueryHints {
 
    String DEFAULT_AST_OPTIMIZER_CLASS = System.getProperty(
          AST_OPTIMIZER_CLASS, DefaultOptimizerList.class.getName());
+   
+   /**
+    * Switch to re-enable old, {@link ASTJoinOrderByTypeOptimizer} (which was
+    * the predecessor of the {@link ASTJoinGroupOrderOptimizer}. By default,
+    * the new strategy is enabled.
+    * 
+    * @see #OLD_JOIN_ORDER_OPTIMIZER
+    */
+   String OLD_JOIN_ORDER_OPTIMIZER = "OldJoinOrderOptimizer";
+
+   boolean DEFAULT_OLD_JOIN_ORDER_OPTIMIZER = Boolean.valueOf(
+         System.getProperty(OLD_JOIN_ORDER_OPTIMIZER, "false"));
+   
+   /**
+    * Switch to disable normalization/decomposition of FILTER expressions. There 
+    * might be two scenarios where decomposition of FILTER expressions comes 
+    * with a significant overhead: (i) whenever large complex FILTERs are used
+    * or (ii) when there are unselective parts of FILTERs that are evaluated too
+    * early when decomposing FILTERs (cd. SP2B Q6).
+    * 
+    * @see #DEFAULT_NORMALIZE_FILTER_EXPRESSIONS
+    */
+   String NORMALIZE_FILTER_EXPRESSIONS = "normalizeFilterExpressions";
+
+   boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
+         System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
 
 }

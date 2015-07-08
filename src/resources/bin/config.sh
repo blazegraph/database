@@ -53,7 +53,8 @@ if [ -z "${JETTY_PORT}" ] ; then
 fi
 
 #Group commit (true|false)
+#See http://wiki.blazegraph.com/wiki/index.php/GroupCommit and BLZG-192.
 
 if [ -z "${GROUP_COMMIT}" ] ; then
-	export GROUP_COMMIT=true
+	export GROUP_COMMIT=false
 fi

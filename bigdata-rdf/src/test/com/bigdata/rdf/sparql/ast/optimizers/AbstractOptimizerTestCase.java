@@ -241,10 +241,15 @@ public abstract class AbstractOptimizerTestCase extends
 		 */
 		protected QueryRoot given;
 		
-		/**
+      /**
 		 * The expected AST output from the {@link IASTOptimizer}.
 		 */
 		protected QueryRoot expected;
+		
+		/**
+		 * Field for construction of arbitrary AST nodes.
+		 */
+		protected ASTBase tmp;
 		
 		/**
 		 * Variables
@@ -841,13 +846,17 @@ public abstract class AbstractOptimizerTestCase extends
 			return (IVariable<? extends IV>) AST2BOpUtility.toVE(getBOpContext(), globals, v);
 		}
 
-//		private IValueExpression<? extends IV> toValueExpression(final FunctionNode n) {
-//			return AST2BOpUtility.toVE(getBOpContext(), globals, n);
-//		}
+		private IValueExpression<? extends IV> toValueExpression(FunctionNode n) {
+			return AST2BOpUtility.toVE(globals, n);
+		}
 		
 		protected NotExistsNode notExists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
 			return new NotExistsNode(v, jg);
 		}
+
+		protected ASTBase getTmp() {
+         return tmp;
+      }
 	}
 
 	protected static final class ASTPropertyPathOptimizerInTest extends ASTPropertyPathOptimizer {
