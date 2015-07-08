@@ -285,7 +285,7 @@ public class ASTGraphGroupOptimizer implements IASTOptimizer {
                     		context.getTimestamp()
                     		);
                     
-                    AST2BOpUtility.toVE(globals,
+                    AST2BOpUtility.toVE(context.getBOpContext(), globals,
                             filterNode.getValueExpressionNode());
 
                     group.addChild(filterNode);
