@@ -101,6 +101,11 @@ ga('send', 'pageview');
     </dependency>
      <dependency>
       <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
       <version>${junit-ext.version}</version>
     </dependency>
@@ -133,6 +138,11 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
 <!--

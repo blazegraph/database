@@ -188,7 +188,8 @@ dependencies.
     <module>../junit-ext</module>
     <module>../lgpl-utils</module>
     <module>../bigdata-ganglia</module>
-    <module>../bigdata-utils</module>
+    <module>../rdf-properties</module>
+    <module>../bigdata-util</module>
     <module>../bigdata-client</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-blueprints</module>
