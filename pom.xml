@@ -54,7 +54,7 @@ dependencies.
    </parent>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-    <version>1.5.2-SNAPSHOT-BLZG_1269_client-BLZG_1269_client</version>
+    <version>1.5.2-SNAPSHOT-BLZG_1269_client</version>
     
    <!-- <version>${bigdata.version}</version> -->
    <packaging>jar</packaging>
