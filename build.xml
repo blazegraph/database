@@ -254,6 +254,8 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-gom/src/test" />
             <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
             <src path="${bigdata.dir}/rdf-properties/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-util/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-util/src/test/java" />
             <!-- Do not include the unit tests @todo conditionally include?
             -->
             <compilerarg value="-version" />
@@ -358,6 +360,7 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
             <fileset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
             <fileset dir="${bigdata.dir}/rdf-properties/src/main/java" />
+            <fileset dir="${bigdata.dir}/bigdata-util/src/main/java" />
         </jar>
     </target>
 
@@ -414,6 +417,7 @@ public class BuildInfo {
             <fileset dir="bigdata-jini/src/main/java" />
             <fileset dir="bigdata-rdf/src/java" />
             <fileset dir="rdf-properties/src/main/java" />
+            <fileset dir="bigdata-util/src/main/java" />
             <fileset dir="bigdata-sails/src/java" />
             <fileset dir="bigdata-blueprints/src/main/java" />
          <fileset dir="bigdata-gom/src/java" />
@@ -456,6 +460,7 @@ public class BuildInfo {
          <packageset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
          <packageset dir="${bigdata.dir}/rdf-properties/src/main/java" />
+         <packageset dir="${bigdata.dir}/bigdata-util/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
@@ -1564,6 +1569,9 @@ substitutions.
       <copy toDir="${build.dir}/rdf-properites/src">
         <fileset dir="${bigdata.dir}/rdf-properties/src" />
       </copy>
+      <copy toDir="${build.dir}/rdf-properites/src">
+        <fileset dir="${bigdata.dir}/bigdata-util/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-sails/src">
         <fileset dir="${bigdata.dir}/bigdata-sails/src" />
       </copy>
@@ -1664,6 +1672,7 @@ substitutions.
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
           <include name="rdf-properties/src/**" />
+          <include name="bigdata-util/src/**" />
           <include name="bigdata-sails/src/**" />
           <include name="bigdata-blueprints/src/**" />
           <include name="bigdata-gom/src/**" />
