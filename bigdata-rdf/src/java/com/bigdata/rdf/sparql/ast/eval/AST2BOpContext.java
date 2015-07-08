@@ -611,6 +611,13 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         return db.getLexiconRelation().getNamespace();
 
     }
+    
+    @Override
+    public BOpContextBase getBOpContext() {
+
+        return context;
+        
+    }
 
     /**
      * Create a new variable name which is unique within the scope of this

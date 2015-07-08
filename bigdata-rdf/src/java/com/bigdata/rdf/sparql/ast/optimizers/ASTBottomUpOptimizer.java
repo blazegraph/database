@@ -802,7 +802,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     		);
                     
                     // re-generate the value expression.
-                    AST2BOpUtility.toVE(globals,
+                    AST2BOpUtility.toVE(context.context, globals,
                             filter.getValueExpressionNode());
                     
                 }

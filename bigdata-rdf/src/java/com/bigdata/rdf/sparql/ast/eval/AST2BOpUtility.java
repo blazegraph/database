@@ -4983,36 +4983,37 @@ public class AST2BOpUtility extends AST2BOpRTO {
         
     }
     
-    /**
-     * Convert an {@link IValueExpressionNode} (recursively) to an
-     * {@link IValueExpression}. If the {@link IValueExpression} can be reduced
-     * to an {@link IConstant}, then that {@link IConstant} will be be returned
-     * instead. Either way, the {@link IValueExpression} is set on the
-     * {@link IValueExpressionNode} as a side effect.
-     * 
-     * @param globals
-     *            The global annotations, including the lexicon namespace.
-     * @param node
-     *            The expression to convert.
-     * 
-     * @return The converted expression.
-     * 
-     * @see ASTSetValueExpressionsOptimizer
-     * 
-     * @see BLZG-1343 (MathBOp and DateTime abstraction)
-     * 
-     *      FIXME BLZG-1372:: Callers should be refactored to pass in the
-     *      BOpContextBase from {@link AST2BOpContext#context} in order to allow
-     *      correct resolution of the {@link LexiconRelation} and
-     *      {@link ILexiconConfiguration} required to properly evaluate
-     *      {@link IValueExpression}s.
-     */
-    @SuppressWarnings("rawtypes")
-    public static final IValueExpression<? extends IV> toVE(
-            final GlobalAnnotations globals,
-            final IValueExpressionNode node) {
-        return toVE(null/*context*/,globals,node);
-    }
+//    /**
+//     * Convert an {@link IValueExpressionNode} (recursively) to an
+//     * {@link IValueExpression}. If the {@link IValueExpression} can be reduced
+//     * to an {@link IConstant}, then that {@link IConstant} will be be returned
+//     * instead. Either way, the {@link IValueExpression} is set on the
+//     * {@link IValueExpressionNode} as a side effect.
+//     * 
+//     * @param globals
+//     *            The global annotations, including the lexicon namespace.
+//     * @param node
+//     *            The expression to convert.
+//     * 
+//     * @return The converted expression.
+//     * 
+//     * @see ASTSetValueExpressionsOptimizer
+//     * 
+//     * @see BLZG-1343 (MathBOp and DateTime abstraction)
+//     * 
+//     * @deprecated by the version that accepts the BOpContextBase. See
+//     *             BLZG-1372:: Callers should be refactored to pass in the
+//     *             BOpContextBase from {@link AST2BOpContext#context} in order
+//     *             to allow correct resolution of the {@link LexiconRelation}
+//     *             and {@link ILexiconConfiguration} required to properly
+//     *             evaluate {@link IValueExpression}s.
+//     */
+//    @SuppressWarnings("rawtypes")
+//    public static final IValueExpression<? extends IV> toVE(
+//            final GlobalAnnotations globals,
+//            final IValueExpressionNode node) {
+//        return toVE(null/*context*/,globals,node);
+//    }
     
     /**
      * Convert an {@link IValueExpressionNode} (recursively) to an
@@ -5032,14 +5033,29 @@ public class AST2BOpUtility extends AST2BOpRTO {
      *            The expression to convert.
      * 
      * @return The converted expression.
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
      * 
      * @see ASTSetValueExpressionsOptimizer
+     * 
+     * @see BLZG-1372 toVE() was refactored to pass in the
+     *      {@link BOpContextBase} to allow correct resolution of the
+     *      {@link LexiconRelation} and {@link ILexiconConfiguration} in order
+     *      to properly evaluate {@link IValueExpression}s during query
+     *      optimization.
      */
     @SuppressWarnings("rawtypes")
     public static final IValueExpression<? extends IV> toVE(
             final BOpContextBase context,
     		final GlobalAnnotations globals,
             final IValueExpressionNode node) {
+
+        if (context == null)
+            throw new IllegalArgumentException();
+        if (globals == null)
+            throw new IllegalArgumentException();
+        if (node == null)
+            throw new IllegalArgumentException();
 
         // Convert AST value expr node => IValueExpressionNode.
         final IValueExpression<? extends IV> ve1 = toVE1(context, globals, node);
@@ -5252,7 +5268,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new ValueExpressionNode[functionNode.arity()]);
 
             final IValueExpression<? extends IV> ve = FunctionRegistry.toVE(
-                    globals, functionURI, scalarValues, args);
+                    context, globals, functionURI, scalarValues, args);
 
             functionNode.setValueExpression(ve);
 

@@ -29,8 +29,12 @@ package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Set;
 
+import com.bigdata.bop.BOpContextBase;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -99,6 +103,20 @@ public interface IEvaluationContext {
      */
     String getLexiconNamespace();
 
+    /**
+     * Return the context for evaluation of {@link IValueExpression}s during
+     * query optimization.
+     * 
+     * @return The context that can be used to resolve the
+     *         {@link ILexiconConfiguration} and {@link LexiconRelation} for
+     *         evaluation if {@link IValueExpression}s during query
+     *         optimization. (During query evaluation this information is passed
+     *         into the pipeline operators by the {@link ContextBindingSet}.)
+     * 
+     * @see BLZG-1372
+     */
+    BOpContextBase getBOpContext();
+    
     /**
      * Return the timestamp which will be used to read on the lexicon.
      * <p>

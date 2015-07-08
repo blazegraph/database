@@ -29,7 +29,6 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.journal.ITx;
@@ -839,12 +838,13 @@ public abstract class AbstractOptimizerTestCase extends
 		}
 
 		private IVariable<? extends IV> toValueExpression(VarNode v) {
-			return (IVariable<? extends IV>) AST2BOpUtility.toVE(globals, v);
+			return (IVariable<? extends IV>) AST2BOpUtility.toVE(getBOpContext(), globals, v);
 		}
 
-		private IValueExpression<? extends IV> toValueExpression(FunctionNode n) {
-			return AST2BOpUtility.toVE(globals, n);
-		}
+//		private IValueExpression<? extends IV> toValueExpression(final FunctionNode n) {
+//			return AST2BOpUtility.toVE(getBOpContext(), globals, n);
+//		}
+		
 		protected NotExistsNode notExists(VarNode v, GraphPatternGroup<IGroupMemberNode> jg) {
 			return new NotExistsNode(v, jg);
 		}
