@@ -235,9 +235,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
         ctx.setSolutionSetStats(SolutionSetStatserator.get(globallyScopedBindings));
 
         final StaticAnalysisStats stats = new StaticAnalysisStats();
-        
-        stats.registerParserCall(astContainer.getQueryParseTime());
-
+        // register parser call if parse information is available
+        if (astContainer!=null && astContainer.getQueryParseTime()!=null) {
+           stats.registerParserCall(astContainer.getQueryParseTime());
+        }
         ctx.setStaticAnalysisStats(stats);
         
         /**
