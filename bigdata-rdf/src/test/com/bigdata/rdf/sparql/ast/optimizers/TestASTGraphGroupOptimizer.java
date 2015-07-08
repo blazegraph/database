@@ -275,7 +275,7 @@ public class TestASTGraphGroupOptimizer extends
             		context.getTimestamp()
             		);
             
-            AST2BOpUtility.toVE(globals,
+            AST2BOpUtility.toVE(getBOpContext(), globals,
                     filterNode.getValueExpressionNode());
             
             innerGraphGroup.addChild(filterNode);
