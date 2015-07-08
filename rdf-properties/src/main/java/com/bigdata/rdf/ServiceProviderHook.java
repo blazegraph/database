@@ -95,8 +95,7 @@ public class ServiceProviderHook {
 	
 	public static final String JSON_CONSTRUCT_WRITER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONWriterForConstructFactory";
 	
-	public static final String JSON_PARSER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory";
-	
+	public static final String JSON_RESULT_PARSER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserFactory"; 
 	public static final String JSON_CONSTRUCT_PARSER_FACTORY = "com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactory";
 	
 	
@@ -255,7 +254,8 @@ public class ServiceProviderHook {
             final TupleQueryResultParserRegistry r = TupleQueryResultParserRegistry.getInstance();
 
             // add our custom RDR-enabled JSON parser for SPARQL result sets.
-            r.add(getInstanceClassName(JSON_PARSER_FACTORY));
+           
+            r.add((TupleQueryResultParserFactory) getInstanceForClass(JSON_RESULT_PARSER_FACTORY));
             
         }
 
@@ -310,12 +310,6 @@ public class ServiceProviderHook {
         
     }
     
-    private static TupleQueryResultParserFactory getInstanceClassName(
-			String jsonParserFactory) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 	protected static Object getInstanceForClass(final String className) {
     	
 		try {
