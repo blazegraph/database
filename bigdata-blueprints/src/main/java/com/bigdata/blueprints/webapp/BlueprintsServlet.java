@@ -20,7 +20,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.rdf.sail.webapp;
+package com.bigdata.blueprints.webapp;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -33,13 +33,16 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.blueprints.BigdataGraphBulkLoad;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.webapp.AbstractRestApiTask;
+import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
+import com.bigdata.rdf.sail.webapp.BlueprintsServletProxy;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 import com.tinkerpop.blueprints.util.io.graphml.GraphMLReader;
 
 /**
  * Helper servlet for the blueprints layer.
  */
-public class BlueprintsServlet extends BigdataRDFServlet {
+public class BlueprintsServlet extends BlueprintsServletProxy {
 
     /**
      * 
@@ -52,11 +55,6 @@ public class BlueprintsServlet extends BigdataRDFServlet {
         "application/graphml+xml"    
     }) ;
     
-    /**
-     * Flag to signify a blueprints operation.
-     */
-    static final transient String ATTR_BLUEPRINTS = "blueprints";
-
     public BlueprintsServlet() {
 
     }
@@ -156,5 +154,19 @@ public class BlueprintsServlet extends BigdataRDFServlet {
         }
 
     }
+
+    /**
+     * 
+     * Convenience method to access doPost from a public method.
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException 
+     */
+	public void doPostRequest(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+
+		doPost(req, resp);
+		
+	}
 
 }

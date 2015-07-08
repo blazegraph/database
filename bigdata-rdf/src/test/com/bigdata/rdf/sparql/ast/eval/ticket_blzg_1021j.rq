@@ -1,0 +1,6 @@
+select * { 
+   FILTER (?a = ?b)
+   <http://s> <http://p> ?a .
+   <http://s> <http://p> ?b .
+   hint:Query hint:optimizer "None" .
+}

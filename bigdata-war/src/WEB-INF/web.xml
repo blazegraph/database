@@ -69,6 +69,11 @@
    <param-name>warmupThreadPoolSize</param-name>
    <param-value>20</param-value>
   </context-param>
+  <context-param>
+   <description>The name of the class to use for the Blueprints Servlet instance</description>
+   <param-name>blueprintsServletProvider</param-name>
+   <param-value>com.bigdata.blueprints.webapp.BlueprintsServlet</param-value>
+  </context-param>
   <listener>
    <listener-class>com.bigdata.rdf.sail.webapp.BigdataRDFServletContextListener</listener-class>
   </listener>
