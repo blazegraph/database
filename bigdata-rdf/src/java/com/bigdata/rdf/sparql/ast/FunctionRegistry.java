@@ -12,7 +12,9 @@ import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.algebra.Compare.CompareOp;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IValueExpression;
@@ -23,6 +25,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.aggregate.AggregateBase;
 import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.rdf.aggregate.GROUP_CONCAT;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.AndBOp;
 import com.bigdata.rdf.internal.constraints.BNodeBOp;
@@ -75,6 +78,7 @@ import com.bigdata.rdf.internal.constraints.TrueBOp;
 import com.bigdata.rdf.internal.constraints.UUIDBOp;
 import com.bigdata.rdf.internal.constraints.UcaseBOp;
 import com.bigdata.rdf.internal.constraints.XsdStrBOp;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
@@ -95,6 +99,7 @@ import com.bigdata.rdf.store.BD;
  *      {@link BD#NAMESPACE} to static initialization.  The code
  *      already does not permit replacement of registered functions.
  */
+@SuppressWarnings("rawtypes")
 public class FunctionRegistry {
 
     public interface Annotations extends AggregateBase.Annotations{
@@ -240,13 +245,13 @@ public class FunctionRegistry {
 
     static {
         add(AVERAGE, new AggregateFactory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression ve = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context, globals, args[0]);
                 
                 return new com.bigdata.bop.rdf.aggregate.AVERAGE(new BOp[]{ve}, scalarValues);
 
@@ -254,13 +259,13 @@ public class FunctionRegistry {
         });
 
         add(COUNT, new AggregateFactory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression ve = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context, globals, args[0]);
 
                 return new com.bigdata.bop.rdf.aggregate.COUNT(new BOp[]{ve}, scalarValues);
 
@@ -270,28 +275,28 @@ public class FunctionRegistry {
         add(GROUP_CONCAT, new GroupConcatFactory());
 
         add(MAX, new AggregateFactory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
                 IValueExpression<? extends IV> expressions[]=new IValueExpression[args.length];
                 for(int i=0;i<args.length;i++){
-                    expressions[i] = AST2BOpUtility.toVE(globals, args[i]);
+                    expressions[i] = AST2BOpUtility.toVE(context, globals, args[i]);
                 }
                 return new com.bigdata.bop.rdf.aggregate.MAX(expressions, scalarValues);
             }
         });
 
         add(MIN, new AggregateFactory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
                 IValueExpression<? extends IV> expressions[]=new IValueExpression[args.length];
                 for(int i=0;i<args.length;i++){
-                    expressions[i] = AST2BOpUtility.toVE(globals, args[i]);
+                    expressions[i] = AST2BOpUtility.toVE(context, globals, args[i]);
                 }
                 return new com.bigdata.bop.rdf.aggregate.MIN(expressions, scalarValues);
 
@@ -299,13 +304,13 @@ public class FunctionRegistry {
         });
 
         add(SAMPLE, new AggregateFactory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //              final IValueExpression ve = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context, globals, args[0]);
 
                 return new com.bigdata.bop.rdf.aggregate.SAMPLE(false,ve);
 
@@ -313,14 +318,14 @@ public class FunctionRegistry {
         });
 
         add(SUM, new AggregateFactory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
                 IValueExpression<? extends IV> expressions[]=new IValueExpression[args.length];
                 for(int i=0;i<args.length;i++){
-                    expressions[i] = AST2BOpUtility.toVE(globals, args[i]);
+                    expressions[i] = AST2BOpUtility.toVE(context, globals, args[i]);
                 }
                 return new com.bigdata.bop.rdf.aggregate.SUM(false,expressions);
 
@@ -329,7 +334,7 @@ public class FunctionRegistry {
 		// add the bigdata built-ins
 
 		add(BOUND, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, VarNode.class);
@@ -343,13 +348,13 @@ public class FunctionRegistry {
 		});
 
 		add(IS_LITERAL, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 //              final IValueExpression ve = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context, globals, args[0]);
 
 				return new IsLiteralBOp(ve);
 
@@ -357,13 +362,13 @@ public class FunctionRegistry {
 		});
 
 		add(IS_BLANK, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 //              final IValueExpression ve = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context, globals, args[0]);
 
 				return new IsBNodeBOp(ve);
 
@@ -371,39 +376,39 @@ public class FunctionRegistry {
 		});
 
 		add(IS_URI, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 //				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context, globals, args[0]);
 
                 return new IsURIBOp(ve);
 
 			}
 		});
 		add(IS_IRI, new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 
 				return new IsURIBOp(ve);
 
 			}
 		});
 		add(IS_NUMERIC, new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 
                 return new IsNumericBOp(ve);
 
@@ -411,13 +416,13 @@ public class FunctionRegistry {
         });
 
 		add(STR, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 //				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 
 				return new StrBOp(ve, globals);
 
@@ -425,13 +430,13 @@ public class FunctionRegistry {
 		});
 
 		add(ENCODE_FOR_URI,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 
                 return new EncodeForURIBOp(ve, globals);
 
@@ -439,70 +444,70 @@ public class FunctionRegistry {
         });
 
 		add(LCASE,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(context,globals, args[0]);
                 return new LcaseBOp(ve, globals);
 
             }
         });
 
 		add(UCASE,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(context,globals, args[0]);
                 return new UcaseBOp(ve, globals);
 
             }
         });
 		add(STR_DT,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(globals, args[0]);
-                final IValueExpression<? extends IV> type = AST2BOpUtility.toVE(globals, args[1]);
+                final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(context,globals, args[0]);
+                final IValueExpression<? extends IV> type = AST2BOpUtility.toVE(context,globals, args[1]);
                 return new StrdtBOp(ve,type ,globals);
 
             }
         });
 		add(STR_LANG,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(globals, args[0]);
-                final IValueExpression<? extends IV> lang = AST2BOpUtility.toVE(globals, args[1]);
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(context,globals, args[0]);
+                final IValueExpression<? extends IV> lang = AST2BOpUtility.toVE(context,globals, args[1]);
                 return new StrlangBOp(var,lang ,globals);
 
             }
         });
 		add(STR_LEN,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(context,globals, args[0]);
                 return new StrlenBOp(var,globals);
 
             }
         });
 		add(SUBSTR,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(context,
                         globals, args[0]);
 
 //                if (args.length == 2) {
@@ -510,10 +515,10 @@ public class FunctionRegistry {
 //                } else {
                 	
 	                final IValueExpression<? extends IV> start = AST2BOpUtility
-	                        .toVE(globals, args[1]);
+	                        .toVE(context, globals, args[1]);
 	                
 	                final IValueExpression<? extends IV> length = args.length >= 3 ? AST2BOpUtility
-	                        .toVE(globals, args[2]) : null;
+	                        .toVE(context, globals, args[2]) : null;
 	                
 	                return new SubstrBOp(var, start, length, globals);
 	                
@@ -522,16 +527,16 @@ public class FunctionRegistry {
             }
         });
         add(CONTAINS,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,
                         ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> x = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> x = AST2BOpUtility.toVE(context,
                         globals, args[0]);
 
-                final IValueExpression<? extends IV> y = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> y = AST2BOpUtility.toVE(context,
                         globals, args[1]);
 
                 return new StrcontainsBOp(x, y);
@@ -539,69 +544,69 @@ public class FunctionRegistry {
             }
         });
 		add(LANG, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> ve =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context,globals, args[0]);
 				return new LangBOp(ve, globals);
 
 			}
 		});
 		add(CONCAT, new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
                 IValueExpression<? extends IV> expressions[]=new IValueExpression[args.length];
                 for(int i=0;i<args.length;i++){
-                    expressions[i] = AST2BOpUtility.toVE(globals, args[i]);
+                    expressions[i] = AST2BOpUtility.toVE(context,globals, args[i]);
                 }
                 return new ConcatBOp(globals,expressions);
 
             }
         });
 		add(COALESCE, new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
                 IValueExpression<? extends IV> expressions[]=new IValueExpression[args.length];
                 for(int i=0;i<args.length;i++){
-                    expressions[i] = AST2BOpUtility.toVE(globals, args[i]);
+                    expressions[i] = AST2BOpUtility.toVE(context,globals, args[i]);
                 }
                 return new CoalesceBOp(globals,expressions);
 
             }
         });
 		add(IF, new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class,ValueExpressionNode.class);
-                final IValueExpression<? extends IV> conditional = AST2BOpUtility.toVE(globals, args[0]);
-                final IValueExpression<? extends IV> expression1 = AST2BOpUtility.toVE(globals, args[1]);
-                final IValueExpression<? extends IV> expression2 = AST2BOpUtility.toVE(globals, args[2]);
+                final IValueExpression<? extends IV> conditional = AST2BOpUtility.toVE(context,globals, args[0]);
+                final IValueExpression<? extends IV> expression1 = AST2BOpUtility.toVE(context,globals, args[1]);
+                final IValueExpression<? extends IV> expression2 = AST2BOpUtility.toVE(context,globals, args[2]);
                 return new IfBOp(conditional,expression1,expression2);
             }
         });
 		add(DATATYPE, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> ve =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context,globals, args[0]);
 				return new DatatypeBOp(ve, globals);
 
 			}
 		});
 
 		add(RAND,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
                 if(args!=null&&args.length>0){
                     throw new IllegalArgumentException("wrong # of args");
@@ -612,17 +617,17 @@ public class FunctionRegistry {
         });
 
 		add(LANG_MATCHES, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args,
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> left =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context,globals, args[0]);
 
 				final IValueExpression<? extends IV> right =
-					AST2BOpUtility.toVE(globals, args[1]);
+					AST2BOpUtility.toVE(context,globals, args[1]);
 				
 				return new LangMatchesBOp(left, right);
 
@@ -630,17 +635,17 @@ public class FunctionRegistry {
 		});
 
 		add(REGEX, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args,
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> var =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context,globals, args[0]);
 				
 				final IValueExpression<? extends IV> pattern =
-					AST2BOpUtility.toVE(globals, args[1]);
+					AST2BOpUtility.toVE(context,globals, args[1]);
 
 				if (args.length == 2) {
 
@@ -649,7 +654,7 @@ public class FunctionRegistry {
 				} else {
 
 					final IValueExpression<? extends IV> flags =
-						AST2BOpUtility.toVE(globals, args[2]);
+						AST2BOpUtility.toVE(context,globals, args[2]);
 
 					return new RegexBOp(var, pattern, flags);
 
@@ -659,17 +664,17 @@ public class FunctionRegistry {
 		});
 
 		add(AND, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args,
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> left =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context,globals, args[0]);
 				
 				final IValueExpression<? extends IV> right =
-					AST2BOpUtility.toVE(globals, args[1]);
+					AST2BOpUtility.toVE(context,globals, args[1]);
 				
 				return new AndBOp(left, right);
 
@@ -677,17 +682,17 @@ public class FunctionRegistry {
 		});
 
 		add(OR, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args,
 						ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> left =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context, globals, args[0]);
 				
 				final IValueExpression<? extends IV> right =
-					AST2BOpUtility.toVE(globals, args[1]);
+					AST2BOpUtility.toVE(context, globals, args[1]);
 
 				return new OrBOp(left, right);
 
@@ -695,12 +700,12 @@ public class FunctionRegistry {
 		});
 
 		add(NOT, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> arg = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression<? extends IV> arg = AST2BOpUtility.toVE(context, globals, args[0]);
 
 				return new NotBOp(arg);
 
@@ -708,13 +713,13 @@ public class FunctionRegistry {
 		});
 
 		add(IRI,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
                 
                 final String baseURI = (String)
                         scalarValues.get(IriBOp.Annotations.BASE_URI);
@@ -725,7 +730,7 @@ public class FunctionRegistry {
         });
 
 		add(BNODE,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
             	if (args.length == 0) {
@@ -737,7 +742,7 @@ public class FunctionRegistry {
             		checkArgs(args, ValueExpressionNode.class);
 
 //                final IValueExpression<? extends IV> var = args[0].getValueExpression();
-	                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+	                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 	
 	                return new BNodeBOp(ve, globals);
 
@@ -748,16 +753,16 @@ public class FunctionRegistry {
         });
 
 		add(STARTS_WITH,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(context,
                         globals, args[0]);
                 
                 final IValueExpression<? extends IV> token = AST2BOpUtility
-                        .toVE(globals, args[1]);
+                        .toVE(context, globals, args[1]);
 	                
                 return new StrstartsBOp(var, token);
 	                
@@ -765,16 +770,16 @@ public class FunctionRegistry {
         });
 		
 		add(ENDS_WITH,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class,ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> var = AST2BOpUtility.toVE(context,
                         globals, args[0]);
                 
                 final IValueExpression<? extends IV> token = AST2BOpUtility
-                        .toVE(globals, args[1]);
+                        .toVE(context, globals, args[1]);
 	                
                 return new StrendsBOp(var, token);
 	                
@@ -782,15 +787,15 @@ public class FunctionRegistry {
         });
 		
 		add(STR_BEFORE,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> arg1 = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> arg1 = AST2BOpUtility.toVE(context,
                         globals, args[0]);
 
-                final IValueExpression<? extends IV> arg2 = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> arg2 = AST2BOpUtility.toVE(context,
                 		globals, args[1]);
                 
                 return new StrBeforeBOp(arg1, arg2, globals);
@@ -799,15 +804,15 @@ public class FunctionRegistry {
         });
 		
 		add(STR_AFTER,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class, ValueExpressionNode.class);
 
-                final IValueExpression<? extends IV> arg1 = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> arg1 = AST2BOpUtility.toVE(context,
                         globals, args[0]);
 
-                final IValueExpression<? extends IV> arg2 = AST2BOpUtility.toVE(
+                final IValueExpression<? extends IV> arg2 = AST2BOpUtility.toVE(context,
                 		globals, args[1]);
                 
                 return new StrAfterBOp(arg1, arg2, globals);
@@ -816,19 +821,19 @@ public class FunctionRegistry {
         });
 		
 		add(REPLACE,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 checkArgs(args, ValueExpressionNode.class, ValueExpressionNode.class, ValueExpressionNode.class);
 
 				final IValueExpression<? extends IV> var =
-					AST2BOpUtility.toVE(globals, args[0]);
+					AST2BOpUtility.toVE(context,globals, args[0]);
 				
 				final IValueExpression<? extends IV> pattern =
-					AST2BOpUtility.toVE(globals, args[1]);
+					AST2BOpUtility.toVE(context,globals, args[1]);
 
 				final IValueExpression<? extends IV> replacement =
-					AST2BOpUtility.toVE(globals, args[2]);
+					AST2BOpUtility.toVE(context,globals, args[2]);
 
 				if (args.length == 3) {
 
@@ -837,7 +842,7 @@ public class FunctionRegistry {
 				} else {
 
 					final IValueExpression<? extends IV> flags =
-						AST2BOpUtility.toVE(globals, args[3]);
+						AST2BOpUtility.toVE(context,globals, args[3]);
 
 					return new ReplaceBOp(var, pattern, replacement, flags, globals);
 
@@ -898,13 +903,13 @@ public class FunctionRegistry {
 	     */
 //	    add(XSD_STR, new CastFactory(XMLSchema.STRING.toString()));
 		add(XSD_STR, new Factory() {
-			public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+			public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 					Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 				checkArgs(args, ValueExpressionNode.class);
 
 //				final IValueExpression<? extends IV> var = args[0].getValueExpression();
-                final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 
 				return new XsdStrBOp(ve, globals);
 
@@ -929,7 +934,7 @@ public class FunctionRegistry {
         add(TZ,new DateFactory(DateOp.TZ));
 
         add(NOW,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 if (args != null && args.length > 0)
@@ -941,7 +946,7 @@ public class FunctionRegistry {
         });
 
         add(UUID,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 if (args != null && args.length > 0)
@@ -953,7 +958,7 @@ public class FunctionRegistry {
         });
 
         add(STRUUID,new Factory() {
-            public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+            public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                     Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
                 if (args != null && args.length > 0)
@@ -1047,6 +1052,7 @@ public class FunctionRegistry {
      * @return The {@link IValueExpression}.
      */
     public static final IValueExpression<? extends IV> toVE(
+            final BOpContextBase context,// BLZG-1343
 			final GlobalAnnotations globals, final URI functionURI,
 			final Map<String,Object> scalarValues,
 			final ValueExpressionNode... args) {
@@ -1079,7 +1085,7 @@ public class FunctionRegistry {
         	f = new UnknownFunctionFactory(functionURI);        	
         }
         
-		return f.create(globals, scalarValues, args);
+		return f.create(context, globals, scalarValues, args);
 
 	}
 
@@ -1157,17 +1163,29 @@ public class FunctionRegistry {
         /**
          * Create an {@link IValueExpression} instance.
          * 
-	     * @param globals
-	     *            The global annotations, including the lexicon namespace.
+         * @param context
+         *            The {@link BOpContextBase} required to evaluate
+         *            {@link IValueExpression}s. This is used if we need to
+         *            statically evaluate an {@link IValueExpression} during
+         *            query optimization. During query execution the
+         *            {@link ContextBindingSet} will convey this information.
+         * @param globals
+         *            The global annotations, including the lexicon namespace.
          * @param scalarValues
          *            The scalar arguments (used by some {@link IAggregate}s).
          * @param args
          *            The function arguments.
          * @return The {@link IValueExpression}.
+         * @see BLZG-1372 create() was refactored to pass in the
+         *      {@link BOpContextBase} to allow correct resolution of the
+         *      {@link LexiconRelation} and {@link ILexiconConfiguration} in
+         *      order to properly evaluate {@link IValueExpression}s during
+         *      query optimization.
          */
 		IValueExpression<? extends IV> create(
-				final GlobalAnnotations globals,
-				final Map<String,Object> scalarValues,
+		        final BOpContextBase context,//BLZG-1343
+				final GlobalAnnotations globals,//
+				final Map<String,Object> scalarValues,//
 				final ValueExpressionNode... args);
 
 	}
@@ -1189,7 +1207,9 @@ public class FunctionRegistry {
 			this.op = op;
 		}
 
-        public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+        public IValueExpression<? extends IV> create(
+                final BOpContextBase context,
+                final GlobalAnnotations globals,
                 final Map<String, Object> scalarValues,
                 final ValueExpressionNode... args) {
 
@@ -1197,10 +1217,10 @@ public class FunctionRegistry {
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
-				AST2BOpUtility.toVE(globals, args[0]);
+				AST2BOpUtility.toVE(context, globals, args[0]);
 			
 			final IValueExpression<? extends IV> right =
-				AST2BOpUtility.toVE(globals, args[1]);
+				AST2BOpUtility.toVE(context, globals, args[1]);
 
 	    	/*
 	         * If we are dealing with a URI constant we can use 
@@ -1256,17 +1276,17 @@ public class FunctionRegistry {
 
 	    public static final SameTermFactory INSTANCE = new SameTermFactory();
 	    
-		public IValueExpression<? extends IV> create(
+		public IValueExpression<? extends IV> create(final BOpContextBase context,
 				final GlobalAnnotations globals, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 			checkArgs(args,
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
-				AST2BOpUtility.toVE(globals, args[0]);
+				AST2BOpUtility.toVE(context,globals, args[0]);
 			
 			final IValueExpression<? extends IV> right =
-				AST2BOpUtility.toVE(globals, args[1]);
+				AST2BOpUtility.toVE(context,globals, args[1]);
 
 	        return new SameTermBOp(left, right, CompareOp.EQ);
 
@@ -1282,16 +1302,16 @@ public class FunctionRegistry {
 			this.op = op;
 		}
 
-		public IValueExpression<? extends IV> create(
+		public IValueExpression<? extends IV> create(final BOpContextBase context,
 				final GlobalAnnotations globals, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 			checkArgs(args,
 					ValueExpressionNode.class, ValueExpressionNode.class);
 
 			final IValueExpression<? extends IV> left =
-				AST2BOpUtility.toVE(globals, args[0]);
+				AST2BOpUtility.toVE(context,globals, args[0]);
 			final IValueExpression<? extends IV> right =
-				AST2BOpUtility.toVE(globals, args[1]);
+				AST2BOpUtility.toVE(context,globals, args[1]);
 
 			return new MathBOp(left, right, op,globals);
 
@@ -1307,14 +1327,14 @@ public class FunctionRegistry {
             this.op = op;
         }
 
-        public IValueExpression<? extends IV> create(
+        public IValueExpression<? extends IV> create(final BOpContextBase context,
                 final GlobalAnnotations globals, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
             checkArgs(args,
                     ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> left =
-                AST2BOpUtility.toVE(globals, args[0]);
+                AST2BOpUtility.toVE(context,globals, args[0]);
 
             return new NumericBOp(left,  op);
 
@@ -1329,14 +1349,14 @@ public class FunctionRegistry {
             this.op = op;
         }
 
-        public IValueExpression<? extends IV> create(
+        public IValueExpression<? extends IV> create(final BOpContextBase context,
                 final GlobalAnnotations globals, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
             checkArgs(args,
                     ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> left =
-                AST2BOpUtility.toVE(globals, args[0]);
+                AST2BOpUtility.toVE(context,globals, args[0]);
 
             return new DigestBOp(left, op, globals);
 
@@ -1352,14 +1372,14 @@ public class FunctionRegistry {
             this.op = op;
         }
 
-        public IValueExpression<? extends IV> create(
+        public IValueExpression<? extends IV> create(final BOpContextBase context,
                 final GlobalAnnotations globals, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
             checkArgs(args,
                     ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> left =
-                AST2BOpUtility.toVE(globals, args[0]);
+                AST2BOpUtility.toVE(context,globals, args[0]);
 
             return new DateBOp(left, op, globals);
 
@@ -1375,14 +1395,14 @@ public class FunctionRegistry {
 			this.uri = uri;
 		}
 
-		public IValueExpression<? extends IV> create(
+		public IValueExpression<? extends IV> create(final BOpContextBase context,
 				final GlobalAnnotations globals, Map<String, Object> scalarValues, final ValueExpressionNode... args) {
 
 			final IValueExpression<? extends IV>[] bops =
 				new IValueExpression[args.length];
 
 			for (int i = 0; i < args.length; i++) {
-				bops[i] = AST2BOpUtility.toVE(globals, args[i]);
+				bops[i] = AST2BOpUtility.toVE(context,globals, args[i]);
 			}
 
 			return new FuncBOp(bops, uri, globals);
@@ -1399,7 +1419,7 @@ public class FunctionRegistry {
 	    public GroupConcatFactory() {
         }
 
-	    public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+	    public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
 	            final Map<String,Object> scalarValues,
                 final ValueExpressionNode... args) {
 
@@ -1417,7 +1437,7 @@ public class FunctionRegistry {
 
             tmp.put(Annotations.NAMESPACE, globals.lex);
             
-            final IValueExpression ve = AST2BOpUtility.toVE(globals, args[0]);
+            final IValueExpression ve = AST2BOpUtility.toVE(context,globals, args[0]);
 
             return new com.bigdata.bop.rdf.aggregate.GROUP_CONCAT(
                     new BOp[] { ve }, tmp);
@@ -1466,7 +1486,7 @@ public class FunctionRegistry {
 
         }
 
-        public IValueExpression<? extends IV> create(final GlobalAnnotations globals,
+        public IValueExpression<? extends IV> create(final BOpContextBase context, final GlobalAnnotations globals,
                 final Map<String, Object> scalarValues,
                 final ValueExpressionNode... args) {
 
@@ -1506,7 +1526,7 @@ public class FunctionRegistry {
                  * "foo IN(bar)" is SameTerm(foo,bar) if bar is a URI, otherwise CompareBOp.
                  */
 
-//            	final IValueExpression<? extends IV> val = AST2BOpUtility.toVE(globals, args[1]);
+//            	final IValueExpression<? extends IV> val = AST2BOpUtility.toVE(context,globals, args[1]);
             	
 //                final IValueExpression ret = SameTermFactory.INSTANCE.create(
 //                        globals, scalarValues, args);
@@ -1518,7 +1538,7 @@ public class FunctionRegistry {
                  */
             	if (allowLiterals) {
             		
-                	final IValueExpression ret = SameTermFactory.INSTANCE.create(
+                	final IValueExpression ret = SameTermFactory.INSTANCE.create(context,
                             globals, scalarValues, args);
 
                       if (not)
@@ -1529,7 +1549,7 @@ public class FunctionRegistry {
             	}
                 
             	// compare factory is smart enough to optimize for SameTerm when necessary
-            	final IValueExpression ret = new CompareFactory(CompareOp.EQ).create(
+            	final IValueExpression ret = new CompareFactory(CompareOp.EQ).create(context,
                       globals, scalarValues, args);
 
                 if (not)
@@ -1548,7 +1568,7 @@ public class FunctionRegistry {
 
                 checkArgs(args, ValueExpressionNode.class, ConstantNode.class);
 
-                final IValueExpression<? extends IV> arg = AST2BOpUtility.toVE(globals, args[0]);
+                final IValueExpression<? extends IV> arg = AST2BOpUtility.toVE(context,globals, args[0]);
 
                 final IConstant<? extends IV> set[] = new IConstant[args.length - 1];
 
@@ -1580,12 +1600,12 @@ public class FunctionRegistry {
                 		
                 		if (ret == null) {
                 			
-                            ret = compare.create(globals, scalarValues, args[0],
+                            ret = compare.create(context, globals, scalarValues, args[0],
                                     args[i]);
 
                         } else {
 
-                            ret = new OrBOp(ret, compare.create(globals,
+                            ret = new OrBOp(ret, compare.create(context, globals,
                                     scalarValues, args[0], args[i]));
 
                 		}
@@ -1615,7 +1635,7 @@ public class FunctionRegistry {
 
                 for (int i = 0; i < args.length; i++) {
 
-                    set[i] = AST2BOpUtility.toVE(globals, args[i]);
+                    set[i] = AST2BOpUtility.toVE(context,globals, args[i]);
 
                 }
 
@@ -1655,6 +1675,7 @@ public class FunctionRegistry {
 
         @Override
         public IValueExpression<? extends IV> create(
+                final BOpContextBase context,
         		final GlobalAnnotations globals,
                 final Map<String, Object> scalarValues, 
                 final ValueExpressionNode... args) {
@@ -1683,7 +1704,8 @@ public class FunctionRegistry {
     	
         @Override
         public IValueExpression<? extends IV> create(
-        		final GlobalAnnotations globals,
+                final BOpContextBase context,
+                final GlobalAnnotations globals,
                 final Map<String, Object> scalarValues, 
                 final ValueExpressionNode... args) {
 
