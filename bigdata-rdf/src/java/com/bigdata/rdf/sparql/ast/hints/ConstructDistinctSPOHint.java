@@ -53,7 +53,7 @@ final class ConstructDistinctSPOHint extends AbstractBooleanQueryHint {
 
         if (scope == QueryHintScope.Query) {
 
-            context.nativeDistinctSPO = value;
+            context.constructDistinctSPO = value;
 
             return;
 

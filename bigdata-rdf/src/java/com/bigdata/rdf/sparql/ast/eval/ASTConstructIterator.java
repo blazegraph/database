@@ -312,21 +312,27 @@ public class ASTConstructIterator implements
 		final boolean distinctQuads = construct.isDistinctQuads() && tripleStore.isQuads() && hasMixedQuadData(templates);
 		final boolean nativeDistinct = construct.isNativeDistinct();
 		
+        if (!constructDistinctSPO) {
+            /**
+             * DISTINCT SPO filter was disabled by a query hint. The output is
+             * NOT guaranteed to be distinct.
+             * 
+             * @see BLZG-1341.
+             */
+            // No filter will be imposed.
+            return null;
+        }
+        
 		if (nativeDistinct && construct.isDistinctQuads()) {
 			flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = true;
 		}
 		
-        final boolean isObviouslyDistinct;
-        if (!constructDistinctSPO) {
-            // DISTINCT SPO filter was disabled by a query hint.
-            // @see BLZG-1341
-            isObviouslyDistinct = false;
-        } else {
-            // Test the CONSTRUCT clause and WHERE clause to see if we need to
-            // impose a DISTINCT SPO filter.
-            isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(),
-                    templates, whereClause);
-        }
+        /*
+         * Test the CONSTRUCT clause and WHERE clause to see if we need to
+         * impose a DISTINCT SPO filter.
+         */
+        final boolean isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(),
+                templates, whereClause);
 
 		if (isObviouslyDistinct) {
 
@@ -357,13 +363,13 @@ public class ASTConstructIterator implements
 	}
 
 	/**
-	 * FIXME This method needs to be written. It should scale, whereas the
-	 * current implementation does not.  
+	 * FIXME NATIVE DISTINCT : This needs to create a filter using a HTree to
+	 * impose a scalable distinct.  
 	 * 
-	 * @see <a href="http://trac.blazegraph.com/ticket/807"> native distinct in
-	 *      quad mode (insert/delete) </a>
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-260"> native
+     *      distinct in quad mode (insert/delete) </a>
 	 */
-	private IFilterTest createNativeDistinctQuadsFilter(ConstructNode construct) {
+	private IFilterTest createNativeDistinctQuadsFilter(final ConstructNode construct) {
 		return createHashDistinctQuadsFilter(construct);
 	}
 
@@ -377,7 +383,7 @@ public class ASTConstructIterator implements
         };
 	}
 
-	private boolean hasMixedQuadData(List<StatementPatternNode> templates) {
+	private boolean hasMixedQuadData(final List<StatementPatternNode> templates) {
 		if (templates.size() == 0) {
 			return false;
 		}
@@ -396,7 +402,7 @@ public class ASTConstructIterator implements
 		return false;
 	}
 
-	private boolean equals(TermNode a, TermNode b) {
+	private boolean equals(final TermNode a, final TermNode b) {
 		return a == b || ( a != null && a.equals(b));
 	}
 
@@ -488,6 +494,7 @@ public class ASTConstructIterator implements
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
      *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
      */
+	// Note: package private to expose to test suite.
     static boolean isObviouslyDistinct(//
             final boolean quads,//
             final List<StatementPatternNode> templates,//
@@ -761,6 +768,12 @@ public class ASTConstructIterator implements
      * 
      * @param stmt
      *            The statement.
+     * 
+     *            FIXME NATIVE DISTINCT: This method needs to be vectored for
+     *            native distinct.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-260"> native
+     *      distinct in quad mode (insert/delete) </a>
      */
     private void addStatementToBuffer(final BigdataStatement stmt) {
 
