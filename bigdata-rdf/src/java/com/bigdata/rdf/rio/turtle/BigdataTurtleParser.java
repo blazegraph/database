@@ -19,6 +19,7 @@ import org.openrdf.rio.turtle.TurtleParser;
 import org.openrdf.rio.turtle.TurtleUtil;
 
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * RDF parser for <a href="http://www.dajobe.org/2004/01/turtle/">Turtle</a>
@@ -42,6 +43,14 @@ import com.bigdata.rdf.model.BigdataValueFactory;
  */
 public class BigdataTurtleParser extends TurtleParser {
 
+	/**
+	 * Standalone variant of the parser, should be used only
+	 * when connection is not available.
+	 */
+	public BigdataTurtleParser() {
+		super(BigdataValueFactoryImpl.getInstance(""));
+	}
+	
     /**
      * Parses an RDF value. This method parses uriref, qname, node ID, quoted
      * literal, integer, double and boolean.
