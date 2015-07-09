@@ -507,15 +507,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             }
            	opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(contexts));
 
-           	if(isQuardMode()) {
-            	
-            	opts.addRequestParam("Content-Type", RDFFormat.NQUADS.getDefaultMIMEType());
-            	
-            } else {
-            	
-            	opts.addRequestParam("Content-Type", RDFFormat.NTRIPLES.getDefaultMIMEType());
-            	
-            }
+           	opts.addRequestParam("Content-Type", new String[] { RDFFormat.NTRIPLES.getDefaultMIMEType(), RDFFormat.NQUADS.getDefaultMIMEType() } );
 
             JettyResponseListener resp = null;
             try {
@@ -535,31 +527,6 @@ public class RemoteRepository extends RemoteRepositoryBase {
 
     }
     
-    private boolean isQuardMode() throws IOException, Exception{
-		
-		JettyResponseListener resp = null;
-		
-		try{
-			
-			ConnectOptions opts = new ConnectOptions(sparqlEndpointURL + "/properties");
-			
-			opts.method = "GET";
-			
-			resp = mgr.doConnect(opts);
-			
-			Properties x = PropertiesParserRegistry.getInstance().get(PropertiesFormat.XML).getParser().parse(resp.getInputStream());
-			
-			return Boolean.parseBoolean(x.get(AbstractTripleStore.Options.QUADS).toString());
-			
-		} finally {
-			
-			if (resp != null)
-	               resp.abort();
-		}
-
-   }
-    
-
    /**
     * Method to line up with the Sesame interface.
     * 
