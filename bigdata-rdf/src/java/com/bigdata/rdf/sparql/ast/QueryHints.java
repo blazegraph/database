@@ -325,7 +325,7 @@ public interface QueryHints {
      */
     String CONSTRUCT_DISTINCT_SPO = "constructDistinctSPO";
     
-    boolean DEFAULT_CONSTRUCT_DISTINCT_SPO = false;
+    boolean DEFAULT_CONSTRUCT_DISTINCT_SPO = true;
     
     /**
      * When <code>true</code>, force the use of REMOTE access paths in scale-out
