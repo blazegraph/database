@@ -64,6 +64,12 @@ enum TestMode {
       return this != quads;
    }
 
+   public boolean isQuads() {
+
+       return this == quads;
+
+   }
+   
    public Properties getProperties() {
 
       return getProperties(new Properties());
