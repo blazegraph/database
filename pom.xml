@@ -331,7 +331,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	  </excludes>
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
-          <argLine>-server -ea -Xms512m -Xmx2g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+          <argLine>-server -ea -Xms512m -Xmx4g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
         </configuration>
       </plugin>
       <plugin>
