@@ -104,12 +104,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
  * Abstract base class for data driven test suites.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id: AbstractDataDrivenSPARQLTestCase.java 5130 2011-09-05 16:54:20Z
- *          thompsonbry $
- * 
- *          TODO Add tests for triples-only and sids modes.
- * 
- *          TODO Support manifest driven test suite.
  */
 public class AbstractDataDrivenSPARQLTestCase extends
         AbstractDataAndSPARQLTestCase {
@@ -126,7 +120,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
     /**
      * @param name
      */
-    public AbstractDataDrivenSPARQLTestCase(String name) {
+    public AbstractDataDrivenSPARQLTestCase(final String name) {
         super(name);
     }
 
@@ -569,6 +563,7 @@ public class AbstractDataDrivenSPARQLTestCase extends
             
         }
         
+        @Override
         public AbstractTripleStore getTripleStore() {
             
             return store;

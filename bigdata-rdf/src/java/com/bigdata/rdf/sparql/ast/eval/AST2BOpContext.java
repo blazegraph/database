@@ -261,7 +261,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *      RDF Value materialization performance on cluster </a>
      */
     boolean materializeProjectionInQuery = false;
-    
+
+    /**
+     * Set by the {@link ConstructDistinctSPOHint}. When <code>false</code>, no
+     * DISTINCT SPO filter will be imposed by the {@link ASTConstructIterator}.
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1341 (performance of dumping
+     *      single graph)
+     */
+    public boolean constructDistinctSPO = QueryHints.DEFAULT_CONSTRUCT_DISTINCT_SPO;
+
     /**
      * When <code>true</code>, force the use of REMOTE access paths in scale-out
      * joins.
