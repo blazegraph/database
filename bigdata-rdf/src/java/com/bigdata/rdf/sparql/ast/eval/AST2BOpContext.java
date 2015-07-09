@@ -45,6 +45,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.SimpleIdFactory;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.QueryEngine;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
@@ -159,7 +160,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * Factory for resolving relations and access paths used primarily by
      * {@link AST2BOpJoins}s.
      */
-    final BOpContextBase context;
+    public final BOpContextBase context;
     
     /**
      * When <code>true</code>, may use the version of DISTINCT which operates on
@@ -260,7 +261,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *      RDF Value materialization performance on cluster </a>
      */
     boolean materializeProjectionInQuery = false;
-    
+
+    /**
+     * Set by the {@link ConstructDistinctSPOHint}. When <code>false</code>, no
+     * DISTINCT SPO filter will be imposed by the {@link ASTConstructIterator}.
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1341 (performance of dumping
+     *      single graph)
+     */
+    public boolean constructDistinctSPO = QueryHints.DEFAULT_CONSTRUCT_DISTINCT_SPO;
+
     /**
      * When <code>true</code>, force the use of REMOTE access paths in scale-out
      * joins.
@@ -298,6 +308,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
     private ISolutionSetStats sss = null;
     
     /**
+     * Summary statistics for the static analysis phase.
+     */
+    private StaticAnalysisStats saStats = null;
+    
+    /**
      * Globally scoped variables, as injected through Sesame's
      * Operation.setBindings() method.
      */
@@ -313,6 +328,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         
     }
     
+    @Override
+    public StaticAnalysisStats getStaticAnalysisStats() {
+       
+       if (saStats==null) { 
+          // hack to avoid optimizers from crashing when this is not set
+          saStats = new StaticAnalysisStats();
+       }
+       return saStats;
+    }
+    
     /**
      * Set the statistics summary for the exogenous solution sets.
      * 
@@ -321,8 +346,6 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *            
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>
-     * @throws IllegalStateException
-     *             if the property has already been set.
      */
     public void setSolutionSetStats(final ISolutionSetStats stats) {
         
@@ -332,6 +355,23 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         this.sss = stats;
         
     }
+    
+    /**
+     * Set the statistics object for the static analysis phase.
+     * 
+     * @param saStats the static analysis stats object
+     * 
+     * @throws IllegalArgumentException
+     *             if the argument is <code>null</code>
+     */
+    public void setStaticAnalysisStats(final StaticAnalysisStats saStats) {
+       
+       if (saStats == null)
+           throw new IllegalArgumentException();
+       
+       this.saStats = saStats;
+       
+   }
     
     /**
      * Static analysis object initialized once we apply the AST optimizers and
@@ -610,6 +650,13 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         return db.getLexiconRelation().getNamespace();
 
+    }
+    
+    @Override
+    public BOpContextBase getBOpContext() {
+
+        return context;
+        
     }
 
     /**

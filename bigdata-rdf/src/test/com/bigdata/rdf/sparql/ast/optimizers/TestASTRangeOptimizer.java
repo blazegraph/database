@@ -173,7 +173,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
                     new ConstantNode(upper)
                     );
             
-            final RangeBOp bop = ASTRangeOptimizer.toRangeBOp(range, globals);
+            final RangeBOp bop = ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals);
             
             range.setRangeBOp(bop);
             
@@ -207,7 +207,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         
         final IV lower = new XSDNumericIV(25);
 
-        final IV upper = new XSDNumericIV(35);
+//        final IV upper = new XSDNumericIV(35);
         
         // The source AST.
         final QueryRoot given = new QueryRoot(QueryType.SELECT);
@@ -294,7 +294,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
             final RangeNode range = new RangeNode(new VarNode("p"));
             range.setFrom(new ConstantNode(lower));
             
-            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
             
             sp.setRange(range);
             
@@ -324,7 +324,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 
         final IV p = makeIV(new URIImpl("http://example/p"));
         
-        final IV lower = new XSDNumericIV(25);
+//        final IV lower = new XSDNumericIV(25);
 
         final IV upper = new XSDNumericIV(35);
         
@@ -412,7 +412,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
             
             final RangeNode range = new RangeNode(new VarNode("p"));
             range.setTo(new ConstantNode(upper));
-            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
             
             sp.setRange(range);
             
@@ -525,7 +525,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
                     new ConstantNode(lower),
                     new ConstantNode(upper)
                     );
-            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
             
             sp.setRange(range);
             
@@ -636,7 +636,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
             final RangeNode range = new RangeNode(new VarNode("p"));
             range.setFrom(new ConstantNode(lower));
             range.setTo(new ConstantNode(upper));
-            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
             
             sp.setRange(range);
             
@@ -781,7 +781,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
             range.setFrom(FunctionNode.subtract(new VarNode("o1"), new ConstantNode(ten)));
             range.setTo(FunctionNode.add(new VarNode("o1"), new ConstantNode(ten)));
             
-            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
             
             sp.setRange(range);
             
@@ -936,7 +936,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         		
 	            final RangeNode range = new RangeNode(new VarNode("o1"));
 	            range.setFrom(new VarNode("o"));
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
 	            
 //	            sp.setRange(range);
         		
@@ -951,7 +951,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         		
 	            final RangeNode range = new RangeNode(new VarNode("o2"));
 	            range.setFrom(new VarNode("o"));
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
         		
 //	            sp.setRange(range);
         		
@@ -966,7 +966,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
         		
 	            final RangeNode range = new RangeNode(new VarNode("o3"));
 	            range.setFrom(new VarNode("o"));
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
         		
 //	            sp.setRange(range);
         		
@@ -984,7 +984,7 @@ public class TestASTRangeOptimizer extends AbstractASTEvaluationTestCase {
 	            range.setTo(
 	            		FunctionNode.MIN(
 	            				FunctionNode.MIN(new VarNode("o1"), new VarNode("o2")), new VarNode("o3"))); 
-	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(range, globals));
+	            range.setRangeBOp(ASTRangeOptimizer.toRangeBOp(getBOpContext(), range, globals));
 	            
 	            sp.setRange(range);
 	            

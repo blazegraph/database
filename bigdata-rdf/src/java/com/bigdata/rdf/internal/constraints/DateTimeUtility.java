@@ -17,7 +17,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 
-public class DateTimeUtility {
+public class DateTimeUtility implements IMathOpHandler {
     static protected final DatatypeFactory datatypeFactory;
     static {
         try {
@@ -27,7 +27,8 @@ public class DateTimeUtility {
         }
     }
 
-    static public boolean checkDateTimeDatatype(final Literal... args) {
+    @Override
+    public boolean canInvokeMathOp(final Literal... args) {
     	for (Literal lit : args) {
     		final URI dt = lit.getDatatype();
     		if (dt == null)
@@ -37,16 +38,17 @@ public class DateTimeUtility {
     	}
     	return true;
     }
-    
-    static public IV dateTimeMath(
-    		final Literal l1, final IV iv1, 
-    		final Literal l2, final IV iv2, 
-    		final MathOp op, 
+
+    @Override
+    public IV doMathOp(
+    		final Literal l1, final IV iv1,
+    		final Literal l2, final IV iv2,
+    		final MathOp op,
     		final BigdataValueFactory vf) {
-    	
-        if (!checkDateTimeDatatype(l1, l2))
+
+        if (!canInvokeMathOp(l1, l2))
         	throw new SparqlTypeErrorException();
-    	
+
     	final URI dt1 = l1.getDatatype();
         final URI dt2 = l2.getDatatype();
         XMLGregorianCalendar c1 = XMLDatatypeUtil.isCalendarDatatype(dt1) ? l1.calendarValue() : null;
@@ -124,5 +126,5 @@ public class DateTimeUtility {
             throw new SparqlTypeErrorException();
         }
     }
-    
+
 }

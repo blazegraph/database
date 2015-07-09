@@ -26,6 +26,7 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 
 /**
  * Interface declaring the <code>config-param</code>s understood by the
@@ -34,7 +35,7 @@ import com.bigdata.journal.IIndexManager;
  * Note: When used in a jini/River configuration, the name of the component for
  * those configuration options is the fully qualified class name for the
  * {@link NanoSparqlServer}.
- * 
+ *
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/596"> Change
  *      web.xml parameter names to be consistent with Jini/River </a>
  */
@@ -47,42 +48,42 @@ public interface ConfigParams {
      * {@link IIndexManager} is specified as an attribute of the web application
      * context.
      */
-    String PROPERTY_FILE = "propertyFile";
+    final String PROPERTY_FILE = "propertyFile";
 
     /**
      * The default bigdata namespace of for the triple or quad store instance to
      * be exposed (default {@link #DEFAULT_NAMESPACE}). Note that there can be
      * many triple or quad store instances within a bigdata instance.
      */
-    String NAMESPACE = "namespace";
+    final String NAMESPACE = "namespace";
     
-    String DEFAULT_NAMESPACE = "kb";
+    final String DEFAULT_NAMESPACE = "kb";
 
     /**
      * When <code>true</code>, an instance of the specified {@link #NAMESPACE}
      * will be created if none exists.
      */
-    String CREATE = "create";
+    final String CREATE = "create";
     
-    boolean DEFAULT_CREATE = true;
+    final boolean DEFAULT_CREATE = true;
     
     /**
      * The size of the thread pool used to service SPARQL queries -OR- ZERO
      * (0) for an unbounded thread pool (default
      * {@value #DEFAULT_QUERY_THREAD_POOL_SIZE}).
      */
-    String QUERY_THREAD_POOL_SIZE = "queryThreadPoolSize";
+    final String QUERY_THREAD_POOL_SIZE = "queryThreadPoolSize";
     
-    int DEFAULT_QUERY_THREAD_POOL_SIZE = 16;
+    final int DEFAULT_QUERY_THREAD_POOL_SIZE = 16;
     
     /**
      * Force a compacting merge of all shards on all data services in a
      * bigdata federation (optional, default <code>false</code>).
-     * 
+     *
      * <strong>This option should only be used for benchmarking
      * purposes.</strong>
      */
-    String FORCE_OVERFLOW = "forceOverflow";
+    final String FORCE_OVERFLOW = "forceOverflow";
 
     /**
      * The commit time against which the server will assert a read lock by
@@ -92,7 +93,7 @@ public interface ConfigParams {
      * recent commit point on the database. Regardless, each query will be
      * issued against a read-only transaction.
      */
-    String READ_LOCK = "readLock";
+    final String READ_LOCK = "readLock";
     
     /**
      * When <code>true</code> and the KB instance is in the <code>quads</code>
@@ -110,27 +111,27 @@ public interface ConfigParams {
      * this if you only have a reasonable number of named graphs and/or only
      * expose the SPARQL end point to a limited audience.
      */
-    String DESCRIBE_EACH_NAMED_GRAPH = "describeEachNamedGraph";
+    final String DESCRIBE_EACH_NAMED_GRAPH = "describeEachNamedGraph";
     
-    boolean DEFAULT_DESCRIBE_EACH_NAMED_GRAPH = false;
+    final boolean DEFAULT_DESCRIBE_EACH_NAMED_GRAPH = false;
     
     /**
      * When <code>true</code>, requests will be refused for mutation operations
      * on the database made through the REST API. This may be used to help lock
      * down a public facing interface.
      */
-    String READ_ONLY = "readOnly";
+    final String READ_ONLY = "readOnly";
 
-    boolean DEFAULT_READ_ONLY = false;
+    final boolean DEFAULT_READ_ONLY = false;
 
     /**
      * When non-zero, this specifies the timeout (milliseconds) for a query.
      * This may be used to limit resource consumption on a public facing
      * interface.
      */
-    String QUERY_TIMEOUT = "queryTimeout";
+    final String QUERY_TIMEOUT = "queryTimeout";
 
-    long DEFAULT_QUERY_TIMEOUT = 0L;
+    final long DEFAULT_QUERY_TIMEOUT = 0L;
 
     /**
     * When non-zero, this specifies the timeout (milliseconds) for a warmup
@@ -139,9 +140,9 @@ public interface ConfigParams {
     * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
     *      on startup </a>
     */
-    String WARMUP_TIMEOUT = "warmupTimeout";
+    final String WARMUP_TIMEOUT = "warmupTimeout";
 
-    long DEFAULT_WARMUP_TIMEOUT = 0L;
+    final long DEFAULT_WARMUP_TIMEOUT = 0L;
 
     /**
     * The size of the thread pool used to warmup the journal (default
@@ -150,9 +151,9 @@ public interface ConfigParams {
     * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
     *      on startup </a>
     */
-    String WARMUP_THREAD_POOL_SIZE = "warmupThreadPoolSize";
+    final String WARMUP_THREAD_POOL_SIZE = "warmupThreadPoolSize";
     
-    int DEFAULT_WARMUP_THREAD_POOL_SIZE = 20;
+    final int DEFAULT_WARMUP_THREAD_POOL_SIZE = 20;
     
     /**
     * A comma delimited list of namespaces to be processed during the warmup 
@@ -161,7 +162,7 @@ public interface ConfigParams {
     * @see <a href="http://trac.bigdata.com/ticket/1050" > pre-heat the journal
     *      on startup </a>
     */
-    String WARMUP_NAMESPACE_LIST = "warmupNamespaceList";
+    final String WARMUP_NAMESPACE_LIST = "warmupNamespaceList";
     
     String DEFAULT_WARMUP_NAMESPACE_LIST = "";
     
@@ -171,17 +172,32 @@ public interface ConfigParams {
      * methods.
      * <p>
      * Note:
-     * 
+     *
      * @see BigdataRDFServletContextListener#contextInitialized(ServletContextEvent)
      * @see BigdataRDFServletContextListener#contextDestroyed(ServletContextEvent)
      * @see #DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS
-     * 
+     *
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/667" >
      *      Provide NanoSparqlServer initialization hook </a>
      */
-    String SERVLET_CONTEXT_LISTENER_CLASS = "servletContextListenerClass";
+    final String SERVLET_CONTEXT_LISTENER_CLASS = "servletContextListenerClass";
 
     String DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS = BigdataRDFServletContextListener.class
             .getName();
+    
+    /**
+     * A class the implements the {@link BlueprintsServletProxy}.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1295"> Refactor Blueprints </a>
+     * 
+     */
+    
+    final String BLUEPRINTS_SERVLET_PROVIDER = "blueprintsServletProvider";
+    
+    final static String DEFAULT_BLUEPRINTS_SERVLET_PROVIDER = BlueprintsServletProxy.getDefaultProvider();
 
+    /**
+     * List of the services this instance is allowed to call out to.
+     */
+    String SERVICE_WHITELIST = "serviceWhitelist";
 }

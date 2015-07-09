@@ -32,7 +32,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
-import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 
 /**
  * Trac733 shows some strange behavior, this test case is intended
@@ -145,7 +145,7 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 
 
 					protected void estimateCardinalities(StatementPatternNode sp, final IV<?, ?> s, final IV<?, ?> p,
-							final IV<?, ?> o, final IV<?, ?> c, final AbstractTripleStore db) {
+							final IV<?, ?> o, final IV<?, ?> c, final AST2BOpContext ctx) {
 						if (o != null)
 						    sp.setProperty(Annotations.ESTIMATED_CARDINALITY, 26l);
 						else 

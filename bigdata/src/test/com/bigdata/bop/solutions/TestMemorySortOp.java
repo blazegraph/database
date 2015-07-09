@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.solutions;
 
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.FutureTask;
 
@@ -50,7 +51,9 @@ import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.engine.BlockingBufferWithStats;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.bop.engine.MockRunningQuery;
+import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.MathBOp;
@@ -60,6 +63,8 @@ import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.relation.accesspath.IAsynchronousIterator;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
@@ -341,7 +346,20 @@ public class TestMemorySortOp extends TestCase2 {
     @SuppressWarnings({ "rawtypes", "unchecked" })
     public void testComputedValueExpressions() 
     {
-
+        final String namespace = getName();
+        final String lexiconNamespace;
+        final Properties properties = new Properties();
+        properties.setProperty(com.bigdata.journal.Options.BUFFER_MODE,BufferMode.MemStore.name());
+        final Journal store = new Journal(properties);
+        try {
+            {
+                final AbstractTripleStore kb = new LocalTripleStore(store,
+                        namespace, ITx.UNISOLATED, properties);
+                kb.create();
+                store.commit();
+                lexiconNamespace = kb.getLexiconRelation().getNamespace();
+            }
+        
         final IVariable<IV> x = Var.var("x");
         final IVariable<IV> y = Var.var("y");
         final IVariable<IV> z = Var.var("z");
@@ -352,7 +370,7 @@ public class TestMemorySortOp extends TestCase2 {
         final IConstant<IV> _5 = new Constant<IV>(new XSDNumericIV(5));
 
         final ISortOrder<?> sors[] = new ISortOrder[] { //
-                new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS,new GlobalAnnotations(getName(), ITx.READ_COMMITTED))), false/* asc */),//
+                new SortOrder(new Bind(z,new MathBOp(x, y, MathBOp.MathOp.PLUS,new GlobalAnnotations(lexiconNamespace, ITx.READ_COMMITTED))), false/* asc */),//
                 new SortOrder(y, false/* asc */), //
                 new SortOrder(x, true/* asc */), //
         };
@@ -416,7 +434,7 @@ public class TestMemorySortOp extends TestCase2 {
         final UUID queryId = UUID.randomUUID();
         final IQueryContext queryContext = new MockQueryContext(queryId);
         final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
-        , null/* indexManager */,queryContext
+        , store/* indexManager */,queryContext
         );
         
         final BOpContext<IBindingSet> context = new BOpContext<IBindingSet>(
@@ -446,6 +464,9 @@ public class TestMemorySortOp extends TestCase2 {
         assertEquals ( 10, stats.unitsIn.get () ) ;
         assertEquals ( 10, stats.unitsOut.get () ) ;
         assertEquals(1, stats.chunksOut.get());
+        } finally {
+            store.destroy();
+        }
     }
 
 }
