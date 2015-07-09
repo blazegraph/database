@@ -1452,13 +1452,13 @@ public class QueryServlet extends BigdataRDFServlet {
       final URI p;
       final Value o;
       final Resource[] c;
-      final String mimetype;
+      final String[] mimeTypes;
       try {
          s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
          p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
          o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
          c = decodeContexts(req, "c");
-         mimetype = req.getParameter("Content-Type");
+         mimeTypes = req.getParameterValues("Content-Type");
 //         c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
       } catch (IllegalArgumentException ex) {
          buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -1476,7 +1476,7 @@ public class QueryServlet extends BigdataRDFServlet {
          submitApiTask(
                new GetStmtsTask(req, resp, getNamespace(req), getTimestamp(req), //
                      includeInferred,//
-                     s, p, o, c, mimetype)).get();
+                     s, p, o, c, mimeTypes)).get();
 
       } catch (Throwable t) {
 
@@ -1494,7 +1494,7 @@ public class QueryServlet extends BigdataRDFServlet {
     */
    private static class GetStmtsTask extends AbstractRestApiTask<Void> {
 
-	  private final String mimeType;
+	  private final String[] mimeTypes;
 	  private final boolean includeInferred;
       private final Resource s;
       private final URI p;
@@ -1504,7 +1504,7 @@ public class QueryServlet extends BigdataRDFServlet {
       public GetStmtsTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final boolean includeInferred,
-            final Resource s, final URI p, final Value o, final Resource[] c, String mimeType) {
+            final Resource s, final URI p, final Value o, final Resource[] c, String[] mimeTypes) {
 
          super(req, resp, namespace, timestamp);
 
@@ -1513,7 +1513,7 @@ public class QueryServlet extends BigdataRDFServlet {
          this.p = p;
          this.o = o;
          this.c = c;
-         this.mimeType = mimeType;
+         this.mimeTypes = mimeTypes;
 
       }
 
@@ -1525,69 +1525,53 @@ public class QueryServlet extends BigdataRDFServlet {
       @Override
       public Void call() throws Exception {
 
-         final long begin = System.currentTimeMillis();
+        BigdataSailRepositoryConnection conn = null;
+        
+        try {
 
-         BigdataSailRepositoryConnection conn = null;
-         
-         
-         
-		try {
+            conn = getQueryConnection();
 
-			conn = getQueryConnection();
-			
-			resp.setContentType(mimeType);
-			
-			final OutputStream os = resp.getOutputStream();
-						
-			final RDFFormat format = RDFWriterRegistry.getInstance()
-	                    .getFileFormatForMIMEType(mimeType);
+            String mimeType = null;
+            RDFFormat format = null;
+			for (String mt: mimeTypes) {
+                RDFFormat fmt = RDFWriterRegistry.getInstance()
+                     .getFileFormatForMIMEType(mt);
+                if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
+                    mimeType = mt;
+                    format = fmt;
+                }
+            }
+            resp.setContentType(mimeType);
 
-	        final RDFWriter w = RDFWriterRegistry.getInstance().get(format)
-	                    .getWriter(os);
-	        
-	        RepositoryResult<Statement> stmts = null;
-	        
-	        try {
-	        	
-	        	w.startRDF();
-	        
-		        stmts = conn.getStatements(s, p, o, includeInferred, c);
-		            
-		        while(stmts.hasNext()){
-		            	
-		            	w.handleStatement(stmts.next());
-		            	
-		        }
-		        
-		        w.endRDF();
-	        
-	        } finally {
-	        	
-	        	if (stmts != null) {
+            final OutputStream os = resp.getOutputStream();
 
-	        		stmts.close();
+            final RDFWriter w = RDFWriterRegistry.getInstance().get(format)
+                .getWriter(os);
 
-				}
-	        	
-	        	os.flush();
-	        	
-	        	os.close();	        	
-	        }
-						
-			return null;
-					
-		} finally {
-								
-			if (conn != null) {
+            RepositoryResult<Statement> stmts = null;
 
-				conn.close();
+            try {
+                w.startRDF();
+                stmts = conn.getStatements(s, p, o, includeInferred, c);
+                while(stmts.hasNext()){
+                    w.handleStatement(stmts.next());
+                }
+                w.endRDF();
+            } finally {
+                if (stmts != null) {
+                    stmts.close();
+                }
+                os.flush();
+                os.close();
+            }
 
-			}
-
-		}
-
+            return null;
+        } finally {
+            if (conn != null) {
+                conn.close();
+            }
+        }
       }
-
    } // GETSTMT task.
 
      /**
