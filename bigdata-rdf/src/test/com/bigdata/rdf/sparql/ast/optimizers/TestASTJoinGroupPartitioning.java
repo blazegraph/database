@@ -76,7 +76,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       
       assertTrue(partitions.getPartitionList().size()==1);
       assertTrue(partitions.getPartitionList().get(0).nonOptionalNonMinusNodes.isEmpty());
-      assertTrue(partitions.extractNodeList().isEmpty());
+      assertTrue(partitions.extractNodeList(true).isEmpty());
    }
 
    /**
@@ -103,13 +103,13 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
 
       // checks on partitions object
       assertEquals(1, partitions.getPartitionList().size());
-      assertEquals(1, partitions.extractNodeList().size());
-      assertTrue(partitions.extractNodeList().contains(spn));
+      assertEquals(1, partitions.extractNodeList(true).size());
+      assertTrue(partitions.extractNodeList(true).contains(spn));
       
       // checks on partition object
       ASTJoinGroupPartition partition = partitions.getPartitionList().get(0);
-      assertEquals(1,partition.extractNodeList().size());
-      assertTrue(partition.extractNodeList().contains(spn));
+      assertEquals(1,partition.extractNodeList(true).size());
+      assertTrue(partition.extractNodeList(true).contains(spn));
       assertTrue(partition.externallyBound.equals(external));
       assertEquals(1,partition.nonOptionalNonMinusNodes.size());
       assertTrue(partition.nonOptionalNonMinusNodes.contains(spn));
@@ -145,15 +145,15 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
 
       // checks on partitions object
       assertEquals(1, partitions.getPartitionList().size());
-      assertEquals(2, partitions.extractNodeList().size());
-      assertTrue(partitions.extractNodeList().contains(spn1));
-      assertTrue(partitions.extractNodeList().contains(spn2));
+      assertEquals(2, partitions.extractNodeList(true).size());
+      assertTrue(partitions.extractNodeList(true).contains(spn1));
+      assertTrue(partitions.extractNodeList(true).contains(spn2));
       
       // checks on partition object
       ASTJoinGroupPartition partition = partitions.getPartitionList().get(0);
-      assertEquals(2,partition.extractNodeList().size());
-      assertTrue(partition.extractNodeList().contains(spn1));
-      assertTrue(partition.extractNodeList().contains(spn2));
+      assertEquals(2,partition.extractNodeList(true).size());
+      assertTrue(partition.extractNodeList(true).contains(spn1));
+      assertTrue(partition.extractNodeList(true).contains(spn2));
       assertTrue(partition.externallyBound.equals(external));
       assertEquals(2,partition.nonOptionalNonMinusNodes.size());
       assertTrue(partition.nonOptionalNonMinusNodes.contains(spn1));
@@ -191,16 +191,16 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
 
       // checks on partitions object
       assertEquals(1, partitions.getPartitionList().size());
-      assertEquals(3, partitions.extractNodeList().size());
-      assertTrue(partitions.extractNodeList().contains(spn1));
-      assertTrue(partitions.extractNodeList().contains(spn2));
-      assertTrue(partitions.extractNodeList().contains(spn3Opt));
+      assertEquals(3, partitions.extractNodeList(true).size());
+      assertTrue(partitions.extractNodeList(true).contains(spn1));
+      assertTrue(partitions.extractNodeList(true).contains(spn2));
+      assertTrue(partitions.extractNodeList(true).contains(spn3Opt));
       
       // checks on partition object
       ASTJoinGroupPartition partition = partitions.getPartitionList().get(0);
-      assertEquals(3,partition.extractNodeList().size());
-      assertTrue(partition.extractNodeList().contains(spn1));
-      assertTrue(partition.extractNodeList().contains(spn2));
+      assertEquals(3,partition.extractNodeList(true).size());
+      assertTrue(partition.extractNodeList(true).contains(spn1));
+      assertTrue(partition.extractNodeList(true).contains(spn2));
       assertEquals(2,partition.nonOptionalNonMinusNodes.size());
       assertTrue(partition.nonOptionalNonMinusNodes.contains(spn1));
       assertTrue(partition.nonOptionalNonMinusNodes.contains(spn2));
@@ -249,7 +249,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
 
       // checks on partitions object
       assertEquals(4, partitions.getPartitionList().size());
-      assertEquals(nodes, partitions.extractNodeList());
+      assertEquals(nodes, partitions.extractNodeList(true));
       
       // checks on partition object
       final ASTJoinGroupPartition p1 = partitions.getPartitionList().get(0);
@@ -257,7 +257,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       p1Exp.add(spn1);
       p1Exp.add(spn2);
       p1Exp.add(spn3Opt);
-      assertEquals(p1Exp, p1.extractNodeList());
+      assertEquals(p1Exp, p1.extractNodeList(true));
       assertEquals(spn3Opt, p1.optionalOrMinus);
       assertEquals(varSet("y","x1","x2"), p1.definitelyProduced);
       
@@ -265,7 +265,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       final List<IGroupMemberNode> p2Exp = new ArrayList<IGroupMemberNode>();
       p2Exp.add(spn4);
       p2Exp.add(spn5Opt);
-      assertEquals(p2Exp, p2.extractNodeList());
+      assertEquals(p2Exp, p2.extractNodeList(true));
       assertEquals(spn5Opt, p2.optionalOrMinus);
       assertEquals(varSet("y","x1","x2","x4"), p2.definitelyProduced);
 
@@ -274,7 +274,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       final List<IGroupMemberNode> p3Exp = new ArrayList<IGroupMemberNode>();
       p3Exp.add(spn6);
       p3Exp.add(spn7Opt);
-      assertEquals(p3Exp, p3.extractNodeList());
+      assertEquals(p3Exp, p3.extractNodeList(true));
       assertEquals(spn7Opt, p3.optionalOrMinus);
       assertEquals(varSet("y","x1","x2","x4","x6"), p3.definitelyProduced);
 
@@ -283,7 +283,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       final ASTJoinGroupPartition p4 = partitions.getPartitionList().get(3);
       final List<IGroupMemberNode> p4Exp = new ArrayList<IGroupMemberNode>();
       p4Exp.add(spn8);
-      assertEquals(p4Exp, p4.extractNodeList());
+      assertEquals(p4Exp, p4.extractNodeList(true));
       assertNull(p4.optionalOrMinus);
       assertEquals(varSet("y","x1","x2","x4","x6","x8"), p4.definitelyProduced);
       
@@ -331,7 +331,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
 
       // checks on partitions object
       assertEquals(3, partitions.getPartitionList().size());
-      assertEquals(nodes, partitions.extractNodeList());
+      assertEquals(nodes, partitions.extractNodeList(true));
       
       // checks on partition object
       final ASTJoinGroupPartition p1 = partitions.getPartitionList().get(0);
@@ -340,7 +340,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       p1Exp.add(n2);
       p1Exp.add(n3);
       p1Exp.add(n4);
-      assertEquals(p1Exp, p1.extractNodeList());
+      assertEquals(p1Exp, p1.extractNodeList(true));
       assertEquals(n4, p1.optionalOrMinus);
       assertEquals(varSet("x1","x2","x4"), p1.definitelyProduced);
       
@@ -349,7 +349,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       p2Exp.add(n5);
       p2Exp.add(n6);
       p2Exp.add(n7);
-      assertEquals(p2Exp, p2.extractNodeList());
+      assertEquals(p2Exp, p2.extractNodeList(true));
       assertEquals(n7, p2.optionalOrMinus);
       assertEquals(varSet("x1","x2","x4","x5","x6"), p2.definitelyProduced);
 
@@ -359,7 +359,7 @@ public class TestASTJoinGroupPartitioning extends AbstractOptimizerTestCaseWithU
       p3Exp.add(n8);
       p3Exp.add(n9);
       p3Exp.add(n10);
-      assertEquals(p3Exp, p3.extractNodeList());
+      assertEquals(p3Exp, p3.extractNodeList(true));
       assertNull(p3.optionalOrMinus);
       assertEquals(varSet("x1","x2","x4","x5","x6","x7","x8"), p3.definitelyProduced);
       

@@ -113,7 +113,7 @@ public class TestGroupNodeVarBindingInfo extends AbstractOptimizerTestCaseWithUt
        final GlobalAnnotations globals = 
              new GlobalAnnotations(
                 context.getLexiconNamespace(), context.getTimestamp());
-          AST2BOpUtility.toVE(globals, fn.getValueExpressionNode());
+          AST2BOpUtility.toVE(getBOpContext(), globals, fn.getValueExpressionNode());
           
        final GroupNodeVarBindingInfo biSpn = 
           new GroupNodeVarBindingInfo(spn, sa,null);     

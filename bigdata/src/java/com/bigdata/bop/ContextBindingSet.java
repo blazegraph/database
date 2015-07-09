@@ -47,17 +47,17 @@ public class ContextBindingSet implements IBindingSet {
      */
     private static final long serialVersionUID = 1L;
 
-    private transient BOpContext<?> context;
+    private transient BOpContextBase context;
 
     private final IBindingSet delegate;
 
-    public BOpContext getBOpContext() {
+    public BOpContextBase getBOpContext() {
 
         return context;
 
     }
 
-    public ContextBindingSet(final BOpContext<?> context,
+    public ContextBindingSet(final BOpContextBase context,
             final IBindingSet delegate) {
 
         this.context = context;

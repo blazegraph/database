@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.engine.StaticAnalysisStats;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
@@ -99,7 +100,7 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
 
             if (sp.getProperty(Annotations.ESTIMATED_CARDINALITY) == null) {
 
-                tasks.add(new RangeCountTask(sp, db, exogenousBindings));
+                tasks.add(new RangeCountTask(sp, ctx, exogenousBindings));
 
             }
 
@@ -154,21 +155,21 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
     private class RangeCountTask implements Callable<Void> {
 
         private final StatementPatternNode sp;
-        private final AbstractTripleStore db;
+        private final AST2BOpContext ctx;
         private final IBindingSet exogenousBindings;
         
         public RangeCountTask(final StatementPatternNode sp,
-                final AbstractTripleStore db,
+                final AST2BOpContext ctx,
                 final IBindingSet exogenousBindings) {
             this.sp = sp;
-            this.db = db;
+            this.ctx = ctx;
             this.exogenousBindings = exogenousBindings;
         }
         
         @Override
         public Void call() throws Exception {
 
-            estimateCardinality(sp, db, exogenousBindings);
+            estimateCardinality(sp, ctx, exogenousBindings);
             
             return null;
         }
@@ -181,25 +182,35 @@ public class ASTRangeCountOptimizer extends AbstractJoinGroupOptimizer
      * @param db
      * @param exogenousBindings
      */
-	protected void estimateCardinality(StatementPatternNode sp, final AbstractTripleStore db,
+	protected void estimateCardinality(StatementPatternNode sp, 
+	      final AST2BOpContext ctx,
 			final IBindingSet exogenousBindings) {
 		final IV<?, ?> s = getIV(sp.s(), exogenousBindings);
 		final IV<?, ?> p = getIV(sp.p(), exogenousBindings);
 		final IV<?, ?> o = getIV(sp.o(), exogenousBindings);
 		final IV<?, ?> c = getIV(sp.c(), exogenousBindings);
 		
-		estimateCardinalities(sp, s, p, o, c, db);
+		estimateCardinalities(sp, s, p, o, c, ctx);
 	}
 
 	protected void estimateCardinalities(StatementPatternNode sp, final IV<?, ?> s, final IV<?, ?> p,
-			final IV<?, ?> o, final IV<?, ?> c, final AbstractTripleStore db) {
+			final IV<?, ?> o, final IV<?, ?> c, final AST2BOpContext ctx) {
+	   
+	   final AbstractTripleStore db = ctx.getAbstractTripleStore();
 		final RangeNode rangeNode = sp.getRange();
 		final RangeBOp range = rangeNode != null ? rangeNode.getRangeBOp() : null;
 		
 		final IAccessPath<?> ap = db.getAccessPath(s, p, o, c, range);
 		
+
+		final StaticAnalysisStats saStats = ctx.getStaticAnalysisStats();
+		long start = System.nanoTime();
+		
 		final long cardinality = ap.rangeCount(false/* exact */);
 
+      saStats.registerRangeCountCall(System.nanoTime() - start);
+		
+		
 		// Annotate with the fast range count.
 		sp.setProperty(Annotations.ESTIMATED_CARDINALITY, cardinality);
 		

@@ -1418,6 +1418,46 @@ public class TestBindings extends AbstractDataDrivenSPARQLTestCase {
        ).runTest();       
     }    
     
+    public void test_nested_values01() throws Exception {
+       new TestHelper("nested_values01",// testURI,
+             "nested_values01.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values01.srx"// resultFileURL
+       ).runTest();           
+    }
+    
+    public void test_nested_values02() throws Exception {
+       new TestHelper("nested_values02",// testURI,
+             "nested_values02.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values02.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    public void test_nested_values03() throws Exception {
+       new TestHelper("nested_values03",// testURI,
+             "nested_values03.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values03.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    public void test_nested_values04() throws Exception {
+       new TestHelper("nested_values04",// testURI,
+             "nested_values04.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values04.srx"// resultFileURL
+       ).runTest();          
+    }
+    
+    public void test_nested_values05() throws Exception {
+       new TestHelper("nested_values05",// testURI,
+             "nested_values05.rq",// queryFileURL
+             "nested_values.trig",// dataFileURL
+             "nested_values05.srx"// resultFileURL
+       ).runTest();          
+    }
+    
     /**
      * Some of the test cases require the FTS index, so we need a custom
      * properties definition here.

@@ -44,6 +44,7 @@ import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.bop.join.IHashJoinUtility;
 import com.bigdata.btree.ISimpleIndexAccess;
 import com.bigdata.journal.IBTreeManager;
+import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
 import com.bigdata.rdf.model.BigdataBNode;
@@ -57,6 +58,7 @@ import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.rwstore.sector.IMemoryManager;
+import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedFilter;
 import com.bigdata.striterator.Chunkerator;
 import com.bigdata.striterator.CloseableChunkedIteratorWrapperConverter;
@@ -182,7 +184,7 @@ public class BOpContext<E> extends BOpContextBase {
     /**
      * 
      * @param runningQuery
-     *            The {@link IRunningQuery}.
+     *            The {@link IRunningQuery} (required).
      * @param partitionId
      *            The index partition identifier -or- <code>-1</code> if the
      *            index is not sharded.
@@ -222,7 +224,6 @@ public class BOpContext<E> extends BOpContextBase {
      *       from ChunkedRunningQuery. It always has a fully materialized chunk
      *       on hand and ready to be processed.
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public BOpContext(//
             final IRunningQuery runningQuery,//
             final int partitionId,//
@@ -234,8 +235,68 @@ public class BOpContext<E> extends BOpContextBase {
             final IBlockingBuffer<E[]> sink2//
             ) {
         
-        super(runningQuery.getFederation(), runningQuery.getLocalIndexManager());
+        this(runningQuery, runningQuery.getFederation(), runningQuery
+                .getLocalIndexManager(), partitionId, stats, op,
+                lastInvocation, source, sink, sink2);
         
+    }
+
+    /**
+     * Variant used by some test cases that need to mock up a {@link BOpContext}
+     * .
+     * 
+     * @param runningQuery
+     *            The {@link IRunningQuery} (not checked).
+     * @param fed
+     *            The federation iff running in scale-out.
+     * @param localIndexManager
+     *            The <strong>local</strong> index manager (required).
+     * @param runningQuery
+     *            The {@link IRunningQuery} (required).
+     * @param partitionId
+     *            The index partition identifier -or- <code>-1</code> if the
+     *            index is not sharded.
+     * @param stats
+     *            The object used to collect statistics about the evaluation of
+     *            this operator.
+     * @param source
+     *            Where to read the data to be consumed by the operator.
+     * @param op
+     *            The operator that is being executed.
+     * @param lastInvocation
+     *            <code>true</code> iff this is the last invocation pass for
+     *            that operator.
+     * @param sink
+     *            Where to write the output of the operator.
+     * @param sink2
+     *            Alternative sink for the output of the operator (optional).
+     *            This is used by things like SPARQL optional joins to route
+     *            failed joins outside of the join group.
+     * 
+     * @throws IllegalArgumentException
+     *             if the <i>stats</i> is <code>null</code>
+     * @throws IllegalArgumentException
+     *             if the <i>source</i> is <code>null</code> (use an empty
+     *             source if the source will be ignored).
+     * @throws IllegalArgumentException
+     *             if the <i>sink</i> is <code>null</code>
+     */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    BOpContext(//
+                final IRunningQuery runningQuery,//
+                final IBigdataFederation<?> fed,//
+                final IIndexManager localIndexManager,//
+                final int partitionId,//
+                final BOpStats stats, //
+                final PipelineOp op,//
+                final boolean lastInvocation,//
+                final ICloseableIterator<E[]> source,//
+                final IBlockingBuffer<E[]> sink, //
+                final IBlockingBuffer<E[]> sink2//
+                ) {
+            
+        super(fed, localIndexManager);
+            
         if (stats == null)
             throw new IllegalArgumentException();
 
@@ -267,6 +328,27 @@ public class BOpContext<E> extends BOpContextBase {
         this.sink2 = sink2; // may be null
     }
 
+    /**
+     * Test suite helper.
+     */
+    public static <E> BOpContext<E> newMock(//
+            final IRunningQuery runningQuery,//
+            final IBigdataFederation<?> fed,//
+            final IIndexManager localIndexManager,//
+            final int partitionId,//
+            final BOpStats stats, //
+            final PipelineOp op,//
+            final boolean lastInvocation,//
+            final ICloseableIterator<E[]> source,//
+            final IBlockingBuffer<E[]> sink, //
+            final IBlockingBuffer<E[]> sink2//
+    ) {
+
+        return new BOpContext<>(runningQuery, fed, localIndexManager,
+                partitionId, stats, op, lastInvocation, source, sink, sink2);
+
+    }
+    
     /**
      * Wraps each {@link IBindingSet} to provide access to the
      * {@link BOpContext}.
@@ -674,7 +756,7 @@ public class BOpContext<E> extends BOpContextBase {
     }
 
     /**
-     * Return the {@link ClientConnectionManager} used to make remote SERVICE
+     * Return the {@link HttpClient} used to make remote SERVICE
      * call requests.
      */
     public HttpClient getClientConnectionManager() {
@@ -1106,7 +1188,7 @@ public class BOpContext<E> extends BOpContextBase {
 //    *            The array of distinct variables (no duplicates) to be
 //    *            extracted from the visited {@link IElement}s.
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    static public ICloseableIterator<IBindingSet[]> solutions(
+    public ICloseableIterator<IBindingSet[]> solutions(
             final IChunkedIterator<?> src, //
             final IPredicate<?> pred,//
 //            final IVariable<?>[] varsx, 
@@ -1147,7 +1229,7 @@ public class BOpContext<E> extends BOpContextBase {
 
                         final IElement e = (IElement) obj;
 
-                        final IBindingSet bset = new ListBindingSet();
+                        final IBindingSet bset = new ContextBindingSet(BOpContext.this, new ListBindingSet());
 
                         /*
                          * Propagate bindings from the element to the binding
