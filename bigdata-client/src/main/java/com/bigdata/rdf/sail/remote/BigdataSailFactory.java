@@ -247,7 +247,7 @@ public class BigdataSailFactory {
         } else {
         
             final Properties props = new Properties();
-            props.setProperty("com.bigdata.journal.AbstractJournal", file);
+            props.setProperty("com.bigdata.journal.AbstractJournal.file", file);
             
             final Sail sail = getSailProviderInstance(props);
             
@@ -363,7 +363,7 @@ public class BigdataSailFactory {
         */
 
         if (file != null) {
-            props.setProperty("com.bigdata.journal.AbstractJournal", file);
+            props.setProperty("com.bigdata.journal.AbstractJournal.file", file);
             props.setProperty("com.bigdata.journal.AbstractJournal.bufferMode", "DiskRW");
         } else {
             props.setProperty("com.bigdata.journal.AbstractJournal.bufferMode", "MemStore");
@@ -409,7 +409,7 @@ public class BigdataSailFactory {
 
 		try {
 			final Class<?> c = Class.forName(providerClass);
-			final Constructor<?> cons = c.getConstructor();
+			final Constructor<?> cons = c.getConstructor(Properties.class);
 			final Object object = cons.newInstance(props);
 			final Sail proxy = (Sail) object;
 			return proxy;
@@ -417,8 +417,10 @@ public class BigdataSailFactory {
 				| SecurityException | InstantiationException
 				| IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException e) {
-			
-			throw new RuntimeException(providerClass + " is not found in the classpath.");
+
+			throw new RuntimeException(providerClass
+					+ " is not found in the classpath.\n" + e.toString() + "\n"
+					+ e.getCause());
 		}
 			
 	}

@@ -26,10 +26,10 @@ import java.io.File;
 import java.util.Properties;
 
 import org.openrdf.repository.RepositoryException;
+import org.openrdf.repository.sail.SailRepository;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
-import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory.Option;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -69,10 +69,10 @@ public class TestBigdataGraphEmbeddedRepository extends
 
 	}
 
-	public BigdataSailRepository getOrCreateRepository(String journalFile) {
+	public SailRepository getOrCreateRepository(String journalFile) {
 
 		final java.util.Properties props = new java.util.Properties();
-		BigdataSailRepository repo = null;
+		SailRepository repo = null;
 
 		/*
 		 * Lax edges allows us to use non-unique edge identifiers
@@ -92,7 +92,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			 * location. Create a new store. (If journal== null an in-memory
 			 * store will be created.
 			 */
-			repo = (BigdataSailRepository) BigdataSailFactory.createRepository(props, journalFile,
+			repo = (SailRepository) BigdataSailFactory.createRepository(props, journalFile,
 					Option.TextIndex);// , Option.RDR);
 
 		} else {
@@ -101,7 +101,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			 * Journal already exists at specified location. Open existing
 			 * store.
 			 */
-			repo = (BigdataSailRepository) BigdataSailFactory.openRepository(journalFile);
+			repo =  BigdataSailFactory.openRepository(journalFile);
 
 		}
 

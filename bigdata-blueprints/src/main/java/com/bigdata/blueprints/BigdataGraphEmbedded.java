@@ -27,10 +27,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.sail.Sail;
 
 import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit;
 import com.bigdata.blueprints.BigdataGraphListener.BigdataGraphEdit.Action;
@@ -60,7 +59,7 @@ import com.tinkerpop.blueprints.TransactionalGraph;
  */
 public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalGraph, IChangeLog {
 
-	final BigdataSailRepository repo;
+	final SailRepository repo;
 	
 //	transient BigdataSailRepositoryConnection cxn;
 	
@@ -70,7 +69,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	/**
 	 * Create a Blueprints wrapper around a {@link BigdataSail} instance.
 	 */
-    public BigdataGraphEmbedded(final BigdataSail sail) {
+    public BigdataGraphEmbedded(final Sail sail) {
         this(sail, BigdataRDFFactory.INSTANCE);
     }
     
@@ -78,25 +77,25 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      * Create a Blueprints wrapper around a {@link BigdataSail} instance with
      * a non-standard {@link BlueprintsValueFactory} implementation.
      */
-    public BigdataGraphEmbedded(final BigdataSail sail, 
+    public BigdataGraphEmbedded(final Sail sail, 
             final BlueprintsValueFactory factory) {
-        this(new BigdataSailRepository(sail), factory, new Properties());
+        this(new SailRepository(sail), factory, new Properties());
     }
     
     /**
      * Create a Blueprints wrapper around a {@link BigdataSail} instance with
      * a non-standard {@link BlueprintsValueFactory} implementation.
      */
-    public BigdataGraphEmbedded(final BigdataSail sail, 
+    public BigdataGraphEmbedded(final Sail sail, 
             final BlueprintsValueFactory factory, final Properties props) {
-        this(new BigdataSailRepository(sail), factory, props);
+        this(new SailRepository(sail), factory, props);
     }
     
     /**
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance.
      */
-	public BigdataGraphEmbedded(final BigdataSailRepository repo) {
+	public BigdataGraphEmbedded(final SailRepository repo) {
 		this(repo, BigdataRDFFactory.INSTANCE, new Properties());
 	}
 	
@@ -104,14 +103,14 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance with a non-standard {@link BlueprintsValueFactory} implementation.
      */
-	public BigdataGraphEmbedded(final BigdataSailRepository repo, 
+	public BigdataGraphEmbedded(final SailRepository repo, 
 			final BlueprintsValueFactory factory, final Properties props) {
 	    super(factory, props);
 	    
 	    this.repo = repo;
 	}
 	
-	public BigdataSailRepository getRepository() {
+	public SailRepository getRepository() {
 	    return repo;
 	}
 	
@@ -119,7 +118,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
         protected BigdataSailRepositoryConnection initialValue() {
             BigdataSailRepositoryConnection cxn = null;
             try {
-                cxn = repo.getUnisolatedConnection();
+                cxn = ((BigdataSailRepository)repo).getUnisolatedConnection();
                 cxn.setAutoCommit(false);
                 cxn.addChangeLog(BigdataGraphEmbedded.this);
             } catch (Exception ex) {
@@ -138,7 +137,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 	
 	protected BigdataSailRepositoryConnection getReadConnection() throws Exception {
-	    return repo.getReadOnlyConnection();
+	    return ((BigdataSailRepository)repo).getReadOnlyConnection();
 	}
 	
 	@Override
@@ -191,7 +190,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 	
 	public StringBuilder dumpStore() {
-	    return repo.getDatabase().dumpStore();
+	    return ((BigdataSailRepository)repo).getDatabase().dumpStore();
 	}
 	
 	
