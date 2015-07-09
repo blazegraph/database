@@ -74,8 +74,7 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 	public static Test suite() {
 
 		return ProxySuiteHelper.suiteWhenStandalone(TestNanoSparqlClient.class,
-//                "test.*", TestMode.quads
-		        "test_construct_.*", TestMode.quads
+                "test.*", TestMode.quads
 //                , TestMode.sids
 //                , TestMode.triples
                 );
