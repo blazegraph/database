@@ -925,19 +925,8 @@ public class QueryServlet extends BigdataRDFServlet {
 		{
 
 			XMLBuilder.Node current = doc.root("html");
-			{
-				current = current.node("head");
-                current.node("meta")
-                        .attr("http-equiv", "Content-Type")
-                        .attr("content",
-                                "text/html;charset=" + queryTask.charset.name())
-                        .close();
-				current.node("title").textNoEncode("bigdata&#174;").close();
-				current = current.close();// close the head.
-			}
 
-			// open the body
-			current = current.node("body");
+            BigdataRDFContext.addHtmlHeader(current, charset);
 
 			current.node("h1", "Query");
 
@@ -1627,20 +1616,8 @@ public class QueryServlet extends BigdataRDFServlet {
                     final HTMLBuilder doc = new HTMLBuilder(charset, w);
                     
                     XMLBuilder.Node current = doc.root("html");
-                    {
-                        current = current.node("head");
-                        current.node("meta")
-                                .attr("http-equiv", "Content-Type")
-                                .attr("content",
-                                        "text/html;charset=utf-8")
-                                .close();
-                        current.node("title")
-                                .textNoEncode("bigdata&#174;").close();
-                        current = current.close();// close the head.
-                    }
-
-                    // open the body
-                    current = current.node("body");
+                    
+                    BigdataRDFContext.addHtmlHeader(current, charset);
 
                     final IBigdataFederation<?> fed = (IBigdataFederation<?>)// getBigdataRDFContext()
                             getIndexManager();

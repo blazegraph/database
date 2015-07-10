@@ -528,17 +528,9 @@ public class StatusServlet extends BigdataRDFServlet {
             final HTMLBuilder doc = new HTMLBuilder(UTF8, w);
 
             XMLBuilder.Node current = doc.root("html");
-            {
-                current = current.node("head");
-                current.node("meta").attr("http-equiv", "Content-Type").attr(
-                        "content", "text/html;charset=utf-8").close();
-                current.node("title").textNoEncode("bigdata&#174;").close();
-                current = current.close();// close the head.
-            }
 
-            // open the body
-            current = current.node("body");
-
+            BigdataRDFContext.addHtmlHeader(current, charset);
+            
             // Dump Journal?
             final boolean dumpJournal = req.getParameter(DUMP_JOURNAL) != null;
 
