@@ -32,7 +32,11 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDFS;
+import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQuery;
+import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
@@ -105,6 +109,38 @@ public class Test_Ticket_1207<S extends IIndexManager> extends
     	  resultDoNotIncludeInferred.close();
       }
 
+      {
+          final TupleQuery tq = m_repo.getBigdataSailRemoteRepository().getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "SELECT * {?s ?p ?o} LIMIT 100", null);
+          tq.setBinding("s", s);
+          tq.setIncludeInferred(true);
+          TupleQueryResult tqr = tq.evaluate();
+          try {
+              int count = 0;
+              while (tqr.hasNext()) {
+                  tqr.next();
+                  count++;
+               }
+              assertEquals(2,count);
+          } finally {
+               tqr.close();
+          }
+      }
+      {
+          final TupleQuery tq = m_repo.getBigdataSailRemoteRepository().getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "SELECT * {?s ?p ?o} LIMIT 100", null);
+          tq.setBinding("s", s);
+          tq.setIncludeInferred(false);
+          TupleQueryResult tqr = tq.evaluate();
+          try {
+              int count = 0;
+              while (tqr.hasNext()) {
+                  System.out.println(tqr.next());
+                  count++;
+               }
+              assertEquals(1,count);
+          } finally {
+               tqr.close();
+          }
+      }
    }
 
 }

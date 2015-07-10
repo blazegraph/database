@@ -604,6 +604,9 @@ public class QueryServlet extends BigdataRDFServlet {
     	  return;
       }
 
+      final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
+              true/* default */);
+
       try {
 
          final String namespace = getNamespace(req);
@@ -611,7 +614,7 @@ public class QueryServlet extends BigdataRDFServlet {
          final long timestamp = getTimestamp(req);
 
          submitApiTask(
-               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr,
+               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -673,11 +676,12 @@ public class QueryServlet extends BigdataRDFServlet {
 
 		private final String queryStr;
 		private final BigdataRDFContext context;
+		private final boolean includeInferred;
 
       public SparqlQueryTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final String queryStr,
-            final BigdataRDFContext context) {
+            final boolean includeInferred, final BigdataRDFContext context) {
 
          super(req, resp, namespace, timestamp);
 
@@ -688,6 +692,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
          this.queryStr = queryStr;
          this.context = context;
+         this.includeInferred = includeInferred;
          
       }
         
@@ -725,7 +730,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final AbstractQueryTask queryTask = context.getQueryTask(
-							conn, namespace, timestamp, queryStr,
+							conn, namespace, timestamp, queryStr, includeInferred,
 							null/* acceptOverride */, req, resp, os);
 
 					// /*
