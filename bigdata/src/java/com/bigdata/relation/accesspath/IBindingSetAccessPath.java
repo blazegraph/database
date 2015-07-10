@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.relation.accesspath;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IElement;
 import com.bigdata.bop.join.BaseJoinStats;
@@ -61,6 +62,6 @@ public interface IBindingSetAccessPath<R> extends IAbstractAccessPath<R> {
      * @see https://sourceforge.net/apps/trac/bigdata/ticket/209 (Access path
      *      should visit solutions for high level query).
      */
-    ICloseableIterator<IBindingSet[]> solutions(long limit, BaseJoinStats stats);
+    ICloseableIterator<IBindingSet[]> solutions(BOpContext context, long limit, BaseJoinStats stats);
     
 }

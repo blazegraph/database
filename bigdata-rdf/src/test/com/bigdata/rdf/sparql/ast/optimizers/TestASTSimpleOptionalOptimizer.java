@@ -341,7 +341,7 @@ public class TestASTSimpleOptionalOptimizer extends
             		context.getTimestamp()
             		);
             
-            AST2BOpUtility.toVE(globals,
+            AST2BOpUtility.toVE(getBOpContext(), globals,
                     filterNode.getValueExpressionNode());
             
             filters.add(filterNode);

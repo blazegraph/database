@@ -44,8 +44,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
 import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
@@ -55,29 +53,29 @@ import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
  * operation to be applied to the operands is specified by the
  * {@link Annotations#OP} annotation.
  */
-final public class MathBOp extends IVValueExpression 
-		implements INeedsMaterialization { 
+final public class MathBOp extends IVValueExpression
+		implements INeedsMaterialization {
 
     /**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 9136864442064392445L;
-	
+
 	private static final transient Logger log = Logger.getLogger(MathBOp.class);
-	
+
     public interface Annotations extends IVValueExpression.Annotations {
 
         /**
          * The operation to be applied to the left and right operands
          * (required). The value of this annotation is a {@link MathOp}, such as
          * {@link MathOp#PLUS}.
-         * 
+         *
          * @see MathOp
          */
         String OP = (MathBOp.class.getName() + ".op").intern();
 
     }
-    
+
 	public enum MathOp {
 		PLUS,
 		MINUS,
@@ -99,9 +97,9 @@ final public class MathBOp extends IVValueExpression
 			throw new IllegalArgumentException();
 		}
 	}
-    
+
     /**
-     * 
+     *
      * @param left
      *            The left operand.
      * @param right
@@ -110,7 +108,7 @@ final public class MathBOp extends IVValueExpression
      *            The annotation specifying the operation to be performed on
      *            those operands.
      */
-    public MathBOp(final IValueExpression<? extends IV> left, 
+    public MathBOp(final IValueExpression<? extends IV> left,
     		final IValueExpression<? extends IV> right, final MathOp op,
     		final GlobalAnnotations globals) {
 
@@ -120,14 +118,14 @@ final public class MathBOp extends IVValueExpression
 
 	/**
 	 * Required shallow copy constructor.
-	 * 
+	 *
 	 * @param args
 	 *            The operands.
 	 * @param op
 	 *            The operation.
 	 */
     public MathBOp(final BOp[] args, final Map<String, Object> anns) {
-    
+
         super(args, anns);
 
 		if (args.length != 2 || args[0] == null || args[1] == null
@@ -135,62 +133,55 @@ final public class MathBOp extends IVValueExpression
 				|| getProperty(Annotations.NAMESPACE)==null) {
 
 			throw new IllegalArgumentException();
-		
+
 		}
 
     }
 
     /**
      * Constructor required for {@link com.bigdata.bop.BOpUtility#deepCopy(FilterNode)}.
-     * 
+     *
      * @param op
      */
     public MathBOp(final MathBOp op) {
 
         super(op);
-        
+
     }
 
     final public IV get(final IBindingSet bs) {
-        
+
         final IV iv1 = getAndCheckLiteral(0, bs);
         final IV iv2 = getAndCheckLiteral(1, bs);
-        
+
     	if (log.isDebugEnabled()) {
     		log.debug(toString(iv1.toString(), iv2.toString()));
     	}
-    	
+
 		final Literal lit1 = asLiteral(iv1);
 		final Literal lit2 = asLiteral(iv2);
 
-		if (MathUtility.checkNumericDatatype(lit1, lit2)) {
-			
-			return MathUtility.literalMath(lit1, lit2, op());
-			
-		} else if (DateTimeUtility.checkDateTimeDatatype(lit1, lit2)) {
-		
-			final IV iv = 
-				DateTimeUtility.dateTimeMath(lit1, iv1, lit2, iv2, op(), vf());
-			
-			// try to create a real IV if possible
-			if (iv.isNullIV()) {
-				
-				final BigdataValue val = iv.getValue();
-				
-				return asIV(val, bs);
-				
-			} else {
-				
-				return iv;
-				
-			}
-			
+		ILexiconConfiguration<?> lexicon = getLexiconConfiguration(bs);
+
+		for (IMathOpHandler handler: lexicon.getTypeHandlers()) {
+		    if (handler.canInvokeMathOp(lit1, lit2)) {
+		        final IV iv =
+		                handler.doMathOp(lit1, iv1, lit2, iv2, op(), vf());
+
+		        // try to create a real IV if possible
+		        if (iv.isNullIV()) {
+		            final BigdataValue val = iv.getValue();
+		            return asIV(val, bs);
+		        } else {
+		            return iv;
+		        }
+		    }
 		}
-    		
+
     	if (log.isDebugEnabled()) {
     		log.debug("illegal argument(s), filtering solution: " + iv1 + ", " + iv2);
     	}
-    	
+
     	throw new SparqlTypeErrorException();
 
     }
@@ -198,51 +189,51 @@ final public class MathBOp extends IVValueExpression
     public IValueExpression<? extends IV> left() {
     	return get(0);
     }
-    
+
     public IValueExpression<? extends IV> right() {
     	return get(1);
     }
-    
+
     public MathOp op() {
     	return (MathOp) getRequiredProperty(Annotations.OP);
     }
-    
+
     public BigdataValueFactory vf(){
         return super.getValueFactory();
     }
-    
+
     public String toString() {
 
     	final StringBuilder sb = new StringBuilder();
     	sb.append(op());
     	sb.append("(").append(left()).append(", ").append(right()).append(")");
     	return sb.toString();
-        
+
     }
-    
+
     private String toString(final String left, final String right) {
-    	
+
     	final StringBuilder sb = new StringBuilder();
     	sb.append(op());
     	sb.append("(").append(left).append(", ").append(right).append(")");
     	return sb.toString();
-    	
+
     }
 
     final public boolean equals(final MathBOp m) {
 
     	if (m == null)
     		return false;
-    	
-    	if (this == m) 
+
+    	if (this == m)
     		return true;
-    	
+
     	return op().equals(m.op()) &&
     		left().equals(m.left()) &&
     		right().equals(m.right());
 
     }
-    
+
     final public boolean equals(final IVValueExpression o) {
 
     	if(!(o instanceof MathBOp)) {
@@ -250,17 +241,17 @@ final public class MathBOp extends IVValueExpression
             return false;
         }
         return equals((MathBOp) o);
-        
+
     }
-    
-    
+
+
 	/**
 	 * Caches the hash code.
 	 */
 	private int hash = 0;
 
 	public int hashCode() {
-		
+
 		int h = hash;
 		if (h == 0) {
 			final int n = arity();
@@ -271,15 +262,15 @@ final public class MathBOp extends IVValueExpression
 			hash = h;
 		}
 		return h;
-		
+
 	}
 
     /**
      * The MathBOp can work on inline numerics. It is only when the operands
-     * evaluate to non-inline numerics that this bop needs materialization.  
+     * evaluate to non-inline numerics that this bop needs materialization.
      */
     public Requirement getRequirement() {
     	return INeedsMaterialization.Requirement.SOMETIMES;
     }
-    
+
 }

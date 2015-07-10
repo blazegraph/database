@@ -55,6 +55,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 
     <property file="build.properties" />
 
+
     <!-- build-time classpath. -->
     <path id="build.classpath">
         <fileset dir="${bigdata.dir}/bigdata/lib">
@@ -2138,7 +2139,9 @@ ${postInstallMessage}</echo>
       <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
 
       <!-- The zookeeper install directory. -->
-      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+      <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+      </condition>
 
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
