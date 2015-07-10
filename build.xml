@@ -2273,8 +2273,9 @@ ${postInstallMessage}</echo>
         <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
             <arg value="start"/>
         </exec>
-        <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-            <arg value="start"/>
+        <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+        	<arg value="/C"/>
+            <arg value="zkServer.cmd start"/>
         </exec>
     </target>
 
@@ -2285,8 +2286,9 @@ ${postInstallMessage}</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
         <arg value="stop"/>
     </exec>
-    <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-        <arg value="stop"/>
+    <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+    	<arg value="/C"/>
+    	<arg value="zkServer.cmd stop"/>
     </exec>
     </target>
 
