@@ -1610,12 +1610,14 @@ public class QueryServlet extends BigdataRDFServlet {
 
             String mimeType = null;
             RDFFormat format = null;
-			for (String mt: mimeTypes) {
-                RDFFormat fmt = RDFWriterRegistry.getInstance()
-                     .getFileFormatForMIMEType(mt);
-                if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
-                    mimeType = mt;
-                    format = fmt;
+            if (mimeTypes!=null) {
+                for (String mt: mimeTypes) {
+                    RDFFormat fmt = RDFWriterRegistry.getInstance()
+                        .getFileFormatForMIMEType(mt);
+                    if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
+                        mimeType = mt;
+                        format = fmt;
+                    }
                 }
             }
             if (format==null) {
