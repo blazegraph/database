@@ -32,6 +32,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 
 import com.bigdata.blueprints.BigdataGraphBulkLoad;
+import com.bigdata.journal.ITx;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.webapp.AbstractRestApiTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
@@ -86,7 +87,7 @@ public class BlueprintsServlet extends BlueprintsServletProxy {
             
             submitApiTask(
                     new BlueprintsPostTask(req, resp, getNamespace(req),
-                            getTimestamp(req))).get();
+                    		ITx.UNISOLATED)).get();
 
         } catch (Throwable t) {
 
