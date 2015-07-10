@@ -172,12 +172,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
    /**
     * {@inheritDoc}
-    * 
-    * FIXME (***) includeInferred is currently ignored by getStatements() (in the
-    * delegate RemoteRepository class).
-    * 
-    * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
-    *      ignores includeInferred (REST API) </a>
     */
 	@Override
 	public RepositoryResult<Statement> getStatements(final Resource s,
