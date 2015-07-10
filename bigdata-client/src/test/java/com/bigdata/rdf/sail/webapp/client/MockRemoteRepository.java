@@ -1,6 +1,7 @@
 package com.bigdata.rdf.sail.webapp.client;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -11,6 +12,7 @@ import org.eclipse.jetty.client.HttpResponse;
 import org.eclipse.jetty.client.api.Response.ResponseListener;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.MimeTypes;
 
 public class MockRemoteRepository extends RemoteRepository {
 
@@ -47,15 +49,11 @@ public class MockRemoteRepository extends RemoteRepository {
 								return 200;
 							};
 							
-//							@Override
-//							public InputStream getInputStream() {
-//								return new ByteArrayInputStream(responseJson.getBytes(Charset.forName("UTF-8")));
-//							}
 						};
-						response.getHeaders().add(HttpHeader.CONTENT_TYPE, "application/json");
+						response.getHeaders().add(HttpHeader.CONTENT_TYPE, MimeTypes.Type.APPLICATION_JSON.toString());
 						((JettyResponseListener)listener).onHeaders(response);
 						java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(responseJson.length());
-						buf.put(responseJson.getBytes(Charset.forName("UTF-8")));
+						buf.put(responseJson.getBytes(Charset.forName(StandardCharsets.UTF_8.name())));
 						buf.flip();
 						((JettyResponseListener)listener).onContent(response, buf);
 						((JettyResponseListener)listener).onSuccess(response);
@@ -70,33 +68,12 @@ public class MockRemoteRepository extends RemoteRepository {
 		};
 		Executor executor = Executors.newCachedThreadPool();
 		RemoteRepositoryManager mgr = new RemoteRepositoryManager(serviceURL,
-	            httpClient, executor) {
+				httpClient, executor) {
 			@Override
 			public JettyResponseListener doConnect(ConnectOptions opts) throws Exception {
 				// Store connection options
 				data.opts = opts;
 				return super.doConnect(opts);
-//				HttpRequest request = new HttpRequest(new HttpClient(), null, URI.create("")){};
-//				return new JettyResponseListener(request, 0){
-//					@Override
-//					public Response get(long timeout, TimeUnit unit)
-//							throws InterruptedException, TimeoutException,
-//							ExecutionException {
-//						return new HttpResponse(request, null);
-//					}
-//					@Override
-//					public int getStatus() throws IOException {
-//						return 200;
-//					}
-//					@Override
-//					public String getContentType() throws IOException {
-//						return "application/json";
-//					}
-//					@Override
-//					public InputStream getInputStream() {
-//						return new ByteArrayInputStream(responseJson.getBytes(Charset.forName("UTF-8")));
-//					}
-//				};
 			}
 		};
 
