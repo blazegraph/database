@@ -709,6 +709,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
             final Query query = conn.prepareGraphQuery(QueryLanguage.SPARQL,
                   queryString);
+            query.setIncludeInferred(false);
 
             final GraphQueryResult gqr = ((GraphQuery) query).evaluate();
 
@@ -723,6 +724,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
          case SELECT: {
             final Query query = conn.prepareTupleQuery(QueryLanguage.SPARQL,
                   queryString);
+            query.setIncludeInferred(false);
 
             final TupleQueryResult queryResult = ((TupleQuery) query)
                   .evaluate();
