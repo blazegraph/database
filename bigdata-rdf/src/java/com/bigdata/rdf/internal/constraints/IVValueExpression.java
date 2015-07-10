@@ -32,7 +32,7 @@ import org.openrdf.model.Value;
 import com.bigdata.bop.AbstractAccessPathOp;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpBase;
-import com.bigdata.bop.BOpContext;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
@@ -48,6 +48,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.DummyConstantNode;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 
 /**
@@ -311,11 +312,11 @@ public abstract class IVValueExpression<T extends IV> extends BOpBase
                          * received at a node on a cluster.
                          */
 
-                        throw new ContextNotAvailableException();
+                        throw new ContextNotAvailableException(this.toString());
 
                     }
 
-                    final BOpContext<?> context = ((ContextBindingSet) bset)
+                    final BOpContextBase context = ((ContextBindingSet) bset)
                             .getBOpContext();
 
                     final String namespace = getNamespace();

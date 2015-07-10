@@ -16,11 +16,13 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.BufferAnnotations;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
@@ -87,10 +89,10 @@ import com.bigdata.bop.solutions.SliceOp;
 import com.bigdata.bop.solutions.SortOrder;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.CoalesceBOp;
 import com.bigdata.rdf.internal.constraints.ConditionalBind;
-import com.bigdata.rdf.internal.constraints.ContextNotAvailableException;
 import com.bigdata.rdf.internal.constraints.INeedsMaterialization.Requirement;
 import com.bigdata.rdf.internal.constraints.InBOp;
 import com.bigdata.rdf.internal.constraints.IsBoundBOp;
@@ -103,6 +105,7 @@ import com.bigdata.rdf.internal.constraints.XSDBooleanIVValueExpression;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.literal.NumericIV;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sparql.ast.ASTBase;
@@ -233,9 +236,13 @@ public class AST2BOpUtility extends AST2BOpRTO {
          * solution set stats.
          */
         ctx.setSolutionSetStats(SolutionSetStatserator.get(globallyScopedBindings));
-        
-        ctx.setStaticAnalysisStats(
-           new StaticAnalysisStats(astContainer.getQueryParseTime()));
+
+        final StaticAnalysisStats stats = new StaticAnalysisStats();
+        // register parser call if parse information is available
+        if (astContainer!=null && astContainer.getQueryParseTime()!=null) {
+           stats.registerParserCall(astContainer.getQueryParseTime());
+        }
+        ctx.setStaticAnalysisStats(stats);
         
         /**
          * By definition of the API, the mappings passed in from Sesame
@@ -4984,6 +4991,38 @@ public class AST2BOpUtility extends AST2BOpRTO {
         
     }
     
+//    /**
+//     * Convert an {@link IValueExpressionNode} (recursively) to an
+//     * {@link IValueExpression}. If the {@link IValueExpression} can be reduced
+//     * to an {@link IConstant}, then that {@link IConstant} will be be returned
+//     * instead. Either way, the {@link IValueExpression} is set on the
+//     * {@link IValueExpressionNode} as a side effect.
+//     * 
+//     * @param globals
+//     *            The global annotations, including the lexicon namespace.
+//     * @param node
+//     *            The expression to convert.
+//     * 
+//     * @return The converted expression.
+//     * 
+//     * @see ASTSetValueExpressionsOptimizer
+//     * 
+//     * @see BLZG-1343 (MathBOp and DateTime abstraction)
+//     * 
+//     * @deprecated by the version that accepts the BOpContextBase. See
+//     *             BLZG-1372:: Callers should be refactored to pass in the
+//     *             BOpContextBase from {@link AST2BOpContext#context} in order
+//     *             to allow correct resolution of the {@link LexiconRelation}
+//     *             and {@link ILexiconConfiguration} required to properly
+//     *             evaluate {@link IValueExpression}s.
+//     */
+//    @SuppressWarnings("rawtypes")
+//    public static final IValueExpression<? extends IV> toVE(
+//            final GlobalAnnotations globals,
+//            final IValueExpressionNode node) {
+//        return toVE(null/*context*/,globals,node);
+//    }
+    
     /**
      * Convert an {@link IValueExpressionNode} (recursively) to an
      * {@link IValueExpression}. If the {@link IValueExpression} can be reduced
@@ -4991,27 +5030,48 @@ public class AST2BOpUtility extends AST2BOpRTO {
      * instead. Either way, the {@link IValueExpression} is set on the
      * {@link IValueExpressionNode} as a side effect.
      * 
+     * @param context
+     *            The {@link BOpContextBase} is required in order to resolve the
+     *            {@link ILexiconConfiguration} and {@link LexiconRelation}.
+     *            These are required for the evaluation of some
+     *            {@link IValueExpression}s.
      * @param globals
      *            The global annotations, including the lexicon namespace.
      * @param node
      *            The expression to convert.
      * 
      * @return The converted expression.
+     * @throws IllegalArgumentException
+     *             if any argument is <code>null</code>.
      * 
      * @see ASTSetValueExpressionsOptimizer
+     * 
+     * @see BLZG-1372 toVE() was refactored to pass in the
+     *      {@link BOpContextBase} to allow correct resolution of the
+     *      {@link LexiconRelation} and {@link ILexiconConfiguration} in order
+     *      to properly evaluate {@link IValueExpression}s during query
+     *      optimization.
      */
     @SuppressWarnings("rawtypes")
     public static final IValueExpression<? extends IV> toVE(
+            final BOpContextBase context,
     		final GlobalAnnotations globals,
             final IValueExpressionNode node) {
 
+        if (context == null)
+            throw new IllegalArgumentException();
+        if (globals == null)
+            throw new IllegalArgumentException();
+        if (node == null)
+            throw new IllegalArgumentException();
+
         // Convert AST value expr node => IValueExpressionNode.
-        final IValueExpression<? extends IV> ve1 = toVE1(globals, node);
+        final IValueExpression<? extends IV> ve1 = toVE1(context, globals, node);
 
         // Reduce IValueExpressionNode to constant when possible.
         try {
 
-            final IValueExpression<? extends IV> ve2 = toVE2(ve1);
+            final IValueExpression<? extends IV> ve2 = toVE2(context, ve1);
 
             if (ve2 != ve1) {
 
@@ -5024,19 +5084,19 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
             return ve1;
 
-        } catch (ContextNotAvailableException ex) {
-            
-            /*
-             * The value expression could not be evaluated because it could not
-             * resolve the ILexiconConfiguration from the EmptyBindingSet.
-             * 
-             * TODO This is thrown during query optimization since the necessary
-             * context is not available at that point. That should be fixed, but
-             * it is a static method invocation so we would have to touch a lot
-             * of code.
-             */
-        
-            return ve1;
+//        } catch (ContextNotAvailableException ex) {
+//            
+//            /*
+//             * The value expression could not be evaluated because it could not
+//             * resolve the ILexiconConfiguration from the EmptyBindingSet.
+//             * 
+//             * TODO This is thrown during query optimization since the necessary
+//             * context is not available at that point. That should be fixed, but
+//             * it is a static method invocation so we would have to touch a lot
+//             * of code. [Fixed in BLZG-1343].
+//             */
+//        
+//            return ve1;
 
         } catch (SparqlTypeErrorException ex) {
 
@@ -5070,6 +5130,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      */
     @SuppressWarnings("rawtypes")
     private static final IValueExpression<? extends IV> toVE2(
+            final BOpContextBase context,//
             final IValueExpression<? extends IV> ve) {
 
         if (ve instanceof IVariableOrConstant) {
@@ -5143,9 +5204,10 @@ public class AST2BOpUtility extends AST2BOpRTO {
             }
 
         }
-            
+
+        // BLZG-1343 (MathBOp and DateTime abstraction)
         final IValueExpression<? extends IV> ve2 = new Constant<IV>(
-                ve.get(EmptyBindingSet.INSTANCE));
+                ve.get(new ContextBindingSet(context, EmptyBindingSet.INSTANCE)));
 
 //        System.err.println("ve=" + ve + " => " + ve2);
 
@@ -5169,6 +5231,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
      */
     @SuppressWarnings("rawtypes")
     private static final IValueExpression<? extends IV> toVE1(
+            final BOpContextBase context,
     		final GlobalAnnotations globals,
             final IValueExpressionNode node) {
 
@@ -5197,7 +5260,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final IValueExpressionNode valueExpr = assignment
                     .getValueExpressionNode();
 
-            final IValueExpression<? extends IV> ve = toVE(globals, valueExpr);
+            final IValueExpression<? extends IV> ve = toVE(context, globals, valueExpr);
 
             return ve;
 
@@ -5213,7 +5276,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
                     new ValueExpressionNode[functionNode.arity()]);
 
             final IValueExpression<? extends IV> ve = FunctionRegistry.toVE(
-                    globals, functionURI, scalarValues, args);
+                    context, globals, functionURI, scalarValues, args);
 
             functionNode.setValueExpression(ve);
 

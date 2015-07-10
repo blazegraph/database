@@ -42,7 +42,10 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.bop.ContextBindingSet;
+import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.engine.AbstractQueryEngineTestCase;
@@ -50,9 +53,11 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
+import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sail.BigdataSail;
@@ -85,12 +90,34 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
 
     protected String baseURI = null;
 
+    private BOpContextBase context = null;
+    
+    /**
+     * Return the context for evaluation of {@link IValueExpression}s during
+     * query optimization.
+     * 
+     * @return The context that can be used to resolve the
+     *         {@link ILexiconConfiguration} and {@link LexiconRelation} for
+     *         evaluation if {@link IValueExpression}s during query
+     *         optimization. (During query evaluation this information is passed
+     *         into the pipeline operators by the {@link ContextBindingSet}.)
+     * 
+     * @see BLZG-1372
+     */
+    public BOpContextBase getBOpContext() {
+
+        return context;
+        
+    }
+    
     @Override
     protected void setUp() throws Exception {
         
         super.setUp();
         
         store = getStore(getProperties());
+
+        context = new BOpContextBase(null/* fed */, store.getIndexManager());
         
         valueFactory = store.getValueFactory();
         
@@ -112,6 +139,8 @@ public class AbstractASTEvaluationTestCase extends AbstractQueryEngineTestCase {
         
         }
 
+        context = null;
+        
         valueFactory = null;
         
         baseURI = null;

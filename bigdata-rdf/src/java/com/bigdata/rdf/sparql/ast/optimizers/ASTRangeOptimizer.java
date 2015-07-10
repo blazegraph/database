@@ -33,6 +33,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
 
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.rdf.internal.IV;
@@ -67,7 +68,8 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     /**
      * Optimize the join group, attach range nodes.
      */
-    @SuppressWarnings("rawtypes")
+//    @SuppressWarnings("rawtypes")
+	@Override
 	protected void optimizeJoinGroup(final AST2BOpContext ctx, 
     		final StaticAnalysis sa, final IBindingSet[] bSets, final JoinGroupNode group) {
 
@@ -141,7 +143,7 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
 
 			final RangeNode range = ranges.get(v);
 			
-			final RangeBOp bop = toRangeBOp(range, globals);
+			final RangeBOp bop = toRangeBOp(ctx.getBOpContext(), range, globals);
 			
 			if (log.isDebugEnabled()) {
 				log.debug("attaching a range:\n" + range + "\n to statement pattern: " + sp);
@@ -156,9 +158,11 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     }
     
     /**
-     * Public static faciliatates the test cases.
+     * Public static facilitates the test cases.
      */
+    @SuppressWarnings("rawtypes")
     public static RangeBOp toRangeBOp(
+            final BOpContextBase context,
     		final RangeNode range, final GlobalAnnotations globals) {
     	
 //    	final IVariable<? extends IV> var = range.var().getValueExpression();
@@ -170,7 +174,7 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     	if (from != null) {
     		
     		final IValueExpression<? extends IV> ve = 
-    			AST2BOpUtility.toVE(globals, from);
+    			AST2BOpUtility.toVE(context, globals, from);
     		
     		bop.setFrom(ve);
     		
@@ -181,7 +185,7 @@ public class ASTRangeOptimizer extends AbstractJoinGroupOptimizer
     	if (to != null) {
     		
     		final IValueExpression<? extends IV> ve = 
-    			AST2BOpUtility.toVE(globals, to);
+    			AST2BOpUtility.toVE(context, globals, to);
     		
     		bop.setTo(ve);
     		

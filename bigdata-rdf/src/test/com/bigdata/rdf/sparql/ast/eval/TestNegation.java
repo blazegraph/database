@@ -703,7 +703,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 
                 whereClause.addChild(filter1);
 
-                AST2BOpUtility.toVE(globals, filter1.getValueExpressionNode());
+                AST2BOpUtility.toVE(getBOpContext(), globals, filter1.getValueExpressionNode());
 
             }           
             
@@ -729,7 +729,7 @@ public class TestNegation extends AbstractDataDrivenSPARQLTestCase {
                 
                 whereClause.addChild(filter2);
                 
-                AST2BOpUtility.toVE(globals, filter2.getValueExpressionNode());
+                AST2BOpUtility.toVE(getBOpContext(), globals, filter2.getValueExpressionNode());
                 
             }         
 
