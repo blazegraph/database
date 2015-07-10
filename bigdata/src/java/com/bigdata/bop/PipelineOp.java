@@ -306,7 +306,7 @@ abstract public class PipelineOp extends BOpBase {
     final public long getChunkTimeout() {
         
         return getProperty(Annotations.CHUNK_TIMEOUT,
-                Annotations.DEFAULT_CHUNK_TIMEOUT);
+                (long)Annotations.DEFAULT_CHUNK_TIMEOUT);
         
     }
 

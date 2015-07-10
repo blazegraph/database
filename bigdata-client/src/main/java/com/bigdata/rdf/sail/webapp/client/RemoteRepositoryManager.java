@@ -73,6 +73,7 @@ import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.PropertyUtil;
 
 /**
  * A manager for connections to one or more REST API / SPARQL end points for the
@@ -742,8 +743,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 //                    + OPTION_CREATE_KB_NAMESPACE);
 
         // Set the namespace property.
-        final Properties tmp = new Properties();
-        tmp.putAll(properties);
+        final Properties tmp = PropertyUtil.flatCopy(properties);
         tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
         
         /*
