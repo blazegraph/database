@@ -124,6 +124,9 @@ public class QueryHintRegistry {
         add(new DescribeIterationLimitHint());
         add(new DescribeStatementLimitHint());
 
+        // CONSTRUCT
+        add(new ConstructDistinctSPOHint());
+        
         /*
          * BufferAnnotations
          * 

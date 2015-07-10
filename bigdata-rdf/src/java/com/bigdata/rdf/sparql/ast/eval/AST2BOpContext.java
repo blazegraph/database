@@ -160,7 +160,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * Factory for resolving relations and access paths used primarily by
      * {@link AST2BOpJoins}s.
      */
-    final BOpContextBase context;
+    public final BOpContextBase context;
     
     /**
      * When <code>true</code>, may use the version of DISTINCT which operates on
@@ -261,7 +261,16 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      *      RDF Value materialization performance on cluster </a>
      */
     boolean materializeProjectionInQuery = false;
-    
+
+    /**
+     * Set by the {@link ConstructDistinctSPOHint}. When <code>false</code>, no
+     * DISTINCT SPO filter will be imposed by the {@link ASTConstructIterator}.
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1341 (performance of dumping
+     *      single graph)
+     */
+    public boolean constructDistinctSPO = QueryHints.DEFAULT_CONSTRUCT_DISTINCT_SPO;
+
     /**
      * When <code>true</code>, force the use of REMOTE access paths in scale-out
      * joins.
@@ -641,6 +650,13 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         return db.getLexiconRelation().getNamespace();
 
+    }
+    
+    @Override
+    public BOpContextBase getBOpContext() {
+
+        return context;
+        
     }
 
     /**

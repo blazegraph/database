@@ -34,6 +34,7 @@ import org.openrdf.rio.ntriples.NTriplesUtil;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataStatement;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 
 /**
  * RDF parser for N-Triples files. A specification of NTriples can be found in
@@ -154,7 +155,10 @@ public class BigdataNTriplesParser extends RDFParserBase {
 	 * create object for resources, bNodes and literals.
 	 */
 	public BigdataNTriplesParser() {
-		super();
+		// We are providing Bigdata-specific value factory to support parsing of RDR,
+		// which require BigdataValueFactory instead of default Sesame implementation
+		// See https://jira.blazegraph.com/browse/BLZG-1322
+		super(BigdataValueFactoryImpl.getInstance(""));
 	}
 
 	/**

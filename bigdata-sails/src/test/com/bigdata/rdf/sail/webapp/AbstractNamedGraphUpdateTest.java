@@ -27,23 +27,21 @@ import java.io.IOException;
 
 import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 
-
-
 /**
  * This class is concerning the issues raised in trac 804
  * 
- * @see <a href="http://trac.blazegraph.com/ticket/804" >update bug deleting
- *      quads</a>
- * @author jeremycarroll
+ * @see <a href="https://jira.blazegraph.com/browse/BLZG-885" >update bug
+ *      deleting quads</a>
  * 
+ * @author jeremycarroll
  */
 public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 	
-	private static String distinctHintFalse = "    hint:Query hint:nativeDistinctSPO false . \n";
-	private static String distinctHintTrue = "    hint:Query hint:nativeDistinctSPO true . \n";
+	private final static String distinctHintFalse = "    hint:Query hint:nativeDistinctSPO false . \n";
+	private final static String distinctHintTrue = "    hint:Query hint:nativeDistinctSPO true . \n";
 	private final boolean nativeDistinct;
 	
-	public AbstractNamedGraphUpdateTest(boolean nativeDistinct, String name)  {
+	public AbstractNamedGraphUpdateTest(final boolean nativeDistinct, final String name)  {
 		super(name);
 		this.nativeDistinct = nativeDistinct;
 	}
@@ -97,7 +95,7 @@ public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 	
 	
 	private void makeUpdate(String update) throws IOException {
-		boolean hasHint = update.contains(distinctHintFalse);
+		final boolean hasHint = update.contains(distinctHintFalse);
 		if (hasHint) {
 			ASTConstructIterator.flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = false;
 			if (nativeDistinct) {
@@ -205,6 +203,7 @@ public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 		assertQuad("<eg:A>","<eg:x> rdf:type ?x");
 		assertQuad("<eg:B>","<eg:x> rdf:type ?x ");
 	}
+	
 	public void test_double_triple_delete_insert() throws  IOException {
 		makeUpdate( "prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
 			    "INSERT DATA\n" +
@@ -267,6 +266,7 @@ public class AbstractNamedGraphUpdateTest extends AbstractProtocolTest {
 		assertQuad("<eg:AA>","<eg:B> <eg:moveTo> <eg:BB>");
 		assertQuad("<eg:BB>","<eg:B> <eg:moveTo> <eg:BB> ");
 	}
+
 	public void test_triple_template_and_fixed_insert() throws  IOException {
 		makeUpdate( "prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n" +
 			    "INSERT DATA\n" +

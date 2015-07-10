@@ -27,10 +27,13 @@ import java.math.BigDecimal;
 
 import junit.framework.TestCase2;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.TestMockUtility;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.ITx;
@@ -46,6 +49,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -61,19 +65,14 @@ public class TestAVERAGE extends TestCase2 {
 	public TestAVERAGE(String name) {
 		super(name);
 	}
-
-    private GlobalAnnotations globals;
     
     protected void setUp() throws Exception {
 
         super.setUp();
         
-        globals = new GlobalAnnotations(getName(), ITx.READ_COMMITTED);
     }
     
     protected void tearDown() throws Exception {
-        
-        globals = null;
         
         super.tearDown();
         
@@ -135,61 +134,70 @@ public class TestAVERAGE extends TestCase2 {
 
     public void test_average_with_complex_inner_value_expression() {
         
-        final IVariable<IV> org = Var.var("org");
-        final IVariable<IV> auth = Var.var("auth");
-        final IVariable<IV> book = Var.var("book");
-        final IVariable<IV> lprice = Var.var("lprice");
+       AbstractTripleStore kb = TestMockUtility.mockTripleStore(getName());
+       try {
+           final BOpContext<IBindingSet> context = TestMockUtility.mockContext(kb);
+           final String lexiconNamespace = kb.getLexiconRelation().getNamespace();
 
-        final IConstant<String> org1 = new Constant<String>("org1");
-        final IConstant<String> org2 = new Constant<String>("org2");
-        final IConstant<String> auth1 = new Constant<String>("auth1");
-        final IConstant<String> auth2 = new Constant<String>("auth2");
-        final IConstant<String> auth3 = new Constant<String>("auth3");
-        final IConstant<String> book1 = new Constant<String>("book1");
-        final IConstant<String> book2 = new Constant<String>("book2");
-        final IConstant<String> book3 = new Constant<String>("book3");
-        final IConstant<String> book4 = new Constant<String>("book4");
-        final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(5));
-        final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(7));
-        final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
-                new XSDNumericIV<BigdataLiteral>(9));
+           GlobalAnnotations globals = new GlobalAnnotations(lexiconNamespace, ITx.READ_COMMITTED);
 
-        /**
-         * The test data:
-         * 
-         * <pre>
-         * ?org  ?auth  ?book  ?lprice
-         * org1  auth1  book1  9
-         * org1  auth1  book3  5
-         * org1  auth2  book3  7
-         * org2  auth3  book4  7
-         * </pre>
-         */
-        final IBindingSet data [] = new IBindingSet []
-        {
-            new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } )
-          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } )
-          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } )
-          , new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } )
-        };
-
-        // AVERAGE(lprice*2)
-        final AVERAGE op = new AVERAGE(false/* distinct */, new MathBOp(lprice,
-                new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY, globals));
-        assertFalse(op.isDistinct());
-        assertFalse(op.isWildcard());
-
-        op.reset();
-        for (IBindingSet bs : data) {
-            op.get(bs);
-        }
-        assertEquals(
-                new XSDDecimalIV(BigDecimal
-                        .valueOf((9 * 2 + 5 * 2 + 7 * 2 + 7 * 2) / 4.)),
-                op.done());
-
+           final IVariable<IV> org = Var.var("org");
+           final IVariable<IV> auth = Var.var("auth");
+           final IVariable<IV> book = Var.var("book");
+           final IVariable<IV> lprice = Var.var("lprice");
+   
+           final IConstant<String> org1 = new Constant<String>("org1");
+           final IConstant<String> org2 = new Constant<String>("org2");
+           final IConstant<String> auth1 = new Constant<String>("auth1");
+           final IConstant<String> auth2 = new Constant<String>("auth2");
+           final IConstant<String> auth3 = new Constant<String>("auth3");
+           final IConstant<String> book1 = new Constant<String>("book1");
+           final IConstant<String> book2 = new Constant<String>("book2");
+           final IConstant<String> book3 = new Constant<String>("book3");
+           final IConstant<String> book4 = new Constant<String>("book4");
+           final IConstant<XSDNumericIV<BigdataLiteral>> price5 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(5));
+           final IConstant<XSDNumericIV<BigdataLiteral>> price7 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(7));
+           final IConstant<XSDNumericIV<BigdataLiteral>> price9 = new Constant<XSDNumericIV<BigdataLiteral>>(
+                   new XSDNumericIV<BigdataLiteral>(9));
+   
+           /**
+            * The test data:
+            * 
+            * <pre>
+            * ?org  ?auth  ?book  ?lprice
+            * org1  auth1  book1  9
+            * org1  auth1  book3  5
+            * org1  auth2  book3  7
+            * org2  auth3  book4  7
+            * </pre>
+            */
+           final IBindingSet data [] = new IBindingSet []
+           {
+               new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book1, price9 } ))
+             , new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth1, book2, price5 } ))
+             , new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org1, auth2, book3, price7 } ))
+             , new ContextBindingSet(context, new ListBindingSet ( new IVariable<?> [] { org, auth, book, lprice }, new IConstant [] { org2, auth3, book4, price7 } ))
+           };
+   
+           // AVERAGE(lprice*2)
+           final AVERAGE op = new AVERAGE(false/* distinct */, new MathBOp(lprice,
+                   new Constant<IV>(new XSDNumericIV(2)), MathBOp.MathOp.MULTIPLY, globals));
+           assertFalse(op.isDistinct());
+           assertFalse(op.isWildcard());
+   
+           op.reset();
+           for (IBindingSet bs : data) {
+               op.get(bs);
+           }
+           assertEquals(
+                   new XSDDecimalIV(BigDecimal
+                           .valueOf((9 * 2 + 5 * 2 + 7 * 2 + 7 * 2) / 4.)),
+                   op.done());
+       } finally {
+          kb.getIndexManager().destroy();
+       }
     }
 
     public void test_average_with_null() {

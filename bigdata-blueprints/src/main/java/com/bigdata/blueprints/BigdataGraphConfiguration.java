@@ -49,25 +49,42 @@ public class BigdataGraphConfiguration implements GraphConfiguration {
         String TYPE_EMBEDDED = "embedded";
         
         /**
-         * Specifies that a remote bigdata instance should be used.
+         * Specifies that a remote bigdata instance should be used. You MUST
+         * also specify one of the following combinations:
+         * <dl>
+         * <dt>{@link #HOST} + {@link #PORT}</dt>
+         * <dd>The connect to the default namespace on that host.</dd>
+         * <dt>{@link #SPARQL_ENDPOINT_URL}</dt>
+         * <dd>To connect to a specific namespace using the SPARQL endpoint URL.
+         * </dd>
+         * </dl>
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1374
          */
         String TYPE_REMOTE = "remote";
-    
+
         /**
          * Journal file for an embedded bigdata instance.
          */
         String FILE = "properties.file";
-        
+
         /**
          * Host for a remote bigdata instance.
          */
         String HOST = "properties.host";
-        
+
         /**
          * Port for a remote bigdata instance.
          */
         String PORT = "properties.port";
-    
+
+        /**
+         * To connect to a specific namespace using the SPARQL endpoint URL
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1374
+         */
+        String SPARQL_ENDPOINT_URL = "properties.sparqlEndpointURL";
+        
     }
     
     /**
@@ -119,6 +136,14 @@ public class BigdataGraphConfiguration implements GraphConfiguration {
             }
             
         } else if (Options.TYPE_REMOTE.equals(type)) {
+
+            if (config.containsKey(Options.SPARQL_ENDPOINT_URL)) {
+                
+                final String sparqlEndpointURL = config.getString(Options.SPARQL_ENDPOINT_URL);
+
+                return BigdataGraphFactory.connect(sparqlEndpointURL);
+
+            }
             
             if (!config.containsKey(Options.HOST)) {
                 throw new GraphConfigurationException("missing required parameter: " + Options.HOST);
