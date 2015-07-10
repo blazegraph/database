@@ -27,15 +27,12 @@ import info.aduna.io.IOUtil;
 
 import java.io.Closeable;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.http.entity.ByteArrayEntity;
@@ -43,7 +40,6 @@ import org.apache.http.entity.mime.FormBodyPart;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.log4j.Logger;
-import org.openrdf.OpenRDFUtil;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -52,11 +48,7 @@ import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.rdf.properties.PropertiesFormat;
-import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
-import com.bigdata.rdf.sail.webapp.QueryServlet;
-import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
  * Java API to the Nano Sparql Server.
@@ -373,99 +365,6 @@ public class RemoteRepository extends RemoteRepositoryBase {
     }
 
     /**
-    * Return all matching statements.
-    * 
-    * @param subj
-    * @param pred
-    * @param obj
-    * @param includeInferred
-    * @param contexts
-    * @return
-    * @throws Exception
-    * 
-    * FIXME (***) includeInferred is currently ignored by getStatements() - #1175.
-    * 
-    * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
-    *      ignores includeInferred (REST API) </a>
-    */
-    public IPreparedGraphQuery getStatements2(final Resource subj, final URI pred,
-            final Value obj, final boolean includeInferred,
-            final Resource... contexts) throws Exception {
-
-        OpenRDFUtil.verifyContextNotNull(contexts);
-
-        final Map<String, String> prefixDecls = Collections.emptyMap();
-
-        final AST2SPARQLUtil util = new AST2SPARQLUtil(prefixDecls);
-
-        final StringBuilder sb = new StringBuilder();
-
-        /*
-         * Note: You can not use the CONSTRUCT WHERE shortcut with a data set
-         * declaration (FROM, FROM NAMED)....
-         */
-
-        if (contexts.length > 0) {
-
-            sb.append("CONSTRUCT {\n");
-
-            sb.append(asConstOrVar(util, "?s", subj));
-            
-            sb.append(" ");
-            
-            sb.append(asConstOrVar(util, "?p", pred));
-            
-            sb.append(" ");
-            
-            sb.append(asConstOrVar(util, "?o", obj));
-
-            sb.append("\n}\n");
-
-            // Add FROM clause for each context to establish the defaultGraph.
-            for (int i = 0; i < contexts.length; i++) {
-
-                /*
-                 * Interpret a [null] entry in contexts[] as a reference to the
-                 * openrdf nullGraph.
-                 */
-
-                final Resource c = contexts[i] == null ? BD_NULL_GRAPH
-                        : contexts[i];
-
-                sb.append("FROM " + util.toExternal(c) + "\n");
-
-            }
-            
-            sb.append("WHERE {\n");
-
-        } else {
-            
-            // CONSTRUCT WHERE shortcut form.
-            sb.append("CONSTRUCT WHERE {\n");
-            
-        }
-
-        sb.append(asConstOrVar(util, "?s", subj));
-        
-        sb.append(" ");
-        
-        sb.append(asConstOrVar(util, "?p", pred));
-        
-        sb.append(" ");
-        
-        sb.append(asConstOrVar(util, "?o", obj));
-
-        sb.append("\n}");
-        
-        final String queryStr = sb.toString();
-        
-        final IPreparedGraphQuery query = prepareGraphQuery(queryStr);
-        
-        return query;
-        
-    }
-    
-    /**
      * Return all matching statements.
      * 
      * @param subj
@@ -475,9 +374,6 @@ public class RemoteRepository extends RemoteRepositoryBase {
      * @param contexts
      * @return
      * @throws Exception
-     * 
-     * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
-     *      ignores includeInferred (REST API) </a>
      */
     public GraphQueryResult getStatements(final Resource subj, final URI pred,
             final Value obj, final boolean includeInferred,
@@ -494,7 +390,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
             opts.addRequestParam("GETSTMTS");
-            opts.addRequestParam(QueryServlet.INCLUDE_INFERRED,
+            opts.addRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED,
                   Boolean.toString(includeInferred));
             if (subj != null) {
                opts.addRequestParam("s", EncodeDecodeValue.encodeValue(subj));
@@ -559,57 +455,38 @@ public class RemoteRepository extends RemoteRepositoryBase {
          // See #1177
          throw new IllegalArgumentException();
       }
-      if (false) {
-         /*
-          * This should be pushed down to a server-side operation for improved
-          * performance. We need to lift hasStatements() into the REST API for
-          * that. See #1109.
-          */
-         final GraphQueryResult ret = getStatements(s, p, o, includeInferred, c);
-         try {
-            return ret.hasNext();
-         } finally {
-            ret.close();
-         }
-      } else {
-         /*
-          * This is the new code path that optimizes the effort by the server.
-          */
-          // TODO Allow client to specify UUID for HASSTMT. See #1254.
-          final UUID uuid = UUID.randomUUID();
-         final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
+      final UUID uuid = UUID.randomUUID();
+      final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
-         opts.addRequestParam("HASSTMT");
-         opts.addRequestParam(QueryServlet.INCLUDE_INFERRED,
-               Boolean.toString(includeInferred));
-         if (s != null) {
-            opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
-         }
-         if (p != null) {
-            opts.addRequestParam("p", EncodeDecodeValue.encodeValue(p));
-         }
-         if (o != null) {
-            opts.addRequestParam("o", EncodeDecodeValue.encodeValue(o));
-         }
-         opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(c));
+      opts.addRequestParam("HASSTMT");
+      opts.addRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED,
+            Boolean.toString(includeInferred));
+      if (s != null) {
+         opts.addRequestParam("s", EncodeDecodeValue.encodeValue(s));
+      }
+      if (p != null) {
+         opts.addRequestParam("p", EncodeDecodeValue.encodeValue(p));
+      }
+      if (o != null) {
+         opts.addRequestParam("o", EncodeDecodeValue.encodeValue(o));
+      }
+      opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(c));
 
-         JettyResponseListener resp = null;
-         try {
+      JettyResponseListener resp = null;
+      try {
 
-            opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
+         opts.setAcceptHeader(ConnectOptions.MIME_APPLICATION_XML);
 
-            checkResponseCode(resp = doConnect(opts));
+         checkResponseCode(resp = doConnect(opts));
 
-            final BooleanResult result = RemoteRepositoryManager.booleanResults(resp);
+         final BooleanResult result = RemoteRepositoryManager.booleanResults(resp);
 
-            return result.result;
+         return result.result;
 
-         } finally {
+      } finally {
 
-            if (resp != null)
-               resp.abort();
-
-         }
+         if (resp != null)
+            resp.abort();
 
       }
 

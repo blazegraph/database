@@ -126,5 +126,12 @@ public class RemoteRepositoryDecls {
     * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
     */
    static protected final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
+
+
+   /**
+    * The name of the parameter/attribute that contains boolean flag to include inferred statements while evaluating queries or returning statements.
+    * @see com.bigdata.rdf.sail.webapp.QueryServlet.INCLUDE_INFERRED
+    */
+   public static final String INCLUDE_INFERRED = "includeInferred";
       
 }

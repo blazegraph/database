@@ -5,8 +5,8 @@ import org.openrdf.model.URI;
 import org.openrdf.query.Binding;
 import org.openrdf.query.impl.AbstractQuery;
 
-import com.bigdata.rdf.sail.webapp.QueryServlet;
 import com.bigdata.rdf.sail.webapp.client.IPreparedQuery;
+import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
 
 public abstract class AbstractBigdataRemoteQuery extends AbstractQuery {
 
@@ -25,7 +25,7 @@ public abstract class AbstractBigdataRemoteQuery extends AbstractQuery {
 		if (baseURI != null) {
 			q.addRequestParam(Protocol.BASEURI_PARAM_NAME, baseURI);
 		}
-		q.addRequestParam(QueryServlet.INCLUDE_INFERRED,
+		q.addRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED,
 				Boolean.toString(includeInferred));
 		if (maxQueryTime > 0) {
 			q.addRequestParam(Protocol.TIMEOUT_PARAM_NAME, Integer.toString(maxQueryTime));
