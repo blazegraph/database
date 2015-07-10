@@ -76,6 +76,7 @@ import java.util.Set;
 import javax.servlet.http.HttpServletResponse;
 
 import junit.framework.Test;
+import junit.util.PropertyUtil;
 
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -255,7 +256,7 @@ public class TestFederatedQuery<S extends IIndexManager> extends
          }
          if (!found) {
             // Create the repository.
-            final Properties p = new Properties(getProperties());
+            final Properties p = PropertyUtil.flatCopy(getProperties());
             p.setProperty(RemoteRepositoryManager.OPTION_CREATE_KB_NAMESPACE,
                   ns);
             m_mgr.createRepository(ns, p);
@@ -709,7 +710,6 @@ public class TestFederatedQuery<S extends IIndexManager> extends
 
             final Query query = conn.prepareGraphQuery(QueryLanguage.SPARQL,
                   queryString);
-            query.setIncludeInferred(false);
 
             final GraphQueryResult gqr = ((GraphQuery) query).evaluate();
 
@@ -724,7 +724,6 @@ public class TestFederatedQuery<S extends IIndexManager> extends
          case SELECT: {
             final Query query = conn.prepareTupleQuery(QueryLanguage.SPARQL,
                   queryString);
-            query.setIncludeInferred(false);
 
             final TupleQueryResult queryResult = ((TupleQuery) query)
                   .evaluate();
