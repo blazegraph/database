@@ -493,7 +493,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             final UUID uuid = UUID.randomUUID();
             final ConnectOptions opts = mgr.newQueryConnectOptions(sparqlEndpointURL, uuid, tx);
 
-            opts.addRequestParam("GETSTMT");
+            opts.addRequestParam("GETSTMTS");
             opts.addRequestParam(QueryServlet.INCLUDE_INFERRED,
                   Boolean.toString(includeInferred));
             if (subj != null) {

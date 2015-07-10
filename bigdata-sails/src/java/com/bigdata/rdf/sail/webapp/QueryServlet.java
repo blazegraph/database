@@ -139,10 +139,10 @@ public class QueryServlet extends BigdataRDFServlet {
    static final transient String ATTR_HASSTMT = "HASSTMT";
    
    /**
-    * The name of the URL query parameter that indicates an GETSTMT request
+    * The name of the URL query parameter that indicates an GETSTMTS request
     * (retrieve statements from a store)
     */
-   static final transient String ATTR_GETSTMT = "GETSTMT";
+   static final transient String ATTR_GETSTMTS = "GETSTMTS";
 
     /**
      * The name of the URL query parameter that indicates an request
@@ -239,7 +239,7 @@ public class QueryServlet extends BigdataRDFServlet {
            // HASSTMT with caching defeated.
            doHasStmt(req, resp);
            
-        } else if (req.getParameter(ATTR_GETSTMT) != null) {
+        } else if (req.getParameter(ATTR_GETSTMTS) != null) {
             
             // HASSTMT with caching defeated.
             doGetStmts(req, resp);
@@ -281,7 +281,7 @@ public class QueryServlet extends BigdataRDFServlet {
            
            doHasStmt(req, resp);
            
-        } else if (req.getParameter(ATTR_GETSTMT) != null) {
+        } else if (req.getParameter(ATTR_GETSTMTS) != null) {
             
             doGetStmts(req, resp);
            
@@ -1545,7 +1545,7 @@ public class QueryServlet extends BigdataRDFServlet {
       }
 
       if (log.isInfoEnabled())
-         log.info("GETSTMT: access path: (includeInferred=" + includeInferred
+         log.info("GETSTMTS: access path: (includeInferred=" + includeInferred
                + ", s=" + s + ", p=" + p + ", o=" + o + ", c="
                + Arrays.toString(c) + ")");
 
@@ -1558,7 +1558,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
       } catch (Throwable t) {
 
-         launderThrowable(t, resp, "GETSTMT: access path: (includeInferred="
+         launderThrowable(t, resp, "GETSTMTS: access path: (includeInferred="
                + includeInferred + ", s=" + s + ", p=" + p + ", o=" + o
                + ", c=" + Arrays.toString(c) + ")");
 
@@ -1567,7 +1567,7 @@ public class QueryServlet extends BigdataRDFServlet {
    }
   
    /**
-    * Helper task for the GETSTMT query.
+    * Helper task for the GETSTMTS query.
     * 
     */
    private static class GetStmtsTask extends AbstractRestApiTask<Void> {
@@ -1665,7 +1665,7 @@ public class QueryServlet extends BigdataRDFServlet {
             }
         }
       }
-   } // GETSTMT task.
+   } // GETSTMTS task.
 
      /**
 	 * Report on the contexts in use in the quads database.
