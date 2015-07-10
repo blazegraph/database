@@ -45,12 +45,15 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.openrdf.http.protocol.Protocol;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.LinkedHashModel;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
@@ -597,6 +600,10 @@ public class QueryServlet extends BigdataRDFServlet {
 
       }
 
+      if (checkforInvalidBindings(req, resp)) {
+    	  return;
+      }
+
       try {
 
          final String namespace = getNamespace(req);
@@ -615,7 +622,49 @@ public class QueryServlet extends BigdataRDFServlet {
 
    }
 
-    /**
+	/**
+	 * Checks query parameter bindings for validity to provide client with
+	 * meaningful response.
+	 * 
+	 * @param req
+	 * @param resp
+	 * @throws IOException
+	 */
+	private boolean checkforInvalidBindings(HttpServletRequest req,
+			HttpServletResponse resp) throws IOException {
+		Enumeration<String> parameterNames = req.getParameterNames();
+		StringBuilder sb = new StringBuilder();
+		ValueFactory vf = new ValueFactoryImpl();
+		while (parameterNames.hasMoreElements()) {
+			String param = parameterNames.nextElement();
+			if (param.startsWith("$")) {
+				String name = param.substring(1);
+				String valueStr = req.getParameter(param);
+				if (valueStr == null || valueStr.isEmpty()) {
+					sb.append("Invalid binding ").append(name)
+							.append(" with no value ").append("\n");
+				} else {
+					try {
+						Protocol.decodeValue(valueStr, vf);
+					} catch (Exception e) {
+						sb.append("Invalid binding ").append(name)
+								.append(" with value ").append(valueStr)
+								.append(": ").append(e.getMessage())
+								.append("\n");
+					}
+				}
+			}
+		}
+		if (sb.length() > 0) {
+			sb.append("Values should follow N-Triples representation (quoted literals or URIs)");
+			buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+					sb.toString());
+			return true;
+		}
+		return false;
+	}
+
+	/**
      * Helper task for the SPARQL QUERY.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
