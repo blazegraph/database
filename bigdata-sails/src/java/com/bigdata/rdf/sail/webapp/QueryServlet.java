@@ -1099,7 +1099,7 @@ public class QueryServlet extends BigdataRDFServlet {
                         current = current.close(); // tr
                      }
                         
-                     current.close(); // table
+                     current = current.close(); // table
                         
                   }
                } 
