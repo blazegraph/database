@@ -1618,6 +1618,15 @@ public class QueryServlet extends BigdataRDFServlet {
                     format = fmt;
                 }
             }
+            if (format==null) {
+                if(conn.getTripleStore().isQuads()){
+                    mimeType = RDFFormat.NQUADS.getDefaultMIMEType();
+                } else {
+                    mimeType = RDFFormat.NTRIPLES.getDefaultMIMEType();
+                }
+                format = RDFWriterRegistry.getInstance()
+                    .getFileFormatForMIMEType(mimeType);
+            }
             resp.setContentType(mimeType);
 
             final OutputStream os = resp.getOutputStream();
