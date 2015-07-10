@@ -30,6 +30,7 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -1529,13 +1530,13 @@ public class QueryServlet extends BigdataRDFServlet {
       final URI p;
       final Value o;
       final Resource[] c;
-      final String[] mimeTypes;
+      final Enumeration<String> mimeTypes;
       try {
          s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
          p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
          o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
          c = decodeContexts(req, "c");
-         mimeTypes = req.getParameterValues("Content-Type");
+         mimeTypes = req.getHeaders("Content-Type");
 //         c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
       } catch (IllegalArgumentException ex) {
          buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -1571,7 +1572,7 @@ public class QueryServlet extends BigdataRDFServlet {
     */
    private static class GetStmtsTask extends AbstractRestApiTask<Void> {
 
-	  private final String[] mimeTypes;
+	  private final Enumeration<String> mimeTypes;
 	  private final boolean includeInferred;
       private final Resource s;
       private final URI p;
@@ -1581,7 +1582,7 @@ public class QueryServlet extends BigdataRDFServlet {
       public GetStmtsTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final boolean includeInferred,
-            final Resource s, final URI p, final Value o, final Resource[] c, String[] mimeTypes) {
+            final Resource s, final URI p, final Value o, final Resource[] c, Enumeration<String> mimeTypes) {
 
          super(req, resp, namespace, timestamp);
 
@@ -1611,13 +1612,17 @@ public class QueryServlet extends BigdataRDFServlet {
             String mimeType = null;
             RDFFormat format = null;
             if (mimeTypes!=null) {
-                for (String mt: mimeTypes) {
-                    RDFFormat fmt = RDFWriterRegistry.getInstance()
-                        .getFileFormatForMIMEType(mt);
-                    if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
-                        mimeType = mt;
-                        format = fmt;
-                    }
+                mimeTypesLoop:
+            	while(mimeTypes.hasMoreElements()) {
+                	for (String mt:mimeTypes.nextElement().split(",")) {
+                		mt = mt.trim();
+	                    RDFFormat fmt = RDFWriterRegistry.getInstance()
+	                        .getFileFormatForMIMEType(mt);
+	                    if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
+	                        mimeType = mt;
+	                        format = fmt;
+	                        break mimeTypesLoop;	                    }
+                	}
                 }
             }
             if (format==null) {
