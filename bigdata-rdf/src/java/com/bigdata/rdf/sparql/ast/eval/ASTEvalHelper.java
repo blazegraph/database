@@ -970,7 +970,7 @@ public class ASTEvalHelper {
                     PipelineOp.Annotations.DEFAULT_CHUNK_OF_CHUNKS_CAPACITY);
             final long chunkTimeout = query.getProperty(
                     PipelineOp.Annotations.CHUNK_TIMEOUT,
-                    PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT);
+                    (long)PipelineOp.Annotations.DEFAULT_CHUNK_TIMEOUT);
             final int termsChunkSize = chunkCapacity;
             final int blobsChunkSize = chunkCapacity;
             
