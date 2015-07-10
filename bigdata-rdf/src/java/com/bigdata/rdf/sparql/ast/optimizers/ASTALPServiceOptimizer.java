@@ -296,7 +296,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                 if (swap) {
                     final IValueExpressionNode veNode = f.getValueExpressionNode(); 
                     veNode.setValueExpression(null);
-                    AST2BOpUtility.toVE(globals, veNode);
+                    AST2BOpUtility.toVE(ctx.context, globals, veNode);
                 }
                 
             }

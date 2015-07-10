@@ -782,6 +782,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							}
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
+                                    context,//
                                     context.conn.getTripleStore(), template,
                                     op.getWhereClause(), null/* bnodesMap */,
                                     result);
@@ -857,6 +858,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							}
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
+                                    context,//
                                     context.conn.getTripleStore(), template,
                                     op.getWhereClause(), null/* bnodesMap */,
                                     result);

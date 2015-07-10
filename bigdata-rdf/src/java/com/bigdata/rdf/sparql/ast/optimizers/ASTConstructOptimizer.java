@@ -95,19 +95,29 @@ public class ASTConstructOptimizer implements IASTOptimizer {
         final ProjectionNode projection;
         if (queryRoot.getProjection() == null) {
 
-            /*
+            /**
              * Set a new projection on the query.
              * 
              * Note: This handles both a CONSTRUCT query and a DESCRIBE query
              * when we are NOT maintaining a DESCRIBE cache.
              * 
-             * @see <a
-             * href="https://sourceforge.net/apps/trac/bigdata/ticket/584">
-             * DESCRIBE CACHE </a>
+             * Note: We do NOT specify REDUCED if a query hint has been used to
+             * disable the DISTINCT SPO semantics of the CONSTRUCT.
+             * 
+             * @see <a href="https://jira.blazegraph.com/browse/BLZG-687">
+             *      DESCRIBE CACHE </a>
+             * 
+             * @see <a href="https://jira.blazegraph.com/browse/BLZG-1341">
+             *      Query hint to disable DISTINCT SPO semantics for CONSTRUCT
+             *      </a>
              */
             queryRoot.setProjection(projection = new ProjectionNode());
 
-            projection.setReduced(true);
+            if (context.constructDistinctSPO) {
+
+                projection.setReduced(true);
+                
+            }
 
         } else {
             

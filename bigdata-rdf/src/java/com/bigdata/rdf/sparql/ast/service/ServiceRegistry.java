@@ -23,7 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sparql.ast.service;
 
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -54,7 +56,7 @@ import cutthecrap.utils.striterators.ReadOnlyIterator;
 
 /**
  * Registry for service calls.
- * 
+ *
  * @see <a
  *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=FederatedQuery">
  *      Federated Query and Custom Services</a>
@@ -86,20 +88,30 @@ public class ServiceRegistry {
      * The set of registered {@link ServiceFactory}s is also maintained here for
      * fast, safe iteration by {@link #services()}.
      */
-    private final CopyOnWriteArrayList<CustomServiceFactory> customServices;  
+    private final CopyOnWriteArrayList<CustomServiceFactory> customServices;
 
     /**
      * The default {@link ServiceFactory} used for REMOTE SPARQL SERVICE end
      * points which are not otherwise registered.
      */
     private AtomicReference<ServiceFactory> defaultServiceFactoryRef;
-    
+
+    /**
+     * Allowed service whitelist.
+     */
+    private final Set<String> serviceWhitelist = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+
+    /**
+     * Whether service whitelisting is enabled.
+     */
+    private boolean whitelistEnabled = false;
+
     protected ServiceRegistry() {
 
         services = new ConcurrentHashMap<URI, ServiceFactory>();
 
         customServices = new CopyOnWriteArrayList<CustomServiceFactory>();
-        
+
         aliases = new ConcurrentHashMap<URI, URI>();
 
         defaultServiceFactoryRef = new AtomicReference<ServiceFactory>(
@@ -113,7 +125,7 @@ public class ServiceRegistry {
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
-        
+
         // Add the sample index service.
         add(SampleServiceFactory.SERVICE_KEY, new SampleServiceFactory());
 
@@ -129,7 +141,7 @@ public class ServiceRegistry {
                     new DescribeServiceFactory());
 
         }
-        
+
         if (true) {
 
             /**
@@ -148,7 +160,7 @@ public class ServiceRegistry {
                     new RDRHistoryServiceFactory());
 
         }
-        
+
         // The Gather-Apply-Scatter RDF Graph Mining service.
         add(GASService.Options.SERVICE_KEY, new GASService());
         
@@ -159,32 +171,32 @@ public class ServiceRegistry {
      * serviceURI is not associated with an explicitly registered service. For
      * example, you can use this to control whether or not the service end point
      * is assumed to support <code>SPARQL 1.0</code> or <code>SPARQL 1.1</code>.
-     * 
+     *
      * @param defaultServiceFactory
      *            The default {@link ServiceFactory}.
-     * 
+     *
      * @throws IllegalArgumentException
      *             if the argument is <code>null</code>.
      */
     public void setDefaultServiceFactory(
             final ServiceFactory defaultServiceFactory) {
-    
+
         if (defaultServiceFactory == null)
             throw new IllegalArgumentException();
-        
+
         this.defaultServiceFactoryRef.set(defaultServiceFactory);
-        
+
     }
 
     public ServiceFactory getDefaultServiceFactory() {
-        
+
         return defaultServiceFactoryRef.get();
-        
+
     }
 
     /**
      * Register a service.
-     * 
+     *
      * @param serviceURI
      *            The service URI.
      * @param factory
@@ -213,16 +225,16 @@ public class ServiceRegistry {
             }
 
         }
-        
-	}
+
+    }
 
     /**
      * Remove a service from the registry and/or set of known aliases.
-     * 
+     *
      * @param serviceURI
      *            The URI of the service -or- the URI of an alias registered
      *            using {@link #addAlias(URI, URI)}.
-     * 
+     *
      * @return <code>true</code> iff a service for that URI was removed.
      */
     public final boolean remove(final URI serviceURI) {
@@ -248,7 +260,7 @@ public class ServiceRegistry {
                 if(factory instanceof CustomServiceFactory) {
 
                     customServices.remove(factory);
-                    
+
                 }
 
             }
@@ -261,7 +273,7 @@ public class ServiceRegistry {
 
     /**
      * Register one URI as an alias for another.
-     * 
+     *
      * @param serviceURI
      *            The URI of a service. It is expressly permitted to register an
      *            alias for a URI which does not have a registered
@@ -292,17 +304,17 @@ public class ServiceRegistry {
              * which does not have a registered ServiceFactory. This may be used
              * to alias a remote URI which you want to intercept locally.
              */
-            
+
 //            // Lookup the service.
 //            final ServiceFactory service = services.get(serviceURI);
-//            
+//
 //            if (service == null) {
 //
 //                throw new IllegalStateException("No such service: uri="
 //                        + serviceURI);
 //
 //            }
-            
+
             if (services.containsKey(aliasURI)) {
 
                 throw new IllegalStateException(
@@ -316,11 +328,42 @@ public class ServiceRegistry {
                         "Alias already registered: uri=" + aliasURI);
 
             }
-            
+
             aliases.put(aliasURI, serviceURI);
-            
+
         }
 
+    }
+
+    /**
+     * Add URL to service whitelist
+     * @param URL the URL to add
+     */
+    public void addWhitelistURL(String URL) {
+        serviceWhitelist.add(URL);
+    }
+
+    /**
+     * Remove URL to service whitelist
+     * @param URL the URL to remove
+     */
+    public void removeWhitelistURL(String URL) {
+        serviceWhitelist.remove(URL);
+    }
+
+    /**
+     * Set whitelist status.
+     * @param enable true if enabled, false if disabled
+     */
+    public void setWhitelistEnabled(boolean enable) {
+        whitelistEnabled = enable;
+    }
+
+    /**
+     * Check if whitelisting is enabled
+     */
+    public boolean isWhitelistEnabled() {
+        return whitelistEnabled;
     }
 
     /**
@@ -338,15 +381,15 @@ public class ServiceRegistry {
                 customServices.iterator());
 
     }
-    
+
     /**
      * Return the {@link ServiceFactory} for that URI. If the {@link URI} is a
      * known alias, then it is resolved before looking up the
      * {@link ServiceFactory}.
-     * 
+     *
      * @param serviceURI
      *            The {@link URI}.
-     * 
+     *
      * @return The {@link ServiceFactory} if one is registered for that
      *         {@link URI}.
      */
@@ -354,7 +397,7 @@ public class ServiceRegistry {
 
         if (serviceURI == null)
             throw new IllegalArgumentException();
-    
+
         final URI alias = aliases.get(serviceURI);
 
         if (alias != null) {
@@ -362,18 +405,18 @@ public class ServiceRegistry {
             return services.get(alias);
 
         }
-        
+
         return services.get(serviceURI);
-        
+
     }
-    
+
     /**
      * Resolve a {@link ServiceCall} for a service {@link URI}. If a
      * {@link ServiceFactory} was registered for that <i>serviceURI</i>, then it
      * will be returned. Otherwise {@link #getDefaultServiceFactory()} is used
      * to obtain the {@link ServiceFactory} that will be used to create the
      * {@link ServiceCall} object for that end point.
-     * 
+     *
      * @param store
      *            The {@link AbstractTripleStore}.
      * @param cm
@@ -383,7 +426,7 @@ public class ServiceRegistry {
      *            The as-bound {@link URI} of the service end point.
      * @param serviceNode
      *            The AST model of the SERVICE clause.
-     * 
+     *
      * @return A {@link ServiceCall} for that service.
      */
     public final ServiceCall<? extends Object> toServiceCall(
@@ -397,12 +440,16 @@ public class ServiceRegistry {
         final URI dealiasedServiceURI = aliases.get(serviceURI);
 
         if (dealiasedServiceURI != null) {
-            
+
             // Use the de-aliased URI.
             serviceURI = dealiasedServiceURI;
 
         }
-        
+
+        if (isWhitelistEnabled() && !serviceWhitelist.contains(serviceURI)) {
+            throw new IllegalArgumentException("Service URI " + serviceURI + " is not allowed");
+        }
+
         ServiceFactory f = services.get(serviceURI);
 
         if (f == null) {
@@ -449,28 +496,28 @@ public class ServiceRegistry {
     private static class ServiceCallCreateParamsImpl implements ServiceCallCreateParams {
 
         private final URI serviceURI;
-        private final AbstractTripleStore store; 
+        private final AbstractTripleStore store;
         private final ServiceNode serviceNode;
         private final HttpClient cm;
         private final IServiceOptions serviceOptions;
-        
+
         public ServiceCallCreateParamsImpl(final URI serviceURI,
                 final AbstractTripleStore store, final ServiceNode serviceNode,
                 final HttpClient cm,
                 final IServiceOptions serviceOptions) {
 
             this.serviceURI = serviceURI;
-            
+
             this.store = store;
-            
+
             this.serviceNode = serviceNode;
-            
+
             this.cm = cm;
-            
+
             this.serviceOptions = serviceOptions;
-            
+
         }
-        
+
         @Override
         public URI getServiceURI() {
             return serviceURI;
@@ -495,7 +542,7 @@ public class ServiceRegistry {
         public IServiceOptions getServiceOptions() {
             return serviceOptions;
         }
-        
+
         @Override
         public String toString() {
 
@@ -508,9 +555,9 @@ public class ServiceRegistry {
             sb.append(",clientConnectionManager=" + getClientConnectionManager());
             sb.append("}");
             return sb.toString();
-            
+
         }
-        
+
     }
-    
+
 }
