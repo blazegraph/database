@@ -118,7 +118,10 @@ public class QueryServlet extends BigdataRDFServlet {
     static final transient String ATTR_QUERY = "query";
 
     /**
-     * The name of the parameter/attribute that contains boolean flag to include inferred statements while evaluating queries or returning statements.
+     * The name of the parameter/attribute that contains boolean flag to include
+     * inferred statements while evaluating queries or returning statements.
+     * 
+     * @see BLZG-1207 (getStatements() ingores includeInferred)
      */
     static final transient String INCLUDE_INFERRED = "includeInferred";
 
@@ -604,6 +607,8 @@ public class QueryServlet extends BigdataRDFServlet {
     	  return;
       }
 
+      // Note: The historical behavior was to always include inferences.
+      // @see BLZG-1207 
       final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
               true/* default */);
 
@@ -633,16 +638,16 @@ public class QueryServlet extends BigdataRDFServlet {
 	 * @param resp
 	 * @throws IOException
 	 */
-	private boolean checkforInvalidBindings(HttpServletRequest req,
-			HttpServletResponse resp) throws IOException {
-		Enumeration<String> parameterNames = req.getParameterNames();
-		StringBuilder sb = new StringBuilder();
-		ValueFactory vf = new ValueFactoryImpl();
+	private boolean checkforInvalidBindings(final HttpServletRequest req,
+	        final HttpServletResponse resp) throws IOException {
+		final Enumeration<String> parameterNames = req.getParameterNames();
+		final StringBuilder sb = new StringBuilder();
+		final ValueFactory vf = new ValueFactoryImpl();
 		while (parameterNames.hasMoreElements()) {
-			String param = parameterNames.nextElement();
+			final String param = parameterNames.nextElement();
 			if (param.startsWith("$")) {
-				String name = param.substring(1);
-				String valueStr = req.getParameter(param);
+				final String name = param.substring(1);
+				final String valueStr = req.getParameter(param);
 				if (valueStr == null || valueStr.isEmpty()) {
 					sb.append("Invalid binding ").append(name)
 							.append(" with no value ").append("\n");
@@ -1578,6 +1583,8 @@ public class QueryServlet extends BigdataRDFServlet {
          return;
       }
 
+      // Note: The historical behavior was to always include inferrences.
+      // @see BLZG-1207
       final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
             true/* default */);
       final Resource s;
