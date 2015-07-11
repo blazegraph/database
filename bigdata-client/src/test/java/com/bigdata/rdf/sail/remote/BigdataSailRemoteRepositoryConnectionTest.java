@@ -1,6 +1,28 @@
+/**
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
 package com.bigdata.rdf.sail.remote;
 
-import static org.junit.Assert.assertEquals;
+import junit.framework.TestCase;
 
 import org.junit.After;
 import org.junit.Before;
@@ -18,25 +40,30 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 
-import com.bigdata.rdf.sail.webapp.QueryServlet;
 import com.bigdata.rdf.sail.webapp.client.MockRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
 
-public class BigdataSailRemoteRepositoryConnectionTest {
+/**
+ * Test of the Java client for the REST API using mock objects to verify that
+ * the generated http request is correct.
+ * 
+ * @author igorkim
+ */
+public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 	
 	private BigdataSailRemoteRepositoryConnection con;
 	private MockRemoteRepository remote;
 	private BigdataSailRemoteRepository repo;
 
 	@Before
-	public void prepare() {
+    protected void setUp() {
 		remote = MockRemoteRepository.create("{\"head\":{\"vars\":[\"s\"]}}");
 		repo = remote.getBigdataSailRemoteRepository();
 		con = new BigdataSailRemoteRepositoryConnection(repo);
 	}
 	
 	@After
-	public void tearDown() throws RepositoryException {
+	protected void tearDown() throws RepositoryException {
         if (con != null) {
             con.close();
             con = null;
