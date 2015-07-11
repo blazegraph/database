@@ -70,6 +70,13 @@ public class DeleteServlet extends BigdataRDFServlet {
     static private final transient Logger log = Logger
             .getLogger(DeleteServlet.class);
 
+    /**
+     * Note: includedInferred is false because inferences can not be deleted
+     * (they are retracted by truth maintenance when they can no longer be
+     * proven).
+     */
+    private static final boolean includeInferred = false;
+    
     public DeleteServlet() {
 
     }
@@ -251,7 +258,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                   final AbstractQueryTask queryTask = context
                         .getQueryTask(roconn, namespace,
-                              readOnlyTimestamp, queryStr, false,
+                              readOnlyTimestamp, queryStr, includeInferred,
                               format.getDefaultMIMEType(), req, resp,
                               os);
 
@@ -410,7 +417,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                final RDFFormat format = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr, false,
+                     namespace, ITx.UNISOLATED, queryStr, includeInferred,
                      format.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
