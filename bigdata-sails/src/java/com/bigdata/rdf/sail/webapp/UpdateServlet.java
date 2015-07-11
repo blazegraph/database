@@ -560,8 +560,15 @@ public class UpdateServlet extends BigdataRDFServlet {
                // Use this format for the query results.
                final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
 
+                /*
+                 * Note: includedInferred is false because inferences can
+                 * not be deleted (they are retracted by truth maintenance
+                 * when they can no longer be proven).
+                 */
+               final boolean includeInferred = false;
+
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr, false,
+                     namespace, ITx.UNISOLATED, queryStr, includeInferred,
                      deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
