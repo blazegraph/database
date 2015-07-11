@@ -37,17 +37,21 @@ public class BigdataSailRemoteRepositoryConnectionTest {
 	
 	@After
 	public void tearDown() throws RepositoryException {
-		con.close();
-		con = null;
-		repo.shutDown();
-		remote = null;
+        if (con != null) {
+            con.close();
+            con = null;
+        }
+        if (repo != null) {
+            repo.shutDown();
+            remote = null;
+        }
 	}
 
 	@Test
 	public void testTupleQueryBindings() throws Exception {
-		TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}");
-		Value s = new URIImpl(":s");
-		Value p = new URIImpl(":p");
+		final TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}");
+		final Value s = new URIImpl(":s");
+		final Value p = new URIImpl(":p");
 		tq.setBinding("s", s);
 		tq.setBinding("p", p);
 		TupleQueryResult tqr = tq.evaluate();
@@ -63,14 +67,14 @@ public class BigdataSailRemoteRepositoryConnectionTest {
 
 	@Test
 	public void testTupleQueryIncludeInferred() throws Exception {
-		TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}");
+		final TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}");
 		tq.setIncludeInferred(false);
 		tq.evaluate();
 		assertEquals("false", remote.data.opts.getRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED));
 		assertEquals("false", remote.data.request.getParams().get(RemoteRepositoryDecls.INCLUDE_INFERRED).getValue());
 		
 		tq.setIncludeInferred(true);
-		TupleQueryResult tqr = tq.evaluate();
+		final TupleQueryResult tqr = tq.evaluate();
 		try {
 			assertEquals("true", remote.data.opts.getRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED));
 			assertEquals("true", remote.data.request.getParams().get(RemoteRepositoryDecls.INCLUDE_INFERRED).getValue());
@@ -81,18 +85,18 @@ public class BigdataSailRemoteRepositoryConnectionTest {
 	
 	@Test
 	public void testTupleQueryDataset() throws Exception {
-		TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}");
-		DatasetImpl dataset = new DatasetImpl();
-		URI defaultGraph1 = new URIImpl(":defaultGraph1");
-		URI defaultGraph2 = new URIImpl(":defaultGraph2");
-		URI namedGraph1 = new URIImpl(":namedGraph1");
-		URI namedGraph2 = new URIImpl(":namedGraph2");
+	    final TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}");
+	    final DatasetImpl dataset = new DatasetImpl();
+	    final URI defaultGraph1 = new URIImpl(":defaultGraph1");
+	    final URI defaultGraph2 = new URIImpl(":defaultGraph2");
+	    final URI namedGraph1 = new URIImpl(":namedGraph1");
+	    final URI namedGraph2 = new URIImpl(":namedGraph2");
 		dataset.addDefaultGraph(defaultGraph1);
 		dataset.addDefaultGraph(defaultGraph2);
 		dataset.addNamedGraph(namedGraph1);
 		dataset.addNamedGraph(namedGraph2);
 		tq.setDataset(dataset);
-		TupleQueryResult tqr = tq.evaluate();
+		final TupleQueryResult tqr = tq.evaluate();
 		try {
 			assertEquals(defaultGraph1.stringValue(),remote.data.opts.getRequestParam(Protocol.DEFAULT_GRAPH_PARAM_NAME));
 			assertEquals(defaultGraph1.stringValue(),remote.data.request.getParams().get(Protocol.DEFAULT_GRAPH_PARAM_NAME).getValue());
@@ -105,9 +109,9 @@ public class BigdataSailRemoteRepositoryConnectionTest {
 
 	@Test
 	public void testTupleQueryBaseURI() throws Exception {
-		String baseURI = ":baseURI";
-		TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}", baseURI);
-		TupleQueryResult tqr = tq.evaluate();
+	    final String baseURI = ":baseURI";
+	    final TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}", baseURI);
+	    final TupleQueryResult tqr = tq.evaluate();
 		try {
 			assertEquals(baseURI, remote.data.opts.getRequestParam(Protocol.BASEURI_PARAM_NAME));
 			assertEquals(baseURI,remote.data.opts.getRequestParam(Protocol.BASEURI_PARAM_NAME));
@@ -118,12 +122,12 @@ public class BigdataSailRemoteRepositoryConnectionTest {
 
 	@Test
 	public void testGetStatements() throws RepositoryException {
-		Resource s = new URIImpl(":s");
-		URI p = new URIImpl(":p");
-		Value o = new URIImpl(":o");
-		boolean includeInferred = false;
-		Resource c = new URIImpl(":c");
-		RepositoryResult<Statement> stmts = con.getStatements(s, p, o, includeInferred, c);
+	    final Resource s = new URIImpl(":s");
+	    final URI p = new URIImpl(":p");
+	    final Value o = new URIImpl(":o");
+	    final boolean includeInferred = false;
+	    final Resource c = new URIImpl(":c");
+	    final RepositoryResult<Statement> stmts = con.getStatements(s, p, o, includeInferred, c);
 		try {
 			assertEquals("<:s>", remote.data.opts.getRequestParam("s"));
 			assertEquals("<:p>", remote.data.opts.getRequestParam("p"));
