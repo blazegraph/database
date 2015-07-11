@@ -251,7 +251,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                   final AbstractQueryTask queryTask = context
                         .getQueryTask(roconn, namespace,
-                              readOnlyTimestamp, queryStr,
+                              readOnlyTimestamp, queryStr, false,
                               format.getDefaultMIMEType(), req, resp,
                               os);
 
@@ -410,7 +410,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                final RDFFormat format = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr,
+                     namespace, ITx.UNISOLATED, queryStr, false,
                      format.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
