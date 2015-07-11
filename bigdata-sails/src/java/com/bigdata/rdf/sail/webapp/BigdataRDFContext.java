@@ -96,6 +96,7 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -1960,21 +1961,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 throws IOException {
 
             XMLBuilder.Node current = doc.root("html");
-            {
-                current = current.node("head");
-                current.node("meta").attr("http-equiv", "Content-Type")
-                        .attr("content", "text/html;charset=" + charset.name())
-                        .close();
-                current.node("title").textNoEncode("bigdata&#174;").close();
-                current = current.close();// close the head.
-            }
-
-            // open the body
-            current = current.node("body");
+            		
+            addHtmlHeader(current, charset.name());
 
             return current;
             
         }
+        
 
         @Override
         public void updateEvent(final SPARQLUpdateEvent e) {
@@ -2672,5 +2665,29 @@ public class BigdataRDFContext extends BigdataBaseContext {
       }
 
    }
-	
+
+	/**
+	 * Utility method to consolidate header into a single location.
+	 * 
+	 * The post-condition is that the current node is open for writing on the
+	 * body element.
+	 * 
+	 * @param current
+	 * @throws IOException
+	 */
+	public static void addHtmlHeader(Node current, String charset)
+			throws IOException {
+
+		current = current.node("head");
+		current.node("meta").attr("http-equiv", "Content-Type")
+				.attr("content", "text/html;charset=" + charset).close();
+		current.node("title").textNoEncode("blazegraph&trade; by SYSTAP")
+				.close();
+		current = current.close();// close the head.
+
+		// open the body
+		current = current.node("body");
+
+	}
+
 }
