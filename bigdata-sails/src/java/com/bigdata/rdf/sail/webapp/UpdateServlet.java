@@ -349,7 +349,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										readOnlyTimestamp, queryStr,
+										readOnlyTimestamp, queryStr, false,
 										deleteQueryFormat.getDefaultMIMEType(),
 										req, resp, os);
 
@@ -561,7 +561,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr,
+                     namespace, ITx.UNISOLATED, queryStr, false,
                      deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
