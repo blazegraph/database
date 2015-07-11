@@ -267,6 +267,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          }
          if (testMode.isTruthMaintenanceSupported()) {
             suite.addTestSuite(Test_REST_HASSTMT.TruthMaintenance.class);
+            suite.addTestSuite(Test_Ticket_1207.class); // BLZG-1207
+
          }
          suite.addTestSuite(Test_REST_ServiceDescription.class);
          suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
