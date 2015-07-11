@@ -32,7 +32,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDFS;
-import org.openrdf.query.BindingSet;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
@@ -42,7 +41,10 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 
 /**
- * @see <a href="http://jira.blazegraph.com/browse/BLZG-1207" > getStatements() ignores includeInferred (REST API) </a>
+ * GETSTMTS test suite for includeInferred.
+ * 
+ * @see <a href="http://jira.blazegraph.com/browse/BLZG-1207" > getStatements()
+ *      ignores includeInferred (REST API) </a>
  */
 public class Test_Ticket_1207<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
@@ -75,11 +77,11 @@ public class Test_Ticket_1207<S extends IIndexManager> extends
       final URI p1 = new URIImpl("http://test/p1");
       final URI o = new URIImpl("http://test/o");
 
-      ValueFactoryImpl vf = ValueFactoryImpl.getInstance();
-	final Statement[] a = new Statement[] { 
+      final ValueFactoryImpl vf = ValueFactoryImpl.getInstance();
+      final Statement[] a = new Statement[] { 
 			vf.createStatement(s, p, o),
 			vf.createStatement(p, RDFS.SUBPROPERTYOF, p1)
-		};
+	  };
 
       final AddOp addOp = new AddOp(Arrays.asList(a));
 
@@ -113,7 +115,7 @@ public class Test_Ticket_1207<S extends IIndexManager> extends
           final TupleQuery tq = m_repo.getBigdataSailRemoteRepository().getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "SELECT * {?s ?p ?o} LIMIT 100", null);
           tq.setBinding("s", s);
           tq.setIncludeInferred(true);
-          TupleQueryResult tqr = tq.evaluate();
+          final TupleQueryResult tqr = tq.evaluate();
           try {
               int count = 0;
               while (tqr.hasNext()) {
@@ -129,7 +131,7 @@ public class Test_Ticket_1207<S extends IIndexManager> extends
           final TupleQuery tq = m_repo.getBigdataSailRemoteRepository().getConnection().prepareTupleQuery(QueryLanguage.SPARQL, "SELECT * {?s ?p ?o} LIMIT 100", null);
           tq.setBinding("s", s);
           tq.setIncludeInferred(false);
-          TupleQueryResult tqr = tq.evaluate();
+          final TupleQueryResult tqr = tq.evaluate();
           try {
               int count = 0;
               while (tqr.hasNext()) {
