@@ -45,6 +45,8 @@ q:before, q:after {
 table {
    border-collapse: collapse;
    border-spacing: 0;
+   border: 0;
+   border-image-width: 0;
 }
 
 
@@ -74,15 +76,19 @@ h2 {
 
 #top {
    text-align: right;
-   margin-bottom: 20px;
+   margin-bottom: 0px;
 }
 
 #logo {
    float: left;
 }
 
+#empty_table {
+	border: 0px;
+	align: center;
+}
+
 #search-form {
-   padding-top: 80px;
 }
 
 #search-form input {
@@ -396,4 +402,22 @@ iframe {
 #links {
    text-align: center;
    margin-top: 20px;
+}
+
+#h1_nopad {
+   font-size: 125%;
+   margin-bottom: 0px;
+}
+
+#h2_nopad {
+   font-size: 110%;
+   margin-bottom: 0px;
+}
+
+#nopad {
+  border: 0;
+  margin-bottom: 0px;
+  margin-top: 0px;
+  border: 0px;
+  padding: 0px;
 }
