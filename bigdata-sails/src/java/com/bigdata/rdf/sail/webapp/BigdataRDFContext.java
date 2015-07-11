@@ -668,6 +668,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
         /**
          * Controls returning inferred triples.
+         * 
+         * @see BLZG-1207 (getStatements ignored includeInferred)
          */
         protected final boolean includeInferred;
 
@@ -957,6 +959,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
          *            the query will be run.
          * @param baseURI
          *            The base URI.
+         * @param includeInferred
+         *            when <code>true</code> inferences will be included in the
+         *            visited access paths.
          * @param astContainer
          *            The container with all the information about the submitted
          *            query, including the original SPARQL query, the parse
