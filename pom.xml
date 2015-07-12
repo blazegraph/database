@@ -331,7 +331,9 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	  </excludes>
           <forkCount>2</forkCount>
           <reuseForks>true</reuseForks>
-          <argLine>-server -ea -Xms512m -Xmx2g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+	  <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -677,24 +679,14 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	<artifactId>sesame-store-testsuite</artifactId>
 	<version>${sesame.version}</version>
     </dependency>
-    <dependency>
-        <groupId>net.jini</groupId>
-        <artifactId>jini-core</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
-    <dependency>
-        <groupId>org.apache.river</groupId>
-        <artifactId>tools</artifactId>
-        <version>2.2.2</version>
-        <type>jar</type>
-    </dependency>
+<!--
     <dependency>
         <groupId>net.jini</groupId>
         <artifactId>jini-ext</artifactId>
         <version>2.1</version>
         <type>jar</type>
     </dependency>
+-->
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
@@ -702,21 +694,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
-       <type>test-jar</type>
-       <scope>test</scope>
-     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
+<!-- TODO: Factor out dependency on bigdata-gas BLZG-1272
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
@@ -780,6 +762,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <artifactId>lgpl-utils</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>rdf-properties</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-continuation</artifactId>
@@ -855,10 +842,5 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <artifactId>javax.servlet-api</artifactId>
         <version>${servlet.version}</version>
       </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>rdf-properties</artifactId>
-       <version>${bigdata.version}</version>
-    </dependency>
    </dependencies>
 </project>

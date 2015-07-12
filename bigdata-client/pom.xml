@@ -76,7 +76,8 @@ ga('send', 'pageview');
       <artifactId>junit-ext</artifactId>
       <version>${junit-ext.version}</version>
     </dependency>
-    <!-- FIXME Remove bigdata dependency. bigdata-client should not depend on bigdata module.  See BLZG-1271. -->
+    <!-- FIXME Remove bigdata dependency. bigdata-client should not depend on bigdata module.  See BLZG-1271. 
+	-->
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
