@@ -36,7 +36,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.NV;
-import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.rdf.sparql.ast.PathNode.PathMod;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTALPServiceOptimizer;
@@ -451,6 +450,35 @@ public class ArbitraryLengthPathNode
             return result;
             
         }
+        
+        /*
+         * Question mark ALP nodes with single statement pattern inherit the
+         * cardinality of the inner statement pattern, in case there is a
+         * single statement pattern 
+         */
+        if (group.arity() == 1 && upperBound()>=1 && upperBound()<Long.MAX_VALUE) {
+           
+            BOp pathExpr = group.get(0);
+            
+            if (pathExpr != null && pathExpr.getProperty(
+                  AST2BOpBase.Annotations.ESTIMATED_CARDINALITY) != null) {
+            
+               final long estCard = pathExpr.getProperty(
+                     AST2BOpBase.Annotations.ESTIMATED_CARDINALITY, 
+                     Long.MAX_VALUE); 
+                
+               /**
+                * The upper bound tells us how often the pattern will be
+                * executed, we multiply it with the estimated cardinality and
+                * add the zero match adjustment.
+                */
+               if (estCard < Long.MAX_VALUE) {
+                  return upperBound()*estCard + zeroMatchAdjustment;
+               }
+               
+            }
+        }
+        
         
         long result = 0;
         
