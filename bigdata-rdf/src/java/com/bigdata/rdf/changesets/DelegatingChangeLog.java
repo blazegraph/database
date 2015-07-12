@@ -134,4 +134,18 @@ public class DelegatingChangeLog implements IChangeLog {
 
     }
 
+    @Override
+    public void close() {
+
+        if (log.isInfoEnabled())
+            log.info("close");
+
+        for (IChangeLog delegate : delegates) {
+
+            delegate.close();
+
+        }
+
+    }
+
 }

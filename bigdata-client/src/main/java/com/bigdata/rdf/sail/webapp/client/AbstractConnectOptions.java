@@ -44,6 +44,9 @@ public class AbstractConnectOptions implements IMimeTypes {
 
     /** The HTTP method (GET, POST, etc). */
     public String method = "POST";
+    
+    /** The Request Header value */
+    public static final transient String ACCEPT_HEADER = "Accept";
 
     /**
      * When <code>true</code>, the request is a non-idempotent operation (an
@@ -192,13 +195,13 @@ public class AbstractConnectOptions implements IMimeTypes {
 
     public void setAcceptHeader(final String value) {
 
-        setHeader("Accept", value);
+        setHeader(ACCEPT_HEADER, value);
 
     }
 
     public String getAcceptHeader() {
 
-        return getHeader("Accept");
+        return getHeader(ACCEPT_HEADER);
 
     }
 
