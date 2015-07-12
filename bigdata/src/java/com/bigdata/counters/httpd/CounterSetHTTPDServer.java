@@ -47,6 +47,7 @@ import com.bigdata.service.Event;
 import com.bigdata.service.IService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.httpd.AbstractHTTPD;
+import com.bigdata.util.httpd.Config;
 import com.bigdata.util.httpd.NanoHTTPD;
 
 /**
@@ -102,7 +103,7 @@ public class CounterSetHTTPDServer implements Runnable {
     public static void main(final String[] args) throws Exception {
 
         // default port.
-        int port = 8080;
+        int port = Config.BLAZEGRAPH_HTTP_PORT;
 
         // @todo args
         final int unitsToRetain = 1000;
