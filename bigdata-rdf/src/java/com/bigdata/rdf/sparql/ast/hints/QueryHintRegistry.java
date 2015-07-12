@@ -124,6 +124,9 @@ public class QueryHintRegistry {
         add(new DescribeIterationLimitHint());
         add(new DescribeStatementLimitHint());
 
+        // CONSTRUCT
+        add(new ConstructDistinctSPOHint());
+        
         /*
          * BufferAnnotations
          * 
@@ -167,6 +170,12 @@ public class QueryHintRegistry {
          * FILTER (NOT) EXISTS evaluation strategy hint.
          */
         add(new FilterExistsHint());
+        
+        /*
+         * Mark a statement pattern to include history (SPOs where 
+         * type == StatementEnum.History, which are normally hidden from view). 
+         */
+        add(new HistoryHint());
         
     }
 

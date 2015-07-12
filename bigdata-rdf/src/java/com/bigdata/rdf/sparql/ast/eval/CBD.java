@@ -491,7 +491,7 @@ public class CBD {
 
         // Constructed Statements.
         final CloseableIteration<BigdataStatement, QueryEvaluationException> src =
-                new ASTConstructIterator(store, //
+                new ASTConstructIterator(context, store, //
                         optimizedQuery.getConstruct(), //
                         optimizedQuery.getWhereClause(),//
                         bnodes,//

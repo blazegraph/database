@@ -196,6 +196,12 @@ public class SPORelation extends AbstractRelation<ISPO> {
     final private boolean historyService;
 
     /**
+     * When true, SPOs will never be removed from the indices, only downgraded
+     * to {@link StatementEnum#History}.
+     */
+    final private boolean history;
+
+    /**
      * When <code>true</code> the database will support statement identifiers.
      * A statement identifier is a unique 64-bit integer taken from the same
      * space as the term identifiers and which uniquely identifiers a statement
@@ -281,6 +287,11 @@ public class SPORelation extends AbstractRelation<ISPO> {
         this.bloomFilter = Boolean.parseBoolean(getProperty(
                 AbstractTripleStore.Options.BLOOM_FILTER,
                 AbstractTripleStore.Options.DEFAULT_BLOOM_FILTER));
+        
+        final String historyClass = getProperty(
+                AbstractTripleStore.Options.RDR_HISTORY_CLASS,
+                null);
+        this.history = historyClass != null && historyClass.length() > 0;
 
         // declare the various indices.
         {
@@ -1622,9 +1633,27 @@ public class SPORelation extends AbstractRelation<ISPO> {
             }
     		
     	}
+
+    	final IPredicate<ISPO> historyFiltered;
+    	/*
+    	 * If we are in history mode and the predicate does not have the
+    	 * include history annotation, attached an index local filter to filter
+    	 * out SPOs where type == StatementEnum.History.
+    	 */
+    	if (history &&
+    	        !predicate.getProperty(SPOPredicate.Annotations.INCLUDE_HISTORY, false)) {
+    	    
+            historyFiltered = ((Predicate<ISPO>) predicate).addIndexLocalFilter(
+                    ElementFilter.newInstance(HistorySPOFilter.INSTANCE));
+            
+    	} else {
+    	    
+            historyFiltered = predicate;
+            
+    	}
     	
         return new SPOAccessPath(this/*relation*/, localIndexManager, //timestamp,
-                predicate, keyOrder
+                historyFiltered, keyOrder
 //                , ndx, flags, chunkOfChunksCapacity,
 //                chunkCapacity, fullyBufferedReadThreshold
                 ).init();
@@ -2302,6 +2331,28 @@ public class SPORelation extends AbstractRelation<ISPO> {
         
         final long begin = System.currentTimeMillis();
 
+        /*
+         * Downgrade statements to StatementEnum.History instead of actually
+         * removing them.
+         */
+        if (history) {
+            
+            final ISPO[] a = new ISPO[numStmts];
+            for (int i = 0; i < numStmts; i++) {
+                a[i] = new SPO(stmts[i].s(), stmts[i].p(), stmts[i].o(), 
+                                StatementEnum.History);
+            }
+            
+            final long nmodified = insert(a, numStmts, null);
+            
+            for (int i = 0; i < numStmts; i++) {
+                stmts[i].setModified(a[i].getModified());
+            }
+            
+            return nmodified;
+            
+        }
+        
         // The time to sort the data.
         final AtomicLong sortTime = new AtomicLong(0);
 

@@ -73,13 +73,12 @@ public class StaticAnalysisStats implements Serializable {
     *          if left null)
     */
    public StaticAnalysisStats() {
+      
       this.optimizerStats = new LinkedHashMap<String, StaticAnalysisStat>();
      
-      // for parserStat object: delayed initialization, don't show parser stats 
-      // if for some reason not present in some mode
-      
+      parserStat = new StaticAnalysisStat("ParseTime"); 
       rangeCountStat = new StaticAnalysisStat("RangeCount"); 
-      optimizerLoopStat = new StaticAnalysisStat(ASTOptimizerList.class.getName());
+      optimizerLoopStat = new StaticAnalysisStat("Optimizers");
       
    }
 
@@ -92,7 +91,7 @@ public class StaticAnalysisStats implements Serializable {
    public void registerParserCall(final Long elapsedNanoSec) {
       
       if (parserStat==null) {
-         parserStat = new StaticAnalysisStat("Parse Time");
+         parserStat = new StaticAnalysisStat("ParseTime");
       }
 
       parserStat.incrementNrCalls();

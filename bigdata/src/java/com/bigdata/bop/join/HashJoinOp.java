@@ -384,7 +384,7 @@ abstract public class HashJoinOp<E> extends PipelineOp implements
 
             // Obtain the iterator for the current join dimension.
             final ICloseableIterator<IBindingSet[]> itr = accessPath
-                    .solutions(cutoffLimit, stats);
+                  .solutions(context, cutoffLimit, stats);
 
             /*
              * Note: The [stats] are NOT passed in here since the chunksIn and

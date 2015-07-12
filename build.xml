@@ -55,6 +55,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 
     <property file="build.properties" />
 
+
     <!-- build-time classpath. -->
     <path id="build.classpath">
         <fileset dir="${bigdata.dir}/bigdata/lib">
@@ -1075,6 +1076,10 @@ ${postInstallMessage}</echo>
     	<!-- JSON -->
       <copy file="${bigdata-sails.lib}/jackson-core-${jackson.version}.jar"
             tofile="${dist.lib}/jackson-core.jar" />
+      <copy file="${bigdata-sails.lib}/jackson-annotations-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-annotations.jar" />
+      <copy file="${bigdata-sails.lib}/jackson-databind-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-databind.jar" />
     
       <!-- jetty library -->
      <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
@@ -1951,7 +1956,7 @@ ${postInstallMessage}</echo>
 
         <!-- TODO ${path.separator}${dist.lib}/bigdata-gas.jar -->
       <property name="javac.test.classpath"
-         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${dist.lib}/jackson-annotations.jar${path.separator}${dist.lib}/jackson-databind.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
             
         <echo>javac
 </echo>
@@ -2138,7 +2143,9 @@ ${postInstallMessage}</echo>
       <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
 
       <!-- The zookeeper install directory. -->
-      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+      <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+      </condition>
 
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
@@ -2349,12 +2356,14 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/httpmime.jar" />
         <pathelement location="${dist.lib}/blueprints-core.jar" />
         <pathelement location="${dist.lib}/jackson-core.jar" />
+        <pathelement location="${dist.lib}/jackson-annotations.jar" />
+        <pathelement location="${dist.lib}/jackson-databind.jar" />
         <pathelement location="${blueprints-test.jar}" />
         <pathelement location="${jettison.jar}" />
       </path>
 
       <property name="run.class.path"
-         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${dist.lib}/jackson-annotations.jar${path.separator}${dist.lib}/jackson-databind.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
         
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -2517,6 +2526,8 @@ ${postInstallMessage}</echo>
         <sysproperty key="servlet-api.jar" value="${dist.lib}/servlet-api.jar" />
         <sysproperty key="blueprints-core.jar" value="${dist.lib}/blueprints-core.jar" />
         <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-core.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-annotations.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-databind.jar" />
 
         <!-- Jini group name -->
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
