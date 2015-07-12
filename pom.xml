@@ -48,7 +48,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.5.1-SNAPSHOT</version>
+   <version>1.5.2-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>bigdata(R)</name>
     <description>Bigdata(R) Maven Build</description>
@@ -289,11 +289,21 @@ dependencies.
            <artifactId>commons-logging</artifactId>
            <version>${apache.commons_logging.version}</version>
        </dependency>
-		<dependency>
-		   <groupId>com.fasterxml.jackson.core</groupId>
-		   <artifactId>jackson-core</artifactId>
-		   <version>${jackson.version}</version>
-		</dependency>
+        <dependency>
+	   <groupId>com.fasterxml.jackson.core</groupId>
+	   <artifactId>jackson-core</artifactId>
+	   <version>${jackson.version}</version>
+	</dependency>
+        <dependency>
+	   <groupId>com.fasterxml.jackson.core</groupId>
+	   <artifactId>jackson-annotations</artifactId>
+	   <version>${jackson.version}</version>
+	</dependency>
+        <dependency>
+	   <groupId>com.fasterxml.jackson.core</groupId>
+	   <artifactId>jackson-databind</artifactId>
+	   <version>${jackson.version}</version>
+	</dependency>
         <dependency>
            <groupId>com.tinkerpop.blueprints</groupId>
            <artifactId>blueprints-core</artifactId>

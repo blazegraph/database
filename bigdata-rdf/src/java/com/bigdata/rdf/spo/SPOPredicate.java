@@ -34,6 +34,7 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.bnode.SidIV;
+import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.relation.rule.IAccessPathExpander;
 
@@ -61,6 +62,14 @@ public class SPOPredicate extends Predicate<ISPO> {
 		 * The SID {@link IVariable} (optional).
 		 */
 		String SID = SPOPredicate.class.getName() + ".sid";
+		
+		/**
+		 * Include historical SPOs (type == StatementEnum.History).  By default
+		 * these will be filtered out.
+		 * 
+		 * @see {@link StatementEnum#History}
+		 */
+		String INCLUDE_HISTORY = SPOPredicate.class.getName() + ".includeHistory";
 
 	}
 	
@@ -347,6 +356,15 @@ public class SPOPredicate extends Predicate<ISPO> {
 //    	
 //    }
 
+    /**
+     * If true, do not filter out {@link StatementEnum#History} SPOs.
+     */
+    public final boolean includeHistory() {
+        
+        return getProperty(Annotations.INCLUDE_HISTORY, false);
+        
+    }
+    
     /**
      * Strengthened return type.
      * <p>

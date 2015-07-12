@@ -83,7 +83,7 @@ import com.bigdata.relation.accesspath.IAccessPath;
  */
 public class ASTStaticJoinOptimizer implements IASTOptimizer {
 
-    static final Logger log = Logger
+    public static final Logger log = Logger
             .getLogger(ASTStaticJoinOptimizer.class);
 
     public interface Annotations extends AST2BOpBase.Annotations {

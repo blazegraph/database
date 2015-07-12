@@ -32,8 +32,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.apache.log4j.Logger;
 import org.openrdf.query.resultio.BooleanQueryResultFormat;
 import org.openrdf.query.resultio.TupleQueryResultFormat;
@@ -41,6 +39,7 @@ import org.openrdf.rio.RDFFormat;
 
 import com.bigdata.counters.format.CounterSetFormat;
 import com.bigdata.rdf.properties.PropertiesFormat;
+import com.bigdata.rdf.sail.webapp.client.IMimeTypes;
 import com.bigdata.rdf.sail.webapp.client.MiniMime;
 
 /**
@@ -116,7 +115,7 @@ public class ConnegUtil {
 	 * 
 	 * @see http://trac.blazegraph.com/ticket/984
 	 */
-	public static String getMimeTypeForQueryParameter(String outputFormat,
+	public static String getMimeTypeForQueryParameterQueryRequest(String outputFormat,
 			String acceptHeader) {
 
 		String acceptHeaderValue = null;
@@ -137,6 +136,52 @@ public class ConnegUtil {
 				break;
 			default:
 				acceptHeaderValue = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+				log.warn("Unknown value for QUERY PARAMETER: "
+						+ BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER
+						+ " passed " + outputFormat + ".  Defaulting to XML.");
+			}
+		} else {
+			acceptHeaderValue = acceptHeader;
+		}
+
+		return acceptHeaderValue;
+	}
+
+	/**
+	 * A utility method to check for a format string query parameter and update
+	 * the mimetype for sending back results. This is to enable the use of the
+	 * ?format=json style of interaction. See Trac Ticket #984.
+	 * 
+	 * Checks if a query parameter "out" has been passed to set the response
+	 * type. If found, it maps to the requested Accept Header. It currently
+	 * supports json and xml.
+	 * 
+	 * This method should be used for general HTTP requests rather than Sparql 
+	 * query results.
+	 * 
+	 * TODO:  Support HTML, XML, and RDF
+	 * 
+	 * 
+	 * @param req
+	 * @return The value of the format string, if present or the Accept Header.
+	 * 
+	 * @see http://trac.blazegraph.com/ticket/984
+	 */
+	public static String getMimeTypeForQueryParameterServiceRequest(String outputFormat,
+			String acceptHeader) {
+
+		String acceptHeaderValue = null;
+
+		if (outputFormat != null) {
+			switch (outputFormat.toLowerCase()) {
+			case BigdataRDFServlet.OUTPUT_FORMAT_JSON_SHORT:
+				acceptHeaderValue = BigdataRDFServlet.MIME_JSON;
+				break;
+			case BigdataRDFServlet.OUTPUT_FORMAT_XML_SHORT:
+				acceptHeaderValue = BigdataRDFServlet.MIME_SPARQL_RESULTS_XML;
+				break;
+			default: //Keep HTML as the default for now for legacy compatibility with workbench
+				acceptHeaderValue = IMimeTypes.MIME_TEXT_HTML;
 				log.warn("Unknown value for QUERY PARAMETER: "
 						+ BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER
 						+ " passed " + outputFormat + ".  Defaulting to XML.");

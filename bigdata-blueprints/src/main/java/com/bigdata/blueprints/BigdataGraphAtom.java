@@ -6,7 +6,7 @@ package com.bigdata.blueprints;
  * 
  * @author mikepersonick
  */
-public class BigdataGraphAtom {
+public abstract class BigdataGraphAtom {
 
     public static enum ElementType {
         
@@ -17,83 +17,130 @@ public class BigdataGraphAtom {
     /**
      * The element id.
      */
-    private final String id;
-    
-    /**
-     * The element type - vertex or edge.
-     */
-    private final ElementType type;
-    
-    /**
-     * Edge from id.
-     */
-    private final String fromId;
-    
-    /**
-     * Edge to id.
-     */
-    private final String toId;
-    
-    /**
-     * Edge label.
-     */
-    private final String label;
-    
-    /**
-     * Property key (name).
-     */
-    private final String key;
-    
-    /**
-     * Property value (primitive).
-     */
-    private final Object val;
-    
-    public BigdataGraphAtom(final String id, final ElementType type,
-            final String fromId, final String toId, final String label, 
-            final String key, final Object val) {
-        this.id = id;
-        this.type = type;
-        this.fromId = fromId;
-        this.toId = toId;
-        this.label = label;
-        this.key = key;
-        this.val = val;
-    }
+    protected final String id;
 
+    protected BigdataGraphAtom(final String id) {
+        this.id = id;
+    }
+    
     public String getId() {
         return id;
     }
 
-    public ElementType getType() {
-        return type;
-    }
+    public static class ExistenceAtom extends BigdataGraphAtom {
+        
+        /**
+         * The element type - vertex or edge.
+         */
+        private final ElementType type;
+        
+        public ExistenceAtom(final String id, final ElementType type) {
+            super(id);
+            
+            this.type = type;
+        }
+        
+        public ElementType getElementType() {
+            return type;
+        }
 
-    public String getFromId() {
-        return fromId;
+        @Override
+        public String toString() {
+            return "ExistenceAtom [id=" + id + ", type=" + type + "]";
+        }
+        
     }
+    
+    public static class EdgeAtom extends BigdataGraphAtom {
+        
+        /**
+         * Edge from id.
+         */
+        private final String fromId;
+        
+        /**
+         * Edge to id.
+         */
+        private final String toId;
+        
+        public EdgeAtom(final String id, final String fromId, final String toId) {
+            super(id);
+            
+            this.fromId = fromId;
+            this.toId = toId;
+        }
+        
+        public String getFromId() {
+            return fromId;
+        }
 
-    public String getToId() {
-        return toId;
+        public String getToId() {
+            return toId;
+        }
+
+        @Override
+        public String toString() {
+            return "EdgeAtom [id=" + id + ", from=" + fromId + ", to=" + toId + "]";
+        }
+        
     }
+    
+    public static class EdgeLabelAtom extends BigdataGraphAtom {
+        
+        /**
+         * Edge label.
+         */
+        private final String label;
 
-    public String getLabel() {
-        return label;
+        public EdgeLabelAtom(final String id, final String label) {
+            super(id);
+            
+            this.label = label;
+        }
+        
+        public String getLabel() {
+            return label;
+        }
+
+        @Override
+        public String toString() {
+            return "EdgeLabelAtom [id=" + id + ", label=" + label + "]";
+        }
+        
     }
+    
+    public static class PropertyAtom extends BigdataGraphAtom {
+    
+        /**
+         * Property key (name).
+         */
+        private final String key;
+        
+        /**
+         * Property value (primitive).
+         */
+        private final Object val;
 
-    public String getKey() {
-        return key;
+        public PropertyAtom(final String id, final String key, final Object val) {
+            super(id);
+            
+            this.key = key;
+            this.val = val;
+        }
+        
+        public String getKey() {
+            return key;
+        }
+
+        public Object getVal() {
+            return val;
+        }
+
+        @Override
+        public String toString() {
+            return "PropertyAtom [id=" + id + ", key=" + key + ", val=" + val + "]";
+        }
+
     }
-
-    public Object getVal() {
-        return val;
-    }
-
-    @Override
-    public String toString() {
-        return "BigdataGraphAtom [id=" + id + ", type=" + type + ", fromId="
-                + fromId + ", toId=" + toId + ", label=" + label + 
-                ", key=" + key + ", val=" + val + "]";
-    }
-
+    
 }

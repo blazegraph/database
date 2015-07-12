@@ -691,6 +691,16 @@ public interface QueryHints {
     */
    String OLD_JOIN_ORDER_OPTIMIZER = "OldJoinOrderOptimizer";
 
+   
+   /**
+    * Used to mark a predicate for historical read.  When history mode is 
+    * enabled, statements are not actually deleted, they are just marked as
+    * history using StatementEnum.History.  By default these historical SPOs
+    * are hidden from view during read.
+    */
+   String HISTORY = "history";
+       
+
    boolean DEFAULT_OLD_JOIN_ORDER_OPTIMIZER = Boolean.valueOf(
          System.getProperty(OLD_JOIN_ORDER_OPTIMIZER, "false"));
    

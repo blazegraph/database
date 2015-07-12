@@ -106,6 +106,14 @@ public class BigdataEdge extends BigdataElement implements Edge {
 		
 	}
 	
+	public BigdataVertex getFrom() {
+	    return new BigdataVertex((URI) stmt.getSubject(), graph);
+	}
+	
+    public BigdataVertex getTo() {
+        return new BigdataVertex((URI) stmt.getObject(), graph);
+    }
+    
 	@Override
 	public void setProperty(final String prop, final Object val) {
 
