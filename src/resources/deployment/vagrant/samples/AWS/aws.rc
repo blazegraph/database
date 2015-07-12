@@ -9,10 +9,10 @@ export AWS_KEYPAIR_NAME="YOUR AWS KEYPAIR NAME"
 
 #
 # Add a single security group here (a list will be supported later).
-# The security group must minimally allow outside access to ports 22 and 8080.
+# The security group must minimally allow outside access to ports 22 and 9999.
 #
 # SSH			TCP	22	0.0.0.0/0
-# Custom TCP Rule	TCP	8080	0.0.0.0/0
+# Custom TCP Rule	TCP	9999	0.0.0.0/0
 #
 export AWS_SECURITY_GROUPS="YOUR AWS SECURITY GROUP"
 

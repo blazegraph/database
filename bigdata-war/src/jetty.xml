@@ -111,7 +111,7 @@
              </Array>
            </Arg>
            <Set name="host"><SystemProperty name="jetty.host" /></Set>
-           <Set name="port"><SystemProperty name="jetty.port" default="8080" /></Set>
+           <Set name="port"><SystemProperty name="jetty.port" default="9999" /></Set>
            <Set name="idleTimeout"><SystemProperty name="http.timeout" default="30000"/></Set>
          </New>
        </Arg>

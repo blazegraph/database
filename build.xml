@@ -2727,7 +2727,7 @@ ${postInstallMessage}</echo>
 <target name="DemoSesameServer" depends="samples.compile" description="Runs the DemoSesameServer sample code.">
 <java classname="com.bigdata.samples.remoting.DemoSesameServer" failonerror="true" fork="false" logerror="true">
     <classpath refid="samples.runtime.classpath" />
-    <arg value="http://localhost:8080/openrdf-sesame" />
+    <arg value="http://localhost:9999/openrdf-sesame" />
     <arg value="bigdata" />
 </java>
 </target>
