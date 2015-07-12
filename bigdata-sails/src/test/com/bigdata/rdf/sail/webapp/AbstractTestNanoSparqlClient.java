@@ -148,8 +148,8 @@ public abstract class AbstractTestNanoSparqlClient<S extends IIndexManager> exte
      * the ContextPath for the webapp.
      * 
      * <pre>
-     * http://localhost:8080 -- root URL
-     * http://localhost:8080/bigdata -- webapp URL (includes "/bigdata" context path.
+     * http://localhost:9999 -- root URL
+     * http://localhost:9999/bigdata -- webapp URL (includes "/bigdata" context path.
      * </pre>
      */
 	protected String m_rootURL;

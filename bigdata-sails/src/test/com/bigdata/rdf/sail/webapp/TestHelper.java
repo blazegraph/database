@@ -9,6 +9,7 @@ import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.rdf.sail.remote.BigdataSailRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.util.httpd.Config;
 
 /**
  * Helper class to debug the NSS by issuing commands that we can not issue
@@ -36,7 +37,7 @@ public class TestHelper extends TestCase {
       final String sparqlEndpointURL = args[0];
 
       final RemoteRepositoryManager mgr = new RemoteRepositoryManager(
-            "localhost:8080"/* serviceURLIsIngored */);
+            "localhost:" + Config.BLAZEGRAPH_HTTP_PORT /* serviceURLIsIngored */);
 
       try {
 

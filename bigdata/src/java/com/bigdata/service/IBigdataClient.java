@@ -486,7 +486,7 @@ public interface IBigdataClient<T> {
          * <p>
          * Note: The httpd service for the {@link LoadBalancerService} is
          * normally run on a known port in order to make it easy to locate that
-         * service, e.g., port 80, 8000 or 8080, etc. This MUST be overridden for
+         * service, e.g., port 80, 8000 or 9999, etc. This MUST be overridden for
          * the {@link LoadBalancerService} it its configuration since
          * {@link #DEFAULT_HTTPD_PORT} will otherwise cause a random port to be
          * assigned.
