@@ -118,6 +118,8 @@ public interface BigdataValueFactory extends ValueFactory {
 
     BigdataLiteral createLiteral(Date arg0);
 
+    BigdataLiteral createXSDDateTime(long timestamp);
+        
     BigdataLiteral createLiteral(String label, String language);
 
     BigdataLiteral createLiteral(String label, URI datatype);

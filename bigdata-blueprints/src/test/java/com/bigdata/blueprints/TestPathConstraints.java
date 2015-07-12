@@ -7,11 +7,14 @@ import junit.framework.TestCase;
 import org.apache.log4j.Logger;
 import org.openrdf.query.QueryLanguage;
 
-import com.bigdata.blueprints.BigdataSelection.Bindings;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.store.BDS;
 import com.tinkerpop.blueprints.Edge;
+import com.tinkerpop.blueprints.Vertex;
+
+import cutthecrap.utils.striterators.ICloseableIterator;
 
 public class TestPathConstraints extends TestCase {
 
@@ -77,14 +80,21 @@ public class TestPathConstraints extends TestCase {
 //                }
     
                 for (int i = 1; i < 5; i++) {
-                    final BigdataSelection selection = 
+                    final ICloseableIterator<BigdataBindingSet> selection = 
                             graph.select(queryStr.replace("?upper", ""+i));
-                    if (log.isDebugEnabled()) {
-                        for (Bindings bs : selection.getBindings()) {
-                            log.debug(bs.toString());
+                    try {
+                        int n = 0;
+                        while (selection.hasNext()) {
+                            final BigdataBindingSet bbs = selection.next();
+                            if (log.isDebugEnabled()) {
+                                log.debug(bbs);
+                            }
+                            n++;
                         }
+                        assertTrue(n == i);
+                    } finally {
+                        selection.close();
                     }
-                    assertTrue(selection.getBindings().size() == i);
                 }
                 
             }
@@ -116,13 +126,20 @@ public class TestPathConstraints extends TestCase {
 //                    cxn.close();
 //                }
     
-                final BigdataSelection selection = graph.select(queryStr);
-                if (log.isDebugEnabled()) {
-                    for (Bindings bs : selection.getBindings()) {
-                        log.debug(bs.toString());
+                final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
                     }
+                    assertTrue(n == 3);
+                } finally {
+                    selection.close();
                 }
-                assertTrue(selection.getBindings().size() == 3);
                 
             }
             
@@ -181,13 +198,20 @@ public class TestPathConstraints extends TestCase {
 
 //                showOptimizedAST(graph, queryStr);
                 
-                final BigdataSelection selection = graph.select(queryStr);
-                if (log.isDebugEnabled()) {
-                    for (Bindings bs : selection.getBindings()) {
-                        log.debug(bs.toString());
+                final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
                     }
+                    assertTrue(n == 3);
+                } finally {
+                    selection.close();
                 }
-                assertTrue(selection.getBindings().size() == 3);
                 
             }
             
@@ -216,13 +240,20 @@ public class TestPathConstraints extends TestCase {
                 
 //              showOptimizedAST(graph, queryStr);
                 
-                final BigdataSelection selection = graph.select(queryStr);
-                if (log.isDebugEnabled()) {
-                    for (Bindings bs : selection.getBindings()) {
-                        log.debug(bs.toString());
+                final ICloseableIterator<BigdataBindingSet> selection = graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
                     }
+                    assertTrue(n == 3);
+                } finally {
+                    selection.close();
                 }
-                assertTrue(selection.getBindings().size() == 3);
                 
             }
             
@@ -232,10 +263,256 @@ public class TestPathConstraints extends TestCase {
         
     }
     
-    private void showOptimizedAST(final BigdataGraphEmbedded graph, 
+    public void testPred() throws Exception {
+    
+        final Properties props = new Properties();
+        props.setProperty(BigdataGraph.Options.LAX_EDGES, "true");
+        
+        final BigdataGraphEmbedded graph = (BigdataGraphEmbedded)
+                BigdataGraphFactory.create(
+                        SimpleBlueprintsValueFactory.INSTANCE, props);
+        
+        try {
+            
+//            for (int i = 0; i < 5; i++) {
+//                graph.addVertex("v"+i);
+//                if (i > 0) {
+//                    final PartialVertex from = new PartialVertex("v"+(i-1));
+//                    final PartialVertex to = new PartialVertex("v"+i);
+//                    final Edge e = graph.addEdge("e"+(i-1)+""+i, from, to, "edge");
+//                }
+//            }
+            /*
+             * Create more than one path to v4 and see if the ALP op can
+             * handle it.
+             */
+            final Vertex v0 = graph.addVertex("v0");
+            final Vertex v1 = graph.addVertex("v1");
+            final Vertex v2 = graph.addVertex("v2");
+            final Vertex v3a = graph.addVertex("v3a");
+            final Vertex v3b = graph.addVertex("v3b");
+            final Vertex v4 = graph.addVertex("v4");
+            graph.addEdge("e01", v0, v1, "edge");
+            graph.addEdge("e12", v1, v2, "edge");
+            graph.addEdge("e23a", v2, v3a, "edge");
+            graph.addEdge("e23b", v2, v3b, "edge");
+            graph.addEdge("e3a4", v3a, v4, "edge");
+            graph.addEdge("e3b4", v3b, v4, "edge");
+            graph.commit();
+            
+            if (log.isDebugEnabled()) {
+                log.debug("\n"+graph.dumpStore());
+            }
+            
+            { // path predecessor
+                
+                final String queryStr =
+                        "select ?from ?edge ?to " +
+                        "where { " +
+                        "  service bd:alp { " +
+                        "    <id:v0> ?e ?to . " +
+                        "    hint:Prior hint:alp.pathExpr \"true\" . " +
+                        "    filter(?e != <bigdata:type>) . " +
+                        "    hint:Group hint:alp.lowerBound 0 . " +
+                        "    hint:Group hint:alp.upperBound 10 . " + 
+                        "    hint:Group hint:alp.edgeVar ?edge . " + 
+                        "  } " +
+//                        "  ?from ?edge ?to . " +
+//                        "  filter(?to = <id:v4>) . " +
+                        "}";
+                
+//                final BigdataSailRepositoryConnection cxn = graph
+//                        .getReadConnection();
+//                try {
+//                    final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
+//                            .prepareQuery(QueryLanguage.SPARQL, queryStr);
+//                    final QueryRoot optimized = query.optimize();
+//                    if (log.isDebugEnabled()) {
+//                        log.debug("optimized:\n" + optimized);
+//                    }
+//                } finally {
+//                    cxn.close();
+//                }
+    
+                final ICloseableIterator<BigdataBindingSet> selection = 
+                        graph.select(queryStr);
+                try {
+                    int n = 0;
+                    while (selection.hasNext()) {
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        n++;
+                    }
+//                    assertTrue(n == 2);
+                } finally {
+                    selection.close();
+                }
+                
+            }
+            
+            if (false) { // node and optionally any edges using ZLP
+                
+                final String queryStr =
+                        "select ?from ?edge ?to " +
+                        "where { " +
+                        "  service bd:alp { " +
+                        "    ?id ?e ?to . " +
+                        "    hint:Prior hint:alp.pathExpr \"true\" . " +
+                        "    filter(?e != <bigdata:type>) . " +
+                        "    hint:Group hint:alp.lowerBound 0 . " +
+                        "    hint:Group hint:alp.upperBound 1 . " + 
+                        "    hint:Group hint:alp.edgeVar ?edge . " + 
+                        "  } " +
+//                        "  optional { ?from ?edge ?to . } " +
+                        "}";
+                
+//                final BigdataSailRepositoryConnection cxn = graph
+//                        .getReadConnection();
+//                try {
+//                    final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
+//                            .prepareQuery(QueryLanguage.SPARQL, queryStr);
+//                    final QueryRoot optimized = query.optimize();
+//                    if (log.isDebugEnabled()) {
+//                        log.debug("optimized:\n" + optimized);
+//                    }
+//                } finally {
+//                    cxn.close();
+//                }
+
+                { // v0 has an edge
+                    
+                    final ICloseableIterator<BigdataBindingSet> selection = 
+                            graph.select(queryStr.replace("?id", "<id:v0>"));
+                    try {
+                        int n = 0;
+                        while (selection.hasNext()) {
+                            final BigdataBindingSet bbs = selection.next();
+                            if (log.isDebugEnabled()) {
+                                log.debug(bbs);
+                            }
+                            n++;
+                        }
+                        assertTrue(n == 2);
+                    } finally {
+                        selection.close();
+                    }
+                    
+                }
+                
+                { // v4 has no edge
+                    
+                    final ICloseableIterator<BigdataBindingSet> selection = 
+                            graph.select(queryStr.replace("?id", "<id:v4>"));
+                    try {
+                        assertTrue(selection.hasNext());
+                        final BigdataBindingSet bbs = selection.next();
+                        if (log.isDebugEnabled()) {
+                            log.debug(bbs);
+                        }
+                        assertFalse(selection.hasNext());
+                        assertFalse(bbs.isBound("edge"));
+                    } finally {
+                        selection.close();
+                    }
+                    
+                }
+                
+            }
+            
+        } finally {
+            graph.shutdown();
+        }
+        
+    }
+    
+    public void testJoinOrder() throws Exception {
+        
+        final Properties props = new Properties();
+        props.setProperty(BigdataGraph.Options.LAX_EDGES, "true");
+        
+        final BigdataGraphEmbedded graph = (BigdataGraphEmbedded)
+                BigdataGraphFactory.create(
+                        SimpleBlueprintsValueFactory.INSTANCE, props);
+        
+        try {
+            
+            for (int i = 0; i < 5; i++) {
+                final Vertex v = graph.addVertex("v"+i);
+                if (i > 0) {
+                    final PartialVertex from = new PartialVertex("v"+(i-1));
+                    final PartialVertex to = new PartialVertex("v"+i);
+                    graph.addEdge("e"+(i-1)+""+i, from, to, "edge");
+                } else {
+                    v.setProperty("foo", "bar");
+                }
+            }
+            graph.commit();
+            
+            if (log.isDebugEnabled()) {
+                log.debug("\n"+graph.dumpStore());
+            }
+            
+            { // join ordering
+                
+                final String queryStr =
+                        "select ?from ?edge ?to " +
+                        "where { " +
+                        "  ?id <"+BDS.SEARCH+"> \"bar\" . " +
+                        "  service bd:alp { " +
+                        "    ?id ?e ?to . " +
+                        "    hint:Prior hint:alp.pathExpr \"true\" . " +
+                        "    filter(?e != <bigdata:type>) . " +
+                        "    hint:Group hint:alp.lowerBound 0 . " +
+                        "    hint:Group hint:alp.upperBound 10 . " + 
+                        "    hint:Group hint:alp.edgeVar ?edge . " + 
+                        "  } " +
+                        "  ?from ?edge ?to . " +
+                        "  ?from <bigdata:type> <bigdata:Vertex> . " +
+                        "}";
+                
+                final BigdataSailRepositoryConnection cxn = graph
+                        .getReadConnection();
+                try {
+                    final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
+                            .prepareQuery(QueryLanguage.SPARQL, queryStr);
+                    final QueryRoot optimized = query.optimize();
+                    if (log.isDebugEnabled()) {
+                        log.debug("optimized:\n" + optimized);
+                    }
+                } finally {
+                    cxn.close();
+                }
+    
+//                final ICloseableIterator<BigdataBindingSet> selection = 
+//                        graph.select(queryStr);
+//                try {
+//                    int n = 0;
+//                    while (selection.hasNext()) {
+//                        final BigdataBindingSet bbs = selection.next();
+//                        if (log.isDebugEnabled()) {
+//                            log.debug(bbs);
+//                        }
+//                        n++;
+//                    }
+////                    assertTrue(n == 2);
+//                } finally {
+//                    selection.close();
+//                }
+                
+            }
+            
+        } finally {
+            graph.shutdown();
+        }
+        
+    }
+    
+    private void showOptimizedAST(final BigdataGraph graph, 
             final String queryStr) throws Exception {
         
-        final BigdataSailRepositoryConnection cxn = graph.getReadConnection();
+        final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) graph.getReadConnection();
         try {
             final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
                     .prepareQuery(QueryLanguage.SPARQL, queryStr);
