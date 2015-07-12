@@ -358,6 +358,14 @@ public class HistoryServiceFactory extends CustomServiceFactoryBase {
 
         }
 
+        /**
+         * See {@link IChangeLog#close()}.
+         */
+        @Override
+        public void close() {
+            reset();
+        }
+
         /** Reset the buffer. */
         private void reset() {
 

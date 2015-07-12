@@ -90,6 +90,7 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSail.BigdataSailConnection;
+import com.bigdata.rdf.sail.BigdataBaseContext;
 import com.bigdata.rdf.sail.BigdataSailBooleanQuery;
 import com.bigdata.rdf.sail.BigdataSailGraphQuery;
 import com.bigdata.rdf.sail.BigdataSailQuery;
@@ -99,6 +100,7 @@ import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
+import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryHints;
@@ -288,6 +290,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
          public final AbstractRestApiTask<T> task;
          public final FutureTask<T> ft;
          public final long beginNanos;
+         public UUID taskUuid;
          private final AtomicLong elapsedNanos = new AtomicLong(-1L);
 
          TaskAndFutureTask(final AbstractRestApiTask<T> task, final FutureTask<T> ft, final long beginNanos) {
@@ -295,6 +298,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
              this.ft = ft;
              this.beginNanos = beginNanos;
          }
+         
+         
 
          /**
           * Hook must be invoked when the task is done executing.
@@ -320,6 +325,32 @@ public class BigdataRDFContext extends BigdataBaseContext {
             return elapsedNanos;
 
          }
+         
+         /**
+ 		 * Convenience method to return com.bigdata.rdf.sail.model.RunningQuery from a BigdataRDFContext
+ 		 * running query. 
+ 		 * 
+ 		 * There is a current difference between the embedded and the REST model in that
+ 		 * the embedded model uses an arbitrary string as an External ID, but the 
+ 		 * REST version uses a timestamp.  The timestap is tightly coupled to the current
+ 		 * workbench.
+ 		 * 
+ 		 * TODO:  This needs to be refactored into unified model between the embedded and REST clients for tasks.
+ 		 * 
+ 		 * @return 
+ 		 */
+ 		public com.bigdata.rdf.sail.model.RunningQuery getModelRunningQuery() {
+ 		
+ 			final com.bigdata.rdf.sail.model.RunningQuery modelQuery;
+ 			
+ 			final boolean isUpdateQuery = false;
+ 			
+ 			modelQuery = new com.bigdata.rdf.sail.model.RunningQuery(
+ 					Long.toString(this.beginNanos), this.task.uuid, this.beginNanos,
+ 					isUpdateQuery);
+ 			
+ 			return modelQuery;
+ 		}
 
     }
 
@@ -1756,6 +1787,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 @Override
                 public void transactionAborted() {
                 }
+                
+                @Override
+                public void close() {
+                }
+
             });
 
             // Prepare the UPDATE request.
@@ -2000,21 +2036,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 throws IOException {
 
             XMLBuilder.Node current = doc.root("html");
-            {
-                current = current.node("head");
-                current.node("meta").attr("http-equiv", "Content-Type")
-                        .attr("content", "text/html;charset=" + charset.name())
-                        .close();
-                current.node("title").textNoEncode("bigdata&#174;").close();
-                current = current.close();// close the head.
-            }
-
-            // open the body
-            current = current.node("body");
+            		
+            addHtmlHeader(current, charset.name());
 
             return current;
             
         }
+        
 
         @Override
         public void updateEvent(final SPARQLUpdateEvent e) {
@@ -2321,7 +2349,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-            acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
+            acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
         }
 
         // Do conneg.
@@ -2429,6 +2457,30 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			
 			this.queryTask = queryTask;
 
+		}
+		
+		/**
+		 * Convenience method to return com.bigdata.rdf.sail.model.RunningQuery from a BigdataRDFContext
+		 * running query. 
+		 * 
+		 * There is a current difference between the embedded and the REST model in that
+		 * the embedded model uses an arbitrary string as an External ID, but the 
+		 * REST version uses a timestamp.  The timestap is tightly coupled to the current
+		 * workbench.
+		 * 
+		 * @return 
+		 */
+		public com.bigdata.rdf.sail.model.RunningQuery getModelRunningQuery() {
+		
+			final com.bigdata.rdf.sail.model.RunningQuery modelQuery;
+			
+			final boolean isUpdateQuery = queryTask instanceof UpdateTask?true:false;
+			
+			modelQuery = new com.bigdata.rdf.sail.model.RunningQuery(
+					Long.toString(this.queryId), this.queryId2, this.begin,
+					isUpdateQuery);
+			
+			return modelQuery;
 		}
 
 	}
@@ -2717,5 +2769,29 @@ public class BigdataRDFContext extends BigdataBaseContext {
       }
 
    }
-	
+
+	/**
+	 * Utility method to consolidate header into a single location.
+	 * 
+	 * The post-condition is that the current node is open for writing on the
+	 * body element.
+	 * 
+	 * @param current
+	 * @throws IOException
+	 */
+	public static void addHtmlHeader(Node current, String charset)
+			throws IOException {
+
+		current = current.node("head");
+		current.node("meta").attr("http-equiv", "Content-Type")
+				.attr("content", "text/html;charset=" + charset).close();
+		current.node("title").textNoEncode("blazegraph&trade; by SYSTAP")
+				.close();
+		current = current.close();// close the head.
+
+		// open the body
+		current = current.node("body");
+
+	}
+
 }

@@ -37,6 +37,7 @@ import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.graph.impl.bd.GASService;
+import com.bigdata.rdf.sail.RDRHistoryServiceFactory;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
@@ -148,15 +149,21 @@ public class ServiceRegistry {
              *      href="https://sourceforge.net/apps/trac/bigdata/ticket/607">
              *      HISTORY SERVICE </a>
              */
-
             add(new URIImpl(BD.NAMESPACE + "history"),
                     new HistoryServiceFactory());
+            
+            /**
+             * Replacing with a history service using RDR instead of a custom
+             * index.
+             */
+            add(new URIImpl(BD.NAMESPACE + "rdrhistory"),
+                    new RDRHistoryServiceFactory());
 
         }
 
         // The Gather-Apply-Scatter RDF Graph Mining service.
         add(GASService.Options.SERVICE_KEY, new GASService());
-
+        
     }
 
     /**

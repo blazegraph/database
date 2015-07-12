@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -72,8 +73,16 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
+import com.bigdata.rdf.sail.model.JsonHelper;
+import com.bigdata.rdf.sail.model.RunningQuery;
+import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
+import com.bigdata.rdf.sail.webapp.StatusServlet;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PropertyUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 /**
  * A manager for connections to one or more REST API / SPARQL end points for the
@@ -1515,6 +1524,49 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
            
    }
 
+   /**
+    * List the currently running queries on the server
+    * 
+    */
+   public Collection<RunningQuery> showQueries() throws Exception {
+   
+       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL, 
+    		   null, null/* txId */);
+
+       opts.addRequestParam(StatusServlet.SHOW_QUERIES);
+       
+       opts.setAcceptHeader(BigdataRDFServlet.MIME_JSON);
+
+       JettyResponseListener response = null;
+
+       try {
+			// Issue request, check response status code.
+			checkResponseCode(response = doConnect(opts));
+
+			final String contentType = response.getContentType();
+
+			if (!BigdataRDFServlet.MIME_JSON.equals(contentType))
+				throw new RuntimeException("Expected MIME_TYPE "
+						+ BigdataRDFServlet.MIME_JSON + " but received : "
+						+ contentType + ".");
+
+			final InputStream is = response.getInputStream();
+
+			final List<RunningQuery> runningQueries = JsonHelper.readRunningQueryList(is);
+
+			return runningQueries;
+           
+       } finally {
+           /*
+            * Ensure that the http response entity is consumed so that the http
+            * connection will be released in a timely fashion.
+            */
+        if (response != null)
+           response.abort();
+           
+       }
+           
+   }
    /**
     * Extracts the solutions from a SPARQL query.
     * 
