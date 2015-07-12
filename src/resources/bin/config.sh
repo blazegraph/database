@@ -49,7 +49,7 @@ fi
 #Port for the NanoSparqlServer Jetty
 
 if [ -z "${JETTY_PORT}" ] ; then
-	export JETTY_PORT=8080
+	export JETTY_PORT=9999
 fi
 
 #Group commit (true|false)
