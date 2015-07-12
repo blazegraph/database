@@ -28,11 +28,15 @@ import java.util.UUID;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.StatementImpl;
+import org.openrdf.query.impl.AbstractQuery;
 import org.openrdf.repository.RepositoryConnection;
 
 import com.bigdata.rdf.changesets.IChangeLog;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.model.RunningQuery;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.QueryType;
 import com.tinkerpop.blueprints.Edge;
 import com.tinkerpop.blueprints.GraphQuery;
 import com.tinkerpop.blueprints.TransactionalGraph;
@@ -65,11 +69,11 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		this.cxn.addChangeLog(this);
 	}
 
-	protected RepositoryConnection getWriteConnection() throws Exception {
+	public RepositoryConnection getWriteConnection() throws Exception {
 		return cxn;
 	}
 
-	protected RepositoryConnection getReadConnection() throws Exception {
+	public RepositoryConnection getReadConnection() throws Exception {
 		return cxn;
 	}
 
@@ -181,32 +185,32 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 		throw new UnsupportedOperationException();
 	}
 
-	/**
-	 * Set a single-value property on an edge or vertex (remove the old value
-	 * first).
-	 * 
-	 * @see {@link BigdataElement}
-	 */
-	@Override
-	public void setProperty(final URI uri, final URI prop, final Literal val) {
-
-		try {
-
-			final RepositoryConnection cxn = getWriteConnection();
-
-			// // remove the old value
-			// cxn.remove(uri, prop, null);
-
-			// add the new value
-			cxn.add(uri, prop, val);
-
-		} catch (RuntimeException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
-	}
+//	/**
+//	 * Set a single-value property on an edge or vertex (remove the old value
+//	 * first).
+//	 * 
+//	 * @see {@link BigdataElement}
+//	 */
+//	@Override
+//	public void setProperty(final URI uri, final URI prop, final Literal val) {
+//
+//		try {
+//
+//			final RepositoryConnection cxn = getWriteConnection();
+//
+//			// // remove the old value
+//			// cxn.remove(uri, prop, null);
+//
+//			// add the new value
+//			cxn.add(uri, prop, val);
+//
+//		} catch (RuntimeException e) {
+//			throw e;
+//		} catch (Exception e) {
+//			throw new RuntimeException(e);
+//		}
+//
+//	}
 
 	/**
 	 * Set a multi-value property on an edge or vertex (remove the old values
@@ -353,6 +357,10 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 	public void transactionAborted() {
 	}
 
+    @Override
+    public void close() {
+    }
+
 	public long getMutationCountTotal() {
 		return mutationCountTotal;
 	}
@@ -363,6 +371,71 @@ public class BigdataGraphBulkLoad extends BigdataGraph implements
 
 	public long getMutationCountLastCommit() {
 		return mutationCountLastCommit;
+	}
+
+	@Override
+	protected UUID setupQuery(BigdataSailRepositoryConnection cxn,
+			ASTContainer astContainer, QueryType queryType, String extQueryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	protected void tearDownQuery(UUID queryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+
+	}
+
+	@Override
+	public Collection<RunningQuery> getRunningQueries() {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	public void cancel(UUID queryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	public void cancel(String externalQueryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	public void cancel(RunningQuery r) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	public RunningQuery getQueryById(UUID queryId2) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	public RunningQuery getQueryByExternalId(String extQueryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
+	}
+
+	@Override
+	protected boolean isQueryCancelled(UUID queryId) {
+		// This is a NOOP for the BigdataGraphBulkLoad
+		throw new RuntimeException(
+				"Method is not implemented for BigdataGraphBulkLoad.");
 	}
 
 }

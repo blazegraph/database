@@ -171,6 +171,12 @@ public class QueryHintRegistry {
          */
         add(new FilterExistsHint());
         
+        /*
+         * Mark a statement pattern to include history (SPOs where 
+         * type == StatementEnum.History, which are normally hidden from view). 
+         */
+        add(new HistoryHint());
+        
     }
 
 }

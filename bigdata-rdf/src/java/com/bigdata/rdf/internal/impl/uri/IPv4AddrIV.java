@@ -127,7 +127,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	
 	// "((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?
 
-	private static final Pattern pattern = 
+	public static final Pattern pattern = 
 			Pattern.compile(IPv4_OPTIONAL_CIDR_PATTERN);
 	
     /**

@@ -120,7 +120,7 @@ public class SPO implements ISPO, java.io.Serializable {
 	 * Bit flags used to represent statement type, user flag, override, 
 	 * modified enum, and sidable flag.  Much more compact representation.
 	 */
-	private byte flags = 0;
+	public byte flags = 0;
 
 	/**
 	 * Denotes which bit to find the StatementType within the {@link #flags}.
@@ -132,22 +132,22 @@ public class SPO implements ISPO, java.io.Serializable {
 	 * Denotes which bit to find the ModifiedEnum within the {@link #flags}.
 	 * Modified takes two bits.
 	 */
-    private static int MODIFIED_BIT = 2;
+    private static int MODIFIED_BIT = 3;
 
     /**
 	 * Denotes which bit to find the userFlag within the {@link #flags}.
 	 */
-    private static int USERFLAG_BIT = 4;
+    private static int USERFLAG_BIT = 5;
 
     /**
 	 * Denotes which bit to find the override flag within the {@link #flags}.
 	 */
-    private static int OVERRIDE_BIT = 5;
+    private static int OVERRIDE_BIT = 6;
 
 //    /**
 //	 * Denotes which bit to find the sidable flag within the {@link #flags}.
 //	 */
-//    private static int SIDABLE_BIT = 6;
+//    private static int SIDABLE_BIT = 7;
 	
 	
     @Override
@@ -602,6 +602,7 @@ public class SPO implements ISPO, java.io.Serializable {
                 case Explicit    : t = "Explicit    "; break;
                 case Inferred    : t = "Inferred    "; break;
                 case Axiom       : t = "Axiom       "; break;
+                case History     : t = "History     "; break;
                 default: throw new AssertionError();
                 }
             } else {
@@ -679,11 +680,12 @@ public class SPO implements ISPO, java.io.Serializable {
 	 */
 	private StatementEnum type() {
 		
-		// get just the 0 and 1 bits
-//		final byte b = Bits.mask(flags, 0, 1);
+		// get just the 0 and 1 and 2 bits
+//		final byte b = Bits.mask(flags, 0, 1, 2);
 		byte b = 0;
 		b |= (0x1 << TYPE_BIT);
 		b |= (0x1 << (TYPE_BIT+1));
+        b |= (0x1 << (TYPE_BIT+2));
 		b &= flags;
 		
         switch (b) {
@@ -691,6 +693,7 @@ public class SPO implements ISPO, java.io.Serializable {
         case 1: return StatementEnum.Explicit;
         case 2: return StatementEnum.Axiom;
         case 3: return StatementEnum.Inferred;
+        case 4: return StatementEnum.History;
         }
         
         throw new IllegalStateException();
@@ -698,25 +701,28 @@ public class SPO implements ISPO, java.io.Serializable {
 	}
 	
 	/**
-	 * Statement type is hiding in the 0 and 1 bits of the flags.
+	 * Statement type is hiding in the 0 and 1 and 2 bits of the flags.
 	 */
 	private void type(final StatementEnum type) {
 
 		byte b = flags;
 		
 		if (type == null) {
-			b = Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), false);
+			b = Bits.set(Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), false), (TYPE_BIT+2), false);
 		} else {
 			switch(type) {
 			case Explicit: 
-				b = Bits.set(Bits.set(b, TYPE_BIT, true), (TYPE_BIT+1), false);
+				b = Bits.set(Bits.set(Bits.set(b, TYPE_BIT, true), (TYPE_BIT+1), false), (TYPE_BIT+2), false);
 				break;
 			case Axiom: 
-				b = Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), true);
+				b = Bits.set(Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), true), (TYPE_BIT+2), false);
 				break;
 			case Inferred:
-				b = Bits.set(Bits.set(b, TYPE_BIT, true), (TYPE_BIT+1), true);
+				b = Bits.set(Bits.set(Bits.set(b, TYPE_BIT, true), (TYPE_BIT+1), true), (TYPE_BIT+2), false);
 				break;
+            case History:
+                b = Bits.set(Bits.set(Bits.set(b, TYPE_BIT, false), (TYPE_BIT+1), false), (TYPE_BIT+2), true);
+                break;
 			default:
 		        throw new IllegalStateException();
 			}
@@ -727,22 +733,22 @@ public class SPO implements ISPO, java.io.Serializable {
 	}
 	
 	/**
-	 * Modified enum is hiding in the 2 and 3 bits of the flags.
+	 * Modified enum is hiding in the 3 and 4 bits of the flags.
 	 */
 	private ModifiedEnum modified() {
 		
-		// get just the 2 and 3 bits
-//		final byte b = Bits.mask(flags, 2, 3);
+		// get just the 3 and 4 bits
+//		final byte b = Bits.mask(flags, 3, 4);
 		byte b = 0;
 		b |= (0x1 << MODIFIED_BIT);
 		b |= (0x1 << (MODIFIED_BIT+1));
 		b &= flags;
 		
         switch (b) {
-        case 0: return ModifiedEnum.NONE;
-        case 4: return ModifiedEnum.INSERTED;
-        case 8: return ModifiedEnum.REMOVED;
-        case 12: return ModifiedEnum.UPDATED;
+        case 0: return ModifiedEnum.NONE; // 00000
+        case 8: return ModifiedEnum.INSERTED; // 01000
+        case 16: return ModifiedEnum.REMOVED; // 10000
+        case 24: return ModifiedEnum.UPDATED; // 11000
         }
         
         throw new IllegalStateException();
@@ -750,7 +756,7 @@ public class SPO implements ISPO, java.io.Serializable {
 	}
 	
 	/**
-	 * Modified enum is hiding in the 2 and 3 bits of the flags.
+	 * Modified enum is hiding in the 3 and 4 bits of the flags.
 	 */
 	private void modified(final ModifiedEnum modified) {
 		
@@ -782,42 +788,42 @@ public class SPO implements ISPO, java.io.Serializable {
 	}
 	
 	/**
-	 * User flag is hiding in the 4 bit of the flags.
+	 * User flag is hiding in the 5 bit of the flags.
 	 */
 	private boolean userFlag() {
 		return Bits.get(flags, USERFLAG_BIT);
 	}
 	
 	/**
-	 * User flag is hiding in the 4 bit of the flags.
+	 * User flag is hiding in the 5 bit of the flags.
 	 */
 	private void userFlag(final boolean userFlag) {
 		flags = Bits.set(flags, USERFLAG_BIT, userFlag);
 	}
 	
 	/**
-	 * Override is hiding in the 5 bit of the flags.
+	 * Override is hiding in the 6 bit of the flags.
 	 */
 	private boolean override() {
 		return Bits.get(flags, OVERRIDE_BIT);
 	}
 	
 	/**
-	 * Override is hiding in the 5 bit of the flags.
+	 * Override is hiding in the 6 bit of the flags.
 	 */
 	private void override(final boolean override) {
 		flags = Bits.set(flags, OVERRIDE_BIT, override);
 	}
 	
 //	/**
-//	 * Sidable is hiding in the 6 bit of the flags.
+//	 * Sidable is hiding in the 7 bit of the flags.
 //	 */
 //	private boolean sidable() {
 //		return Bits.get(flags, SIDABLE_BIT);
 //	}
 //	
 //	/**
-//	 * Sidable is hiding in the 6 bit of the flags.
+//	 * Sidable is hiding in the 7 bit of the flags.
 //	 */
 //	private void sidable(final boolean sidable) {
 //		flags = Bits.set(flags, SIDABLE_BIT, sidable);

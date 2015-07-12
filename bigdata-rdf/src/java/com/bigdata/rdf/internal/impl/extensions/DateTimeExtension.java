@@ -53,6 +53,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDNumericIV;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.util.InnerCause;
 
 /**
@@ -122,23 +123,24 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         
         final URI dt = lit.getDatatype();
         
-        if (dt == null)
-            throw new IllegalArgumentException();
-        
-        BigdataURI resolvedDT = null;
-        for (BigdataURI val : datatypes.values()) {
-            // Note: URI.stringValue() is efficient....
-            if (val.stringValue().equals(dt.stringValue())) {
-                resolvedDT = val;
-            }
-        }
-        
-        if (resolvedDT == null)
-            throw new IllegalArgumentException();
-        
         final String s = value.stringValue();
         
-        final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(s);
+        /*
+         * Returns the current time as UTC milliseconds from the epoch
+         */
+        final long l = getTimestamp(s, defaultTZ);
+        
+        return createIV(l, dt);
+        
+    }
+    
+    /**
+     * Convert an xsd:dateTime into its milliseconds from the epoch 
+     * representation.
+     */
+    public static long getTimestamp(final String dateTime, final TimeZone defaultTZ) {
+        
+        final XMLGregorianCalendar c = XMLDatatypeUtil.parseCalendar(dateTime);
         
         if (c.getTimezone() == DatatypeConstants.FIELD_UNDEFINED) {
             final GregorianCalendar gc = c.toGregorianCalendar();
@@ -156,11 +158,41 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         gc.setGregorianChange(new Date(Long.MIN_VALUE));
         
         /*
-         * Returns the current time as UTC milliseconds from the epoch
+         * Returns the current time as milliseconds from the epoch
          */
         final long l = gc.getTimeInMillis();
+        return l;
 
-        final AbstractLiteralIV delegate = new XSDNumericIV(l);
+    }
+        
+    /**
+     * Convert an xsd:dateTime into its milliseconds from the epoch 
+     * representation.
+     */
+    public static long getTimestamp(final String dateTime) {
+
+        return getTimestamp(dateTime, TimeZone.getTimeZone(
+                AbstractTripleStore.Options.DEFAULT_INLINE_DATE_TIMES_TIMEZONE));
+        
+    }
+
+    public LiteralExtensionIV createIV(final long timestamp, final URI dt) {
+        
+        if (dt == null)
+            throw new IllegalArgumentException();
+        
+        BigdataURI resolvedDT = null;
+        for (BigdataURI val : datatypes.values()) {
+            // Note: URI.stringValue() is efficient....
+            if (val.stringValue().equals(dt.stringValue())) {
+                resolvedDT = val;
+            }
+        }
+        
+        if (resolvedDT == null)
+            throw new IllegalArgumentException();
+        
+        final AbstractLiteralIV delegate = new XSDNumericIV(timestamp);
 
         return new LiteralExtensionIV(delegate, resolvedDT.getIV());
         
@@ -243,9 +275,9 @@ public class DateTimeExtension<V extends BigdataValue> implements IExtension<V> 
         }
 
     }
-
+    
     /** Singleton. */
-    private static final DatatypeFactory datatypeFactorySingleton;
+    public static final DatatypeFactory datatypeFactorySingleton;
 
     /**
      * Singleton caching pattern for the Datatype factory reference.

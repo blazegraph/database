@@ -94,6 +94,7 @@ public class SampleCode {
      */
     public void loadSomeData(Repository repo) throws Exception {
         RepositoryConnection cxn = repo.getConnection();
+        
         cxn.setAutoCommit(false);
         try {
             Resource s = new URIImpl("http://www.bigdata.com/rdf#Mike");

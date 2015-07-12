@@ -156,6 +156,14 @@ public class AST2BOpBase {
          * named graph query.
          */
         String NKNOWN = AST2BOpBase.class.getName() + ".nknown";
+        
+        
+        /**
+         * Boolean indicating whether the AST2BOpUpdate should autocommit.  Default
+         * value is TRUE.
+         */
+        
+        String AUTO_COMMIT = AST2BOpBase.class.getName() + "AUTO_COMMIT";
 
     }
 
