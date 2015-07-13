@@ -27,11 +27,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import java.util.UUID;
+
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
+import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.bop.IQueryContext;
+import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.engine.BOpStats;
+import com.bigdata.bop.engine.BlockingBufferWithStats;
+import com.bigdata.bop.engine.IRunningQuery;
+import com.bigdata.bop.engine.MockRunningQuery;
+import com.bigdata.bop.solutions.MockQuery;
+import com.bigdata.bop.solutions.MockQueryContext;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
@@ -48,6 +60,9 @@ import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.relation.accesspath.IAsynchronousIterator;
+import com.bigdata.relation.accesspath.IBlockingBuffer;
+import com.bigdata.relation.accesspath.ThickAsynchronousIterator;
 
 /**
  * Test suite for {@link ASTSetValueExpressionsOptimizer}.
@@ -98,12 +113,33 @@ public class TestASTSetValueExpressionOptimizer extends AbstractASTEvaluationTes
         @SuppressWarnings("rawtypes")
         final IV c13 = store.getLexiconRelation().getInlineIV(
                 store.getValueFactory().createLiteral("13", XSD.INTEGER));
+        store.commit();
         
+        @SuppressWarnings("rawtypes")
+        final BOpContext context;
+        {
+            final BOpStats stats = new BOpStats();
+            final PipelineOp mockQuery = new MockQuery();
+            final IAsynchronousIterator<IBindingSet[]> source = new ThickAsynchronousIterator<IBindingSet[]>(
+                    new IBindingSet[][] {});
+            final IBlockingBuffer<IBindingSet[]> sink = new BlockingBufferWithStats<IBindingSet[]>(
+                    mockQuery, stats);
+            final UUID queryId = UUID.randomUUID();
+            final IQueryContext queryContext = new MockQueryContext(queryId);
+            final IRunningQuery runningQuery = new MockRunningQuery(null/* fed */
+            , store.getIndexManager()/* indexManager */,queryContext
+            );
+            context = BOpContext.newMock(runningQuery, null/* fed */,
+                    store.getIndexManager()/* localIndexManager */,
+                    -1/* partitionId */, stats, mockQuery,
+                    false/* lastInvocation */, source, sink, null/* sink2 */);
+        }
+
         final IBindingSet[] bsets = new IBindingSet[] { //
-        new ListBindingSet(//
+        new ContextBindingSet(context, new ListBindingSet(//
 //                new IVariable[] { Var.var("p") },//
 //                new IConstant[] { new Constant<IV>(mockIV) }
-                ) //
+                )) //
         };
 
         // The source AST.

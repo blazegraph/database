@@ -473,39 +473,6 @@ public class HAJournalServer extends AbstractServer {
 
     }
     
-//    /**
-//     * Configuration options for the {@link NanoSparqlServer}.
-//     * 
-//     * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
-//     *      Allow configuration of embedded NSS jetty server using jetty-web.xml
-//     *      </a>
-//     */
-//    @Deprecated
-//    public interface NSSConfigurationOptions extends ConfigParams {
-//
-//        @Deprecated
-//        String COMPONENT = NanoSparqlServer.class.getName();
-//        
-//        /**
-//         * The port at which the embedded {@link NanoSparqlServer} will respond
-//         * to HTTP requests (default {@value #DEFAULT_PORT}). This MAY be ZERO
-//         * (0) to use a random open port.
-//         * 
-//         * @deprecated This has been replaced by the use of <code>web.xml</code>
-//         *             and <code>jetty.xml</code>.
-//         * 
-//         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/730" >
-//         *      Allow configuration of embedded NSS jetty server using
-//         *      jetty-web.xml </a>
-//         */
-//        @Deprecated
-//        String PORT = "port";
-//
-//        @Deprecated
-//        int DEFAULT_PORT = 8080;
-//
-//    }
-
     /**
      * The journal.
      */

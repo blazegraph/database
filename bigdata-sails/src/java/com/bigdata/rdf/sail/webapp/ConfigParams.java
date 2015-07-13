@@ -26,6 +26,7 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sparql.ast.service.ServiceFactory;
 
 /**
  * Interface declaring the <code>config-param</code>s understood by the
@@ -34,7 +35,7 @@ import com.bigdata.journal.IIndexManager;
  * Note: When used in a jini/River configuration, the name of the component for
  * those configuration options is the fully qualified class name for the
  * {@link NanoSparqlServer}.
- * 
+ *
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/596"> Change
  *      web.xml parameter names to be consistent with Jini/River </a>
  */
@@ -78,7 +79,7 @@ public interface ConfigParams {
     /**
      * Force a compacting merge of all shards on all data services in a
      * bigdata federation (optional, default <code>false</code>).
-     * 
+     *
      * <strong>This option should only be used for benchmarking
      * purposes.</strong>
      */
@@ -171,11 +172,11 @@ public interface ConfigParams {
      * methods.
      * <p>
      * Note:
-     * 
+     *
      * @see BigdataRDFServletContextListener#contextInitialized(ServletContextEvent)
      * @see BigdataRDFServletContextListener#contextDestroyed(ServletContextEvent)
      * @see #DEFAULT_SERVLET_CONTEXT_LISTENER_CLASS
-     * 
+     *
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/667" >
      *      Provide NanoSparqlServer initialization hook </a>
      */
@@ -195,4 +196,8 @@ public interface ConfigParams {
     
     final static String DEFAULT_BLUEPRINTS_SERVLET_PROVIDER = BlueprintsServletProxy.getDefaultProvider();
 
+    /**
+     * List of the services this instance is allowed to call out to.
+     */
+    String SERVICE_WHITELIST = "serviceWhitelist";
 }

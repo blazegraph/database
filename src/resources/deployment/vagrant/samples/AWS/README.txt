@@ -53,7 +53,7 @@ Sample Session
 % cp Vagrantfile.aws.tomcat Vagrantfile
 % vagrant up
 
-# The bigdata server is now found at the public IP address of the instance: http://<public-ip>:8080/bigdata
+# The bigdata server is now found at the public IP address of the instance: http://<public-ip>:9999/bigdata
 
 # to login to the host:
 % vagrant ssh

@@ -316,6 +316,14 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     }
 
     /**
+     * MP: Make SPARQL Update an auto-commit operation by default.
+     * 
+     * TODO:  Make this private once merged down.
+     */
+	public static boolean AUTO_COMMIT = Boolean.parseBoolean(System
+			.getProperty(AST2BOpBase.Annotations.AUTO_COMMIT, "true"));
+    
+    /**
      * Commit.
      * <p>
      * Note: Not required on cluster (Shard-wise ACID updates).
@@ -337,8 +345,8 @@ public class AST2BOpUpdate extends AST2BOpUtility {
     	 * query engine that things could be different (but that requires a
     	 * wholly different plan).
     	 */
-//        if (!context.isCluster()) 
-        {
+//        if (!context.isCluster())
+        if (AUTO_COMMIT) {
 
             if (runOnQueryEngine) {
             
@@ -774,6 +782,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							}
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
+                                    context,//
                                     context.conn.getTripleStore(), template,
                                     op.getWhereClause(), null/* bnodesMap */,
                                     result);
@@ -849,6 +858,7 @@ public class AST2BOpUpdate extends AST2BOpUtility {
 							}
 
                             final ASTConstructIterator itr = new ASTConstructIterator(
+                                    context,//
                                     context.conn.getTripleStore(), template,
                                     op.getWhereClause(), null/* bnodesMap */,
                                     result);
