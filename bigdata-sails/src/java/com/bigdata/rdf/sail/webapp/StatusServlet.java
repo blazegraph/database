@@ -146,7 +146,7 @@ public class StatusServlet extends BigdataRDFServlet {
      * @see #DETAILS
      * @see #QUERY_ID
      */
-    public static final String SHOW_QUERIES = "showQueries";
+    private static final String SHOW_QUERIES = "showQueries";
 
     /**
      * @see #SHOW_QUERIES
