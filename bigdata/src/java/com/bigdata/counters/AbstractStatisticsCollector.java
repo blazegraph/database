@@ -54,6 +54,7 @@ import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.util.httpd.AbstractHTTPD;
+import com.bigdata.util.httpd.Config;
 
 /**
  * Base class for collecting data on a host. The data are described by a
@@ -852,7 +853,7 @@ abstract public class AbstractStatisticsCollector implements IStatisticsCollecto
          */
         AbstractHTTPD httpd = null;
         {
-            final int port = 8080;
+            final int port = Config.BLAZEGRAPH_HTTP_PORT;
             if (port != 0) {
                 try {
                     httpd = new CounterSetHTTPD(port, client);

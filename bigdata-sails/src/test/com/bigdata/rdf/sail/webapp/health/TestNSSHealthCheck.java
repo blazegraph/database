@@ -97,7 +97,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * ContextPath).
 	 * 
 	 * <pre>
-	 * http://localhost:8080/bigdata -- webapp URL (includes "/bigdata" context path.
+	 * http://localhost:9999/bigdata -- webapp URL (includes "/bigdata" context path.
 	 * </pre>
 	 */
 	protected String m_serviceURL;
@@ -107,7 +107,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * the ContextPath for the webapp.
 	 * 
 	 * <pre>
-	 * http://localhost:8080 -- root URL
+	 * http://localhost:9999 -- root URL
 	 * </pre>
 	 */
 	protected String m_rootURL;
@@ -372,7 +372,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * bare URL of the server
 	 * 
 	 * <pre>
-	 * http://localhost:8080
+	 * http://localhost:9999
 	 * </pre>
 	 * 
 	 * The response is should be <code>index.html</code> since we want the
@@ -396,7 +396,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * URL with correct context path
 	 * 
 	 * <pre>
-	 * http://localhost:8080/bigdata
+	 * http://localhost:9999/bigdata
 	 * </pre>
 	 * 
 	 * The response is should be <code>index.html</code>, which is specified
@@ -413,7 +413,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * URL with context path and index.html reference
 	 * 
 	 * <pre>
-	 * http://localhost:8080/bigdata/index.html
+	 * http://localhost:9999/bigdata/index.html
 	 * </pre>
 	 * 
 	 * This URL does NOT get mapped to anything (404).
@@ -475,7 +475,7 @@ public class TestNSSHealthCheck extends TestCase2 {
 	 * The fully qualified URL for <code>index.html</code>
 	 * 
 	 * <pre>
-	 * http://localhost:8080/bigdata/html/index.html
+	 * http://localhost:9999/bigdata/html/index.html
 	 * </pre>
 	 * 
 	 * The response is should be <code>index.html</code>, which is specified
