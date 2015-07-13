@@ -1322,8 +1322,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final String s = req
                         .getHeader(HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS);
                 if (s != null) {
-                    long tmp = StringUtil.toLong(s);
-                    if (tmp != -1L && //
+                    final long tmp = StringUtil.toLong(s);
+                    if (tmp > 0 && // != -1L && //
                             (queryTimeoutMillis == 0/* noLimit */
                             || //
                             tmp < queryTimeoutMillis/* shorterLimit */)//
@@ -1341,8 +1341,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
                     /*
                      * The maxQueryTimeMillis parameter was specified (0 implies no timeout).
                      */
-                    long tmp = StringUtil.toLong(s);
-                    if (tmp != -1L && //
+                    final long tmp = StringUtil.toLong(s);
+                    if (tmp > 0 && // != -1L && //
                             (queryTimeoutMillis == 0/* noLimit */
                             || //
                             tmp < queryTimeoutMillis/* shorterLimit */)//
