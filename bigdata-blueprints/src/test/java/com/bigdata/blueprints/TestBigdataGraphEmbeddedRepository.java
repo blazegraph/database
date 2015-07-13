@@ -30,6 +30,7 @@ import org.openrdf.repository.sail.SailRepository;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory;
 import com.bigdata.rdf.sail.remote.BigdataSailFactory.Option;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -69,7 +70,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 
 	}
 
-	public SailRepository getOrCreateRepository(String journalFile) {
+	public BigdataSail getOrCreateRepository(String journalFile) {
 
 		final java.util.Properties props = new java.util.Properties();
 		SailRepository repo = null;
@@ -92,7 +93,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			 * location. Create a new store. (If journal== null an in-memory
 			 * store will be created.
 			 */
-			repo = (SailRepository) BigdataSailFactory.createRepository(props, journalFile,
+			repo = BigdataSailFactory.createRepository(props, journalFile,
 					Option.TextIndex);// , Option.RDR);
 
 		} else {
@@ -112,7 +113,7 @@ public class TestBigdataGraphEmbeddedRepository extends
 			testPrint(e.toString());
 		}
 
-		return repo;
+		return (BigdataSail) repo.getSail();
 	}
 
 	@Override
