@@ -183,10 +183,10 @@ dependencies.
   </repositories>
 
   <modules>
-    <module>../ctc-striterators</module>
-    <module>../dsi-utils</module>
     <module>../junit-ext</module>
+    <module>../ctc-striterators</module>
     <module>../lgpl-utils</module>
+    <module>../dsi-utils</module>
     <module>../rdf-properties</module>
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
