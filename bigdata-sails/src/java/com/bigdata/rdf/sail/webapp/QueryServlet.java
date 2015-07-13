@@ -409,15 +409,21 @@ public class QueryServlet extends BigdataRDFServlet {
         // The SPARQL update
         final String updateStr = getUpdateString(req);
 
-        Map<String, Value> bindings = parseBindings(req, resp);
+        final Map<String, Value> bindings = parseBindings(req, resp);
         if (bindings == null) {
+            // There was an error in the bindings. The response was already
+            // committed.
         	return;
         }
 
-        String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+        // The openrdf query timeout in SECONDS.
         int maxQueryTime = 0;
-        if (maxQueryTimeStr != null) {
-            maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+        {
+            final String maxQueryTimeStr = req
+                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+            if (maxQueryTimeStr != null) {
+                maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+            }
         }
 
         if (updateStr == null) {
@@ -617,17 +623,22 @@ public class QueryServlet extends BigdataRDFServlet {
 
       }
 
-      Map<String, Value> bindings = parseBindings(req, resp);
-      if (bindings==null) {
+      final Map<String, Value> bindings = parseBindings(req, resp);
+      if (bindings == null) {
+          // There was a problem with the bindings. An error response was
+          // already committed.
           return;
       }
       
-      String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+      // The openrdf query timeout in SECONDS. 
       int maxQueryTime = 0;
-      if (maxQueryTimeStr != null) {
-          maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+      {
+          final String maxQueryTimeStr = req
+                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+          if (maxQueryTimeStr != null) {
+              maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+          }
       }
-
 
       // Note: The historical behavior was to always include inferences.
       // @see BLZG-1207 

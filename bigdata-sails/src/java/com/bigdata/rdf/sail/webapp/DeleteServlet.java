@@ -126,11 +126,14 @@ public class DeleteServlet extends BigdataRDFServlet {
 			return;
 		}
 		
-		String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
-		int maxQueryTime = 0;
-		if (maxQueryTimeStr != null) {
-			maxQueryTime = Integer.parseInt(maxQueryTimeStr);
-		}
+        int maxQueryTime = 0;
+        {
+            final String maxQueryTimeStr = req
+                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+            if (maxQueryTimeStr != null) {
+                maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+            }
+        }
 
 		if (queryStr == null)
 			throw new UnsupportedOperationException();
