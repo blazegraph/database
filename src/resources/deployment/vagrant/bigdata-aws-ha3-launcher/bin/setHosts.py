@@ -99,4 +99,4 @@ if __name__ == '__main__':
 
 	print "The bigdata HA service is now restarting, this may take several minutes. \nOnce back up, you may confirm status by visiting:\n"
 	for host in bigdataHosts:
-		print "\thttp://" + host.__dict__['ip_address'] + ":8080/bigdata/status\n"
+		print "\thttp://" + host.__dict__['ip_address'] + ":9999/bigdata/status\n"

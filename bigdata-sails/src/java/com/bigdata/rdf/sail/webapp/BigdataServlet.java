@@ -455,11 +455,11 @@ abstract public class BigdataServlet extends HttpServlet implements IMimeTypes {
          * service URI. This will be a load balanced version of the serviceURI
          * that we obtained above. We are trying to go from
          * 
-         * http://localhost:8080/bigdata/sparql
+         * http://localhost:9999/bigdata/sparql
          * 
          * to
          * 
-         * http://localhost:8080/bigdata/LBS/sparql
+         * http://localhost:9999/bigdata/LBS/sparql
          * 
          * where LBS is the prefix of the load balancer servlet.
          */
