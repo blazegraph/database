@@ -88,7 +88,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	/**
 	 * Create a Blueprints wrapper around a {@link BigdataSail} instance.
 	 */
-    public BigdataGraphEmbedded(final Sail sail) {
+    public BigdataGraphEmbedded(final BigdataSail sail) {
         this(sail, BigdataRDFFactory.INSTANCE);
     }
     
@@ -96,25 +96,25 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      * Create a Blueprints wrapper around a {@link BigdataSail} instance with
      * a non-standard {@link BlueprintsValueFactory} implementation.
      */
-    public BigdataGraphEmbedded(final Sail sail, 
+    public BigdataGraphEmbedded(final BigdataSail sail, 
             final BlueprintsValueFactory factory) {
-        this(new SailRepository(sail), factory, new Properties());
+        this(new BigdataSailRepository(sail), factory, new Properties());
     }
     
     /**
      * Create a Blueprints wrapper around a {@link BigdataSail} instance with
      * a non-standard {@link BlueprintsValueFactory} implementation.
      */
-    public BigdataGraphEmbedded(final Sail sail, 
+    public BigdataGraphEmbedded(final BigdataSail sail, 
             final BlueprintsValueFactory factory, final Properties props) {
-        this(new SailRepository(sail), factory, props);
+        this(new BigdataSailRepository(sail), factory, props);
     }
     
     /**
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance.
      */
-	public BigdataGraphEmbedded(final SailRepository repo) {
+	public BigdataGraphEmbedded(final BigdataSailRepository repo) {
 		this(repo, BigdataRDFFactory.INSTANCE, new Properties());
 	}
 	
@@ -122,14 +122,14 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
      * Create a Blueprints wrapper around a {@link BigdataSailRepository} 
      * instance with a non-standard {@link BlueprintsValueFactory} implementation.
      */
-	public BigdataGraphEmbedded(final SailRepository repo, 
+	public BigdataGraphEmbedded(final BigdataSailRepository repo, 
 			final BlueprintsValueFactory factory, final Properties props) {
 	    super(factory, props);
 	    
 	    this.repo = (BigdataSailRepository) repo;
 	}
 	
-	public SailRepository getRepository() {
+	public BigdataSailRepository getRepository() {
 	    return repo;
 	}
 	
