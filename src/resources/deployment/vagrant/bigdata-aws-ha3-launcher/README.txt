@@ -27,7 +27,7 @@ Your organization's AWS access credentials are essential to launching the cluste
   * AWS Secreet Access Key
   * AWS Keypair Name
   * The SSH Private Key file corresponding to the keypair
-  * AWS Security Group for the cluster nodes to join [must minimally allow public TCP access to ports 22 and 8080]
+  * AWS Security Group for the cluster nodes to join [must minimally allow public TCP access to ports 22 and 9999]
 
 
 All AWS settings reside in the "aws.rc" file. You must edit this file and set AWS values accordingly.

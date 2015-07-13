@@ -66,7 +66,7 @@ if [ -z "${LOCATORS}" ]; then
 fi
 if [ -z "${ZK_SERVERS}" ]; then
 #   export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081"
-   echo "Must specify: ZK_SERVERS"
+   echo "Must specify and start: ZK_SERVERS"
    exit 1
 fi
 
