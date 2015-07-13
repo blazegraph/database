@@ -140,15 +140,6 @@ public class UpdateServlet extends BigdataRDFServlet {
             return;
         }
         
-        int maxQueryTime = 0;
-        {
-            final String maxQueryTimeStr = req
-                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
-            if (maxQueryTimeStr != null) {
-                maxQueryTime = Integer.parseInt(maxQueryTimeStr);
-            }
-        }
-
         final String contentType = req.getContentType();
 
         if (log.isInfoEnabled())
@@ -233,7 +224,6 @@ public class UpdateServlet extends BigdataRDFServlet {
 							queryStr,//
 							baseURI,//
 							bindings,//
-							maxQueryTime,//
 							rdfParserFactory,//
 							defaultContextDelete,//
 							defaultContextInsert//
@@ -248,7 +238,6 @@ public class UpdateServlet extends BigdataRDFServlet {
 	                     queryStr,//
 	                     baseURI,//
 	                     bindings,//
-	                     maxQueryTime,//
 	                     rdfParserFactory,//
 	                     defaultContextDelete,//
 	                     defaultContextInsert//
@@ -297,7 +286,6 @@ public class UpdateServlet extends BigdataRDFServlet {
         private final Resource[] defaultContextDelete;
         private final Resource[] defaultContextInsert;
         private final Map<String, Value> bindings;
-        private final int maxQueryTime;
 
         /**
          * 
@@ -322,7 +310,6 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final String queryStr,//
                 final String baseURI,
                 final Map<String, Value> bindings,
-                final int maxQueryTime,
                 final RDFParserFactory parserFactory,
                 final Resource[] defaultContextDelete,//
                 final Resource[] defaultContextInsert//
@@ -331,7 +318,6 @@ public class UpdateServlet extends BigdataRDFServlet {
             this.queryStr = queryStr;
             this.baseURI = baseURI;
             this.bindings = bindings;
-            this.maxQueryTime = maxQueryTime;
             this.parserFactory = parserFactory;
             this.defaultContextDelete = defaultContextDelete;
             this.defaultContextInsert = defaultContextInsert;
@@ -383,7 +369,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										readOnlyTimestamp, queryStr, includeInferred, bindings, maxQueryTime,
+										readOnlyTimestamp, queryStr, includeInferred, bindings,
 										deleteQueryFormat.getDefaultMIMEType(),
 										req, resp, os);
 
@@ -526,7 +512,6 @@ public class UpdateServlet extends BigdataRDFServlet {
       private final Resource[] defaultContextDelete;
       private final Resource[] defaultContextInsert;
       private final Map<String, Value> bindings;
-      private final int maxQueryTime;
 
       /**
        * 
@@ -552,7 +537,6 @@ public class UpdateServlet extends BigdataRDFServlet {
             final String queryStr,//
             final String baseURI,
             final Map<String, Value> bindings,
-            final int maxQueryTime,
             final RDFParserFactory parserFactory,
             final Resource[] defaultContextDelete,//
             final Resource[] defaultContextInsert//
@@ -561,7 +545,6 @@ public class UpdateServlet extends BigdataRDFServlet {
          this.queryStr = queryStr;
          this.baseURI = baseURI;
          this.bindings = bindings;
-         this.maxQueryTime = maxQueryTime;
          this.parserFactory = parserFactory;
          this.defaultContextDelete = defaultContextDelete;
          this.defaultContextInsert = defaultContextInsert;
@@ -603,7 +586,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings, maxQueryTime,
+                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings,
                      deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
