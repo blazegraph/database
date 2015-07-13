@@ -703,10 +703,13 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      * Parses query parameter bindings for validity to provide client with
      * meaningful response.
      * 
-     * @return parsed bindings 
-     * 
      * @param req
      * @param resp
+     * 
+     * @return parsed bindings -or- <code>null</code> if there was an error
+     *         processing the bindings, in which case the response was already
+     *         committed.
+     * 
      * @throws IOException
      */
     protected Map<String, Value> parseBindings(final HttpServletRequest req,
@@ -724,7 +727,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
                             .append(" with no value ").append("\n");
                 } else {
                     try {
-                        Value value = EncodeDecodeValue.decodeValue(valueStr);
+                        final Value value = EncodeDecodeValue.decodeValue(valueStr);
                         result.put(name, value);
                     } catch (Exception e) {
                         sb.append("Invalid binding ").append(name)

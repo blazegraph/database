@@ -245,6 +245,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
     /**
      * The name of the parameter/attribute that contains maxQueryTime (seconds)
      * for remote queries execution (server-side timeout).
+     * <p>
+     * Note: This is the openrdf parameter (in SECONDS). The
+     * {@link #HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS} and the
+     * {@link ConfigParams#QUERY_TIMEOUT} both override this value. This is done
+     * to make it possible to guarantee that a timeout is imposed either by the
+     * server (web.xml) or by an http proxy. Application timeouts may be
+     * specified using this query parameter.
      */
     static final String MAX_QUERY_TIME = "maxQueryTime";
 
@@ -721,7 +728,9 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected final Map<String,Value> bindings;
         
         /**
-         * Max time limit provided for query execution
+         * The openrdf max time limit provided for query execution in SECONDS.
+         * The effective timeout is the minimum of this value and the value of
+         * the {@link BigdataRDFContext#HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS}.
          */
         protected final int maxQueryTime;
         
@@ -1172,11 +1181,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
 			
 			query.setIncludeInferred(includeInferred);
 			
-			// Set max time limit for query execution
-			if (maxQueryTime>0) {
-				query.setMaxQueryTime(maxQueryTime);
-			}
-
             if (analytic) {
 
                 // Turn analytic query on/off as requested.
@@ -1341,8 +1345,30 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 }
             }
 
+            if (maxQueryTime > 0) {
+                /*
+                 * The openrdf maxQueryTime was specified (0 implies no timeout).
+                 */
+                final long tmp = TimeUnit.SECONDS.toMillis(maxQueryTime);
+                if (queryTimeoutMillis == 0 || tmp < queryTimeoutMillis) {
+                    /*
+                     * Either we do not already have a timeout from the http
+                     * header or the web.xml configuration (which implies no
+                     * timeout) or the openrdf value is less than the current
+                     * timeout. In both cases, we use the openrdf timeout
+                     * instead.
+                     */
+                    queryTimeoutMillis = tmp;
+                }
+            }
+
             if (queryTimeoutMillis > 0) {
 
+                /*
+                 * If we have a timeout, then it is applied to the AST. The
+                 * timeout will be in milliseconds.
+                 */
+                
                 final QueryRoot originalQuery = astContainer.getOriginalAST();
 
                 originalQuery.setTimeout(queryTimeoutMillis);

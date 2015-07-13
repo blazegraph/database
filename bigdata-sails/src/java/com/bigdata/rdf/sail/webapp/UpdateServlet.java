@@ -131,19 +131,23 @@ public class UpdateServlet extends BigdataRDFServlet {
 
         final String queryStr = req.getParameter(QueryServlet.ATTR_QUERY);
 
+        if (queryStr == null)
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Required parameter not found: " + QueryServlet.ATTR_QUERY);
+
         final Map<String, Value> bindings = parseBindings(req, resp);
         if (bindings == null) { // invalid bindings definition generated error response 400 while parsing
             return;
         }
         
-        String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
         int maxQueryTime = 0;
-        if (maxQueryTimeStr != null) {
-            maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+        {
+            final String maxQueryTimeStr = req
+                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+            if (maxQueryTimeStr != null) {
+                maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+            }
         }
-
-        if (queryStr == null)
-            throw new UnsupportedOperationException();
 
         final String contentType = req.getContentType();
 
