@@ -141,11 +141,11 @@ public class RemoteRepositoryDecls {
    public static final String BASE_URI = "baseURI";
 
    /**
-    * The name of the parameter/attribute that contains maxQueryTime (seconds) for remote queries execution (server-side timeout).
-    * For highed resolution of the timeout period on client-side see {@link com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls.HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS header}.
+    * The name of the parameter/attribute that contains high resolution maxQueryTime (milliseconds) for remote queries execution.
+    * Minimum value of maxQueryTimeMillis and {@link com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls.HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS header} will be used as an effective timeout.
     * @see com.bigdata.rdf.sail.webapp.QueryServlet.TIMEOUT
     */
-   public static final String MAX_QUERY_TIME = "maxQueryTime";
+   public static final String MAX_QUERY_TIME_MILLIS = "maxQueryTimeMillis";
 
    /**
     * URL query parameter used to specify a URI in the default graph for SPARQL

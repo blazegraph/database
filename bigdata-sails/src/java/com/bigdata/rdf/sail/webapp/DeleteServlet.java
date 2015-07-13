@@ -126,15 +126,6 @@ public class DeleteServlet extends BigdataRDFServlet {
 			return;
 		}
 		
-        int maxQueryTime = 0;
-        {
-            final String maxQueryTimeStr = req
-                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
-            if (maxQueryTimeStr != null) {
-                maxQueryTime = Integer.parseInt(maxQueryTimeStr);
-            }
-        }
-
 		if (queryStr == null)
 			throw new UnsupportedOperationException();
 
@@ -157,8 +148,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                   new DeleteWithQueryMaterializedTask(req, resp, namespace, ITx.UNISOLATED, //
                         queryStr,//
                         baseURI,//
-                        bindings,//
-                        maxQueryTime//
+                        bindings//
                   )).get();
 
          } else {
@@ -174,8 +164,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                   new DeleteWithQuerySteamingTask(req, resp, namespace, ITx.UNISOLATED, //
                         queryStr,//
                         baseURI,//
-                        bindings,//
-                        maxQueryTime//
+                        bindings//
                   )).get();
 
          }
@@ -211,7 +200,6 @@ public class DeleteServlet extends BigdataRDFServlet {
         private final String queryStr;
         private final String baseURI;
         private final Map<String, Value> bindings;
-        private final int maxQueryTime;
 
         /**
          * 
@@ -228,14 +216,12 @@ public class DeleteServlet extends BigdataRDFServlet {
                 final String namespace, final long timestamp,
                 final String queryStr,//
                 final String baseURI,
-                final Map<String, Value> bindings,
-                final int maxQueryTime
+                final Map<String, Value> bindings
                 ) {
             super(req, resp, namespace, timestamp);
             this.queryStr = queryStr;
             this.baseURI = baseURI;
             this.bindings = bindings;
-            this.maxQueryTime = maxQueryTime; 
         }
         
         @Override
@@ -284,7 +270,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                   final AbstractQueryTask queryTask = context
                         .getQueryTask(roconn, namespace,
-                              readOnlyTimestamp, queryStr, includeInferred, bindings, maxQueryTime,
+                              readOnlyTimestamp, queryStr, includeInferred, bindings,
                               format.getDefaultMIMEType(), req, resp,
                               os);
 
@@ -389,7 +375,6 @@ public class DeleteServlet extends BigdataRDFServlet {
       private final String queryStr;
       private final String baseURI;
       private final Map<String, Value> bindings;
-      private final int maxQueryTime;
 
       /**
        * 
@@ -403,12 +388,11 @@ public class DeleteServlet extends BigdataRDFServlet {
       public DeleteWithQueryMaterializedTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final String queryStr,//
-            final String baseURI, final Map<String, Value> bindings, final int maxQueryTime) {
+            final String baseURI, final Map<String, Value> bindings) {
          super(req, resp, namespace, timestamp);
          this.queryStr = queryStr;
          this.baseURI = baseURI;
          this.bindings = bindings;
-         this.maxQueryTime = maxQueryTime;
       }
 
       @Override
@@ -447,7 +431,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                final RDFFormat format = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings, maxQueryTime,
+                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings,
                      format.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {

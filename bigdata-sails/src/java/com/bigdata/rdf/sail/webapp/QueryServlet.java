@@ -416,16 +416,6 @@ public class QueryServlet extends BigdataRDFServlet {
         	return;
         }
 
-        // The openrdf query timeout in SECONDS.
-        int maxQueryTime = 0;
-        {
-            final String maxQueryTimeStr = req
-                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
-            if (maxQueryTimeStr != null) {
-                maxQueryTime = Integer.parseInt(maxQueryTimeStr);
-            }
-        }
-
         if (updateStr == null) {
 
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -451,7 +441,7 @@ public class QueryServlet extends BigdataRDFServlet {
           * visibility guarantees.
           */
          submitApiTask(
-               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr, bindings, maxQueryTime,
+               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr, bindings,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -467,7 +457,6 @@ public class QueryServlet extends BigdataRDFServlet {
         private final String updateStr;
         private final BigdataRDFContext context;
         private final Map<String, Value> bindings;
-        private final int maxQueryTime;
 
         /**
          * 
@@ -483,14 +472,12 @@ public class QueryServlet extends BigdataRDFServlet {
                 final long timestamp,//
                 final String updateStr,//
                 final Map<String, Value> bindings,//
-                final int maxQueryTime,//
                 final BigdataRDFContext context//
                 ) {
             super(req, resp, namespace, timestamp);
             this.updateStr = updateStr;
             this.context = context;
             this.bindings = bindings;
-            this.maxQueryTime = maxQueryTime;
         }
         
         @Override
@@ -538,7 +525,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final UpdateTask updateTask = context.getUpdateTask(conn,
-							namespace, timestamp, baseURI, bindings, maxQueryTime, astContainer, req,
+							namespace, timestamp, baseURI, bindings, astContainer, req,
 							resp, resp.getOutputStream());
 
 					final FutureTask<Void> ft = new FutureTask<Void>(updateTask);
@@ -630,16 +617,6 @@ public class QueryServlet extends BigdataRDFServlet {
           return;
       }
       
-      // The openrdf query timeout in SECONDS. 
-      int maxQueryTime = 0;
-      {
-          final String maxQueryTimeStr = req
-                    .getParameter(BigdataRDFContext.MAX_QUERY_TIME);
-          if (maxQueryTimeStr != null) {
-              maxQueryTime = Integer.parseInt(maxQueryTimeStr);
-          }
-      }
-
       // Note: The historical behavior was to always include inferences.
       // @see BLZG-1207 
       final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
@@ -652,7 +629,7 @@ public class QueryServlet extends BigdataRDFServlet {
          final long timestamp = getTimestamp(req);
 
          submitApiTask(
-               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred, bindings, maxQueryTime,
+               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred, bindings,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -674,13 +651,12 @@ public class QueryServlet extends BigdataRDFServlet {
 		private final BigdataRDFContext context;
 		private final boolean includeInferred;
 		private final Map<String, Value> bindings;
-		private final int maxQueryTime;
 
       public SparqlQueryTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final String queryStr,
             final boolean includeInferred, Map<String, Value> bindings,
-            final int maxQueryTime, final BigdataRDFContext context) {
+            final BigdataRDFContext context) {
 
          super(req, resp, namespace, timestamp);
 
@@ -693,7 +669,6 @@ public class QueryServlet extends BigdataRDFServlet {
          this.context = context;
          this.includeInferred = includeInferred;
          this.bindings = bindings;
-         this.maxQueryTime = maxQueryTime;
          
       }
         
@@ -731,7 +706,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final AbstractQueryTask queryTask = context.getQueryTask(
-							conn, namespace, timestamp, queryStr, includeInferred, bindings, maxQueryTime,
+							conn, namespace, timestamp, queryStr, includeInferred, bindings,
 							null/* acceptOverride */, req, resp, os);
 
 					// /*

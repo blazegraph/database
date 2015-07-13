@@ -243,17 +243,17 @@ public class BigdataRDFContext extends BigdataBaseContext {
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
     /**
-     * The name of the parameter/attribute that contains maxQueryTime (seconds)
-     * for remote queries execution (server-side timeout).
+     * The name of the parameter/attribute that contains maxQueryTime (milliseconds)
+     * for remote queries execution.
      * <p>
-     * Note: This is the openrdf parameter (in SECONDS). The
-     * {@link #HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS} and the
+     * Note: This is not the openrdf parameter (in SECONDS), but higher resolution milliseconds value.
+     * The {@link #HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS} and the
      * {@link ConfigParams#QUERY_TIMEOUT} both override this value. This is done
      * to make it possible to guarantee that a timeout is imposed either by the
      * server (web.xml) or by an http proxy. Application timeouts may be
      * specified using this query parameter.
      */
-    static final String MAX_QUERY_TIME = "maxQueryTime";
+    static final String MAX_QUERY_TIME_MILLIS = "maxQueryTimeMillis";
 
     /**
      * The name of the parameter/attribute that contains baseURI for remote queries execution.
@@ -728,13 +728,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
         protected final Map<String,Value> bindings;
         
         /**
-         * The openrdf max time limit provided for query execution in SECONDS.
-         * The effective timeout is the minimum of this value and the value of
-         * the {@link BigdataRDFContext#HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS}.
-         */
-        protected final int maxQueryTime;
-        
-        /**
          * The {@link ASTContainer} provides access to the original SPARQL
          * query, the query model, the query plan, etc.
          */
@@ -951,7 +944,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final String baseURI, //
                 final boolean includeInferred, //
                 final Map<String, Value> bindings, //
-                final int maxQueryTime, //
                 final ASTContainer astContainer,//
                 final QueryType queryType,//
                 final String mimeType,//
@@ -989,7 +981,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.baseURI = baseURI;
             this.includeInferred = includeInferred;
             this.bindings = bindings;
-            this.maxQueryTime = maxQueryTime;
             this.astContainer = astContainer;
             this.update = false;
             this.queryType = queryType;
@@ -1045,7 +1036,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 final String baseURI, //
                 final boolean includeInferred, //
                 final Map<String, Value> bindings, //
-                final int maxQueryTime, //
                 final ASTContainer astContainer,//
 //                final QueryType queryType,//
 //                final String mimeType,//
@@ -1077,7 +1067,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.baseURI = baseURI;
             this.includeInferred = includeInferred;
             this.bindings = bindings;
-            this.maxQueryTime = maxQueryTime;
             this.astContainer = astContainer;
             this.update = true;
             this.queryType = null;
@@ -1345,22 +1334,31 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 }
             }
 
-            if (maxQueryTime > 0) {
-                /*
-                 * The openrdf maxQueryTime was specified (0 implies no timeout).
-                 */
-                final long tmp = TimeUnit.SECONDS.toMillis(maxQueryTime);
-                if (queryTimeoutMillis == 0 || tmp < queryTimeoutMillis) {
+            {
+                final String s = req
+                        .getParameter(MAX_QUERY_TIME_MILLIS);
+                if (s != null) {
                     /*
-                     * Either we do not already have a timeout from the http
-                     * header or the web.xml configuration (which implies no
-                     * timeout) or the openrdf value is less than the current
-                     * timeout. In both cases, we use the openrdf timeout
-                     * instead.
+                     * The maxQueryTimeMillis parameter was specified (0 implies no timeout).
                      */
-                    queryTimeoutMillis = tmp;
+                    long tmp = StringUtil.toLong(s);
+                    if (tmp != -1L && //
+                            (queryTimeoutMillis == 0/* noLimit */
+                            || //
+                            tmp < queryTimeoutMillis/* shorterLimit */)//
+                    ) {
+                        /*
+                         * Either we do not already have a timeout from the http
+                         * header or the web.xml configuration (which implies no
+                         * timeout) or the query parameter value is less than the current
+                         * timeout. In both cases, we use the query parameter timeout
+                         * instead.
+                         */
+                        queryTimeoutMillis = tmp;
+                    }
                 }
             }
+            
 
             if (queryTimeoutMillis > 0) {
 
@@ -1613,13 +1611,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public AskQueryTask(final BigdataSailRepositoryConnection cxn, 
         		final String namespace, final long timestamp,
                 final String baseURI, final boolean includeInferred,
-                final Map<String, Value> bindings, final int maxQueryTime,
+                final Map<String, Value> bindings,
                 final ASTContainer astContainer, final QueryType queryType,
                 final BooleanQueryResultFormat format,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(cxn, namespace, timestamp, baseURI, includeInferred, bindings, maxQueryTime, astContainer, queryType,
+            super(cxn, namespace, timestamp, baseURI, includeInferred, bindings, astContainer, queryType,
                     format.getDefaultMIMEType(), format.getCharset(), format
                             .getDefaultFileExtension(), req, resp, os);
 
@@ -1654,14 +1652,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public TupleQueryTask(final BigdataSailRepositoryConnection cxn,
         		final String namespace, final long timestamp,
                 final String baseURI, final boolean includeInferred,
-                final Map<String, Value> bindings, final int maxQueryTime,
+                final Map<String, Value> bindings,
                 final ASTContainer astContainer,
                 final QueryType queryType, final String mimeType,
                 final Charset charset, final String fileExt,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(cxn, namespace, timestamp, baseURI, includeInferred, bindings, maxQueryTime, astContainer, queryType,
+            super(cxn, namespace, timestamp, baseURI, includeInferred, bindings, astContainer, queryType,
                     mimeType, charset, fileExt, req, resp, os);
 
 		}
@@ -1743,13 +1741,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public GraphQueryTask(final BigdataSailRepositoryConnection cxn,
                 final String namespace, final long timestamp,
                 final String baseURI, final boolean includeInferred,
-                final Map<String, Value> bindings, final int maxQueryTime,
+                final Map<String, Value> bindings,
                 final ASTContainer astContainer,
                 final QueryType queryType, final RDFFormat format,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
-            super(cxn, namespace, timestamp, baseURI, includeInferred, bindings, maxQueryTime, astContainer, queryType,
+            super(cxn, namespace, timestamp, baseURI, includeInferred, bindings, astContainer, queryType,
                     format.getDefaultMIMEType(), format.getCharset(), format
                             .getDefaultFileExtension(), req, resp, os);
 
@@ -1776,11 +1774,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
 	UpdateTask getUpdateTask(final BigdataSailRepositoryConnection cxn,
 			final String namespace, final long timestamp, final String baseURI,
-			final Map<String, Value> bindings, final int maxQueryTime,
+			final Map<String, Value> bindings,
 			final ASTContainer astContainer, final HttpServletRequest req,
 			final HttpServletResponse resp, final OutputStream os) {
 
-		return new UpdateTask(cxn, namespace, timestamp, baseURI, bindings, maxQueryTime, astContainer,
+		return new UpdateTask(cxn, namespace, timestamp, baseURI, bindings, astContainer,
 				req, resp, os);
 
 	}
@@ -1799,13 +1797,13 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public UpdateTask(final BigdataSailRepositoryConnection cxn, 
         		final String namespace, final long timestamp,
                 final String baseURI, final Map<String, Value> bindings,
-                final int maxQueryTime, final ASTContainer astContainer,
+                final ASTContainer astContainer,
                 final HttpServletRequest req, final HttpServletResponse resp,
                 final OutputStream os) {
 
         	// SPARQL Query parameter includeInferred set to true, because inferred triples
         	// should always be updated automatically upon original triples changed 
-            super(cxn, namespace, timestamp, baseURI, /* includeInferred = */ true, bindings, maxQueryTime, astContainer,
+            super(cxn, namespace, timestamp, baseURI, /* includeInferred = */ true, bindings, astContainer,
                     req,//
                     resp,//
                     os//
@@ -2327,7 +2325,6 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final String queryStr,//
             final boolean includeInferred, //
             final Map<String, Value> bindings, //
-            final int maxQueryTime, //
             final String acceptOverride,//
             final HttpServletRequest req,//
             final HttpServletResponse resp,//
@@ -2425,7 +2422,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             final BooleanQueryResultFormat format = util
                     .getBooleanQueryResultFormat(BooleanQueryResultFormat.SPARQL);
 
-            return new AskQueryTask(cxn, namespace, timestamp, baseURI, includeInferred, bindings, maxQueryTime,
+            return new AskQueryTask(cxn, namespace, timestamp, baseURI, includeInferred, bindings,
                     astContainer, queryType, format, req, resp, os);
 
         }
@@ -2434,7 +2431,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final RDFFormat format = util.getRDFFormat(RDFFormat.RDFXML);
 
-            return new GraphQueryTask(cxn, namespace, timestamp, baseURI, includeInferred, bindings, maxQueryTime,
+            return new GraphQueryTask(cxn, namespace, timestamp, baseURI, includeInferred, bindings,
                     astContainer, queryType, format, req, resp, os);
 
         }
@@ -2459,7 +2456,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 charset = format.getCharset();
                 fileExt = format.getDefaultFileExtension();
             }
-            return new TupleQueryTask(cxn, namespace, timestamp, baseURI, includeInferred, bindings, maxQueryTime,
+            return new TupleQueryTask(cxn, namespace, timestamp, baseURI, includeInferred, bindings,
                     astContainer, queryType, mimeType, charset, fileExt, req,
                     resp, os);
 

@@ -28,7 +28,7 @@ public abstract class AbstractBigdataRemoteQuery extends AbstractQuery {
 		q.addRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED,
 				Boolean.toString(includeInferred));
 		if (maxQueryTime > 0) {
-			q.addRequestParam(RemoteRepositoryDecls.MAX_QUERY_TIME, Integer.toString(maxQueryTime));
+			q.addRequestParam(RemoteRepositoryDecls.MAX_QUERY_TIME_MILLIS, Long.toString(1000L*maxQueryTime));
 		}
 
 		if (dataset != null) {
