@@ -1,10 +1,10 @@
 package com.bigdata.rdf.sail.remote;
 
-import org.openrdf.http.protocol.Protocol;
 import org.openrdf.model.URI;
 import org.openrdf.query.Binding;
 import org.openrdf.query.impl.AbstractQuery;
 
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.IPreparedQuery;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
 
@@ -23,12 +23,12 @@ public abstract class AbstractBigdataRemoteQuery extends AbstractQuery {
 	 */
 	protected void configureConnectOptions(IPreparedQuery q) {
 		if (baseURI != null) {
-			q.addRequestParam(Protocol.BASEURI_PARAM_NAME, baseURI);
+			q.addRequestParam(RemoteRepositoryDecls.BASE_URI, baseURI);
 		}
 		q.addRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED,
 				Boolean.toString(includeInferred));
 		if (maxQueryTime > 0) {
-			q.addRequestParam(Protocol.TIMEOUT_PARAM_NAME, Integer.toString(maxQueryTime));
+			q.addRequestParam(RemoteRepositoryDecls.MAX_QUERY_TIME, Integer.toString(maxQueryTime));
 		}
 
 		if (dataset != null) {
@@ -37,18 +37,21 @@ public abstract class AbstractBigdataRemoteQuery extends AbstractQuery {
 			for (URI defaultGraphURI : dataset.getDefaultGraphs()) {
 				defaultGraphs[i++] = String.valueOf(defaultGraphURI);
 			}
-			q.addRequestParam(Protocol.DEFAULT_GRAPH_PARAM_NAME, defaultGraphs);
+
+			q.addRequestParam(q.isUpdate() ? RemoteRepositoryDecls.USING_GRAPH_URI
+					: RemoteRepositoryDecls.DEFAULT_GRAPH_URI, defaultGraphs);
 			
 			String[] namedGraphs = new String[dataset.getNamedGraphs().size()];
 			i=0;
 			for (URI namedGraphURI : dataset.getNamedGraphs()) {
 				namedGraphs[i++] = String.valueOf(String.valueOf(namedGraphURI));
 			}
-			q.addRequestParam(Protocol.NAMED_GRAPH_PARAM_NAME, namedGraphs);
+			q.addRequestParam(q.isUpdate() ? RemoteRepositoryDecls.USING_NAMED_GRAPH_URI
+					: RemoteRepositoryDecls.NAMED_GRAPH_URI, namedGraphs);
 		}
 		for (Binding binding: bindings) {
-			String paramName = Protocol.BINDING_PREFIX + binding.getName();
-			String paramValue = Protocol.encodeValue(binding.getValue());
+			String paramName = RemoteRepositoryDecls.BINDING_PREFIX + binding.getName();
+			String paramValue = EncodeDecodeValue.encodeValue(binding.getValue());
 			q.addRequestParam(paramName, paramValue);
 		}
 	}

@@ -45,15 +45,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
-import org.openrdf.http.protocol.Protocol;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.LinkedHashModel;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.repository.RepositoryResult;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
@@ -412,6 +409,17 @@ public class QueryServlet extends BigdataRDFServlet {
         // The SPARQL update
         final String updateStr = getUpdateString(req);
 
+        Map<String, Value> bindings = parseBindings(req, resp);
+        if (bindings == null) {
+        	return;
+        }
+
+        String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+        int maxQueryTime = 0;
+        if (maxQueryTimeStr != null) {
+            maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+        }
+
         if (updateStr == null) {
 
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -437,7 +445,7 @@ public class QueryServlet extends BigdataRDFServlet {
           * visibility guarantees.
           */
          submitApiTask(
-               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr,
+               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr, bindings, maxQueryTime,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -448,10 +456,12 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
 
-	static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
-		
-		private final String updateStr;
-    	private final BigdataRDFContext context;
+    static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
+
+        private final String updateStr;
+        private final BigdataRDFContext context;
+        private final Map<String, Value> bindings;
+        private final int maxQueryTime;
 
         /**
          * 
@@ -466,11 +476,15 @@ public class QueryServlet extends BigdataRDFServlet {
                 final String namespace, //
                 final long timestamp,//
                 final String updateStr,//
+                final Map<String, Value> bindings,//
+                final int maxQueryTime,//
                 final BigdataRDFContext context//
                 ) {
             super(req, resp, namespace, timestamp);
             this.updateStr = updateStr;
             this.context = context;
+            this.bindings = bindings;
+            this.maxQueryTime = maxQueryTime;
         }
         
         @Override
@@ -518,7 +532,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final UpdateTask updateTask = context.getUpdateTask(conn,
-							namespace, timestamp, baseURI, astContainer, req,
+							namespace, timestamp, baseURI, bindings, maxQueryTime, astContainer, req,
 							resp, resp.getOutputStream());
 
 					final FutureTask<Void> ft = new FutureTask<Void>(updateTask);
@@ -603,9 +617,17 @@ public class QueryServlet extends BigdataRDFServlet {
 
       }
 
-      if (checkforInvalidBindings(req, resp)) {
-    	  return;
+      Map<String, Value> bindings = parseBindings(req, resp);
+      if (bindings==null) {
+          return;
       }
+      
+      String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+      int maxQueryTime = 0;
+      if (maxQueryTimeStr != null) {
+          maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+      }
+
 
       // Note: The historical behavior was to always include inferences.
       // @see BLZG-1207 
@@ -619,7 +641,7 @@ public class QueryServlet extends BigdataRDFServlet {
          final long timestamp = getTimestamp(req);
 
          submitApiTask(
-               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred,
+               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred, bindings, maxQueryTime,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -631,48 +653,6 @@ public class QueryServlet extends BigdataRDFServlet {
    }
 
 	/**
-	 * Checks query parameter bindings for validity to provide client with
-	 * meaningful response.
-	 * 
-	 * @param req
-	 * @param resp
-	 * @throws IOException
-	 */
-	private boolean checkforInvalidBindings(final HttpServletRequest req,
-	        final HttpServletResponse resp) throws IOException {
-		final Enumeration<String> parameterNames = req.getParameterNames();
-		final StringBuilder sb = new StringBuilder();
-		final ValueFactory vf = new ValueFactoryImpl();
-		while (parameterNames.hasMoreElements()) {
-			final String param = parameterNames.nextElement();
-			if (param.startsWith("$")) {
-				final String name = param.substring(1);
-				final String valueStr = req.getParameter(param);
-				if (valueStr == null || valueStr.isEmpty()) {
-					sb.append("Invalid binding ").append(name)
-							.append(" with no value ").append("\n");
-				} else {
-					try {
-						Protocol.decodeValue(valueStr, vf);
-					} catch (Exception e) {
-						sb.append("Invalid binding ").append(name)
-								.append(" with value ").append(valueStr)
-								.append(": ").append(e.getMessage())
-								.append("\n");
-					}
-				}
-			}
-		}
-		if (sb.length() > 0) {
-			sb.append("Values should follow N-Triples representation (quoted literals or URIs)");
-			buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
-					sb.toString());
-			return true;
-		}
-		return false;
-	}
-
-	/**
      * Helper task for the SPARQL QUERY.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -682,11 +662,14 @@ public class QueryServlet extends BigdataRDFServlet {
 		private final String queryStr;
 		private final BigdataRDFContext context;
 		private final boolean includeInferred;
+		private final Map<String, Value> bindings;
+		private final int maxQueryTime;
 
       public SparqlQueryTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final String queryStr,
-            final boolean includeInferred, final BigdataRDFContext context) {
+            final boolean includeInferred, Map<String, Value> bindings,
+            final int maxQueryTime, final BigdataRDFContext context) {
 
          super(req, resp, namespace, timestamp);
 
@@ -698,6 +681,8 @@ public class QueryServlet extends BigdataRDFServlet {
          this.queryStr = queryStr;
          this.context = context;
          this.includeInferred = includeInferred;
+         this.bindings = bindings;
+         this.maxQueryTime = maxQueryTime;
          
       }
         
@@ -735,7 +720,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final AbstractQueryTask queryTask = context.getQueryTask(
-							conn, namespace, timestamp, queryStr, includeInferred,
+							conn, namespace, timestamp, queryStr, includeInferred, bindings, maxQueryTime,
 							null/* acceptOverride */, req, resp, os);
 
 					// /*

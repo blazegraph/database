@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.PipedOutputStream;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
@@ -120,6 +121,17 @@ public class DeleteServlet extends BigdataRDFServlet {
 
 		final String queryStr = req.getParameter("query");
 
+		final Map<String, Value> bindings = parseBindings(req, resp);
+		if (bindings == null) { // invalid bindings definition generated error response 400 while parsing
+			return;
+		}
+		
+		String maxQueryTimeStr = req.getParameter(BigdataRDFContext.MAX_QUERY_TIME);
+		int maxQueryTime = 0;
+		if (maxQueryTimeStr != null) {
+			maxQueryTime = Integer.parseInt(maxQueryTimeStr);
+		}
+
 		if (queryStr == null)
 			throw new UnsupportedOperationException();
 
@@ -141,7 +153,9 @@ public class DeleteServlet extends BigdataRDFServlet {
             submitApiTask(
                   new DeleteWithQueryMaterializedTask(req, resp, namespace, ITx.UNISOLATED, //
                         queryStr,//
-                        baseURI//
+                        baseURI,//
+                        bindings,//
+                        maxQueryTime//
                   )).get();
 
          } else {
@@ -156,7 +170,9 @@ public class DeleteServlet extends BigdataRDFServlet {
             submitApiTask(
                   new DeleteWithQuerySteamingTask(req, resp, namespace, ITx.UNISOLATED, //
                         queryStr,//
-                        baseURI//
+                        baseURI,//
+                        bindings,//
+                        maxQueryTime//
                   )).get();
 
          }
@@ -189,8 +205,10 @@ public class DeleteServlet extends BigdataRDFServlet {
     */
     private static class DeleteWithQuerySteamingTask extends AbstractRestApiTask<Void> {
 
-    	private final String queryStr;
+        private final String queryStr;
         private final String baseURI;
+        private final Map<String, Value> bindings;
+        private final int maxQueryTime;
 
         /**
          * 
@@ -200,16 +218,21 @@ public class DeleteServlet extends BigdataRDFServlet {
          *            The timestamp used to obtain a mutable connection.
          * @param baseURI
          *            The base URI for the operation.
+         * @param bindings 
          */
         public DeleteWithQuerySteamingTask(final HttpServletRequest req,
                 final HttpServletResponse resp,
                 final String namespace, final long timestamp,
                 final String queryStr,//
-                final String baseURI
+                final String baseURI,
+                final Map<String, Value> bindings,
+                final int maxQueryTime
                 ) {
             super(req, resp, namespace, timestamp);
             this.queryStr = queryStr;
             this.baseURI = baseURI;
+            this.bindings = bindings;
+            this.maxQueryTime = maxQueryTime; 
         }
         
         @Override
@@ -258,7 +281,7 @@ public class DeleteServlet extends BigdataRDFServlet {
 
                   final AbstractQueryTask queryTask = context
                         .getQueryTask(roconn, namespace,
-                              readOnlyTimestamp, queryStr, includeInferred,
+                              readOnlyTimestamp, queryStr, includeInferred, bindings, maxQueryTime,
                               format.getDefaultMIMEType(), req, resp,
                               os);
 
@@ -362,6 +385,8 @@ public class DeleteServlet extends BigdataRDFServlet {
 
       private final String queryStr;
       private final String baseURI;
+      private final Map<String, Value> bindings;
+      private final int maxQueryTime;
 
       /**
        * 
@@ -375,10 +400,12 @@ public class DeleteServlet extends BigdataRDFServlet {
       public DeleteWithQueryMaterializedTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final String queryStr,//
-            final String baseURI) {
+            final String baseURI, final Map<String, Value> bindings, final int maxQueryTime) {
          super(req, resp, namespace, timestamp);
          this.queryStr = queryStr;
          this.baseURI = baseURI;
+         this.bindings = bindings;
+         this.maxQueryTime = maxQueryTime;
       }
 
       @Override
@@ -417,7 +444,7 @@ public class DeleteServlet extends BigdataRDFServlet {
                final RDFFormat format = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr, includeInferred,
+                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings, maxQueryTime,
                      format.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
@@ -507,6 +534,11 @@ public class DeleteServlet extends BigdataRDFServlet {
         final String contentType = req.getContentType();
 
         final String queryStr = req.getParameter("query");
+        
+        final Map<String, Value> bindings = parseBindings(req, resp);
+        if (bindings == null) { // invalid bindings definition generated error response 400 while parsing
+            return;
+        }
 
         if (queryStr != null) {
 
