@@ -183,16 +183,17 @@ dependencies.
   </repositories>
 
   <modules>
-    <module>../bigdata-blueprints</module>
-    <module>../bigdata-client</module>
-    <module>../bigdata-ganglia</module>
-    <module>../bigdata-gas</module>
-    <module>../bigdata-jini</module>
     <module>../ctc-striterators</module>
     <module>../dsi-utils</module>
     <module>../junit-ext</module>
     <module>../lgpl-utils</module>
+    <module>../rdf-properties</module>
+    <module>../bigdata-client</module>
+    <module>../bigdata-ganglia</module>
+    <module>../bigdata-gas</module>
+    <module>../bigdata-blueprints</module>
     <module>../bigdata-war</module>
+    <module>../bigdata-jini</module>
     <module>../bigdata-jar</module>
   </modules>
 
