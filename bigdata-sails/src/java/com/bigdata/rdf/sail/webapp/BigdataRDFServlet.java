@@ -36,7 +36,10 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLDecoder;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.servlet.Servlet;
@@ -47,7 +50,10 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -60,6 +66,7 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.util.InnerCause;
 
@@ -690,6 +697,51 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     	return uris;
     	
+    }
+
+    /**
+     * Parses query parameter bindings for validity to provide client with
+     * meaningful response.
+     * 
+     * @return parsed bindings 
+     * 
+     * @param req
+     * @param resp
+     * @throws IOException
+     */
+    protected Map<String, Value> parseBindings(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+        final Enumeration<String> parameterNames = req.getParameterNames();
+        final StringBuilder sb = new StringBuilder();
+        final Map<String, Value> result = new HashMap<>();
+        while (parameterNames.hasMoreElements()) {
+            final String param = parameterNames.nextElement();
+            if (param.startsWith("$")) {
+                final String name = param.substring(1);
+                final String valueStr = req.getParameter(param);
+                if (valueStr == null || valueStr.isEmpty()) {
+                    sb.append("Invalid binding ").append(name)
+                            .append(" with no value ").append("\n");
+                } else {
+                    try {
+                        Value value = EncodeDecodeValue.decodeValue(valueStr);
+                        result.put(name, value);
+                    } catch (Exception e) {
+                        sb.append("Invalid binding ").append(name)
+                                .append(" with value ").append(valueStr)
+                                .append(": ").append(e.getMessage())
+                                .append("\n");
+                    }
+                }
+            }
+        }
+        if (sb.length() > 0) {
+            sb.append("Values should follow N-Triples representation (quoted literals or URIs)");
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    sb.toString());
+            return null;
+        }
+        return result;
     }
 
 }

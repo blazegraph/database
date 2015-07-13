@@ -27,7 +27,6 @@ import junit.framework.TestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.openrdf.http.protocol.Protocol;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
@@ -125,10 +124,10 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 		tq.setDataset(dataset);
 		final TupleQueryResult tqr = tq.evaluate();
 		try {
-			assertEquals(defaultGraph1.stringValue(),remote.data.opts.getRequestParam(Protocol.DEFAULT_GRAPH_PARAM_NAME));
-			assertEquals(defaultGraph1.stringValue(),remote.data.request.getParams().get(Protocol.DEFAULT_GRAPH_PARAM_NAME).getValue());
-			assertEquals(namedGraph1.stringValue(),remote.data.opts.getRequestParam(Protocol.NAMED_GRAPH_PARAM_NAME));
-			assertEquals(namedGraph1.stringValue(),remote.data.request.getParams().get(Protocol.NAMED_GRAPH_PARAM_NAME).getValue());
+			assertEquals(defaultGraph1.stringValue(),remote.data.opts.getRequestParam(RemoteRepositoryDecls.DEFAULT_GRAPH_URI));
+			assertEquals(defaultGraph1.stringValue(),remote.data.request.getParams().get(RemoteRepositoryDecls.DEFAULT_GRAPH_URI).getValue());
+			assertEquals(namedGraph1.stringValue(),remote.data.opts.getRequestParam(RemoteRepositoryDecls.NAMED_GRAPH_URI));
+			assertEquals(namedGraph1.stringValue(),remote.data.request.getParams().get(RemoteRepositoryDecls.NAMED_GRAPH_URI).getValue());
 		} finally {
 			tqr.close();
 		}
@@ -140,8 +139,8 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 	    final TupleQuery tq = con.prepareTupleQuery(QueryLanguage.SPARQL, "select * from {?s ?p ?o}", baseURI);
 	    final TupleQueryResult tqr = tq.evaluate();
 		try {
-			assertEquals(baseURI, remote.data.opts.getRequestParam(Protocol.BASEURI_PARAM_NAME));
-			assertEquals(baseURI,remote.data.opts.getRequestParam(Protocol.BASEURI_PARAM_NAME));
+			assertEquals(baseURI, remote.data.opts.getRequestParam(RemoteRepositoryDecls.BASE_URI));
+			assertEquals(baseURI,remote.data.opts.getRequestParam(RemoteRepositoryDecls.BASE_URI));
 		} finally {
 			tqr.close();
 		}
