@@ -239,7 +239,7 @@ public class TestBigdataGraphEmbeddedTransactional extends AbstractTestBigdataGr
                    testGraphs.put(key, graph);
 	            }
 	            
-				BigdataGraphEmbedded graph = testGraphs.get(key); //testSail; //getSail();
+				BigdataGraph graph = testGraphs.get(key); //testSail; //getSail();
 				
 //				if (!graph.repo.getSail().isOpen()) {
 //				    

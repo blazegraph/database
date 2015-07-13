@@ -7,6 +7,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.journal.ITx;
@@ -28,6 +30,8 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer.Annotations;
  */
 public final class StaticOptimizer {
 
+    private static final transient Logger log = ASTStaticJoinOptimizer.log;
+    
 	private final StaticAnalysis sa;
 
 	private final IBindingProducerNode[] ancestry;
@@ -130,8 +134,17 @@ public final class StaticOptimizer {
 
 		this.arity = nodes.size();
 
-		if (ASTStaticJoinOptimizer.log.isDebugEnabled()) {
-			ASTStaticJoinOptimizer.log.debug("arity: " + arity);
+		if (log.isDebugEnabled()) {
+			log.debug("arity: " + arity);
+			for (int i = 0; i < arity; i++) {
+			    final IReorderableNode node = nodes.get(i);
+			    log.debug(node.getClass() + 
+			            ", reorderable: " + node.isReorderable() + 
+			            ", estcard: " + node.getEstimatedCardinality(this) + 
+			            ", vars: " + getVars(i));
+			    log.debug(node.getEstimatedCardinality(this));
+			    log.debug(node.isReorderable());
+			}
 		}
 
 		this.optimistic = optimistic;
@@ -668,9 +681,9 @@ public final class StaticOptimizer {
 	 */
 	protected Set<String> getVars(int tail) {
 		final IReorderableNode node = nodes.get(tail);
-		if (ASTStaticJoinOptimizer.log.isDebugEnabled()) {
-			ASTStaticJoinOptimizer.log.debug(node);
-		}
+//		if (ASTStaticJoinOptimizer.log.isDebugEnabled()) {
+//			ASTStaticJoinOptimizer.log.debug(node);
+//		}
 
 		final Set<IVariable<?>> vars = new LinkedHashSet<IVariable<?>>();
 		/*

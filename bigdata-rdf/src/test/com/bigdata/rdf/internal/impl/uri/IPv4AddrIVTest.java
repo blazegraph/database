@@ -60,7 +60,6 @@ public class IPv4AddrIVTest extends TestCase {
 	public void testIPAddress1() {
 		String testCase = "66.249.211.254";
 
-		@SuppressWarnings("unused")
 		IPv4AddrIV<BigdataLiteral> addr = null;
 		
 		try {
@@ -79,7 +78,6 @@ public class IPv4AddrIVTest extends TestCase {
 	public void testIPAddress2() {
 		String testCase = "66.249.71.255";
 
-		@SuppressWarnings("unused")
 		IPv4AddrIV<BigdataLiteral> addr = null;
 		
 		try {
@@ -98,7 +96,6 @@ public class IPv4AddrIVTest extends TestCase {
 	public void testIPAddress3() {
 		String testCase = "66.249.71.253/32";
 
-		@SuppressWarnings("unused")
 		IPv4AddrIV<BigdataLiteral> addr = null;
 		
 		try {

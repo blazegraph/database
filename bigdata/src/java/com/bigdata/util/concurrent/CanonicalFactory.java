@@ -23,6 +23,10 @@
  */
 package com.bigdata.util.concurrent;
 
+import java.lang.ref.WeakReference;
+import java.util.Iterator;
+import java.util.Map;
+
 import com.bigdata.cache.ConcurrentWeakValueCache;
 
 /**
@@ -147,5 +151,28 @@ abstract public class CanonicalFactory<KEY, VAL, STATE> {
 	 * @return The new instance to be paired with that key.
 	 */
 	abstract protected VAL newInstance(KEY key,STATE state);
+	
+    /**
+     * Clear all entries from the cache.
+     */
+    public void clear() {
+        
+        cache.clear();
+        
+    }
+    
+    /**
+     * An iterator that visits the entries in the map. You must test the weak
+     * reference for each entry in order to determine whether its value has been
+     * cleared as of the moment that you request that value. The entries visited
+     * by the iterator are not "touched" so the use of the iterator will not
+     * cause them to be retained any longer than they otherwise would have been
+     * retained.
+     */
+    public Iterator<Map.Entry<KEY,WeakReference<VAL>>> entryIterator() {
+
+        return cache.entryIterator();
+        
+    }
 
 }

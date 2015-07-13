@@ -511,7 +511,7 @@ public class TestASTBottomUpOptimizer extends
                     		context.getLexiconNamespace(),
                     		context.getTimestamp()
                     		);
-                    AST2BOpUtility.toVE(globals,
+                    AST2BOpUtility.toVE(getBOpContext(), globals,
                             filterNode.getValueExpressionNode());
                     innerClause.addChild(filterNode);
 
@@ -1028,7 +1028,7 @@ public class TestASTBottomUpOptimizer extends
             		context.getLexiconNamespace(),
             		context.getTimestamp()
             		);
-            AST2BOpUtility.toVE(globals,
+            AST2BOpUtility.toVE(getBOpContext(), globals,
                     filterNode.getValueExpressionNode());
             innerGroup.addChild(filterNode);
 
@@ -1179,7 +1179,7 @@ public class TestASTBottomUpOptimizer extends
             		context.getLexiconNamespace(),
             		context.getTimestamp()
             		);
-            AST2BOpUtility.toVE(globals,
+            AST2BOpUtility.toVE(getBOpContext(), globals,
                     filterNode.getValueExpressionNode());
             expectedWhereClause.addChild(filterNode);
 

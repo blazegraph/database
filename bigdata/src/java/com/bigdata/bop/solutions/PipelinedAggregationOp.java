@@ -14,6 +14,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
@@ -27,6 +28,7 @@ import com.bigdata.bop.aggregate.IAggregate;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.util.InnerCause;
 
@@ -312,7 +314,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
          *            The first input solution encountered for the group (the
          *            one which led to the group becoming defined).
          */
-        SolutionGroupState(final IValueExpression<?>[] groupBy,
+        SolutionGroupState(final BOpContext context, final IValueExpression<?>[] groupBy,
                 final LinkedHashMap<IAggregate<?>, IVariable<?>> aggExpr,
                 final IBindingSet bset) {
 
@@ -330,7 +332,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
              * Propagate GROUP_BY expression onto [aggregates].
              */
 
-            this.aggregates = new ListBindingSet();
+            this.aggregates = new ContextBindingSet(context, new ListBindingSet());
 
             final IBindingSet aSolution = bset;
             
@@ -610,7 +612,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
             if (m == null) {
 
                 map.put(s,
-                        m = new SolutionGroupState(groupBy, rewrite
+                        m = new SolutionGroupState(context, groupBy, rewrite
                                 .getAggExpr(), bset));
 
             }
@@ -689,7 +691,7 @@ public class PipelinedAggregationOp extends GroupByOp implements
                          * evaluated. If the solution is not dropped, then only
                          * the SELECTed variables are projected out.
                          */
-                        final IBindingSet aggregates = new ListBindingSet();
+                        final IBindingSet aggregates = new ContextBindingSet(context, new ListBindingSet());
 
                         // Finalize and bind on [aggregates].
                         finalizeAggregates(aggExpr, aggregates, stats);

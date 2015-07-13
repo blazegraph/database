@@ -264,7 +264,31 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
                 // old statement type.
                 final StatementEnum oldType = StatementEnum.deserialize(oldval);
 
-                if (override) {
+                if (oldType == StatementEnum.History ||
+                        newType == StatementEnum.History) {
+                    
+                    if (oldType != newType) {
+                        
+                        ndx.insert(key, tupleSer.serializeVal(
+                                false/* override */, 
+                                userFlag, 
+                                newType));
+
+                        if (isPrimaryIndex && DEBUG) {
+                            log.debug("Changing statement type: key="
+                                    + BytesUtil.toString(key) + ", oldType="
+                                    + oldType + ", newType=" + newType);
+                        }
+
+                        writeCount++;
+
+                        if (reportMutation)
+                            modified[i] = newType == StatementEnum.History ?
+                                    ModifiedEnum.REMOVED : ModifiedEnum.INSERTED;
+                        
+                    }
+                    
+                } else if (override) {
 
                     if (oldType != newType) {
 

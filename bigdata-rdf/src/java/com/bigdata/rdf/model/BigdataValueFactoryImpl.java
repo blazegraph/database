@@ -31,6 +31,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import javax.xml.datatype.DatatypeConfigurationException;
@@ -47,6 +48,8 @@ import org.openrdf.model.impl.BooleanLiteralImpl;
 
 import com.bigdata.cache.WeakValueCache;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.XSD;
+import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.literal.XSDBooleanIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedByteIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedIntIV;
@@ -54,6 +57,7 @@ import com.bigdata.rdf.internal.impl.literal.XSDUnsignedLongIV;
 import com.bigdata.rdf.internal.impl.literal.XSDUnsignedShortIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.util.concurrent.CanonicalFactory;
+import com.bigdata.util.InnerCause;
 
 /**
  * An implementation using {@link BigdataValue}s and {@link BigdataStatement}s.
@@ -442,13 +446,9 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
     public BigdataLiteralImpl createLiteral(final Date date) {
         GregorianCalendar c = new GregorianCalendar();
         c.setTime(date);
-        try {
-            XMLGregorianCalendar xmlGregCalendar = DatatypeFactory.newInstance().newXMLGregorianCalendar(c);
-            return createLiteral(xmlGregCalendar);
-        }
-        catch (DatatypeConfigurationException e) {
-            throw new RuntimeException("Could not instantiate javax.xml.datatype.DatatypeFactory", e);
-        }
+        XMLGregorianCalendar xmlGC = 
+                DateTimeExtension.datatypeFactorySingleton.newXMLGregorianCalendar(c);
+        return createLiteral(xmlGC);
     }
 
     @Override
@@ -465,6 +465,19 @@ public class BigdataValueFactoryImpl implements BigdataValueFactory {
                         arg0.getXMLSchemaType()).stringValue()));
         
     }
+
+    @Override
+    public BigdataLiteralImpl createXSDDateTime(final long timestamp) {
+        final TimeZone tz = TimeZone.getDefault()/*getTimeZone("GMT")*/;
+        final GregorianCalendar c = new GregorianCalendar(tz);
+        c.setGregorianChange(new Date(Long.MIN_VALUE));
+        c.setTimeInMillis(timestamp);
+        
+        final XMLGregorianCalendar xmlGC = 
+                DateTimeExtension.datatypeFactorySingleton.newXMLGregorianCalendar(c);
+        return createLiteral(xmlGC);
+    }
+
 
     @Override
     public BigdataLiteralImpl createLiteral(final String label, final String language) {
