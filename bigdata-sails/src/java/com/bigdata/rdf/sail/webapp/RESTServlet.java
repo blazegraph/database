@@ -237,6 +237,7 @@ public class RESTServlet extends BigdataRDFServlet {
                 || req.getParameter(QueryServlet.ATTR_UUID) != null
                 || req.getParameter(QueryServlet.ATTR_ESTCARD) != null
                 || req.getParameter(QueryServlet.ATTR_HASSTMT) != null
+                || req.getParameter(QueryServlet.ATTR_GETSTMTS) != null
                 || req.getParameter(QueryServlet.ATTR_CONTEXTS) != null
                 // the two cases below were added to fix bug trac 711
                 || hasMimeType(req, BigdataRDFServlet.MIME_SPARQL_UPDATE)

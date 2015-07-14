@@ -1,6 +1,5 @@
-package com.bigdata.rdf.sail.remote;
-
 /**
+
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
 Contact:
@@ -22,29 +21,18 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-/*
- * Created on April 20, 2015
- */
-
+package com.bigdata.rdf.sail.remote;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.sail.webapp.TestNanoSparqlServer;
-
-/**
- * Test suite.
- * 
- * @author <a href="mailto:beebs@users.sourceforge.net">Brad Bebee</a>
- */
 public class TestAll extends TestCase {
 
     /**
      * 
      */
     public TestAll() {
-        super();
     }
 
     /**
@@ -54,15 +42,18 @@ public class TestAll extends TestCase {
         super(arg0);
     }
 
-    public static Test suite() {
+    /**
+     * Returns a test that will run each of the implementation specific test
+     * suites in turn.
+     */
+    public static Test suite()
+    {
 
-        final TestSuite suite = new TestSuite("WebApp");
+        final TestSuite suite = new TestSuite(TestAll.class.getPackage().getName());
 
-        // Test suite of NSS startup behavior and overrides.
-        //suite.addTestSuite(TestNanoSparqlServer.class);
-        
         suite.addTestSuite(BigdataSailFactoryTest.class);
-
+        suite.addTestSuite(BigdataSailRemoteRepositoryConnectionTest.class);
+        
         return suite;
 
     }

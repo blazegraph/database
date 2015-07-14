@@ -78,6 +78,7 @@ import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFServlet;
 import com.bigdata.rdf.sail.webapp.StatusServlet;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.PropertyUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -751,7 +752,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 //                    + OPTION_CREATE_KB_NAMESPACE);
 
         // Set the namespace property.
-        final Properties tmp = new Properties(properties);
+        final Properties tmp = PropertyUtil.flatCopy(properties);
         tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
         
         /*
