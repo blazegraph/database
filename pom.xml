@@ -54,7 +54,7 @@ dependencies.
    </parent>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>1.5.2-SNAPSHOT</version>
+    <version>${bigdata.version}</version>
    <packaging>jar</packaging>
    <name>bigdata(R)</name>
     <description>Bigdata(R) Maven Build</description>

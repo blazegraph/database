@@ -33,7 +33,7 @@
                 <artifactItem>
       		  <groupId>com.blazegraph</groupId>
                   <artifactId>bigdata-war</artifactId>
-      		  <version>${bigdata.version}</version>
+      		  <version>${bigdata.legacy.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target</outputDirectory>
@@ -133,7 +133,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
     </dependency>
 <!--
     <dependency>
@@ -147,7 +147,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
