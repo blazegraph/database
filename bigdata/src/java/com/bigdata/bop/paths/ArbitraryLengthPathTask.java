@@ -52,6 +52,7 @@ import com.bigdata.bop.join.IDistinctFilter;
 import com.bigdata.bop.join.JVMDistinctFilter;
 import com.bigdata.bop.paths.ArbitraryLengthPathOp.Annotations;
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.relation.accesspath.UnsynchronizedArrayBuffer;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -119,6 +120,8 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     private IDistinctFilter distinctVarFilter;
     private final Set<IVariable<?>> varsToRetain;
     private Set<IVariable<?>> projectInVars;
+    private final IVariableOrConstant<?> middleTerm;
+    private final IVariable<?> edgeVar;
 
     public ArbitraryLengthPathTask(
             final ArbitraryLengthPathOp controllerOp,
@@ -185,7 +188,19 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
         out = new UnsynchronizedArrayBuffer<IBindingSet>(context.getSink(),
                 IBindingSet.class, controllerOp.getChunkCapacity());
 
-        /**
+        edgeVar = (IVariable<?>) controllerOp.getProperty(Annotations.EDGE_VAR);
+        middleTerm = (IVariableOrConstant<?>) controllerOp.getProperty(Annotations.MIDDLE_TERM);
+
+        if (log.isDebugEnabled()) {
+            log.debug("predVar: " + edgeVar);
+            log.debug("middleTerm: " + middleTerm);
+        }
+        
+        if (edgeVar != null && middleTerm == null) {
+            throw new IllegalArgumentException("Must provide a middle term when edge var is present");
+        }
+
+        /*
          * Compute the variables that are retained by this operator and set
          * up a distinct filter for these variables (this is necessary
          * because the ArbitraryLengthPath operator as defined by the W3C
@@ -196,12 +211,14 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
             varsToRetain.add(leftVar);
         if (rightVar != null)
             varsToRetain.add(rightVar);
+        if (edgeVar != null)
+            varsToRetain.add(edgeVar);
         varsToRetain.addAll(projectInVars);
         final IVariable<?>[] varsToRetainList = varsToRetain
                 .toArray(new IVariable<?>[varsToRetain.size()]);
 
         if (log.isDebugEnabled()) {
-            log.debug("vars to retain: " + projectInVars);
+            log.debug("vars to retain: " + varsToRetain);
         }
 
         /**
@@ -266,7 +283,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
 
         final Map<SolutionKey, IBindingSet> solutions = 
                 new LinkedHashMap<SolutionKey, IBindingSet>();
-
+        
         final QueryEngine queryEngine = this.context.getRunningQuery()
                 .getQueryEngine();
 
@@ -382,7 +399,24 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
             final QueryEngine queryEngine,
             final Set<IBindingSet> nextRoundInput, final Gearing gearing) {
 
-        for (int i = 0; i < upperBound; i++) {
+        /*
+         * If we are collecting edge vars and we have an upper bound, we need 
+         * to do one extra iteration, a bonus round, to collect edges between 
+         * nodes at the max distance away.
+         */
+        final boolean bonusRound = 
+                upperBound < Long.MAX_VALUE && edgeVar != null;
+        
+        final long n = upperBound + (bonusRound ? 1 : 0);
+        
+        /*
+         * This set collects visited nodes.  It will only be used if we are
+         * doing a bonus round.
+         */
+        final Set<IConstant<?>> visited = bonusRound ?
+                new LinkedHashSet<IConstant<?>>() : null;
+        
+        for (int i = 0; i < n; i++) {
 
             long sizeBefore = solutions.size();
 
@@ -458,9 +492,49 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                                 }
 
                             }
+                            
+                            /*
+                             * If the edgeVar is bound coming in then we need
+                             * to check whether it matches the value for
+                             * the middle transitive var.  No match, no solution.
+                             */
+                            if (edgeVar != null && bs.get(edgeVar) != null) {
+
+                                final IConstant<?> edge = middleTerm.isConstant() ? 
+                                        (IConstant<?>) middleTerm : 
+                                            bs.get((IVariable<?>) middleTerm);
+                                        
+                                if (!bs.get(edgeVar).equals(edge)) {
+                                    continue;
+                                }
+
+                            }
+                            
+                            /*
+                             * Do not project any new nodes from the bonus round,
+                             * only edges that connect visited nodes.
+                             */
+                            if (bonusRound) {
+                                final IConstant<?> out = bs.get(gearing.tVarOut);
+                                if (i+1 == n && !visited.contains(out)) {
+                                    /*
+                                     * Bonus round + new node, skip
+                                     */
+                                    continue;
+                                }
+                                visited.add(out);
+                            }
 
                             storeAndEmit(bs, gearing, solutions);
 
+                            /*
+                             * No need to remap solutions, there is no next
+                             * round.
+                             */
+                            if (i+1 == n) {
+                                continue;
+                            }
+                            
                             /*
                              * Copy the binding set as input for next round;
                              * this is necessary, because the storeAndEmit
@@ -479,6 +553,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                              * we do not remove potential anonymous
                              * variables driving the evaluation.
                              */
+                            @SuppressWarnings("rawtypes")
                             final Iterator<IVariable> vit = input.vars();
                             Set<IVariable<?>> anonymousVars = new LinkedHashSet<IVariable<?>>();
                             while (vit.hasNext()) {
@@ -782,19 +857,43 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
     private SolutionKey newSolutionKey(final Gearing gearing,
             final IBindingSet bs) {
 
-        if (gearing.inVar != null && gearing.outVar != null) {
-            return new SolutionKey(new IConstant<?>[] {
-                    bs.get(gearing.inVar), bs.get(gearing.outVar),
-                    bs.get(gearing.tVarOut) });
-        } else if (gearing.inVar != null) {
-            return new SolutionKey(new IConstant<?>[] {
-                    bs.get(gearing.inVar), bs.get(gearing.tVarOut) });
-        } else if (gearing.outVar != null) {
-            return new SolutionKey(new IConstant<?>[] {
-                    bs.get(gearing.outVar), bs.get(gearing.tVarOut) });
+        if (edgeVar == null || middleTerm.isConstant()) {
+            if (gearing.inVar != null && gearing.outVar != null) {
+                return new SolutionKey(new IConstant<?>[] {
+                        bs.get(gearing.inVar), bs.get(gearing.outVar),
+                        bs.get(gearing.tVarOut) });
+            } else if (gearing.inVar != null) {
+                return new SolutionKey(new IConstant<?>[] {
+                        bs.get(gearing.inVar), bs.get(gearing.tVarOut) });
+            } else if (gearing.outVar != null) {
+                return new SolutionKey(new IConstant<?>[] {
+                        bs.get(gearing.outVar), bs.get(gearing.tVarOut) });
+            } else {
+                return new SolutionKey(
+                        new IConstant<?>[] { bs.get(gearing.tVarOut) });
+            }
         } else {
-            return new SolutionKey(
-                    new IConstant<?>[] { bs.get(gearing.tVarOut) });
+            final IConstant<?> edge = middleTerm.isConstant() ? 
+                    (IConstant<?>) middleTerm : bs.get((IVariable<?>) middleTerm);
+                    
+            if (gearing.inVar != null && gearing.outVar != null) {
+                return new SolutionKey(new IConstant<?>[] {
+                        bs.get(gearing.inVar), bs.get(gearing.outVar),
+                        bs.get(gearing.tVarOut), edge });
+            } else if (gearing.inVar != null) {
+                return new SolutionKey(new IConstant<?>[] {
+                        bs.get(gearing.inVar), 
+                        bs.get(gearing.tVarOut), edge });
+            } else if (gearing.outVar != null) {
+                return new SolutionKey(new IConstant<?>[] {
+                        bs.get(gearing.outVar), 
+                        bs.get(gearing.tVarOut), edge });
+            } else {
+                return new SolutionKey(
+                        new IConstant<?>[] { 
+                        bs.get(gearing.tVarOut), edge });
+            }
+            
         }
 
     }
@@ -817,6 +916,9 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
             final Map<SolutionKey, IBindingSet> solutions) {
 
         final SolutionKey solutionKey = newSolutionKey(gearing, bs);
+        if (log.isDebugEnabled()) {
+            log.debug("solution key: " + solutionKey);
+        }
         storeAndEmit(solutionKey, bs, gearing, solutions);
 
     }
@@ -826,7 +928,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
      * and adds this combination to the solutions map. Once this has been
      * done, the solution is emitted (it will still run through a distinct
      * filter, taking care that we don't emit solutions that have been
-     * emited before already).
+     * emitted before already).
      * 
      * @param solution
      *            the key for the solution
@@ -837,11 +939,11 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
      * @param solutions
      *            the solutions map where to store bindings
      */
-    private void storeAndEmit(SolutionKey solution, IBindingSet bs,
+    private void storeAndEmit(SolutionKey solutionKey, IBindingSet bs,
             final Gearing gearing,
             final Map<SolutionKey, IBindingSet> solutions) {
 
-        solutions.put(solution, bs);
+        solutions.put(solutionKey, bs);
         emitSolutions(bs, gearing);
 
     }
@@ -863,8 +965,25 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
          */
         if (gearing.outVar != null) {
 
-            bset.set(gearing.outVar, bset.get(gearing.tVarOut));
+            final IConstant<?> out = bset.get(gearing.tVarOut);
+            if (out != null) {
+                bset.set(gearing.outVar, out);
+            }
 
+        }
+        
+        /*
+         * Set the edgeVar if necessary.
+         */
+        if (edgeVar != null) {
+            
+            final IConstant<?> edge = middleTerm.isConstant() ? 
+                    (IConstant<?>) middleTerm : bs.get((IVariable<?>) middleTerm);
+            
+            if (edge != null) {
+                bset.set(edgeVar, edge);
+            }
+            
         }
 
         /**
@@ -1002,7 +1121,11 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
             }
             return true;
         }
+        
+        public String toString() {
+            return Arrays.toString(vals);
+        }
 
     }
-
+    
 }

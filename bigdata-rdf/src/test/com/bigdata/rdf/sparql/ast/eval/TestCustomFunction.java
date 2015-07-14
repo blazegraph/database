@@ -35,6 +35,7 @@ import org.openrdf.model.impl.LiteralImpl;
 import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.NV;
@@ -88,14 +89,15 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
 
             @Override
             public IValueExpression<? extends IV> create(
-            		GlobalAnnotations globals,
-                    Map<String, Object> scalarValues,
-                    ValueExpressionNode... args) {
+                    final BOpContextBase context,//
+                    final GlobalAnnotations globals,//
+                    final Map<String, Object> scalarValues,//
+                    final ValueExpressionNode... args) {
 
                 FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
                 final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                        globals, args[0]);
+                        context, globals, args[0]);
 
                 return new MyFunctionBOp(ve, globals);
 
@@ -150,14 +152,15 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
 
         @Override
         public IValueExpression<? extends IV> create(
-        		GlobalAnnotations globals,
-                Map<String, Object> scalarValues,
-                ValueExpressionNode... args) {
+                final BOpContextBase context,//
+                final GlobalAnnotations globals,//
+                final Map<String, Object> scalarValues,//
+                final ValueExpressionNode... args) {
 
             FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                    globals, args[0]);
+                    context, globals, args[0]);
 
             return new MyFunctionBOp(ve, globals);
 
@@ -265,14 +268,15 @@ public class TestCustomFunction extends AbstractDataDrivenSPARQLTestCase {
 
         @Override
         public IValueExpression<? extends IV> create(
-        		GlobalAnnotations globals,
-                Map<String, Object> scalarValues,
-                ValueExpressionNode... args) {
+                final BOpContextBase context,//
+                final GlobalAnnotations globals,//
+                final Map<String, Object> scalarValues,//
+                final ValueExpressionNode... args) {
             
             FunctionRegistry.checkArgs(args, ValueExpressionNode.class);
 
             final IValueExpression<? extends IV> ve = AST2BOpUtility.toVE(
-                    globals, args[0]);
+                    context, globals, args[0]);
 
             return new MyFilterBOp(ve);
 

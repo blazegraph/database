@@ -212,4 +212,8 @@ public class BNodeContextFactory implements BigdataValueFactory {
         return valueFactory.asValue(v);
     }
 
+    public BigdataLiteral createXSDDateTime(long timestamp) {
+        return valueFactory.createXSDDateTime(timestamp);
+    }
+
 }

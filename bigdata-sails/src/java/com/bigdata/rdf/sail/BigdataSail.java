@@ -97,6 +97,7 @@ import org.openrdf.sail.SailException;
 import org.openrdf.sail.UnknownSailTransactionStateException;
 import org.openrdf.sail.UpdateContext;
 
+import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.IIndexManager;
@@ -112,6 +113,7 @@ import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.changesets.StatementWriter;
 import com.bigdata.rdf.inf.TruthMaintenance;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.model.BigdataBNodeImpl;
 import com.bigdata.rdf.model.BigdataStatement;
@@ -132,6 +134,7 @@ import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.InferredSPOFilter;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.spo.SPOPredicate;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BigdataSolutionResolverator;
@@ -145,12 +148,15 @@ import com.bigdata.rdf.store.LocalTripleStore;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.rdf.store.TempTripleStore;
 import com.bigdata.rdf.task.AbstractApiTask;
+import com.bigdata.relation.accesspath.ElementFilter;
 import com.bigdata.relation.accesspath.EmptyAccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
+import com.bigdata.striterator.ChunkedOrderedStriterator;
+import com.bigdata.striterator.ChunkedWrappedIterator;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
@@ -1237,6 +1243,8 @@ public class BigdataSail extends SailBase implements Sail {
                     if (log.isInfoEnabled())
                         log.info("Closing the backing database");
 
+                    final BigdataValueFactoryImpl vf = ((BigdataValueFactoryImpl)getValueFactory());
+
                     /*
                      * Discard the value factory for the lexicon's namespace.
                      * iff the backing Journal will also be closed.
@@ -1246,10 +1254,17 @@ public class BigdataSail extends SailBase implements Sail {
                      * AbstractTripleStore instances for the same namespace and
                      * database instance.
                      */
-                    ((BigdataValueFactoryImpl)getValueFactory()).remove();
+                    vf.remove();
+
+                    /*
+                     * Discard all term cache entries for the lexicon's
+                     * namespace with the same caveat as above for the 
+                     * backing Journal.
+                     */
+                    LexiconRelation.clearTermCacheFactory(vf.getNamespace());
 
                     database.close();
-
+                    
                 }
                 
             } finally {
@@ -1512,6 +1527,18 @@ public class BigdataSail extends SailBase implements Sail {
             // new writable connection.
             conn = new BigdataSailConnection(database, writeLock, true/* unisolated */)
                     .startConn();
+            
+            /*
+             * Add the RDRHistory class if that feature is enabled.
+             * 
+             * This happens via RDRHistoryServiceFactory.startConnection() now.
+             */
+//            if (database.isRDRHistory()) {
+//                final RDRHistory history = database.getRDRHistoryInstance();
+//                history.init();
+//                conn.addChangeLog(history);
+//            }
+            
         } catch(DatasetNotFoundException ex) {
             /*
              * This exception should not be thrown for the UNISOLATED connection
@@ -2914,6 +2941,215 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Note: The CONTEXT is ignored when in statementIdentifier mode!
          */
+        public synchronized int removeStatements(final SPOPredicate pred) 
+                throws SailException {
+            
+            assertWritableConn();
+
+            flushStatementBuffers(true/* flushAssertBuffer */, false/* flushRetractBuffer */);
+
+            if (m_listeners != null) {
+
+                /*
+                 * FIXME to support the SailConnectionListener we need to
+                 * pre-materialize the explicit statements that are to be
+                 * deleted and then notify the listener for each such explicit
+                 * statement. Since that is a lot of work, make sure that we do
+                 * not generate notices unless there are registered listeners!
+                 */
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            // #of explicit statements removed.
+            long n = 0;
+
+            if (getTruthMaintenance()) {
+
+                /*
+                 * Since we are doing truth maintenance we need to copy the
+                 * matching "explicit" statements into a temporary store rather
+                 * than deleting them directly. This uses the internal API to
+                 * copy the statements to the temporary store without
+                 * materializing them as Sesame Statement objects.
+                 */
+
+                /*
+                 * Obtain a chunked iterator using the triple pattern that
+                 * visits only the explicit statements.
+                 */
+                final IChunkedOrderedIterator<ISPO> itr = database.getSPORelation()
+                        .getAccessPath(pred.addIndexLocalFilter(
+                        ElementFilter.newInstance(ExplicitSPOFilter.INSTANCE)))
+                        .iterator();
+
+                // The tempStore absorbing retractions.
+                final AbstractTripleStore tempStore = getRetractionBuffer()
+                        .getStatementStore();
+
+                // Copy explicit statements to tempStore.
+                n = tempStore.addStatements(tempStore, true/* copyOnly */,
+                        itr, null/* filter */);
+
+                /*
+                 * Nothing more happens until the commit or incremental write
+                 * flushes the retraction buffer and runs TM.
+                 */
+                
+            } else {
+
+                /*
+                 * Since we are not doing truth maintenance, just remove the
+                 * statements from the database (synchronous, batch api, not
+                 * buffered).
+                 */
+                
+                final IAccessPath<ISPO> ap = database.getSPORelation().getAccessPath(pred);
+                
+                if (changeLog == null) {
+                    
+                    n = ap.removeAll();
+                    
+                } else {
+                
+                    final IChunkedOrderedIterator<ISPO> itr = 
+                        database.computeClosureForStatementIdentifiers(
+                                ap.iterator());
+                    
+                    // no need to compute closure for sids since we just did it
+                    n = StatementWriter.removeStatements(database, itr, 
+                            false/* computeClosureForStatementIdentifiers */,
+                            changeLog);
+                    
+                }
+
+            }
+
+            // avoid overflow.
+            return (int) Math.min(Integer.MAX_VALUE, n);
+            
+        }
+            
+        public synchronized int removeStatements(final SPOPredicate[] preds,
+                final int numPreds) throws SailException {
+            
+            assertWritableConn();
+
+            flushStatementBuffers(true/* flushAssertBuffer */, false/* flushRetractBuffer */);
+
+            if (m_listeners != null) {
+
+                /*
+                 * FIXME to support the SailConnectionListener we need to
+                 * pre-materialize the explicit statements that are to be
+                 * deleted and then notify the listener for each such explicit
+                 * statement. Since that is a lot of work, make sure that we do
+                 * not generate notices unless there are registered listeners!
+                 */
+
+                throw new UnsupportedOperationException();
+                
+            }
+
+            // #of explicit statements removed.
+            long n = 0;
+
+            if (getTruthMaintenance()) {
+
+                /*
+                 * Since we are doing truth maintenance we need to copy the
+                 * matching "explicit" statements into a temporary store rather
+                 * than deleting them directly. This uses the internal API to
+                 * copy the statements to the temporary store without
+                 * materializing them as Sesame Statement objects.
+                 */
+
+                /*
+                 * Obtain a chunked iterator using the triple pattern that
+                 * visits only the explicit statements.
+                 */
+                final IChunkedOrderedIterator<ISPO> itr = 
+                        combineAndIterate(preds, numPreds);
+
+                // The tempStore absorbing retractions.
+                final AbstractTripleStore tempStore = getRetractionBuffer()
+                        .getStatementStore();
+
+                // Copy explicit statements to tempStore.
+                n = tempStore.addStatements(tempStore, true/* copyOnly */,
+                        itr, null/* filter */);
+
+                /*
+                 * Nothing more happens until the commit or incremental write
+                 * flushes the retraction buffer and runs TM.
+                 */
+                
+            } else {
+
+                /*
+                 * Since we are not doing truth maintenance, just remove the
+                 * statements from the database (synchronous, batch api, not
+                 * buffered).
+                 */
+                
+                if (changeLog == null) {
+
+                    for (int i = 0; i < numPreds; i++) {
+                    
+                        final SPOPredicate pred = preds[i];
+                        
+                        final IAccessPath<ISPO> ap = database.getSPORelation().getAccessPath(pred);
+                        
+                        n = ap.removeAll();
+                    }
+                    
+                    
+                } else {
+                
+                    final IChunkedOrderedIterator<ISPO> itr = 
+                        database.computeClosureForStatementIdentifiers(
+                                combineAndIterate(preds, numPreds));
+                    
+                    // no need to compute closure for sids since we just did it
+                    n = StatementWriter.removeStatements(database, itr, 
+                            false/* computeClosureForStatementIdentifiers */,
+                            changeLog);
+                    
+                }
+
+            }
+
+            // avoid overflow.
+            return (int) Math.min(Integer.MAX_VALUE, n);
+            
+        }
+        
+        private IChunkedOrderedIterator<ISPO> combineAndIterate(
+                final SPOPredicate[] preds, final int numPreds) {
+            
+            /*
+             * Sort preds?
+             */
+            
+            final Striterator sitr = new Striterator(Collections.emptyIterator());
+            
+            for (int i = 0; i < numPreds; i++) {
+                
+                final SPOPredicate pred = preds[i];
+                
+                final IAccessPath<ISPO> ap = database.getSPORelation().getAccessPath(pred);
+                
+                sitr.append(ap.iterator());
+            }
+            
+            return new ChunkedWrappedIterator<ISPO>(sitr);
+            
+        }
+            
+        /**
+         * Note: The CONTEXT is ignored when in statementIdentifier mode!
+         */
         public synchronized int removeStatements(final Resource s, final URI p,
                 final Value o, final Resource c) throws SailException {
             
@@ -3033,7 +3269,18 @@ public class BigdataSail extends SailBase implements Sail {
         /**
          * Note: The CONTEXT is ignored when in statementIdentifier mode!
          */
-        public synchronized int removeStatements(final ISPO[] stmts) throws SailException {
+        public synchronized int removeStatements(final ISPO[] stmts) 
+                throws SailException {
+            
+            return removeStatements(stmts, stmts.length);
+            
+        }
+            
+        /**
+         * Note: The CONTEXT is ignored when in statementIdentifier mode!
+         */
+        public synchronized int removeStatements(final ISPO[] stmts, 
+                final int numStmts) throws SailException {
             
             assertWritableConn();
 
@@ -3071,7 +3318,7 @@ public class BigdataSail extends SailBase implements Sail {
                  * visits only the explicit statements.
                  */
                 final IChunkedOrderedIterator<ISPO> itr = 
-                		new ChunkedArrayIterator<ISPO>(stmts);
+                		new ChunkedArrayIterator<ISPO>(numStmts, stmts);
 
                 // The tempStore absorbing retractions.
                 final AbstractTripleStore tempStore = getRetractionBuffer()
@@ -3096,13 +3343,13 @@ public class BigdataSail extends SailBase implements Sail {
                 
                 if (changeLog == null) {
                     
-                    n = database.removeStatements(stmts, stmts.length);
+                    n = database.removeStatements(stmts, numStmts);
                     
                 } else {
                 
                     final IChunkedOrderedIterator<ISPO> itr = 
                         database.computeClosureForStatementIdentifiers(
-                        		new ChunkedArrayIterator<ISPO>(stmts));
+                        		new ChunkedArrayIterator<ISPO>(numStmts, stmts));
                     
                     // no need to compute closure for sids since we just did it
                     n = StatementWriter.removeStatements(database, itr, 
@@ -3515,6 +3762,10 @@ public class BigdataSail extends SailBase implements Sail {
                 rollback();
             }
             
+            if (changeLog != null) {
+                changeLog.close();
+            }
+
             try {
                 // notify the SailBase that the connection is no longer in use.
                 BigdataSail.this.connectionClosed(this);
@@ -4248,7 +4499,7 @@ public class BigdataSail extends SailBase implements Sail {
 
         /*
 		 * These methods are new with openrdf 2.7. Bigdata uses either
-		 * MVCC (full read-write tx) or simply a single writer on the live
+		 * MVCC(full read-write tx) or simply a single writer on the live
 		 * indices (unisolated). The latter has more throughput.
 		 * 
 		 * FIXME Use the MVCC semantics in bigdata do use a prepare()/commit()

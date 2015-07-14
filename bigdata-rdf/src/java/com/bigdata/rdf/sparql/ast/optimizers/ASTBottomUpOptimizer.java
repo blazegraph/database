@@ -807,7 +807,7 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                     		context.getLexiconNamespace(),
                     		context.getTimestamp()
                     		);
-                    
+                     
                     /**
                      * Re-generate the value expression. Note that this must be
                      * done recursively in the general case, e.g in the case
@@ -830,10 +830,9 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
                           });
                      while (it.hasNext()) {
    
-                         AST2BOpUtility.toVE(
-                             globals, 
-                             ((IValueExpressionNodeContainer) it.next()).
-                                  getValueExpressionNode());
+						AST2BOpUtility.toVE(context.getBOpContext(), globals,
+								((IValueExpressionNodeContainer) it.next())
+										.getValueExpressionNode());
                      }
                 }
             }

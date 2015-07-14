@@ -27,21 +27,21 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.model;
 
-import com.bigdata.rdf.internal.IV;
-
 /**
- * This class wraps a {@link BigdataStatement}
- * and provides {@link #hashCode()} and {@link #equals(Object)}
- * respecting all four fields rather than SPO as per the {@link org.openrdf.model.Statement} contract
+ * This class wraps a {@link BigdataStatement} and provides {@link #hashCode()}
+ * and {@link #equals(Object)} respecting all four fields rather than SPO as per
+ * the {@link org.openrdf.model.Statement} contract.
+ * 
  * @author jeremycarroll
- *
  */
 public class BigdataQuadWrapper {
 	
 	private final BigdataStatement delegate;
-	public BigdataQuadWrapper(BigdataStatement cspo) {
+
+	public BigdataQuadWrapper(final BigdataStatement cspo) {
 		delegate = cspo;
 	}
+
 	@Override
 	public int hashCode() {
         if (hash == 0) {
@@ -56,8 +56,10 @@ public class BigdataQuadWrapper {
         return hash;
 	}
     private int hash = 0;
+    
     @Override 
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
+        if(this == o) return true;
     	if (! (o instanceof BigdataQuadWrapper)) {
     		return false;
     	}
@@ -65,10 +67,11 @@ public class BigdataQuadWrapper {
     	return delegate.equals(oo) && equals(delegate.getContext(),oo.getContext());
     }
     
-    private boolean equals(BigdataResource a, BigdataResource b) {
+    private boolean equals(final BigdataResource a, final BigdataResource b) {
 		return a == b || (a != null && a.equals(b));
 	}
-	public BigdataStatement statement() {
+
+    public BigdataStatement statement() {
     	return delegate;
     }
 

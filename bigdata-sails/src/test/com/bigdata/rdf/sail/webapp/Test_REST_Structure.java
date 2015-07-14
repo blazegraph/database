@@ -139,7 +139,7 @@ public class Test_REST_Structure<S extends IIndexManager> extends
     * bare URL of the server
     * 
     * <pre>
-    * http://localhost:8080
+    * http://localhost:9999
     * </pre>
     * 
     * The response is should be <code>index.html</code> since we want the
@@ -163,7 +163,7 @@ public class Test_REST_Structure<S extends IIndexManager> extends
     * URL with correct context path
     * 
     * <pre>
-    * http://localhost:8080/bigdata
+    * http://localhost:9999/bigdata
     * </pre>
     * 
     * The response is should be <code>index.html</code>, which is specified
@@ -180,7 +180,7 @@ public class Test_REST_Structure<S extends IIndexManager> extends
     * URL with context path and index.html reference
     * 
     * <pre>
-    * http://localhost:8080/bigdata/index.html
+    * http://localhost:9999/bigdata/index.html
     * </pre>
     * 
     * This URL does NOT get mapped to anything (404).
@@ -242,7 +242,7 @@ public class Test_REST_Structure<S extends IIndexManager> extends
     * The fully qualified URL for <code>index.html</code>
     * 
     * <pre>
-    * http://localhost:8080/bigdata/html/index.html
+    * http://localhost:9999/bigdata/html/index.html
     * </pre>
     * 
     * The response is should be <code>index.html</code>, which is specified

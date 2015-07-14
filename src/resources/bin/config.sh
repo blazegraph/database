@@ -32,7 +32,9 @@ fi
 
 if [ -z "${ZK_SERVERS}" ] ; then
 	#Use for single node configuration
-	export ZK_SERVERS="localhost:2181"
+	#export ZK_SERVERS="localhost:2181"
+	#Placeholder to make sure ZK SERVERS are set and started.
+	export ZK_SERVERS=""
 	#Use for a multiple ZK configuration
 	#export ZK_SERVERS="bigdata15:2081,bigdata16:2081,bigdata17:2081"
 fi
@@ -49,11 +51,12 @@ fi
 #Port for the NanoSparqlServer Jetty
 
 if [ -z "${JETTY_PORT}" ] ; then
-	export JETTY_PORT=8080
+	export JETTY_PORT=9999
 fi
 
 #Group commit (true|false)
+#See http://wiki.blazegraph.com/wiki/index.php/GroupCommit and BLZG-192.
 
 if [ -z "${GROUP_COMMIT}" ] ; then
-	export GROUP_COMMIT=true
+	export GROUP_COMMIT=false
 fi

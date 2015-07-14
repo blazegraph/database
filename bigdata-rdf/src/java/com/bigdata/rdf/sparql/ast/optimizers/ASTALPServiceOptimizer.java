@@ -37,7 +37,10 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
+import com.bigdata.bop.paths.ArbitraryLengthPathOp;
 import com.bigdata.rdf.sparql.ast.ArbitraryLengthPathNode;
+import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupMemberNodeBase;
@@ -53,6 +56,7 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.BasicBooleanQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.BasicIntQueryHint;
+import com.bigdata.rdf.sparql.ast.hints.BasicStringQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.BD;
@@ -106,11 +110,14 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
     
     public static final String BIDIRECTIONAL = "alp.bidirectional";
     
+    public static final String EDGE_VAR = "alp.edgeVar";
+    
     static {
         QueryHintRegistry.add(new BasicBooleanQueryHint(PATH_EXPR, false));
         QueryHintRegistry.add(new BasicIntQueryHint(LOWER_BOUND, 1));
         QueryHintRegistry.add(new BasicIntQueryHint(UPPER_BOUND, Integer.MAX_VALUE));
         QueryHintRegistry.add(new BasicBooleanQueryHint(BIDIRECTIONAL, false));
+        QueryHintRegistry.add(new BasicStringQueryHint(EDGE_VAR, null));
     }
      
     /**
@@ -170,27 +177,35 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
             final boolean bidirectional = 
                     subgroup.getQueryHintAsBoolean(BIDIRECTIONAL, false);
             
+            final String evHint = subgroup.getQueryHint(EDGE_VAR);
+            VarNode edgeVar = null;
+            if (evHint != null) {
+                if (!(evHint.length() > 1 && evHint.charAt(0) == '?')) {
+                    throw new IllegalArgumentException("Illegal hint for "+EDGE_VAR+": " + evHint);
+                }
+                edgeVar = new VarNode(evHint.substring(1));
+            }
+            
             TermNode left = null;
             TermNode right = null;
             IGroupMemberNode pathExpr = null;
             JoinGroupNode group1 = null;
             JoinGroupNode group2 = null;
+            TermNode middle = null;
             
             for (StatementPatternNode child : subgroup.getStatementPatterns()) {
                 if (child.getQueryHintAsBoolean(PATH_EXPR, false)) {
                     if (pathExpr != null) {
                         throw new RuntimeException("Only one " + PATH_EXPR + " allowed");
                     }
-                    /*
-                     * Make all variables in the ALP service (other than the
-                     * left and right) anonymous, since they cannot be projected
-                     * out in a meaningful fashion.
-                     */
+                    left = child.s();
+                    right = child.o();
+                    middle = child.p();
+                    
                     if (child.p() instanceof VarNode) {
                         ((VarNode) child.p()).setAnonymous(true);
                     }
-                    left = child.s();
-                    right = child.o();
+                    
                     if (bidirectional) {
                         final StatementPatternNode forward = 
                                 new StatementPatternNode(
@@ -200,6 +215,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                                 child.c(), 
                                 child.getScope()
                                 );
+                        forward.setQueryHint(PATH_EXPR, "true");
                         group1 = new JoinGroupNode();
                         group1.addChild(forward);
                         
@@ -211,13 +227,13 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                                 child.c(), 
                                 child.getScope()
                                 );
+                        reverse.setQueryHint(PATH_EXPR, "true");
                         group2 = new JoinGroupNode();
                         group2.addChild(reverse);
                         
                         final UnionNode union = new UnionNode();
                         union.addArg(group1);
                         union.addArg(group2);
-                        union.setQueryHint(PATH_EXPR, "true");
                         
                         pathExpr = union;
                     } else {
@@ -280,7 +296,7 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                 if (swap) {
                     final IValueExpressionNode veNode = f.getValueExpressionNode(); 
                     veNode.setValueExpression(null);
-                    AST2BOpUtility.toVE(globals, veNode);
+                    AST2BOpUtility.toVE(ctx.context, globals, veNode);
                 }
                 
             }
@@ -290,6 +306,10 @@ public class ASTALPServiceOptimizer extends AbstractJoinGroupOptimizer
                     tVarLeft, tVarRight,
                     lowerBound, upperBound
                     );
+            
+            if (edgeVar != null) {
+                alpNode.setEdgeVar(edgeVar, middle);
+            }
             
             alpNode.subgroup().addChild(pathExpr);
             for (@SuppressWarnings("rawtypes") GroupMemberNodeBase child : 

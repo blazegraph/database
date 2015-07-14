@@ -54,11 +54,11 @@ dependencies.
    </parent>
    <groupId>com.bigdata</groupId>
    <artifactId>bigdata</artifactId>
-   <version>${bigdata.version}</version>
+   <version>1.5.2-SNAPSHOT</version>
    <packaging>jar</packaging>
-   <name>Blazegraph(tm)</name>
-    <description>Blazegraph(tm) Maven Build</description>
-    <url>http://www.blazegraph.com/</url>
+   <name>bigdata(R)</name>
+    <description>Bigdata(R) Maven Build</description>
+    <url>http://www.systap.com/bigdata.htm</url>
     <organization>
         <name>SYSTAP, LLC</name>
         <url>http://www.systap.com/</url>
@@ -333,7 +333,9 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
           <disableXmlReport>false</disableXmlReport>
           <forkCount>2</forkCount>
           <reuseForks>true</reuseForks>
-          <argLine>-server -ea -Xms512m -Xmx2g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+	  <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -629,11 +631,21 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
            <artifactId>commons-logging</artifactId>
            <version>${apache.commons_logging.version}</version>
        </dependency>
-       <dependency>
- 	   <groupId>com.fasterxml.jackson.core</groupId>
-	   <artifactId>jackson-core</artifactId>
-	   <version>${jackson.version}</version>
-	</dependency>
+        <dependency>
+           <groupId>com.fasterxml.jackson.core</groupId>
+           <artifactId>jackson-core</artifactId>
+           <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+           <groupId>com.fasterxml.jackson.core</groupId>
+           <artifactId>jackson-annotations</artifactId>
+           <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+           <groupId>com.fasterxml.jackson.core</groupId>
+           <artifactId>jackson-databind</artifactId>
+           <version>${jackson.version}</version>
+        </dependency>
 	<dependency>
            <groupId>org.codehaus.jettison</groupId>
            <artifactId>jettison</artifactId>

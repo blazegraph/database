@@ -12,7 +12,7 @@ bigdataServices_0h.xls
 	This worksheet can be quite convenient to use once you have it setup
 	for your cluster.  However, getting it setup for your cluster means
 	that you need to review and possibly edit the queries (they are issued
-	to localhost:8080 with the presumption that you are using SSH to port
+	to localhost:9999 with the presumption that you are using SSH to port
 	forward that request to the machine on the cluster running the load
 	balancer), the data source ranges for the charts, and the various
 	formulae which compute averages, maximums, etc.
