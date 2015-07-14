@@ -16,7 +16,7 @@ import com.bigdata.btree.proc.ISimpleIndexProcedure;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Atomic write of a single block for a file version.

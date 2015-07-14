@@ -49,12 +49,12 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.service.IDataService;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.Bytes;
 
 /**
  * A connection to a local, remote, or distributed caching layer.

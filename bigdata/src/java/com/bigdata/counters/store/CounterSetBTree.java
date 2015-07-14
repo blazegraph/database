@@ -63,9 +63,9 @@ import com.bigdata.counters.PeriodEnum;
 import com.bigdata.counters.History.SampleIterator;
 import com.bigdata.counters.ICounterSet.IInstrumentFactory;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.Bytes;
 
 /**
  * An API encapsulating for writing and querying counter sets. The data are

@@ -39,7 +39,6 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.bop.join.HashJoinAnnotations;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
 import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
@@ -51,6 +50,7 @@ import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
+import com.bigdata.util.Bytes;
 
 /**
  * Query hints are directives understood by the SPARQL end point. A query hint

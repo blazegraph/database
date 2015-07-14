@@ -31,10 +31,10 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Batch removal of one or more tuples, optionally returning their existing

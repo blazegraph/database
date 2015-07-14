@@ -52,7 +52,6 @@ import java.util.zip.Adler32;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.QuorumPipelineImpl;
 import com.bigdata.ha.msg.HAMessageWrapper;
 import com.bigdata.ha.msg.HASendState;
@@ -63,6 +62,7 @@ import com.bigdata.ha.msg.IHAWriteMessageBase;
 import com.bigdata.ha.pipeline.HASendService.IncSendTask;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCacheService;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.ChecksumError;
 
 /**

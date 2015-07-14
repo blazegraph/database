@@ -40,8 +40,6 @@ import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.ChangeRecord;
 import com.bigdata.rdf.changesets.IChangeLog;
@@ -425,7 +423,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     @Override
     public long flush() {
        
-        log.warn("");
+//        log.warn("");
 
         /*
          * Process deferred statements (NOP unless using statement identifiers).

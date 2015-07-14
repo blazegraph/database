@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Class provides (de-)compression for logical byte[][]s based on front coding.

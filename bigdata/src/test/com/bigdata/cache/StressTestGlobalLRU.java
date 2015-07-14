@@ -54,13 +54,13 @@ import com.bigdata.concurrent.TestLockManager;
 import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.io.IDataRecordAccess;
 import com.bigdata.io.IFixedDataRecord;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.test.ExperimentDriver;
 import com.bigdata.test.ExperimentDriver.IComparisonTest;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.NV;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 

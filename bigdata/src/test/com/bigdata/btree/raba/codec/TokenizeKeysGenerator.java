@@ -42,7 +42,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Tokenize an input file, collect the set of distinct keywords, and encode

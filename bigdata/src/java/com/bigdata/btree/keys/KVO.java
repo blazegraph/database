@@ -30,8 +30,8 @@ package com.bigdata.btree.keys;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.service.ndx.pipeline.KVOC;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A key-value-object tuple. Comparison places the {@link KVO} tuples into an

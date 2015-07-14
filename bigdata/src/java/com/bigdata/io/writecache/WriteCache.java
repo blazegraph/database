@@ -57,6 +57,7 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -66,11 +67,10 @@ import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.journal.AbstractBufferStrategy;
 import com.bigdata.journal.StoreTypeEnum;
 import com.bigdata.journal.WORMStrategy;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * This class provides a write cache with read-through for NIO writes on a

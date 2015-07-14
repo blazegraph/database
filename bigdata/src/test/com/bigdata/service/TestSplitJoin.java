@@ -46,9 +46,9 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite verifies that inserts eventually split an index and that deletes

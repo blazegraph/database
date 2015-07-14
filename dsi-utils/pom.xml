@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT</version>
+    <version>1.5.2-SNAPSHOT-BLZG_1269_client</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
@@ -83,6 +83,7 @@
       <groupId>it.unimi.dsi</groupId>
       <artifactId>dsiutils</artifactId>
       <version>1.0.10</version>
+      <!-- <version>1.0.6-020610</version> -->
    </dependency>
   </dependencies>
   

@@ -2,13 +2,9 @@ package com.bigdata.util;
 
 import java.io.Serializable;
 
-import com.bigdata.btree.IIndex;
-import com.bigdata.cache.WeakValueCache;
-import com.bigdata.relation.IRelation;
-
 /**
- * The name of an {@link IIndex} or an {@link IRelation} and a timestamp. This
- * is used as a key for a {@link WeakValueCache} to provide a canonicalizing
+ * The name of an {@link com.bigdata.btree.IIndex} or an {@link com.bigdata.relation.IRelation} and a timestamp. This
+ * is used as a key for a {@link com.bigdata.cache.WeakValueCache} to provide a canonicalizing
  * mapping for index views or relation views.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -42,7 +38,7 @@ public class NT implements Serializable {
     /**
      * 
      * @param name
-     *            The name of an {@link IIndex} or an {@link IRelation}.
+     *            The name of an {@link com.bigdata.btree.IIndex} or an {@link com.bigdata.relation.IRelation}.
      * @param timestamp
      *            The timestamp associated with the view.
      */

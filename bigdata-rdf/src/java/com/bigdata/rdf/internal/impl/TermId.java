@@ -31,12 +31,12 @@ import org.openrdf.model.Value;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.LongPacker;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.util.Bytes;
 
 /**
  * Implementation for any kind of RDF {@link Value} when the values is not being
