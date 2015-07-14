@@ -692,6 +692,10 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTSubGroupJoinVarOptimizer());
         
+        /**
+         * Prepare Mapgrap GPU acceleration of join groups.
+         */
+        add(new ASTGPUAccelerationOptimizer());
     }
 
 }
