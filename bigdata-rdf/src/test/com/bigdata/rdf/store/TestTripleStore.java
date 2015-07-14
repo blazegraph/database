@@ -50,7 +50,6 @@ import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.lexicon.DumpLexicon;
 import com.bigdata.rdf.lexicon.Id2TermWriteProc;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc;
@@ -65,6 +64,7 @@ import com.bigdata.rdf.rio.StatementBuffer;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.rdf.util.DumpLexicon;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.striterator.ChunkedArrayIterator;
 

@@ -38,9 +38,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.IHAJournal;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.IRemoteJournal;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumEvent;
@@ -80,7 +80,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * A {@link WeakReference} to the {@link HAJournal} avoids pinning the
      * {@link HAJournal}.
      */
-    protected final AtomicReference<WeakReference<IRemoteJournal>> journalRef = new AtomicReference<WeakReference<IRemoteJournal>>();
+    protected final AtomicReference<WeakReference<IHAJournal>> journalRef = new AtomicReference<WeakReference<IHAJournal>>();
 
     /**
      * The {@link UUID} of the HAJournalServer.
@@ -142,9 +142,9 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      * @return The reference or <code>null</code> iff the reference has been
      *         cleared or has not yet been set.
      */
-    protected IRemoteJournal getJournal() {
+    protected IHAJournal getJournal() {
 
-        final WeakReference<IRemoteJournal> ref = journalRef.get();
+        final WeakReference<IHAJournal> ref = journalRef.get();
 
         if (ref == null)
             return null;
@@ -172,7 +172,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         contextPath.set(servletContext.getContextPath());
 
-        final IRemoteJournal journal = (IRemoteJournal) BigdataServlet
+        final IHAJournal journal = (IHAJournal) BigdataServlet
                 .getIndexManager(servletContext);
 
         if (journal == null)
@@ -181,7 +181,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
         serviceIDRef.compareAndSet(null/* expect */,
                 journal.getServiceID()/* update */);
 
-        this.journalRef.set(new WeakReference<IRemoteJournal>(journal));
+        this.journalRef.set(new WeakReference<IHAJournal>(journal));
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
                 .getQuorum();
@@ -202,7 +202,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
          * Figure out whether the quorum is met and if this is the quorum
          * leader.
          */
-        final IRemoteJournal journal = getJournal();
+        final IHAJournal journal = getJournal();
         Quorum<HAGlue, QuorumService<HAGlue>> quorum = null;
         QuorumService<HAGlue> quorumService = null;
         long token = Quorum.NO_QUORUM; // assume no quorum.
@@ -298,7 +298,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
 
         final ServletContext servletContext = request.getServletContext();
 
-        final IRemoteJournal journal = (IRemoteJournal) BigdataServlet
+        final IHAJournal journal = (IHAJournal) BigdataServlet
                 .getIndexManager(servletContext);
 
         final Quorum<HAGlue, QuorumService<HAGlue>> quorum = journal
@@ -497,7 +497,7 @@ abstract public class AbstractLBSPolicy implements IHALoadBalancerPolicy,
      */
     protected void updateServiceTable() {
 
-        final IRemoteJournal journal = getJournal();
+        final IHAJournal journal = getJournal();
 
         if (journal == null) {
             // Can't do anything if there is no journal.

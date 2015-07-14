@@ -1,4 +1,4 @@
-package com.bigdata.rdf.lexicon;
+package com.bigdata.rdf.util;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -23,6 +23,9 @@ import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -38,6 +41,13 @@ import com.bigdata.service.IBigdataFederation;
  * @author thompsonbry
  */
 public class DumpLexicon {
+	
+	private final static String REMOTE_ERR_MSG = "Remote Lexicon dumping is not supported by this class."
+			+ "\nPlease use DumpRemoteLexicon in bigdata-jini."
+			+ "See BLZG-1370 \n";
+	
+	private final static String CONFIG_EXT = ".config";
+	private final static String PROPERTY_EXT = ".properties";
 
 	protected DumpLexicon() {
 	}
@@ -72,14 +82,11 @@ public class DumpLexicon {
         }
 
         boolean isJini = false;
-        if (propertyFile.endsWith(".config")) {
+        if (propertyFile.endsWith(CONFIG_EXT)) {
             // scale-out.
             isJini = true;
-			throw new RuntimeException(
-					"Remote Lexicon dumping is not supported by this class."
-							+ "\nPlease use DumpRemoteLexicon in bigdata-jini."
-							+ "See BLZG-1370 \n");
-        } else if (propertyFile.endsWith(".properties")) {
+			throw new RuntimeException(REMOTE_ERR_MSG);
+        } else if (propertyFile.endsWith(PROPERTY_EXT)) {
             // local journal.
             isJini = false;
         } else {

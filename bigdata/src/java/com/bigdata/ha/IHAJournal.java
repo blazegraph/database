@@ -23,16 +23,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
  */
 
-package com.bigdata.journal;
+package com.bigdata.ha;
 
 import java.util.UUID;
+
+import com.bigdata.journal.IJournal;
 
 /**
  * Convenience interface created in BLZG-1370 to factor out bigdata-jini
  * artifact dependencies.
  * 
  */
-public interface IRemoteJournal extends IJournal {
+public interface IHAJournal extends IJournal {
 
 	/**
 	 * Convenience method created in BLZG-1370 to factor out bigdata-jini

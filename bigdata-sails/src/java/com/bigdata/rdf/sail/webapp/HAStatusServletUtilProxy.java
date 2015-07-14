@@ -45,6 +45,8 @@ public class HAStatusServletUtilProxy {
 	
 	private static final String DEFAULT_PROVIDER = "com.bigdata.rdf.sail.webapp.HAStatusServletUtil";
 	
+	private static final String WITHOUT_JINI_MSG = "Running without the bigdata-jini package.  See BLZG-1370.";
+	
     static private final transient Logger log = Logger.getLogger(HAStatusServletUtilProxy.class);
     
     protected HAStatusServletUtilProxy(IIndexManager indexManager) {
@@ -66,7 +68,7 @@ public class HAStatusServletUtilProxy {
 			HttpServletResponse resp, XMLBuilder.Node current)
 			throws IOException {
     	if(log.isInfoEnabled()) {
-    		log.info("Running without the bigdata-jini package.  See BLZG-1370.");
+    		log.info(WITHOUT_JINI_MSG);
     	}
 	}
 
@@ -83,7 +85,7 @@ public class HAStatusServletUtilProxy {
 	public void doHAStatus(HttpServletRequest req,
 			HttpServletResponse resp) throws IOException {
     	if(log.isInfoEnabled()) {
-    		log.info("Running without the bigdata-jini package.  See BLZG-1370.");
+    		log.info(WITHOUT_JINI_MSG);
     	}
 	}
 
@@ -100,7 +102,7 @@ public class HAStatusServletUtilProxy {
 	public void doHealthStatus(HttpServletRequest req,
 			HttpServletResponse resp) throws IOException {
     	if(log.isInfoEnabled()) {
-    		log.info("Running without the bigdata-jini package.  See BLZG-1370.");
+    		log.info(WITHOUT_JINI_MSG);
     	}
 	}
 

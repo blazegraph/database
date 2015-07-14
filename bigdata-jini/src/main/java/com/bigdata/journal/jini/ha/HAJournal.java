@@ -60,6 +60,7 @@ import com.bigdata.concurrent.FutureTaskInvariantMon;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.IHAJournal;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogWriter;
@@ -93,7 +94,6 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.IHABufferStrategy;
-import com.bigdata.journal.IRemoteJournal;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
@@ -139,7 +139,7 @@ import com.bigdata.util.StackInfoReport;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530"> Journal HA </a>
  */
-public class HAJournal extends Journal implements IRemoteJournal {
+public class HAJournal extends Journal implements IHAJournal {
 
     private static final Logger log = Logger.getLogger(HAJournal.class);
 
