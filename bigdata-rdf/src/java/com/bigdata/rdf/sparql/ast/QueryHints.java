@@ -41,10 +41,13 @@ import com.bigdata.htree.HTree;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.cache.CacheConnectionFactory;
+import com.bigdata.rdf.sparql.ast.eval.ASTConstructIterator;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintRegistry;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTDistinctTermScanOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTFastRangeCountOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinGroupOrderOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTJoinOrderByTypeOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTOptimizerList;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTStaticJoinOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.DefaultOptimizerList;
@@ -305,6 +308,25 @@ public interface QueryHints {
 
     boolean DEFAULT_MERGE_JOIN = true;
 
+    /**
+     * Query hint for disabling the DISTINCT SPO behavior for a CONSTRUCT QUERY
+     * (default {@value #DEFAULT_CONSTRUCT_DISTINCT_SPO}). When disabled, the
+     * CONSTRUCT will NOT eliminate duplicate triples from the constructed
+     * graph. Note that CONSTRUCT automatically avoids duplicate detection and
+     * removal for cases where a CONSTRUCT is already "obviously" distinct. Thus
+     * this query hint is only required if you have a very large graph and want
+     * to stream the graph out without imposing the distinct SPO filter. You can
+     * also use {@link #ANALYTIC} query hint to use the native heap for the
+     * DISTINCT SPO filter. Thus this query hint is really only for very large
+     * graphs.
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1341 (performance of dumping
+     *      single graph)
+     */
+    String CONSTRUCT_DISTINCT_SPO = "constructDistinctSPO";
+    
+    boolean DEFAULT_CONSTRUCT_DISTINCT_SPO = true;
+    
     /**
      * When <code>true</code>, force the use of REMOTE access paths in scale-out
      * joins. This is intended as a tool when analyzing query patterns in
@@ -669,6 +691,16 @@ public interface QueryHints {
     */
    String OLD_JOIN_ORDER_OPTIMIZER = "OldJoinOrderOptimizer";
 
+   
+   /**
+    * Used to mark a predicate for historical read.  When history mode is 
+    * enabled, statements are not actually deleted, they are just marked as
+    * history using StatementEnum.History.  By default these historical SPOs
+    * are hidden from view during read.
+    */
+   String HISTORY = "history";
+       
+
    boolean DEFAULT_OLD_JOIN_ORDER_OPTIMIZER = Boolean.valueOf(
          System.getProperty(OLD_JOIN_ORDER_OPTIMIZER, "false"));
    
@@ -684,6 +716,6 @@ public interface QueryHints {
    String NORMALIZE_FILTER_EXPRESSIONS = "normalizeFilterExpressions";
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
-         System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "true"));
+         System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
 
 }

@@ -33,7 +33,6 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
 import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -54,11 +53,8 @@ import org.openrdf.query.GraphQuery;
 import org.openrdf.query.GraphQueryResult;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.Query;
-import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
-import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.TupleQueryResultHandler;
 import org.openrdf.query.Update;
 import org.openrdf.query.UpdateExecutionException;
 import org.openrdf.repository.Repository;
@@ -72,10 +68,7 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 
-import com.bigdata.rdf.sail.webapp.client.IPreparedBooleanQuery;
-import com.bigdata.rdf.sail.webapp.client.IPreparedGraphQuery;
 import com.bigdata.rdf.sail.webapp.client.IPreparedSparqlUpdate;
-import com.bigdata.rdf.sail.webapp.client.IPreparedTupleQuery;
 import com.bigdata.rdf.sail.webapp.client.IRemoteTx;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
@@ -179,12 +172,6 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
    /**
     * {@inheritDoc}
-    * 
-    * FIXME (***) includeInferred is currently ignored by getStatements() (in the
-    * delegate RemoteRepository class).
-    * 
-    * @see <a href="http://trac.bigdata.com/ticket/1175" > getStatements()
-    *      ignores includeInferred (REST API) </a>
     */
 	@Override
 	public RepositoryResult<Statement> getStatements(final Resource s,
@@ -276,7 +263,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	@Override
 	public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
-            final String query) throws RepositoryException,
+            final String query, final String baseURI) throws RepositoryException,
             MalformedQueryException {
 		
 		if (ql != QueryLanguage.SPARQL) {
@@ -287,93 +274,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final RemoteRepository remote = repo.getRemoteRepository();
-			
-			final IPreparedBooleanQuery q = remote.prepareBooleanQuery(query);
-			
-			/*
-			 * Only supports evaluate() right now.
-			 */
-			return new BooleanQuery() {
-	
-				@Override
-				public boolean evaluate() throws QueryEvaluationException {
-					try {
-						return q.evaluate();
-					} catch (Exception ex) {
-						throw new QueryEvaluationException(ex);
-					}
-				}
-	
-				/**
-                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
-				 */
-                @Override
-                public int getMaxQueryTime() {
-
-                    final long millis = q.getMaxQueryMillis();
-
-                    if (millis == -1) {
-                        // Note: -1L is returned if the http header is not specified.
-                        return -1;
-                        
-                    }
-                    
-                    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
-
-                }
-                
-                /**
-                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on remote query)
-                 */
-				@Override
-				public void setMaxQueryTime(final int seconds) {
-
-				    q.setMaxQueryMillis(TimeUnit.SECONDS.toMillis(seconds));
-				    
-				}
-	
-				@Override
-				public void clearBindings() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public BindingSet getBindings() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void removeBinding(String arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void setBinding(String arg0, Value arg1) {
-					throw new UnsupportedOperationException();
-				}
-	
-            @Override
-            public Dataset getDataset() {
-               throw new UnsupportedOperationException();
-            }
-   
-				@Override
-				public void setDataset(Dataset arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-            @Override
-            public boolean getIncludeInferred() {
-               throw new UnsupportedOperationException();
-            }
-   
-				@Override
-				public void setIncludeInferred(boolean arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-			};
+			return new BigdataRemoteBooleanQuery(repo.getRemoteRepository(), query, baseURI);
 		
 		} catch (Exception ex) {
 			
@@ -385,19 +286,16 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	@Override
     public BooleanQuery prepareBooleanQuery(final QueryLanguage ql,
-            final String query, final String baseURI)
+            final String query)
             throws RepositoryException, MalformedQueryException {
 
-        if (baseURI != null)
-            throw new UnsupportedOperationException("baseURI not supported");
-		
-        return prepareBooleanQuery(ql, query);
+        return prepareBooleanQuery(ql, query, null);
         
 	}
 
 	@Override
     public GraphQuery prepareGraphQuery(final QueryLanguage ql,
-            final String query) throws RepositoryException,
+            final String query, final String baseURI) throws RepositoryException,
             MalformedQueryException {
 
 		if (ql != QueryLanguage.SPARQL) {
@@ -408,101 +306,7 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 		
 		try {
 			
-			final RemoteRepository remote = repo.getRemoteRepository();
-			
-			final IPreparedGraphQuery q = remote.prepareGraphQuery(query);
-			
-			/*
-			 * Only supports evaluate() right now.
-			 */
-			return new GraphQuery() {
-	
-				@Override
-				public GraphQueryResult evaluate() throws QueryEvaluationException {
-					try {
-						return q.evaluate();
-					} catch (Exception ex) {
-						throw new QueryEvaluationException(ex);
-					}
-				}
-	
-                /**
-                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
-                 *      remote query)
-                 */
-                @Override
-                public int getMaxQueryTime() {
-
-                    final long millis = q.getMaxQueryMillis();
-
-                    if (millis == -1) {
-                        // Note: -1L is returned if the http header is not specified.
-                        return -1;
-                        
-                    }
-
-                    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
-
-                }
-
-                /**
-                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
-                 *      remote query)
-                 */
-                @Override
-                public void setMaxQueryTime(final int seconds) {
-
-                    q.setMaxQueryMillis(TimeUnit.SECONDS.toMillis(seconds));
-
-                }
-	
-				@Override
-				public void clearBindings() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public BindingSet getBindings() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void removeBinding(String arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void setBinding(String arg0, Value arg1) {
-					throw new UnsupportedOperationException();
-				}
-	
-            @Override
-            public Dataset getDataset() {
-               throw new UnsupportedOperationException();
-            }
-   
-				@Override
-				public void setDataset(Dataset arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-            @Override
-            public boolean getIncludeInferred() {
-               throw new UnsupportedOperationException();
-            }
-   
-				@Override
-				public void setIncludeInferred(boolean arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void evaluate(RDFHandler arg0)
-						throws QueryEvaluationException, RDFHandlerException {
-					throw new UnsupportedOperationException();
-				}
-				
-			};
+			return new BigdataRemoteGraphQuery(repo.getRemoteRepository(), query, baseURI);
 		
 		} catch (Exception ex) {
 			
@@ -514,13 +318,10 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 
 	@Override
     public GraphQuery prepareGraphQuery(final QueryLanguage ql,
-            final String query, final String baseURI)
+            final String query)
             throws RepositoryException, MalformedQueryException {
 
-        if (baseURI != null)
-            throw new UnsupportedOperationException("baseURI not supported.");
-
-        return prepareGraphQuery(ql, query);    
+        return prepareGraphQuery(ql, query, null);    
 		
 	}
 
@@ -537,17 +338,14 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
             final String baseURI) throws RepositoryException,
             MalformedQueryException {
 
-        if (baseURI != null)
-            throw new UnsupportedOperationException("baseURI not supported");
-
         return prepareQuery(ql, query);
 
     }
 
-    @Override
+	@Override
     public TupleQuery prepareTupleQuery(final QueryLanguage ql,
-            final String query) throws RepositoryException,
-            MalformedQueryException {
+            final String query, final String baseURI)
+            throws RepositoryException, MalformedQueryException {
 
 		if (ql != QueryLanguage.SPARQL) {
 			
@@ -559,117 +357,22 @@ public class BigdataSailRemoteRepositoryConnection implements RepositoryConnecti
 			
 			final RemoteRepository remote = repo.getRemoteRepository();
 			
-			final IPreparedTupleQuery q = remote.prepareTupleQuery(query);
-			
-			/*
-			 * Only supports evaluate() right now.
-			 */
-			return new TupleQuery() {
-	
-				@Override
-				public TupleQueryResult evaluate() throws QueryEvaluationException {
-					try {
-						return q.evaluate();
-					} catch (Exception ex) {
-						throw new QueryEvaluationException(ex);
-					}
-				}
-
-                /**
-                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
-                 *      remote query)
-                 */
-                @Override
-				public int getMaxQueryTime() {
-
-                    final long millis = q.getMaxQueryMillis();
-
-                    if (millis == -1) {
-                        // Note: -1L is returned if the http header is not specified.
-                        return -1;
-                        
-                    }
-                    
-                    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
-
-				}
-
-                /**
-                 * @see http://trac.blazegraph.com/ticket/914 (Set timeout on
-                 *      remote query)
-                 */
-                @Override
-                public void setMaxQueryTime(final int seconds) {
-
-                    q.setMaxQueryMillis(TimeUnit.SECONDS.toMillis(seconds));
-
-                }
-	
-				@Override
-				public void clearBindings() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public BindingSet getBindings() {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void removeBinding(String arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void setBinding(String arg0, Value arg1) {
-					throw new UnsupportedOperationException();
-				}
-	
-            @Override
-            public Dataset getDataset() {
-               throw new UnsupportedOperationException();
-            }
-   
-				@Override
-				public void setDataset(Dataset arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-            @Override
-            public boolean getIncludeInferred() {
-               throw new UnsupportedOperationException();
-            }
-   
-				@Override
-				public void setIncludeInferred(boolean arg0) {
-					throw new UnsupportedOperationException();
-				}
-	
-				@Override
-				public void evaluate(TupleQueryResultHandler arg0)
-						throws QueryEvaluationException {
-					throw new UnsupportedOperationException();
-				}
-				
-			};
+			return new BigdataRemoteTupleQuery(remote, query, baseURI);
 		
 		} catch (Exception ex) {
 			
 			throw new RepositoryException(ex);
 			
 		}
-		
 	}
 
-	@Override
+    @Override
     public TupleQuery prepareTupleQuery(final QueryLanguage ql,
-            final String query, final String baseURI)
-            throws RepositoryException, MalformedQueryException {
-
-        if (baseURI != null)
-            throw new UnsupportedOperationException("baseURI not supported.");
-
-        return prepareTupleQuery(ql, query);	
+            final String query) throws RepositoryException,
+            MalformedQueryException {
+    	
+        return prepareTupleQuery(ql, query, null);	
+		
 	}
 
 	@Override

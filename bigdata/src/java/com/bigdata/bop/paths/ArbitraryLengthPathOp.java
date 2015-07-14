@@ -119,8 +119,25 @@ public class ArbitraryLengthPathOp extends PipelineOp {
          */
         String LOAD_FACTOR = HashMapAnnotations.class.getName() + ".loadFactor";
 
-        float DEFAULT_LOAD_FACTOR = .75f;      
+        float DEFAULT_LOAD_FACTOR = .75f;
+        
+        /**
+         * The middle term - can be a variable or a constant.  Only used
+         * when edge var is present.
+         */
+        String MIDDLE_TERM = Annotations.class.getName() + ".middleTerm";
 
+        /**
+         * The edge variable. This is an extension that allows the caller
+         * to understand how a node was visited (what was the edge that
+         * led to it).  If set, this will allow in duplicate solutions in
+         * violation of the SPARQL spec (if a node can be reached by more than
+         * one path there will be one solution emitted per path).  Used
+         * in conjunction with the middle term.  If the middle term is a var,
+         * the edge var must not be the same var, since the middle var is
+         * used to calculate transitive closure.
+         */
+        String EDGE_VAR = Annotations.class.getName() + ".edgeVar";
         
     }
 

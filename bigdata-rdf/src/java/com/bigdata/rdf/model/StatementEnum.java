@@ -40,15 +40,23 @@ public enum StatementEnum {
      * application.
      */
     Explicit((byte) 0),
+    
     /**
      * Something that is directly entailed by the appropriate model theory.
      */
     Axiom((byte) 1),
+    
     /**
      * A statement that was inferred from the explicit statements by the
      * appropriate model theory.
      */
-    Inferred((byte) 2);
+    Inferred((byte) 2),
+    
+    /**
+     * An explicit statement that was deleted but is being maintained in the
+     * statement indices for history.
+     */
+    History((byte) 3);
     
     private final byte code;
     
@@ -70,6 +78,7 @@ public enum StatementEnum {
      * <li>Explicit</li>
      * <li>Axiom</li>
      * <li>Inferred</li>
+     * <li>Deleted</li>
      * </ul>
      * @param a
      * @param b
@@ -108,6 +117,8 @@ public enum StatementEnum {
         case 1: return Axiom;
         
         case 2: return Inferred;
+        
+        case 3: return History;
         
         default:
             throw new RuntimeException("Unexpected byte: " + b);
@@ -157,7 +168,7 @@ public enum StatementEnum {
     public static final int MASK_OVERRIDE = 0x1 << 3;
 
     /**
-     * A user bit mask used by applications to flag statements
+     * A user bit mask used by applications to flag statements.
      */
     public static final int MASK_USER_FLAG = 0x1 << 2;
   

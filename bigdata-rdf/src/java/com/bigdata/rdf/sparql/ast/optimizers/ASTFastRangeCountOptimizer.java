@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
@@ -50,6 +51,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -61,6 +63,7 @@ import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpBase;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.spo.SPOPredicate;
 
 /**
  * Optimizes SELECT COUNT(*) { triple-pattern } using the fast range count
@@ -336,6 +339,20 @@ public class ASTFastRangeCountOptimizer implements IASTOptimizer {
 				// Can not rewrite.
 				return;
 			}
+		}
+		
+		/**
+		 * When in history mode, we can't do fast range count with two key-
+		 * probes, unless the StatementPatternNode has been marked to read
+		 * history.  Without that a scan+filter is necessary.
+		 */
+		if (context.getAbstractTripleStore().isRDRHistory()) {
+		    
+		    if (!sp.getQueryHintAsBoolean(QueryHints.HISTORY, false)) {
+                // Can not rewrite.
+                return;
+		    }
+		    
 		}
 
 		/**

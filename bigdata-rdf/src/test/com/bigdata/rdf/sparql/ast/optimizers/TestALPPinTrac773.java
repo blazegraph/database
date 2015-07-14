@@ -79,10 +79,18 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
     			alpp1 = alpp1(zero_or_one_to_one_or_more);
     			alpp2 = alpp2(zero_or_one_to_one_or_more);
     		}
-    		final GroupMemberNodeBase<?> gmn[] = alpp1.lowerBound() == 0 
-    				? new GroupMemberNodeBase[]{alpp1, spn1, alpp2, spn2}
-    		        : new GroupMemberNodeBase[]{alpp1, alpp2, spn2, spn1};
     		
+    		/**
+    		 * Adjusted order due to changes made in history branch. The 
+    		 * computation of ArbitraryLengthPathNode.getEstimatedCardinality()
+    		 * has changed, causing triple patterns to have precedence over
+    		 * unbounded path expressions. See
+    		 * https://jira.blazegraph.com/browse/BLZG-858 / trac #733.
+    		 */
+         final GroupMemberNodeBase<?> gmn[] = (sym.equals("?")) ?
+            new GroupMemberNodeBase[]{alpp1, spn1, alpp2, spn2} :
+            new GroupMemberNodeBase[]{spn2, alpp2, spn1, alpp1 };
+         
 			expected = select( varNode(z),  where ( gmn ) );
     		varCount = 0;
     		
@@ -121,10 +129,17 @@ public class TestALPPinTrac773 extends AbstractOptimizerTestCase {
 									statementPatternNode(leftVar(), constantNode(d),  rightVar(), 3135)
 									) );
 
-    		final GroupMemberNodeBase<?> gmn[] = alpp1.lowerBound() == 0 
-    				? new GroupMemberNodeBase[]{alpp1, spn1, alpp2, spn2}
-    		        : new GroupMemberNodeBase[]{alpp1, alpp2, spn2, spn1};
-    				
+         /**
+          * Adjusted order due to changes made in history branch. The 
+          * computation of ArbitraryLengthPathNode.getEstimatedCardinality()
+          * has changed, causing triple patterns to have precedence over
+          * unbounded path expressions. See
+          * https://jira.blazegraph.com/browse/BLZG-858 / trac #733.
+          */
+         final GroupMemberNodeBase<?> gmn[] = (sym.equals("?")) ?
+               new GroupMemberNodeBase[]{alpp1, spn1, alpp2, spn2} :
+               new GroupMemberNodeBase[]{spn2, alpp2, spn1, alpp1 };
+			
 			expected = select( varNode(z), where ( gmn ) );
     		varCount = 0;
     		

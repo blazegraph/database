@@ -113,6 +113,13 @@ public class InMemChangeLog implements IChangeLog {
     }
     
     /**
+     * See {@link IChangeLog#close()}.
+     */
+    @Override
+    public void close() {
+    }
+
+    /**
      * Return the change set as of the last commmit point.
      * 
      * @return

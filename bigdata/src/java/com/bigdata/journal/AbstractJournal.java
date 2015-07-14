@@ -1089,7 +1089,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                     _bufferStrategy = new MemStrategy(new MemoryManager(
                             DirectBufferPool.INSTANCE,
-                            Integer.MAX_VALUE/* maxSectors */, true/* blocks */, properties));
+                            Integer.MAX_VALUE/* maxSectors */, true/*blocking*/, properties));
 
                     break;
 

@@ -30,6 +30,7 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -46,9 +47,14 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.LinkedHashModel;
+import org.openrdf.repository.RepositoryResult;
+import org.openrdf.rio.RDFFormat;
+import org.openrdf.rio.RDFWriter;
+import org.openrdf.rio.RDFWriterRegistry;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
@@ -109,6 +115,14 @@ public class QueryServlet extends BigdataRDFServlet {
     static final transient String ATTR_QUERY = "query";
 
     /**
+     * The name of the parameter/attribute that contains boolean flag to include
+     * inferred statements while evaluating queries or returning statements.
+     * 
+     * @see BLZG-1207 (getStatements() ingores includeInferred)
+     */
+    static final transient String INCLUDE_INFERRED = "includeInferred";
+
+    /**
      * The name of the URL query parameter that contains the SPARQL UPDATE
      * request.
      */
@@ -126,6 +140,12 @@ public class QueryServlet extends BigdataRDFServlet {
     * pattern).
     */
    static final transient String ATTR_HASSTMT = "HASSTMT";
+   
+   /**
+    * The name of the URL query parameter that indicates an GETSTMTS request
+    * (retrieve statements from a store)
+    */
+   static final transient String ATTR_GETSTMTS = "GETSTMTS";
 
     /**
      * The name of the URL query parameter that indicates an request
@@ -221,6 +241,11 @@ public class QueryServlet extends BigdataRDFServlet {
         
            // HASSTMT with caching defeated.
            doHasStmt(req, resp);
+           
+        } else if (req.getParameter(ATTR_GETSTMTS) != null) {
+            
+            // HASSTMT with caching defeated.
+            doGetStmts(req, resp);
 
         } else if (req.getParameter(ATTR_CONTEXTS) != null) {
 
@@ -258,6 +283,10 @@ public class QueryServlet extends BigdataRDFServlet {
         } else if (req.getParameter(ATTR_HASSTMT) != null) {
            
            doHasStmt(req, resp);
+           
+        } else if (req.getParameter(ATTR_GETSTMTS) != null) {
+            
+            doGetStmts(req, resp);
            
         } else if (req.getParameter(ATTR_CONTEXTS) != null) {
             
@@ -380,6 +409,13 @@ public class QueryServlet extends BigdataRDFServlet {
         // The SPARQL update
         final String updateStr = getUpdateString(req);
 
+        final Map<String, Value> bindings = parseBindings(req, resp);
+        if (bindings == null) {
+            // There was an error in the bindings. The response was already
+            // committed.
+        	return;
+        }
+
         if (updateStr == null) {
 
             buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
@@ -405,7 +441,7 @@ public class QueryServlet extends BigdataRDFServlet {
           * visibility guarantees.
           */
          submitApiTask(
-               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr,
+               new SparqlUpdateTask(req, resp, namespace, timestamp, updateStr, bindings,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -416,10 +452,11 @@ public class QueryServlet extends BigdataRDFServlet {
 
     }
 
-	static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
-		
-		private final String updateStr;
-    	private final BigdataRDFContext context;
+    static class SparqlUpdateTask extends AbstractRestApiTask<Void> {
+
+        private final String updateStr;
+        private final BigdataRDFContext context;
+        private final Map<String, Value> bindings;
 
         /**
          * 
@@ -434,11 +471,13 @@ public class QueryServlet extends BigdataRDFServlet {
                 final String namespace, //
                 final long timestamp,//
                 final String updateStr,//
+                final Map<String, Value> bindings,//
                 final BigdataRDFContext context//
                 ) {
             super(req, resp, namespace, timestamp);
             this.updateStr = updateStr;
             this.context = context;
+            this.bindings = bindings;
         }
         
         @Override
@@ -486,7 +525,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final UpdateTask updateTask = context.getUpdateTask(conn,
-							namespace, timestamp, baseURI, astContainer, req,
+							namespace, timestamp, baseURI, bindings, astContainer, req,
 							resp, resp.getOutputStream());
 
 					final FutureTask<Void> ft = new FutureTask<Void>(updateTask);
@@ -571,6 +610,18 @@ public class QueryServlet extends BigdataRDFServlet {
 
       }
 
+      final Map<String, Value> bindings = parseBindings(req, resp);
+      if (bindings == null) {
+          // There was a problem with the bindings. An error response was
+          // already committed.
+          return;
+      }
+      
+      // Note: The historical behavior was to always include inferences.
+      // @see BLZG-1207 
+      final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
+              true/* default */);
+
       try {
 
          final String namespace = getNamespace(req);
@@ -578,7 +629,7 @@ public class QueryServlet extends BigdataRDFServlet {
          final long timestamp = getTimestamp(req);
 
          submitApiTask(
-               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr,
+               new SparqlQueryTask(req, resp, namespace, timestamp, queryStr, includeInferred, bindings,
                      getBigdataRDFContext())).get();
 
       } catch (Throwable t) {
@@ -589,7 +640,7 @@ public class QueryServlet extends BigdataRDFServlet {
 
    }
 
-    /**
+	/**
      * Helper task for the SPARQL QUERY.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -598,10 +649,13 @@ public class QueryServlet extends BigdataRDFServlet {
 
 		private final String queryStr;
 		private final BigdataRDFContext context;
+		private final boolean includeInferred;
+		private final Map<String, Value> bindings;
 
       public SparqlQueryTask(final HttpServletRequest req,
             final HttpServletResponse resp, final String namespace,
             final long timestamp, final String queryStr,
+            final boolean includeInferred, Map<String, Value> bindings,
             final BigdataRDFContext context) {
 
          super(req, resp, namespace, timestamp);
@@ -613,6 +667,8 @@ public class QueryServlet extends BigdataRDFServlet {
 
          this.queryStr = queryStr;
          this.context = context;
+         this.includeInferred = includeInferred;
+         this.bindings = bindings;
          
       }
         
@@ -650,7 +706,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					 */
 
 					final AbstractQueryTask queryTask = context.getQueryTask(
-							conn, namespace, timestamp, queryStr,
+							conn, namespace, timestamp, queryStr, includeInferred, bindings,
 							null/* acceptOverride */, req, resp, os);
 
 					// /*
@@ -925,19 +981,8 @@ public class QueryServlet extends BigdataRDFServlet {
 		{
 
 			XMLBuilder.Node current = doc.root("html");
-			{
-				current = current.node("head");
-                current.node("meta")
-                        .attr("http-equiv", "Content-Type")
-                        .attr("content",
-                                "text/html;charset=" + queryTask.charset.name())
-                        .close();
-				current.node("title").textNoEncode("bigdata&#174;").close();
-				current = current.close();// close the head.
-			}
 
-			// open the body
-			current = current.node("body");
+            BigdataRDFContext.addHtmlHeader(current, charset);
 
 			current.node("h1", "Query");
 
@@ -1048,8 +1093,8 @@ public class QueryServlet extends BigdataRDFServlet {
                      current = current.node("tr");
                      current.node("th").text("object").close();
                      current.node("th").text("category").close(); 
-                     current.node("th").text("elapsed [10^-3s]").close();
-                     current.node("th").text("elapsed [10^-6s]").close();
+                     current.node("th").text("elapsed [ms]").close();
+                     current.node("th").text("elapsed [us]").close();
                      current.node("th").text("numCalls").close();
                      current = current.close(); // tr
                         
@@ -1099,7 +1144,7 @@ public class QueryServlet extends BigdataRDFServlet {
                         current = current.close(); // tr
                      }
                         
-                     current.close(); // table
+                     current = current.close(); // table
                         
                   }
                } 
@@ -1377,7 +1422,7 @@ public class QueryServlet extends BigdataRDFServlet {
          return;
       }
 
-      final boolean includeInferred = getBooleanValue(req, "includeInferred",
+      final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
             true/* default */);
       final Resource s;
       final URI p;
@@ -1485,6 +1530,163 @@ public class QueryServlet extends BigdataRDFServlet {
       }
 
    } // HASSTMT task.
+   
+   /**
+    * Return statements.
+    * 
+    */
+   private void doGetStmts(final HttpServletRequest req,
+         final HttpServletResponse resp) throws IOException {
+
+      if (!isReadable(getServletContext(), req, resp)) {
+         // HA Quorum in use, but quorum is not met.
+         return;
+      }
+
+      // Note: The historical behavior was to always include inferrences.
+      // @see BLZG-1207
+      final boolean includeInferred = getBooleanValue(req, INCLUDE_INFERRED,
+            true/* default */);
+      final Resource s;
+      final URI p;
+      final Value o;
+      final Resource[] c;
+      final Enumeration<String> mimeTypes;
+      try {
+         s = EncodeDecodeValue.decodeResource(req.getParameter("s"));
+         p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
+         o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
+         c = decodeContexts(req, "c");
+         mimeTypes = req.getHeaders("Content-Type");
+//         c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
+      } catch (IllegalArgumentException ex) {
+         buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+               ex.getLocalizedMessage());
+         return;
+      }
+
+      if (log.isInfoEnabled())
+         log.info("GETSTMTS: access path: (includeInferred=" + includeInferred
+               + ", s=" + s + ", p=" + p + ", o=" + o + ", c="
+               + Arrays.toString(c) + ")");
+
+      try {
+
+         submitApiTask(
+               new GetStmtsTask(req, resp, getNamespace(req), getTimestamp(req), //
+                     includeInferred,//
+                     s, p, o, c, mimeTypes)).get();
+
+      } catch (Throwable t) {
+
+         launderThrowable(t, resp, "GETSTMTS: access path: (includeInferred="
+               + includeInferred + ", s=" + s + ", p=" + p + ", o=" + o
+               + ", c=" + Arrays.toString(c) + ")");
+
+      }
+
+   }
+  
+   /**
+    * Helper task for the GETSTMTS query.
+    * 
+    */
+   private static class GetStmtsTask extends AbstractRestApiTask<Void> {
+
+	  private final Enumeration<String> mimeTypes;
+	  private final boolean includeInferred;
+      private final Resource s;
+      private final URI p;
+      private final Value o;
+      private final Resource[] c;
+
+      public GetStmtsTask(final HttpServletRequest req,
+            final HttpServletResponse resp, final String namespace,
+            final long timestamp, final boolean includeInferred,
+            final Resource s, final URI p, final Value o, final Resource[] c, Enumeration<String> mimeTypes) {
+
+         super(req, resp, namespace, timestamp);
+
+         this.includeInferred = includeInferred;
+         this.s = s;
+         this.p = p;
+         this.o = o;
+         this.c = c;
+         this.mimeTypes = mimeTypes;
+
+      }
+
+      @Override
+      public boolean isReadOnly() {
+         return true;
+      }
+
+      @Override
+      public Void call() throws Exception {
+
+        BigdataSailRepositoryConnection conn = null;
+        
+        try {
+
+            conn = getQueryConnection();
+
+            String mimeType = null;
+            RDFFormat format = null;
+            if (mimeTypes!=null) {
+                mimeTypesLoop:
+            	while(mimeTypes.hasMoreElements()) {
+                	for (String mt:mimeTypes.nextElement().split(",")) {
+                		mt = mt.trim();
+	                    RDFFormat fmt = RDFWriterRegistry.getInstance()
+	                        .getFileFormatForMIMEType(mt);
+	                    if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
+	                        mimeType = mt;
+	                        format = fmt;
+	                        break mimeTypesLoop;	                    }
+                	}
+                }
+            }
+            if (format==null) {
+                if(conn.getTripleStore().isQuads()){
+                    mimeType = RDFFormat.NQUADS.getDefaultMIMEType();
+                } else {
+                    mimeType = RDFFormat.NTRIPLES.getDefaultMIMEType();
+                }
+                format = RDFWriterRegistry.getInstance()
+                    .getFileFormatForMIMEType(mimeType);
+            }
+            resp.setContentType(mimeType);
+
+            final OutputStream os = resp.getOutputStream();
+
+            final RDFWriter w = RDFWriterRegistry.getInstance().get(format)
+                .getWriter(os);
+
+            RepositoryResult<Statement> stmts = null;
+
+            try {
+                w.startRDF();
+                stmts = conn.getStatements(s, p, o, includeInferred, c);
+                while(stmts.hasNext()){
+                    w.handleStatement(stmts.next());
+                }
+                w.endRDF();
+            } finally {
+                if (stmts != null) {
+                    stmts.close();
+                }
+                os.flush();
+                os.close();
+            }
+
+            return null;
+        } finally {
+            if (conn != null) {
+                conn.close();
+            }
+        }
+      }
+   } // GETSTMTS task.
 
      /**
 	 * Report on the contexts in use in the quads database.
@@ -1627,20 +1829,8 @@ public class QueryServlet extends BigdataRDFServlet {
                     final HTMLBuilder doc = new HTMLBuilder(charset, w);
                     
                     XMLBuilder.Node current = doc.root("html");
-                    {
-                        current = current.node("head");
-                        current.node("meta")
-                                .attr("http-equiv", "Content-Type")
-                                .attr("content",
-                                        "text/html;charset=utf-8")
-                                .close();
-                        current.node("title")
-                                .textNoEncode("bigdata&#174;").close();
-                        current = current.close();// close the head.
-                    }
-
-                    // open the body
-                    current = current.node("body");
+                    
+                    BigdataRDFContext.addHtmlHeader(current, charset);
 
                     final IBigdataFederation<?> fed = (IBigdataFederation<?>)// getBigdataRDFContext()
                             getIndexManager();
