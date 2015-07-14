@@ -75,6 +75,7 @@ dependencies.
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
       <bigdata.version>1.5.2-SNAPSHOT-BLZG-1370</bigdata.version>
+      <bigdata.legacy.version>1.5.2-SNAPSHOT</bigdata.legacy.version>
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
@@ -183,11 +184,16 @@ dependencies.
   </repositories>
 
   <modules>
+<<<<<<< HEAD
     <module>../junit-ext</module>
     <module>../ctc-striterators</module>
     <module>../lgpl-utils</module>
     <module>../dsi-utils</module>
     <module>../rdf-properties</module>
+=======
+    <module>../rdf-properties</module>
+    <module>../bigdata-blueprints</module>
+>>>>>>> 455eec7688bf8d9c1ad6199155a71ff56f830970
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>

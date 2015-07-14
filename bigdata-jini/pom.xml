@@ -232,12 +232,12 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
     </dependency>
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
