@@ -57,6 +57,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.IDataService;
+import com.bigdata.util.BytesUtil;
 
 /**
  * An object used to stream key scan results back to the client.

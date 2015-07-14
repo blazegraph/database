@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.cache;
 
 import com.bigdata.LRUNexus.AccessPolicyEnum;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Some unit tests for the {@link BCHMGlobalLRU2} using true thread local

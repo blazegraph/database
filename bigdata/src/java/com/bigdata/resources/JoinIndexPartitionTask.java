@@ -31,7 +31,6 @@ package com.bigdata.resources;
 import java.util.Arrays;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.AbstractTask;
@@ -45,6 +44,7 @@ import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.DataService;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Task joins one or more index partitions and should be invoked when their is

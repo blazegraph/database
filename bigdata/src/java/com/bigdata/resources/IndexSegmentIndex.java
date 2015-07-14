@@ -34,8 +34,8 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * {@link BTree} mapping {@link IndexSegmentStore} <em>createTime</em>s to

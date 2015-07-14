@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -51,6 +50,7 @@ import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.lexicon.Term2IdWriteProc.Result;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
+import com.bigdata.util.BytesUtil;
 
 /**
  * This unisolated operation inserts terms into the <em>term:id</em> index,

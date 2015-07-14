@@ -31,9 +31,7 @@ import java.io.ObjectOutput;
 import java.util.Arrays;
 import java.util.UUID;
 
-
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
 import com.bigdata.btree.IndexSegmentStore;
@@ -41,6 +39,7 @@ import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
 import com.bigdata.journal.Journal;
 import com.bigdata.service.DataService;
+import com.bigdata.util.BytesUtil;
 
 /**
  * An immutable object providing metadata about a local index partition,

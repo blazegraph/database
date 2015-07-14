@@ -39,7 +39,7 @@ import org.apache.log4j.Logger;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for conformance with synchronous IO write requests made on a

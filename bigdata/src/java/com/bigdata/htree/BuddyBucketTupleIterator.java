@@ -3,12 +3,12 @@ package com.bigdata.htree;
 import java.util.NoSuchElementException;
 
 import com.bigdata.btree.AbstractTuple;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.LeafTupleIterator;
 import com.bigdata.btree.raba.IRaba;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Iterator visits all tuples in a buddy bucket having the desired key. 

@@ -7,8 +7,8 @@ import java.io.InputStream;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.util.Bytes;
 
 /**
  * Reads from blocks visited by a range scan for a file and version.

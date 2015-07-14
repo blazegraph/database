@@ -37,9 +37,9 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService.TxState;
+import com.bigdata.util.Bytes;
 
 /**
  * {@link BTree} whose keys are the absolute value of the txIds and whose values

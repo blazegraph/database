@@ -98,7 +98,6 @@ import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.JournalMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.DataService;
@@ -109,6 +108,7 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.MetadataService;
 import com.bigdata.sparse.SparseRowStore;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 import com.bigdata.util.config.NicUtil;
 

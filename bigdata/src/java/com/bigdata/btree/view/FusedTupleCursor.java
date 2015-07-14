@@ -30,7 +30,6 @@ package com.bigdata.btree.view;
 
 import java.util.NoSuchElementException;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -38,6 +37,7 @@ import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleCursor2;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Layers on the additional methods from the {@link ITupleCursor} interface.

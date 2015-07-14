@@ -8,16 +8,16 @@ import java.io.OutputStream;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.AbstractCodedRaba;
 import com.bigdata.btree.raba.codec.ICodedRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Coder for values in statement index with inference enabled but without SIDS.

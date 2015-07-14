@@ -60,7 +60,6 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.journal.WriteExecutorService;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.IResourceManagerCounters;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.DataService;
@@ -70,6 +69,7 @@ import com.bigdata.service.EventType;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.DataService.IDataServiceCounters;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

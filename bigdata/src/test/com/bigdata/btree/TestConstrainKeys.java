@@ -32,6 +32,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.proc.AbstractKeyRangeIndexProcedure;
 import com.bigdata.mdi.ISeparatorKeys;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test imposing constraint on a fromKey or toKey based on an index partition's

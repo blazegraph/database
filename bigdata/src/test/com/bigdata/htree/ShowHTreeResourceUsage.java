@@ -13,9 +13,9 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.util.Bytes;
 
 /**
  * The purpose of this class is to show that adding a large number of entries

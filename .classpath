@@ -35,6 +35,8 @@
 	<classpathentry kind="src" path="bigdata-client/src/main/java"/>
 	<classpathentry kind="src" path="bigdata-client/src/test/java"/>
 	<classpathentry kind="src" path="rdf-properties/src/main/java"/>
+	<classpathentry kind="src" path="bigdata-util/src/main/java"/>
+	<classpathentry kind="src" path="bigdata-util/src/test/java"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.7-270114.jar"/>
 	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/servlet-api-3.1.0.jar"/>

@@ -39,8 +39,8 @@ import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.htree.HTree;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for {@link TemporaryStore} (temporary store with named indices).

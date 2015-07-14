@@ -52,7 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-   <version>1.5.2-SNAPSHOT</version>
+   <version>1.5.2-SNAPSHOT-BLZG_1269_client</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -74,7 +74,7 @@ dependencies.
       <!-- This is a copy of that information. However, there are a   -->
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
-      <bigdata.version>1.5.2-SNAPSHOT</bigdata.version>
+      <bigdata.version>1.5.2-SNAPSHOT-BLZG_1269_client</bigdata.version>
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
@@ -95,7 +95,7 @@ dependencies.
       <log4j.version>1.2.17</log4j.version>
       <colt.version>1.2.0</colt.version>
       <fastutil.version>6.5.16</fastutil.version>
-      <dsiutils.version>1.0.6-020610</dsiutils.version>
+      <dsiutils.version>1.0.10</dsiutils.version>
       <lgplutils.version>1.0.7-270114</lgplutils.version>
       <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
       <jackson.version>2.2.3</jackson.version>
@@ -188,12 +188,13 @@ dependencies.
     <module>../lgpl-utils</module>
     <module>../dsi-utils</module>
     <module>../rdf-properties</module>
+    <module>../bigdata-util</module>
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-blueprints</module>
-    <module>../bigdata-war</module>
     <module>../bigdata-jini</module>
+    <module>../bigdata-war</module>
     <module>../bigdata-jar</module>
   </modules>
 

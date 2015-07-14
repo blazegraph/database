@@ -35,7 +35,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -52,6 +51,7 @@ import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Implementation of a metadata service for a named scale-out index.

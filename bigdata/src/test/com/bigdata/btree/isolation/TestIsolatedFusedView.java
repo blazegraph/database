@@ -36,7 +36,6 @@ import java.util.UUID;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -47,6 +46,7 @@ import com.bigdata.btree.view.TestFusedView;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for {@link IsolatedFusedView}.

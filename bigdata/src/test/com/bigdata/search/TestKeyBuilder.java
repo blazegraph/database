@@ -30,13 +30,13 @@ package com.bigdata.search;
 
 import java.util.Properties;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.search.FullTextIndex.Options;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Unit tests for key formation for the {@link FullTextIndex}.

@@ -50,7 +50,6 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.raba.codec.FrontCodedRabaCoder;
 import com.bigdata.btree.raba.codec.SimpleRabaCoder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVCache;
@@ -64,6 +63,7 @@ import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.util.Bytes;
 
 /**
  * A concrete implementation using scalable {@link BTree}s to store the mapping

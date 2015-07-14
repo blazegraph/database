@@ -51,12 +51,12 @@ import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.view.FusedView;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.relation.rule.IAccessPathExpander;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.Bytes;
 
 import cutthecrap.utils.striterators.IFilter;
 

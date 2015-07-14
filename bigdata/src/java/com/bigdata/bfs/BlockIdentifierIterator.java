@@ -5,7 +5,7 @@ import java.util.Iterator;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Extracts the block identifier from the key.

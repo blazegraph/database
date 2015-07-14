@@ -47,7 +47,6 @@ import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.EmptyBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -74,6 +73,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.accesspath.EmptyCloseableIterator;
 import com.bigdata.relation.accesspath.ThickCloseableIterator;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 

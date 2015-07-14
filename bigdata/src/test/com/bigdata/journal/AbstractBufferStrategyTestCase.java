@@ -33,8 +33,8 @@ import java.util.Random;
 
 import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.rawstore.AbstractRawStoreTestCase;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * Base class for writing test cases for the different {@link IBufferStrategy}

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import com.bigdata.mdi.ISeparatorKeys;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Exception thrown when a key is before the start of the half-open range of an

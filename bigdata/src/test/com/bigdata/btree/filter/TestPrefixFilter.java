@@ -37,7 +37,6 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.AbstractTupleCursorTestCase;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -49,6 +48,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for the {@link PrefixFilter}.
