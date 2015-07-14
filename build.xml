@@ -2280,8 +2280,9 @@ ${postInstallMessage}</echo>
         <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
             <arg value="start"/>
         </exec>
-        <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-            <arg value="start"/>
+        <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+        	<arg value="/C"/>
+            <arg value="zkServer.cmd start"/>
         </exec>
     </target>
 
@@ -2292,8 +2293,9 @@ ${postInstallMessage}</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
         <arg value="stop"/>
     </exec>
-    <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-        <arg value="stop"/>
+    <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+    	<arg value="/C"/>
+    	<arg value="zkServer.cmd stop"/>
     </exec>
     </target>
 
@@ -2583,6 +2585,8 @@ ${postInstallMessage}</echo>
 
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.remote.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.webapp.client.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.webapp.TestAll" todir="${test.results.dir}" unless="testName" />
 
         <test name="com.bigdata.gom.TestAll" todir="${test.results.dir}" unless="testName" />
