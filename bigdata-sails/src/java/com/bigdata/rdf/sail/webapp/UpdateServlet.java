@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.PipedOutputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -39,6 +40,7 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Value;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
@@ -69,6 +71,13 @@ public class UpdateServlet extends BigdataRDFServlet {
 
     static private final transient Logger log = Logger
             .getLogger(UpdateServlet.class);
+
+    /*
+     * Note: includedInferred is false because inferences can
+     * not be deleted (they are retracted by truth maintenance
+     * when they can no longer be proven).
+     */
+    private static final boolean includeInferred = false;
 
     public UpdateServlet() {
 
@@ -123,8 +132,14 @@ public class UpdateServlet extends BigdataRDFServlet {
         final String queryStr = req.getParameter(QueryServlet.ATTR_QUERY);
 
         if (queryStr == null)
-            throw new UnsupportedOperationException();
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    "Required parameter not found: " + QueryServlet.ATTR_QUERY);
 
+        final Map<String, Value> bindings = parseBindings(req, resp);
+        if (bindings == null) { // invalid bindings definition generated error response 400 while parsing
+            return;
+        }
+        
         final String contentType = req.getContentType();
 
         if (log.isInfoEnabled())
@@ -208,6 +223,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 							ITx.UNISOLATED, //
 							queryStr,//
 							baseURI,//
+							bindings,//
 							rdfParserFactory,//
 							defaultContextDelete,//
 							defaultContextInsert//
@@ -221,6 +237,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 	                     ITx.UNISOLATED, //
 	                     queryStr,//
 	                     baseURI,//
+	                     bindings,//
 	                     rdfParserFactory,//
 	                     defaultContextDelete,//
 	                     defaultContextInsert//
@@ -268,6 +285,7 @@ public class UpdateServlet extends BigdataRDFServlet {
         private final RDFParserFactory parserFactory;
         private final Resource[] defaultContextDelete;
         private final Resource[] defaultContextInsert;
+        private final Map<String, Value> bindings;
 
         /**
          * 
@@ -291,6 +309,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                 final String namespace, final long timestamp,
                 final String queryStr,//
                 final String baseURI,
+                final Map<String, Value> bindings,
                 final RDFParserFactory parserFactory,
                 final Resource[] defaultContextDelete,//
                 final Resource[] defaultContextInsert//
@@ -298,6 +317,7 @@ public class UpdateServlet extends BigdataRDFServlet {
             super(req, resp, namespace, timestamp);
             this.queryStr = queryStr;
             this.baseURI = baseURI;
+            this.bindings = bindings;
             this.parserFactory = parserFactory;
             this.defaultContextDelete = defaultContextDelete;
             this.defaultContextInsert = defaultContextInsert;
@@ -349,7 +369,7 @@ public class UpdateServlet extends BigdataRDFServlet {
 
 						final AbstractQueryTask queryTask = context
 								.getQueryTask(roconn, namespace,
-										readOnlyTimestamp, queryStr,
+										readOnlyTimestamp, queryStr, includeInferred, bindings,
 										deleteQueryFormat.getDefaultMIMEType(),
 										req, resp, os);
 
@@ -491,6 +511,7 @@ public class UpdateServlet extends BigdataRDFServlet {
       private final RDFParserFactory parserFactory;
       private final Resource[] defaultContextDelete;
       private final Resource[] defaultContextInsert;
+      private final Map<String, Value> bindings;
 
       /**
        * 
@@ -500,6 +521,7 @@ public class UpdateServlet extends BigdataRDFServlet {
        *           The timestamp used to obtain a mutable connection.
        * @param baseURI
        *           The base URI for the operation.
+     * @param bindings 
        * @param defaultContextDelete
        *           When removing statements, the context(s) for triples without
        *           an explicit named graph when the KB instance is operating in
@@ -513,13 +535,16 @@ public class UpdateServlet extends BigdataRDFServlet {
             final HttpServletResponse resp, final String namespace,
             final long timestamp,
             final String queryStr,//
-            final String baseURI, final RDFParserFactory parserFactory,
+            final String baseURI,
+            final Map<String, Value> bindings,
+            final RDFParserFactory parserFactory,
             final Resource[] defaultContextDelete,//
             final Resource[] defaultContextInsert//
       ) {
          super(req, resp, namespace, timestamp);
          this.queryStr = queryStr;
          this.baseURI = baseURI;
+         this.bindings = bindings;
          this.parserFactory = parserFactory;
          this.defaultContextDelete = defaultContextDelete;
          this.defaultContextInsert = defaultContextInsert;
@@ -561,7 +586,7 @@ public class UpdateServlet extends BigdataRDFServlet {
                final RDFFormat deleteQueryFormat = RDFFormat.NTRIPLES;
 
                final AbstractQueryTask queryTask = context.getQueryTask(conn,
-                     namespace, ITx.UNISOLATED, queryStr,
+                     namespace, ITx.UNISOLATED, queryStr, includeInferred, bindings,
                      deleteQueryFormat.getDefaultMIMEType(), req, resp, os);
 
                switch (queryTask.queryType) {
