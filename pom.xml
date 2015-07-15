@@ -49,7 +49,7 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT-BLZG_1269_merge</version>
+    <version>1.5.2-SNAPSHOT-BLZG-1272</version>
     <relativePath>blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.bigdata</groupId>
@@ -701,7 +701,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <version>${bigdata.version}</version>
      </dependency>
 <!-- TODO: Factor out dependency on bigdata-gas BLZG-1272
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
@@ -714,6 +713,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <type>test-jar</type>
        <scope>test</scope>
      </dependency>
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
@@ -757,6 +757,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-gas</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
     <dependency>
