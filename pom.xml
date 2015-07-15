@@ -203,18 +203,6 @@ dependencies.
                 <include>**/*.trig</include>
             </includes>
         </resource>
-        <resource>
-            <directory>bigdata-war/src</directory>
-            <includes>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
        </resources>
         <plugins>
           <plugin>
@@ -285,148 +273,10 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.18.1</version>
-        <configuration>
-          <includes>
-     	    <include>com/bigdata/cache/TestAll.java</include>
-            <include>com/bigdata/io/TestAll.java</include>
-            <include>com/bigdata/net/TestAll.java</include>
-            <include>com/bigdata/config/TestAll.java</include>
-            <include>com/bigdata/util/TestAll.java</include>
-            <include>com/bigdata/util/concurrent/TestAll.java</include>
-            <include>com/bigdata/striterator/TestAll.java</include>
-            <include>com/bigdata/counters/TestAll.java</include>
-            <include>com/bigdata/rawstore/TestAll.java</include>
-            <include>com/bigdata/btree/TestAll.java</include>
-            <include>com/bigdata/htree/TestAll.java</include>
-            <include>com/bigdata/concurrent/TestAll.java</include>
-            <include>com/bigdata/quorum/TestAll.java</include>
-            <include>com/bigdata/ha/TestAll.java</include>
-            <include>com/bigdata/io/writecache/TestAll.java</include>
-            <include>com/bigdata/journal/TestAll.java</include>
-            <include>com/bigdata/rwstore/TestAll.java</include>
-            <include>com/bigdata/resources/TestAll.java</include>
-            <include>com/bigdata/relation/TestAll.java</include>
-            <include>com/bigdata/bop/TestAll.java</include>
-            <include>com/bigdata/relation/rule/eval/TestAll.java</include>
-            <include>com/bigdata/mdi/TestAll.java</include>
-    <!-- enabled until moved into maven scale-out project/ hopefully will not run out of CI resources now that jini is in its own project/ -->
-            <include>com/bigdata/service/TestAll.java</include>
-            <include>com/bigdata/bop/fed/TestAll.java</include>
-            <include>com/bigdata/sparse/TestAll.java</include>
-            <include>com/bigdata/search/TestAll.java</include>
-            <!-- not suppported yet/
-            <include>com/bigdata/bfs/TestAll.java</include>
-            -->
-            <include>com/bigdata/rdf/TestAll.java</include>
-            <include>com/bigdata/rdf/sail/TestAll.java</include>
-            <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
-            <include>com/bigdata/gom/TestAll.java</include>
-            <include>com/bigdata/util/httpd/TestAll.java</include>
-           </includes>
-           <excludes>
-    	    <exclude>com/bigdata/TestAll.java</exclude>
-	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
-	  </excludes>
-          <printSummary>false</printSummary>
-          <disableXmlReport>false</disableXmlReport>
-          <forkCount>2</forkCount>
-          <reuseForks>true</reuseForks>
-	  <printSummary>false</printSummary>
-          <disableXmlReport>false</disableXmlReport>
-          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
         <version>1.9.1</version>
         <executions>
-          <execution>
-            <id>add-test-resource</id>
-            <phase>generate-test-sources</phase>
-            <goals>
-              <goal>add-test-resource</goal>
-            </goals>
-            <configuration>
-              <resources>
- 		<resource>
-                 <directory>bigdata/src/test</directory>
-                  <includes>
-                   <include>**/*.n3</include>
-                   <include>**/*.owl</include>
-                   <include>**/*.properties</include>
-                   <include>**/*.xml</include>
-                   <include>**/*.txt</include>
-                   <include>**/*.ttl</include>
-                   <include>**/*.rq</include>
-                   <include>**/*.srx</include>
-                   <include>**/*.trig</include>
-               </includes>
-               </resource>
-               <resource>
-                   <directory>bigdata-rdf/src/test</directory>
-                   <includes>
-                       <include>**/*.n3</include>
-                       <include>**/*.nt</include>
-                       <include>**/*.owl</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.rdf</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-               <resource>
-                   <directory>bigdata-sails/src/test</directory>
-                   <includes>
-                       <include>**/*.n3</include>
-                       <include>**/*.nt</include>
-                       <include>**/*.owl</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-               <resource>
-                   <directory>bigdata-gom/src/test</directory>
-                   <includes>
-                       <include>**/*.n3</include>
-                       <include>**/*.owl</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-               <resource>
-                   <directory>bigdata-war/src</directory>
-                   <includes>
-                       <include>**/*.n3</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-              </resources>
-            </configuration>
-          </execution> 
           <execution>
             <id>add-source</id>
             <phase>generate-sources</phase>
@@ -442,51 +292,8 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
               </sources>
             </configuration>
           </execution>
-          <execution>
-            <id>add-test-source</id>
-            <phase>generate-test-sources</phase>
-            <goals>
-              <goal>add-test-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-            	<source>bigdata/src/test</source>
-                <source>bigdata-rdf/src/test</source>
-                <source>bigdata-sails/src/test</source>
-                <source>bigdata-gom/src/test</source>
-              </sources>
-            </configuration>
-          </execution>
         </executions>
       </plugin>
-       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <version>2.10</version>
-        <executions>
-          <execution>
-            <id>copy</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>com.blazegraph</groupId>
-                  <artifactId>bigdata-war</artifactId>
-                  <version>${bigdata.version}</version>
-                  <type>war</type>
-                  <overWrite>true</overWrite>
-                  <outputDirectory>target</outputDirectory>
-                  <destFileName>bigdata.war</destFileName>
-                </artifactItem>
-              </artifactItems>
-              <!-- other configurations here -->
-            </configuration>
-          </execution>
-        </executions>
-        </plugin>
         </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
