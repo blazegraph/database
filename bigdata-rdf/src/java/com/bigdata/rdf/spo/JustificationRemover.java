@@ -13,8 +13,8 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.inf.Justification;
+import com.bigdata.util.Bytes;
 
 /**
  * Class writes on the justification index, removing all {@link Justification}s

@@ -7,9 +7,9 @@ import java.util.Set;
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.util.Bytes;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 

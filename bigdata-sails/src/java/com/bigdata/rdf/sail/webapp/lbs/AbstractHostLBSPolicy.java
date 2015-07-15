@@ -46,7 +46,6 @@ import org.apache.log4j.Logger;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.PlatformStatsPlugIn;
-import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rdf.sail.webapp.HALoadBalancerServlet;
 import com.bigdata.util.InnerCause;
@@ -296,7 +295,7 @@ public abstract class AbstractHostLBSPolicy extends AbstractLBSPolicy {
 
         super.init(servletConfig, indexManager);
 
-        final HAJournal journal = (HAJournal) indexManager;
+        final Journal journal = (Journal) indexManager;
 
         if (journal.getPlatformStatisticsCollector() == null) {
             // LBS requires platform stats to load balance requests.

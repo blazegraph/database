@@ -47,7 +47,7 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.StackInfoReport;
 
 /**

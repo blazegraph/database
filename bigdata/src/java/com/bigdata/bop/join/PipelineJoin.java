@@ -57,7 +57,6 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.bop.engine.AbstractRunningQuery;
 import com.bigdata.bop.engine.QueryTimeoutException;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.concurrent.FutureTaskMon;
 import com.bigdata.relation.IRelation;
@@ -80,6 +79,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.service.DataService;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.Haltable;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
@@ -1782,7 +1782,7 @@ public class PipelineJoin<E> extends PipelineOp implements
             	
                 // Obtain the iterator for the current join dimension.
                 final ICloseableIterator<IBindingSet[]> itr = ((IBindingSetAccessPath<?>) accessPath)
-                        .solutions(cutoffLimit, stats);
+                      .solutions(context, cutoffLimit, stats);
 
                 try {
 

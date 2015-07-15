@@ -76,4 +76,9 @@ public interface IChangeLog {
      */
     void transactionAborted();
     
+    /**
+     * Close any open resources.
+     */
+    void close();
+    
 }

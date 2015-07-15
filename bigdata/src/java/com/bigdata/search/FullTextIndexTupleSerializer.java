@@ -33,7 +33,6 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -41,7 +40,8 @@ import com.bigdata.btree.keys.IKeyBuilderFactory;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.io.ByteArrayBuffer;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Class manages the encoding and decoding of keys for the full text index. You

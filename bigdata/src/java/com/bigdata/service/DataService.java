@@ -78,7 +78,6 @@ import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
-import com.bigdata.service.jini.DataServer;
 
 import cutthecrap.utils.striterators.IFilter;
 

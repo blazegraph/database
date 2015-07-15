@@ -433,7 +433,7 @@ public class TestIVariableBindingRequirements extends AbstractOptimizerTestCase 
        final GlobalAnnotations globals = 
           new GlobalAnnotations(
              context.getLexiconNamespace(), context.getTimestamp());
-       AST2BOpUtility.toVE(globals, fn.getValueExpressionNode());
+       AST2BOpUtility.toVE(getBOpContext(), globals, fn.getValueExpressionNode());
        
        assertEquals(requiredBound, fn.getRequiredBound(sa));
        assertEquals(desiredBound, fn.getDesiredBound(sa));
@@ -493,8 +493,8 @@ public class TestIVariableBindingRequirements extends AbstractOptimizerTestCase 
           QueryType.SELECT), context);
        final GlobalAnnotations globals = new GlobalAnnotations(
           context.getLexiconNamespace(), context.getTimestamp());
-       AST2BOpUtility.toVE(globals, exists.getValueExpressionNode());
-       AST2BOpUtility.toVE(globals, notExists.getValueExpressionNode());
+       AST2BOpUtility.toVE(getBOpContext(), globals, exists.getValueExpressionNode());
+       AST2BOpUtility.toVE(getBOpContext(), globals, notExists.getValueExpressionNode());
        
        assertEquals(requiredBound, exists.getRequiredBound(sa));
        assertEquals(desiredBound, exists.getDesiredBound(sa));

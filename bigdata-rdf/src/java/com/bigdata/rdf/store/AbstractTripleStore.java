@@ -69,7 +69,6 @@ import com.bigdata.bop.joinGraph.IEvaluationPlanFactory;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
@@ -125,6 +124,7 @@ import com.bigdata.rdf.rules.InferenceEngine;
 import com.bigdata.rdf.rules.MatchRule;
 import com.bigdata.rdf.rules.RDFJoinNexusFactory;
 import com.bigdata.rdf.rules.RuleContextEnum;
+import com.bigdata.rdf.sail.RDRHistory;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTBottomUpOptimizer;
 import com.bigdata.rdf.spo.BulkCompleteConverter;
 import com.bigdata.rdf.spo.BulkFilterConverter;
@@ -175,6 +175,7 @@ import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PropertyUtil;
 
@@ -325,6 +326,13 @@ abstract public class AbstractTripleStore extends
     final private boolean bottomUpEvaluation;
     
     /**
+     * The {@link RDRHistory} class.
+     * 
+     * @see Options#RDR_HISTORY_CLASS
+     */
+    final private Class<? extends RDRHistory> rdrHistoryClass;
+    
+    /**
      * Return an instance of the class that is used to compute the closure of
      * the database.
      */
@@ -342,6 +350,39 @@ abstract public class AbstractTripleStore extends
             throw new RuntimeException(e);
 
         }
+        
+    }
+    
+    /**
+     * Return an instance of the {@link RDRHistory} class.
+     */
+    public RDRHistory getRDRHistoryInstance() {
+
+        if (!isRDRHistory()) {
+            throw new RuntimeException("RDR history not enabled");
+        }
+        
+        try {
+
+            final Constructor<? extends RDRHistory> ctor = rdrHistoryClass
+                    .getConstructor(new Class[] { AbstractTripleStore.class });
+
+            return ctor.newInstance(this);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(e);
+
+        }
+        
+    }
+    
+    /**
+     * Return true if the RDR history feature is enabled (experimental).
+     */
+    public boolean isRDRHistory() {
+        
+        return rdrHistoryClass != null;
         
     }
     
@@ -1222,6 +1263,12 @@ abstract public class AbstractTripleStore extends
         String DEFAULT_INLINE_URI_FACTORY_CLASS = InlineURIFactory.class
                 .getName();
 
+        /**
+         * The name of the {@link RDRHistory} class.  Null by default.
+         */
+        String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
+                + ".rdrHistoryClass";
+
     }
 
     protected Class determineAxiomClass() {
@@ -1446,7 +1493,41 @@ abstract public class AbstractTripleStore extends
         
         this.bottomUpEvaluation = Boolean.valueOf(getProperty(
                 Options.BOTTOM_UP_EVALUATION,
-                Options.DEFAULT_BOTTOM_UP_EVALUATION)); 
+                Options.DEFAULT_BOTTOM_UP_EVALUATION));
+        
+        { // RDR History class
+            
+            final String className = getProperty(Options.RDR_HISTORY_CLASS, null);
+            
+            if (className != null && className.length() > 0) {
+                
+                if (!statementIdentifiers) {
+                    throw new RuntimeException("statement identifiers must be enabled for RDR history");
+                }
+                
+                final Class cls;
+                try {
+                    cls = Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException("Bad option: "
+                            + Options.RDR_HISTORY_CLASS, e);
+                }
+    
+                if (!RDRHistory.class.isAssignableFrom(cls)) {
+                    throw new RuntimeException(Options.RDR_HISTORY_CLASS
+                            + ": Must extend: "
+                            + RDRHistory.class.getName());
+                }
+                
+                rdrHistoryClass = cls;
+                
+            } else {
+            
+                rdrHistoryClass = null;
+                
+            }
+            
+        }
         
         /*
          * Setup namespace mapping for serialization utility methods.
@@ -2424,7 +2505,7 @@ abstract public class AbstractTripleStore extends
     @Override
     public void addTerms(final BigdataValue[] terms) {
 
-        getLexiconRelation().addTerms( terms, terms.length, false/*readOnly*/);
+        getLexiconRelation().addTerms(terms, terms.length, false/*readOnly*/);
         
     }
 
@@ -3208,6 +3289,7 @@ abstract public class AbstractTripleStore extends
 //                                keyOrder),//
                         new NV(IPredicate.Annotations.INDEX_LOCAL_FILTER,
                                ElementFilter.newInstance(filter)),//
+                        new NV(SPOPredicate.Annotations.INCLUDE_HISTORY, true),
                         }));
 //        final SPOPredicate p = new SPOPredicate(//
 //                new String[] { r.getNamespace() },//
@@ -3495,6 +3577,12 @@ abstract public class AbstractTripleStore extends
 
     }
 
+    final public StringBuilder dumpStore(final boolean history) {
+
+        return dumpStore(this, true, true, true, history, false);
+
+    }
+
     final public StringBuilder dumpStore(
             final AbstractTripleStore resolveTerms, final boolean explicit,
             final boolean inferred, final boolean axioms) {
@@ -3525,8 +3613,18 @@ abstract public class AbstractTripleStore extends
             final boolean inferred, final boolean axioms,
             final boolean justifications) {
 
-        return dumpStore(resolveTerms, explicit, inferred, axioms,
-                justifications, getSPORelation().getPrimaryKeyOrder());
+        return dumpStore(resolveTerms, explicit, inferred, axioms, true,
+                justifications, true, getSPORelation().getPrimaryKeyOrder());
+
+    }
+ 
+    final public StringBuilder dumpStore(
+            final AbstractTripleStore resolveTerms, final boolean explicit,
+            final boolean inferred, final boolean axioms,
+            final boolean history, final boolean justifications) {
+
+        return dumpStore(resolveTerms, explicit, inferred, axioms, history,
+                justifications, true, getSPORelation().getPrimaryKeyOrder());
 
     }
  
@@ -3551,8 +3649,9 @@ abstract public class AbstractTripleStore extends
      */
     public StringBuilder dumpStore(
             final AbstractTripleStore resolveTerms, final boolean explicit,
-            final boolean inferred, final boolean axioms,
-            final boolean justifications, final IKeyOrder<ISPO> keyOrder) {
+            final boolean inferred, final boolean axioms, final boolean history,
+            final boolean justifications, final boolean sids,
+            final IKeyOrder<ISPO> keyOrder) {
 
         final StringBuilder sb = new StringBuilder();
         
@@ -3561,6 +3660,7 @@ abstract public class AbstractTripleStore extends
         long nexplicit = 0;
         long ninferred = 0;
         long naxioms = 0;
+        long nhistory = 0;
 
         {
 
@@ -3577,6 +3677,10 @@ abstract public class AbstractTripleStore extends
 
                     final BigdataStatement stmt = itr.next();
 
+                    if (!sids && stmt.getSubject().getIV().isStatement()) {
+                        continue;
+                    }
+                    
                     switch (stmt.getStatementType()) {
 
                     case Explicit:
@@ -3596,6 +3700,13 @@ abstract public class AbstractTripleStore extends
                     case Axiom:
                         naxioms++;
                         if (!axioms)
+                            continue;
+                        else
+                            break;
+
+                    case History:
+                        nhistory++;
+                        if (!history)
                             continue;
                         else
                             break;
@@ -3647,7 +3758,8 @@ abstract public class AbstractTripleStore extends
 
         sb.append("dumpStore: #statements=" + nstmts + ", #explicit="
                 + nexplicit + ", #inferred=" + ninferred + ", #axioms="
-                + naxioms + (justifications ? ", #just=" + njust : ""));
+                + naxioms + ", #history=" + nhistory 
+                + (justifications ? ", #just=" + njust : ""));
 
         return sb;
         
@@ -4191,15 +4303,24 @@ abstract public class AbstractTripleStore extends
      * @see BLZG-1268 (NPE during read-only namespace resolution caused by RDR
      *      Truth Maintenance and GRS concurrent modification)
      */
+    @SuppressWarnings("unused")
     public IChunkedOrderedIterator<ISPO> computeClosureForStatementIdentifiers(
             IChunkedOrderedIterator<ISPO> src) {
      
-        if(!statementIdentifiers) {
+        if (!statementIdentifiers) {
             
             // There will be no statement identifiers unless they were enabled.
             
             return src;
             
+        }
+        
+        /*
+         * If RDR history is enabled we don't want to remove non-grounded
+         * sids.
+         */
+        if (rdrHistoryClass != null) {
+            return src;
         }
         
         final Properties properties = getProperties();

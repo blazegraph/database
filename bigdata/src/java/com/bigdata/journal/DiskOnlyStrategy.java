@@ -48,9 +48,9 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.journal.WORMStrategy.StoreCounters;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.StoreManager.ManagedJournal;
+import com.bigdata.util.Bytes;
 
 /**
  * Disk-based journal strategy.

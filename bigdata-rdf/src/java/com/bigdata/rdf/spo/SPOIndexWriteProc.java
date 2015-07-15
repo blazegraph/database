@@ -32,7 +32,6 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedure;
 import com.bigdata.btree.proc.AbstractKeyArrayIndexProcedureConstructor;
@@ -41,6 +40,7 @@ import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.codec.IRabaCoder;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.relation.IMutableRelationIndexWriteProcedure;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Procedure for batch insert on a single statement index (or index partition).
@@ -264,7 +264,31 @@ public class SPOIndexWriteProc extends AbstractKeyArrayIndexProcedure<Object> im
                 // old statement type.
                 final StatementEnum oldType = StatementEnum.deserialize(oldval);
 
-                if (override) {
+                if (oldType == StatementEnum.History ||
+                        newType == StatementEnum.History) {
+                    
+                    if (oldType != newType) {
+                        
+                        ndx.insert(key, tupleSer.serializeVal(
+                                false/* override */, 
+                                userFlag, 
+                                newType));
+
+                        if (isPrimaryIndex && DEBUG) {
+                            log.debug("Changing statement type: key="
+                                    + BytesUtil.toString(key) + ", oldType="
+                                    + oldType + ", newType=" + newType);
+                        }
+
+                        writeCount++;
+
+                        if (reportMutation)
+                            modified[i] = newType == StatementEnum.History ?
+                                    ModifiedEnum.REMOVED : ModifiedEnum.INSERTED;
+                        
+                    }
+                    
+                } else if (override) {
 
                     if (oldType != newType) {
 

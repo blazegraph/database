@@ -69,11 +69,11 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.bop.engine.QueryTimeoutException;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.relation.accesspath.BufferClosedException;
 import com.bigdata.test.ExperimentDriver.Result;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -556,7 +556,7 @@ public class StressTestConcurrentRestApiRequests<S extends IIndexManager>
      * namespaces that is intended to run in CI.
      */
     public void test_concurrentClients() throws Exception {
-if(BigdataStatics.runKnownBadTests)return; // FIXME Conditionally disabled in CI due to "namespace: EXISTS" test harness failures.
+if(!BigdataStatics.runKnownBadTests)return; // FIXME Conditionally disabled in CI due to "namespace: EXISTS" test harness failures.
         /*
          * Note: Using a timeout will cause any tasks still running when the
          * timeout expires to be interrupted.

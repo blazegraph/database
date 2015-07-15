@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.AssertionFailedError;
 
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.TestCase3;
@@ -48,7 +49,6 @@ import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.rwstore.RWWriteCacheService;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test suite for the {@link WriteCacheService} using scattered writes on a

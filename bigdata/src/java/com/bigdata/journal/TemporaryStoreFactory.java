@@ -38,8 +38,8 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 
 /**

@@ -58,10 +58,12 @@ import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHALogRequest;
 import com.bigdata.ha.msg.IHARebuildRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
+import com.bigdata.io.MergeStreamWithSnapshotData;
 import com.bigdata.io.compression.CompressorRegistry;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.writecache.IBackingReader;
@@ -73,8 +75,6 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
-import com.bigdata.util.MergeStreamWithSnapshotData;
 
 /**
  * Disk-based Write Once Read Many (WORM) journal strategy. The phsyical layout

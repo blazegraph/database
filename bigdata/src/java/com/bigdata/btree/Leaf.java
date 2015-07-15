@@ -43,6 +43,7 @@ import com.bigdata.btree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.journal.ITransactionService;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;

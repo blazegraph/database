@@ -34,9 +34,9 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder.Options;
 import com.bigdata.io.IManagedByteArray;
+import com.bigdata.util.BytesUtil;
 
 /**
  * <p>

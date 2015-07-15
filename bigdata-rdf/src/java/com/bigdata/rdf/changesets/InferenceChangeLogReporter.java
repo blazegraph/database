@@ -113,6 +113,10 @@ public class InferenceChangeLogReporter implements IChangeLog {
 
     }
 
+    @Override
+    public void close() {
+    }
+
     /**
      * Return iterator visiting the inferences that were added to the KB.
      */

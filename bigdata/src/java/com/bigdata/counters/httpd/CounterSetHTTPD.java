@@ -41,8 +41,8 @@ import com.bigdata.counters.query.ICounterSelector;
 import com.bigdata.counters.query.URLQueryModel;
 import com.bigdata.counters.render.IRenderer;
 import com.bigdata.counters.render.RendererFactory;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IService;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.httpd.AbstractHTTPD;
 
 /**

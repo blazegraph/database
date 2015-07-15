@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -72,7 +73,10 @@ import com.bigdata.rdf.properties.PropertiesParserFactory;
 import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
+import com.bigdata.rdf.sail.model.JsonHelper;
+import com.bigdata.rdf.sail.model.RunningQuery;
 import com.bigdata.util.InnerCause;
+import com.bigdata.util.PropertyUtil;
 
 /**
  * A manager for connections to one or more REST API / SPARQL end points for the
@@ -155,6 +159,11 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
      * <code>true</code> iff open.
      */
     private volatile boolean m_closed = false;
+    
+    /**
+     * Show Queries Query Parameter
+     */
+    private static String SHOW_QUERIES = "showQueries";
 
     /**
     * Return the remote client for the transaction manager API.
@@ -742,7 +751,7 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 //                    + OPTION_CREATE_KB_NAMESPACE);
 
         // Set the namespace property.
-        final Properties tmp = new Properties(properties);
+        final Properties tmp = PropertyUtil.flatCopy(properties);
         tmp.setProperty(OPTION_CREATE_KB_NAMESPACE, namespace);
         
         /*
@@ -1514,6 +1523,49 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
            
    }
 
+   /**
+    * List the currently running queries on the server
+    * 
+    */
+   public Collection<RunningQuery> showQueries() throws Exception {
+   
+       final ConnectOptions opts = newUpdateConnectOptions(baseServiceURL, 
+    		   null, null/* txId */);
+
+       opts.addRequestParam(SHOW_QUERIES);
+       
+       opts.setAcceptHeader(IMimeTypes.MIME_APPLICATION_JSON);
+
+       JettyResponseListener response = null;
+
+       try {
+			// Issue request, check response status code.
+			checkResponseCode(response = doConnect(opts));
+
+			final String contentType = response.getContentType();
+
+			if (!IMimeTypes.MIME_APPLICATION_JSON.equals(contentType))
+				throw new RuntimeException("Expected MIME_TYPE "
+						+ IMimeTypes.MIME_APPLICATION_JSON + " but received : "
+						+ contentType + ".");
+
+			final InputStream is = response.getInputStream();
+
+			final List<RunningQuery> runningQueries = JsonHelper.readRunningQueryList(is);
+
+			return runningQueries;
+           
+       } finally {
+           /*
+            * Ensure that the http response entity is consumed so that the http
+            * connection will be released in a timely fashion.
+            */
+        if (response != null)
+           response.abort();
+           
+       }
+           
+   }
    /**
     * Extracts the solutions from a SPARQL query.
     * 

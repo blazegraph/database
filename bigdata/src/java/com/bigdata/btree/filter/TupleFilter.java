@@ -8,13 +8,13 @@ import org.apache.log4j.Logger;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.AbstractTuple;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.Tuple;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.FilterBase;

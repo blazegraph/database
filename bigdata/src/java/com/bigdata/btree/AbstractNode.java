@@ -40,6 +40,7 @@ import com.bigdata.btree.filter.EmptyTupleIterator;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.btree.raba.MutableKeyBuffer;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.Expander;
 import cutthecrap.utils.striterators.IStriterator;

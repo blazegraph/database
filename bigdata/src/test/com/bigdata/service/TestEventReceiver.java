@@ -796,6 +796,12 @@ public class TestEventReceiver extends TestCase2 {
            return false;
         }
 
+		@Override
+		public boolean isJiniFederation() {
+			//BLZG-1370
+			return false;
+		}
+
     }
     
 }

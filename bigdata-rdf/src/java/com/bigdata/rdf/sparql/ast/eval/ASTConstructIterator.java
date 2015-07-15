@@ -91,6 +91,14 @@ public class ASTConstructIterator implements
     private static final Logger log = Logger
             .getLogger(ASTConstructIterator.class);
     
+    /**
+     * When <code>false</code>, no DISTINCT SPO filter will be imposed.
+     * 
+     * @see https://jira.blazegraph.com/browse/BLZG-1341 (performance of dumping
+     *      single graph)
+     */
+    private final boolean constructDistinctSPO;
+
     private final BigdataValueFactory f;
 
     /**
@@ -221,12 +229,15 @@ public class ASTConstructIterator implements
      *            The solutions that will be used to construct the triples.
      */
     public ASTConstructIterator(//
+            final AST2BOpContext context,//
             final AbstractTripleStore tripleStore,//
             final ConstructNode construct,//
             final GraphPatternGroup<?> whereClause,//
             final Map<String, BigdataBNode> bnodesIn,//
             final CloseableIteration<BindingSet, QueryEvaluationException> src) {
 
+        this.constructDistinctSPO = context.constructDistinctSPO;
+        
         this.f = tripleStore.getValueFactory();
 
         // Note: MAY be null (MUST be null for CONSTRUCT).
@@ -301,11 +312,27 @@ public class ASTConstructIterator implements
 		final boolean distinctQuads = construct.isDistinctQuads() && tripleStore.isQuads() && hasMixedQuadData(templates);
 		final boolean nativeDistinct = construct.isNativeDistinct();
 		
+        if (!constructDistinctSPO) {
+            /**
+             * DISTINCT SPO filter was disabled by a query hint. The output is
+             * NOT guaranteed to be distinct.
+             * 
+             * @see BLZG-1341.
+             */
+            // No filter will be imposed.
+            return null;
+        }
+        
 		if (nativeDistinct && construct.isDistinctQuads()) {
 			flagToCheckNativeDistinctQuadsInvocationForJUnitTesting = true;
 		}
 		
-        final boolean isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(), templates, whereClause);
+        /*
+         * Test the CONSTRUCT clause and WHERE clause to see if we need to
+         * impose a DISTINCT SPO filter.
+         */
+        final boolean isObviouslyDistinct = isObviouslyDistinct(tripleStore.isQuads(),
+                templates, whereClause);
 
 		if (isObviouslyDistinct) {
 
@@ -314,7 +341,6 @@ public class ASTConstructIterator implements
             return null;
             
         }
-		
 
 		if (distinctQuads) {
 			
@@ -337,13 +363,13 @@ public class ASTConstructIterator implements
 	}
 
 	/**
-	 * FIXME This method needs to be written. It should scale, whereas the
-	 * current implementation does not.  
+	 * FIXME NATIVE DISTINCT : This needs to create a filter using a HTree to
+	 * impose a scalable distinct.  
 	 * 
-	 * @see <a href="http://trac.blazegraph.com/ticket/807"> native distinct in
-	 *      quad mode (insert/delete) </a>
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-260"> native
+     *      distinct in quad mode (insert/delete) </a>
 	 */
-	private IFilterTest createNativeDistinctQuadsFilter(ConstructNode construct) {
+	private IFilterTest createNativeDistinctQuadsFilter(final ConstructNode construct) {
 		return createHashDistinctQuadsFilter(construct);
 	}
 
@@ -357,7 +383,7 @@ public class ASTConstructIterator implements
         };
 	}
 
-	private boolean hasMixedQuadData(List<StatementPatternNode> templates) {
+	private boolean hasMixedQuadData(final List<StatementPatternNode> templates) {
 		if (templates.size() == 0) {
 			return false;
 		}
@@ -376,7 +402,7 @@ public class ASTConstructIterator implements
 		return false;
 	}
 
-	private boolean equals(TermNode a, TermNode b) {
+	private boolean equals(final TermNode a, final TermNode b) {
 		return a == b || ( a != null && a.equals(b));
 	}
 
@@ -468,6 +494,7 @@ public class ASTConstructIterator implements
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/579">
      *      CONSTRUCT should apply DISTINCT (s,p,o) filter </a>
      */
+	// Note: package private to expose to test suite.
     static boolean isObviouslyDistinct(//
             final boolean quads,//
             final List<StatementPatternNode> templates,//
@@ -547,11 +574,13 @@ public class ASTConstructIterator implements
 //        if (!sp1.o().equals(sp2.o()))
 //            return false;
 
-        /*
+        /**
          * CONSTRUCT always produces triples, but the access path for the
          * statement pattern in the WHERE clause may visit multiple named
          * graphs. If it does, then duplicate triples can result unless the
          * access path is the RDF MERGE (default graph access path).
+         * 
+         * @see https://jira.blazegraph.com/browse/BLZG-1341 (do not de-dup for very large graphs)
          */
 
         if (quads && sp2.c() == null && sp2.getScope() == Scope.NAMED_CONTEXTS) {
@@ -574,6 +603,7 @@ public class ASTConstructIterator implements
         
     }
 
+    @Override
     public boolean hasNext() throws QueryEvaluationException {
 
         while (true) {
@@ -631,6 +661,7 @@ public class ASTConstructIterator implements
         
     }
 
+    @Override
     public void close() throws QueryEvaluationException {
 
         if (open) {
@@ -658,6 +689,7 @@ public class ASTConstructIterator implements
 
     }
 
+    @Override
     public void remove() throws QueryEvaluationException {
 
         throw new UnsupportedOperationException();
@@ -736,6 +768,12 @@ public class ASTConstructIterator implements
      * 
      * @param stmt
      *            The statement.
+     * 
+     *            FIXME NATIVE DISTINCT: This method needs to be vectored for
+     *            native distinct.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-260"> native
+     *      distinct in quad mode (insert/delete) </a>
      */
     private void addStatementToBuffer(final BigdataStatement stmt) {
 

@@ -1,0 +1,3 @@
+<http://bigdata.com/bob> <http://xmlns.com/foaf/0.1/name> "Bob" .
+<<<http://bigdata.com/bob> <http://xmlns.com/foaf/0.1/age> "23">> <http://purl.org/dc/elements/1.1/creator> <http://example.com/crawlers#c1> .
+<<<http://bigdata.com/bob> <http://xmlns.com/foaf/0.1/age> "23">> <http://purl.org/dc/elements/1.1/source> <http://example.net/homepage-listing.html> .

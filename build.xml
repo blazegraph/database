@@ -55,6 +55,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 
     <property file="build.properties" />
 
+
     <!-- build-time classpath. -->
     <path id="build.classpath">
         <fileset dir="${bigdata.dir}/bigdata/lib">
@@ -253,6 +254,9 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
             <src path="${bigdata.dir}/bigdata-gom/src/test" />
             <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
+            <src path="${bigdata.dir}/rdf-properties/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-util/src/main/java" />
+            <src path="${bigdata.dir}/bigdata-util/src/test/java" />
             <!-- Do not include the unit tests @todo conditionally include?
             -->
             <compilerarg value="-version" />
@@ -356,6 +360,8 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
             <fileset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
+            <fileset dir="${bigdata.dir}/rdf-properties/src/main/java" />
+            <fileset dir="${bigdata.dir}/bigdata-util/src/main/java" />
         </jar>
     </target>
 
@@ -411,6 +417,8 @@ public class BuildInfo {
             <fileset dir="bigdata-client/src/main/java" />
             <fileset dir="bigdata-jini/src/main/java" />
             <fileset dir="bigdata-rdf/src/java" />
+            <fileset dir="rdf-properties/src/main/java" />
+            <fileset dir="bigdata-util/src/main/java" />
             <fileset dir="bigdata-sails/src/java" />
             <fileset dir="bigdata-blueprints/src/main/java" />
          <fileset dir="bigdata-gom/src/java" />
@@ -452,6 +460,8 @@ public class BuildInfo {
          <packageset dir="${bigdata.dir}/bigdata-client/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
+         <packageset dir="${bigdata.dir}/rdf-properties/src/main/java" />
+         <packageset dir="${bigdata.dir}/bigdata-util/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
@@ -1071,6 +1081,10 @@ ${postInstallMessage}</echo>
     	<!-- JSON -->
       <copy file="${bigdata-sails.lib}/jackson-core-${jackson.version}.jar"
             tofile="${dist.lib}/jackson-core.jar" />
+      <copy file="${bigdata-sails.lib}/jackson-annotations-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-annotations.jar" />
+      <copy file="${bigdata-sails.lib}/jackson-databind-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-databind.jar" />
     
       <!-- jetty library -->
      <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
@@ -1557,6 +1571,12 @@ substitutions.
       <copy toDir="${build.dir}/bigdata-rdf/src">
         <fileset dir="${bigdata.dir}/bigdata-rdf/src" />
       </copy>
+      <copy toDir="${build.dir}/rdf-properites/src">
+        <fileset dir="${bigdata.dir}/rdf-properties/src" />
+      </copy>
+      <copy toDir="${build.dir}/rdf-properites/src">
+        <fileset dir="${bigdata.dir}/bigdata-util/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-sails/src">
         <fileset dir="${bigdata.dir}/bigdata-sails/src" />
       </copy>
@@ -1656,6 +1676,8 @@ substitutions.
           <include name="bigdata-client/src/**" />
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
+          <include name="rdf-properties/src/**" />
+          <include name="bigdata-util/src/**" />
           <include name="bigdata-sails/src/**" />
           <include name="bigdata-blueprints/src/**" />
           <include name="bigdata-gom/src/**" />
@@ -1943,7 +1965,7 @@ ${postInstallMessage}</echo>
 
         <!-- TODO ${path.separator}${dist.lib}/bigdata-gas.jar -->
       <property name="javac.test.classpath"
-         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${dist.lib}/jackson-annotations.jar${path.separator}${dist.lib}/jackson-databind.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
             
         <echo>javac
 </echo>
@@ -2130,7 +2152,9 @@ ${postInstallMessage}</echo>
       <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
 
       <!-- The zookeeper install directory. -->
-      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+      <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+      </condition>
 
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
@@ -2265,8 +2289,9 @@ ${postInstallMessage}</echo>
         <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
             <arg value="start"/>
         </exec>
-        <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-            <arg value="start"/>
+        <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+        	<arg value="/C"/>
+            <arg value="zkServer.cmd start"/>
         </exec>
     </target>
 
@@ -2277,8 +2302,9 @@ ${postInstallMessage}</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
         <arg value="stop"/>
     </exec>
-    <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-        <arg value="stop"/>
+    <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+    	<arg value="/C"/>
+    	<arg value="zkServer.cmd stop"/>
     </exec>
     </target>
 
@@ -2341,12 +2367,14 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/httpmime.jar" />
         <pathelement location="${dist.lib}/blueprints-core.jar" />
         <pathelement location="${dist.lib}/jackson-core.jar" />
+        <pathelement location="${dist.lib}/jackson-annotations.jar" />
+        <pathelement location="${dist.lib}/jackson-databind.jar" />
         <pathelement location="${blueprints-test.jar}" />
         <pathelement location="${jettison.jar}" />
       </path>
 
       <property name="run.class.path"
-         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${dist.lib}/jackson-annotations.jar${path.separator}${dist.lib}/jackson-databind.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
         
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -2509,6 +2537,8 @@ ${postInstallMessage}</echo>
         <sysproperty key="servlet-api.jar" value="${dist.lib}/servlet-api.jar" />
         <sysproperty key="blueprints-core.jar" value="${dist.lib}/blueprints-core.jar" />
         <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-core.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-annotations.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-databind.jar" />
 
         <!-- Jini group name -->
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
@@ -2554,6 +2584,7 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.bop.fed.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.sparse.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.util.httpd.TestAll" todir="${test.results.dir}" unless="testName" />
         <!-- not suppported yet.
         <test name="com.bigdata.bfs.TestAll" todir="${test.results.dir}" unless="testName" />
         -->
@@ -2564,6 +2595,8 @@ ${postInstallMessage}</echo>
 
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.remote.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.webapp.client.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.webapp.TestAll" todir="${test.results.dir}" unless="testName" />
 
         <test name="com.bigdata.gom.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -2711,7 +2744,7 @@ ${postInstallMessage}</echo>
 <target name="DemoSesameServer" depends="samples.compile" description="Runs the DemoSesameServer sample code.">
 <java classname="com.bigdata.samples.remoting.DemoSesameServer" failonerror="true" fork="false" logerror="true">
     <classpath refid="samples.runtime.classpath" />
-    <arg value="http://localhost:8080/openrdf-sesame" />
+    <arg value="http://localhost:9999/openrdf-sesame" />
     <arg value="bigdata" />
 </java>
 </target>

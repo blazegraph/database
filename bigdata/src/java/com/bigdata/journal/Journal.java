@@ -84,7 +84,6 @@ import com.bigdata.ha.msg.IHAGatherReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeRequest;
 import com.bigdata.ha.msg.IHANotifyReleaseTimeResponse;
 import com.bigdata.journal.JournalTransactionService.ValidateWriteSetTask;
-import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
 import com.bigdata.rawstore.IRawStore;
@@ -327,7 +326,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         
         getExecutorService().execute(new StartDeferredTasksTask());
 
-      if (isGroupCommit() && !(this instanceof HAJournal)
+      if (isGroupCommit() && !(this.isHAJournal())
             && getRootBlockView().getCommitCounter() == 0L) {
 
          /*

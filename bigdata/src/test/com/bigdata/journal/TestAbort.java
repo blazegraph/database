@@ -34,8 +34,8 @@ import com.bigdata.LRUNexus;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.cache.IGlobalLRU.ILRUCache;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Test the ability to abort (discard an uncommitted write set). This is a test

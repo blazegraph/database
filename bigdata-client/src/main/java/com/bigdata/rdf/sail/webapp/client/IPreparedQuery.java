@@ -33,5 +33,7 @@ package com.bigdata.rdf.sail.webapp.client;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public interface IPreparedQuery extends IPreparedOperation {
-    
+
+	public void addRequestParam(String name, String... val);
+
 }

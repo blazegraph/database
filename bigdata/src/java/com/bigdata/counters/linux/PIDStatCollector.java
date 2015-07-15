@@ -45,7 +45,7 @@ import com.bigdata.counters.IInstrument;
 import com.bigdata.counters.IProcessCounters;
 import com.bigdata.counters.ProcessReaderHelper;
 import com.bigdata.counters.linux.SarCpuUtilizationCollector.DI;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Collects statistics on the JVM process relating to CPU, memory, and IO

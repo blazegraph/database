@@ -48,6 +48,7 @@ import com.bigdata.rdf.spo.TestSPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.AbstractTripleStoreTestCase;
 import com.bigdata.rdf.store.BigdataValueIteratorImpl;
+import com.bigdata.rdf.util.DumpLexicon;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.bigdata.search.Hit;
 import com.bigdata.search.Hiterator;

@@ -33,7 +33,7 @@ import java.util.UUID;
 
 import junit.framework.TestCase;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for {@link DTE}

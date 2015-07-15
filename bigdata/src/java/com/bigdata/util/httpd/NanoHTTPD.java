@@ -29,11 +29,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-
 import org.apache.log4j.Logger;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IServiceShutdown;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.CaseInsensitiveStringComparator;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
