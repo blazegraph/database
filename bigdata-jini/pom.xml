@@ -230,9 +230,9 @@ ga('send', 'pageview');
      <type>war</type> 
     </dependency>
     <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.legacy.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
+      <version>${bigdata.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>

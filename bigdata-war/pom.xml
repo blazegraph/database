@@ -52,17 +52,10 @@ ga('send', 'pageview');
   
   <dependencies>
     <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.legacy.version}</version>
-    </dependency>
-<!--
-    <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-blueprints</artifactId>
+      <artifactId>bigdata-core</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
--->
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-util</artifactId>

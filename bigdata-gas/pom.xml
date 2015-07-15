@@ -83,13 +83,6 @@ ga('send', 'pageview');
       <artifactId>bigdata-util</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
-    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. 
-    <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.legacy.version}</version>
-    </dependency>
- 	-->
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>

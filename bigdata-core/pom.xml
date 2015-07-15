@@ -140,69 +140,6 @@ dependencies.
                 <include>**/*.trig</include>
             </includes>
         </resource>
-        <resource>
-            <directory>bigdata/src/test</directory>
-            <includes>
-                <include>**/*.csv</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-rdf/src/test</directory>
-            <includes>
-                <include>**/*.n3</include>
-                <include>**/*.nt</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.rdf</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-sails/src/test</directory>
-            <includes>
-                <include>**/*.n3</include>
-                <include>**/*.nt</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-gom/src/test</directory>
-            <includes>
-                <include>**/*.n3</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
        </resources>
         <plugins>
           <plugin>
@@ -224,7 +161,7 @@ dependencies.
             			<format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
         		</tstamp>
         		<property environment="env" />
-			<loadfile property="git.branch" srcFile=".git/HEAD">
+			<loadfile property="git.branch" srcFile="../.git/HEAD">
 			   <filterchain>
     			     <linecontainsregexp>
       				<regexp pattern="^ref: (.*)$"/>
@@ -255,23 +192,6 @@ public class BuildInfo {
             </executions>
           </plugin>
 
-<!--
-TODO:  Break out into separate test class project.
-
-See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.html
--->
-         <plugin>
-           <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.6</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>

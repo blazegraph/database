@@ -319,8 +319,8 @@ ga('send', 'pageview');
   
   <dependencies>
     <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
     <dependency>
