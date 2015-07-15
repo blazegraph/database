@@ -52,23 +52,6 @@ ga('send', 'pageview');
   </reporting>
   
   <dependencies>
-<!--
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit4.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-client</artifactId>
-      <version>${jetty.version}</version>
-    </dependency>
--->
      <dependency>
        <groupId>commons-io</groupId>
        <artifactId>commons-io</artifactId>
