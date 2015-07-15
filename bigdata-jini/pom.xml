@@ -235,9 +235,9 @@ ga('send', 'pageview');
       <version>${bigdata.legacy.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.legacy.version}</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core-test</artifactId>
+      <version>${bigdata.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
