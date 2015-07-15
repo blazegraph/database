@@ -50,7 +50,7 @@ dependencies.
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
     <version>1.5.2-BLZG_1269_merge-SNAPSHOT</version>
-    <relativePath>blazegraph-parent/pom.xml</relativePath>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-core</artifactId>
