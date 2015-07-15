@@ -4,11 +4,11 @@
 
 PARENT_POM=./blazegraph-parent/pom.xml
 
-CURRENT_SNAPSHOT=`cat $PARENT_POM | perl -n -e '/^.*\<version\>(.*-SNAPSHOT.*)\<\/version\>.*$/ && printf("%s", $1)'`
+CURRENT_SNAPSHOT=`cat $PARENT_POM | grep "SNAPSHOT" | perl -n -e '/^.*\<version\>(.*)\<\/version\>.*$/ && printf("%s", $1)'`
 CURRENT_BRANCH=`cat .git/HEAD | cut -d\/ -f3`
 
 
-RESET_SNAPSHOT=`echo $CURRENT_SNAPSHOT | cut -d\- -f1,2`
+RESET_SNAPSHOT=`echo $CURRENT_SNAPSHOT | cut -d\- -f1`-SNAPSHOT
 
 echo "${CURRENT_SNAPSHOT} -> ${RESET_SNAPSHOT}"
 
