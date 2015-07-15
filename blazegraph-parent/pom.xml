@@ -51,7 +51,7 @@ dependencies.
          >
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
-   <artifactId>blazegraph</artifactId>
+   <artifactId>blazegraph-parent</artifactId>
    <version>1.5.2-BLZG_1269_merge-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
