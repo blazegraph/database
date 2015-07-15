@@ -45,8 +45,8 @@ import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IReopenChannel;
 import com.bigdata.io.writecache.WriteCacheService;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.Bytes;
 
 /**
  * Helper object used when opening or creating journal file in any of the

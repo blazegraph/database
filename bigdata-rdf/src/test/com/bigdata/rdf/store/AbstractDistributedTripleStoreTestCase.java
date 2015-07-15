@@ -30,7 +30,6 @@ package com.bigdata.rdf.store;
 import java.util.Properties;
 
 import com.bigdata.journal.ITx;
-import com.bigdata.service.jini.JiniClient;
 
 /**
  * Abstract test case that sets up and connects to a bigdata federation and

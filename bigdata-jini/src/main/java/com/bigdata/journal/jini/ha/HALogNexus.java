@@ -61,6 +61,7 @@ import com.bigdata.ha.halog.IHALogReader;
 import com.bigdata.ha.halog.IHALogWriter;
 import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockUtility;
@@ -71,7 +72,6 @@ import com.bigdata.quorum.Quorum;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.InnerCause;
 
 /**

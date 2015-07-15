@@ -42,7 +42,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ILinearList;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -58,6 +57,7 @@ import com.bigdata.resources.StoreManager;
 import com.bigdata.service.AbstractScaleOutClient.MetadataIndexCachePolicy;
 import com.bigdata.service.AbstractScaleOutClient.Options;
 import com.bigdata.service.ndx.ClientIndexView;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

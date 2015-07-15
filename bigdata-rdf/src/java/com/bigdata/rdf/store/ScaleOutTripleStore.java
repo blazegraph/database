@@ -32,7 +32,6 @@ import java.util.Properties;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.relation.locator.DefaultResourceLocator;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniFederation;
 
 /**
  * Implementation of an {@link ITripleStore} as a client of an

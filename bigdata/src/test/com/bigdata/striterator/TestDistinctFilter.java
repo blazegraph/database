@@ -35,7 +35,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TemporaryStore;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Unit tests for {@link DistinctFilter}.

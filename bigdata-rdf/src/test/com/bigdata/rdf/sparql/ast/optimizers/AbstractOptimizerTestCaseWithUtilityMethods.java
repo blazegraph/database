@@ -575,7 +575,7 @@ extends AbstractOptimizerTestCase {
           if (op instanceof IValueExpressionNodeContainer) {
 
               // AssignmentNode, FilterNode, OrderByExpr
-          AST2BOpUtility.toVE(globals, 
+          AST2BOpUtility.toVE(getBOpContext(), globals, 
                 ((IValueExpressionNodeContainer) op).getValueExpressionNode());
               
           } else if (op instanceof HavingNode) {
@@ -584,7 +584,7 @@ extends AbstractOptimizerTestCase {
               
               for(IValueExpressionNode node : havingNode) {
               
-                  AST2BOpUtility.toVE(globals, node);
+                  AST2BOpUtility.toVE(getBOpContext(), globals, node);
                   
               }
               
@@ -597,10 +597,10 @@ extends AbstractOptimizerTestCase {
              if (range != null) {
                 
                 if (range.from() != null)
-                   AST2BOpUtility.toVE(globals, range.from());
+                   AST2BOpUtility.toVE(getBOpContext(), globals, range.from());
                    
                 if (range.to() != null)
-                   AST2BOpUtility.toVE(globals, range.to());
+                   AST2BOpUtility.toVE(getBOpContext(), globals, range.to());
              }
           }          
       }

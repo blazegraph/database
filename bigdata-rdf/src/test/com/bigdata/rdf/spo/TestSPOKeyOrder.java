@@ -37,14 +37,14 @@ import com.bigdata.bop.Constant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 

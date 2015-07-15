@@ -31,14 +31,16 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+
 import junit.framework.TestCase2;
-import com.bigdata.btree.BytesUtil;
+
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for {@link Id2TermTupleSerializer}.

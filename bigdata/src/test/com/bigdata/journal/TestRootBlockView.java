@@ -36,10 +36,10 @@ import junit.framework.TestCase2;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.TestWormAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**

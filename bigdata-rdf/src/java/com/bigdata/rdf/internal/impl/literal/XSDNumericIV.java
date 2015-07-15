@@ -29,11 +29,11 @@ import java.math.BigInteger;
 
 import org.openrdf.model.Literal;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.util.Bytes;
 
 /** 
  * Implementation for inline <code>xsd:byte</code>, <code>xsd:short</code>,

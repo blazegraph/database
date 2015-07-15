@@ -3,6 +3,8 @@ package com.bigdata.btree;
 import java.io.IOException;
 import java.util.Random;
 
+import com.bigdata.util.BytesUtil;
+
 /**
  * Rather than run in a JUnit, the performance tests are best run
  * standalone.

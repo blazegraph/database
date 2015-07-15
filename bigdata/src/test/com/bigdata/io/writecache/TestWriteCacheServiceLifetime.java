@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.IReopenChannel;
@@ -26,7 +27,6 @@ import com.bigdata.io.writecache.WriteCache.FileChannelWriteCache;
 import com.bigdata.quorum.MockQuorumFixture;
 import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.QuorumActor;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

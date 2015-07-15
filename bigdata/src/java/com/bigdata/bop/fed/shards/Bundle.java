@@ -4,10 +4,10 @@ import java.util.Arrays;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Helper class used to place the binding sets into order based on the

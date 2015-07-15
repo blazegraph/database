@@ -51,11 +51,11 @@ import com.bigdata.journal.Journal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.Bytes;
 
 /**
  * Bootstrap test suite for the {@link ResourceManager}.

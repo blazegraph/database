@@ -36,8 +36,8 @@ import junit.framework.TestCase;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for {@link IndexSegmentCheckpoint}.

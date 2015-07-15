@@ -40,13 +40,13 @@ import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.codec.IRabaCoder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.changesets.ChangeAction;
 import com.bigdata.rdf.changesets.IChangeRecord;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.util.Bytes;
 
 /**
  * (De-)serializes {@link IChangeRecord}s for the history index.

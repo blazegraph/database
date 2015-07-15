@@ -48,7 +48,6 @@ import com.bigdata.bop.cost.ScanCostReport;
 import com.bigdata.bop.join.BaseJoinStats;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IBTreeStatistics;
 import com.bigdata.btree.IBloomFilter;
 import com.bigdata.btree.IIndex;
@@ -70,7 +69,6 @@ import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.AbstractResource;
 import com.bigdata.relation.IRelation;
 import com.bigdata.service.AbstractClient;
@@ -84,6 +82,8 @@ import com.bigdata.striterator.EmptyChunkedIterator;
 import com.bigdata.striterator.IChunkedIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.FilterBase;
 import cutthecrap.utils.striterators.ICloseableIterator;
@@ -771,13 +771,13 @@ public class AccessPath<R> implements IAccessPath<R>, IBindingSetAccessPath<R> {
      *      should visit solutions for high level query).
      */
     @Override
-    public ICloseableIterator<IBindingSet[]> solutions(final long limit,
+    public ICloseableIterator<IBindingSet[]> solutions(final BOpContext context, final long limit,
     		final BaseJoinStats stats) {
 
 //        final IVariable<?>[] vars = BOpUtility
 //                .getDistinctArgumentVariables(predicate);
 
-        return BOpContext.solutions(
+        return context.solutions(
                 iterator(0L/* offset */, limit, 0/* capacity */), predicate,
                 stats);
 

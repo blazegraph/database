@@ -36,7 +36,10 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLDecoder;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.servlet.Servlet;
@@ -47,7 +50,10 @@ import org.apache.log4j.Logger;
 import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
+import org.openrdf.model.Value;
+import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -60,6 +66,7 @@ import com.bigdata.rdf.properties.PropertiesFormat;
 import com.bigdata.rdf.properties.PropertiesWriter;
 import com.bigdata.rdf.properties.PropertiesWriterRegistry;
 import com.bigdata.rdf.rules.ConstraintViolationException;
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sparql.ast.QuadsOperationInTriplesModeException;
 import com.bigdata.util.InnerCause;
 
@@ -104,6 +111,8 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
      */
     static public final transient String MIME_RDF_XML = "application/rdf+xml";
 
+    public static final String MIME_JSON = "application/json";
+    
 	public static final String MIME_SPARQL_QUERY = "application/sparql-query";
 
 	public static final String MIME_SPARQL_UPDATE = "application/sparql-update";
@@ -117,6 +126,15 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 	public static final String OUTPUT_FORMAT_JSON_SHORT = "json";
 	
 	public static final String OUTPUT_FORMAT_XML_SHORT = "xml";
+	
+	
+	
+	/*
+	 * There are cases when a default namespace exists, but has not been
+	 * selected that the workbench will pass the name "undefined".
+	 */
+	public static final String UNDEFINED_WORKBENCH_NAMESPACE = "undefined";
+
 
 	/**
 	 * Flag to signify a blueprints operation.
@@ -423,6 +441,17 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
+        
+        /*
+         * Handle the case where the Workbench sends undefined in the query string.
+         * This will not affect a user explicitly using the namespace named
+         * undefined. beebs@users.sourceforge.net 
+         */
+       	if(this.UNDEFINED_WORKBENCH_NAMESPACE.equals(namespace))
+       	{
+            namespace = getConfig(getServletContext()).namespace;
+       	}
+        
         return namespace;
     }
 
@@ -525,7 +554,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				req.getHeader("Accept")); 
 		
@@ -596,7 +625,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameter(req
+    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				req.getHeader("Accept")); 
         
@@ -668,6 +697,54 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
 
     	return uris;
     	
+    }
+
+    /**
+     * Parses query parameter bindings for validity to provide client with
+     * meaningful response.
+     * 
+     * @param req
+     * @param resp
+     * 
+     * @return parsed bindings -or- <code>null</code> if there was an error
+     *         processing the bindings, in which case the response was already
+     *         committed.
+     * 
+     * @throws IOException
+     */
+    protected Map<String, Value> parseBindings(final HttpServletRequest req,
+            final HttpServletResponse resp) throws IOException {
+        final Enumeration<String> parameterNames = req.getParameterNames();
+        final StringBuilder sb = new StringBuilder();
+        final Map<String, Value> result = new HashMap<>();
+        while (parameterNames.hasMoreElements()) {
+            final String param = parameterNames.nextElement();
+            if (param.startsWith("$")) {
+                final String name = param.substring(1);
+                final String valueStr = req.getParameter(param);
+                if (valueStr == null || valueStr.isEmpty()) {
+                    sb.append("Invalid binding ").append(name)
+                            .append(" with no value ").append("\n");
+                } else {
+                    try {
+                        final Value value = EncodeDecodeValue.decodeValue(valueStr);
+                        result.put(name, value);
+                    } catch (Exception e) {
+                        sb.append("Invalid binding ").append(name)
+                                .append(" with value ").append(valueStr)
+                                .append(": ").append(e.getMessage())
+                                .append("\n");
+                    }
+                }
+            }
+        }
+        if (sb.length() > 0) {
+            sb.append("Values should follow N-Triples representation (quoted literals or URIs)");
+            buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
+                    sb.toString());
+            return null;
+        }
+        return result;
     }
 
 }

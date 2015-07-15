@@ -32,12 +32,12 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.htree.HTree;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for the {@link Name2Addr index} used to name index names to the

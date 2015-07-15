@@ -73,7 +73,6 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.LRUNexus;
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.ICheckpointProtocol;
 import com.bigdata.btree.IIndex;
@@ -149,6 +148,7 @@ import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.ha.msg.Mock2PhaseCommitProtocolException;
 import com.bigdata.htree.HTree;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IDataRecord;
 import com.bigdata.io.IDataRecordAccess;
@@ -180,7 +180,7 @@ import com.bigdata.rwstore.sector.MemoryManager;
 import com.bigdata.service.AbstractHATransactionService;
 import com.bigdata.service.AbstractTransactionService;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.ClocksNotSynchronizedException;
 import com.bigdata.util.NT;
 import com.bigdata.util.StackInfoReport;
@@ -1089,7 +1089,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 
                     _bufferStrategy = new MemStrategy(new MemoryManager(
                             DirectBufferPool.INSTANCE,
-                            Integer.MAX_VALUE/* maxSectors */, true/* blocks */, properties));
+                            Integer.MAX_VALUE/* maxSectors */, true/*blocking*/, properties));
 
                     break;
 
@@ -8702,5 +8702,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 				
 			};
 		}   	
+    }
+    
+    @Override
+    public boolean isHAJournal() {
+    	return false;
     }
 }

@@ -40,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
@@ -79,7 +80,6 @@ import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IInlineURIFactory;
@@ -120,8 +120,9 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.util.CanonicalFactory;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.NT;
+import com.bigdata.util.concurrent.CanonicalFactory;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
@@ -1763,7 +1764,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                  * LexiconConfiguration.
                  */
                 final URI dt = ((BigdataLiteral) v).getDatatype();
-                if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
+                if (dt == null || dt.equals(XSD.STRING)) {
+                    // always text index strings, even inline ones
+                    textIndex.add(v);
+                } else if (lexiconConfiguration.isInlineDatatypeToTextIndex(dt)) {
                     textIndex.add(v);
                 }
                 
@@ -2899,6 +2903,22 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             ));
         }
     };
+    
+    /**
+     * Clear all term caches for the supplied namespace.
+     */
+    @SuppressWarnings("rawtypes")
+    static public void clearTermCacheFactory(final String namespace) {
+        
+        final Iterator it = termCacheFactory.entryIterator();
+        while (it.hasNext()) {
+            final NT nt = (NT) ((Entry) it.next()).getKey();
+            if (nt.getName().equals(namespace)) {
+                it.remove();
+            }
+        }
+        
+    }
     
     /**
      * The {@link Vocabulary} implementation class.

@@ -50,12 +50,12 @@ import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.ByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.util.BytesUtil;
 
 /**
  * This class provides (de-)compression for logical byte[][]s based on canonical

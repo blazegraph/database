@@ -35,7 +35,6 @@ import net.jini.config.ConfigurationException;
 
 import org.openrdf.model.vocabulary.RDF;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.config.Configuration;
 import com.bigdata.journal.ITx;
@@ -47,6 +46,7 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.accesspath.IAccessPath;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Utility to create a scale-out KB instance.  You must specify an appropriate

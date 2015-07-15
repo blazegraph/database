@@ -47,14 +47,13 @@ import com.bigdata.bop.engine.IQueryDecl;
 import com.bigdata.bop.engine.IQueryPeer;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.QueryEngineCounters;
-import com.bigdata.journal.ConcurrencyManager;
 import com.bigdata.journal.IIndexManager;
+import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.DataService;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ManagedResourceService;
 import com.bigdata.service.ResourceService;
-import com.bigdata.service.jini.JiniFederation;
 
 /**
  * An {@link IBigdataFederation} aware {@link QueryEngine}.
@@ -286,7 +285,7 @@ public class FederatedQueryEngine extends QueryEngine {
 
         this.isDataService = isDataService;
         
-        if(fed instanceof JiniFederation<?>) {
+        if(fed.isJiniFederation()) {
 
             /*
              * The proxy for this query engine when used as a query controller.
@@ -299,7 +298,7 @@ public class FederatedQueryEngine extends QueryEngine {
              * explicitly configured Exporter for its proxy. 
              */
 
-            this.clientProxy = (IQueryClient) ((JiniFederation<?>) fed)
+            this.clientProxy = (IQueryClient) ((AbstractDistributedFederation<?>) fed)
                     .getProxy(this, true/* enableDGC */);
 
         } else {

@@ -8,6 +8,9 @@
     <condition property="mvn.home" value="${env.MAVEN_HOME}" else="">
        <isset property="env.MAVEN_HOME" />
     </condition>
+    <condition property="java.home" value="${env.JAVA_HOME}" else="/usr/java/current">
+       <isset property="env.JAVA_HOME" />
+    </condition>
     <exec executable="hostname"
         outputproperty="this.hostname">
      </exec>
@@ -116,6 +119,7 @@
       <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 </echo>
       <java jar="${dependency.dir}/${classserver.jar}"
+	    jvm="${java.home}/bin/java"
             fork="true"
             spawn="true">
         <arg value="-verbose" />
@@ -129,6 +133,7 @@
       <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 	</echo>
       <java jar="${dependency.dir}/${classserver.jar}"
+	    jvm="${java.home}/bin/java"
             fork="true"
             failonerror="true">
         <arg line="-port ${test.codebase.port}" />
@@ -149,6 +154,7 @@
 </echo>
       <java classname="com.bigdata.service.jini.util.LookupStarter"
 	    classpathref="jini.classpath"
+	    jvm="${java.home}/bin/java"
             fork="true"
             spawn="true">
         <sysproperty key="app.home" value="${app.home}" />
@@ -178,6 +184,7 @@
 </echo>
       <java classname="com.bigdata.service.jini.util.LookupStarter"
             fork="true"
+	    jvm="${java.home}/bin/java"
             failonerror="true">
         <classpath refid="jini.classpath" />
         <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />

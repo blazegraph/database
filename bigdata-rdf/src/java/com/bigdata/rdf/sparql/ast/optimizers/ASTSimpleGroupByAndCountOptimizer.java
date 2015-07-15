@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
@@ -50,6 +52,7 @@ import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.QueryBase;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -89,6 +92,8 @@ import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
  */
 public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
 
+    private static final transient Logger log = Logger.getLogger(ASTSimpleGroupByAndCountOptimizer.class);
+    
    public ASTSimpleGroupByAndCountOptimizer() {
    }
 
@@ -240,8 +245,29 @@ public class ASTSimpleGroupByAndCountOptimizer implements IASTOptimizer {
          if (!(potentialStmtPattern instanceof StatementPatternNode)) {
             return;
          }
-
+         
          stmtPattern = (StatementPatternNode) potentialStmtPattern;
+         
+         /*
+          * When in history mode, we can't do this optimization because neither
+          * a distinct term scan nor a fast range count is possible, except if 
+          * the StatementPatternNode has been marked to read history.
+          */
+         if (context.getAbstractTripleStore().isRDRHistory()) {
+             
+             if (!stmtPattern.getQueryHintAsBoolean(QueryHints.HISTORY, false)) {
+                 if (log.isDebugEnabled()) {
+                     log.debug("nope");
+                 }
+                 // Can not rewrite.
+                 return;
+             }
+             
+         }
+         if (log.isDebugEnabled()) {
+             log.debug("yep");
+         }
+
          Set<VarNode> varNodesInStmtPattern = new HashSet<VarNode>();
          VarNode graphVarNode = null;
          for (int i = 0; i < stmtPattern.arity(); i++) {

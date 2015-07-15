@@ -91,5 +91,17 @@ public interface IJournal extends IMRMW, IAtomicStore, IBTreeManager {
    long awaitHAReady(final long timeout, final TimeUnit units)
          throws InterruptedException, TimeoutException,
          AsynchronousQuorumCloseException;
+   
+   /**
+    * Convenience method created in BLZG-1370 to factor out bigdata-jini
+    * artifact dependencies.
+    * 
+    * This should return true IFF the underlying journal is com.bigdata.jini.ha.HAJournal. 
+    * 
+    * @return
+    */
+   public boolean isHAJournal();
+
+  
 
 }

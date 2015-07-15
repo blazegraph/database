@@ -27,12 +27,12 @@ package com.bigdata.rdf.internal.impl.literal;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.util.Bytes;
 
 /** Implementation for inline <code>xsd:unsignedInt</code>. */
 public class XSDUnsignedIntIV<V extends BigdataLiteral> extends

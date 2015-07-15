@@ -36,10 +36,10 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.util.ChecksumUtility;
 
 import junit.framework.TestCase;
 

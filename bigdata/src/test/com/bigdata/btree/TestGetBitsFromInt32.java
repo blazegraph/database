@@ -28,6 +28,8 @@ package com.bigdata.btree;
 
 import java.util.Formatter;
 
+import com.bigdata.util.BytesUtil;
+
 import junit.framework.TestCase2;
 
 /**

@@ -34,8 +34,8 @@ import java.util.concurrent.ExecutionException;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Correctness test suite for unisolated writes on one or more indices. The

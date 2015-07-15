@@ -31,6 +31,7 @@ import junit.framework.TestCase2;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for low-level operations on variable length byte[]s.

@@ -38,6 +38,7 @@ import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Options;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test build trees on the journal, evicts them into an {@link IndexSegment},

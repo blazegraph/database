@@ -60,6 +60,7 @@ import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
+import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.hints.IQueryHint;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintException;
@@ -613,9 +614,16 @@ public class ASTQueryHintOptimizer implements IASTOptimizer {
      */
     private String getValue(final TermNode t) {
 
-        if (!(t instanceof ConstantNode)) {
-            throw new RuntimeException(
-                    "Object position of query hint must be a constant.");
+//        if (!(t instanceof ConstantNode)) {
+//            throw new RuntimeException(
+//                    "Object position of query hint must be a constant.");
+//        }
+        
+        /*
+         * Let the variable through as a string.
+         */
+        if (t instanceof VarNode) {
+            return '?'+((VarNode) t).getValueExpression().getName();
         }
 
         final BigdataValue v = ((ConstantNode) t).getValue();

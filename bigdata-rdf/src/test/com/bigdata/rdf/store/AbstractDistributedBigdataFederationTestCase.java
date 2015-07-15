@@ -29,8 +29,7 @@ package com.bigdata.rdf.store;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.util.JiniServicesHelper;
+import com.bigdata.service.AbstractScaleOutClient;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data
@@ -53,23 +52,27 @@ abstract public class AbstractDistributedBigdataFederationTestCase extends TestC
         super(name);
     }
 
-    private JiniServicesHelper helper = new JiniServicesHelper();
+//BLZG-1370 removing unused test classes for bigdata-jini
+    //private JiniServicesHelper helper = new JiniServicesHelper();
     
-    protected JiniClient client;
+    protected AbstractScaleOutClient client;
     
     protected void setUp() throws Exception {
         
         // start services.
-        helper.start();
+//BLZG-1370 removing unused test classes for bigdata-jini
+//        helper.start();
         
         // expose to subclasses.
-        client = helper.client;
+//BLZG-1370 removing unused test classes for bigdata-jini
+//        client = helper.client;
         
     }
 
     protected void tearDown() throws Exception {
         
-        helper.destroy();
+//BLZG-1370 removing unused test classes for bigdata-jini
+//        helper.destroy();
         
     }
     

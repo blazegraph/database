@@ -12,8 +12,8 @@ import junit.framework.TestCase2;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.journal.Journal.Options;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rwstore.RWStore;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 
 /**

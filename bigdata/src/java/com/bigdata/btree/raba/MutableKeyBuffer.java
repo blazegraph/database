@@ -27,7 +27,7 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A flyweight mutable implementation exposing the backing byte[][] and

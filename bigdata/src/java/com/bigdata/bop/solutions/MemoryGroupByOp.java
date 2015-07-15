@@ -42,6 +42,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.ContextBindingSet;
 import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
@@ -54,6 +55,7 @@ import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.htree.HTree;
 import com.bigdata.rdf.error.SparqlTypeErrorException;
+import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.util.InnerCause;
 
@@ -525,7 +527,7 @@ public class MemoryGroupByOp extends GroupByOp {
              * any) may then be then be trivially evaluated. If the solution is
              * not dropped, then only the SELECTed variables are projected out.
              */
-            final IBindingSet aggregates = new ListBindingSet();
+            final IBindingSet aggregates = new ContextBindingSet(context,new ListBindingSet());
 
             /**
              * Propagate GROUP_BY expression onto [aggregates]. 

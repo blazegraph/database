@@ -46,9 +46,9 @@ import com.bigdata.io.IDataRecord;
 import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.compression.IRecordCompressorFactory;
 import com.bigdata.io.compression.NOPRecordCompressor;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * <p>

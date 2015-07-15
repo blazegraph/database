@@ -47,6 +47,7 @@ import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.IValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.QueryType;
@@ -355,6 +356,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
            projection.addProjectionVar(new VarNode("s"));
            
            final JoinGroupNode whereClause = new JoinGroupNode();
+           whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
            given.setWhereClause(whereClause);
 
            whereClause.addChild(new StatementPatternNode(new VarNode("s"),
@@ -381,6 +383,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           expected.setWhereClause(whereClause);
 
           whereClause.addChild(new StatementPatternNode(new VarNode("s"),
@@ -438,6 +441,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
            projection.addProjectionVar(new VarNode("s"));
            
            final JoinGroupNode whereClause = new JoinGroupNode();
+           whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
            given.setWhereClause(whereClause);
 
            final FilterNode filterNode = 
@@ -469,6 +473,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           expected.setWhereClause(whereClause);
 
           final StatementPatternNode spn = 
@@ -522,6 +527,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
            projection.addProjectionVar(new VarNode("s"));
            
            final JoinGroupNode whereClause = new JoinGroupNode();
+           whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
            given.setWhereClause(whereClause);
 
            
@@ -555,6 +561,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           expected.setWhereClause(whereClause);
 
           
@@ -611,6 +618,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
            projection.addProjectionVar(new VarNode("s"));
            
            final JoinGroupNode whereClause = new JoinGroupNode();
+           whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
            given.setWhereClause(whereClause);
 
            
@@ -644,6 +652,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           expected.setWhereClause(whereClause);
 
           
@@ -699,6 +708,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           
@@ -736,6 +746,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          final FunctionNode bound = 
@@ -785,6 +796,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           
@@ -822,6 +834,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          final FunctionNode bound = 
@@ -868,6 +881,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           final StatementPatternNode spn = 
@@ -913,6 +927,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          final StatementPatternNode spn = 
@@ -970,7 +985,8 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
     */
    public void testOrAndSwitchWithNegation() {
       
-      final ASTFilterNormalizationOptimizer rewriter = new ASTFilterNormalizationOptimizer();
+      final ASTFilterNormalizationOptimizer rewriter = 
+         new ASTFilterNormalizationOptimizer();
 
       /*
        * Note: DO NOT share structures in this test!!!!
@@ -986,6 +1002,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setQueryHint(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           final StatementPatternNode spn = 
@@ -1025,6 +1042,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           
           assertFalse(StaticAnalysis.isCNF(filterNode));
           whereClause.addChild(filterNode);
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
 
       }
 
@@ -1037,7 +1055,9 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setQueryHint(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
+         
 
          final StatementPatternNode spn = 
                new StatementPatternNode(
@@ -1075,6 +1095,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          whereClause.addChild(new FilterNode(or4));
          whereClause.addChild(new FilterNode(or5));
          whereClause.addChild(new FilterNode(or6));
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
 
       }
       
@@ -1109,6 +1130,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           final StatementPatternNode spn = 
@@ -1188,6 +1210,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          final StatementPatternNode spn = 
@@ -1373,6 +1396,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           final StatementPatternNode spn = 
@@ -1423,6 +1447,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          final StatementPatternNode spn = 
@@ -1536,6 +1561,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           whereClause.addChild(new StatementPatternNode(new VarNode("s1"),
@@ -1600,6 +1626,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          whereClause.addChild(new StatementPatternNode(new VarNode("s1"),
@@ -1675,6 +1702,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
 
           whereClause.addChild(new StatementPatternNode(new VarNode("s"),
@@ -1707,6 +1735,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
 
          whereClause.addChild(new StatementPatternNode(new VarNode("s"),
@@ -1790,6 +1819,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
           projection.addProjectionVar(new VarNode("s"));
           
           final JoinGroupNode whereClause = new JoinGroupNode();
+          whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
           given.setWhereClause(whereClause);
           
           final StatementPatternNode spo1 =
@@ -1883,6 +1913,7 @@ public class TestASTFilterNormalizationOptimizer extends AbstractASTEvaluationTe
          projection.addProjectionVar(new VarNode("s"));
          
          final JoinGroupNode whereClause = new JoinGroupNode();
+         whereClause.setProperty(QueryHints.NORMALIZE_FILTER_EXPRESSIONS, "true");
          expected.setWhereClause(whereClause);
          
          final StatementPatternNode spo1 =

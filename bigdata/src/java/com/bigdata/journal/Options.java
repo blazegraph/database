@@ -41,12 +41,12 @@ import com.bigdata.io.compression.IRecordCompressor;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.io.writecache.WriteCache.ReadCache;
 import com.bigdata.io.writecache.WriteCacheService;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.rwstore.RWStore;
 import com.bigdata.rwstore.sector.MemStore;
+import com.bigdata.util.Bytes;
 
 /**
  * Options for the {@link Journal}. Options are specified as property values to

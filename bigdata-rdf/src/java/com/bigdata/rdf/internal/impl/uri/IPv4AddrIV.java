@@ -36,8 +36,6 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
@@ -48,6 +46,8 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.util.BytesUtil;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Internal value representing an inline IP address.  Uses the InetAddress
@@ -127,7 +127,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	
 	// "((?:[0-9]{1,3}\\.){3}[0-9]{1,3})((\\/)(([0-9]{1,2})))?
 
-	private static final Pattern pattern = 
+	public static final Pattern pattern = 
 			Pattern.compile(IPv4_OPTIONAL_CIDR_PATTERN);
 	
     /**

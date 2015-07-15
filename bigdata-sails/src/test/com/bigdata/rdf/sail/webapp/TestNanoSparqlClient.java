@@ -31,6 +31,7 @@ import junit.framework.Test;
 
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.LinkedHashModel;
@@ -623,6 +624,112 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 		doConstructTest("POST", RDFFormat.TRIX);
 	}
 
+    /**
+     * A construct where the data has duplicate triples in different named
+     * graphs. We materialize all triples. In this version of the test the
+     * duplicate triples should be eliminated (this is verified by a count of
+     * the CONSTRUCT results).
+     * 
+     * <pre>
+     * PREFIX : <http://www.bigdata.com/>
+     * 
+     * CONSTRUCT {
+     *   ?s ?p ?o
+     * } where {
+     *   GRAPH ?g {?s ?p ?o}
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1341"> Query hint
+     *      to disable DISTINCT SPO semantics for CONSTRUCT </a>
+     */
+    public void test_construct_eliminates_duplicates_triples() throws Exception {
+       
+        if (!getTestMode().isQuads()) {
+            // This is a quads mode only test.
+            return;
+        }
+        
+        // Load data. Includes the same triple in 2 different named graphs.
+        m_repo.add(new AddOp(
+                new File(
+                        "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/construct-eliminates-duplicate-triples.trig"),
+                RDFFormat.TRIG));
+
+        // Should be two statements.
+        final long rangeCount = m_repo.rangeCount(null/* s */, null/* p */,
+                null/* o */, (Resource) null/* c */);
+
+        assertEquals(2, rangeCount);
+        
+//        final String queryHint = "\n hint:Query hint:constructDistinctSPO true .\n";
+        final String queryHint = ""; // No query hint.
+        
+        final String queryStr = "PREFIX : <http://www.bigdata.com/> \n" + //
+                "CONSTRUCT { ?s ?p ?o }\n"//
+                + "WHERE { " + queryHint + " GRAPH ?g {?s ?p ?o} }";
+
+        final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
+
+        final long n = countResults(query.evaluate());
+
+        assertEquals(1, n);
+
+    }
+    	
+    /**
+     * A construct where the data has duplicate triples in different named
+     * graphs. We materialize all triples. In this version of the test the
+     * duplicate triples should be eliminated (this is verified by a count of
+     * the CONSTRUCT results).
+     * 
+     * <pre>
+     * PREFIX : <http://www.bigdata.com/>
+     * 
+     * CONSTRUCT {
+     *   ?s ?p ?o
+     * } where {
+     *   hint:Query hint:constructDistinctSPO false .
+     *   GRAPH ?g {?s ?p ?o}
+     * }
+     * </pre>
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1341"> Query hint
+     *      to disable DISTINCT SPO semantics for CONSTRUCT </a>
+     */
+    public void test_construct_does_not_eliminate_duplicates_triples() throws Exception {
+       
+        if (!getTestMode().isQuads()) {
+            // This is a quads mode only test.
+            return;
+        }
+        
+        // Load data. Includes the same triple in 2 different named graphs.
+        m_repo.add(new AddOp(
+                new File(
+                        "bigdata-sails/src/test/com/bigdata/rdf/sail/webapp/construct-eliminates-duplicate-triples.trig"),
+                RDFFormat.TRIG));
+
+        // Should be two statements.
+        final long rangeCount = m_repo.rangeCount(null/* s */, null/* p */,
+                null/* o */, (Resource) null/* c */);
+
+        assertEquals(2, rangeCount);
+        
+        final String queryHint = "\n hint:Query hint:constructDistinctSPO false .\n";
+        
+        final String queryStr = "PREFIX : <http://www.bigdata.com/> \n" + //
+                "CONSTRUCT { ?s ?p ?o }\n"//
+                + "WHERE { " + queryHint + " GRAPH ?g {?s ?p ?o} }";
+
+        final IPreparedGraphQuery query = m_repo.prepareGraphQuery(queryStr);
+
+        final long n = countResults(query.evaluate());
+
+        assertEquals(2, n);
+
+    }
+        
 	/**
 	 * Unit test for ACID UPDATE using PUT. This test is for the operation where
 	 * a SPARQL selects the data to be deleted and the request body contains the

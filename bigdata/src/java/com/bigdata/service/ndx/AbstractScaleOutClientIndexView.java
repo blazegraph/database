@@ -41,7 +41,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AsynchronousIndexWriteConfiguration;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ICounter;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleCursor;
@@ -85,6 +84,7 @@ import com.bigdata.service.IMetadataService;
 import com.bigdata.service.Split;
 import com.bigdata.service.ndx.pipeline.IDuplicateRemover;
 import com.bigdata.service.ndx.pipeline.IndexWriteTask;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.IFilter;
 

@@ -4,13 +4,13 @@ import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleCursor;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.KeyOutOfRangeException;
 import com.bigdata.io.ByteArrayBuffer;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.FilterBase;
 

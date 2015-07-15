@@ -26,7 +26,7 @@ package com.bigdata.ha.msg;
 import java.io.Serializable;
 import java.util.UUID;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 public class HADigestResponse implements IHADigestResponse, Serializable {
 

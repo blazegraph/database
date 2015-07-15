@@ -18,7 +18,6 @@ import com.bigdata.bop.ap.filter.DistinctFilter;
 import com.bigdata.bop.engine.IRunningQuery;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.HTreeIndexMetadata;
 import com.bigdata.btree.ICheckpointProtocol;
@@ -38,6 +37,7 @@ import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rwstore.sector.MemStore;
 import com.bigdata.rwstore.sector.MemoryManager;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 import cutthecrap.utils.striterators.Filter;
 import cutthecrap.utils.striterators.Filterator;

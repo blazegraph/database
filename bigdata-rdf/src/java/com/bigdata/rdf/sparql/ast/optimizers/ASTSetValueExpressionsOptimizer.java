@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.AssignmentNode;
@@ -93,7 +94,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
 
 //        convert1(lex, query); // Works around a concurrent modification.
 
-        convert2(globals, query); // Should be faster.
+        convert2(context.context, globals, query); // Should be faster.
         
         return new QueryNodeWithBindingSet(query, bindingSets);
         
@@ -139,7 +140,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
      * @param lex
      * @param query
      */
-    private void convert2(final GlobalAnnotations globals, final QueryRoot query) {
+    private void convert2(final BOpContextBase context, final GlobalAnnotations globals, final QueryRoot query) {
         
         /*
          * Visit nodes that require modification.
@@ -192,7 +193,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
             if (op instanceof IValueExpressionNodeContainer) {
 
                 // AssignmentNode, FilterNode, OrderByExpr
-        		AST2BOpUtility.toVE(globals, 
+        		AST2BOpUtility.toVE(context, globals, 
         				((IValueExpressionNodeContainer) op).getValueExpressionNode());
                 
             } else if (op instanceof HavingNode) {
@@ -201,7 +202,7 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
                 
                 for(IValueExpressionNode node : havingNode) {
                 
-                    AST2BOpUtility.toVE(globals, node);
+                    AST2BOpUtility.toVE(context, globals, node);
                     
                 }
                 
@@ -214,10 +215,10 @@ public class ASTSetValueExpressionsOptimizer implements IASTOptimizer {
             	if (range != null) {
             		
             		if (range.from() != null)
-            			AST2BOpUtility.toVE(globals, range.from());
+            			AST2BOpUtility.toVE(context, globals, range.from());
             			
             		if (range.to() != null)
-            			AST2BOpUtility.toVE(globals, range.to());
+            			AST2BOpUtility.toVE(context, globals, range.to());
             		
             	}
                 

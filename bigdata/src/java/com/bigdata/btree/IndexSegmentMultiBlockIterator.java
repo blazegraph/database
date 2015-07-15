@@ -11,6 +11,7 @@ import com.bigdata.btree.IndexSegment.ImmutableNodeFactory.ImmutableLeaf;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A fast iterator based on multi-block IO for the {@link IndexSegment}. This

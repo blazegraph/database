@@ -1,0 +1,9 @@
+@prefix : <http://www.bigdata.com/> .
+
+:foo {
+:Bryan :likes :RDF .
+}
+
+:bar {
+:Bryan :likes :RDF .
+}

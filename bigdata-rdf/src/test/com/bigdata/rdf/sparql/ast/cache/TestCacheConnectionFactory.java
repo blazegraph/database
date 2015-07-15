@@ -36,7 +36,7 @@ import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Stress test for correct shutdown of the {@link ICacheConnection} as allocated
