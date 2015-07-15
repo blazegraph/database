@@ -74,9 +74,15 @@ dependencies.
     <build>
        <resources>
         <resource>
+            <directory>bigdata-rdf/src/resources</directory>
+            <includes>
+                <include>**/*</include>
+	    </includes>
+        </resource>
+        <resource>
             <directory>bigdata-sails/src/resources</directory>
             <includes>
-                <include>**/*.xml</include>
+                <include>**/*</include>
 	    </includes>
         </resource>
         <resource>

@@ -196,7 +196,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_small() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf";
+        final String resource = "/com/bigdata/rdf/rio/small.rdf";
 
         doLoadAndVerifyTest(resource, getProperties());
 
@@ -207,7 +207,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_small_quadsMode() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf";
+        final String resource = "/com/bigdata/rdf/rio/small.rdf";
 
         final Properties p = getProperties();
         
@@ -223,7 +223,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_little_ttl_quadsMode() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/little.ttl";
+        final String resource = "/com/bigdata/rdf/rio/little.ttl";
 
         final Properties p = getProperties();
         
@@ -239,7 +239,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_little_trig_quadsMode() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/little.trig";
+        final String resource = "/com/bigdata/rdf/rio/little.trig";
 
         final Properties p = getProperties();
         
@@ -254,7 +254,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_smallWithBlobs() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/smallWithBlobs.rdf";
+        final String resource = "/com/bigdata/rdf/rio/smallWithBlobs.rdf";
 
         doLoadAndVerifyTest(resource, getProperties());
 
@@ -265,7 +265,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_smallWithBlobs_quadsMode() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/smallWithBlobs.rdf";
+        final String resource = "/com/bigdata/rdf/rio/smallWithBlobs.rdf";
 
         final Properties p = getProperties();
         
@@ -284,7 +284,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadFails() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/broken.rdf";
+        final String resource = "/com/bigdata/rdf/rio/broken.rdf";
 
         final AbstractTripleStore store = getStore();
         try {
@@ -324,7 +324,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_sampleData() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/sample data.rdf";
+        final String resource = "/com/bigdata/rdf/rio/sample data.rdf";
 
         doLoadAndVerifyTest( resource, getProperties() );
         
@@ -335,7 +335,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_sampleData_quadsMode() throws Exception {
         
-        final String resource = "bigdata-rdf/src/test/com/bigdata/rdf/rio/sample data.rdf";
+        final String resource = "/com/bigdata/rdf/rio/sample data.rdf";
 
         final Properties p = getProperties();
 
@@ -351,7 +351,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_bsbm_pc100() throws Exception {
         
-        final String file = "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt";
+        final String file = "/data/bsbm/dataset_pc100.nt";
 
         final Properties p = getProperties();
 
@@ -367,7 +367,7 @@ public class TestAsynchronousStatementBufferFactory extends
      */
     public void test_loadAndVerify_bsbm_pc100_quadsMode() throws Exception {
 
-        final String file = "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt";
+        final String file = "/data/bsbm/dataset_pc100.nt";
 
         final Properties p = getProperties();
 
@@ -388,7 +388,7 @@ public class TestAsynchronousStatementBufferFactory extends
 //	 */
 //    public void test_loadAndVerify_U1() throws Exception {
 //        
-//        final String file = "bigdata-rdf/src/resources/data/lehigh/U1";
+//        final String file = "/data/lehigh/U1";
 //
 //        doLoadAndVerifyTest(file, getProperties());
 //        

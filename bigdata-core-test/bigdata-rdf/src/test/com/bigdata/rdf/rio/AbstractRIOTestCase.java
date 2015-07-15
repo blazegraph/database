@@ -202,6 +202,18 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
             
             return tasks;
             
+        } else {
+        	
+			final String s = getClass().getClassLoader().getResource(resource).getFile();
+
+			if (s != null) {
+
+				// load a resource from the class loader
+				tasks.add(new LoadTask(s, factory));
+
+				return tasks;
+			}
+        	
         }
 
         // try file system.
@@ -331,6 +343,11 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
                 // try the classpath
                 rdfStream = getClass().getResourceAsStream(resource);
+
+                //Try the class loader
+                if(rdfStream == null) {
+                	rdfStream = getClass().getClassLoader().getResourceAsStream(resource);
+                }
 
                 if (rdfStream != null) {
                     
@@ -513,14 +530,15 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
         final List<Callable<Void>> tasks = new LinkedList<Callable<Void>>();
 
-        if (getClass().getResource(resource) != null) {
+		if (getClass().getResource(resource) != null
+				|| getClass().getClassLoader().getResource(resource) != null) {
 
-            // load a resource on the classpath
-            tasks.add(new VerifyTask(resource, store));
+			// load a resource on the classpath
+			tasks.add(new VerifyTask(resource, store));
 
-            return tasks;
+			return tasks;
 
-        }
+		}
 
         // try file system.
         final File file = new File(resource);
@@ -655,15 +673,28 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                 log.info("Verifying all statements found using reparse: file="
                         + resource);
 
+                InputStream is = null;
+                
                 final String baseURI; ;
                 if (getClass().getResource(resource) != null) {
                     
                     baseURI = getClass().getResource(resource).toURI()
                             .toString();
                     
+                    is = getClass().getResourceAsStream(resource);
+                    
+                } else if (getClass().getClassLoader().getResource(resource) != null) {
+                	
+                    baseURI = getClass().getClassLoader().getResource(resource).toURI()
+                            .toString();
+
+                    is = getClass().getClassLoader().getResourceAsStream(resource);
+                    
                 } else {
                     
                     baseURI = new File(resource).toURI().toString();
+                    
+                    is = new FileInputStream(baseURI);
                     
                 }
                 
@@ -680,9 +711,13 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                 
                 options.setVerifyData(false);
 
+                /*
                 loader.loadRdf(new BufferedReader(new InputStreamReader(
-                        new FileInputStream(resource))), baseURI, rdfFormat,
+                        new FileInputStream(baseURI))), baseURI, rdfFormat,
                         null, options);
+                */
+                loader.loadRdf(new BufferedReader(new InputStreamReader(is)), 
+                		baseURI, rdfFormat, null, options);
 
                 if(log.isInfoEnabled())
                 	log.info("End of reparse: nerrors=" + nerrs + ", file="
