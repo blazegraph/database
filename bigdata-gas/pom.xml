@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT-BLZG_1269_merge</version>
+    <version>1.5.2-SNAPSHOT-BLZG-1272</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
@@ -78,12 +78,18 @@ ga('send', 'pageview');
       <version>${junit3.version}</version>
       <scope>test</scope>
     </dependency>
-    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. -->
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+    <!-- FIXME Remove bigdata dependency. bigdata-gas must not depend on bigdata module.  See BLZG-1272. 
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
       <version>${bigdata.legacy.version}</version>
     </dependency>
+ 	-->
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
