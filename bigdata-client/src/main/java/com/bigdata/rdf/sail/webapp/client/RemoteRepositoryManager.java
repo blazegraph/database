@@ -89,6 +89,9 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
 
     private static final transient Logger log = Logger
             .getLogger(RemoteRepositoryManager.class);
+
+	final static String EXCEPTION_MSG = "Class not found for service provider hook. "
+						+ "Blazegraph specific parser extensions will not be available.";
     
     /**
      * The path to the root of the web application (without the trailing "/").
@@ -474,7 +477,16 @@ public class RemoteRepositoryManager extends RemoteRepositoryBase implements
       setQueryMethod(System.getProperty(QUERY_METHOD, DEFAULT_QUERY_METHOD));
 
       // See #1235 bigdata-client does not invoke ServiceProviderHook.forceLoad()
-      ServiceProviderHook.forceLoad();
+      try {
+    	  ServiceProviderHook.forceLoad();
+      } catch (java.lang.NoClassDefFoundError | java.lang.ExceptionInInitializerError e) {
+    	  //If we are running in unit tests in the client package this introduces
+    	  //a runtime dependency on the bigdata-core artifact.  Just catch the
+    	  //Exception and let the unit test complete.
+    	  if(log.isInfoEnabled()) {
+    		  log.info(EXCEPTION_MSG);
+    	  }
+      }
 
    }
 
