@@ -94,12 +94,7 @@ ga('send', 'pageview');
       <artifactId>junit</artifactId>
       <version>${junit4.version}</version>
     </dependency>
-     <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>rdf-properties</artifactId>
-      <version>${bigdata.version}</version>
-    </dependency>
-     <dependency>
+    <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
       <version>${junit-ext.version}</version>
