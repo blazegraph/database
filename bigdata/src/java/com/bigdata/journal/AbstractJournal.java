@@ -8703,4 +8703,9 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			};
 		}   	
     }
+    
+    @Override
+    public boolean isHAJournal() {
+    	return false;
+    }
 }

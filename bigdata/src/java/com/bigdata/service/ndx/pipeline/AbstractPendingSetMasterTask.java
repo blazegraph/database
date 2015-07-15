@@ -37,8 +37,8 @@ import org.apache.log4j.Logger;
 import com.bigdata.BigdataStatics;
 import com.bigdata.btree.BigdataMap;
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.jini.JiniFederation;
-import com.bigdata.service.jini.master.INotifyOutcome;
+import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.master.INotifyOutcome;
 
 /**
  * Extends the master task to track outstanding asynchronous operations on work
@@ -76,9 +76,9 @@ implements INotifyOutcome<E, L>
      */
     private final ReentrantLock lock = new ReentrantLock();
 
-    private final JiniFederation<?> fed;
+    private final AbstractDistributedFederation<?> fed;
 
-    public JiniFederation<?> getFederation() {
+    public AbstractDistributedFederation<?> getFederation() {
 
         return fed;
 
@@ -104,7 +104,7 @@ implements INotifyOutcome<E, L>
      * @param sinkIdleTimeoutNanos
      * @param sinkPollTimeoutNanos
      */
-    public AbstractPendingSetMasterTask(final JiniFederation<?> fed,
+    public AbstractPendingSetMasterTask(final AbstractDistributedFederation<?> fed,
             final H stats, final BlockingBuffer<E[]> buffer,
             final long sinkIdleTimeoutNanos, final long sinkPollTimeoutNanos) {
 

@@ -48,7 +48,6 @@ import com.bigdata.counters.ICounterNode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.PlatformStatsPlugIn;
-import com.bigdata.journal.jini.ha.HAJournalServer;
 import com.bigdata.rdf.sail.webapp.CountersServlet;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.EntityContentProvider;
@@ -212,7 +211,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
     private HttpClient getClientConnectionManager() {
 
-        final Journal journal = getJournal();
+        final Journal journal = (Journal) getJournal();
 
         QueryEngine queryEngine = QueryEngineFactory
                 .getExistingQueryController(journal);

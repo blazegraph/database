@@ -3188,6 +3188,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
            return delegate.isGroupCommit();
         }
 
+		@Override
+		public boolean isHAJournal() {
+			return false;
+		}
+
     } // class IsolatatedActionJournal
 
     /**
@@ -3212,6 +3217,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
             return getClass().getName() + "{task=" + AbstractTask.this + "}";
 
         }
+        
+        @Override
+		public boolean isHAJournal() {
+			return false;
+		}
 
         @SuppressWarnings({ "unchecked", "rawtypes" })
         public ReadOnlyJournal(final AbstractJournal source) {

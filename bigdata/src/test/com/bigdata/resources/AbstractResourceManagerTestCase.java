@@ -663,6 +663,12 @@ public class AbstractResourceManagerTestCase extends
             // TODO Auto-generated method stub
             return null;
         }
+
+		@Override
+		public boolean isJiniFederation() {
+			// BLZG-1370
+			return false;
+		}
         
     }
     

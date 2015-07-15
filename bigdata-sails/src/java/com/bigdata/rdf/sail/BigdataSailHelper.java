@@ -15,12 +15,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
-import net.jini.config.ConfigurationException;
-
 import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.config.ConfigurationException;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
@@ -36,8 +35,7 @@ import com.bigdata.rdf.store.ScaleOutTripleStore;
 import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.ScaleOutClientFactory;
 import com.bigdata.util.Bytes;
 
 /**
@@ -489,7 +487,7 @@ public class BigdataSailHelper {
      * Utility class.
      * <p>
      * Note: The LTS (local triple store) mode is inferred when the filename is
-     * a <code>.properties</code> file. The {@link JiniFederation} (JDS) mode is
+     * a <code>.properties</code> file. The JiniFederation (JDS) mode is
      * inferred when the filename is a <code>.config</code> file. If neither of
      * those file extensions is used, then you must specify the either LTS or
      * JDS explicitly.
@@ -512,8 +510,7 @@ public class BigdataSailHelper {
      * @throws ConfigurationException
      * @throws IOException
      */
-    public static void main(final String[] args) throws SailException,
-            ConfigurationException, IOException {
+    public static void main(final String[] args) throws SailException, IOException {
 
         if (args.length == 0) {
 
@@ -653,8 +650,8 @@ public class BigdataSailHelper {
         case JDS:
 
             // Should be a jini configuration file.
-            fed = new JiniClient(new String[] { args[0] }).connect();
-
+            fed = (AbstractFederation<?>) ScaleOutClientFactory.getJiniClient(new String[] { args[0] }).connect();
+            
             sail = helper.getSail(fed, namespace, timestamp);
 
             break;

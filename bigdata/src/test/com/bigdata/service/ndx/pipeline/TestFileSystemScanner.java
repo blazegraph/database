@@ -39,8 +39,8 @@ import java.util.concurrent.FutureTask;
 import junit.framework.TestCase2;
 
 import com.bigdata.relation.accesspath.BlockingBuffer;
-import com.bigdata.service.jini.master.AbstractResourceScanner;
-import com.bigdata.service.jini.master.FileSystemScanner;
+import com.bigdata.service.master.AbstractResourceScanner;
+import com.bigdata.service.master.FileSystemScanner;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

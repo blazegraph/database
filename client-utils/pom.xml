@@ -9,11 +9,12 @@
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-war</artifactId>
+  <artifactId>client-utils</artifactId>
   <version>${bigdata.version}</version>
-  <name>bigdata-war</name>
+  <name>client-utils</name>
   <url>http://maven.apache.org</url>
-  <packaging>war</packaging>
+  <build>
+  </build>
 
   <reporting>
     <plugins>
@@ -26,7 +27,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>bigdata-war</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>client-utils</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
@@ -51,26 +52,58 @@ ga('send', 'pageview');
   </reporting>
   
   <dependencies>
-    <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.legacy.version}</version>
+<!--
+     <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit4.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-blueprints</artifactId>
-      <version>${bigdata.version}</version>
+      <artifactId>junit-ext</artifactId>
+      <version>${junit-ext.version}</version>
     </dependency>
     <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-util</artifactId>
-      <version>${bigdata.version}</version>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-client</artifactId>
+      <version>${jetty.version}</version>
     </dependency>
+     <dependency>
+       <groupId>commons-io</groupId>
+       <artifactId>commons-io</artifactId>
+       <version>${apache.commons_io.version}</version>
+     </dependency>
+     <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-util</artifactId>
+	<version>${sesame.version}</version>
+     </dependency>
+     <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-rio-rdfxml</artifactId>
+	<version>${sesame.version}</version>
+     </dependency>
+-->
     <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>rdf-properties</artifactId>
-      <version>${bigdata.version}</version>
+       <groupId>log4j</groupId>
+       <artifactId>log4j</artifactId>
+       <version>${log4j.version}</version>
+     </dependency>
+      <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-runtime</artifactId>
+      <version>${sesame.version}</version>
     </dependency>
+     <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-http</artifactId>
+        <version>${jetty.version}</version>
+     </dependency>
+     <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-client</artifactId>
+        <version>${jetty.version}</version>
+     </dependency>
   </dependencies>
 
   </project>

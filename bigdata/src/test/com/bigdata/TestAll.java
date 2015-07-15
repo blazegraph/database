@@ -121,7 +121,8 @@ public class TestAll extends TestCase {
 //        suite.addTest( com.bigdata.service.mapReduce.TestAll.suite() );
 
         // Jini integration
-        suite.addTest(com.bigdata.jini.TestAll.suite());
+        //BLZG-1370 moved to jini package.
+        //suite.addTest(com.bigdata.jini.TestAll.suite());
 
         // RDF
         suite.addTest(com.bigdata.rdf.TestAll.suite());

@@ -1,105 +1,122 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="bigdata/src/java"/>
-	<classpathentry kind="src" path="bigdata-rdf/src/java"/>
-	<classpathentry kind="src" path="bigdata-sails/src/java"/>
-	<classpathentry kind="src" path="bigdata-blueprints/src/main/java"/>
-	<classpathentry kind="src" path="bigdata/src/test"/>
-	<classpathentry kind="src" path="bigdata-rdf/src/test"/>
-	<classpathentry kind="src" path="bigdata-sails/src/test"/>
-	<classpathentry kind="src" path="bigdata-blueprints/src/test/java"/>
-	<classpathentry kind="src" path="bigdata-war/src"/>
-	<classpathentry kind="src" path="bigdata/src/resources/logging"/>
-	<classpathentry kind="src" path="bigdata-rdf/src/samples"/>
-	<classpathentry kind="src" path="dsi-utils/src/main/java"/>
-	<classpathentry kind="src" path="bigdata-sails/src/samples"/>
-	<classpathentry kind="src" path="bigdata-jini/src/test/java"/>
-	<classpathentry kind="src" path="bigdata-jini/src/main/java"/>
-	<classpathentry kind="src" path="contrib/src/problems"/>
-	<classpathentry kind="src" path="bigdata/src/samples"/>
-	<classpathentry kind="src" path="dsi-utils/src/test/java"/>
-	<classpathentry kind="src" path="ctc-striterators/src/main/java"/>
-	<classpathentry kind="src" path="ctc-striterators/src/test/java"/>
-	<classpathentry kind="src" path="junit-ext/src/test/java"/>
-	<classpathentry kind="src" path="junit-ext/src/main/java"/>
-	<classpathentry kind="src" path="lgpl-utils/src/main/java"/>
-	<classpathentry kind="src" path="lgpl-utils/src/test/java"/>
-	<classpathentry kind="src" path="bigdata-ganglia/src/main/java"/>
-	<classpathentry kind="src" path="bigdata-ganglia/src/test/java"/>
-	<classpathentry kind="src" path="bigdata-rdf/src/resources/service-providers"/>
-	<classpathentry kind="src" path="bigdata-gom/src/java"/>
-	<classpathentry kind="src" path="bigdata-gom/src/test"/>
-	<classpathentry kind="src" path="bigdata-gom/src/samples"/>
-	<classpathentry kind="src" path="bigdata-gas/src/main/java"/>
-	<classpathentry kind="src" path="bigdata-gas/src/test/java"/>
-	<classpathentry kind="src" path="bigdata-client/src/main/java"/>
-	<classpathentry kind="src" path="bigdata-client/src/test/java"/>
-	<classpathentry kind="src" path="rdf-properties/src/main/java"/>
-	<classpathentry kind="src" path="bigdata-util/src/main/java"/>
-	<classpathentry kind="src" path="bigdata-util/src/test/java"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/dsi-utils-1.0.6-020610.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/lgpl-utils-1.0.7-270114.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/servlet-api-3.1.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/colt-1.2.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/unimi/fastutil-6.5.16.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-4.8.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/icu/icu4j-charset-4.8.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/apache/zookeeper-3.4.5.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/browser.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/classserver.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/fiddler.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jini-core.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jini-ext.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jsk-lib.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jsk-platform.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/jsk-resources.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/mahalo.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/mercury.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/norm.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/outrigger.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/reggie.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/start.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/sun-util.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-jini/lib/jini/lib/tools.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-analyzers-3.0.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/lucene/lucene-core-3.0.0.jar"/>
-	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/high-scale-lib-v1.1.2.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-ext-1.1-b3-dev.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-api-1.6.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/slf4j-log4j12-1.6.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/apache/log4j-1.2.17.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/jackson-core-2.3.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/jackson-annotations-2.3.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/jackson-databind-2.3.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/jettison-1.3.3.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/rexster-core-2.5.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/blueprints-core-2.5.0.jar"/>
-	<classpathentry kind="lib" path="bigdata-blueprints/lib/blueprints-test-2.5.0.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-client-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-continuation-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-http-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-io-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-proxy-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-rewrite-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-security-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-server-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-servlet-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-util-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-webapp-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/jetty/jetty-xml-9.2.3.v20140905.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/junit-4.11.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-rdf/lib/openrdf-sesame-2.7.13-onejar.jar" sourcepath="/Users/bryan/cuda-workspace/openrdf-sesame-2.7.13"/>
-	<classpathentry kind="lib" path="bigdata-rdf/lib/sesame-rio-testsuite-2.7.13.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-sparql-testsuite-2.7.13.jar"/>
-	<classpathentry kind="lib" path="bigdata-sails/lib/sesame-store-testsuite-2.7.13.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata/lib/hamcrest-core-1.3.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-blueprints/lib/commons-configuration-1.10.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-io-2.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/httpcore-4.1.4.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/httpmime-4.1.3.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/httpclient-4.1.3.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-fileupload-1.3.1.jar"/>
-	<classpathentry exported="true" kind="lib" path="bigdata-sails/lib/httpcomponents/commons-logging-1.1.1.jar"/>
-	<classpathentry kind="output" path="bin"/>
+  <classpathentry kind="src" path="bigdata/src/java"/>
+  <classpathentry kind="src" path="bigdata-rdf/src/java"/>
+  <classpathentry kind="src" path="bigdata-sails/src/java"/>
+  <classpathentry kind="src" path="bigdata-gom/src/java"/>
+  <classpathentry kind="src" path="bigdata-rdf/src/resources/service-providers" including="**/*" excluding="**/*.java"/>
+  <classpathentry kind="src" path="bigdata-sails/src/resources" including="**/*.xml" excluding="**/*.java"/>
+  <classpathentry kind="src" path="bigdata/src/test" including="**/*.csv|**/*.owl|**/*.properties|**/*.xml|**/*.txt|**/*.ttl|**/*.ttlx|**/*.rq|**/*.srx|**/*.trig" excluding="**/*.java"/>
+  <classpathentry kind="src" path="bigdata-rdf/src/test" including="**/*.n3|**/*.nt|**/*.owl|**/*.properties|**/*.xml|**/*.txt|**/*.ttl|**/*.ttlx|**/*.rq|**/*.rdf|**/*.srx|**/*.trig" excluding="**/*.java"/>
+  <classpathentry kind="src" path="bigdata-sails/src/test" including="**/*.n3|**/*.nt|**/*.owl|**/*.properties|**/*.xml|**/*.txt|**/*.ttl|**/*.ttlx|**/*.rq|**/*.srx|**/*.trig" excluding="**/*.java"/>
+  <classpathentry kind="src" path="bigdata-gom/src/test" including="**/*.n3|**/*.owl|**/*.properties|**/*.xml|**/*.txt|**/*.ttl|**/*.ttlx|**/*.rq|**/*.srx|**/*.trig" excluding="**/*.java"/>
+  <classpathentry kind="src" path="bigdata-war/src" including="**/*.properties|**/*.xml|**/*.txt|**/*.ttl|**/*.rq|**/*.srx|**/*.trig" excluding="**/*.java"/>
+  <classpathentry kind="output" path="target/classes"/>
+  <classpathentry kind="var" path="M2_REPO/javax/servlet/javax.servlet-api/3.1.0/javax.servlet-api-3.1.0.jar"/>
+  <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
+  <classpathentry kind="var" path="M2_REPO/com/github/stephenc/high-scale-lib/high-scale-lib/1.1.2/high-scale-lib-1.1.2.jar"/>
+  <classpathentry kind="var" path="M2_REPO/colt/colt/1.2.0/colt-1.2.0.jar"/>
+  <classpathentry kind="var" path="M2_REPO/concurrent/concurrent/1.3.4/concurrent-1.3.4.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/lucene/lucene-core/3.0.0/lucene-core-3.0.0.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/lucene/lucene-analyzers/3.0.0/lucene-analyzers-3.0.0.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/ibm/icu/icu4j/4.8/icu4j-4.8.jar"/>
+  <classpathentry kind="var" path="M2_REPO/log4j/log4j/1.2.17/log4j-1.2.17.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/slf4j/slf4j-api/1.6.1/slf4j-api-1.6.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/slf4j/slf4j-log4j12/1.6.1/slf4j-log4j12-1.6.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/httpcomponents/httpclient/4.1.3/httpclient-4.1.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/httpcomponents/httpcore/4.1.4/httpcore-4.1.4.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-logging/commons-logging/1.1.1/commons-logging-1.1.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-codec/commons-codec/1.4/commons-codec-1.4.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/httpcomponents/httpclient-cache/4.1.3/httpclient-cache-4.1.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/httpcomponents/httpmime/4.1.3/httpmime-4.1.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-fileupload/commons-fileupload/1.3.1/commons-fileupload-1.3.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-io/commons-io/2.1/commons-io-2.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/fasterxml/jackson/core/jackson-core/2.2.3/jackson-core-2.2.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/fasterxml/jackson/core/jackson-annotations/2.2.3/jackson-annotations-2.2.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/fasterxml/jackson/core/jackson-databind/2.2.3/jackson-databind-2.2.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/codehaus/jettison/jettison/1.3.3/jettison-1.3.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/stax/stax-api/1.0.1/stax-api-1.0.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-runtime/2.7.12/sesame-runtime-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-model/2.7.12/sesame-model-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-util/2.7.12/sesame-util-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-api/2.7.12/sesame-repository-api-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-query/2.7.12/sesame-query-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-api/2.7.12/sesame-rio-api-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-manager/2.7.12/sesame-repository-manager-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-event/2.7.12/sesame-repository-event-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-sail/2.7.12/sesame-repository-sail-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sail-api/2.7.12/sesame-sail-api-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryalgebra-model/2.7.12/sesame-queryalgebra-model-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryparser-api/2.7.12/sesame-queryparser-api-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-trig/2.7.12/sesame-rio-trig-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-turtle/2.7.12/sesame-rio-turtle-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-datatypes/2.7.12/sesame-rio-datatypes-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-languages/2.7.12/sesame-rio-languages-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sail-memory/2.7.12/sesame-sail-memory-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sail-inferencer/2.7.12/sesame-sail-inferencer-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryparser-serql/2.7.12/sesame-queryparser-serql-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryalgebra-evaluation/2.7.12/sesame-queryalgebra-evaluation-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-sparql/2.7.12/sesame-repository-sparql-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-http-client/2.7.12/sesame-http-client-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-http-protocol/2.7.12/sesame-http-protocol-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-ntriples/2.7.12/sesame-rio-ntriples-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryresultio-api/2.7.12/sesame-queryresultio-api-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-httpclient/commons-httpclient/3.1/commons-httpclient-3.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryparser-sparql/2.7.12/sesame-queryparser-sparql-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryresultio-sparqlxml/2.7.12/sesame-queryresultio-sparqlxml-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-http/2.7.12/sesame-repository-http-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-contextaware/2.7.12/sesame-repository-contextaware-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sail-federation/2.7.12/sesame-sail-federation-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryresultio-binary/2.7.12/sesame-queryresultio-binary-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryresultio-sparqljson/2.7.12/sesame-queryresultio-sparqljson-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-queryresultio-text/2.7.12/sesame-queryresultio-text-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/net/sf/opencsv/opencsv/2.0/opencsv-2.0.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-repository-dataset/2.7.12/sesame-repository-dataset-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-binary/2.7.12/sesame-rio-binary-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-nquads/2.7.12/sesame-rio-nquads-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-n3/2.7.12/sesame-rio-n3-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-rdfjson/2.7.12/sesame-rio-rdfjson-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-rdfxml/2.7.12/sesame-rio-rdfxml-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-trix/2.7.12/sesame-rio-trix-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sail-nativerdf/2.7.12/sesame-sail-nativerdf-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sail-rdbms/2.7.12/sesame-sail-rdbms-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-dbcp/commons-dbcp/1.3/commons-dbcp-1.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/commons-pool/commons-pool/1.5.4/commons-pool-1.5.4.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-rio-testsuite/2.7.12/sesame-rio-testsuite-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/xml-security/xmlsec/1.3.0/xmlsec-1.3.0.jar"/>
+  <classpathentry kind="var" path="M2_REPO/xalan/xalan/2.6.0/xalan-2.6.0.jar"/>
+  <classpathentry kind="var" path="M2_REPO/xml-apis/xml-apis/1.0.b2/xml-apis-1.0.b2.jar"/>
+  <classpathentry kind="var" path="M2_REPO/junit/junit/4.11/junit-4.11.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-sparql-testsuite/2.7.12/sesame-sparql-testsuite-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/openrdf/sesame/sesame-store-testsuite/2.7.12/sesame-store-testsuite-2.7.12.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/apache/zookeeper/zookeeper/3.4.5/zookeeper-3.4.5.jar"/>
+  <classpathentry kind="var" path="M2_REPO/jline/jline/0.9.94/jline-0.9.94.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/jboss/netty/netty/3.2.2.Final/netty-3.2.2.Final.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/bigdata-ganglia/1.5.2-SNAPSHOT-BLZG-1370/bigdata-ganglia-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/bigdata-gas/1.5.2-SNAPSHOT-BLZG-1370/bigdata-gas-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/bigdata-gas/1.5.2-SNAPSHOT-BLZG-1370/bigdata-gas-1.5.2-SNAPSHOT-BLZG-1370-tests.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/ctc-striterators/1.5.2-SNAPSHOT-BLZG-1370/ctc-striterators-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/dsi-utils/1.5.2-SNAPSHOT-BLZG-1370/dsi-utils-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/it/unimi/dsi/fastutil/6.5.16/fastutil-6.5.16.jar"/>
+  <classpathentry kind="var" path="M2_REPO/it/unimi/dsi/dsiutils/1.0.10/dsiutils-1.0.10.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/junit-ext/1.1-b3-dev/junit-ext-1.1-b3-dev.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/lgpl-utils/1.5.2-SNAPSHOT-BLZG-1370/lgpl-utils-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/rdf-properties/1.5.2-SNAPSHOT-BLZG-1370/rdf-properties-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/com/blazegraph/bigdata-util/1.5.2-SNAPSHOT-BLZG-1370/bigdata-util-1.5.2-SNAPSHOT-BLZG-1370.jar"/>
+  <classpathentry kind="var" path="M2_REPO/net/jini/jini-ext/2.1/jini-ext-2.1.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-continuation/9.2.3.v20140905/jetty-continuation-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-http/9.2.3.v20140905/jetty-http-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-util/9.2.3.v20140905/jetty-util-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-io/9.2.3.v20140905/jetty-io-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-jmx/9.2.3.v20140905/jetty-jmx-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-jndi/9.2.3.v20140905/jetty-jndi-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-server/9.2.3.v20140905/jetty-server-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-webapp/9.2.3.v20140905/jetty-webapp-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-xml/9.2.3.v20140905/jetty-xml-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-servlet/9.2.3.v20140905/jetty-servlet-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-security/9.2.3.v20140905/jetty-security-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-rewrite/9.2.3.v20140905/jetty-rewrite-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-client/9.2.3.v20140905/jetty-client-9.2.3.v20140905.jar"/>
+  <classpathentry kind="var" path="M2_REPO/org/eclipse/jetty/jetty-proxy/9.2.3.v20140905/jetty-proxy-9.2.3.v20140905.jar"/>
 </classpath>

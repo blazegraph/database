@@ -48,11 +48,12 @@ import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.sail.BigdataSailRepository;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.store.ScaleOutTripleStore;
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractScaleOutClient;
+import com.bigdata.service.ScaleOutClientFactory;
 
 /**
- * Runs the SPARQL test suite against a {@link JiniFederation}, which must be
+ * Runs the SPARQL test suite against a JiniFederation, which must be
  * already deployed. Each test in the suite is run against a distinct quad store
  * in its own bigdata namespace.
  * <p>
@@ -246,13 +247,13 @@ extends SPARQLQueryTest
         return _ts ;
     }
 
-    private JiniFederation<Object> getFederation ()
+    private AbstractDistributedFederation<Object> getFederation ()
         throws Exception
     {
         if ( null == _fed )
         {
-            JiniClient<Object> jc = new JiniClient<Object> ( new String [] { getConfiguration () } ) ;
-            _fed = jc.connect () ;
+            AbstractScaleOutClient<?> jc = ScaleOutClientFactory.getJiniClient( new String [] { getConfiguration () } ) ;
+			_fed = (AbstractDistributedFederation<Object>) jc.connect();
         }
         return _fed ;
     }
@@ -372,7 +373,7 @@ extends SPARQLQueryTest
      * Instance fields for the current test.
      */
     
-    private JiniFederation<Object> _fed = null ;
+    private AbstractDistributedFederation<Object> _fed = null ;
     private ScaleOutTripleStore _ts = null ;
     private BigdataSail _sail = null;
     
