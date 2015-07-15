@@ -46,6 +46,8 @@ import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.FederationCallable;
 import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.master.IAsynchronousClientTask;
+import com.bigdata.service.master.IHashFunction;
 import com.bigdata.service.ndx.pipeline.AbstractPendingSetMasterTask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtask;
 import com.bigdata.service.ndx.pipeline.AbstractSubtaskStats;

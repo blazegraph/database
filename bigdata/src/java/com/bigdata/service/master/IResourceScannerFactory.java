@@ -22,32 +22,32 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*
- * Created on Jul 15, 2009
+ * Created on Jul 12, 2009
  */
 
-package com.bigdata.service.jini.master;
+package com.bigdata.service.master;
 
 import java.io.Serializable;
 
+import com.bigdata.relation.accesspath.BlockingBuffer;
+
 /**
- * A hash function.
+ * Factory for AbstractResourceScanner implementations.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
- * 
- * @param <V>
- *            The generic type of the value whose hash code will be returned.
  */
-public interface IHashFunction<V> extends Serializable {
+public interface IResourceScannerFactory<V> extends Serializable {
 
     /**
-     * Return the hash code of the value.
+     * Return a new scanner instance.
      * 
-     * @param value
-     *            The value.
+     * @param buffer
+     *            The buffer on which the scanner will place resources to be
+     *            processed.
      * 
-     * @return The hash code.
+     * @return The scanner.
      */
-    public int hashFunction(V value);
-    
+    public AbstractResourceScanner<V> newScanner(BlockingBuffer<V[]> buffer);
+
 }

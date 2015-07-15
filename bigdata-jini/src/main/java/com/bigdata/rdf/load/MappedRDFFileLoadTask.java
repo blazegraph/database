@@ -24,7 +24,7 @@ import com.bigdata.service.IRemoteExecutor;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.master.AbstractAsynchronousClientTask;
 import com.bigdata.service.jini.master.ClientLocator;
-import com.bigdata.service.jini.master.INotifyOutcome;
+import com.bigdata.service.master.INotifyOutcome;
 
 /**
  * Task reads files from the file system, loads them into an

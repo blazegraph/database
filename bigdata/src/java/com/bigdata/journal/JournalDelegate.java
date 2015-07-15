@@ -62,6 +62,11 @@ public class JournalDelegate implements IJournal {
 	public JournalDelegate(final AbstractJournal source) {
 		this.delegate = source;
 	}
+	
+	@Override
+	public boolean isHAJournal() {
+		return false;
+	}
 
 	@Override
 	public Properties getProperties() {

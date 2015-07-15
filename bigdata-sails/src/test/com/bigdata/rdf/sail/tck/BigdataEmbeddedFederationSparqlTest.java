@@ -32,7 +32,6 @@ import java.util.Properties;
 
 import junit.framework.Test;
 import junit.framework.TestSuite;
-import net.jini.config.ConfigurationException;
 
 import org.apache.log4j.Logger;
 import org.openrdf.query.Dataset;
@@ -282,16 +281,9 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
         fed = client.connect();
 
         final BigdataSail sail;
-        try {
 
-            sail = new BigdataSail(openTripleStore(NAMESPACE, properties));
+        sail = new BigdataSail(openTripleStore(NAMESPACE, properties));
             
-        } catch (ConfigurationException e) {
-            
-            throw new RuntimeException(e);
-            
-        }
-
         // See #1196 (Enable BigdataEmbeddedFederationSparqlTest tests in CI)
 //        return new DatasetRepository(new BigdataSailRepository(sail));
         return new BigdataSailRepository(sail);
@@ -358,7 +350,7 @@ public class BigdataEmbeddedFederationSparqlTest extends BigdataSparqlTest {
      * Create/re-open the repository.
      */
     private AbstractTripleStore openTripleStore(final String namespace,
-            final Properties properties) throws ConfigurationException {
+            final Properties properties) {
 
         // locate the resource declaration (aka "open").
         AbstractTripleStore tripleStore = (AbstractTripleStore) fed

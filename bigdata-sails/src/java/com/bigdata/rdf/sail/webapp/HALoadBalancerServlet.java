@@ -44,7 +44,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.counters.CAT;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.journal.jini.ha.HAJournal;
+//import com.bigdata.journal.jini.ha.HAJournal;
 import com.bigdata.rdf.sail.webapp.lbs.DefaultHARequestURIRewriter;
 import com.bigdata.rdf.sail.webapp.lbs.IHALoadBalancerPolicy;
 import com.bigdata.rdf.sail.webapp.lbs.IHAPolicyLifeCycle;
@@ -332,7 +332,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
         final IIndexManager indexManager = BigdataServlet
                 .getIndexManager(servletContext);
 
-        if (!(indexManager instanceof HAJournal)) {
+        if (! ((AbstractJournal) indexManager).isHAJournal()) {
             // This is not an error, but the LBS is only for HA.
             log.warn("Not HA");
             return;
@@ -412,7 +412,7 @@ public class HALoadBalancerServlet extends ProxyServlet {
         final IIndexManager indexManager = BigdataServlet
                 .getIndexManager(servletContext);
 
-        if (indexManager instanceof HAJournal
+        if (((AbstractJournal) indexManager).isHAJournal()
                 && ((AbstractJournal) indexManager).getQuorum() != null
                 && ((AbstractJournal) indexManager).getQuorum()
                         .replicationFactor() > 1) {

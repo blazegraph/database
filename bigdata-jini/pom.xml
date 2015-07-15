@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT-BLZG_1269_client</version>
+    <version>1.5.2-SNAPSHOT-BLZG-1370</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
@@ -98,6 +98,8 @@
         <configuration>
          <basedir>${basedir}</basedir>
          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
+	 <forkCount>2</forkCount>
+         <reuseForks>true</reuseForks>
          <printSummary>false</printSummary>
          <disableXmlReport>false</disableXmlReport>
         </configuration>
@@ -230,12 +232,12 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
     </dependency>
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

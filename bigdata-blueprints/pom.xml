@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT-BLZG_1269_client</version>
+    <version>1.5.2-SNAPSHOT-BLZG-1370</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
@@ -33,7 +33,7 @@
                 <artifactItem>
       		  <groupId>com.blazegraph</groupId>
                   <artifactId>bigdata-war</artifactId>
-      		  <version>${bigdata.version}</version>
+      		  <version>${bigdata.legacy.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target</outputDirectory>
@@ -138,7 +138,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
@@ -162,7 +162,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.bigdata</groupId>
       <artifactId>bigdata</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${bigdata.legacy.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

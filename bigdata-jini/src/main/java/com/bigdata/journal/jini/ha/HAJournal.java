@@ -47,6 +47,7 @@ import java.util.concurrent.locks.Lock;
 
 import net.jini.config.Configuration;
 import net.jini.config.ConfigurationException;
+import net.jini.core.lookup.ServiceID;
 import net.jini.export.Exporter;
 import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
@@ -59,6 +60,7 @@ import com.bigdata.concurrent.FutureTaskInvariantMon;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
 import com.bigdata.ha.HAGlue;
+import com.bigdata.ha.IHAJournal;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.RunState;
 import com.bigdata.ha.halog.HALogWriter;
@@ -87,6 +89,7 @@ import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
+import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
@@ -136,7 +139,7 @@ import com.bigdata.util.StackInfoReport;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/530"> Journal HA </a>
  */
-public class HAJournal extends Journal {
+public class HAJournal extends Journal implements IHAJournal {
 
     private static final Logger log = Logger.getLogger(HAJournal.class);
 
@@ -2340,5 +2343,22 @@ public class HAJournal extends Journal {
         }
 
     }
+    
+    @Override
+    public boolean isHAJournal() {
+    	return true;
+    }
+
+    /**
+     * BLZG-1370 Convenience method to encapsulate bigdata-jini dependencies.
+     */
+	@Override
+	public UUID getServiceID() {
+
+		 final ServiceID tmp = getHAJournalServer().getServiceID();
+
+		 return JiniUtil.serviceID2UUID(tmp);
+		
+	}
     
 }

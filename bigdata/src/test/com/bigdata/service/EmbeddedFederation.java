@@ -1048,4 +1048,10 @@ public class EmbeddedFederation<T> extends AbstractScaleOutFederation<T> {
         
     }
 
+	@Override
+	public boolean isJiniFederation() {
+		//BLZG-1370
+		return false;
+	}
+
 }

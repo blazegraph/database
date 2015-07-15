@@ -1,4 +1,4 @@
-package com.bigdata.rdf.lexicon;
+package com.bigdata.rdf.util;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -21,6 +21,9 @@ import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.lexicon.BlobsIndexHelper;
+import com.bigdata.rdf.lexicon.LexiconKeyOrder;
+import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
@@ -29,7 +32,6 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 
@@ -39,11 +41,18 @@ import com.bigdata.util.BytesUtil;
  * @author thompsonbry
  */
 public class DumpLexicon {
+	
+	private final static String REMOTE_ERR_MSG = "Remote Lexicon dumping is not supported by this class."
+			+ "\nPlease use DumpRemoteLexicon in bigdata-jini."
+			+ "See BLZG-1370 \n";
+	
+	private final static String CONFIG_EXT = ".config";
+	private final static String PROPERTY_EXT = ".properties";
 
-	private DumpLexicon() {
+	protected DumpLexicon() {
 	}
 
-	private static void usage() {
+	protected static void usage() {
         
         System.err.println("usage: (-tuples) <namespace> <filename>");
 
@@ -57,9 +66,12 @@ public class DumpLexicon {
      *            jini configuration file (for a bigdata federation). The file
      *            must end with either ".properties" or ".config".
      *            
+     *            Starting with 1.5.2 the remote dump lexicon capability
+     *            was moved into the bigdata-jini artifact.  See BLZG-1370.
+     *            
      * @return The {@link IIndexManager}.
      */
-    private static IIndexManager openIndexManager(final String propertyFile) {
+    protected static IIndexManager openIndexManager(final String propertyFile) {
 
         final File file = new File(propertyFile);
 
@@ -69,13 +81,11 @@ public class DumpLexicon {
 
         }
 
-        boolean isJini = false;
-        if (propertyFile.endsWith(".config")) {
+        if (propertyFile.endsWith(CONFIG_EXT)) {
             // scale-out.
-            isJini = true;
-        } else if (propertyFile.endsWith(".properties")) {
+			throw new RuntimeException(REMOTE_ERR_MSG);
+        } else if (propertyFile.endsWith(PROPERTY_EXT)) {
             // local journal.
-            isJini = false;
         } else {
             /*
              * Note: This is a hack, but we are recognizing the jini
@@ -87,55 +97,39 @@ public class DumpLexicon {
                             + file);
         }
 
-        final IIndexManager indexManager;
-        try {
+		final IIndexManager indexManager;
+		try {
 
-            if (isJini) {
+			/*
+			 * Note: we only need to specify the FILE when re-opening a journal
+			 * containing a pre-existing KB.
+			 */
+			final Properties properties = new Properties();
+			{
+				// Read the properties from the file.
+				final InputStream is = new BufferedInputStream(
+						new FileInputStream(propertyFile));
+				try {
+					properties.load(is);
+				} finally {
+					is.close();
+				}
+				if (System.getProperty(BigdataSail.Options.FILE) != null) {
+					// Override/set from the environment.
+					properties.setProperty(BigdataSail.Options.FILE,
+							System.getProperty(BigdataSail.Options.FILE));
+				}
+			}
 
-                /*
-                 * A bigdata federation.
-                 */
+			final Journal jnl = new Journal(properties);
 
-                @SuppressWarnings("unchecked")
-                final JiniClient<?> jiniClient = new JiniClient(
-                        new String[] { propertyFile });
+			indexManager = jnl;
 
-                indexManager = jiniClient.connect();
+		} catch (Exception ex) {
 
-            } else {
+			throw new RuntimeException(ex);
 
-                /*
-                 * Note: we only need to specify the FILE when re-opening a
-                 * journal containing a pre-existing KB.
-                 */
-                final Properties properties = new Properties();
-                {
-                    // Read the properties from the file.
-                    final InputStream is = new BufferedInputStream(
-                            new FileInputStream(propertyFile));
-                    try {
-                        properties.load(is);
-                    } finally {
-                        is.close();
-                    }
-                    if (System.getProperty(BigdataSail.Options.FILE) != null) {
-                        // Override/set from the environment.
-                        properties.setProperty(BigdataSail.Options.FILE, System
-                                .getProperty(BigdataSail.Options.FILE));
-                    }
-                }
-
-                final Journal jnl = new Journal(properties);
-                
-                indexManager = jnl;
-
-            }
-
-        } catch (Exception ex) {
-
-            throw new RuntimeException(ex);
-
-        }
+		}
 
         return indexManager;
         

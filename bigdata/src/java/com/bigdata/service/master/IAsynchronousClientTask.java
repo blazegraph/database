@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jul 13, 2009
  */
 
-package com.bigdata.service.jini.master;
+package com.bigdata.service.master;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
 
 /**
  * Interface for remote {@link Callable}s which process chunks of resources as
- * assigned by the {@link MappedTaskMaster}. This interface extends
+ * assigned by the MappedTaskMaster. This interface extends
  * {@link Remote} since its methods are invoked using RMI.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
@@ -96,7 +96,7 @@ public interface IAsynchronousClientTask<U, V> extends Remote {
      * Return a proxy for the future of this task (this allows us to have both
      * the proxy for the task and the proxy for its {@link Future}). The
      * {@link Future} is required in order to interrupt the client tasks when
-     * the {@link MappedTaskMaster} terminates.
+     * the MappedTaskMaster terminates.
      * 
      * @throws IllegalStateException
      *             if the future has not been set.

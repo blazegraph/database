@@ -55,9 +55,9 @@ import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.service.jini.master.AbstractAsynchronousClientTask;
 import com.bigdata.service.jini.master.ClientLocator;
-import com.bigdata.service.jini.master.INotifyOutcome;
 import com.bigdata.service.jini.master.MappedTaskMaster;
 import com.bigdata.service.jini.master.TaskMaster;
+import com.bigdata.service.master.INotifyOutcome;
 import com.bigdata.util.Bytes;
 
 /**
@@ -66,6 +66,8 @@ import com.bigdata.util.Bytes;
  * clients. The clients will run until the master is canceled loading any data
  * found in the {@link JobState#dataDir}. Files are optionally deleted after
  * they have been successfully loaded. Closure may be optionally computed.
+ * 
+ * BLZG-1370 moved this into the bigdata-jini package to resolve the dependency.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$

@@ -44,9 +44,10 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.RWStrategy;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.service.AbstractDistributedFederation;
+import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.IBigdataFederation;
-import com.bigdata.service.jini.JiniClient;
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.ScaleOutClientFactory;
 import com.bigdata.util.Bytes;
 
 /**
@@ -71,7 +72,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 
 	/**
 	 * The {@link IIndexManager} for the backing persistence engine (may be a
-	 * {@link Journal} or {@link JiniFederation}).
+	 * {@link Journal} or JiniFederation).
 	 */
 	private IIndexManager m_indexManager;
 
@@ -147,7 +148,7 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
 	 * which is in turn running against the caller's {@link IIndexManager}.
 	 * 
 	 * @param indexManager
-	 *            The {@link Journal} or {@link JiniFederation}.
+	 *            The {@link Journal} or JiniFederation.
 	 * @param testMode
 	 *            Identifies what mode the kb instance will be using.
 	 */
@@ -419,8 +420,8 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
                  */
 
 				@SuppressWarnings("rawtypes")
-                final JiniClient<?> jiniClient = new JiniClient(
-						new String[] { propertyFile });
+				final AbstractScaleOutClient<?> jiniClient = ScaleOutClientFactory
+						.getJiniClient(new String[] { propertyFile });
 
                 indexManager = jiniClient.connect();
 
@@ -561,9 +562,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
         	
         } finally {
 
-			if (indexManager instanceof JiniFederation<?>) {
+			if (indexManager instanceof AbstractDistributedFederation<?>) {
 				// disconnect
-				((JiniFederation<?>) indexManager).shutdownNow();
+				((AbstractDistributedFederation<?>) indexManager).shutdownNow();
 			} else {
 				// destroy journal.
 				((Journal) indexManager).destroy();

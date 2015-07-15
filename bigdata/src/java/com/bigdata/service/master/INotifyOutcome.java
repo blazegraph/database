@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jul 10, 2009
  */
 
-package com.bigdata.service.jini.master;
+package com.bigdata.service.master;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;

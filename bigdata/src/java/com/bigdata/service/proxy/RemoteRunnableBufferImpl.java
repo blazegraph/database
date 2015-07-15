@@ -32,15 +32,13 @@ import java.io.IOException;
 import java.rmi.Remote;
 import java.util.concurrent.Future;
 
-import net.jini.export.Exporter;
-
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.relation.accesspath.IRunnableBuffer;
 
 /**
  * A helper object that provides the API of {@link IBlockingBuffer} but whose
  * methods throw {@link IOException} and are therefore compatible with
- * {@link Remote} and {@link Exporter}.
+ * {@link Remote} and Exporter.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
