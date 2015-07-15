@@ -42,6 +42,7 @@ import com.bigdata.journal.IIndexStore;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.TimestampUtility;
 import com.bigdata.rawstore.IBlock;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.IFilter;
 

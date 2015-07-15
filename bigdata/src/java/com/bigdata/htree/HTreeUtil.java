@@ -29,7 +29,7 @@ package com.bigdata.htree;
 
 import it.unimi.dsi.bits.Fast;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Static utility methods and data for an {@link HTree}.

@@ -19,11 +19,11 @@ import org.openrdf.sail.SailException;
 
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.config.ConfigurationException;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.sail.BigdataSail.Options;
@@ -36,6 +36,7 @@ import com.bigdata.relation.RelationSchema;
 import com.bigdata.service.AbstractFederation;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ScaleOutClientFactory;
+import com.bigdata.util.Bytes;
 
 /**
  * Class provides guidance on parameter setup a data set and queries.

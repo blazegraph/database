@@ -36,7 +36,6 @@ import com.bigdata.LRUNexus;
 import com.bigdata.bfs.BigdataFileSystem;
 import com.bigdata.bfs.BigdataFileSystem.Options;
 import com.bigdata.btree.AbstractBTreeTestCase;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -48,6 +47,7 @@ import com.bigdata.mdi.MetadataIndex;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.search.FullTextIndex;
 import com.bigdata.service.ndx.RawDataServiceTupleIterator;
+import com.bigdata.util.BytesUtil;
 
 /**
  * An abstract test harness that sets up (and tears down) the metadata and data

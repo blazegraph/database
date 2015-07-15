@@ -34,9 +34,9 @@ import java.util.Random;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 /**
  * Test suite for {@link IVUnicode}.

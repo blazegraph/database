@@ -42,7 +42,6 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.htree.HTree;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.rdf.internal.IV;
@@ -52,6 +51,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Decoder for {@link IVSolutionSetEncoder}.

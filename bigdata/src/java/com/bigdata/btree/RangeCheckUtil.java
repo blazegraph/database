@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.btree;
 
 import com.bigdata.mdi.ISeparatorKeys;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Utility class to verify that a key lies within a key range.

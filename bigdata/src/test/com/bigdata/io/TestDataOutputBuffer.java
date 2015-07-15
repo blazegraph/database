@@ -31,7 +31,7 @@ import java.io.IOException;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for {@link DataOutputBuffer}.

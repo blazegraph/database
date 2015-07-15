@@ -39,8 +39,8 @@ import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.journal.IIndexManager;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.util.Bytes;
 
 /**
  * Iterator visits {@link Justification}s reading from the justification index.

@@ -68,11 +68,6 @@ ga('send', 'pageview');
       <artifactId>jetty-client</artifactId>
       <version>${jetty.version}</version>
     </dependency>
-    <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
 -->
      <dependency>
        <groupId>commons-io</groupId>
@@ -88,6 +83,21 @@ ga('send', 'pageview');
 	<groupId>org.openrdf.sesame</groupId>
 	<artifactId>sesame-rio-rdfxml</artifactId>
 	<version>${sesame.version}</version>
+     </dependency>
+       <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-rdfxml</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-queryresultio-sparqljson</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>log4j</groupId>
+       <artifactId>log4j</artifactId>
+       <version>${log4j.version}</version>
      </dependency>
   </dependencies>
 

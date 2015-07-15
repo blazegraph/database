@@ -32,7 +32,6 @@ import java.util.Random;
 import java.util.UUID;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.FixedLengthPrefixSplits;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -44,8 +43,9 @@ import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.journal.IJournal;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.Split;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Unit tests for splitting an index segment based on its size on the disk, the

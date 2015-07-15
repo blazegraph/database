@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 import com.bigdata.ha.msg.HARebuildRequest;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.FileMetadata;
 import com.bigdata.journal.ForceEnum;
@@ -42,7 +43,6 @@ import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.util.ChecksumUtility;
 
 /**
  * Shortcuts the HA transfer protocols to exercise directly the low level

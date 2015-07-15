@@ -49,7 +49,6 @@ import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.helpers.RDFHandlerBase;
 
 import com.bigdata.LRUNexus;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.ITupleSerializer;
@@ -81,6 +80,7 @@ import com.bigdata.service.AbstractClient;
 import com.bigdata.service.Split;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 
 /**
  * <p>

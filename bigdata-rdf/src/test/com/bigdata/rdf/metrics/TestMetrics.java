@@ -42,10 +42,10 @@ import junit.framework.TestCase2;
 
 import org.openrdf.rio.RDFFormat;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.rio.LoadStats;
 import com.bigdata.rdf.store.DataLoader;
 import com.bigdata.rdf.store.DataLoader.ClosureEnum;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.PropertyUtil;
 import com.bigdata.util.config.NicUtil;
 

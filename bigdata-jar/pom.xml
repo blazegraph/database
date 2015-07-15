@@ -186,6 +186,11 @@ ga('send', 'pageview');
       <artifactId>bigdata-blueprints</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
   </dependencies>
 
   </project>

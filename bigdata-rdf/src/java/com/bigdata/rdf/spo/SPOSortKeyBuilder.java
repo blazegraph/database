@@ -3,8 +3,8 @@ package com.bigdata.rdf.spo;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.ISortKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.store.IRawTripleStore;
+import com.bigdata.util.Bytes;
 
 /**
  * Class produces unsigned byte[] sort keys for {@link ISPO}s. This

@@ -73,13 +73,13 @@ import com.bigdata.journal.Tx;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.mdi.SegmentMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventType;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IDataService;
 import com.bigdata.service.ndx.IClientIndex;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.NT;
 
 /**

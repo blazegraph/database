@@ -28,11 +28,11 @@ import java.util.UUID;
 import org.openrdf.model.Literal;
 import org.openrdf.model.ValueFactory;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.util.Bytes;
 
 /**
  * Implementation for inline {@link UUID}s (there is no corresponding XML

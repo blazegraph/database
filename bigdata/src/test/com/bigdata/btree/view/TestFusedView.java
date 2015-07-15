@@ -36,7 +36,6 @@ import com.bigdata.btree.AbstractBTreeTestCase;
 import com.bigdata.btree.AbstractTupleCursorTestCase;
 import com.bigdata.btree.BTree;
 import com.bigdata.btree.BloomFilterFactory;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -53,6 +52,7 @@ import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.sparse.SparseRowStore;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.IFilter;
 

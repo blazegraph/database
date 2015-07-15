@@ -63,6 +63,7 @@ import com.bigdata.ha.msg.IHASyncRequest;
 import com.bigdata.ha.msg.IHAWriteMessage;
 import com.bigdata.ha.msg.IHAWriteSetStateRequest;
 import com.bigdata.ha.msg.IHAWriteSetStateResponse;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.FileChannelUtility;
 import com.bigdata.io.IBufferAccess;
@@ -79,8 +80,7 @@ import com.bigdata.quorum.MockQuorumFixture.MockQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
 import com.bigdata.quorum.QuorumMember;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for the {@link WriteCacheService} using pure append writes.

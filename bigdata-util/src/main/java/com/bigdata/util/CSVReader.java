@@ -45,8 +45,6 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rawstore.Bytes;
-
 /**
  * A helper class to read CSV (comma separated value) and similar kinds of
  * delimited data. Files may use commas or tabs to delimit columns. If you have

@@ -28,10 +28,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.raba.AbstractRaba;
 import com.bigdata.btree.raba.IRaba;
 import com.bigdata.htree.HTree;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A flyweight mutable implementation for an {@link HTree} bucket page using a

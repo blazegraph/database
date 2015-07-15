@@ -34,9 +34,9 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexSegment;
+import com.bigdata.util.BytesUtil;
 
 /**
  * This class imposes the constraint that the separator key must not split a

@@ -36,6 +36,7 @@ import org.apache.log4j.Level;
 
 import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.io.SerializerUtil;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

@@ -45,7 +45,6 @@ import net.jini.config.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.KeeperException;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.halog.IHALogReader;
@@ -54,6 +53,7 @@ import com.bigdata.journal.jini.ha.HALogIndex.IHALogRecord;
 import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.zk.ZKQuorumClient;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 

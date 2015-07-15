@@ -30,7 +30,6 @@ package com.bigdata.service;
 import java.io.IOException;
 import java.util.UUID;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -47,6 +46,7 @@ import com.bigdata.journal.ITx;
 import com.bigdata.mdi.PartitionLocator;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.service.ndx.PartitionedTupleIterator;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for the {@link IRangeQuery} API.

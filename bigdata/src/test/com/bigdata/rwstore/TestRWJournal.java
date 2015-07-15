@@ -68,10 +68,10 @@ import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalAbort;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.VerifyCommitRecordIndex;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PseudoRandom;
 

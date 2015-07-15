@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 
-package com.bigdata.jini.util;
+package com.bigdata.util.config;
 
 import java.io.IOException;
 
@@ -31,9 +31,6 @@ import net.jini.url.httpmd.HttpmdUtil;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
-import com.bigdata.util.config.LogUtil;
-import com.bigdata.util.config.NicUtil;
 
 /**
  * Utility class that provides a set of static convenience methods

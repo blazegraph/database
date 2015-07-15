@@ -34,10 +34,10 @@ import org.apache.log4j.Level;
 import com.bigdata.btree.data.ILeafData;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.journal.TestRestartSafe;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.rawstore.RawStoreDelegate;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for {@link BTree#removeAll()}.

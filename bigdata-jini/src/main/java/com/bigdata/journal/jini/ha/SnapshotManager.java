@@ -63,6 +63,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HASnapshotResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
@@ -75,12 +76,11 @@ import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.journal.jini.ha.SnapshotIndex.SnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IServiceInit;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**

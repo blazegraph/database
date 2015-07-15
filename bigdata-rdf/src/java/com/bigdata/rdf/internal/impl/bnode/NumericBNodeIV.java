@@ -25,11 +25,11 @@ package com.bigdata.rdf.internal.impl.bnode;
 
 import org.openrdf.model.BNode;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataBNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.util.Bytes;
 
 /**
  * Class for inline RDF blank nodes. Blank nodes MUST be based on a numeric

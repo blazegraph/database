@@ -39,7 +39,6 @@ import junit.textui.ResultPrinter;
 import com.bigdata.journal.BufferMode;
 import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.Journal;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
@@ -48,6 +47,7 @@ import com.bigdata.service.AbstractDistributedFederation;
 import com.bigdata.service.AbstractScaleOutClient;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.ScaleOutClientFactory;
+import com.bigdata.util.Bytes;
 
 /**
  * A version of the test suite that is intended for local debugging and is NOT
@@ -65,7 +65,7 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
 
 	/**
 	 * The {@link IIndexManager} for the backing persistence engine (may be a
-	 * {@link Journal} or {@link JiniFederation}).
+	 * {@link Journal} or {@link com.bigdata.service.jini.JiniFederation}).
 	 */
 	private IIndexManager m_indexManager;
 
@@ -111,7 +111,7 @@ public class TestNanoSparqlServerWithProxyIndexManager2<S extends IIndexManager>
 	 * which is in turn running against the caller's {@link IIndexManager}.
 	 * 
 	 * @param indexManager
-	 *            The {@link Journal} or {@link JiniFederation}.
+	 *            The {@link Journal} or {@link com.bigdata.service.jini.JiniFederation}.
 	 * @param testMode
 	 *            Identifies what mode the kb instance will be using.
 	 */

@@ -35,14 +35,14 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.IndexMetadata;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.writecache.WriteCache;
 import com.bigdata.quorum.Quorum;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.rwstore.RWStore;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.Bytes;
 
 /**
  * A view onto a root block of the {@link Journal}.

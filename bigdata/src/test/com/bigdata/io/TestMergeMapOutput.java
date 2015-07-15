@@ -1,4 +1,4 @@
-package com.bigdata.util;
+package com.bigdata.io;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -9,6 +9,7 @@ import junit.framework.TestCase2;
 
 import org.junit.Test;
 
+import com.bigdata.io.MergeStreamWithSnapshotData;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.AbstractJournal.ISnapshotData;
 

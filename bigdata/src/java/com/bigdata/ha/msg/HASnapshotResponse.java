@@ -26,10 +26,10 @@ package com.bigdata.ha.msg;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.BytesUtil;
 
 public class HASnapshotResponse implements IHASnapshotResponse, Serializable {
 
