@@ -193,6 +193,8 @@ dependencies.
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
+    <module>../</module>
+    <module>../bigdata-core-test/</module>
     <module>../bigdata-blueprints</module>
     <module>../bigdata-jini</module>
     <module>../bigdata-war</module>
