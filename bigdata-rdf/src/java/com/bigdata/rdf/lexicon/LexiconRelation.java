@@ -80,7 +80,6 @@ import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.NoSuchIndexException;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtensionFactory;
 import com.bigdata.rdf.internal.IInlineURIFactory;
@@ -121,8 +120,9 @@ import com.bigdata.service.IBigdataFederation;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
-import com.bigdata.util.CanonicalFactory;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.NT;
+import com.bigdata.util.concurrent.CanonicalFactory;
 
 import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;

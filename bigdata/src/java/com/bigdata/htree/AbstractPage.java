@@ -31,10 +31,10 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.PO;
 import com.bigdata.btree.data.IAbstractNodeData;
 import com.bigdata.cache.HardReferenceQueue;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Persistence capable abstract base class for HTree pages.

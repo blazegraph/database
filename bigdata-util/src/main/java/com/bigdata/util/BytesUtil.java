@@ -21,7 +21,7 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-package com.bigdata.btree;
+package com.bigdata.util;
 
 import it.unimi.dsi.fastutil.bytes.custom.CustomByteArrayFrontCodedList;
 import it.unimi.dsi.io.InputBitStream;
@@ -33,8 +33,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
-
-import com.bigdata.rawstore.Bytes;
 
 /**
  * Class supporting operations on variable length byte[] keys.
@@ -1001,7 +999,7 @@ public class BytesUtil {
 	 * @throws IllegalArgumentException
 	 *             if <i>nbits</i> is GT 32.
 	 */
-	static/* private */int getMSBMask(final int nbits) {
+	public static/* private */int getMSBMask(final int nbits) {
 
 		if (nbits < 0 || nbits > 32)
 			throw new IllegalArgumentException();

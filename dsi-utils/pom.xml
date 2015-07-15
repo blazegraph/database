@@ -83,6 +83,7 @@
       <groupId>it.unimi.dsi</groupId>
       <artifactId>dsiutils</artifactId>
       <version>1.0.10</version>
+      <!-- <version>1.0.6-020610</version> -->
    </dependency>
   </dependencies>
   

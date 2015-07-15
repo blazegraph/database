@@ -40,8 +40,8 @@ import java.util.Random;
 import org.apache.log4j.Logger;
 import org.apache.system.SystemUtil;
 
-import com.bigdata.btree.BytesUtil;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 import junit.framework.TestCase;
 

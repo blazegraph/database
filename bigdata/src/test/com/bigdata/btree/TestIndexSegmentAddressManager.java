@@ -29,8 +29,8 @@ package com.bigdata.btree;
 
 import java.util.UUID;
 
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.WormAddressManager;
+import com.bigdata.util.Bytes;
 
 /**
  * Tests logic to encode and decode the offsets within regions in an

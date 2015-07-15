@@ -10,7 +10,6 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Properties;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
@@ -19,7 +18,6 @@ import com.bigdata.journal.IJournal;
 import com.bigdata.journal.ITx;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.TimestampUtility;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.internal.impl.TermId;
@@ -34,6 +32,8 @@ import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataClient;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Utility class to dump the TERMS index of a triple store.
@@ -81,14 +81,11 @@ public class DumpLexicon {
 
         }
 
-        boolean isJini = false;
         if (propertyFile.endsWith(CONFIG_EXT)) {
             // scale-out.
-            isJini = true;
 			throw new RuntimeException(REMOTE_ERR_MSG);
         } else if (propertyFile.endsWith(PROPERTY_EXT)) {
             // local journal.
-            isJini = false;
         } else {
             /*
              * Note: This is a hack, but we are recognizing the jini

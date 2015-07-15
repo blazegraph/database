@@ -34,7 +34,6 @@ import java.util.UUID;
 
 import com.bigdata.bop.solutions.JVMDistinctBindingSetsOp;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.NOPTupleSerializer;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
@@ -43,6 +42,7 @@ import com.bigdata.journal.IIndexManager;
 import com.bigdata.journal.TemporaryStore;
 import com.bigdata.relation.rule.IRule;
 import com.bigdata.relation.rule.eval.ISolution;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A filter that imposes a DISTINCT constraint on the {@link ISolution}s

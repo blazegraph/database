@@ -50,8 +50,8 @@ import com.bigdata.btree.keys.KVO;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.TestKeyBuilder;
 import com.bigdata.mdi.IMetadataIndex;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.util.Bytes;
 
 /**
  * Stress test using key-range partitioned index ({@link IMetadataIndex}), which

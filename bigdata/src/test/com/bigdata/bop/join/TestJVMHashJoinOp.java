@@ -43,8 +43,8 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.ap.Predicate;
 import com.bigdata.bop.controller.NamedSetAnnotations;
 import com.bigdata.journal.ITx;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.util.Bytes;
 
 /**
  * Test suite for {@link JVMHashJoinOp}.

@@ -42,13 +42,13 @@ import junit.framework.TestCase2;
 import com.bigdata.ha.msg.HAWriteMessage;
 import com.bigdata.ha.msg.IHAMessage;
 import com.bigdata.ha.msg.IHAWriteMessage;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
 import com.bigdata.journal.StoreTypeEnum;
-import com.bigdata.rawstore.Bytes;
-import com.bigdata.util.ChecksumUtility;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
 /**

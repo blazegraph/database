@@ -35,7 +35,6 @@ import java.util.Properties;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ILocalBTreeView;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.IndexSegment;
@@ -43,6 +42,7 @@ import com.bigdata.btree.IndexSegmentBuilder;
 import com.bigdata.journal.IJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.Options;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Unit tests for splitting an index segment based on its size on the disk, the

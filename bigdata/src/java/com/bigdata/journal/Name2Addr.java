@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ICheckpointProtocol;
@@ -76,10 +75,11 @@ import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.ICounterSet;
 import com.bigdata.io.DataInputBuffer;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.resources.IndexManager;
 import com.bigdata.resources.ResourceManager;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.concurrent.ExecutionExceptions;
 
 import cutthecrap.utils.striterators.IStriterator;

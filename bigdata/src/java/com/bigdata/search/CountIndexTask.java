@@ -2,11 +2,11 @@ package com.bigdata.search;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ISimpleSplitHandler;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Procedure reads on the terms index, aggregating data on a per-{@link Hit}

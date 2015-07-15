@@ -31,8 +31,8 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.KeyBuilder.Options;
+import com.bigdata.util.BytesUtil;
 import com.ibm.icu.text.Collator;
 
 /**

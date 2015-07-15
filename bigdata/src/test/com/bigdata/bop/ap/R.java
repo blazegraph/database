@@ -40,7 +40,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariableOrConstant;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.btree.IndexMetadata;
@@ -52,6 +51,7 @@ import com.bigdata.service.AbstractScaleOutFederation;
 import com.bigdata.striterator.AbstractKeyOrder;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 import com.bigdata.striterator.IKeyOrder;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.SingleValueIterator;
 

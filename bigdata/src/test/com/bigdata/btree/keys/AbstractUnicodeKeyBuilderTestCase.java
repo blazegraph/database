@@ -34,12 +34,12 @@ import java.util.Properties;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.DefaultKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.StrengthEnum;
 import com.bigdata.btree.keys.KeyBuilder.Options;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Base class for the test suites that examine support for Unicode sort keys in

@@ -34,7 +34,6 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.DefaultTupleSerializer;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -45,7 +44,6 @@ import com.bigdata.io.DataInputBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.LongPacker;
 import com.bigdata.io.ShortPacker;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.search.FullTextIndexTupleSerializer;
@@ -54,6 +52,8 @@ import com.bigdata.search.ITermDocRecord;
 import com.bigdata.search.ITermDocVal;
 import com.bigdata.search.ReadOnlyTermDocKey;
 import com.bigdata.search.ReadOnlyTermDocRecord;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Replaces the {@link FullTextIndexTupleSerializer} to support {@link IV}s as

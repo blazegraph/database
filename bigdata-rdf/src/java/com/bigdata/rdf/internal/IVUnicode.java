@@ -36,7 +36,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.compression.IUnicodeCompressor;
 import com.bigdata.io.compression.NoCompressor;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Utility class supporting {@link IV}s having inline Unicode data.

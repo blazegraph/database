@@ -49,12 +49,12 @@ import com.bigdata.journal.RegisterIndexTask;
 import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.IndexPartitionCause;
 import com.bigdata.mdi.LocalPartitionMetadata;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.SimpleMemoryRawStore;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.resources.StoreManager.ManagedJournal;
 import com.bigdata.service.Event;
 import com.bigdata.service.EventResource;
+import com.bigdata.util.Bytes;
 
 /**
  * Basic test of building an index segment from an index partition on overflow.

@@ -37,7 +37,7 @@ import com.bigdata.BigdataStatics;
 import com.bigdata.ha.msg.HAMessageWrapper;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.ChecksumError;
 import com.bigdata.util.InnerCause;
 

@@ -35,7 +35,6 @@ import java.io.ObjectOutput;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -43,6 +42,7 @@ import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.btree.proc.AbstractIndexProcedure;
 import com.bigdata.btree.proc.ISimpleIndexProcedure;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Abstract class implements the atomic read operation. However, it does NOT

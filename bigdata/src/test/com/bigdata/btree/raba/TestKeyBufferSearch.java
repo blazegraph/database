@@ -29,7 +29,7 @@ package com.bigdata.btree.raba;
 
 import junit.framework.TestCase2;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Unit tests for {@link IKeyBuffer#search(byte[] searchKey)}.

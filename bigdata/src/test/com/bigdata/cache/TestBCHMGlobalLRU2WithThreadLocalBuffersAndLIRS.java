@@ -33,8 +33,8 @@ import com.bigdata.LRUNexus.AccessPolicyEnum;
 import com.bigdata.cache.BCHMGlobalLRU2.DLNLirs;
 import com.bigdata.cache.BCHMGlobalLRU2.LIRSAccessPolicy;
 import com.bigdata.cache.BCHMGlobalLRU2.LRUCacheImpl;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rawstore.IAddressManager;
+import com.bigdata.util.Bytes;
 
 /**
  * Some unit tests for the {@link BCHMGlobalLRU2} using true thread local

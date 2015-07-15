@@ -41,7 +41,6 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.keys.ASCIIKeyBuilderFactory;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.htree.HTree;
@@ -55,6 +54,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.model.BigdataValueSerializer;
+import com.bigdata.util.BytesUtil;
 
 /**
  * This class provides fast, efficient serialization for solution sets. Each

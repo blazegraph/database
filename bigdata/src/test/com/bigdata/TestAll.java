@@ -93,7 +93,7 @@ public class TestAll extends TestCase {
         suite.addTest( com.bigdata.io.TestAll.suite() );
         suite.addTest( com.bigdata.net.TestAll.suite() );
         suite.addTest( com.bigdata.config.TestAll.suite() );
-        suite.addTest( com.bigdata.util.TestAll.suite() );
+        //suite.addTest( com.bigdata.util.TestAll.suite() );
         suite.addTest( com.bigdata.util.concurrent.TestAll.suite() );
         suite.addTest( com.bigdata.jsr166.TestAll.suite() );
         suite.addTest( com.bigdata.striterator.TestAll.suite() );

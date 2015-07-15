@@ -8,7 +8,8 @@ import java.io.Serializable;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Imposes constraint that the key before the separatorKey must differ in

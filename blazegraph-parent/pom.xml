@@ -75,7 +75,7 @@ dependencies.
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
       <bigdata.version>1.5.2-SNAPSHOT-BLZG-1370</bigdata.version>
-      <bigdata.legacy.version>1.5.2-SNAPSHOT</bigdata.legacy.version>
+      <bigdata.legacy.version>1.5.2-SNAPSHOT-BLZG-1370</bigdata.legacy.version>
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
@@ -96,7 +96,7 @@ dependencies.
       <log4j.version>1.2.17</log4j.version>
       <colt.version>1.2.0</colt.version>
       <fastutil.version>6.5.16</fastutil.version>
-      <dsiutils.version>1.0.6-020610</dsiutils.version>
+      <dsiutils.version>1.0.10</dsiutils.version>
       <lgplutils.version>1.0.7-270114</lgplutils.version>
       <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
       <jackson.version>2.2.3</jackson.version>
@@ -184,22 +184,18 @@ dependencies.
   </repositories>
 
   <modules>
-<<<<<<< HEAD
     <module>../junit-ext</module>
     <module>../ctc-striterators</module>
     <module>../lgpl-utils</module>
     <module>../dsi-utils</module>
     <module>../rdf-properties</module>
-=======
-    <module>../rdf-properties</module>
-    <module>../bigdata-blueprints</module>
->>>>>>> 455eec7688bf8d9c1ad6199155a71ff56f830970
+    <module>../bigdata-util</module>
     <module>../bigdata-client</module>
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-blueprints</module>
-    <module>../bigdata-war</module>
     <module>../bigdata-jini</module>
+    <module>../bigdata-war</module>
     <module>../bigdata-jar</module>
   </modules>
 

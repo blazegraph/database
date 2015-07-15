@@ -1,5 +1,7 @@
 package com.bigdata.btree;
 
+import com.bigdata.util.BytesUtil;
+
 /**
  * Utility class to dump an index in a variety of ways.
  * 

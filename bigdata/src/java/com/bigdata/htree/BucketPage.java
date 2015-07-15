@@ -35,7 +35,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractTuple;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.IRawRecordAccess;
 import com.bigdata.btree.ITuple;
@@ -47,6 +46,7 @@ import com.bigdata.htree.raba.MutableKeyBuffer;
 import com.bigdata.htree.raba.MutableValueBuffer;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.rawstore.IRawStore;
+import com.bigdata.util.BytesUtil;
 
 import cutthecrap.utils.striterators.EmptyIterator;
 import cutthecrap.utils.striterators.SingleValueIterator;

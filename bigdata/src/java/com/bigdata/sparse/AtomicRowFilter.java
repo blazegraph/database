@@ -33,7 +33,6 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractTuple;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IIndex;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
@@ -43,6 +42,7 @@ import com.bigdata.btree.filter.TupleTransformer;
 import com.bigdata.btree.filter.LookaheadTupleFilter.ILookaheadTupleIterator;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.sparse.TPS.TPV;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Transforms an {@link ITupleIterator} reading directly on an {@link IIndex}

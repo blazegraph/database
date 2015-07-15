@@ -49,11 +49,11 @@ import com.bigdata.journal.ITx;
 import com.bigdata.journal.TemporaryRawStore;
 import com.bigdata.mdi.IMetadataIndex;
 import com.bigdata.mdi.PartitionLocator;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.resources.ResourceManager;
 import com.bigdata.resources.ResourceManager.Options;
 import com.bigdata.service.ndx.ClientIndexView;
 import com.bigdata.service.ndx.RawDataServiceTupleIterator;
+import com.bigdata.util.Bytes;
 
 /**
  * Some unit tests for moving an index partition.

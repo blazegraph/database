@@ -36,7 +36,7 @@ import com.bigdata.btree.data.AbstractReadOnlyNodeData;
 import com.bigdata.btree.data.IAbstractNodeDataCoder;
 import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * Default implementation for immutable {@link IDirectoryData} records.

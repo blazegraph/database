@@ -34,7 +34,6 @@ import junit.framework.TestCase2;
 import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KVO;
@@ -55,6 +54,7 @@ import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.util.DumpLexicon;
+import com.bigdata.util.BytesUtil;
 
 /**
  * Test suite for low-level operations on the BLOBS index.

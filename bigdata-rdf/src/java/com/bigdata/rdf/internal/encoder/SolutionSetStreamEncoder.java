@@ -33,9 +33,9 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.io.DataOutputBuffer;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.rdf.sparql.ast.ISolutionSetStats;
 import com.bigdata.rdf.sparql.ast.SolutionSetStatserator;
+import com.bigdata.util.Bytes;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 

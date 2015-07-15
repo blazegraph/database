@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
 
 import com.bigdata.io.ByteBufferInputStream;
 import com.bigdata.io.LongPacker;
-import com.bigdata.rawstore.Bytes;
+import com.bigdata.util.Bytes;
 
 /**
  * A helper class for (de-)serializing the root addresses.

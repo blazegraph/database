@@ -61,6 +61,16 @@ ga('send', 'pageview');
       <artifactId>bigdata-blueprints</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
   </dependencies>
 
   </project>
