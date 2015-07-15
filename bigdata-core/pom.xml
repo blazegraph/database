@@ -52,13 +52,13 @@ dependencies.
     <version>1.5.2-SNAPSHOT-BLZG_1269_merge</version>
     <relativePath>blazegraph-parent/pom.xml</relativePath>
    </parent>
-   <groupId>com.bigdata</groupId>
-   <artifactId>bigdata</artifactId>
+   <groupId>com.blazegraph</groupId>
+   <artifactId>bigdata-core</artifactId>
     <version>${bigdata.version}</version>
    <packaging>jar</packaging>
-   <name>bigdata(R)</name>
-    <description>Bigdata(R) Maven Build</description>
-    <url>http://www.systap.com/bigdata.htm</url>
+   <name>Blazegraph Core (tm)</name>
+    <description>Blazegraph(TM) Maven Build</description>
+    <url>http://www.blazegraph.com</url>
     <organization>
         <name>SYSTAP, LLC</name>
         <url>http://www.systap.com/</url>
