@@ -363,6 +363,9 @@ public interface IBigdataFederation<T> extends IIndexManager,
     /**
      * Convenience method to return whether the Federation is a Jini Federation.
      * Created in BLZG-1370 to factor our bigdata-jini dependency.
+     * 
+     * This should return true IFF the instance is backed by a com.bigdata.service.jini.JiniFederation.
+     * 
      * @return
      */
 	public boolean isJiniFederation();
