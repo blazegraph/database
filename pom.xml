@@ -754,6 +754,11 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        <artifactId>bigdata-util</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-client</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-continuation</artifactId>
