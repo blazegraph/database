@@ -96,11 +96,6 @@ ga('send', 'pageview');
     </dependency>
      <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-client</artifactId>
-      <version>${bigdata.version}</version>
-    </dependency>
-     <dependency>
-      <groupId>com.blazegraph</groupId>
       <artifactId>rdf-properties</artifactId>
       <version>${bigdata.version}</version>
     </dependency>
@@ -149,22 +144,6 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>rdf-properties</artifactId>
       <version>${bigdata.version}</version>
-    </dependency>
-<!--
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>bigdata-war</artifactId>
-      <version>${bigdata.version}</version>
-      <type>war</type>
-      <scope>test</scope>
-    </dependency>
--->
-    <dependency>
-      <groupId>com.bigdata</groupId>
-      <artifactId>bigdata</artifactId>
-      <version>${bigdata.legacy.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>

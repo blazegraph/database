@@ -62,12 +62,7 @@ ga('send', 'pageview');
 	<artifactId>sesame-util</artifactId>
 	<version>${sesame.version}</version>
      </dependency>
-     <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-rio-rdfxml</artifactId>
-	<version>${sesame.version}</version>
-     </dependency>
-       <dependency>
+    <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-rio-rdfxml</artifactId>
       <version>${sesame.version}</version>
