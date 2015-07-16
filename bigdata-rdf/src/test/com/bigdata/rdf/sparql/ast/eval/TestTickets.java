@@ -1088,4 +1088,18 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_blzg_1021ef.srx"// resultFileURL
        ).runTest();
     }
+    
+    /**
+     * Filter Not Exists RC1 Broken.
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1380">
+     * Filter Not Exists RC1 Broken</a>
+     */
+    public void test_ticket_blzg_1380() throws Exception {
+       new TestHelper("ticket_blzg_1380",// testURI,
+             "ticket_blzg_1380.rq",// queryFileURL
+             "ticket_blzg_1380.trig",// dataFileURL
+             "ticket_blzg_1380.srx"// resultFileURL
+       ).runTest();
+    }
 }
