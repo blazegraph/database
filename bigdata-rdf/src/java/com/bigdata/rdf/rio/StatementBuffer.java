@@ -425,7 +425,7 @@ public class StatementBuffer<S extends Statement> implements IStatementBuffer<S>
     @Override
     public long flush() {
        
-        log.warn("");
+    //    log.warn("");
 
         /*
          * Process deferred statements (NOP unless using statement identifiers).
