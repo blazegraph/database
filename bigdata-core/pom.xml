@@ -83,6 +83,7 @@ dependencies.
                 <include>**/*.ttl</include>
                 <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
+                <include>**/*.js</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
             </includes>
