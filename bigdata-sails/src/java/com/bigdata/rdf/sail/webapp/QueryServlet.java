@@ -80,6 +80,7 @@ import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.AbstractQueryTask;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
+import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
@@ -1557,8 +1558,7 @@ public class QueryServlet extends BigdataRDFServlet {
          p = EncodeDecodeValue.decodeURI(req.getParameter("p"));
          o = EncodeDecodeValue.decodeValue(req.getParameter("o"));
          c = decodeContexts(req, "c");
-         mimeTypes = req.getHeaders("Content-Type");
-//         c = EncodeDecodeValue.decodeContexts(req.getParameterValues("c"));
+         mimeTypes = req.getHeaders(ConnectOptions.ACCEPT_HEADER);
       } catch (IllegalArgumentException ex) {
          buildAndCommitResponse(resp, HTTP_BADREQUEST, MIME_TEXT_PLAIN,
                ex.getLocalizedMessage());
@@ -1642,7 +1642,8 @@ public class QueryServlet extends BigdataRDFServlet {
 	                    if (conn.getTripleStore().isQuads() && (mt.equals(RDFFormat.NQUADS.getDefaultMIMEType()) || mt.equals(RDFFormat.TURTLE.getDefaultMIMEType())) || !conn.getTripleStore().isQuads() && fmt != null) {
 	                        mimeType = mt;
 	                        format = fmt;
-	                        break mimeTypesLoop;	                    }
+	                        break mimeTypesLoop;
+	                    }
                 	}
                 }
             }
