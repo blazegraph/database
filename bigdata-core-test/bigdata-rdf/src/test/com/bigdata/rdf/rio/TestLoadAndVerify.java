@@ -187,7 +187,7 @@ public class TestLoadAndVerify extends AbstractRIOTestCase {
      */
     public void test_loadAndVerify_U1() throws Exception {
         
-        final String file = "/data/lehigh/U1";
+        final String file = "/data/lehigh/LUBM-U1.rdf.gz";
 
         doLoadAndVerifyTest(file, parallel);
         
