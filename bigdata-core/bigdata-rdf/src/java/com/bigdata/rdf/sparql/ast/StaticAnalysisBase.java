@@ -191,6 +191,13 @@ public class StaticAnalysisBase {
 
             // fall through - look for attached filters.
 
+        } else if (op instanceof BindingsClause) {
+    
+            final BindingsClause bc = (BindingsClause)op;
+            
+            varSet.addAll(bc.getDeclaredVariables());
+           return varSet;
+          
         } else if (op instanceof FilterNode && !filters) {
 
             // DO NOT RECURSE INTO THE FILTER!
