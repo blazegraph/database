@@ -36,6 +36,7 @@ import com.bigdata.bop.join.GPUJoinGroupOp;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
+import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode.Annotations;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
@@ -72,7 +73,11 @@ public class ASTGPUAccelerationOptimizer extends AbstractJoinGroupOptimizer {
       // TODO: disable for quads mode, sids mode, etc., check whether
       // GPU mode is turned on
       
-      // TODO: avoid using this optimizer as per query hint
+      // Verify that this optimizer has not been disabled with a query hint.
+      if (!group.getProperty(
+         QueryHints.DISABLE_GPU_ACCELERATION, 
+         QueryHints.DEFAULT_DISABLE_GPU_ACCELERATION))
+         return;
       
       // the subgroups
       final List<GPUAcceleratableGroup> gpuAcceleratableGroups = 

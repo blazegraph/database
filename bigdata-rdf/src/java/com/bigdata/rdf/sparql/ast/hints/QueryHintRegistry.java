@@ -103,6 +103,7 @@ public class QueryHintRegistry {
         add(new RTONEdgesQueryHint());
         add(new OptimisticQueryHint());
         add(new NormalizeFilterExpressionHint());
+        add(new DisableGPUAccelerationHint());
 
         // Analytic query mode.
         add(new AnalyticQueryHint());
