@@ -348,7 +348,7 @@ public class BuildInfo {
         <jar destfile="${build.dir}/${version}-sources.jar">
             <fileset dir="${bigdata.dir}/bigdata/src/java" />
             <fileset dir="${bigdata.dir}/bigdata/src/samples" />
-            <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-ganglia/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-client/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
