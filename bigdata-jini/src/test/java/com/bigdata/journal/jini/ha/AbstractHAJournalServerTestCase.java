@@ -68,7 +68,6 @@ import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
-import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
@@ -742,7 +741,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/617" >
      *      Concurrent KB create fails with "No axioms defined?" </a>
      * 
-     * @see TestConcurrentKBCreate
+     * @see com.bigdata.rdf.sail.TestConcurrentKBCreate
      * 
      *      Note: This method sometimes deadlocked in the repo.size() call on
      *      the leader (HTTP end point). This was tracked down to an attempt by
