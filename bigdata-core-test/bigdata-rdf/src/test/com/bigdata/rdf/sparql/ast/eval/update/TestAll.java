@@ -27,13 +27,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest2;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest2DiskRW;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTest2DiskWORM;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest;
-import com.bigdata.rdf.sail.tck.BigdataSPARQLUpdateTxTest2;
-
 /**
  * Aggregates test suites into increasing dependency order.
  * 
@@ -72,48 +65,6 @@ public class TestAll extends TestCase {
          * engine to evaluate SPARQL update at this time. 
          */
 //        suite.addTestSuite(TestUpdateBootstrap.class);
-
-        /*
-         * The openrdf SPARQL UPDATE test suite.
-         * 
-         * Note: This test suite is for quads mode only. SPARQL UPDATE support
-         * is also tested by the NSS test suite.
-         */
-
-        // Unisolated operations.
-        suite.addTestSuite(BigdataSPARQLUpdateTest.class);
-
-        // Fully isolated read/write operations.
-        suite.addTestSuite(BigdataSPARQLUpdateTxTest.class);
-
-        /**
-         * The bigdata extensions to SPARQL UPDATE to support solution sets as
-         * well as graphs.
-         * 
-         * Note: We need to run a few different IRawStore backends to confirm
-         * support for the IStreamStore interface and to confirm that the store
-         * correctly supports SPARQL UPDATE on NAMED SOLUTION SETS using that
-         * IStreamStore interface.
-         * 
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/531">
-         *      SPARQL UPDATE Extensions (Trac) </a>
-         * @see <a
-         *      href="https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=SPARQL_Update">
-         *      SPARQL Update Extensions (Wiki) </a>
-         * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/555" >
-         *      Support PSOutputStream/InputStream at IRawStore </a>
-         */
-        {
-
-            // Unisolated operations
-            suite.addTestSuite(BigdataSPARQLUpdateTest2.class); // MemStore.
-            suite.addTestSuite(BigdataSPARQLUpdateTest2DiskRW.class);
-            suite.addTestSuite(BigdataSPARQLUpdateTest2DiskWORM.class);
-
-            // Fully isolated read/write operations.
-            suite.addTestSuite(BigdataSPARQLUpdateTxTest2.class); // MemStore
-
-        }
 
         return suite;
 

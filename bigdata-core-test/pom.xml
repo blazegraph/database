@@ -49,7 +49,7 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-BLZG_1269_merge-SNAPSHOT</version>
+    <version>1.5.2-BLZG_1269_sails_test-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
@@ -80,12 +80,6 @@ dependencies.
 	    </includes>
         </resource>
         <resource>
-            <directory>bigdata-sails/src/resources</directory>
-            <includes>
-                <include>**/*</include>
-	    </includes>
-        </resource>
-        <resource>
             <directory>bigdata/src/test</directory>
             <includes>
                 <include>**/*.csv</include>
@@ -98,6 +92,7 @@ dependencies.
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
+                <include>**/*.java</include>
             </includes>
         </resource>
         <resource>
@@ -115,22 +110,7 @@ dependencies.
                 <include>**/*.rdf</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-sails/src/test</directory>
-            <includes>
-                <include>**/*.n3</include>
-                <include>**/*.nt</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
+                <include>**/*.java</include>
             </includes>
         </resource>
         <resource>
@@ -146,6 +126,7 @@ dependencies.
                 <include>**/*.rq</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
+                <include>**/*.java</include>
             </includes>
         </resource>
        </resources>
@@ -211,8 +192,10 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             <include>com/bigdata/bfs/TestAll.java</include>
             -->
             <include>com/bigdata/rdf/TestAll.java</include>
+<!-- Moved into bigdata-sails-test
             <include>com/bigdata/rdf/sail/TestAll.java</include>
             <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
+-->
             <include>com/bigdata/gom/TestAll.java</include>
             <include>com/bigdata/util/httpd/TestAll.java</include>
            </includes>
@@ -271,21 +254,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                    </includes>
                </resource>
                <resource>
-                   <directory>bigdata-sails/src/test</directory>
-                   <includes>
-                       <include>**/*.n3</include>
-                       <include>**/*.nt</include>
-                       <include>**/*.owl</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-               <resource>
                    <directory>bigdata-gom/src/test</directory>
                    <includes>
                        <include>**/*.n3</include>
@@ -325,7 +293,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
               <sources>
                 <source>bigdata/src/java</source>
                 <source>bigdata-rdf/src/java</source>
-                <source>bigdata-sails/src/java</source>
                 <source>bigdata-gom/src/java</source>
               </sources>
             </configuration>
@@ -340,7 +307,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
               <sources>
             	<source>bigdata/src/test</source>
                 <source>bigdata-rdf/src/test</source>
-                <source>bigdata-sails/src/test</source>
                 <source>bigdata-gom/src/test</source>
               </sources>
             </configuration>

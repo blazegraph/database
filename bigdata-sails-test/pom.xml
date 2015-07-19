@@ -53,10 +53,10 @@ dependencies.
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
-   <artifactId>bigdata-core</artifactId>
+   <artifactId>bigdata-sails-test</artifactId>
     <version>${bigdata.version}</version>
    <packaging>jar</packaging>
-   <name>Blazegraph Core (tm)</name>
+   <name>Blazegraph(tm) Sail Tests</name>
     <description>Blazegraph(TM) Maven Build</description>
     <url>http://www.blazegraph.com</url>
     <organization>
@@ -72,150 +72,28 @@ dependencies.
     </licenses>
     <!-- properties are now in the parent POM. -->
     <build>
-      <sourceDirectory>bigdata/src/java</sourceDirectory>
-      <resources>
-        <resource>
-            <directory>bigdata/src/java</directory>
-            <includes>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.js</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-rdf/src/java</directory>
-            <includes>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.rdf</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <!-- Include the RIO parser configurations for OpenRDF -->
-        <resource>
-	   <directory>bigdata-rdf/src/resources/service-providers/</directory>
-            <includes>
-                <include>**/*</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-sails/src/resources</directory>
-            <includes>
-                <include>**/*.xml</include>
-	    </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-sails/src/java</directory>
-            <includes>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-gom/src/java</directory>
-            <includes>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-            </includes>
-        </resource>
-       </resources>
-        <plugins>
-          <plugin>
-           <artifactId>maven-antrun-plugin</artifactId>
-           <version>1.6</version>
-           <executions>
-             <execution>
-               <id>build-info</id>
-               <goals>
-                 <goal>run</goal>
-               </goals>
-               <phase>process-resources</phase>
-               <configuration>
-                 <target>
-        		<property name="buildinfo.file" 
-            			value="bigdata/src/java/com/bigdata/BuildInfo.java"/>
-			<property name="build.ver" value = "${bigdata.version}"/>
-        		<tstamp>
-            			<format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
-        		</tstamp>
-        		<property environment="env" />
-			<loadfile property="git.branch" srcFile="../.git/HEAD">
-			   <filterchain>
-    			     <linecontainsregexp>
-      				<regexp pattern="^ref: (.*)$"/>
-    			     </linecontainsregexp>
-    			     <replaceregex 
-      				pattern="^ref: (.*)$"
-         			replace="\1" />
-				<striplinebreaks />
-  			     </filterchain>
-		 	</loadfile>  
-        		<echo file="${buildinfo.file}">
-package com.bigdata;
-public class BuildInfo {
-    public static final String buildVersion="${build.ver}";
-    public static final String gitBranch = "${git.branch}";
-    public static final String buildTimestamp="${build.timestamp}";
-    public static final String buildUser="${user.name}";
-    public static final String osArch="${os.arch}";
-    public static final String osName="${os.name}";
-    public static final String osVersion="${os.version}";
-}
-</echo>
-    			<loadfile property="buildinfo" srcFile="${buildinfo.file}"/>
-    			<echo message="${buildinfo}"/>
-                 </target>
-               </configuration>
-             </execution>
-            </executions>
-          </plugin>
-
+     <plugins>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <version>1.9.1</version>
-        <executions>
-          <execution>
-            <id>add-source</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>add-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-                <source>bigdata/src/java</source>
-                <source>bigdata-rdf/src/java</source>
-                <source>bigdata-sails/src/java</source>
-                <source>bigdata-gom/src/java</source>
-              </sources>
-            </configuration>
-          </execution>
-        </executions>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <includes>
+            <include>com/bigdata/rdf/sail/TestAll.java</include>
+            <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
+           </includes>
+           <excludes>
+    	    <exclude>com/bigdata/TestAll.java</exclude>
+	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
+	  </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+	  <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+        </configuration>
       </plugin>
-        </plugins>
+     </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
       <extension>
@@ -410,14 +288,6 @@ public class BuildInfo {
 	<artifactId>sesame-store-testsuite</artifactId>
 	<version>${sesame.version}</version>
     </dependency>
-<!--
-    <dependency>
-        <groupId>net.jini</groupId>
-        <artifactId>jini-ext</artifactId>
-        <version>2.1</version>
-        <type>jar</type>
-    </dependency>
--->
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
@@ -428,20 +298,6 @@ public class BuildInfo {
        <artifactId>bigdata-ganglia</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
-<!-- TODO: Factor out dependency on bigdata-gas BLZG-1272
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
-       <type>test-jar</type>
-       <scope>test</scope>
-     </dependency>
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
@@ -452,11 +308,13 @@ public class BuildInfo {
        <artifactId>dsi-utils</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
+<!--
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit3.version}</version>
      </dependency>
+-->
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -477,16 +335,39 @@ public class BuildInfo {
        <artifactId>rdf-properties</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
-     <dependency>
+    <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-core</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-core-test</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-core-test</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+    </dependency>
+<!-- TODO:  Factor our main classes.
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-sails</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+-->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>

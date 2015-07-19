@@ -48,7 +48,7 @@ import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
-import com.bigdata.rdf.sail.sparql.AbstractBigdataExprBuilderTestCase;
+import com.bigdata.rdf.sparql.AbstractBigdataExprBuilderTestCase;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
