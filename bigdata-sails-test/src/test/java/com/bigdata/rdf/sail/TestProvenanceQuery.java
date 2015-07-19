@@ -98,7 +98,7 @@ public class TestProvenanceQuery extends ProxyBigdataSailTestCase {
             final DataLoader dataLoader = sail.database.getDataLoader();
 
             dataLoader.loadData(
-                    "/java/com/bigdata/rdf/sail/provenance01.ttlx",
+                    "/com/bigdata/rdf/sail/provenance01.ttlx",
                     ""/*baseURL*/, ServiceProviderHook.TURTLE_RDR);
             
         }
