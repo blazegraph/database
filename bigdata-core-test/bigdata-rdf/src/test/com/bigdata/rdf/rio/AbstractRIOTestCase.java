@@ -37,6 +37,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -204,12 +205,12 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
             
         } else {
         	
-			final String s = getClass().getClassLoader().getResource(resource).getFile();
+			final URL u = getClass().getClassLoader().getResource(resource);
 
-			if (s != null) {
+			if (u != null) {
 
 				// load a resource from the class loader
-				tasks.add(new LoadTask(s, factory));
+				tasks.add(new LoadTask(u.getFile(), factory));
 
 				return tasks;
 			}
