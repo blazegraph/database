@@ -1941,7 +1941,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final ProjectionNode projection = subqueryRoot.getProjection();
 
         // The variables projected by the subquery.
-        final IVariable<?>[] projectedVars = projection.getProjectionVars();
+        
+        final Set<IVariable<?>> projectedVars = 
+            projection.getProjectionVars(new HashSet<IVariable<?>>());
+        projectedVars.retainAll(
+           ctx.sa.getMaybeIncomingBindings(
+              subqueryRoot, new HashSet<IVariable<?>>()));
 
         @SuppressWarnings("rawtypes")
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
@@ -2005,7 +2010,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
 
         left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
-              joinConstraints, projectedVars, namedSolutionSet);
+              joinConstraints, projectedVars.toArray(new IVariable<?>[0]), namedSolutionSet);
         
         // Append the subquery plan.
         left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
@@ -4070,7 +4075,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //
 //        }
                 
-        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
+        final INamedSolutionSetRef namedSolutionSet = 
+            NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
@@ -5477,6 +5483,22 @@ public class AST2BOpUtility extends AST2BOpRTO {
             * point anyway, what we're doing here just serves the purpose to avoid
             * the computation of unneeded bindings inside the subclause, in the
             * sense that we pass in every possible binding once), cf. ticket #835.
+            * 
+            * A query where this happens is, for instance:
+            * 
+            * select *
+            * where {
+            *   ?a :knows ?b .
+            *   OPTIONAL {
+            *     ?b :knows ?c .
+            *     ?c :knows ?d .
+            *     filter(?a != :paul) # Note: filter applies to variable in the outer group.
+            *    }
+            *  }
+            *  
+            *  The join variable for the subgroup/optional is ?b, but we also
+            *  need to project in ?a, since the variable is visible inside the
+            *  filter. See TestOptionals.test_optionals_emptyWhereClause.
             */
            left = addDistinctProjectionOp(left, ctx, node, projectInVars);        
          
