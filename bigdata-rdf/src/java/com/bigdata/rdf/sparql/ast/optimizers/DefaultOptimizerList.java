@@ -688,14 +688,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTNamedSubqueryOptimizer());
         
         /**
-         * Identify and assign the join variables to sub-groups.
-         */
-        add(new ASTSubGroupJoinVarOptimizer());
-        
-        /**
          * Prepare Mapgrap GPU acceleration of join groups.
          */
         add(new ASTGPUAccelerationOptimizer());
+        
+        /**
+         * Identify and assign the join variables to sub-groups.
+         */
+        add(new ASTSubGroupJoinVarOptimizer());
     }
 
 }
