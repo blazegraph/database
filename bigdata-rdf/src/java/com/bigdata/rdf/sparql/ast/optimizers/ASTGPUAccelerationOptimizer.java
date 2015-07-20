@@ -70,13 +70,16 @@ public class ASTGPUAccelerationOptimizer extends AbstractJoinGroupOptimizer {
          AST2BOpContext ctx, StaticAnalysis sa,
          IBindingSet[] bSets, JoinGroupNode group) {  
 
+      if (ctx.gpuEvaluation == null)
+         return;
+      
       // TODO: disable for quads mode, sids mode, etc., check whether
       // GPU mode is turned on
       
       // Verify that this optimizer has not been disabled with a query hint.
-      if (!group.getProperty(
-         QueryHints.DISABLE_GPU_ACCELERATION, 
-         QueryHints.DEFAULT_DISABLE_GPU_ACCELERATION))
+      if (group.getProperty(
+            QueryHints.DISABLE_GPU_ACCELERATION, 
+            QueryHints.DEFAULT_DISABLE_GPU_ACCELERATION))
          return;
       
       // the subgroups

@@ -161,6 +161,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * {@link AST2BOpJoins}s.
      */
     public final BOpContextBase context;
+
+    /**
+     * The {@link IExternalAST2BOp} for using GPUs or <code>null</code>.
+     */
+    public final IExternalAST2BOp gpuEvaluation;
     
     /**
      * When <code>true</code>, may use the version of DISTINCT which operates on
@@ -547,6 +552,27 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         this.context = new BOpContextBase(queryEngine);
         
         this.globallyScopedVariables = new HashSet<IVariable<?>>();
+        
+        // try to set this.gpuEvaluation
+        IExternalAST2BOp gpuEvaluationInstance;
+        try {
+            final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.eval.GPUEvaluation" );
+
+            if (IExternalAST2BOp.class.isAssignableFrom(cls)) {
+                gpuEvaluationInstance = (IExternalAST2BOp) cls.newInstance();
+                log.info( "Found Blazegraph-Mapgraph connector: "
+                          + cls.getCanonicalName() );
+            } else {
+                gpuEvaluationInstance = null;
+                log.warn(cls.getCanonicalName()
+                         + " does not extend "
+                         + IExternalAST2BOp.class.getCanonicalName());
+            }
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+            gpuEvaluationInstance = null;
+            log.warn( "No Blazegraph-Mapgraph connector found ( " + e.getMessage() + ")" );
+        }
+        this.gpuEvaluation = gpuEvaluationInstance;
 
     }
 
