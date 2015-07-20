@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -80,14 +81,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     private final AtomicBoolean open = new AtomicBoolean(true);
     
     /**
-     * The operator whose annotations are used to initialize this object.
-     * <p>
-     * Note: This was added to support the DISTINCT FILTER in
-     * {@link #outputSolutions(IBuffer)}.
-     */
-    private final PipelineOp op;
-    
-    /**
      * The type of join to be performed.
      */
     private final JoinTypeEnum joinType;
@@ -125,12 +118,10 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     private final IVariable<?>[] selectVars;
 
     /**
-     * The variables to be projected into a join group. When set, a distinct
-     * projection over these variables is computed, otherwise the complete
-     * binding set is passed in. Note that this parameter is only considered
-     * if selectVars is not null.
+     * True if the hash join utility class is to output the distinct join
+     * variables.
      */
-    private final IVariable<?>[] projectInVars;
+    private boolean outputDistinctJVs = false;
     
     /**
      * The join constraints (optional).
@@ -189,8 +180,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
-        if (projectInVars != null)
-           sb.append(",projectInVars=" + Arrays.toString(projectInVars));        
+        sb.append(",outputDistinctJVs=" + outputDistinctJVs);        
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -224,7 +214,6 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         if(joinType == null)
             throw new IllegalArgumentException();
         
-        this.op = op;
         this.joinType = joinType;
         /*
          * Note: This flag needs to be [true] if we allow solutions to be stored
@@ -277,12 +266,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
          */
         this.selectVars = filter ? joinVars : (IVariable<?>[]) op
                 .getProperty(JoinAnnotations.SELECT);
+        
+        this.outputDistinctJVs = 
+           op.getProperty(
+              HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
 
-        /*
-         * The variables that are projected IN to the join group.
-         */
-        this.projectInVars = (IVariable<?>[]) op
-                .getProperty(HashJoinAnnotations.PROJECT_IN_VARS);
         
         // The join constraints (optional).
         this.constraints = (IConstraint[]) op
@@ -353,6 +341,11 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     @Override
     public IVariable<?>[] getSelectVars() {
         return selectVars;
+    }
+    
+    @Override
+    public boolean isOutputDistinctJoinVars() {
+       return outputDistinctJVs;
     }
     
     @Override
@@ -840,67 +833,93 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     }
     
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter distinctFilter) {
+    public void outputSolutions(final IBuffer<IBindingSet> out) {
         
-        try {
+       try {
 
-            final JVMHashIndex rightSolutions = getRightSolutions();
+          final JVMHashIndex rightSolutions = getRightSolutions();
 
-            final IVariable<?>[] selected = getSelectVars();
+          final IVariable<?>[] selected = getSelectVars();
 
-            if (log.isInfoEnabled())
-                log.info("rightSolutions: #buckets="
-                        + rightSolutions.bucketCount());
+          if (log.isInfoEnabled())
+              log.info("rightSolutions: #buckets="
+                      + rightSolutions.bucketCount());
 
-            // source.
-            final Iterator<Bucket> bucketIterator = rightSolutions.buckets();
+          // source.
+          final Iterator<Bucket> bucketIterator = rightSolutions.buckets();
 
-            while (bucketIterator.hasNext()) {
+          while (bucketIterator.hasNext()) {
 
-                final Bucket bucket = bucketIterator.next();
+              final Bucket bucket = bucketIterator.next();
 
-                for (SolutionHit solutionHit : bucket) {
+              // New hash bucket so new DISTINCT set.
+              final HashSet<IBindingSet> distinctSet = 
+                 outputDistinctJVs ? new HashSet<IBindingSet>()// TODO Size estimate?
+                      : null;
 
-                    IBindingSet bs = solutionHit.solution;
+              for (SolutionHit solutionHit : bucket) {
 
-                    if (distinctFilter != null) {
+                  IBindingSet bs = solutionHit.solution;
 
-                        if ((bs = distinctFilter.accept(bs)) == null) {
+                  if( outputDistinctJVs) {
 
-                            // Drop duplicate solutions.
-                            continue;
+                      /*
+                       * Output those solutions that are distinct on the join
+                       * variables. We do this by laying a DISTINCT filter
+                       * over the solutions drawn from each bucket that we
+                       * visit. The DISTINCT filter does not need to consider
+                       * solutions that fall into other buckets, just the
+                       * current bucket.
+                       */
 
-                        }
+                      // drop anything not in the join variables.
+                      bs = bs.copy(joinVars);
 
-                    } else if (selected != null) {
+                      if (!distinctSet.add(bs)) {
 
-                        /*
-                         * FIXME We should be using projectedInVars here since
-                         * outputSolutions() is used to stream solutions into
-                         * the child join group (at least for some kinds of
-                         * joins, but there might be exceptions for joining with
-                         * a named solution set).
-                         */
+                          // Duplicate solution on JVs in this bucket.
+                          continue;
+                          
+                      }
+                      
+//                  if (distinctFilter != null) {
+//
+//                      if ((bs = distinctFilter.accept(bs)) == null) {
+//
+//                          // Drop duplicate solutions.
+//                          continue;
+//
+//                      }
 
-                        // Drop variables which are not projected.
-                        bs = bs.copy(selected);
+                  } else if (selected != null) {
 
-                    }
+                      /*
+                       * FIXME We should be using projectedInVars here since
+                       * outputSolutions() is used to stream solutions into
+                       * the child join group (at least for some kinds of
+                       * joins, but there might be exceptions for joining with
+                       * a named solution set).
+                       */
 
-                    out.add(bs);
+                      // Drop variables which are not projected.
+                      bs = bs.copy(selected);
 
-                    if (log.isDebugEnabled())
-                        log.debug("Output solution: " + bs);
+                  }
 
-                }
+                  out.add(bs);
 
-            }
+                  if (log.isDebugEnabled())
+                      log.debug("Output solution: " + bs);
 
-        } catch (Throwable t) {
-            
-            throw launderThrowable(t);
-            
-        }
+              }
+
+          }
+
+      } catch (Throwable t) {
+          
+          throw launderThrowable(t);
+          
+      }
 
     }
 

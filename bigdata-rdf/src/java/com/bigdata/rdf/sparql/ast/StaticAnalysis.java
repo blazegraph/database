@@ -2109,7 +2109,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * The variables which are projected by the subquery which will be
          * definitely bound based on an analysis of the subquery.
          */
-        final Set<IVariable<?>> boundBySubquery = getMaybeProducedBindings(aSubquery);
+        final Set<IVariable<?>> boundBySubquery = getDefinitelyProducedBindings(aSubquery);
 
         if (log.isInfoEnabled()) {
         	log.info(boundBySubquery);
@@ -2119,7 +2119,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
          * The variables which are possibly bound on entry to the join group
          * in which the subquery appears.
          */
-        final Set<IVariable<?>> incomingBindings = getMaybeIncomingBindings(
+        final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
                 theNode, new LinkedHashSet<IVariable<?>>());
         
         if (log.isInfoEnabled()) {
