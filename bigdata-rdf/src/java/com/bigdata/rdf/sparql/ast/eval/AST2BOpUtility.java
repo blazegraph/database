@@ -53,6 +53,7 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.StaticAnalysisStats;
+import com.bigdata.bop.join.GPUJoinGroupOp;
 import com.bigdata.bop.join.HTreeHashIndexOp;
 import com.bigdata.bop.join.HTreeMergeJoin;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
@@ -2892,6 +2893,20 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final Set<IVariable<?>> doneSet,//
             final AST2BOpContext ctx,//
             final boolean needsEndOp) {
+
+        if (ctx.gpuEvaluation != null
+            && joinGroup.getProperty(
+                  GPUJoinGroupOp.Annotations.EVALUATE_ON_GPU,
+                  GPUJoinGroupOp.Annotations.DEFAULT_EVALUATE_ON_GPU)) {
+            
+            left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, ctx);
+
+            if (needsEndOp && joinGroup.getParent() != null) {
+                left = addEndOp(left, ctx);
+            }
+            
+            return left;
+        }
 
 //        final StaticAnalysis sa = ctx.sa;
 //
