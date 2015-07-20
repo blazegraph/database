@@ -111,21 +111,20 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
         if (group.getParentGraphPatternGroup() != null) {
 
             /*
-             * The variables which will be definitely bound based on an analysis
+             * The variables which will be maybe bound based on an analysis
              * of the group.
              */
             final Set<IVariable<?>> boundByGroup = sa
-                    .getDefinitelyProducedBindings(group,
+                    .getMaybeProducedBindings(group,
                             new LinkedHashSet<IVariable<?>>(), true/* recursive */);
 
             /*
-             * Find the set of variables which will be definitely bound by the
+             * Find the set of variables which will maybe bound by the
              * time the group is evaluated.
              */
             final Set<IVariable<?>> incomingBindings = sa
-                    .getDefinitelyIncomingBindings(
-                            (GraphPatternGroup<?>) group,
-                            new LinkedHashSet<IVariable<?>>());
+                    .getMaybeIncomingBindings(
+                         group, new LinkedHashSet<IVariable<?>>());
 
             /*
              * This is only those variables which are bound on entry into the group
@@ -140,10 +139,10 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
             group.setJoinVars(joinVars);
             
             /*
-             * The variables that will definitely be bound inside the subquery.
+             * The variables that will maybe bound inside the subquery.
              */
-            final Set<IVariable<?>> definitelyBoundInGroup =
-                sa.getDefinitelyProducedBindings(
+            final Set<IVariable<?>> maybeBoundInGroup =
+                sa.getMaybeProducedBindings(
                     group, new LinkedHashSet<IVariable<?>>(), true);
             
             
@@ -157,11 +156,6 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
                     (GraphPatternGroup<?>) group, 
                     new LinkedHashSet<IVariable<?>>());
 
-            /*
-             * Retain the defintely bound variables that have already
-             * appeared previously in the query up to this point. 
-             */
-            definitelyBoundInGroup.retainAll(maybeIncomingBindings);
             
             /**
              * Add the variables that are used inside filters in the OPTIONAL,
@@ -199,15 +193,22 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
                   }
                   
                   for (FilterNode fn : filters) {
-                     definitelyBoundInGroup.addAll(sa.getSpannedVariables(fn,
+                     maybeBoundInGroup.addAll(sa.getSpannedVariables(fn,
                            true/* filters */, new LinkedHashSet<IVariable<?>>()));
                   }
                }
             }
             
+            /*
+             * Retain the defintely bound variables that have already
+             * appeared previously in the query up to this point. 
+             */
+            maybeBoundInGroup.retainAll(maybeIncomingBindings);
+
+            
             @SuppressWarnings("rawtypes")
             final IVariable[] projectInVars = 
-                definitelyBoundInGroup.toArray(new IVariable[0]);
+                maybeBoundInGroup.toArray(new IVariable[0]);
 
             group.setProjectInVars(projectInVars);
             
