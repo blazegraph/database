@@ -32,7 +32,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
-import com.bigdata.rdf.sparql.ast.optimizers.ASTGPUAccelerationOptimizer;
+// import com.bigdata.rdf.sparql.ast.optimizers.ASTGPUAccelerationOptimizer;
 
 /**
  * Query hint to disable GPU acceleration with
