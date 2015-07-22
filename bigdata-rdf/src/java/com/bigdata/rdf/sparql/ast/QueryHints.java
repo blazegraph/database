@@ -717,15 +717,5 @@ public interface QueryHints {
 
    boolean DEFAULT_NORMALIZE_FILTER_EXPRESSIONS = Boolean.valueOf(
          System.getProperty(NORMALIZE_FILTER_EXPRESSIONS, "false"));
-   
-   /**
-    * This query hint indicates whether GPU acceleration has to be disabled.
-    * 
-    * @see #DEFAULT_DISABLE_GPU_ACCELERATION
-    */
-   String DISABLE_GPU_ACCELERATION = "disableGPUAcceleration";
-
-   boolean DEFAULT_DISABLE_GPU_ACCELERATION = Boolean.valueOf(
-         System.getProperty(DISABLE_GPU_ACCELERATION, "false"));
 
 }
