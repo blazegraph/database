@@ -2894,20 +2894,6 @@ public class AST2BOpUtility extends AST2BOpRTO {
             final AST2BOpContext ctx,//
             final boolean needsEndOp) {
 
-        if (ctx.gpuEvaluation != null
-            && joinGroup.getProperty(
-                  GPUJoinGroupOp.Annotations.EVALUATE_ON_GPU,
-                  GPUJoinGroupOp.Annotations.DEFAULT_EVALUATE_ON_GPU)) {
-            
-            left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, ctx);
-
-            if (needsEndOp && joinGroup.getParent() != null) {
-                left = addEndOp(left, ctx);
-            }
-            
-            return left;
-        }
-
 //        final StaticAnalysis sa = ctx.sa;
 //
         // /*
@@ -2975,6 +2961,21 @@ public class AST2BOpUtility extends AST2BOpRTO {
         inFilters.addAll(joinGroup.getInFilters());
 
         final AtomicInteger start = new AtomicInteger(0);
+
+        if (ctx.gpuEvaluation != null
+        	&& joinGroup.getProperty(
+        			GPUJoinGroupOp.Annotations.EVALUATE_ON_GPU,
+                    GPUJoinGroupOp.Annotations.DEFAULT_EVALUATE_ON_GPU)) {
+        	
+        	left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, start, ctx);
+        	
+        	if (needsEndOp && joinGroup.getParent() != null) {
+        		left = addEndOp(left, ctx);
+        	}
+        	
+        	return left;
+        }
+        
         if (joinGroup.getQueryHintAsBoolean(QueryHints.MERGE_JOIN,
                 ctx.mergeJoin)) {
 

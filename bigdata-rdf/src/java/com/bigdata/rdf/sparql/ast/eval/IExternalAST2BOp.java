@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
@@ -47,10 +48,12 @@ public interface IExternalAST2BOp {
      * @param left
      * @param joinGroup
      * @param doneSet
+     * @param start
      * @param ctx
      */
     abstract public PipelineOp convertJoinGroup(PipelineOp left,
             final JoinGroupNode joinGroup,
             final Set<IVariable<?>> doneSet,
+            final AtomicInteger start,
             final AST2BOpContext ctx);
 }
