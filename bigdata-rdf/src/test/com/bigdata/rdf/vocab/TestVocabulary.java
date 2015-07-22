@@ -40,7 +40,6 @@ import org.openrdf.model.vocabulary.RDF;
 
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.NotMaterializedException;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
@@ -103,13 +102,14 @@ public class TestVocabulary extends TestCase2 {
                 assertTrue(v.getIV().hasValue());
                 
                 // The Value is NOT cached on the IV.
-                try {
-                    v.getIV().getValue();
-                    fail("Expecting: " + NotMaterializedException.class);
-                } catch (NotMaterializedException ex) {
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring expected exception: " + ex);
-                }
+//              This was changed as part of #1386: NPE in FunctionNode<init>                 
+//                try {
+//                    v.getIV().getValue();
+//                    fail("Expecting: " + NotMaterializedException.class);
+//                } catch (NotMaterializedException ex) {
+//                    if (log.isInfoEnabled())
+//                        log.info("Ignoring expected exception: " + ex);
+//                }
 
                 /*
                  * The IV attached to the Value can be used to lookup the Value
@@ -198,13 +198,14 @@ public class TestVocabulary extends TestCase2 {
                 assertTrue(v.getIV().hasValue());
                 
                 // The Value is NOT cached on the IV.
-                try {
-                    v.getIV().getValue();
-                    fail("Expecting: " + NotMaterializedException.class);
-                } catch (NotMaterializedException ex) {
-                    if (log.isInfoEnabled())
-                        log.info("Ignoring expected exception: " + ex);
-                }
+//              This was changed as part of #1386: NPE in FunctionNode<init> 
+//                try {
+//                    v.getIV().getValue();
+//                    fail("Expecting: " + NotMaterializedException.class);
+//                } catch (NotMaterializedException ex) {
+//                    if (log.isInfoEnabled())
+//                        log.info("Ignoring expected exception: " + ex);
+//                }
 
                 /*
                  * The IV attached to the Value can be used to lookup the Value
