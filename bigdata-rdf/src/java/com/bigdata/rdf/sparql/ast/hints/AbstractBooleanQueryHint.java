@@ -30,7 +30,7 @@ package com.bigdata.rdf.sparql.ast.hints;
 /**
  * Base class for {@link Boolean} query hints.
  */
-abstract class AbstractBooleanQueryHint extends AbstractQueryHint<Boolean> {
+abstract public class AbstractBooleanQueryHint extends AbstractQueryHint<Boolean> {
 
     protected AbstractBooleanQueryHint(final String name,
             final Boolean defaultValue) {
