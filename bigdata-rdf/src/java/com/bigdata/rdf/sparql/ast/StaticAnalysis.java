@@ -2116,7 +2116,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
         }
         
         /*
-         * The variables which are definitely bound on entry to the join group
+         * The variables which are possibly bound on entry to the join group
          * in which the subquery appears.
          */
         final Set<IVariable<?>> incomingBindings = getDefinitelyIncomingBindings(
