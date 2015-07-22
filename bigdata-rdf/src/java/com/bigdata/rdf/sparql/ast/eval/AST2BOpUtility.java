@@ -1942,7 +1942,12 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final ProjectionNode projection = subqueryRoot.getProjection();
 
         // The variables projected by the subquery.
-        final IVariable<?>[] projectedVars = projection.getProjectionVars();
+        
+        final Set<IVariable<?>> projectedVars = 
+            projection.getProjectionVars(new HashSet<IVariable<?>>());
+        projectedVars.retainAll(
+           ctx.sa.getMaybeIncomingBindings(
+              subqueryRoot, new HashSet<IVariable<?>>()));
 
         @SuppressWarnings("rawtypes")
         final Map<IConstraint, Set<IVariable<IV>>> needsMaterialization = new LinkedHashMap<IConstraint, Set<IVariable<IV>>>();
@@ -2006,7 +2011,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
 
         left = addHashIndexOp(left, ctx, subqueryRoot, joinType, joinVars, 
-              joinConstraints, projectedVars, namedSolutionSet);
+              joinConstraints, projectedVars.toArray(new IVariable<?>[0]), namedSolutionSet);
         
         // Append the subquery plan.
         left = convertQueryBase(left, subqueryRoot, doneSet, ctx);
@@ -4086,7 +4091,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
 //
 //        }
                 
-        final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility.newInstance(
+        final INamedSolutionSetRef namedSolutionSet = 
+            NamedSolutionSetRefUtility.newInstance(
                 ctx.queryId, solutionSetName, joinVars);
 
         final IVariable<?>[] projectInVars = subgroup.getProjectInVars();
@@ -5427,6 +5433,29 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final IVariable<?>[] projectInVars,
         final INamedSolutionSetRef namedSolutionSet) {
       
+       
+       final Set<IVariable<?>> joinVarsSet = new HashSet<IVariable<?>>();
+       if (joinVars!=null) {
+          for (int i=0; i<joinVars.length; i++) {
+             joinVarsSet.add(joinVars[i]);
+          }
+       }
+
+       final Set<IVariable<?>> projectInVarsSet = new HashSet<IVariable<?>>();
+       if (projectInVars!=null) {
+          for (int i=0; i<projectInVars.length; i++) {
+             projectInVarsSet.add(projectInVars[i]);
+          }
+       }
+       
+       /** 
+        * If the set of variables we want to project on equals the join
+        * variables, then we can inline the projection into thee hash index
+        * operation, which provides an efficient way to calculate the
+        * DISTINCT projection over the join variables. 
+        */
+       boolean inlineProjection = joinVarsSet.equals(projectInVarsSet);
+       
         if(ctx.nativeHashJoins) {
             left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
@@ -5439,7 +5468,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
                        new String[]{ctx.getLexiconNamespace()}),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
+                // instead of specifying the SELECT vars, we output the distinct join vars
+                new NV(HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
                 new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
                 new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), node, ctx);
@@ -5453,31 +5483,17 @@ public class AST2BOpUtility extends AST2BOpRTO {
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
                 new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
                 new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(JVMHashIndexOp.Annotations.PROJECT_IN_VARS, projectInVars),//
+                // instead of specifying the SELECT vars, we output the distinct join vars
+                new NV(JVMHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
                 new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// 
                 new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), node, ctx);
         }
         
-        final Set<IVariable<?>> joinVarsSet = new HashSet<IVariable<?>>();
-        if (joinVars!=null) {
-           for (int i=0; i<joinVars.length; i++) {
-              joinVarsSet.add(joinVars[i]);
-           }
-        }
-
-        final Set<IVariable<?>> projectInVarsSet = new HashSet<IVariable<?>>();
-        if (projectInVars!=null) {
-           for (int i=0; i<projectInVars.length; i++) {
-              projectInVarsSet.add(projectInVars[i]);
-           }
-        }
-        
         /** 
-         * If the projection is not implicit by the hash join operator,
-         * we need to apply it on top.
+         * If the projection was not inlined, we need to apply it on top.
          */
-        if (!joinVarsSet.equals(projectInVarsSet)) {
+        if (!inlineProjection) {
            /*
             * Adding a projection operator before the
             * subquery plan ensures that variables which are not visible are
@@ -5493,6 +5509,22 @@ public class AST2BOpUtility extends AST2BOpRTO {
             * point anyway, what we're doing here just serves the purpose to avoid
             * the computation of unneeded bindings inside the subclause, in the
             * sense that we pass in every possible binding once), cf. ticket #835.
+            * 
+            * A query where this happens is, for instance:
+            * 
+            * select *
+            * where {
+            *   ?a :knows ?b .
+            *   OPTIONAL {
+            *     ?b :knows ?c .
+            *     ?c :knows ?d .
+            *     filter(?a != :paul) # Note: filter applies to variable in the outer group.
+            *    }
+            *  }
+            *  
+            *  The join variable for the subgroup/optional is ?b, but we also
+            *  need to project in ?a, since the variable is visible inside the
+            *  filter. See TestOptionals.test_optionals_emptyWhereClause.
             */
            left = addDistinctProjectionOp(left, ctx, node, projectInVars);        
          

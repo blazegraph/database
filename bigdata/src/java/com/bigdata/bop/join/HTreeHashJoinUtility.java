@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.bop.join;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.UUID;
@@ -264,15 +265,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
      */
     private final IVariable<?>[] selectVars;
 
-
     /**
-     * The variables to be projected into a join group. When set, a distinct
-     * projection over these variables is computed, otherwise the complete
-     * binding set is passed in. Note that this parameter is only considered
-     * if selectVars is not null.
+     * True if the hash join utility class is to output the distinct join
+     * variables.
      */
-    private final IVariable<?>[] projectInVars;
-       
+    private boolean outputDistinctJVs = false;
+    
     /**
      * The join constraints (optional).
      */
@@ -360,8 +358,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         if (askVar != null)
             sb.append(",askVar=" + askVar);
         sb.append(",joinVars=" + Arrays.toString(joinVars));
-        if (projectInVars != null)
-           sb.append(",projectInVars=" + Arrays.toString(projectInVars));
+        sb.append(",outputDistinctJVs=" + outputDistinctJVs);
         if (selectVars != null)
             sb.append(",selectVars=" + Arrays.toString(selectVars));
         if (constraints != null)
@@ -441,6 +438,12 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         return selectVars;
         
     }
+    
+    @Override
+    public boolean isOutputDistinctJoinVars() {
+       return outputDistinctJVs;
+    }
+
 
     @Override
     public IConstraint[] getConstraints() {
@@ -536,15 +539,14 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
         // The projected variables (optional and equal to the join variables iff
         // this is a DISTINCT filter).
+        this.outputDistinctJVs = 
+           op.getProperty(
+              HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
+
+        
         this.selectVars = filter ? joinVars : (IVariable<?>[]) op
                 .getProperty(JoinAnnotations.SELECT);
 
-        /*
-         * The variables that are projected IN to the join group.
-         */
-        this.projectInVars = (IVariable<?>[]) op
-                .getProperty(HashJoinAnnotations.PROJECT_IN_VARS);
-        
         /*
          * This wraps an efficient raw store interface around a child memory
          * manager created from the IMemoryManager which will back the named
@@ -1627,64 +1629,98 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
     }
 
     @Override
-    public void outputSolutions(final IBuffer<IBindingSet> out, IDistinctFilter distinctFilter) {
+    public void outputSolutions(final IBuffer<IBindingSet> out) {
 
-        try {
+       try {
 
-           final HTree rightSolutions = getRightSolutions();
+          final HTree rightSolutions = getRightSolutions();
 
-            if (log.isInfoEnabled()) {
-                log.info("rightSolutions: #nnodes="
-                        + rightSolutions.getNodeCount() + ",#leaves="
-                        + rightSolutions.getLeafCount() + ",#entries="
-                        + rightSolutions.getEntryCount());
-            }
+           if (log.isInfoEnabled()) {
+               log.info("rightSolutions: #nnodes="
+                       + rightSolutions.getNodeCount() + ",#leaves="
+                       + rightSolutions.getLeafCount() + ",#entries="
+                       + rightSolutions.getEntryCount());
+           }
+           
+           /*
+            * Used to impose distinct JV on solutions having the same hash
+            * code. Together with lastHashCode, used to decide when we enter a
+            * new hash bucket.
+            */
+           HashSet<IBindingSet> distinctSet = null;
+           int lastHashCode = -1;
+           
+           // source.
+           final ITupleIterator<?> solutionsIterator = rightSolutions
+                   .rangeIterator();
 
-            // source.
-            final ITupleIterator<?> solutionsIterator = rightSolutions
-                    .rangeIterator();
+           while (solutionsIterator.hasNext()) {
 
-            while (solutionsIterator.hasNext()) {
+               final ITuple<?> t = solutionsIterator.next();
+               
+               IBindingSet bset = decodeSolution(t);
 
-                final ITuple<?> t = solutionsIterator.next();
+               if (outputDistinctJVs) {
 
-                IBindingSet bset = decodeSolution(t);
+                   // Drop any bindings that are not in the join variables.
+                   bset = bset.copy(joinVars);
 
-                if (distinctFilter != null) {
+                   final int newHashCode = 
+                      hashCode(joinVars, bset, true/* ignoreUnboundVariables */);
 
-                    if ((bset = distinctFilter.accept(bset)) == null) {
+                   final boolean newBucket = distinctSet == null
+                           || newHashCode != lastHashCode;
 
-                        // Drop duplicate solutions.
-                        continue;
+                   if (newBucket) {
+                       // New bucket? New DISTINCT set.
+                       // TODO This is not on the native heap. But it only
+                       // handles a single bucket. Still, it is possible for
+                       // a bucket to get very large.
+                       distinctSet = 
+                          outputDistinctJVs ? new HashSet<IBindingSet>() : null;
+                       lastHashCode = newHashCode;
+                   }
 
-                    }
+                   if (!distinctSet.add(bset)) {
+                       // Duplicate solution on JVs within current bucket.
+                       continue;
+                   }
+               
+//               if (distinctFilter != null) {
+//
+//                   if ((bset = distinctFilter.accept(bset)) == null) {
+//
+//                       // Drop duplicate solutions.
+//                       continue;
+//
+//                   }
 
-                } else if (selectVars != null) {
+               } else if (selectVars != null) {
 
-                    /*
-                     * FIXME We should be using projectedInVars here since
-                     * outputSolutions() is used to stream solutions into
-                     * the child join group (at least for some kinds of
-                     * joins, but there might be exceptions for joining with
-                     * a named solution set).
-                     */
+                   /*
+                    * FIXME We should be using projectedInVars here since
+                    * outputSolutions() is used to stream solutions into
+                    * the child join group (at least for some kinds of
+                    * joins, but there might be exceptions for joining with
+                    * a named solution set).
+                    */
 
-                    // Drop variables which are not projected.
-                    bset = bset.copy(selectVars);
+                   // Drop variables which are not projected.
+                   bset = bset.copy(selectVars);
 
-                }
+               }
 
-                encoder.resolveCachedValues(bset);
+               encoder.resolveCachedValues(bset);
 
-                out.add(bset);
+               out.add(bset);
 
-            }
+           }
 
-        } catch (Throwable t) {
+       } catch (Throwable t) {
 
-            throw launderThrowable(t);
+           throw launderThrowable(t);
 
-        }
+       }
 
     } // outputSolutions
     
