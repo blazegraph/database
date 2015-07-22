@@ -39,6 +39,7 @@ import org.openrdf.query.impl.DatasetImpl;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
 
+import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MockRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
 
@@ -56,7 +57,7 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 
 	@Before
     protected void setUp() {
-		remote = MockRemoteRepository.create("{\"head\":{\"vars\":[\"s\"]}}");
+		remote = MockRemoteRepository.create("s\n", "");
 		repo = remote.getBigdataSailRemoteRepository();
 		con = new BigdataSailRemoteRepositoryConnection(repo);
 	}
@@ -82,10 +83,10 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 		tq.setBinding("p", p);
 		TupleQueryResult tqr = tq.evaluate();
 		try {
-			assertEquals("<:s>",remote.data.opts.getRequestParam("$s"));
-			assertEquals("<:p>",remote.data.opts.getRequestParam("$p"));
-			assertEquals("<:s>",remote.data.request.getParams().get("$s").getValue());
-			assertEquals("<:p>",remote.data.request.getParams().get("$p").getValue());
+			assertEquals(EncodeDecodeValue.encodeValue(s),remote.data.opts.getRequestParam("$s"));
+			assertEquals(EncodeDecodeValue.encodeValue(p),remote.data.opts.getRequestParam("$p"));
+			assertEquals(EncodeDecodeValue.encodeValue(s),remote.data.request.getParams().get("$s").getValue());
+			assertEquals(EncodeDecodeValue.encodeValue(p),remote.data.request.getParams().get("$p").getValue());
 		} finally {
 			tqr.close();
 		}
@@ -155,10 +156,10 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 	    final Resource c = new URIImpl(":c");
 	    final RepositoryResult<Statement> stmts = con.getStatements(s, p, o, includeInferred, c);
 		try {
-			assertEquals("<:s>", remote.data.opts.getRequestParam("s"));
-			assertEquals("<:p>", remote.data.opts.getRequestParam("p"));
-			assertEquals("<:o>", remote.data.opts.getRequestParam("o"));
-			assertEquals("<:c>", remote.data.opts.getRequestParam("c"));
+			assertEquals(EncodeDecodeValue.encodeValue(s), remote.data.opts.getRequestParam("s"));
+			assertEquals(EncodeDecodeValue.encodeValue(p), remote.data.opts.getRequestParam("p"));
+			assertEquals(EncodeDecodeValue.encodeValue(o), remote.data.opts.getRequestParam("o"));
+			assertEquals(EncodeDecodeValue.encodeValue(c), remote.data.opts.getRequestParam("c"));
 			assertEquals(Boolean.toString(includeInferred), remote.data.opts.getRequestParam(RemoteRepositoryDecls.INCLUDE_INFERRED));
 		} finally {
 			stmts.close();

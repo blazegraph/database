@@ -86,11 +86,15 @@ public interface HashJoinAnnotations {
     
 
     /**
-     * The IVariable[] to be projected into a join group. When set, a distinct
-     * projection over these variables is computed, otherwise the complete
-     * binding set is passed in. Note that this parameter is only considered
-     * if selectVars is not null.
+     * Boolean flag to be set when we do not want to return the variables
+     * defined by the {#JVMHashIndexOp.Annotations.SELECT} annotation, but
+     * instead calculate the DISTINCT projection over the join variables.
+     * This is the approach that we use for many subgroups, where we project
+     * in the distinct variables (typically: exactly the join variables),
+     * execute the inner group, and finally rejoin with the whole set of
+     * variables in the end.
      */
-    String PROJECT_IN_VARS = HashJoinAnnotations.class.getName() + ".projectInVars";
+    final String OUTPUT_DISTINCT_JVs = 
+       HashJoinAnnotations.class.getName() + ".outputDistinctJVs";
     
 }

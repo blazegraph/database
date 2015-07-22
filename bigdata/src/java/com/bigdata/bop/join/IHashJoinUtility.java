@@ -102,6 +102,14 @@ public interface IHashJoinUtility {
     IVariable<?>[] getSelectVars();
 
     /**
+     * Returns true if the projection outputs the distinct join vars (in
+     * that case, the variables delivered by {{@link #getSelectVars()} will
+     * be ignored, might even be uninitialized). See
+     * {@link HashJoinAnnotations#OUTPUT_DISTINCT_JVs}.
+     */
+    public boolean isOutputDistinctJoinVars();
+    
+    /**
      * The join constraints (optional).
      * 
      * @see JoinAnnotations#CONSTRAINTS
@@ -305,10 +313,8 @@ public interface IHashJoinUtility {
      * 
      * @param out
      *            Where to write the solutions.
-     * @param filter
-     *            An optional distinct filter
      */
-    void outputSolutions(IBuffer<IBindingSet> out, IDistinctFilter filter);
+    void outputSolutions(IBuffer<IBindingSet> out);
 
     /**
      * Return an {@link Iterator} that visits all solutions in the index (index
