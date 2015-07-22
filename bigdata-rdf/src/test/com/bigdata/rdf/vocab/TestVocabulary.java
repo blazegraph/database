@@ -100,7 +100,7 @@ public class TestVocabulary extends TestCase2 {
                 assertNotNull(v.getIV());
 
                 // The Value is NOT cached on the IV.
-                assertFalse(v.getIV().hasValue());
+                assertTrue(v.getIV().hasValue());
                 
                 // The Value is NOT cached on the IV.
                 try {
@@ -195,7 +195,7 @@ public class TestVocabulary extends TestCase2 {
                 assertNotNull(v.getIV());
 
                 // The Value is NOT cached on the IV.
-                assertFalse(v.getIV().hasValue());
+                assertTrue(v.getIV().hasValue());
                 
                 // The Value is NOT cached on the IV.
                 try {
