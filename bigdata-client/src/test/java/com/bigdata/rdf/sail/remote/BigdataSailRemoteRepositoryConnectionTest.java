@@ -35,7 +35,6 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.query.Dataset;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQuery;
 import org.openrdf.query.TupleQueryResult;
@@ -49,7 +48,6 @@ import org.openrdf.rio.helpers.RDFHandlerBase;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
 import com.bigdata.rdf.sail.webapp.client.MockRemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryDecls;
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils.Collections;
 
 /**
  * Test of the Java client for the REST API using mock objects to verify that

@@ -271,6 +271,9 @@ public class TestNanoSparqlServerWithProxyIndexManager<S extends IIndexManager>
          if(testMode == TestMode.triplesPlusTruthMaintenance) {
             suite.addTestSuite(Test_Ticket_1207.class); // BLZG-1207 (GETSTMTS with includeInferred)
          }
+         if(testMode == TestMode.quads) {
+             suite.addTestSuite(Test_Ticket_789.class); // BLZG-789 (BigdataSailRemoteRepositoryConnection implements interface methods)
+          }
          suite.addTestSuite(Test_REST_ServiceDescription.class);
          suite.addTestSuite(Test_REST_DELETE_BY_ACCESS_PATH.class);
          suite.addTestSuite(Test_REST_DELETE_WITH_BODY.class);
