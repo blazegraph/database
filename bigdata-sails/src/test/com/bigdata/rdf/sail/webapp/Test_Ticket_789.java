@@ -58,16 +58,15 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 public class Test_Ticket_789<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
 
-//	private final Resource s = new URIImpl("http://test/háð");
-	private final Resource s = new URIImpl("http://test/1");
-	private final URI p = new URIImpl("http://test/谓词");
-	private final URI p1 = new URIImpl("http://test/yüklem");
-	private final Value o = new URIImpl("http://test/αντικείμενο");
-	private final Resource c = new URIImpl("http://test/บริบท");
-	private final URI defaultGraph1 = new URIImpl("http://test/sjálfgefiðLínurit1");
-	private final URI defaultGraph2 = new URIImpl("http://test/กราฟเริ่มต้น2");
-	private final URI namedGraph1 = new URIImpl("http://test/नाउँग्राफ1");
-	private final URI namedGraph2 = new URIImpl("http://test/命名图2");
+	private final Resource s = new URIImpl("http://test/s");
+	private final URI p = new URIImpl("http://test/p");
+	private final URI p1 = new URIImpl("http://test/p1");
+	private final Value o = new URIImpl("http://test/o");
+	private final Resource c = new URIImpl("http://test/c");
+	private final URI defaultGraph1 = new URIImpl("http://test/defaultGraph1");
+	private final URI defaultGraph2 = new URIImpl("http://test/defaultGraph2");
+	private final URI namedGraph1 = new URIImpl("http://test/namedGraph1");
+	private final URI namedGraph2 = new URIImpl("http://test/namedGraph2");
 
 	public Test_Ticket_789() {
 
