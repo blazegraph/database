@@ -51,10 +51,10 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
 public class Test_Ticket_1207<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
 
-	private final Resource s = new URIImpl("http://test/háð");
-	private final URI p = new URIImpl("http://test/yüklem");
-	private final URI p1 = new URIImpl("http://test/谓词");
-	private final Value o = new URIImpl("http://test/αντικείμενο");
+	private final Resource s = new URIImpl("http://test/s");
+	private final URI p = new URIImpl("http://test/p");
+	private final URI p1 = new URIImpl("http://test/p1");
+	private final Value o = new URIImpl("http://test/o");
 
 	public Test_Ticket_1207() {
 
