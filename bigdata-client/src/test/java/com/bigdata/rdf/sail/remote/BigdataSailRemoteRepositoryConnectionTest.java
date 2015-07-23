@@ -62,15 +62,15 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 	private BigdataSailRemoteRepository repo;
 
 	private final boolean includeInferred = false;
-	private final Resource s = new URIImpl(":háð");
-	private final URI p = new URIImpl(":谓词");
-	private final Value o = new URIImpl(":αντικείμενο");
-	private final Resource c = new URIImpl(":บริบท");
+	private final Resource s = new URIImpl("http://test/s");
+	private final URI p = new URIImpl("http://test/p");
+	private final Value o = new URIImpl("http://test/o");
+	private final Resource c = new URIImpl("http://test/c");
+	private final URI defaultGraph1 = new URIImpl("http://test/defaultGraph1");
+	private final URI defaultGraph2 = new URIImpl("http://test/defaultGraph2");
+	private final URI namedGraph1 = new URIImpl("http://test/namedGraph1");
+	private final URI namedGraph2 = new URIImpl("http://test/namedGraph2");
 	private final DatasetImpl dataset = new DatasetImpl();
-	private final URI defaultGraph1 = new URIImpl(":sjálfgefiðLínurit1");
-	private final URI defaultGraph2 = new URIImpl(":กราฟเริ่มต้น2");
-	private final URI namedGraph1 = new URIImpl(":नाउँग्राफ1");
-	private final URI namedGraph2 = new URIImpl(":命名图2");
 	private final Set<URI> defaultGraphs = new HashSet<>();
 	private final Set<URI> namedGraphs = new HashSet<>();
 
