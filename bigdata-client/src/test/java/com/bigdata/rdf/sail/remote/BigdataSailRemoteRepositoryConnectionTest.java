@@ -22,7 +22,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.rdf.sail.remote;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import junit.framework.TestCase;
@@ -157,13 +161,18 @@ public class BigdataSailRemoteRepositoryConnectionTest extends TestCase {
 		try {
 			assertEquals(defaultGraphs,tq.getDataset().getDefaultGraphs());
 			assertEquals(namedGraphs,tq.getDataset().getNamedGraphs());
-			// TODO support multiple default graphs and multiple named graphs
-			// Note that com.bigdata.rdf.sail.webapp.client.AbstractConnectOptions.getRequestParam(String)
-			// returns only first value for the specified name, thus only one default graph and only one named graph could be tested
-			assertEquals(defaultGraph1.stringValue(),remote.data.opts.getRequestParam(RemoteRepositoryDecls.DEFAULT_GRAPH_URI));
-			assertEquals(defaultGraph1.stringValue(),remote.data.request.getParams().get(RemoteRepositoryDecls.DEFAULT_GRAPH_URI).getValue());
-			assertEquals(namedGraph1.stringValue(),remote.data.opts.getRequestParam(RemoteRepositoryDecls.NAMED_GRAPH_URI));
-			assertEquals(namedGraph1.stringValue(),remote.data.request.getParams().get(RemoteRepositoryDecls.NAMED_GRAPH_URI).getValue());
+			Collection<String> optsDefaultGraphs = Arrays.asList(remote.data.opts.requestParams.get(RemoteRepositoryDecls.DEFAULT_GRAPH_URI));
+			assertTrue(optsDefaultGraphs.contains(defaultGraph1.stringValue()));
+			assertTrue(optsDefaultGraphs.contains(defaultGraph2.stringValue()));
+			List<String> requestDefaultGraphs = remote.data.request.getParams().get(RemoteRepositoryDecls.DEFAULT_GRAPH_URI).getValues();
+			assertTrue(requestDefaultGraphs.contains(defaultGraph1.stringValue()));
+			assertTrue(requestDefaultGraphs.contains(defaultGraph2.stringValue()));
+			Collection<String> optsNamedGraphs = Arrays.asList(remote.data.opts.requestParams.get(RemoteRepositoryDecls.NAMED_GRAPH_URI));
+			assertTrue(optsNamedGraphs.contains(namedGraph1.stringValue()));
+			assertTrue(optsNamedGraphs.contains(namedGraph2.stringValue()));
+			List<String> requestNamedGraphs = remote.data.request.getParams().get(RemoteRepositoryDecls.NAMED_GRAPH_URI).getValues();
+			assertTrue(requestNamedGraphs.contains(namedGraph1.stringValue()));
+			assertTrue(requestNamedGraphs.contains(namedGraph2.stringValue()));
 		} finally {
 			tqr.close();
 		}
