@@ -38,6 +38,7 @@ import org.openrdf.query.algebra.evaluation.impl.SameTermFilterOptimizer;
 import com.bigdata.rdf.sparql.ast.FunctionRegistry;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
+import com.bigdata.rdf.sparql.ast.eval.ASTGeoSpatialSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
 
@@ -275,7 +276,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         
 
         /**
-         * Translate {@link SolrSearch#SEARCH} and associated magic predicates
+         * Translate {@link FTS#SEARCH} and associated magic predicates
          * into a a {@link ServiceNode}. If there are multiple external Solr
          * searches in the query, then each is translated into its own
          * {@link ServiceNode}. The magic predicates identify the bindings to
@@ -283,6 +284,14 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         add(new ASTFulltextSearchOptimizer());
 
+        /**
+         * Translate {@link GeoSpatial#SEARCH} and associated magic predicates
+         * into a a {@link ServiceNode}. If there are multiple GeoSpatial
+         * searches in the query, then each is translated into its own
+         * {@link ServiceNode}.
+         */
+        add(new ASTGeoSpatialSearchOptimizer());
+        
         /**
          * Imposes a LIMIT of ONE for a non-aggregation ASK query.
          */
