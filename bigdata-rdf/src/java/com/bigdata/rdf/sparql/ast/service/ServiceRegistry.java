@@ -40,6 +40,7 @@ import com.bigdata.rdf.graph.impl.bd.GASService;
 import com.bigdata.rdf.sail.RDRHistoryServiceFactory;
 import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.cache.DescribeServiceFactory;
+import com.bigdata.rdf.sparql.ast.eval.GeoSpatialServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SampleServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchInSearchServiceFactory;
 import com.bigdata.rdf.sparql.ast.eval.SearchServiceFactory;
@@ -51,6 +52,7 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.service.fts.FTS;
 import com.bigdata.service.fts.FulltextSearchServiceFactory;
+import com.bigdata.service.geospatial.GeoSpatial;
 
 import cutthecrap.utils.striterators.ReadOnlyIterator;
 
@@ -120,12 +122,15 @@ public class ServiceRegistry {
         // Add the Bigdata search service.
         add(BDS.SEARCH, new SearchServiceFactory());
         
+        // Add the Geospatial search service.
+        add(GeoSpatial.SEARCH, new GeoSpatialServiceFactory());
+
         // Add the external Solr search service
         add(FTS.SEARCH, new FulltextSearchServiceFactory());
 
         // Add the Bigdata search in search service.
         add(BDS.SEARCH_IN_SEARCH, new SearchInSearchServiceFactory());
-
+        
         // Add the sample index service.
         add(SampleServiceFactory.SERVICE_KEY, new SampleServiceFactory());
 
