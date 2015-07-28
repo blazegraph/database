@@ -367,7 +367,6 @@ public class BuildInfo {
     <target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
         <jar destfile="${build.dir}/${version}.jar">
             <fileset dir="${build.dir}/classes" excludes="**/*Test*" />
-            <!-- <fileset dir="${build.dir}/classes" /> -->
             <!-- Copy the copyright top-level NOTICE file. -->
             <fileset file="${bigdata.dir}/NOTICE"/>
             <!-- Copy the copyright top-level LICENSE file. -->
