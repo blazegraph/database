@@ -403,7 +403,7 @@ public class RemoteRepository extends RemoteRepositoryBase {
             }
            	opts.addRequestParam("c", EncodeDecodeValue.encodeContexts(contexts));
 
-           	opts.addRequestParam("Content-Type", new String[] { RDFFormat.NTRIPLES.getDefaultMIMEType(), RDFFormat.NQUADS.getDefaultMIMEType() } );
+           	opts.setAcceptHeader(ConnectOptions.DEFAULT_GRAPH_ACCEPT_HEADER);
 
             JettyResponseListener resp = null;
             try {
