@@ -2029,6 +2029,7 @@ ${postInstallMessage}</echo>
           <include name="**/*.class" />
           <include name="**/log4j*.properties" />
         </fileset>
+        <fileset dir="${build.dir}/classes" includes="**/*Test*" />
 <!--
         <fileset dir="${bigdata.dir}/bigdata/src/test">
           <include name="**/*.csv" />
