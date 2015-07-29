@@ -191,7 +191,7 @@ implements IASTOptimizer {
         new HashSet<IVariable<?>>(externallyKnownProduced);
      for (int i=0; i<partitionList.size();i++) {
 
-        // we start out with the second partitions, so this will succeed
+        // we start out with the second partition, so this will succeed
         if (i>0) {
            producedUpToPartition.addAll(
               partitionList.get(i-1).getDefinitelyProduced());
@@ -244,7 +244,7 @@ implements IASTOptimizer {
               conflictingVars.retainAll(candidateBindingInfo.getMaybeProduced());
               
               conflictingVars.removeAll(
-                 definitelyProducedUpToPartition.get(j));
+                 definitelyProducedUpToPartition.get(j+1));
               
               if (conflictingVars.isEmpty() && 
                     definitelyProducedUpToPartition.get(j).containsAll(
