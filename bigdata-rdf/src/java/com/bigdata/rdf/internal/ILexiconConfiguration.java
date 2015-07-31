@@ -75,6 +75,11 @@ public interface ILexiconConfiguration<V extends BigdataValue> {
      * the statement indices.
      */
     public boolean isInlineDateTimes();
+    
+    /**
+     * Return <code>true</code> if GeoSpatial support is enabled.
+     */
+    public boolean isGeoSpatial();
 
     /**
      * Return the default time zone to be used for inlining.

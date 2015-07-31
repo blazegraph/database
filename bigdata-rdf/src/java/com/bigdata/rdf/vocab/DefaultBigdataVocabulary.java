@@ -28,6 +28,7 @@ import com.bigdata.rdf.internal.InlineIPv4URIHandler;
 import com.bigdata.rdf.internal.InlineUUIDURIHandler;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.store.AbstractTripleStore;
+import com.bigdata.rdf.vocab.decls.GeoSpatialVocabularyDecl;
 import com.bigdata.rdf.vocab.decls.VoidVocabularyDecl;
 
 /**
@@ -65,6 +66,7 @@ public class DefaultBigdataVocabulary extends RDFSVocabulary {
         super.addValues();
         
         addDecl(new VoidVocabularyDecl());
+        addDecl(new GeoSpatialVocabularyDecl());
 
         /*
          * Some new URIs for inline URI handling.
