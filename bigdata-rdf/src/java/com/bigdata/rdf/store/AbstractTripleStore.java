@@ -1269,6 +1269,12 @@ abstract public class AbstractTripleStore extends
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
 
+        /**
+         * Enable GeoSpatial support.
+         */
+      String GEO_SPATIAL = AbstractTripleStore.class.getName() + ".geoSpatial";
+
+      String DEFAULT_GEO_SPATIAL = "false";
     }
 
     protected Class determineAxiomClass() {

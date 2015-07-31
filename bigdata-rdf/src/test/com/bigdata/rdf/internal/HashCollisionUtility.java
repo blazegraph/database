@@ -965,7 +965,8 @@ public class HashCollisionUtility {
 				xFactory, // extension factory
 				vocab,    // predefined vocabulary
 				vf,
-				uriFactory
+				uriFactory,
+				false // GeoSpatial support
 				);
 		
 //		valueCache = new ConcurrentWeakValueCacheWithBatchedUpdates<Value, BigdataValue>(

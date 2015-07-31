@@ -122,6 +122,11 @@ public interface GeoSpatial {
     */
    final String NAMESPACE = "http://www.bigdata.com/rdf/geospatial#";
    
+   /**
+    * The datatype to be used for GeoSpatial literals.
+    */
+   final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
+   
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
    final URI SPATIAL_POINT = new URIImpl(NAMESPACE + "spatialPoint");
    final URI SPATIAL_DISTANCE = new URIImpl(NAMESPACE + "spatialDistance");

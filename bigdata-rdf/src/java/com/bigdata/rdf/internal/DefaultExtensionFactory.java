@@ -5,6 +5,7 @@ import java.util.LinkedList;
 
 import com.bigdata.rdf.internal.impl.extensions.DateTimeExtension;
 import com.bigdata.rdf.internal.impl.extensions.DerivedNumericsExtension;
+import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.extensions.XSDStringExtension;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
@@ -41,6 +42,10 @@ public class DefaultExtensionFactory implements IExtensionFactory {
     	 * Always going to inline the derived numeric types.
     	 */
     	extensions.add(new DerivedNumericsExtension<BigdataLiteral>(resolver));
+    	
+    	if (config.isGeoSpatial()) {
+         extensions.add(new GeoSpatialLiteralExtension<BigdataLiteral>(resolver));    	
+      }
     	
     	if (config.isInlineDateTimes()) {
     		
