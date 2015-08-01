@@ -161,8 +161,14 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       int numZOrderBytes = zOrderString.length() / Byte.SIZE;
       byte[] zOrderBytes = new byte[numZOrderBytes];
       for (int i = 0; i < numZOrderBytes; i++) {
-         final String substr = zOrderString.substring(i * 8, (i + 1) * 8);
-         zOrderBytes[i] = Byte.parseByte(substr, 2);
+         final String signum = zOrderString.substring(i * 8, i * 8 + 1);
+         final String substr = zOrderString.substring(i * 8 + 1, (i + 1) * 8);
+         
+         byte b = Byte.parseByte(substr, 2); // parse byte works for unsigned only
+         if (signum.equals("1")) {
+            b |= 1 << 0;
+         }
+         zOrderBytes[i] = b;
       }
 
       BigInteger bi = new BigInteger(zOrderBytes);
