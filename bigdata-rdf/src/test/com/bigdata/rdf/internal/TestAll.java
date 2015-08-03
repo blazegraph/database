@@ -138,7 +138,10 @@ public class TestAll extends TestCase {
 
         // xpath abs(), ceil(), floor(), and round()
         suite.addTestSuite(TestXPathFunctions.class);
-        
+
+        // geospatial format handling.
+        suite.addTest(com.bigdata.rdf.internal.gis.TestAll.suite());
+
         return suite;
         
     }
