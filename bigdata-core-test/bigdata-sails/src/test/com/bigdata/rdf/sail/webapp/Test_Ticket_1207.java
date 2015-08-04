@@ -27,8 +27,10 @@ import java.util.Arrays;
 
 import junit.framework.Test;
 
+import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.vocabulary.RDFS;
@@ -48,6 +50,11 @@ import com.bigdata.rdf.sail.webapp.client.RemoteRepository.AddOp;
  */
 public class Test_Ticket_1207<S extends IIndexManager> extends
 		AbstractTestNanoSparqlClient<S> {
+
+	private final Resource s = new URIImpl("http://test/s");
+	private final URI p = new URIImpl("http://test/p");
+	private final URI p1 = new URIImpl("http://test/p1");
+	private final Value o = new URIImpl("http://test/o");
 
 	public Test_Ticket_1207() {
 
@@ -71,11 +78,6 @@ public class Test_Ticket_1207<S extends IIndexManager> extends
     * Test supposed to check if remote call for getStatements properly handle includeInferred flag
     */
    public void test_ticket_1207() throws Exception {
-
-      final URI s = new URIImpl("http://test/s");
-      final URI p = new URIImpl("http://test/p");
-      final URI p1 = new URIImpl("http://test/p1");
-      final URI o = new URIImpl("http://test/o");
 
       final ValueFactoryImpl vf = ValueFactoryImpl.getInstance();
       final Statement[] a = new Statement[] { 
