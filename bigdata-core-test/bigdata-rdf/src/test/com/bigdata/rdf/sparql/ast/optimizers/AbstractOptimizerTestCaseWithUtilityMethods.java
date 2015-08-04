@@ -120,6 +120,18 @@ extends AbstractOptimizerTestCase {
             
        return spn;
    }
+   
+   /** 
+    * Returns a fresh statement pattern with the specified variables bound.
+    */
+   StatementPatternNode stmtPatternWithVarsOptional(
+      final String varName1, final String varName2) {
+      
+      final StatementPatternNode spn = stmtPatternWithVars(varName1, varName2);
+      spn.setOptional(true);
+      
+      return spn;
+   }
 
    
    /** 

@@ -327,7 +327,7 @@ public class FunctionRegistry {
                 for(int i=0;i<args.length;i++){
                     expressions[i] = AST2BOpUtility.toVE(context, globals, args[i]);
                 }
-                return new com.bigdata.bop.rdf.aggregate.SUM(false,expressions);
+                return new com.bigdata.bop.rdf.aggregate.SUM(expressions, scalarValues);
 
             }
         });
