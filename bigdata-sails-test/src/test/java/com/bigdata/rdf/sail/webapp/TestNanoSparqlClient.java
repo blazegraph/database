@@ -528,7 +528,9 @@ public class TestNanoSparqlClient<S extends IIndexManager> extends
 			// assertEquals(expectedStatementCount, result.mutationCount);
 
 			final AddOp add = new AddOp(
-					"file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf");
+					this.getClass().getClassLoader().getResource("small.rdf").toExternalForm()
+					);
+					//"file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf");
 			assertEquals(expectedStatementCount, m_repo.add(add));
 
 		}
