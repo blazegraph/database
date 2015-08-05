@@ -122,6 +122,21 @@ dependencies.
         </executions>
         </plugin>
      </plugins>
+    <resources>
+	<resource>
+            <directory>src/test/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+    </resources>
     <extensions>
       <!-- Enabling the use of SSH. -->
       <extension>
