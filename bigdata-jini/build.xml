@@ -45,6 +45,8 @@
         <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
        	   <arg value="stop"/>
         </exec>
+        <!-- Make sure old state is clean. -->
+	<delete dir="${test.zookeeper.installDir}/data" quiet="true" />
        	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
        	   <arg value="start"/>
        	</exec>
