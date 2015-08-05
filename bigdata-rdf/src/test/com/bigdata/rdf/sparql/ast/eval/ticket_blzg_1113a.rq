@@ -1,0 +1,4 @@
+SELECT *
+{ BIND (1 as ?x)
+  VALUES ?z { "abc" "def" }
+}

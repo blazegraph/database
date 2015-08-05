@@ -244,6 +244,8 @@ public class BuildInfo {
             <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
             <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
             <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
+            <src path="${bigdata.dir}/rdf-properties/src/main/java" />
+<!--
             <src path="${bigdata.dir}/bigdata/src/test"/>
             <src path="${bigdata.dir}/bigdata-client/src/test/java"/>
             <src path="${bigdata.dir}/bigdata-jini/src/test/java"/>
@@ -257,6 +259,7 @@ public class BuildInfo {
             <src path="${bigdata.dir}/rdf-properties/src/main/java" />
             <src path="${bigdata.dir}/bigdata-util/src/main/java" />
             <src path="${bigdata.dir}/bigdata-util/src/test/java" />
+-->
             <!-- Do not include the unit tests @todo conditionally include?
             -->
             <compilerarg value="-version" />
@@ -370,8 +373,7 @@ public class BuildInfo {
          See 'bundleJar'. -->
     <target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
         <jar destfile="${build.dir}/${version}.jar">
-            <!-- <fileset dir="${build.dir}/classes" excludes="test/**" /> -->
-            <fileset dir="${build.dir}/classes" />
+            <fileset dir="${build.dir}/classes" excludes="test/**" />
             <!-- Copy the copyright top-level NOTICE file. -->
             <fileset file="${bigdata.dir}/NOTICE"/>
             <!-- Copy the copyright top-level LICENSE file. -->
@@ -2014,8 +2016,9 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
         <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
-        <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
+        <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
+
 <!--
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
 -->
@@ -2040,6 +2043,7 @@ ${postInstallMessage}</echo>
           <include name="**/*.class" />
           <include name="**/log4j*.properties" />
         </fileset>
+        <fileset dir="${build.dir}/classes" includes="**/*Test*" />
 <!--
         <fileset dir="${bigdata.dir}/bigdata/src/test">
           <include name="**/*.csv" />
@@ -2554,6 +2558,7 @@ ${postInstallMessage}</echo>
         <test name="${testName}" todir="${test.results.dir}" if="testName" />
 
         <!-- Test suites to run when -DtestName is not set -->
+        <test name="com.bigdata.bop.TestAll" todir="${test.results.dir}" unless="testName" />
 <!-- mavenized.
         <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" /> -->
         <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />

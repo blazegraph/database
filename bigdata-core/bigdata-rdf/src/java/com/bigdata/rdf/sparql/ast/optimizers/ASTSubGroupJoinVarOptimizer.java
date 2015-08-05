@@ -115,17 +115,17 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
              * of the group.
              */
             final Set<IVariable<?>> boundByGroup = sa
-                    .getDefinitelyProducedBindings(group,
-                            new LinkedHashSet<IVariable<?>>(), true/* recursive */);
+                 .getDefinitelyProducedBindings(group,
+                      new LinkedHashSet<IVariable<?>>(), true/* recursive */);
 
             /*
              * Find the set of variables which will be definitely bound by the
              * time the group is evaluated.
              */
             final Set<IVariable<?>> incomingBindings = sa
-                    .getDefinitelyIncomingBindings(
-                            (GraphPatternGroup<?>) group,
-                            new LinkedHashSet<IVariable<?>>());
+                .getDefinitelyIncomingBindings(
+                        (GraphPatternGroup<?>) group,
+                        new LinkedHashSet<IVariable<?>>());
 
             /*
              * This is only those variables which are bound on entry into the group
@@ -157,11 +157,6 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
                     (GraphPatternGroup<?>) group, 
                     new LinkedHashSet<IVariable<?>>());
 
-            /*
-             * Retain the defintely bound variables that have already
-             * appeared previously in the query up to this point. 
-             */
-            definitelyBoundInGroup.retainAll(maybeIncomingBindings);
             
             /**
              * Add the variables that are used inside filters in the OPTIONAL,
@@ -205,9 +200,16 @@ public class ASTSubGroupJoinVarOptimizer implements IASTOptimizer {
                }
             }
             
+            /*
+             * Retain the defintely bound variables that have already
+             * appeared previously in the query up to this point. 
+             */
+            definitelyBoundInGroup.retainAll(maybeIncomingBindings);
+
+            
             @SuppressWarnings("rawtypes")
             final IVariable[] projectInVars = 
-                definitelyBoundInGroup.toArray(new IVariable[0]);
+                  definitelyBoundInGroup.toArray(new IVariable[0]);
 
             group.setProjectInVars(projectInVars);
             
