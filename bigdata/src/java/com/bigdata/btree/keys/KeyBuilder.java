@@ -37,6 +37,7 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.io.LongPacker;
@@ -705,7 +706,7 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
     }
     
     final public KeyBuilder append(long v) {
-
+       
         // performance tweak adds .3% on rdfs bulk load.
         if (len + 8 > buf.length) ensureCapacity(len+8);
 //        ensureFree(8);
@@ -1895,5 +1896,64 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
         }
 
     }
+
+   @Override
+   public byte[] toZOrder(int numDimensions) {
+      
+      // we're operating over Long 
+      final int bytesTotal = Long.SIZE/8*numDimensions;
+      
+      byte[] zOrderArr = new byte[bytesTotal]; // target buffer
+      
+      // we compose the original components into the the z-order bit array
+      int zOrderIt = 0;
+      for (int bufIt=0; bufIt<Long.SIZE; bufIt++) { // iterate over bits
+         
+         for (int dimIt=0; dimIt<numDimensions; dimIt++) {  // iterate over dimensions
+            
+            final int offset = dimIt*Long.SIZE;
+            BytesUtil.setBit(
+               zOrderArr,                             // target array
+               zOrderIt++,                               // position
+               BytesUtil.getBit(buf, bufIt + offset)     // value
+            );
+               
+         }
+      }
+      
+      return zOrderArr;
+   }
+
+   @Override
+   public long[] fromZOrder(int numDimensions) {      
+
+      final int bytesTotal = Long.SIZE/8*numDimensions;
+      
+      byte[] componentArr = new byte[bytesTotal]; // target buffer
+      
+      // we decompose the z-order bit array into its original components 
+      int zOrderIt = 0;
+      for (int bufIt=0; bufIt<Long.SIZE; bufIt++) { // iterate over bits
+         
+         for (int dimIt=0; dimIt<numDimensions; dimIt++) {  // iterate over dimensions
+            
+            final int offset = dimIt*Long.SIZE;
+               
+            BytesUtil.setBit(
+                componentArr,                    // target array 
+                bufIt + offset,                    // position
+                BytesUtil.getBit(buf, zOrderIt++)  // value
+            );
+               
+         }
+      }
+      
+      // having restored the components, decode them as long[]
+      final long[] ret = new long[numDimensions];
+      for (int i=0; i<numDimensions; i++) {
+         ret[i] = decodeLong(componentArr, i*(Long.SIZE/8));
+      }
+      return ret;
+   }
     
 }

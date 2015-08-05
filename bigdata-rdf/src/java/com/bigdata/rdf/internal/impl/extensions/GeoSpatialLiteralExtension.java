@@ -27,8 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.internal.impl.extensions;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -36,8 +38,11 @@ import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
 
+import com.bigdata.btree.keys.IKeyBuilder;
+import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.rdf.internal.IDatatypeURIResolver;
 import com.bigdata.rdf.internal.IExtension;
+import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension.SchemaFieldDescription.Datatype;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.internal.impl.literal.XSDIntegerIV;
@@ -56,7 +61,7 @@ import com.bigdata.util.Bits;
  * The code to create a literal is, e.g.:
  * <code>"2#4"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral></code>
  * 
- * The two components are first broken down into integers, namely
+ * The two components are first broken down long integers, namely
  * - 2 -> 00000000 00000000 00000010
  * - 4 -> 00000000 00000000 00000100
  * 
@@ -71,9 +76,8 @@ import com.bigdata.util.Bits;
  */
 public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExtension<V> {
 
-   // TODO: need mechanism to pass in the number of dimensions
-   private static final int NUM_DIMENSIONS = 2;
-   private static final int SIZE_INTEGER_IN_BYTES = 4;
+   private static final int BASE_SIZE = Double.SIZE / 8;
+   private static final String COMPONENT_SEPARATOR = "#";
 
    @SuppressWarnings("unused")
    private static final transient Logger log = Logger
@@ -83,10 +87,20 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    private final BigdataURI datatype;
    
+   // TODO: make this a hash map supporting different datatypes
+   private SchemaDescription sd;
+   
    public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver) {
 
       this.datatype = resolver.resolve(datatypeURI);
 
+      // TODO: auto-generate from datatype (for now, hardcoded)
+      final List<SchemaFieldDescription> sfd = 
+         new ArrayList<SchemaFieldDescription>();
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));
+//      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 6));
+      this.sd = new SchemaDescription(sfd);
    }
 
    @Override
@@ -109,76 +123,20 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       if (value instanceof Literal == false)
          throw new IllegalArgumentException("Value not a literal");
 
-      final String literalString = value.stringValue();
-      String[] componentsAsString = literalString.split("#");
+      final long[] componentsAsLongArr = 
+         componentStringAsLongArr(value.stringValue(), sd);
+
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
       
-      if (NUM_DIMENSIONS != componentsAsString.length) {
-         throw new IllegalArgumentException(
-            "Value has wrong format. Expected " + NUM_DIMENSIONS 
-            + " dimensions for datatype");
-      }
-
-      final String[] componentsAsBinaryStrings = new String[NUM_DIMENSIONS];
-      for (int i = 0; i < componentsAsString.length; i++) {
-         
-         final String componentAsString = componentsAsString[i];
-
-         // TODO:
-         // This is the code for floats, which has strange side effects
-         // System.err.println("C=" + componentAsString);
-         // Float componentAsFloat = Float.valueOf(componentAsString);
-         // System.err.println("F=" + componentAsFloat);
-         // int componentAsInt = Float.floatToIntBits(componentAsFloat);
-         // System.err.println("I=" + componentAsInt);
-         
-         // parse integer
-         int componentAsInt = Integer.valueOf(componentAsString);
-
-         // TODO: for now, convert to string to compute the z-order string
-         //       (of course, this can (and should) be done more efficiently
-         //       using bit operations instead)
-         // compute 32-pos string for integer binary representation padded with 0
-         final String binaryString = String.format("%32s",
-               Integer.toBinaryString(componentAsInt)).replace(' ', '0');
-         componentsAsBinaryStrings[i] = binaryString;
-         
-         System.err.println("I=" + componentAsInt);
-         System.err.println("B=" + binaryString);
-
-      }
-
-      // compose the z-order string using a string buffer
-      StringBuffer buf = new StringBuffer();
-      for (int i = 0; i < 32; i++) {
-         for (int j = 0; j < componentsAsBinaryStrings.length; j++) {
-            buf.append(componentsAsBinaryStrings[j].charAt(i));
-         }
-      }
-      final String zOrderString = buf.toString();
-      System.err.println("zOrderString=" + zOrderString);
-
-      // convert the binary string back into a byte array
-      int numZOrderBytes = zOrderString.length() / Byte.SIZE;
-      byte[] zOrderBytes = new byte[numZOrderBytes];
-      for (int i = 0; i < numZOrderBytes; i++) {
-         final String signum = zOrderString.substring(i * 8, i * 8 + 1);
-         final String substr = zOrderString.substring(i * 8 + 1, (i + 1) * 8);
-         
-         byte b = Byte.parseByte(substr, 2); // parse byte works for unsigned only
-         if (signum.equals("1")) {
-            b |= 1 << 0;
-         }
-         zOrderBytes[i] = b;
-      }
-
-      BigInteger bi = new BigInteger(zOrderBytes);
-      System.err.println("BI=" + bi);
+      final byte[] zOrderByteArrayTwoCompl = unsignedToTwosComplement(zOrderByteArray);
+      final BigInteger bi = new BigInteger(zOrderByteArrayTwoCompl);
 
       // store big integer using xsd:integer datatype
       final AbstractLiteralIV delegate = new XSDIntegerIV(bi);
       return new LiteralExtensionIV(delegate, datatype.getIV());
 
    }
+
 
    /**
     * Decodes an xsd:integer into an n-dimensional string of the form 
@@ -191,79 +149,254 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       if (!datatype.getIV().equals(iv.getExtensionIV())) {
          throw new IllegalArgumentException("unrecognized datatype");
       }
-
+      
+      final int numDimensions = sd.getNumDimensions();
+      
       final BigInteger bigInt = iv.getDelegate().integerValue();
-      System.err.println("BI" + bigInt);
-
+   
       // convert BigInteger back to byte array
-      byte[] bigIntAsByteArr = bigInt.toByteArray();
+      final byte[] bigIntAsByteArr = bigInt.toByteArray();
       
       // pad 0-bytes if necessary and copy over bytes
-      byte[] bigIntAsByteArrPad = new byte[NUM_DIMENSIONS * SIZE_INTEGER_IN_BYTES];
+      final int paddedArraySize = numDimensions * BASE_SIZE + 1; /* +1 leading zero byte to make value unsigned */
+      
+      final byte[] bigIntAsByteArrPad = new byte[paddedArraySize];
       int idx = 0;
-      for (int i = 0; i < NUM_DIMENSIONS * SIZE_INTEGER_IN_BYTES - bigIntAsByteArr.length; i++) {
+      for (int i = 0; i < paddedArraySize - bigIntAsByteArr.length; i++) {
          bigIntAsByteArrPad[idx++] = 0;   // padding
       }
       for (int i = 0; i < bigIntAsByteArr.length; i++) {
-         bigIntAsByteArrPad[idx] = bigIntAsByteArr[i];   // copy of bytes
+         bigIntAsByteArrPad[idx++] = bigIntAsByteArr[i];   // copy of bytes
       }
 
-      System.err.print("zOrderString=");
-      for (int i = 0; i < bigIntAsByteArrPad.length; i++) {
-         System.err.print(">" + Bits.toString(bigIntAsByteArrPad[i]));
-      }
-      System.err.println();
+      byte[] bigIntAsByteArrUnsigned = twosComplementToUnsigned(bigIntAsByteArrPad);
 
-
-      // TODO: again, we take the StringBuffer approach, which should be changed
-      //       to bit operations
-      final StringBuffer[] components = new StringBuffer[NUM_DIMENSIONS];
-      for (int i = 0; i < NUM_DIMENSIONS; i++) {
-         components[i] = new StringBuffer();
-      }
-
-      // iterate over the bytes and append to the associated buffers
-      int bufId = 0;
-      for (int i = 0; i < bigIntAsByteArrPad.length; i++) {
-         for (int j = 7; j >= 0; j--) { // bytes are inverted
-
-            // add to the corresponding buffer
-            components[bufId].append(getBitFromByte(bigIntAsByteArrPad[i], j));
-            bufId = ++bufId % NUM_DIMENSIONS;
-         }
-      }
-
-      final Integer[] componentsAsInt = new Integer[components.length];
-      for (int i = 0; i < components.length; i++) {
-
-         final String componentAsStr = components[i].toString();
-         System.err.println("cs[" + i + "]=" + componentAsStr);
-
-         final Integer componentAsInt = Integer.parseInt(
-               componentAsStr.toString(), 2);
-         componentsAsInt[i] = componentAsInt;
-         System.err.println("ci[" + i + "]=" + componentAsInt);
-
-         // TODO: add this code when using float
-         // final Float componentAsFloat = Float.intBitsToFloat(componentAsInt);
-         // componentsAsFloat[i] = componentAsFloat;
-         // System.err.println("cf[" + i + "]=" + componentAsFloat);
-
-      }
-
-      final StringBuffer valueStringBuf = new StringBuffer();
-      for (int i = 0; i < componentsAsInt.length; i++) {
-         if (i > 0)
-            valueStringBuf.append("#");
-         valueStringBuf.append(componentsAsInt[i]);
-      }
       
-      final String valueString = valueStringBuf.toString();
-      return (V) vf.createLiteral(valueString, datatype);
+      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned, sd);
+      
+      final String litStr = longArrAsComponentString(componentsAsLongArr, sd);
+      
+      return (V) vf.createLiteral(litStr, datatype);
    }
 
+   
+   /**
+    * Converts a component string (as specified in the literal) into a Long[]
+    * reflecting the long values of the individual components. For double
+    * values, the specified position is applied.
+    * 
+    * @param s the unparsed component string
+    * @param sd the associated schema description
+    * @return the Long[]
+    */
+   final long[] componentStringAsLongArr(final String s, SchemaDescription sd) {
 
-   private static String getBitFromByte(byte b, int bit) {
-      return (b & (1 << bit)) != 0 ? "1" : "0";
+      final long[] ret = new long[sd.getNumDimensions()];
+
+      int numDimensions = sd.getNumDimensions();
+      String[] componentsAsString = s.split(COMPONENT_SEPARATOR);
+      
+      if (numDimensions != componentsAsString.length) {
+         throw new IllegalArgumentException(
+            "Literal value has wrong format. Expected " + numDimensions 
+            + " components for datatype.");
+      }
+      
+      for (int i = 0; i < componentsAsString.length; i++) {
+         
+         final String componentAsString = componentsAsString[i];
+         final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
+         final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
+
+         switch (sfd.getDatatype()) {
+         case DOUBLE:
+            ret[i] = (new Double(Double.valueOf(componentAsString)*precisionAdjustment)).longValue();
+            break;
+         case LONG:
+            ret[i] = Long.valueOf(componentAsString);
+            break;
+         default:
+            throw new RuntimeException("Uncovered encoding case. Please fix code.");
+         }
+
+      }
+      
+      return ret;
+   }
+
+   /**
+    * Converts a a Long[] reflecting the long values of the individual 
+    * components back into a component string representing the literal.
+    * 
+    * @param s the unparsed component string
+    * @param sd the associated schema description
+    * @return the string literal
+    */
+   final String longArrAsComponentString(final long[] arr, final SchemaDescription sd) {
+      
+      int numDimensions = sd.getNumDimensions();
+      if (arr.length!=numDimensions) {
+         throw new IllegalArgumentException(
+               "Encoding has wrong format. Expected " + numDimensions 
+               + " components for datatype.");
+      }
+         
+      final StringBuffer buf = new StringBuffer();
+      for (int i=0; i<arr.length; i++) {
+         if (i>0)
+            buf.append(COMPONENT_SEPARATOR);
+         
+         final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
+         final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
+         
+         switch (sfd.getDatatype()) {
+         case DOUBLE:
+            buf.append(String.valueOf((double)arr[i]/precisionAdjustment));
+            break;
+         case LONG:
+            buf.append(String.valueOf(arr[i]));
+            break;
+         default:
+            throw new RuntimeException("Uncovered decoding case. Please fix code.");
+         }
+         
+
+      }
+      
+      return buf.toString();
+   }
+
+   /**
+    * Converts a long array representing the components to a z-order byte array
+    * 
+    * @param componentsAsLongArr
+    * @param sd
+    * @return
+    */
+   byte[] toZOrderByteArray(
+         final long[] componentsAsLongArr, final SchemaDescription sd) {
+      
+      IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
+      for (int i=0; i<componentsAsLongArr.length; i++) {
+         kb.append(componentsAsLongArr[i]);
+      }
+      
+      return kb.toZOrder(sd.getNumDimensions());
+   }
+   
+   /**
+    * Converts a z-order byte array to a long array representing the components
+    * 
+    * @param byteArr
+    * @param sd2
+    * @return
+    */
+   long[] fromZOrderByteArray(
+      final byte[] byteArr, final SchemaDescription sd) {
+      
+      IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
+      for (int i=0; i<byteArr.length; i++) {
+         kb.append(byteArr[i]);
+      }
+      
+      return kb.fromZOrder(sd.getNumDimensions());
+   }
+
+   /**
+    * Converts an unsigned byte array into a (positive) two's complement array.
+    * 
+    * The trick here is to pad a zero byte. This changes the value (which does
+    * not harm) yet makes sure that the array is an unsigned value, for which
+    * the two's complement representation does not differ.
+    */
+   byte[] unsignedToTwosComplement(byte[] arr) {
+      byte[] ret = new byte[arr.length+1];
+      
+      // ret[0] = 0 by construction
+      for (int i=0; i<arr.length; i++) {
+         ret[i+1] = arr[i];
+      }
+      
+      return ret;
+      
+   }
+
+   /**
+    * Reverts method {{@link #unsignedToTwosComplement(byte[])}.
+    */
+   byte[] twosComplementToUnsigned(byte[] arr) {
+      
+      byte[] ret = new byte[arr.length-1];
+      
+      // ret[0] = 0 by construction
+      for (int i=0; i<ret.length; i++) {
+         ret[i] = arr[i+1];
+      }
+      
+      return ret;
+      
+   }
+
+   /**
+    * Schema description for a geospatial literal
+    */
+   public static class SchemaDescription {
+
+      private final List<SchemaFieldDescription> fields;
+      
+      public SchemaDescription(List<SchemaFieldDescription> fields) {
+         this.fields = fields;
+      }
+      
+      public int getNumDimensions() {
+         return fields.size();
+      }
+      
+      public SchemaFieldDescription getSchemaFieldDescription(int index) {
+         return fields.get(index);
+      }
+
+   }
+   
+   /**
+    * Description of a field in the schema.
+    */
+   public static class SchemaFieldDescription {
+      
+      /**
+       * We support doubles and floats for now
+       */
+      public enum Datatype {
+         LONG,
+         DOUBLE
+      }
+
+      
+      private final Datatype datatype;
+
+      /**
+       * Precision of float value. Based on the precision, we convert the
+       * double into a long value. E.g., if the precision is 8 (meaning
+       * 8 positions after decimal point), we multiply the double by 8
+       * and convert into a long value (ignoring additional positions).
+       */
+      private final int doublePrecision;
+      
+      public SchemaFieldDescription(
+         final Datatype datatype, final int doublePrecision) {
+         this.datatype = datatype;
+         this.doublePrecision = doublePrecision;
+      }
+      
+      
+      public Datatype getDatatype() {
+         return datatype;
+      }
+
+      public int getDoublePrecision() {
+         return doublePrecision;
+      }
+
+      
    }
 }
