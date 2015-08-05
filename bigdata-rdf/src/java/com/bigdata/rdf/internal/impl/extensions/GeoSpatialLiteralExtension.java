@@ -50,7 +50,6 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.service.geospatial.GeoSpatial;
-import com.bigdata.util.Bits;
 
 /**
  * Special encoding for GeoSpatial datatypes. We encode literals of the form
@@ -87,19 +86,25 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    private final BigdataURI datatype;
    
-   // TODO: make this a hash map supporting different datatypes
    private SchemaDescription sd;
    
    public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver) {
 
       this.datatype = resolver.resolve(datatypeURI);
 
-      // TODO: auto-generate from datatype (for now, hardcoded)
+      /**
+       * For now, we're using a fixed, three-dimensional datatype for
+       * latitued, longitude and time.
+       * 
+       * TODO: make this parameterizable, we could construct the datatypes
+       *       according to configuration parameters; what's unclear though
+       *       is how to write a generic, nice SERVICE then.
+       */
       final List<SchemaFieldDescription> sfd = 
          new ArrayList<SchemaFieldDescription>();
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));
-//      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 6));
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));  /* time */
       this.sd = new SchemaDescription(sfd);
    }
 

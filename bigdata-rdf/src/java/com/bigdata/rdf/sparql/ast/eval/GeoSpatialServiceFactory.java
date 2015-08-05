@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -45,8 +46,8 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
@@ -67,9 +68,11 @@ import com.bigdata.search.IHit;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.fts.FulltextSearchHit;
 import com.bigdata.service.fts.FulltextSearchHiterator;
-import com.bigdata.service.fts.IFulltextSearchHit;
 import com.bigdata.service.geospatial.GeoSpatial;
-import com.bigdata.service.geospatial.GeoSpatialQueryHit;
+import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
+import com.bigdata.service.geospatial.GeoSpatial.Point2D;
+import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
+import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
 import com.bigdata.service.geospatial.GeoSpatialQueryHiterator;
 import com.bigdata.service.geospatial.IGeoSpatialQuery;
 import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
@@ -117,6 +120,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
         final AbstractTripleStore store = params.getTripleStore();
 
+        final Properties props =
+              store.getIndexManager()!=null && 
+              store.getIndexManager() instanceof AbstractJournal  ?
+              ((AbstractJournal)store.getIndexManager()).getProperties() : null;
+           
+        final GeoSpatialDefaults dflts = new GeoSpatialDefaults(props);
+        
+        
         if (store == null)
             throw new IllegalArgumentException();
 
@@ -153,7 +164,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          */
 
         return new SerivceCall(store, searchVar, statementPatterns,
-                getServiceOptions());
+                getServiceOptions(), dflts);
         
     }
 
@@ -311,12 +322,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         private TermNode timeDistance = null;
         private TermNode timeDistanceUnit = null;
         private IVariable<?>[] vars;
+        private final GeoSpatialDefaults defaults;
         
         public SerivceCall(
                 final AbstractTripleStore store,
                 final IVariable<?> searchVar,
                 final Map<URI, StatementPatternNode> statementPatterns,
-                final IServiceOptions serviceOptions) {
+                final IServiceOptions serviceOptions,
+                final GeoSpatialDefaults dflts) {
 
             if(store == null)
                 throw new IllegalArgumentException();
@@ -333,6 +346,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.store = store;
             
             this.serviceOptions = serviceOptions;
+            
+            this.defaults = dflts;
             
             /*
              * Unpack the "search" magic predicate:
@@ -380,16 +395,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
         }
 
-        @SuppressWarnings({ "rawtypes", "unchecked" })
-        private GeoSpatialMultiHiterator getHiterator(
-              IBindingSet[] bsList) {
-
-           return new GeoSpatialMultiHiterator(
-              bsList, searchFunction, spatialPoint, spatialDistance, 
-              spatialDistanceUnit, timePoint, timeDistance, timeDistanceUnit);
-
-        }
-
         @Override
         @SuppressWarnings({ "rawtypes", "unchecked" })
         public ICloseableIterator<IBindingSet> call(
@@ -408,7 +413,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
            return new GeoSpatialMultiHiterator(bsList,  searchFunction,
               spatialPoint, spatialDistance, spatialDistanceUnit,
-              timePoint, timeDistance, timeDistanceUnit);
+              timePoint, timeDistance, timeDistanceUnit, defaults);
 
         }
         
@@ -535,6 +540,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        final TermNode timePoint;
        final TermNode timeDistance;
        final TermNode timeDistanceUnit;
+       final GeoSpatialDefaults defaults;
        
        int nextBindingSetItr = 0;
 
@@ -544,7 +550,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              final IBindingSet[] bindingSet,  final TermNode searchFunction, 
              final TermNode spatialPoint, final TermNode spatialDistance, 
              final TermNode spatialDistanceUnit, final TermNode timePoint,
-             final TermNode timeDistance, final TermNode timeDistanceUnit) {
+             final TermNode timeDistance, final TermNode timeDistanceUnit,
+             final GeoSpatialDefaults defaults) {
 
           this.bindingSet = bindingSet;
           this.searchFunction = searchFunction;
@@ -554,6 +561,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           this.timePoint = timePoint;
           this.timeDistance = timeDistance;
           this.timeDistanceUnit = timeDistanceUnit;
+          this.defaults = defaults;
 
           init();
 
@@ -633,13 +641,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
           // TODO: refined type resolvment
           final IBindingSet bs = bindingSet[nextBindingSetItr++];
-          final String searchFunction = resolveAsString(this.searchFunction, bs);
-          final String spatialPoint = resolveAsString(this.spatialPoint, bs);
-          final String spatialDistance = resolveAsString(this.spatialDistance, bs);
-          final String spatialDistanceUnit = resolveAsString(this.spatialDistanceUnit, bs);
-          final String timePoint = resolveAsString(this.timePoint, bs);
-          final String timeDistance = resolveAsString(this.timeDistance, bs);
-          final String timeDistanceUnit = resolveAsString(this.timeDistanceUnit, bs);
+          final GeoFunction searchFunction = resolveAsGeoFunction(this.searchFunction, bs);
+          final Point2D spatialPoint = resolveAsPoint(this.spatialPoint, bs);
+          final Double spatialDistance = resolveAsDouble(this.spatialDistance, bs);
+          final SpatialUnit spatialDistanceUnit = resolveAsSpatialDistanceUnit(this.spatialDistanceUnit, bs);
+          final Double timePoint = resolveAsDouble(this.timePoint, bs);
+          final Double timeDistance = resolveAsDouble(this.timeDistance, bs);
+          final TimeUnit timeDistanceUnit = resolveAsTimeDistanceUnit(this.timeDistanceUnit, bs);
 
           /*
            * Though we currently, we only support Solr, here we might easily hook
@@ -661,6 +669,147 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           nextDelegate();
 
        }
+       
+       private GeoFunction resolveAsGeoFunction(TermNode termNode, IBindingSet bs) {
+          
+          String geoFunctionStr = resolveAsString(termNode, bs);
+          
+          // try override with system default, if not set
+          if (geoFunctionStr==null) {
+             geoFunctionStr = defaults.getDefaultFunction();
+          }
+          
+          if (geoFunctionStr != null && !geoFunctionStr.isEmpty()) {
+
+             try {
+
+                return GeoFunction.valueOf(geoFunctionStr);
+
+             } catch (NumberFormatException e) {
+
+                // illegal, ignore and proceed
+                if (log.isInfoEnabled()) {
+                   log.info("Illegal geo function: " + geoFunctionStr +
+                         " -> will be ignored, using default.");
+
+                }
+
+             }
+          }
+
+          return GeoSpatial.Options.DEFAULT_GEO_FUNCTION; // fallback
+
+       }
+       
+       
+       private TimeUnit resolveAsTimeDistanceUnit(TermNode termNode, IBindingSet bs) {
+          
+          String timeUnitStr = resolveAsString(termNode, bs);
+          
+          // try override with system default, if not set
+          if (timeUnitStr==null) {
+             timeUnitStr = defaults.getDefaultTimeDistanceUnit();
+          }
+          
+          if (timeUnitStr != null && !timeUnitStr.isEmpty()) {
+
+             try {
+
+                return TimeUnit.valueOf(timeUnitStr);
+
+             } catch (NumberFormatException e) {
+
+                // illegal, ignore and proceed
+                if (log.isInfoEnabled()) {
+                   log.info("Illegal time unit: " + timeUnitStr +
+                         " -> will be ignored, using default.");
+
+                }
+
+             }
+          }
+
+          return GeoSpatial.Options.DEFAULT_GEO_TIME_DISTANCE_UNIT; // fallback
+
+       }
+       
+       private SpatialUnit resolveAsSpatialDistanceUnit(TermNode termNode, IBindingSet bs) {
+          
+          String spatialUnitStr = resolveAsString(termNode, bs);
+          
+          // try override with system default, if not set
+          if (spatialUnitStr==null) {
+             spatialUnitStr = defaults.getDefaultSpatialDistanceUnit();
+          }
+          
+          if (spatialUnitStr != null && !spatialUnitStr.isEmpty()) {
+
+             try {
+
+                return SpatialUnit.valueOf(spatialUnitStr);
+
+             } catch (NumberFormatException e) {
+
+                // illegal, ignore and proceed
+                if (log.isInfoEnabled()) {
+                   log.info("Illegal spatial unit: " + spatialUnitStr +
+                         " -> will be ignored, using default.");
+
+                }
+
+             }
+          }
+
+          return GeoSpatial.Options.DEFAULT_GEO_SPATIAL_DISTANCE_UNIT; // fallback
+
+       }
+       
+       private Double resolveAsDouble(TermNode termNode, IBindingSet bs) {
+          
+          String s = resolveAsString(termNode, bs);
+          if (s==null || s.isEmpty()) {
+             return null;
+          }
+          
+          try {
+             return Double.valueOf(s);
+          } catch (NumberFormatException e) {
+             
+             // illegal, ignore and proceed
+             if (log.isInfoEnabled()) {
+                log.info("Illegal double value: " + s +
+                      " -> will be ignored, using default.");
+
+             }
+          }
+          
+          return null; // could not parse
+       }
+       
+       private Point2D resolveAsPoint(TermNode termNode, IBindingSet bs) {
+          
+          String pointAsStr = resolveAsString(termNode, bs);
+          if (pointAsStr==null || pointAsStr.isEmpty()) {
+             return null;
+          }
+          
+          try {
+             
+             return new Point2D(pointAsStr);
+
+          } catch (NumberFormatException e) {
+             
+             // illegal, ignore and proceed
+             if (log.isInfoEnabled()) {
+                log.info("Illegal point value: " + pointAsStr +
+                      " -> will be ignored, using default.");
+
+             }
+          }
+          
+          return null; // could not parse
+       }
+       
        private String resolveAsString(TermNode termNode, IBindingSet bs) {
 
           if (termNode == null) { // term node not set explicitly
@@ -697,6 +846,43 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           }
        }
 
+    }
+    
+    /**
+     * Default values for geospatial service, such as unit definitions.
+     * 
+     * @author msc
+     */
+    public static class GeoSpatialDefaults {
+
+       private final String defaultFunction;
+       private final String defaultSpatialDistanceUnit;
+       private final String defaultTimeDistanceUnit;
+
+       public GeoSpatialDefaults(final Properties p) {
+          
+          this.defaultFunction = 
+                p.getProperty(GeoSpatial.Options.GEO_FUNCTION);
+          
+          this.defaultSpatialDistanceUnit = 
+                p.getProperty(GeoSpatial.Options.GEO_SPATIAL_DISTANCE_UNIT);
+          
+          this.defaultTimeDistanceUnit = 
+                p.getProperty(GeoSpatial.Options.GEO_TIME_DISTANCE_UNIT);
+          
+       }
+
+      public String getDefaultFunction() {
+         return defaultFunction;
+      }
+
+      public String getDefaultSpatialDistanceUnit() {
+         return defaultSpatialDistanceUnit;
+      }
+
+      public String getDefaultTimeDistanceUnit() {
+         return defaultTimeDistanceUnit;
+      }
     }
 
 }

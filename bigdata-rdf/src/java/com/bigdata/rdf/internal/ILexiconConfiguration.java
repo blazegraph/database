@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.internal;
 
-import java.util.Set;
 import java.util.TimeZone;
 
 import org.openrdf.model.URI;
