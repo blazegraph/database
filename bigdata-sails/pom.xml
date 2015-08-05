@@ -49,14 +49,14 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG_1269_sails_test-SNAPSHOT</version>
+    <version>1.5.3-BLZG_1269_sails_test-SNAPSHOT-1.5.3-SNAPSHOT-BLZG_1269_sails_test-BLZG_1269_bigdata-sails-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
-   <artifactId>bigdata-sails-test</artifactId>
+   <artifactId>bigdata-sails</artifactId>
     <version>${bigdata.version}</version>
    <packaging>jar</packaging>
-   <name>Blazegraph(tm) Sail Tests</name>
+   <name>Blazegraph Core (tm)</name>
     <description>Blazegraph(TM) Maven Build</description>
     <url>http://www.blazegraph.com</url>
     <organization>
@@ -72,56 +72,6 @@ dependencies.
     </licenses>
     <!-- properties are now in the parent POM. -->
     <build>
-     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.18.1</version>
-        <configuration>
-          <includes>
-            <include>com/bigdata/rdf/sail/TestAll.java</include>
-            <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
-           </includes>
-           <excludes>
-    	    <exclude>com/bigdata/TestAll.java</exclude>
-	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
-	  </excludes>
-          <forkCount>1</forkCount>
-          <reuseForks>true</reuseForks>
-	  <printSummary>false</printSummary>
-          <disableXmlReport>false</disableXmlReport>
-          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <version>2.10</version>
-        <executions>
-          <execution>
-            <id>copy</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>com.blazegraph</groupId>
-                  <artifactId>bigdata-war</artifactId>
-                  <version>${bigdata.version}</version>
-                  <type>war</type>
-                  <overWrite>true</overWrite>
-                  <outputDirectory>target</outputDirectory>
-                  <destFileName>bigdata.war</destFileName>
-                </artifactItem>
-              </artifactItems>
-              <!-- other configurations here -->
-            </configuration>
-          </execution>
-        </executions>
-        </plugin>
-     </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
       <extension>
@@ -336,13 +286,11 @@ dependencies.
        <artifactId>dsi-utils</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
-<!--
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit3.version}</version>
      </dependency>
--->
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -378,24 +326,6 @@ dependencies.
        <artifactId>bigdata-core</artifactId>
        <version>${bigdata.version}</version>
     </dependency>
-    <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-core-test</artifactId>
-       <version>${bigdata.version}</version>
-    </dependency>
-    <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-core-test</artifactId>
-       <version>${bigdata.version}</version>
-       <type>test-jar</type>
-    </dependency>
-<!-- TODO:  Factor our main classes.
-    <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-sails</artifactId>
-       <version>${bigdata.version}</version>
-    </dependency>
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
