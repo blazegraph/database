@@ -49,6 +49,7 @@ public class GeoSpatialQueryImpl implements IGeoSpatialQuery {
    @Override
    public GeoSpatialQueryHiterator search(GeoSpatialSearchQuery query) {
       
+      System.out.println("Here we go...");
       // TODO: implement
       GeoSpatialQueryHiterator hiterator = new GeoSpatialQueryHiterator(new BigdataURI[0]); 
       return hiterator;

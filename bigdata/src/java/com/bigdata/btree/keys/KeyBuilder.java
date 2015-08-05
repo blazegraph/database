@@ -1905,6 +1905,8 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
       
       byte[] zOrderArr = new byte[bytesTotal]; // target buffer
       
+      // TODO: speed up copying by starting out with most significant bit
+      
       // we compose the original components into the the z-order bit array
       int zOrderIt = 0;
       for (int bufIt=0; bufIt<Long.SIZE; bufIt++) { // iterate over bits
@@ -1930,6 +1932,8 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
       final int bytesTotal = Long.SIZE/8*numDimensions;
       
       byte[] componentArr = new byte[bytesTotal]; // target buffer
+      
+      // TODO: speed up copying by starting out with most significant bit
       
       // we decompose the z-order bit array into its original components 
       int zOrderIt = 0;

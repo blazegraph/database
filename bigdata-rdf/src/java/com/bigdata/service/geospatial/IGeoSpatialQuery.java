@@ -28,6 +28,11 @@ package com.bigdata.service.geospatial;
 
 import java.io.Serializable;
 
+import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
+import com.bigdata.service.geospatial.GeoSpatial.Point2D;
+import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
+import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
+
 /**
  * Interface for geospatial queries and their execution.
  * 
@@ -45,22 +50,21 @@ public interface IGeoSpatialQuery {
 
       private static final long serialVersionUID = -2509557655519603130L;
 
-      final String searchFunction;
+      final GeoFunction searchFunction;
+      final Point2D spatialPoint;
+      final Double spatialDistance;
+      final SpatialUnit spatialDistanceUnit;
+      final Double timePoint;
+      final Double timeDistance;
+      final TimeUnit timeDistanceUnit;
 
-      final String spatialPoint;
-      final String spatialDistance;
-      final String spatialDistanceUnit;
-      final String timePoint;
-      final String timeDistance;
-      final String timeDistanceUnit;
-      
       /**
        * Constructor
        */
-      public GeoSpatialSearchQuery(final String searchFunction, 
-            final String spatialPoint, final String spatialDistance,
-            final String spatialDistanceUnit, final String timePoint,
-            final String timeDistance, final String timeDistanceUnit) {
+      public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
+            final Point2D spatialPoint, final Double spatialDistance,
+            final SpatialUnit spatialDistanceUnit, final Double timePoint,
+            final Double timeDistance, final TimeUnit timeDistanceUnit) {
 
          this.searchFunction = searchFunction;
          this.spatialPoint = spatialPoint;
@@ -72,37 +76,37 @@ public interface IGeoSpatialQuery {
 
       }
       
-      public String getSearchFunction() {
+      public GeoFunction getSearchFunction() {
          return searchFunction;
       }
 
 
-      public String getSpatialPoint() {
+      public Point2D getSpatialPoint() {
          return spatialPoint;
       }
 
 
-      public String getSpatialDistance() {
+      public Double getSpatialDistance() {
          return spatialDistance;
       }
 
 
-      public String getSpatialDistanceUnit() {
+      public SpatialUnit getSpatialDistanceUnit() {
          return spatialDistanceUnit;
       }
 
 
-      public String getTimePoint() {
+      public Double getTimePoint() {
          return timePoint;
       }
 
 
-      public String getTimeDistance() {
+      public Double getTimeDistance() {
          return timeDistance;
       }
 
 
-      public String getTimeDistanceUnit() {
+      public TimeUnit getTimeDistanceUnit() {
          return timeDistanceUnit;
       }
       
