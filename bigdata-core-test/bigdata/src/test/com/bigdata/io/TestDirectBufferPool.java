@@ -63,6 +63,10 @@ public class TestDirectBufferPool extends TestCase2 {
 
     public void test_allocateRelease() throws InterruptedException {
 
+    	//Added as an attempt to reduce stochastic test failures in CI.
+        // Verify that all allocated buffers were released.
+        DirectBufferPoolTestHelper.checkBufferPools(this);
+
         final int poolSizeBefore = DirectBufferPool.INSTANCE.getPoolSize();
         final int poolAcquiredBefore = DirectBufferPool.INSTANCE
                 .getAcquiredBufferCount();

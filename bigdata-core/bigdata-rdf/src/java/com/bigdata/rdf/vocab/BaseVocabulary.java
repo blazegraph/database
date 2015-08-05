@@ -311,7 +311,7 @@ abstract public class BaseVocabulary implements Vocabulary, Externalizable {
             value.setIV(iv);
 
             // Note: Do not cache the Value on the IV.
-            // iv.setValue(value);
+             iv.setValue(value);
 
             iv2val.put(iv, value);
 

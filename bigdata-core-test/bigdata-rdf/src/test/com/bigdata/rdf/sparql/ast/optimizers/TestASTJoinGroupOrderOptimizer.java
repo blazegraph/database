@@ -702,6 +702,59 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
    }
    
    /**
+    * Test OPTIONAL inter-partition reordering.
+    */
+   public void testOptional01() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVarsOptional("x1", "y1"),
+               stmtPatternWithVars("x1", "z1")          
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVar("x1"),
+               stmtPatternWithVars("x1", "z1"),  
+               stmtPatternWithVarsOptional("x1", "y1")      
+           ));
+         
+      }}.test();
+      
+   }
+   
+   /**
+    * Test OPTIONAL inter-partition reordering.
+    */
+   public void testOptional02() {
+
+      new Helper(){{
+         
+         given = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVarsOptional("x1", "y1"),
+               stmtPatternWithVar("x1")
+            ));
+         
+         expected = 
+            select(varNode(x), 
+            where (
+               stmtPatternWithVarsOptional("x1", "y1"),
+               stmtPatternWithVar("x1")
+           ));
+         
+      }}.test();
+      
+   }
+   
+   
+   /**
     * Test complex pattern, including inter- and intra-partition reordering,
     * with focus on BIND and ASSIGNMENT nodes.
     */

@@ -1102,4 +1102,73 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_blzg_1380.srx"// resultFileURL
        ).runTest();
     }
+    
+    /**
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1300">
+     * SUM(DISTINCT $a) does not take DISTINCT into account</a>
+     */
+    public void test_ticket_blzg_1300() throws Exception {
+       new TestHelper("ticket_blzg_1300",// testURI,
+             "ticket_blzg_1300.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_blzg_1300.srx"// resultFileURL
+       ).runTest();
+    }    
+    
+      /**
+     * * does not include var only set in values
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1113">
+     * * does not include var only set in values</a>
+     */
+    public void test_ticket_blzg_1113a() throws Exception {
+       new TestHelper("ticket_blzg_1113a",// testURI,
+             "ticket_blzg_1113a.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_blzg_1113.srx"// resultFileURL
+       ).runTest();
+    }
+ 
+    /**
+     * * does not include var only set in values
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1113">
+     * * does not include var only set in values</a>
+     */
+    public void test_ticket_blzg_1113b() throws Exception {
+       new TestHelper("ticket_blzg_1113b",// testURI,
+             "ticket_blzg_1113b.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_blzg_1113.srx"// resultFileURL
+       ).runTest();
+    }
+    
+    /**
+     * * does not include var only set in values
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1113">
+     * * does not include var only set in values</a>
+     */
+    public void test_ticket_blzg_1113c() throws Exception {
+       new TestHelper("ticket_blzg_1113c",// testURI,
+             "ticket_blzg_1113c.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_blzg_1113.srx"// resultFileURL
+       ).runTest();
+    }
+
+    /**
+     * * does not include var only set in values
+     * 
+     * @see <a href="https://jira.blazegraph.com/browse/BLZG-1113">
+     * * does not include var only set in values</a>
+     */
+    public void test_ticket_blzg_1113d() throws Exception {
+       new TestHelper("ticket_blzg_1113d",// testURI,
+             "ticket_blzg_1113d.rq",// queryFileURL
+             "empty.trig",// dataFileURL
+             "ticket_blzg_1113.srx"// resultFileURL
+       ).runTest();
+    }
 }

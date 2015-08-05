@@ -36,8 +36,6 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
-import com.bigdata.bop.ConcurrentHashMapAnnotations;
-import com.bigdata.bop.HashMapAnnotations;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
 import com.bigdata.bop.ISingleThreadedOp;
@@ -117,12 +115,6 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
     }
     
     /**
-     * Filter for distinct variables, as they might be specified in
-     * PROJECT_IN_VARS annotation above (will be null if the latter is null).
-     */
-    protected IDistinctFilter distinctVarFilter;
-
-    /**
      * Deep copy constructor.
      */
     public HashIndexOp(final HashIndexOp op) {
@@ -187,22 +179,6 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
 
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
-        
-        final IVariable<?>[] projectInVars = 
-            (IVariable<?>[])getProperty(Annotations.PROJECT_IN_VARS);
-        
-        if (projectInVars!=null) {
-
-            distinctVarFilter = new JVMDistinctFilter(projectInVars, //
-                this.getProperty(
-                    HashMapAnnotations.INITIAL_CAPACITY,
-                    HashMapAnnotations.DEFAULT_INITIAL_CAPACITY),//
-                this.getProperty(
-                    HashMapAnnotations.LOAD_FACTOR,
-                    HashMapAnnotations.DEFAULT_LOAD_FACTOR),//
-                ConcurrentHashMapAnnotations.DEFAULT_CONCURRENCY_LEVEL);
-           
-        }
 
         for (IVariable<?> var : joinVars) {
 
@@ -249,7 +225,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
     @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
 
-        return new FutureTask<Void>(new ChunkTask(this, context, distinctVarFilter));
+        return new FutureTask<Void>(new ChunkTask(this, context));
         
     }
     
@@ -267,8 +243,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         private final NamedSolutionSetStats stats;
         
         private final IHashJoinUtility state;
-        
-        private final IDistinctFilter distinctJoinVarFilter;
+
         /**
          * <code>true</code> iff this is the first invocation of this operator.
          */
@@ -284,8 +259,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         private final boolean sourceIsPipeline;
         
         public ChunkTask(final HashIndexOp op,
-                final BOpContext<IBindingSet> context,
-                IDistinctFilter distinctJoinVarFilter) {
+                final BOpContext<IBindingSet> context) {
 
             if (op == null)
                 throw new IllegalArgumentException();
@@ -298,8 +272,6 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
             this.op = op;
             
             this.stats = ((NamedSolutionSetStats) context.getStats());
-            
-            this.distinctJoinVarFilter = distinctJoinVarFilter;
 
             // Metadata to identify the target named solution set.
             final INamedSolutionSetRef namedSetRef = (INamedSolutionSetRef) op
@@ -494,7 +466,7 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
             final UnsyncLocalOutputBuffer<IBindingSet> unsyncBuffer = new UnsyncLocalOutputBuffer<IBindingSet>(
                     op.getChunkCapacity(), sink);
 
-            state.outputSolutions(unsyncBuffer, distinctJoinVarFilter);
+            state.outputSolutions(unsyncBuffer);
             
             unsyncBuffer.flush();
 
