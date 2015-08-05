@@ -393,9 +393,8 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
 
                 try {
 
-                    // guess at the RDF Format, assume RDF/XML.
-                    final RDFFormat rdfFormat = RDFFormat.forFileName(resource,
-                            RDFFormat.RDFXML);
+                    // guess at the RDF Format
+                    final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
                     
                     final RDFParserOptions options = new RDFParserOptions();
                     
@@ -671,7 +670,8 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
             final int maxerrors = 20;
             {
 
-                log.info("Verifying all statements found using reparse: file="
+            	if(log.isInfoEnabled())
+            			log.info("Verifying all statements found using reparse: file="
                         + resource);
 
                 InputStream is = null;
@@ -692,10 +692,10 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                     is = getClass().getClassLoader().getResourceAsStream(resource);
                     
                 } else {
-                    
+                	//Try a file
                     baseURI = new File(resource).toURI().toString();
                     
-                    is = new FileInputStream(baseURI);
+                    is = new FileInputStream(resource);
                     
                 }
                 
@@ -705,8 +705,7 @@ abstract public class AbstractRIOTestCase extends AbstractTripleStoreTestCase {
                 final IRioLoader loader = new StatementVerifier(store,
                         capacity, nerrs, maxerrors);
 
-                final RDFFormat rdfFormat = RDFFormat.forFileName(resource,
-                        RDFFormat.RDFXML);
+                final RDFFormat rdfFormat = RDFFormat.forFileName(resource);
 
                 final RDFParserOptions options = new RDFParserOptions();
                 
