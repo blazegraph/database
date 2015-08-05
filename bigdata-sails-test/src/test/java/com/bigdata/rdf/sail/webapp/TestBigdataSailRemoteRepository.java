@@ -470,7 +470,8 @@ public class TestBigdataSailRemoteRepository<S extends IIndexManager> extends
         
         // Load the resource into the KB.
         {
-            cxn.add(new URL("file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf"), "", RDFFormat.RDFXML);
+        	cxn.add( this.getClass().getClassLoader().getResource("small.rdf"), "", RDFFormat.RDFXML);
+            //cxn.add(new URL("file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf"), "", RDFFormat.RDFXML);
             assertEquals(expectedStatementCount, getExactSize());
         }
 
