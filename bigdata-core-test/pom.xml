@@ -56,7 +56,7 @@ dependencies.
    <artifactId>bigdata-core-test</artifactId>
     <version>${bigdata.version}</version>
    <packaging>jar</packaging>
-   <name>bigdata-core-test</name>
+   <name>Blazegraph Core Tests</name>
     <description>Bigdata(R) Maven Build</description>
     <url>http://www.systap.com/bigdata.htm</url>
     <organization>

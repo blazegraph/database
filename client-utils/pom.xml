@@ -11,7 +11,7 @@
   <groupId>com.blazegraph</groupId>
   <artifactId>client-utils</artifactId>
   <version>${bigdata.version}</version>
-  <name>client-utils</name>
+  <name>Blazegraph Client Utilities</name>
   <url>http://maven.apache.org</url>
   <build>
   </build>
@@ -27,7 +27,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>client-utils</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph Client Utils</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){

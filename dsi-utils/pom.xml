@@ -12,7 +12,7 @@
   <groupId>com.blazegraph</groupId>
   <artifactId>dsi-utils</artifactId>
   <version>${bigdata.version}</version>
-  <name>dsi-utils</name>
+  <name>Blazegraph DSI Utils</name>
   <packaging>jar</packaging>
 
   <reporting>
@@ -26,7 +26,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>ctc-striterators</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph DSI Utils</h1>]]></doctitle>
           <bottom> <![CDATA[ <i> 
                            Copyright (C) SYSTAP, LLC 2006-2012.  All rights reserved.<p>
 
