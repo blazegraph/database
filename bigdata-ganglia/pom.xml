@@ -12,7 +12,7 @@
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-ganglia</artifactId>
   <version>${bigdata.version}</version>
-  <name>bigdata-ganglia</name>
+  <name>Blazegraph Ganglia</name>
   <packaging>jar</packaging>
 
   <reporting>
@@ -26,7 +26,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>bigdata-ganglia</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph Ganglia</h1>]]></doctitle>
           <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){

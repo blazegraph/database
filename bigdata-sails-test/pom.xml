@@ -56,7 +56,7 @@ dependencies.
    <artifactId>bigdata-sails-test</artifactId>
     <version>${bigdata.version}</version>
    <packaging>jar</packaging>
-   <name>Blazegraph(tm) Sail Tests</name>
+   <name>Blazegraph Sail Tests</name>
     <description>Blazegraph(TM) Maven Build</description>
     <url>http://www.blazegraph.com</url>
     <organization>

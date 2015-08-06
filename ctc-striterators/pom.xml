@@ -12,7 +12,7 @@
   <groupId>com.blazegraph</groupId>
   <artifactId>ctc-striterators</artifactId>
   <version>${bigdata.version}</version>
-  <name>ctc-striterators</name>
+  <name>CTC Striterators</name>
   <packaging>jar</packaging>
 
   <reporting>
@@ -26,7 +26,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>ctc-striterators</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>CTC Striterators</h1>]]></doctitle>
           <bottom> <![CDATA[ <i> 
                            Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.<p>
 

@@ -12,7 +12,7 @@
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-blueprints</artifactId>
   <version>${bigdata.version}</version>
-  <name>bigdata-blueprints</name>
+  <name>Blazegraph Blueprints API</name>
   <packaging>jar</packaging>
 
   <build>
@@ -59,7 +59,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>bigdata-blueprints</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph Blueprints API</h1>]]></doctitle>
 	  <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
