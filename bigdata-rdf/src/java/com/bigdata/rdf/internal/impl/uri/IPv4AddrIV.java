@@ -42,7 +42,7 @@ import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.io.LongPacker;
 import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.Inet4Address;
+import com.bigdata.rdf.internal.IPv4Address;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.XSD;
 import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
@@ -59,7 +59,7 @@ import com.bigdata.rdf.model.BigdataLiteral;
  * {@inheritDoc}
  */
 public class IPv4AddrIV<V extends BigdataLiteral> 
-        extends AbstractLiteralIV<V, Inet4Address>
+        extends AbstractLiteralIV<V, IPv4Address>
             implements Serializable, Literal {
 
     /**
@@ -72,7 +72,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	/**
 	 * The inline IP address.
 	 */
-	private final Inet4Address value;
+	private final IPv4Address value;
 	
 	/**
 	 * The cached string representation of this IP.
@@ -89,7 +89,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	 */
 	private transient V uri;
 
-    public IV<V, Inet4Address> clone(final boolean clearCache) {
+    public IV<V, IPv4Address> clone(final boolean clearCache) {
 
         final IPv4AddrIV<V> tmp = new IPv4AddrIV<V>(value);//, prefix);
 
@@ -112,7 +112,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
     /**
 	 * Ctor with internal value specified.
 	 */
-	public IPv4AddrIV(final Inet4Address value) {//, final byte prefix) {
+	public IPv4AddrIV(final IPv4Address value) {//, final byte prefix) {
 
         super(DTE.Extension);
         
@@ -168,7 +168,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 
 			}
 			
-			this.value = Inet4Address.textToAddr(s);
+			this.value = IPv4Address.IPv4Factory(s);
 			
 			if (value == null) {
 			    if (log.isDebugEnabled()) {
@@ -197,7 +197,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
 	/**
 	 * Returns the inline value.
 	 */
-	public Inet4Address getInlineValue() throws UnsupportedOperationException {
+	public IPv4Address getInlineValue() throws UnsupportedOperationException {
 		return value;
 	}
 
@@ -276,7 +276,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
         if (this == o)
             return true;
         if (o instanceof IPv4AddrIV) {
-        		final Inet4Address value2 = ((IPv4AddrIV<?>) o).value;
+        		final IPv4Address value2 = ((IPv4AddrIV<?>) o).value;
         		return value.equals(value2);
         }
         return false;
@@ -358,7 +358,7 @@ public class IPv4AddrIV<V extends BigdataLiteral>
         }
         
         private Object readResolve() throws ObjectStreamException {
-	        return new Inet4Address(key);
+	        return new IPv4Address(key);
         }
 
     }
