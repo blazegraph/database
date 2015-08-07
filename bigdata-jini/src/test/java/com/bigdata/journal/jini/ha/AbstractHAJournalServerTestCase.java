@@ -433,6 +433,10 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 
 				final String s = response.getResponseBody();
 				
+				if(log.isInfoEnabled()) {
+					log.info("HA Status: " + s);
+				}
+				
 				return HAStatusEnum.valueOf(s);
 			} finally {
 				rpm.close();
