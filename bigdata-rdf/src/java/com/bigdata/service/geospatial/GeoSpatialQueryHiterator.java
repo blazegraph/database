@@ -28,15 +28,13 @@ package com.bigdata.service.geospatial;
 
 import java.util.Iterator;
 
-import com.bigdata.rdf.model.BigdataURI;
-
 /**
  * Visits geospatial query search result
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class GeoSpatialQueryHiterator implements Iterator<BigdataURI> {
+public class GeoSpatialQueryHiterator implements Iterator<IGeoSpatialQueryHit<?>> {
 
    /**
     * The index into the array of hits wrapped by this iterator.
@@ -46,13 +44,13 @@ public class GeoSpatialQueryHiterator implements Iterator<BigdataURI> {
    /**
     * The array of hits wrapped by this iterator.
     */
-   private final BigdataURI[] hits;
+   private final IGeoSpatialQueryHit<?>[] hits;
 
    /**
     * 
     * @param hits
     */
-   public GeoSpatialQueryHiterator(final BigdataURI[] hits) {
+   public GeoSpatialQueryHiterator(final IGeoSpatialQueryHit<?>[] hits) {
 
       if (hits == null)
          throw new IllegalArgumentException();
@@ -67,7 +65,7 @@ public class GeoSpatialQueryHiterator implements Iterator<BigdataURI> {
 
    }
 
-   public BigdataURI next() {
+   public IGeoSpatialQueryHit<?> next() {
 
       return hits[rank++];
 

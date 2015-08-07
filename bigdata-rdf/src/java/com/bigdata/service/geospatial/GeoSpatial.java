@@ -143,39 +143,6 @@ public interface GeoSpatial {
    final URI TIME_DISTANCE = new URIImpl(NAMESPACE + "timeDistance");
    final URI TIME_DISTANCE_UNIT = new URIImpl(NAMESPACE + "timeDistanceUnit");
    
-   /**
-    * A two dimensional point, consisting of two Double values.
-    */
-   public static class Point2D {
-      
-      public static final String POINT_SEPARATOR = "#";
 
-      private final Double XCoord;
-      private final Double YCoord;
-      
-      public Point2D(String s) throws NumberFormatException {
-         
-         if (s==null || s.isEmpty()) {
-            throw new NumberFormatException("Point is null or empty.");
-         }
-         
-         String[] xyCoord = s.split(POINT_SEPARATOR);
-         if (xyCoord.length!=2) {
-            throw new NumberFormatException("Point must have 2 components, but has " + xyCoord.length);
-         }
-
-         XCoord = Double.valueOf(xyCoord[0]);
-         YCoord = Double.valueOf(xyCoord[1]);
-      }
-
-      public Double getXCoord() {
-         return XCoord;
-      }
-      
-
-      public Double getYCoord() {
-         return YCoord;
-      }
-   }
 
 }

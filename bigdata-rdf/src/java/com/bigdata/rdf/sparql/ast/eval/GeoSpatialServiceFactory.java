@@ -28,17 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
 import org.openrdf.model.URI;
+import org.openrdf.query.Binding;
+import org.openrdf.query.BindingSet;
+import org.openrdf.query.QueryEvaluationException;
+import org.openrdf.query.QueryLanguage;
+import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.Constant;
@@ -47,11 +55,15 @@ import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.journal.AbstractJournal;
+import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.model.BigdataValueFactoryImpl;
+import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
+import com.bigdata.rdf.sail.BigdataSailTupleQuery;
+import com.bigdata.rdf.sail.Sesame2BigdataIterator;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
-import com.bigdata.rdf.sparql.ast.DummyConstantNode;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
@@ -64,20 +76,22 @@ import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
+import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.search.IHit;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.fts.FulltextSearchHit;
 import com.bigdata.service.fts.FulltextSearchHiterator;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
-import com.bigdata.service.geospatial.GeoSpatial.Point2D;
 import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
 import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
+import com.bigdata.service.geospatial.GeoSpatialQueryHit;
 import com.bigdata.service.geospatial.GeoSpatialQueryHiterator;
-import com.bigdata.service.geospatial.IGeoSpatialQuery;
 import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
 import com.bigdata.service.geospatial.IGeoSpatialQueryHit;
-import com.bigdata.service.geospatial.impl.GeoSpatialQueryImpl;
+import com.bigdata.service.geospatial.impl.GeoSpatialUtility.BoundingBoxLatLonTime;
+import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
+import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -113,12 +127,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         
     }
     
-    public BigdataServiceCall create(final ServiceCallCreateParams params) {
+    public BigdataServiceCall create(final ServiceCallCreateParams createParams) {
 
-        if (params == null)
+        if (createParams == null)
             throw new IllegalArgumentException();
 
-        final AbstractTripleStore store = params.getTripleStore();
+        final AbstractTripleStore store = createParams.getTripleStore();
 
         final Properties props =
               store.getIndexManager()!=null && 
@@ -131,7 +145,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         if (store == null)
             throw new IllegalArgumentException();
 
-        final ServiceNode serviceNode = params.getServiceNode();
+        final ServiceNode serviceNode = createParams.getServiceNode();
 
         if (serviceNode == null)
             throw new IllegalArgumentException();
@@ -162,12 +176,16 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          * Create and return the geospatial service call object, 
          * which will execute this search request.
          */
+        final ServiceParams serviceParams = 
+           ServiceParams.gatherServiceParams(createParams);
 
-        return new SerivceCall(store, searchVar, statementPatterns,
-                getServiceOptions(), dflts);
+        return new GeoSpatialServiceCall(
+           store, searchVar, statementPatterns, getServiceOptions(), dflts, 
+           store, createParams, serviceParams);
         
     }
 
+    
     /**
      * Validate the search request. This looks for search magic predicates and
      * returns them all. It is an error if anything else is found in the group.
@@ -310,7 +328,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
      * is not a {@link Serializable} object. It MUST run on the query
      * controller.
      */
-    private static class SerivceCall implements BigdataServiceCall {
+    private static class GeoSpatialServiceCall implements BigdataServiceCall {
 
         private final AbstractTripleStore store;
         private final IServiceOptions serviceOptions;
@@ -323,13 +341,20 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         private TermNode timeDistanceUnit = null;
         private IVariable<?>[] vars;
         private final GeoSpatialDefaults defaults;
+        private final AbstractTripleStore kb;
         
-        public SerivceCall(
+        private final ServiceCallCreateParams createParams;
+        private final ServiceParams serviceParams;
+        
+        public GeoSpatialServiceCall(
                 final AbstractTripleStore store,
                 final IVariable<?> searchVar,
                 final Map<URI, StatementPatternNode> statementPatterns,
                 final IServiceOptions serviceOptions,
-                final GeoSpatialDefaults dflts) {
+                final GeoSpatialDefaults dflts,
+                final AbstractTripleStore kb,
+                final ServiceCallCreateParams createParams,
+                final ServiceParams serviceParams) {
 
             if(store == null)
                 throw new IllegalArgumentException();
@@ -342,6 +367,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
             if(serviceOptions == null)
                 throw new IllegalArgumentException();
+            
+            if (kb == null)
+               throw new IllegalArgumentException();
 
             this.store = store;
             
@@ -392,8 +420,86 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             this.timePoint = timePoint;
             this.timeDistance = timeDistance;
             this.timeDistanceUnit = timeDistanceUnit;
+            this.kb = kb;
+            this.createParams = createParams;
+            this.serviceParams = serviceParams;
 
         }
+        
+        protected TupleQueryResult doQuery(
+              final BigdataSailRepositoryConnection cxn,
+              final ServiceCallCreateParams createParams,
+              final ServiceParams serviceParams,
+              final String queryString) throws Exception {
+
+         final String baseURI = createParams.getServiceURI().stringValue();
+
+         final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
+                 .prepareTupleQuery(QueryLanguage.SPARQL, queryString, baseURI);
+
+         return query.evaluate();
+      }
+        
+        public GeoSpatialQueryHiterator search(
+              final GeoSpatialSearchQuery query, final AbstractTripleStore tripleStore) {
+
+              
+              final PointLatLonTime centerPoint = 
+                 new PointLatLonTime(query.getSpatialPoint(), query.getTimePoint());
+              
+              final BoundingBoxLatLonTime boundingBox = 
+                 new BoundingBoxLatLonTime(
+                    centerPoint, 
+                    query.getSpatialDistance() /* lat */,
+                    query.getSpatialDistance() /* lon */, 
+                    query.getTimeDistance()    /* time */
+                 );
+
+
+              final Future<TupleQueryResult> ft = AbstractApiTask.submitApiTask(
+                    tripleStore.getIndexManager(),
+                    new GeoSpatialQueryTask(boundingBox,
+                       tripleStore.getNamespace(), tripleStore.getTimestamp()));
+
+              try {
+
+                 final TupleQueryResult tupleQueryResult = ft.get();
+
+                 final Sesame2BigdataIterator<BindingSet, QueryEvaluationException> it = 
+                    new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(tupleQueryResult);
+
+
+                 // TODO: think about streaming and data types
+                 List<IGeoSpatialQueryHit> hits = new ArrayList<IGeoSpatialQueryHit>();
+                 
+                 while (it.hasNext()) {
+                    BindingSet bs = it.next();
+                    Binding b = bs.getBinding("s");
+                    BigdataURI uri = (BigdataURI)b.getValue();
+                    hits.add(new GeoSpatialQueryHit(uri,query.getIncomingBindings()));
+                    System.err.println("bs=" + bs);
+
+                 }
+                 
+                 GeoSpatialQueryHiterator hiterator = 
+                    new GeoSpatialQueryHiterator(
+                       hits.toArray(new GeoSpatialQueryHit[hits.size()]));
+                 
+                 return hiterator;
+                 
+              } catch (Exception e) {
+                 
+                 // TODO: error handling
+                 
+              } finally {
+
+                 ft.cancel(true/* mayInterruptIfRunning */);
+
+              }
+              
+              return null; // TODO: error handling
+          
+           }     
 
         @Override
         @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -413,7 +519,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
            return new GeoSpatialMultiHiterator(bsList,  searchFunction,
               spatialPoint, spatialDistance, spatialDistanceUnit,
-              timePoint, timeDistance, timeDistanceUnit, defaults);
+              timePoint, timeDistance, timeDistanceUnit, defaults, kb,
+              this);
 
         }
         
@@ -481,7 +588,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
               IBindingSet bs = new ListBindingSet();
 
-              bs.set(vars[0], new Constant(DummyConstantNode.toDummyIV(hit.getRes())));
+              bs.set(vars[0], new Constant<IV>(hit.getRes().getIV())); // getRes() is resolved already
               
               final IBindingSet baseBs = hit.getIncomingBindings();
               final Iterator<IVariable> varIt = baseBs.vars();
@@ -522,6 +629,94 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
         }
         
+        
+        public class GeoSpatialQueryTask extends AbstractApiTask<TupleQueryResult> {
+
+           private final BoundingBoxLatLonTime boundingBox;
+
+           public GeoSpatialQueryTask(BoundingBoxLatLonTime boundingBox,
+              final String namespace, final long timestamp) {
+
+               super(namespace, timestamp);
+
+               this.boundingBox = boundingBox;
+           }
+
+           @Override
+           public boolean isReadOnly() {
+
+               return true;
+               
+           }
+           
+           @Override
+           public TupleQueryResult call() throws Exception {
+               BigdataSailRepositoryConnection cxn = null;
+               boolean success = false;
+               try {
+                   // Note: Will be UPDATE connection if UPDATE request!!!
+                   cxn = getQueryConnection();
+                   if (log.isTraceEnabled())
+                       log.trace("Query running...");
+                   final TupleQueryResult ret = doQuery(cxn, createParams,
+                           serviceParams, getQueryString());
+                   success = true;
+                   if (log.isTraceEnabled())
+                       log.trace("Query done.");
+                   return ret;
+               } finally {
+                   if (cxn != null) {
+                       if (!success && !cxn.isReadOnly()) {
+                           /*
+                            * Force rollback of the connection.
+                            * 
+                            * Note: It is possible that the commit has already
+                            * been processed, in which case this rollback()
+                            * will be a NOP. This can happen when there is an
+                            * IO error when communicating with the client, but
+                            * the database has already gone through a commit.
+                            */
+                           try {
+                               // Force rollback of the connection.
+                               cxn.rollback();
+                           } catch (Throwable t) {
+                               log.error(t, t);
+                           }
+                       }
+                       try {
+                           // Force close of the connection.
+                           cxn.close();
+                       } catch (Throwable t) {
+                           log.error(t, t);
+                       }
+                   }
+               }
+           }
+           
+           /**
+            * TODO: proper interface, don't want to go via string
+            * @return
+            */
+           String getQueryString() {
+              
+              final StringBuffer buf = new StringBuffer();
+              buf.append("SELECT ?s WHERE { ");
+              buf.append(" ?s <http://o> ?o . ");
+              buf.append("hint:Prior hint:rangeSafe \"true\" .");
+              buf.append("FILTER(?o<=\"");
+              buf.append(boundingBox.getBorderHigh());
+              buf.append("\"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>) ");
+              buf.append("FILTER(?o>=\"");
+              buf.append(boundingBox.getBorderLow());
+              buf.append("\"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>)");
+              buf.append(" }");
+              
+              final String queryString = buf.toString();
+              return queryString;
+              
+           }
+
+       } // GeoSpatialQueryTask
     }
     
     
@@ -541,6 +736,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        final TermNode timeDistance;
        final TermNode timeDistanceUnit;
        final GeoSpatialDefaults defaults;
+       final AbstractTripleStore kb;
+       final GeoSpatialServiceCall serviceCall;
        
        int nextBindingSetItr = 0;
 
@@ -551,7 +748,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              final TermNode spatialPoint, final TermNode spatialDistance, 
              final TermNode spatialDistanceUnit, final TermNode timePoint,
              final TermNode timeDistance, final TermNode timeDistanceUnit,
-             final GeoSpatialDefaults defaults) {
+             final GeoSpatialDefaults defaults, final AbstractTripleStore kb,
+             GeoSpatialServiceCall serviceCall) {
 
           this.bindingSet = bindingSet;
           this.searchFunction = searchFunction;
@@ -562,6 +760,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           this.timeDistance = timeDistance;
           this.timeDistanceUnit = timeDistanceUnit;
           this.defaults = defaults;
+          this.kb = kb;
+          this.serviceCall = serviceCall;
 
           init();
 
@@ -639,27 +839,22 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
              return false;
           }
 
-          // TODO: refined type resolvment
           final IBindingSet bs = bindingSet[nextBindingSetItr++];
           final GeoFunction searchFunction = resolveAsGeoFunction(this.searchFunction, bs);
-          final Point2D spatialPoint = resolveAsPoint(this.spatialPoint, bs);
+          final PointLatLon spatialPoint = resolveAsPoint(this.spatialPoint, bs);
           final Double spatialDistance = resolveAsDouble(this.spatialDistance, bs);
           final SpatialUnit spatialDistanceUnit = resolveAsSpatialDistanceUnit(this.spatialDistanceUnit, bs);
-          final Double timePoint = resolveAsDouble(this.timePoint, bs);
-          final Double timeDistance = resolveAsDouble(this.timeDistance, bs);
+          final Long timePoint = resolveAsLong(this.timePoint, bs);
+          final Long timeDistance = resolveAsLong(this.timeDistance, bs);
           final TimeUnit timeDistanceUnit = resolveAsTimeDistanceUnit(this.timeDistanceUnit, bs);
 
-          /*
-           * Though we currently, we only support Solr, here we might easily hook
-           * in other implementations based on the magic predicate
-           */
-          final IGeoSpatialQuery geospatialSearch = new GeoSpatialQueryImpl();
 
           GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(
                 searchFunction, spatialPoint, spatialDistance, spatialDistanceUnit,
-                timePoint, timeDistance, timeDistanceUnit);
+                timePoint, timeDistance, timeDistanceUnit, bs);
           
-          curDelegate = (GeoSpatialQueryHiterator)  geospatialSearch.search(sq);
+          curDelegate = 
+             (GeoSpatialQueryHiterator) serviceCall.search(sq, kb);
 
           return true;
        }
@@ -786,7 +981,30 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           return null; // could not parse
        }
        
-       private Point2D resolveAsPoint(TermNode termNode, IBindingSet bs) {
+       private Long resolveAsLong(TermNode termNode, IBindingSet bs) {
+          
+          String s = resolveAsString(termNode, bs);
+          if (s==null || s.isEmpty()) {
+             return null;
+          }
+          
+          try {
+             return Long.valueOf(s);
+          } catch (NumberFormatException e) {
+             
+             // illegal, ignore and proceed
+             if (log.isInfoEnabled()) {
+                log.info("Illegal double value: " + s +
+                      " -> will be ignored, using default.");
+
+             }
+          }
+          
+          return null; // could not parse
+       }
+       
+       
+       private PointLatLon resolveAsPoint(TermNode termNode, IBindingSet bs) {
           
           String pointAsStr = resolveAsString(termNode, bs);
           if (pointAsStr==null || pointAsStr.isEmpty()) {
@@ -795,7 +1013,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           
           try {
              
-             return new Point2D(pointAsStr);
+             return new PointLatLon(pointAsStr);
 
           } catch (NumberFormatException e) {
              
