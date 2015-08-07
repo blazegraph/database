@@ -26,7 +26,6 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -366,18 +365,18 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
      */
     public void test_create03() throws Exception {
 
-    	final List<String> incorrectNamespaces = Arrays.asList("", "te.st");
+        final List<String> incorrectNamespaces = Arrays.asList("", "te.st");
 
         for(String incorrectNamespace:incorrectNamespaces){
-        	try {
-        		
-        		doTestCreate(incorrectNamespace);
-        		
-        		fail("Expecting: " + HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    	
-		    } catch (HttpException ex) {
-				assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
-			}
+            try {
+
+                doTestCreate(incorrectNamespace);
+
+                fail("Expecting: " + HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
+            } catch (HttpException ex) {
+                assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
+            }
         }
     }
     
