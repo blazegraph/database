@@ -70,11 +70,13 @@ ga('send', 'pageview');
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit4.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>junit-ext</artifactId>
       <version>${junit-ext.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>

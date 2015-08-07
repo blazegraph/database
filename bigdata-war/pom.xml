@@ -55,6 +55,36 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
       <version>${bigdata.version}</version>
+      <exclusions>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-server</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-webapp</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-servlet</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions> 
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
