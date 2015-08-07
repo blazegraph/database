@@ -108,7 +108,7 @@ dependencies.
               <artifactItems>
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
-                  <artifactId>bigdata-war</artifactId>
+                  <artifactId>bigdata-war-html</artifactId>
                   <version>${bigdata.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>

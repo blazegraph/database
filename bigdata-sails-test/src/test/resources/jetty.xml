@@ -147,7 +147,7 @@
                          <Set name="contextPath">/bigdata</Set>
                          <Set name="descriptor">WEB-INF/web.xml</Set>
                          <Set name="parentLoaderPriority">true</Set>
-                         <Set name="extractWAR">true</Set>
+                         <Set name="extractWAR">false</Set>
                          <Set name="maxFormContentSize">10485760</Set>
                         </New>
                     </Arg>

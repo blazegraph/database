@@ -23,6 +23,7 @@
        </activation>
        <properties>
 	<zookeeper.Installation>${local.test.zookeeper.installDir}</zookeeper.Installation>
+        <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
        </properties>
      </profile>
      <profile>
@@ -35,31 +36,13 @@
        </activation>
        <properties>
 	<zookeeper.Installation>${env.TEST_ZOOKEEPER_HOME}</zookeeper.Installation>
+        <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
        </properties>
      </profile>
     </profiles>
 
   <build>
     <plugins>
-<!--
-        <plugin>
-        <groupId>jini</groupId>
-        <artifactId>maven-jini-plugin</artifactId>
-        <version>2.0</version>
-        <configuration>
-          <port>5464</port>
-          <dir>.</dir>
-          <securityPolicy>policy.all</securityPolicy>
-          <loggingManager>com.sun.jini.logging.LogManager</loggingManager>
-          <serviceConfig>src/test/resources/startAll.config</serviceConfig>
-          <serverHost>127.0.0.1</serverHost>
-          <codebaseHost>127.0.0.1</codebaseHost>
-          <jiniHome>./jini2_1</jiniHome>
-          <securityDebug>true</securityDebug>
-          <serviceDebug>false</serviceDebug>
-        </configuration>
-      </plugin>
--->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -149,7 +132,7 @@
               <artifactItems>
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
-                  <artifactId>bigdata-war</artifactId>
+                  <artifactId>bigdata-war-html</artifactId>
                   <version>${bigdata.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
