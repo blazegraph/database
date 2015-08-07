@@ -14,6 +14,38 @@
   <name>Blazegraph WAR</name>
   <url>http://maven.apache.org</url>
   <packaging>war</packaging>
+  <build>
+    <plugins>
+<!--
+       <plugin>
+        <groupId>org.codehaus.cargo</groupId>
+        <artifactId>cargo-maven2-plugin</artifactId>
+        <configuration>
+          <descriptor>src/assemble/merge.xml</descriptor>
+        </configuration>
+      </plugin>
+-->
+      <plugin>
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-war-plugin</artifactId>
+       <version>2.6</version>
+       <configuration>
+        <webXml>../bigdata-war-html/src/main/webapp/WEB-INF/web.xml</webXml>
+	<failOnMissingWebXml>false</failOnMissingWebXml>
+         <overlays>
+           <overlay>
+             <groupId>com.blazegraph</groupId>
+             <artifactId>bigdata-war-html</artifactId>
+	     <includes>
+                <include>WEB-INF/web.xml</include>
+                <include>**/*</include>
+              </includes>
+           </overlay>
+         </overlays>
+       </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <reporting>
     <plugins>
@@ -51,6 +83,12 @@ ga('send', 'pageview');
   </reporting>
   
   <dependencies>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-war-html</artifactId>
+      <version>${bigdata.version}</version>
+      <type>war</type>
+    </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
