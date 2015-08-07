@@ -131,6 +131,8 @@ public class BackgroundTupleResult extends TupleQueryResultImpl implements
 			queue.toss(e);
 		} catch (IOException e) {
 			queue.toss(e);
+		} catch (NoClassDefFoundError e) {
+			queue.toss(new QueryResultParseException(e));
 		} finally {
 			synchronized (closeLock) {
 				parserThread = null;
