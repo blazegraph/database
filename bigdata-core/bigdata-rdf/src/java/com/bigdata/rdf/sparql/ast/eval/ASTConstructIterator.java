@@ -162,7 +162,7 @@ public class ASTConstructIterator implements
      * The buffer is pre-populated with any ground triples in the construct
      * template by the constructor.
      */
-    private final List<BigdataStatement> buffer = new LinkedList<BigdataStatement>();
+    private final LinkedList<BigdataStatement> buffer = new LinkedList<BigdataStatement>();
 
     /**
      * A filter which restricts the emitted statements to the distinct
@@ -657,7 +657,7 @@ public class ASTConstructIterator implements
          * Remove and return the first statement from the buffer.
          */
         
-        return buffer.remove(0);
+        return buffer.removeFirst();
         
     }
 
