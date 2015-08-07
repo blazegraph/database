@@ -28,10 +28,13 @@ package com.bigdata.service.geospatial;
 
 import java.io.Serializable;
 
+import com.bigdata.bop.IBindingSet;
+import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
-import com.bigdata.service.geospatial.GeoSpatial.Point2D;
 import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
 import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
+import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 
 /**
  * Interface for geospatial queries and their execution.
@@ -42,29 +45,42 @@ import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
 public interface IGeoSpatialQuery {
 
 
-   public GeoSpatialQueryHiterator search(final GeoSpatialSearchQuery query);
-   
-   // public int count(final ExternalSolrSearchQuery query);
+   /**
+    * Execute a GeoSpatial query.
+    * 
+    * @param query the query to execute
+    * @param indexManager the index manager
+    * @return a result iterator
+    */
+   public GeoSpatialQueryHiterator search(
+      final GeoSpatialSearchQuery query, final AbstractTripleStore tripleStore);
 
+   /**
+    * Representation of a GeoSpatial query. See {@link GeoSpatial} service
+    * for details.
+    */
    public static class GeoSpatialSearchQuery implements Serializable {
 
       private static final long serialVersionUID = -2509557655519603130L;
 
       final GeoFunction searchFunction;
-      final Point2D spatialPoint;
+      final PointLatLon spatialPoint;
       final Double spatialDistance;
       final SpatialUnit spatialDistanceUnit;
-      final Double timePoint;
-      final Double timeDistance;
+      final Long timePoint;
+      final Long timeDistance;
       final TimeUnit timeDistanceUnit;
+      final IBindingSet incomingBindings;
+
 
       /**
        * Constructor
        */
       public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
-            final Point2D spatialPoint, final Double spatialDistance,
-            final SpatialUnit spatialDistanceUnit, final Double timePoint,
-            final Double timeDistance, final TimeUnit timeDistanceUnit) {
+            final PointLatLon spatialPoint, final Double spatialDistance,
+            final SpatialUnit spatialDistanceUnit, final Long timePoint,
+            final Long timeDistance, final TimeUnit timeDistanceUnit,
+            final IBindingSet incomingBindings) {
 
          this.searchFunction = searchFunction;
          this.spatialPoint = spatialPoint;
@@ -73,6 +89,7 @@ public interface IGeoSpatialQuery {
          this.timePoint = timePoint;
          this.timeDistance = timeDistance;
          this.timeDistanceUnit = timeDistanceUnit;
+         this.incomingBindings = incomingBindings;
 
       }
       
@@ -81,7 +98,7 @@ public interface IGeoSpatialQuery {
       }
 
 
-      public Point2D getSpatialPoint() {
+      public PointLatLon getSpatialPoint() {
          return spatialPoint;
       }
 
@@ -96,18 +113,23 @@ public interface IGeoSpatialQuery {
       }
 
 
-      public Double getTimePoint() {
+      public Long getTimePoint() {
          return timePoint;
       }
 
 
-      public Double getTimeDistance() {
+      public Long getTimeDistance() {
          return timeDistance;
       }
 
 
       public TimeUnit getTimeDistanceUnit() {
          return timeDistanceUnit;
+      }
+      
+      
+      public IBindingSet getIncomingBindings() {
+         return incomingBindings;
       }
       
       /*
