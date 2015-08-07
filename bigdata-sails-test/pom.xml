@@ -351,13 +351,6 @@ dependencies.
        <artifactId>dsi-utils</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
-<!--
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
-     </dependency>
--->
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>

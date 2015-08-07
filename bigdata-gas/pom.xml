@@ -90,8 +90,8 @@ ga('send', 'pageview');
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>striterator</artifactId>
-      <version>${striterator.version}</version>
+      <artifactId>ctc-striterators</artifactId>
+      <version>${bigdata.version}</version>
     </dependency>
     <dependency>
        <!-- log4j is the primary logger for bigdata. -->
