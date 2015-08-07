@@ -546,7 +546,7 @@ public class IVUtility {
 //        	 */
 //        	final byte[] addr = new byte[5];
 //        	System.arraycopy(key, o, addr, 0, 5);
-//            final Inet4Address ip = new Inet4Address(addr);
+//            final IPv4Address ip = new IPv4Address(addr);
 //            return new IPv4AddrIV(ip);
 //        }
         case XSDByte: {
@@ -714,7 +714,7 @@ public class IVUtility {
              */
             final byte[] addr = new byte[5];
             System.arraycopy(key, o, addr, 0, 5);
-            final Inet4Address ip = new Inet4Address(addr);
+            final IPv4Address ip = new IPv4Address(addr);
             final AbstractLiteralIV iv = new IPv4AddrIV(ip);
             return isExtension ? new LiteralExtensionIV(iv, datatype) : iv;
         }
