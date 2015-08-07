@@ -49,7 +49,6 @@ import com.bigdata.rdf.properties.PropertiesParserRegistry;
 import com.bigdata.rdf.sail.BigdataSail;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.store.AbstractTripleStore;
-import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.service.IBigdataFederation;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.PropertyUtil;
@@ -95,6 +94,8 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
      * <code>.../namespace/NAMESPACE/sparql</code>.
      */
     private RESTServlet m_restServlet;
+
+    private static final String namespaceRegex = "[^.]+\\Z";
 
     public MultiTenancyServlet() {
 
@@ -352,9 +353,7 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
 
       try {
     	  
-    	  	String pattern = "\\w+\\Z";
-    	      	  	
-    	  	if (Pattern.matches(pattern, namespace)) {
+    	  	if (Pattern.matches(namespaceRegex , namespace)) {
     	  		
     	  		submitApiTask(
                     new RestApiCreateKBTask(req, resp, namespace,
