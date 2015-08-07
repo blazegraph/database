@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -350,10 +351,21 @@ public class MultiTenancyServlet extends BigdataRDFServlet {
                 BigdataSail.Options.DEFAULT_NAMESPACE);
 
       try {
-
-            submitApiTask(
+    	  
+    	  	String pattern = "\\w+\\Z";
+    	      	  	
+    	  	if (Pattern.matches(pattern, namespace)) {
+    	  		
+    	  		submitApiTask(
                     new RestApiCreateKBTask(req, resp, namespace,
                             effectiveProperties)).get();
+    	  		
+    	  	} else {
+    	  		
+    	  		throw new IllegalArgumentException("Namespace should not be empty nor include '.' character");
+    	  		
+    	  	}
+    	  
 
       } catch (Throwable e) {
 
