@@ -24,6 +24,8 @@
 /DIST.*.tgz
 /REL.*.tgz
 /target
+.classpath
+.project
 
 # /bigdata/
 /bigdata/bin
