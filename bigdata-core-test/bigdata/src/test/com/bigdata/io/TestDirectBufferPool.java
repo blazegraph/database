@@ -78,6 +78,9 @@ public class TestDirectBufferPool extends TestCase2 {
             try {
                 b = DirectBufferPool.INSTANCE.acquire();
 
+                //Attempt to reduce stochastic test failures in CI
+                Thread.sleep(10);
+
                 poolSizeDuring = DirectBufferPool.INSTANCE.getPoolSize();
                 poolAcquiredDuring = DirectBufferPool.INSTANCE
                         .getAcquiredBufferCount();
