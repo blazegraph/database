@@ -130,7 +130,7 @@ public class TestTicket473 extends TestCase {
                 try {
                     sail.initialize();
                     loadOntology(sail,
-                            "bigdata-rdf/src/resources/data/lehigh/univ-bench.owl");
+                            this.getClass().getClassLoader().getResource("data/lehigh/univ-bench.owl").getFile());
                     doTicket473Commit(sail);
                 } finally {
                     sail.shutDown();
