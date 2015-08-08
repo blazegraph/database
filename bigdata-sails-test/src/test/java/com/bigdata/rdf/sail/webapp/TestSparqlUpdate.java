@@ -1787,6 +1787,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 
 
         final URI g1 = f.createURI("http://www.bigdata.com/g1");
+        final URI g2 = f.createURI("http://www.bigdata.com/g2");
 
         final String update = "LOAD <" + url.toExternalForm() + "> "
                 + "INTO GRAPH <" + g1.stringValue() + ">";
@@ -1796,7 +1797,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
         m_repo.prepareUpdate(update).evaluate();
 
         assertFalse(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
-                f.createLiteral("Michael Personick"), true, (Resource)null));
+                f.createLiteral("Michael Personick"), true, g2));
 
         assertTrue(hasStatement(f.createURI(ns, "mike"), RDFS.LABEL,
                 f.createLiteral("Michael Personick"), true, g1));
