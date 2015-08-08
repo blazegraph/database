@@ -129,6 +129,7 @@ dependencies.
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
                 <include>**/*.n3</include>
+                <include>**/*.owl</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
                 <include>**/*.ttlx</include>
