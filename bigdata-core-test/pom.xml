@@ -103,6 +103,7 @@ dependencies.
                 <include>**/*.owl</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
+                <include>**/*.gz</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
                 <include>**/*.ttlx</include>
@@ -297,6 +298,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                        <include>**/*.trig</include>
                    </includes>
                </resource>
+<!--
                <resource>
                    <directory>bigdata-war/src</directory>
                    <includes>
@@ -310,6 +312,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                        <include>**/*.trig</include>
                    </includes>
                </resource>
+-->
               </resources>
             </configuration>
           </execution> 
@@ -358,7 +361,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
               <artifactItems>
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
-                  <artifactId>bigdata-war</artifactId>
+                  <artifactId>bigdata-war-html</artifactId>
                   <version>${bigdata.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
