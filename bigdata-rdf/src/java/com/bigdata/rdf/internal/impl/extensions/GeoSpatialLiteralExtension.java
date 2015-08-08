@@ -91,21 +91,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver) {
 
       this.datatype = resolver.resolve(datatypeURI);
-
-      /**
-       * For now, we're using a fixed, three-dimensional datatype for
-       * latitued, longitude and time.
-       * 
-       * TODO: make this parameterizable, we could construct the datatypes
-       *       according to configuration parameters; what's unclear though
-       *       is how to write a generic, nice SERVICE then.
-       */
-      final List<SchemaFieldDescription> sfd = 
-         new ArrayList<SchemaFieldDescription>();
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));  /* time */
-      this.sd = new SchemaDescription(sfd);
+      this.sd = getSchemaDescription();
    }
 
    @Override
@@ -121,25 +107,29 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * Encodes an n-dimensional string of the form <int_1>#...#<int_n> as 
     * xsd:integer.
     */
-   @SuppressWarnings({ "rawtypes", "unchecked" })
+   @SuppressWarnings("rawtypes")
    @Override
    public LiteralExtensionIV createIV(final Value value) {
 
       if (value instanceof Literal == false)
          throw new IllegalArgumentException("Value not a literal");
 
-      final long[] componentsAsLongArr = 
-         componentStringAsLongArr(value.stringValue(), sd);
+      return createIV(value.stringValue().split(COMPONENT_SEPARATOR));
+   }
+
+   @SuppressWarnings({ "rawtypes", "unchecked" })
+   public LiteralExtensionIV createIV(Object[] components) {
+
+      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
 
       final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
-      
+
       final byte[] zOrderByteArrayTwoCompl = unsignedToTwosComplement(zOrderByteArray);
       final BigInteger bi = new BigInteger(zOrderByteArrayTwoCompl);
 
       // store big integer using xsd:integer datatype
       final AbstractLiteralIV delegate = new XSDIntegerIV(bi);
       return new LiteralExtensionIV(delegate, datatype.getIV());
-
    }
 
 
@@ -184,42 +174,51 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return (V) vf.createLiteral(litStr, datatype);
    }
 
-   
    /**
-    * Converts a component string (as specified in the literal) into a Long[]
-    * reflecting the long values of the individual components. For double
-    * values, the specified position is applied.
+    * Convert the components into a long array. The array is passed as an
+    * Object[], in order to allow for unparsed strings as well as Long or
+    * Double's (or any convertable) as input. The array must have the same
+    * size as the number of dimensions, otherwise a runtime exception is thrown.
     * 
-    * @param s the unparsed component string
-    * @param sd the associated schema description
-    * @return the Long[]
+    * Longs (or other objects being parseable as Long) are copied to the target
+    * array without modification. Floats (or objects being parseable as Float)
+    * are converted into Long according to the precision specified in the
+    * passed {@link SchemaDescription}.
     */
-   final long[] componentStringAsLongArr(final String s, SchemaDescription sd) {
+   final static long[] componentsAsLongArr(
+      final Object[] components, final SchemaDescription sd) {
 
       final long[] ret = new long[sd.getNumDimensions()];
 
       int numDimensions = sd.getNumDimensions();
-      String[] componentsAsString = s.split(COMPONENT_SEPARATOR);
-      
-      if (numDimensions != componentsAsString.length) {
+      if (numDimensions != components.length) {
          throw new IllegalArgumentException(
             "Literal value has wrong format. Expected " + numDimensions 
             + " components for datatype.");
       }
       
-      for (int i = 0; i < componentsAsString.length; i++) {
+      for (int i = 0; i < components.length; i++) {
          
-         final String componentAsString = componentsAsString[i];
+         final Object component = components[i];
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
          final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
 
          switch (sfd.getDatatype()) {
          case DOUBLE:
-            ret[i] = (new Double(Double.valueOf(componentAsString)*precisionAdjustment)).longValue();
+         {
+            final Double componentAsDouble = 
+               component instanceof Double ? 
+               (Double)component : Double.valueOf(component.toString());
+            ret[i] = (new Double(componentAsDouble*precisionAdjustment)).longValue();
             break;
+         }
          case LONG:
-            ret[i] = Long.valueOf(componentAsString);
+         {
+            ret[i] = 
+               component instanceof Long ? 
+               (Long)component : Long.valueOf(component.toString());
             break;
+         }
          default:
             throw new RuntimeException("Uncovered encoding case. Please fix code.");
          }
@@ -229,6 +228,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return ret;
    }
 
+   
+   
    /**
     * Converts a a Long[] reflecting the long values of the individual 
     * components back into a component string representing the literal.
@@ -237,7 +238,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * @param sd the associated schema description
     * @return the string literal
     */
-   final String longArrAsComponentString(final long[] arr, final SchemaDescription sd) {
+   final static String longArrAsComponentString(final long[] arr, final SchemaDescription sd) {
       
       int numDimensions = sd.getNumDimensions();
       if (arr.length!=numDimensions) {
@@ -278,7 +279,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * @param sd
     * @return
     */
-   byte[] toZOrderByteArray(
+   static byte[] toZOrderByteArray(
          final long[] componentsAsLongArr, final SchemaDescription sd) {
       
       IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
@@ -296,7 +297,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * @param sd2
     * @return
     */
-   long[] fromZOrderByteArray(
+   static long[] fromZOrderByteArray(
       final byte[] byteArr, final SchemaDescription sd) {
       
       IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
@@ -314,7 +315,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * not harm) yet makes sure that the array is an unsigned value, for which
     * the two's complement representation does not differ.
     */
-   byte[] unsignedToTwosComplement(byte[] arr) {
+   static byte[] unsignedToTwosComplement(byte[] arr) {
       byte[] ret = new byte[arr.length+1];
       
       // ret[0] = 0 by construction
@@ -329,7 +330,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    /**
     * Reverts method {{@link #unsignedToTwosComplement(byte[])}.
     */
-   byte[] twosComplementToUnsigned(byte[] arr) {
+   static byte[] twosComplementToUnsigned(byte[] arr) {
       
       byte[] ret = new byte[arr.length-1];
       
@@ -340,6 +341,25 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       
       return ret;
       
+   }
+
+   /**
+     * For now, we're using a fixed, three-dimensional datatype for
+     * latitued, longitude and time.
+     * 
+     * TODO: this is fixed for now, we may want to make this take a datatype
+     * as input.
+     */
+   static SchemaDescription getSchemaDescription() {
+      
+      final List<SchemaFieldDescription> sfd = 
+         new ArrayList<SchemaFieldDescription>();
+   
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));  /* time */
+         
+      return new SchemaDescription(sfd);      
    }
 
    /**
@@ -401,7 +421,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       public int getDoublePrecision() {
          return doublePrecision;
       }
-
       
    }
+
 }

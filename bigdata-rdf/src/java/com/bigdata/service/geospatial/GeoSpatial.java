@@ -134,8 +134,10 @@ public interface GeoSpatial {
     * The datatype to be used for GeoSpatial literals.
     */
    final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
-   
+
+
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
+   final URI PREDICATE = new URIImpl(NAMESPACE + "predicate");
    final URI SPATIAL_POINT = new URIImpl(NAMESPACE + "spatialPoint");
    final URI SPATIAL_DISTANCE = new URIImpl(NAMESPACE + "spatialDistance");
    final URI SPATIAL_DISTANCE_UNIT = new URIImpl(NAMESPACE + "spatialDistanceUnit");

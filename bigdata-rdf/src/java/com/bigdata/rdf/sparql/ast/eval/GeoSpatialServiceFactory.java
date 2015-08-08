@@ -28,70 +28,63 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
+import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
-import org.openrdf.query.Binding;
-import org.openrdf.query.BindingSet;
-import org.openrdf.query.QueryEvaluationException;
-import org.openrdf.query.QueryLanguage;
-import org.openrdf.query.TupleQueryResult;
+import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.Constant;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
+import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
+import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.TermId;
-import com.bigdata.rdf.model.BigdataURI;
-import com.bigdata.rdf.model.BigdataValueFactory;
-import com.bigdata.rdf.model.BigdataValueFactoryImpl;
-import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
-import com.bigdata.rdf.sail.BigdataSailTupleQuery;
-import com.bigdata.rdf.sail.Sesame2BigdataIterator;
+import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
+import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
+import com.bigdata.rdf.sparql.ast.RangeNode;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTRangeOptimizer;
 import com.bigdata.rdf.sparql.ast.service.BigdataNativeServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.BigdataServiceCall;
 import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
+import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
-import com.bigdata.rdf.task.AbstractApiTask;
-import com.bigdata.search.IHit;
+import com.bigdata.relation.IRelation;
+import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.fts.FulltextSearchException;
-import com.bigdata.service.fts.FulltextSearchHit;
-import com.bigdata.service.fts.FulltextSearchHiterator;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
 import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
-import com.bigdata.service.geospatial.GeoSpatialQueryHit;
-import com.bigdata.service.geospatial.GeoSpatialQueryHiterator;
 import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
-import com.bigdata.service.geospatial.IGeoSpatialQueryHit;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.BoundingBoxLatLonTime;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
+import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -140,10 +133,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
               ((AbstractJournal)store.getIndexManager()).getProperties() : null;
            
         final GeoSpatialDefaults dflts = new GeoSpatialDefaults(props);
-        
-        
-        if (store == null)
-            throw new IllegalArgumentException();
 
         final ServiceNode serviceNode = createParams.getServiceNode();
 
@@ -176,12 +165,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          * Create and return the geospatial service call object, 
          * which will execute this search request.
          */
-        final ServiceParams serviceParams = 
-           ServiceParams.gatherServiceParams(createParams);
-
         return new GeoSpatialServiceCall(
-           store, searchVar, statementPatterns, getServiceOptions(), dflts, 
-           store, createParams, serviceParams);
+           searchVar, statementPatterns, getServiceOptions(), dflts, store);
         
     }
 
@@ -294,8 +279,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                         "Search predicate appears multiple times for same search variable: predicate="
                                 + uri + ", searchVar=" + searchVar);
 
-            assertObjectIsLiteralOrVariable(sp);
-            
+            if (uri.equals(GeoSpatial.PREDICATE)) {
+               assertObjectIsUri(sp); // the predicate of the triple must be fixed
+            } else {
+               assertObjectIsLiteralOrVariable(sp);
+            }
         }
         
         if (!uris.contains(GeoSpatial.SEARCH)) {
@@ -305,6 +293,19 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
         
     }
 
+    private void assertObjectIsUri(final StatementPatternNode sp) {
+
+       final TermNode o = sp.o();
+
+       if (o instanceof URI) {
+
+          throw new IllegalArgumentException(
+                "Object is not literal or variable: " + sp);
+
+       }
+
+    }
+    
     private void assertObjectIsLiteralOrVariable(final StatementPatternNode sp) {
 
        final TermNode o = sp.o();
@@ -322,305 +323,198 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
     }
 
-    /**
-     * 
-     * Note: This has the {@link AbstractTripleStore} reference attached. This
-     * is not a {@link Serializable} object. It MUST run on the query
-     * controller.
-     */
-    private static class GeoSpatialServiceCall implements BigdataServiceCall {
+   /**
+    * 
+    * Note: This has the {@link AbstractTripleStore} reference attached. This is
+    * not a {@link Serializable} object. It MUST run on the query controller.
+    */
+   private static class GeoSpatialServiceCall implements BigdataServiceCall {
 
-        private final AbstractTripleStore store;
-        private final IServiceOptions serviceOptions;
-        private final TermNode searchFunction;
-        private TermNode spatialPoint = null;
-        private TermNode spatialDistance = null;
-        private TermNode spatialDistanceUnit = null;
-        private TermNode timePoint = null;
-        private TermNode timeDistance = null;
-        private TermNode timeDistanceUnit = null;
-        private IVariable<?>[] vars;
-        private final GeoSpatialDefaults defaults;
-        private final AbstractTripleStore kb;
-        
-        private final ServiceCallCreateParams createParams;
-        private final ServiceParams serviceParams;
-        
-        public GeoSpatialServiceCall(
-                final AbstractTripleStore store,
-                final IVariable<?> searchVar,
-                final Map<URI, StatementPatternNode> statementPatterns,
-                final IServiceOptions serviceOptions,
-                final GeoSpatialDefaults dflts,
-                final AbstractTripleStore kb,
-                final ServiceCallCreateParams createParams,
-                final ServiceParams serviceParams) {
+      private final IServiceOptions serviceOptions;
+      private final TermNode searchFunction;
+      private TermNode predicate = null;
+      private TermNode spatialPoint = null;
+      private TermNode spatialDistance = null;
+      private TermNode spatialDistanceUnit = null;
+      private TermNode timePoint = null;
+      private TermNode timeDistance = null;
+      private TermNode timeDistanceUnit = null;
+      private IVariable<?>[] vars;
+      private final GeoSpatialDefaults defaults;
+      private final AbstractTripleStore kb;
 
-            if(store == null)
-                throw new IllegalArgumentException();
+      public GeoSpatialServiceCall(
+            final IVariable<?> searchVar,
+            final Map<URI, StatementPatternNode> statementPatterns,
+            final IServiceOptions serviceOptions,
+            final GeoSpatialDefaults dflts, final AbstractTripleStore kb) {
 
-            if(searchVar == null)
-                throw new IllegalArgumentException();
+         if (searchVar == null)
+            throw new IllegalArgumentException();
 
-            if(statementPatterns == null)
-                throw new IllegalArgumentException();
+         if (statementPatterns == null)
+            throw new IllegalArgumentException();
 
-            if(serviceOptions == null)
-                throw new IllegalArgumentException();
-            
-            if (kb == null)
-               throw new IllegalArgumentException();
+         if (serviceOptions == null)
+            throw new IllegalArgumentException();
 
-            this.store = store;
-            
-            this.serviceOptions = serviceOptions;
-            
-            this.defaults = dflts;
-            
-            /*
-             * Unpack the "search" magic predicate:
-             * 
-             * [?searchVar bd:search objValue]
-             */
-            final StatementPatternNode sp = statementPatterns.get(GeoSpatial.SEARCH);
+         if (kb == null)
+            throw new IllegalArgumentException();
 
-            searchFunction = sp.o();
-            
-            TermNode spatialPoint = null;
-            TermNode spatialDistance = null;
-            TermNode spatialDistanceUnit = null;
-            TermNode timePoint = null;
-            TermNode timeDistance = null;
-            TermNode timeDistanceUnit = null;
-            for (StatementPatternNode meta : statementPatterns.values()) {
+         this.serviceOptions = serviceOptions;
 
-               final URI p = (URI) meta.p().getValue();
+         this.defaults = dflts;
 
-               if (GeoSpatial.SPATIAL_POINT.equals(p)) {
-                  spatialPoint = meta.o();
-               } else if (GeoSpatial.SPATIAL_DISTANCE.equals(p)) {
-                  spatialDistance = meta.o();
-               } else if (GeoSpatial.SPATIAL_DISTANCE_UNIT.equals(p)) {
-                  spatialDistanceUnit = meta.o();
-               } else if (GeoSpatial.TIME_POINT.equals(p)) {
-                  timePoint = meta.o();
-               } else if (GeoSpatial.TIME_DISTANCE.equals(p)) {
-                  timeDistance = meta.o();
-               } else if (GeoSpatial.TIME_DISTANCE_UNIT.equals(p)) {
-                  timeDistanceUnit = meta.o();
-               }
-               
+         /*
+          * Unpack the "search" magic predicate:
+          * 
+          * [?searchVar bd:search objValue]
+          */
+         final StatementPatternNode sp = statementPatterns
+               .get(GeoSpatial.SEARCH);
+
+         searchFunction = sp.o();
+
+         TermNode predicate = null;
+         TermNode spatialPoint = null;
+         TermNode spatialDistance = null;
+         TermNode spatialDistanceUnit = null;
+         TermNode timePoint = null;
+         TermNode timeDistance = null;
+         TermNode timeDistanceUnit = null;
+         for (StatementPatternNode meta : statementPatterns.values()) {
+
+            final URI p = (URI) meta.p().getValue();
+
+            if (GeoSpatial.SPATIAL_POINT.equals(p)) {
+               spatialPoint = meta.o();
+            } else if (GeoSpatial.PREDICATE.equals(p)) {
+               predicate = meta.o();
+            } else if (GeoSpatial.SPATIAL_DISTANCE.equals(p)) {
+               spatialDistance = meta.o();
+            } else if (GeoSpatial.SPATIAL_DISTANCE_UNIT.equals(p)) {
+               spatialDistanceUnit = meta.o();
+            } else if (GeoSpatial.TIME_POINT.equals(p)) {
+               timePoint = meta.o();
+            } else if (GeoSpatial.TIME_DISTANCE.equals(p)) {
+               timeDistance = meta.o();
+            } else if (GeoSpatial.TIME_DISTANCE_UNIT.equals(p)) {
+               timeDistanceUnit = meta.o();
             }
 
-            this.vars = new IVariable[] { searchVar };
-            
-            this.spatialPoint = spatialPoint;
-            this.spatialDistance = spatialDistance;
-            this.spatialDistanceUnit = spatialDistanceUnit;
-            this.timePoint = timePoint;
-            this.timeDistance = timeDistance;
-            this.timeDistanceUnit = timeDistanceUnit;
-            this.kb = kb;
-            this.createParams = createParams;
-            this.serviceParams = serviceParams;
+         }
 
-        }
-        
-        protected TupleQueryResult doQuery(
-              final BigdataSailRepositoryConnection cxn,
-              final ServiceCallCreateParams createParams,
-              final ServiceParams serviceParams,
-              final String queryString) throws Exception {
+         // for now: a single variable containing the result
+         this.vars = new IVariable[] { searchVar };
 
-         final String baseURI = createParams.getServiceURI().stringValue();
+         this.predicate = predicate;
+         this.spatialPoint = spatialPoint;
+         this.spatialDistance = spatialDistance;
+         this.spatialDistanceUnit = spatialDistanceUnit;
+         this.timePoint = timePoint;
+         this.timeDistance = timeDistance;
+         this.timeDistanceUnit = timeDistanceUnit;
+         this.kb = kb;
 
-         final BigdataSailTupleQuery query = (BigdataSailTupleQuery) cxn
-                 .prepareTupleQuery(QueryLanguage.SPARQL, queryString, baseURI);
-
-         return query.evaluate();
       }
         
-        public GeoSpatialQueryHiterator search(
-              final GeoSpatialSearchQuery query, final AbstractTripleStore tripleStore) {
+      @SuppressWarnings({ "unchecked", "rawtypes" })
+      public ICloseableIterator<IBindingSet> search(
+            final GeoSpatialSearchQuery query,
+            final AbstractTripleStore kb) {
 
-              
-              final PointLatLonTime centerPoint = 
-                 new PointLatLonTime(query.getSpatialPoint(), query.getTimePoint());
-              
-              final BoundingBoxLatLonTime boundingBox = 
-                 new BoundingBoxLatLonTime(
-                    centerPoint, 
-                    query.getSpatialDistance() /* lat */,
-                    query.getSpatialDistance() /* lon */, 
-                    query.getTimeDistance()    /* time */
-                 );
+         final BOpContextBase context = new BOpContextBase(
+               QueryEngineFactory.getQueryController(kb.getIndexManager()));
 
+         final GlobalAnnotations globals = new GlobalAnnotations(
+               kb.getLexiconRelation().getNamespace(),
+               kb.getSPORelation().getTimestamp());
 
-              final Future<TupleQueryResult> ft = AbstractApiTask.submitApiTask(
-                    tripleStore.getIndexManager(),
-                    new GeoSpatialQueryTask(boundingBox,
-                       tripleStore.getNamespace(), tripleStore.getTimestamp()));
+         final PointLatLonTime centerPoint = new PointLatLonTime(
+               query.getSpatialPoint(), query.getTimePoint());
 
-              try {
+         final BoundingBoxLatLonTime boundingBox = new BoundingBoxLatLonTime(
+               centerPoint, query.getSpatialDistance() /* lat */,
+               query.getSpatialDistance() /* lon */, query.getTimeDistance() /* time */
+         );
 
-                 final TupleQueryResult tupleQueryResult = ft.get();
+         final Var oVar = Var.var(); // object position variable
+         final StatementPatternNode sp = 
+            new StatementPatternNode(
+               new VarNode(vars[0].getName()), query.getPredicate(), new VarNode(oVar));
+         
+         // construct the RangeBOp and attach to triple pattern
+         GeoSpatialLiteralExtension<BigdataValue> litExt = 
+            new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
+         
+         final Object[] lowerBorderComponents = 
+            PointLatLonTime.toComponentString(boundingBox.getLowerBorder());
+            
+         final Object[] upperBorderComponents = 
+            PointLatLonTime.toComponentString(boundingBox.getUpperBorder());
+         
+         // set up range scan node
+         final RangeNode range = new RangeNode(
+            new VarNode(oVar),
+            new ConstantNode(
+               litExt.createIV(lowerBorderComponents)),
+            new ConstantNode(
+               litExt.createIV(upperBorderComponents))
+         );
 
-                 final Sesame2BigdataIterator<BindingSet, QueryEvaluationException> it = 
-                    new Sesame2BigdataIterator<BindingSet, QueryEvaluationException>(tupleQueryResult);
+         final RangeBOp rangeBop = 
+            ASTRangeOptimizer.toRangeBOp(context, range, globals);
+                  
+         range.setRangeBOp(rangeBop);
+         sp.setRange(range);
 
+         IPredicate<ISPO> pred = (IPredicate<ISPO>)
+               kb.getPredicate(
+                     sp.s() != null && sp.s().isConstant() ? (Resource) sp.s().getValue() : null, 
+                     sp.p() != null && sp.p().isConstant() ? (URI) sp.p().getValue() : null, 
+                     sp.o() != null && sp.o().isConstant() ? (Value) sp.o().getValue() : null, 
+                     sp.c() != null && sp.c().isConstant() ? (Resource) sp.c().getValue() : null,
+                     null, rangeBop);
 
-                 // TODO: think about streaming and data types
-                 List<IGeoSpatialQueryHit> hits = new ArrayList<IGeoSpatialQueryHit>();
-                 
-                 while (it.hasNext()) {
-                    BindingSet bs = it.next();
-                    Binding b = bs.getBinding("s");
-                    BigdataURI uri = (BigdataURI)b.getValue();
-                    hits.add(new GeoSpatialQueryHit(uri,query.getIncomingBindings()));
-                    System.err.println("bs=" + bs);
+         /**
+          * The predicate is null is the p we pass in does not appear in the
+          * database. In that case, we return null to indicate that there are
+          * no matches.
+          */
+         if (pred==null) {
+            return null;
+         }
+         
+         pred = (IPredicate<ISPO>) pred.setProperty(
+               IPredicate.Annotations.TIMESTAMP, kb.getSPORelation().getTimestamp());
 
-                 }
-                 
-                 GeoSpatialQueryHiterator hiterator = 
-                    new GeoSpatialQueryHiterator(
-                       hits.toArray(new GeoSpatialQueryHit[hits.size()]));
-                 
-                 return hiterator;
-                 
-              } catch (Exception e) {
-                 
-                 // TODO: error handling
-                 
-              } finally {
+         final IRelation<ISPO> relation = context.getRelation(pred);
 
-                 ft.cancel(true/* mayInterruptIfRunning */);
+         final AccessPath<ISPO> accessPath = 
+            (AccessPath<ISPO>) context.getAccessPath(relation, pred);
 
-              }
-              
-              return null; // TODO: error handling
-          
-           }     
+         IChunkedOrderedIterator<ISPO> apIt = accessPath.iterator();
+
+         return new ISPOIteratorWrapper(apIt,Var.var(vars[0].getName()));
+      }
 
         @Override
-        @SuppressWarnings({ "rawtypes", "unchecked" })
         public ICloseableIterator<IBindingSet> call(
                 final IBindingSet[] incomingBs) {
 
-           final GeoSpatialMultiHiterator<IGeoSpatialQueryHit<?>> hiterator = 
-                 getGeoSpatialSearchMultiHiterator(incomingBs);
-
-           return new GeoSpatialSearchHitConverter(hiterator);
+           return getGeoSpatialSearchMultiHiterator(incomingBs);
             
         }
 
-        @SuppressWarnings({ "rawtypes", "unchecked" })
-        private GeoSpatialMultiHiterator getGeoSpatialSearchMultiHiterator(
+        private ICloseableIterator<IBindingSet> getGeoSpatialSearchMultiHiterator(
               IBindingSet[] bsList) {
 
-           return new GeoSpatialMultiHiterator(bsList,  searchFunction,
-              spatialPoint, spatialDistance, spatialDistanceUnit,
-              timePoint, timeDistance, timeDistanceUnit, defaults, kb,
-              this);
+           return new GeoSpatialInputBindingsIterator(bsList, searchFunction,
+              predicate, spatialPoint, spatialDistance, spatialDistanceUnit,
+              timePoint, timeDistance, timeDistanceUnit, defaults, kb, this);
 
         }
         
-
-        /**
-         * Converts {@link FulltextSearchHit}s into {@link IBindingSet}
-         */
-        private class GeoSpatialSearchHitConverter implements ICloseableIterator<IBindingSet> {
-
-           private final GeoSpatialMultiHiterator<IGeoSpatialQueryHit<?>> src;
-
-           private IGeoSpatialQueryHit<?> current = null;
-           private boolean open = true;
-
-           public GeoSpatialSearchHitConverter(
-                 final GeoSpatialMultiHiterator<IGeoSpatialQueryHit<?>> src) {
-
-              this.src = src;
-
-           }
-
-           /** TODO: closing logics */
-           public void close() {
-              if (open) {
-                 open = false;
-              }
-           }
-
-           public boolean hasNext() {
-
-              if (!open)
-                 return false;
-
-              if (current != null)
-                 return true;
-
-              while (src.hasNext()) {
-                 current = src.next();
-                 return true;
-              }
-
-              return current != null;
-           }
-
-           public IBindingSet next() {
-
-              if (!hasNext())
-                 throw new NoSuchElementException();
-
-              final IGeoSpatialQueryHit<?> tmp = current;
-
-              current = null;
-
-              return newBindingSet(tmp);
-
-           }
-
-           /**
-            * Convert an {@link IHit} into an {@link IBindingSet}.
-            */
-           private IBindingSet newBindingSet(final IGeoSpatialQueryHit<?> hit) {
-
-              final BigdataValueFactory vf = BigdataValueFactoryImpl
-                    .getInstance(store.getLexiconRelation().getNamespace());
-
-              IBindingSet bs = new ListBindingSet();
-
-              bs.set(vars[0], new Constant<IV>(hit.getRes().getIV())); // getRes() is resolved already
-              
-              final IBindingSet baseBs = hit.getIncomingBindings();
-              final Iterator<IVariable> varIt = baseBs.vars();
-              while (varIt.hasNext()) {
-
-                 final IVariable var = varIt.next();
-
-                 if (bs.isBound(var)) {
-                    throw new FulltextSearchException(
-                          "Illegal use of search service. Variable ?"
-                                + var
-                                + " must not be bound from outside. If you need to "
-                                + " join on the variable, you may try nesting the"
-                                + " SERVICE in a WITH block and join outside.");
-                 }
-
-                 bs.set(var, baseBs.get(var));
-
-              }
-
-              return bs;
-
-           }
-
-           public void remove() {
-
-              throw new UnsupportedOperationException();
-
-           }
-
-        } // class FulltextSearchHitConverter
-
 
         @Override
         public IServiceOptions getServiceOptions() {
@@ -629,106 +523,66 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             
         }
         
-        
-        public class GeoSpatialQueryTask extends AbstractApiTask<TupleQueryResult> {
-
-           private final BoundingBoxLatLonTime boundingBox;
-
-           public GeoSpatialQueryTask(BoundingBoxLatLonTime boundingBox,
-              final String namespace, final long timestamp) {
-
-               super(namespace, timestamp);
-
-               this.boundingBox = boundingBox;
-           }
-
-           @Override
-           public boolean isReadOnly() {
-
-               return true;
-               
-           }
-           
-           @Override
-           public TupleQueryResult call() throws Exception {
-               BigdataSailRepositoryConnection cxn = null;
-               boolean success = false;
-               try {
-                   // Note: Will be UPDATE connection if UPDATE request!!!
-                   cxn = getQueryConnection();
-                   if (log.isTraceEnabled())
-                       log.trace("Query running...");
-                   final TupleQueryResult ret = doQuery(cxn, createParams,
-                           serviceParams, getQueryString());
-                   success = true;
-                   if (log.isTraceEnabled())
-                       log.trace("Query done.");
-                   return ret;
-               } finally {
-                   if (cxn != null) {
-                       if (!success && !cxn.isReadOnly()) {
-                           /*
-                            * Force rollback of the connection.
-                            * 
-                            * Note: It is possible that the commit has already
-                            * been processed, in which case this rollback()
-                            * will be a NOP. This can happen when there is an
-                            * IO error when communicating with the client, but
-                            * the database has already gone through a commit.
-                            */
-                           try {
-                               // Force rollback of the connection.
-                               cxn.rollback();
-                           } catch (Throwable t) {
-                               log.error(t, t);
-                           }
-                       }
-                       try {
-                           // Force close of the connection.
-                           cxn.close();
-                       } catch (Throwable t) {
-                           log.error(t, t);
-                       }
-                   }
-               }
-           }
-           
-           /**
-            * TODO: proper interface, don't want to go via string
-            * @return
-            */
-           String getQueryString() {
-              
-              final StringBuffer buf = new StringBuffer();
-              buf.append("SELECT ?s WHERE { ");
-              buf.append(" ?s <http://o> ?o . ");
-              buf.append("hint:Prior hint:rangeSafe \"true\" .");
-              buf.append("FILTER(?o<=\"");
-              buf.append(boundingBox.getBorderHigh());
-              buf.append("\"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>) ");
-              buf.append("FILTER(?o>=\"");
-              buf.append(boundingBox.getBorderLow());
-              buf.append("\"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral>)");
-              buf.append(" }");
-              
-              final String queryString = buf.toString();
-              return queryString;
-              
-           }
-
-       } // GeoSpatialQueryTask
     }
     
-    
+   public static class ISPOIteratorWrapper implements
+         ICloseableIterator<IBindingSet> {
+
+      private final IChunkedOrderedIterator<ISPO> delegate;
+      @SuppressWarnings("rawtypes")
+      private final Var var;
+
+      /**
+       * TODO: pass in addition filter to post-process results (e.g.: circle,
+       * bounding box).
+       */
+      @SuppressWarnings("rawtypes")
+      public ISPOIteratorWrapper(
+         final IChunkedOrderedIterator<ISPO> delegate, final Var var) {
+         
+         this.delegate = delegate;
+         this.var = var;
+      }
+
+      @Override
+      public boolean hasNext() {
+         return delegate.hasNext();
+      }
+
+      @SuppressWarnings("rawtypes")
+      @Override
+      public IBindingSet next() {
+         
+         final ISPO elem = delegate.next();
+         
+         final IBindingSet bs = new ListBindingSet();
+         bs.set(var, new Constant<IV>(elem.s()));
+         
+         return bs;
+      }
+
+      @Override
+      public void remove() {
+         delegate.remove();
+      }
+
+      @Override
+      public void close() {
+         delegate.close();
+      }
+
+   }
     
     /**
-     * Wrapper around {@link FulltextSearchHiterator}, delegating requests for
-     * multiple binding sets to the latter one.
+     * Iterates a geospatial search over a set of input bindings. This is done
+     * incrementally, in a binding by binding fashion.
      */
-    public static class GeoSpatialMultiHiterator<A extends IGeoSpatialQueryHit> {
+    public static class GeoSpatialInputBindingsIterator 
+    implements ICloseableIterator<IBindingSet> {
        
        final IBindingSet[] bindingSet;
        final TermNode searchFunction;
+       final TermNode predicate;
        final TermNode spatialPoint;
        final TermNode spatialDistance;
        final TermNode spatialDistanceUnit;
@@ -741,10 +595,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        
        int nextBindingSetItr = 0;
 
-       GeoSpatialQueryHiterator curDelegate;
+       ICloseableIterator<IBindingSet> curDelegate;
 
-       public GeoSpatialMultiHiterator(
-             final IBindingSet[] bindingSet,  final TermNode searchFunction, 
+       public GeoSpatialInputBindingsIterator(final IBindingSet[] bindingSet, 
+             final TermNode searchFunction, final TermNode predicate,
              final TermNode spatialPoint, final TermNode spatialDistance, 
              final TermNode spatialDistanceUnit, final TermNode timePoint,
              final TermNode timeDistance, final TermNode timeDistanceUnit,
@@ -753,6 +607,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
           this.bindingSet = bindingSet;
           this.searchFunction = searchFunction;
+          this.predicate = predicate;
           this.spatialPoint = spatialPoint;
           this.spatialDistance = spatialDistance;
           this.spatialDistanceUnit = spatialDistanceUnit;          
@@ -804,7 +659,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           return false; // fallback
        }
 
-       public IGeoSpatialQueryHit<?> next() {
+       public IBindingSet next() {
 
           if (curDelegate == null) {
 
@@ -814,7 +669,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
           if (curDelegate.hasNext()) {
 
-             return (IGeoSpatialQueryHit<?>) curDelegate.next();
+             return curDelegate.next();
 
           } else {
 
@@ -849,12 +704,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           final TimeUnit timeDistanceUnit = resolveAsTimeDistanceUnit(this.timeDistanceUnit, bs);
 
 
-          GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(
-                searchFunction, spatialPoint, spatialDistance, spatialDistanceUnit,
+          GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(searchFunction,
+                predicate, spatialPoint, spatialDistance, spatialDistanceUnit,
                 timePoint, timeDistance, timeDistanceUnit, bs);
           
-          curDelegate = 
-             (GeoSpatialQueryHiterator) serviceCall.search(sq, kb);
+          curDelegate = serviceCall.search(sq, kb);
 
           return true;
        }
@@ -1062,6 +916,24 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                    FulltextSearchException.SERVICE_VARIABLE_UNBOUND + ":" + var);
              }
           }
+       }
+
+       @Override
+       public void remove() {
+          
+          if (curDelegate!=null) {
+             curDelegate.remove();
+          }
+          
+       }
+
+       @Override
+       public void close() {
+          
+          if (curDelegate!=null) {
+             curDelegate.close();
+          }
+          
        }
 
     }
