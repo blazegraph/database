@@ -55,6 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package com.bigdata.rdf.sail.webapp;
 
 import java.io.File;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 
@@ -1750,7 +1751,9 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testLoad()
             throws Exception
         {
-        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf>";
+    	final URL url = this.getClass().getClassLoader().getResource("com/bigdata/rdf/rio/small.rdf");
+
+        final String update = "LOAD <" + url.toExternalForm() + ">";
         
         final String ns = "http://bigdata.com/test/data#";
         
@@ -1765,7 +1768,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testLoadSilent()
         throws Exception
     {
-        final String update = "LOAD SILENT <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/NOT-FOUND.rdf>";
+        final String update = "LOAD SILENT <file:src/test/com/bigdata/rdf/rio/NOT-FOUND.rdf>";
         
         final String ns = "http://bigdata.com/test/data#";
         
@@ -1780,10 +1783,12 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testLoadIntoGraph()
         throws Exception
     {
+    	final URL url = this.getClass().getClassLoader().getResource("com/bigdata/rdf/rio/small.rdf");
+
 
         final URI g1 = f.createURI("http://www.bigdata.com/g1");
 
-        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf> "
+        final String update = "LOAD <" + url.toExternalForm() + "> "
                 + "INTO GRAPH <" + g1.stringValue() + ">";
         
         final String ns = "http://bigdata.com/test/data#";
@@ -1804,7 +1809,10 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
     public void testLoadGZip()
             throws Exception
         {
-        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.gz>";
+    
+    	final URL url = this.getClass().getClassLoader().getResource("com/bigdata/rdf/rio/small.rdf.gz");
+    	
+        final String update = "LOAD <" + url.toExternalForm() + ">";
         
         final String ns = "http://bigdata.com/test/data#";
         
@@ -1821,7 +1829,7 @@ public class TestSparqlUpdate<S extends IIndexManager> extends
 //    public void testLoadZip()
 //            throws Exception
 //        {
-//        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.zip>";
+//        final String update = "LOAD <file:src/test/com/bigdata/rdf/rio/small.rdf.zip>";
 //        
 //        final String ns = "http://bigdata.com/test/data#";
 //        

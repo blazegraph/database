@@ -29,6 +29,7 @@ package com.bigdata.rdf.sail.tck;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
@@ -605,7 +606,11 @@ public class BigdataSPARQLUpdateTest extends SPARQLUpdateTest {
     public void testLoadGZip()
             throws Exception
         {
-        final String update = "LOAD <file:bigdata-rdf/src/test/com/bigdata/rdf/rio/small.rdf.gz>";
+    
+    	//Depends on bigdata-rdf test resource
+    	final URL url = this.getClass().getClassLoader().getResource("com/bigdata/rdf/rio/small.rdf.gz");
+    	
+        final String update = "LOAD <" + url.toExternalForm() + ">";
         
         final String ns = "http://bigdata.com/test/data#";
         

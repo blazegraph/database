@@ -98,6 +98,8 @@ dependencies.
                 <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
                 <include>**/*.rdf</include>
+                <include>**/*.owl</include>
+                <include>**/*.gz</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
             </includes>
@@ -108,12 +110,6 @@ dependencies.
             <includes>
                 <include>**/*</include>
             </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-sails/src/resources</directory>
-            <includes>
-                <include>**/*.xml</include>
-	    </includes>
         </resource>
         <resource>
             <directory>bigdata-sails/src/java</directory>
