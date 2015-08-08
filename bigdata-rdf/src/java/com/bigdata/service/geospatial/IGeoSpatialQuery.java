@@ -29,7 +29,7 @@ package com.bigdata.service.geospatial;
 import java.io.Serializable;
 
 import com.bigdata.bop.IBindingSet;
-import com.bigdata.journal.IIndexManager;
+import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
@@ -64,6 +64,7 @@ public interface IGeoSpatialQuery {
       private static final long serialVersionUID = -2509557655519603130L;
 
       final GeoFunction searchFunction;
+      final TermNode predicate;
       final PointLatLon spatialPoint;
       final Double spatialDistance;
       final SpatialUnit spatialDistanceUnit;
@@ -77,12 +78,14 @@ public interface IGeoSpatialQuery {
        * Constructor
        */
       public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
+            final TermNode predicate,
             final PointLatLon spatialPoint, final Double spatialDistance,
             final SpatialUnit spatialDistanceUnit, final Long timePoint,
             final Long timeDistance, final TimeUnit timeDistanceUnit,
             final IBindingSet incomingBindings) {
 
          this.searchFunction = searchFunction;
+         this.predicate = predicate;
          this.spatialPoint = spatialPoint;
          this.spatialDistance = spatialDistance;
          this.spatialDistanceUnit = spatialDistanceUnit;
@@ -97,6 +100,9 @@ public interface IGeoSpatialQuery {
          return searchFunction;
       }
 
+      public TermNode getPredicate() {
+         return predicate;
+      }
 
       public PointLatLon getSpatialPoint() {
          return spatialPoint;
@@ -186,6 +192,12 @@ public interface IGeoSpatialQuery {
                || (searchFunction != null && other.searchFunction == null)
                || !searchFunction.equals(other.searchFunction))
             return false;
+         
+         if ((predicate == null && other.predicate != null)
+               || (predicate != null && other.predicate == null)
+               || !predicate.equals(other.predicate))
+            return false;
+
 
          if ((spatialPoint == null && other.spatialPoint != null)
                || (spatialPoint != null && other.spatialPoint == null)

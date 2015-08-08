@@ -88,6 +88,23 @@ public class GeoSpatialUtility {
          buf.append(yCoord);
          return buf.toString();
       }
+      
+      /**
+       * Splits a given point into its component string. Corresponds to a
+       * parsed (and typed) version of what toString returns.
+       * 
+       * @param point
+       * @return
+       */
+      public static Object[] toComponentString(PointLatLon point) {
+         
+         final Object[] components = {
+               point.getXCoord(),
+               point.getYCoord(),
+         };
+         
+         return components;
+      }
    }
    
    /**
@@ -149,7 +166,7 @@ public class GeoSpatialUtility {
       public Long getTimestamp() {
          return timestamp;
       }
-    
+
       @Override
       public String toString() {
          final StringBuffer buf = new StringBuffer();
@@ -160,7 +177,24 @@ public class GeoSpatialUtility {
          buf.append(timestamp);
          return buf.toString();
       }
-
+      
+      /**
+       * Splits a given point into its component string. Corresponds to a
+       * parsed (and typed) version of what toString returns.
+       * 
+       * @param point
+       * @return
+       */
+      public static Object[] toComponentString(PointLatLonTime point) {
+         
+         final Object[] components = {
+               point.getSpatialPoint().getXCoord(),
+               point.getSpatialPoint().getYCoord(),
+               point.getTimestamp()
+         };
+         
+         return components;
+      }
    }
 
    
@@ -190,7 +224,7 @@ public class GeoSpatialUtility {
          this.distanceTime = distanceTime;
       }
       
-      public PointLatLonTime getBorderLow() {
+      public PointLatLonTime getLowerBorder() {
          
          return new PointLatLonTime(
               centerPoint.getSpatialPoint().getXCoord() - distanceLat, 
@@ -199,7 +233,7 @@ public class GeoSpatialUtility {
          
       }
       
-      public PointLatLonTime getBorderHigh() {
+      public PointLatLonTime getUpperBorder() {
          
          return new PointLatLonTime(
             centerPoint.getSpatialPoint().getXCoord() + distanceLat, 
@@ -225,11 +259,11 @@ public class GeoSpatialUtility {
          buf.append("\n");
          
          buf.append("-> Low border: ");
-         buf.append(getBorderLow());
+         buf.append(getLowerBorder());
          buf.append("\n");
          
          buf.append("-> High border: ");
-         buf.append(getBorderHigh());
+         buf.append(getUpperBorder());
          buf.append("\n");
          
          return buf.toString();

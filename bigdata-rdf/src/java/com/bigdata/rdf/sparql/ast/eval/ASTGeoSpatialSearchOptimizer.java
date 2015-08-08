@@ -53,6 +53,7 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
         final Set<URI> set = new LinkedHashSet<URI>();
 
         set.add(GeoSpatial.SEARCH);
+        set.add(GeoSpatial.PREDICATE);
         set.add(GeoSpatial.SPATIAL_POINT);
         set.add(GeoSpatial.SPATIAL_DISTANCE);
         set.add(GeoSpatial.SPATIAL_DISTANCE_UNIT);
