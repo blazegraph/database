@@ -437,6 +437,11 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 					log.info("HA Status: " + s);
 				}
 				
+				//Added to look at test failures BLZG-1269
+				if(s == null || s.isEmpty()) {
+					return HAStatusEnum.NotReady;
+				}
+				
 				return HAStatusEnum.valueOf(s);
 			} finally {
 				rpm.close();

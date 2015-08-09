@@ -221,6 +221,11 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core-test</artifactId>
       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core-test</artifactId>
+      <version>${bigdata.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
