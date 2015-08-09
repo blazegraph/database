@@ -130,7 +130,7 @@ public class TestTicket473 extends TestCase {
                 try {
                     sail.initialize();
                     loadOntology(sail,
-                            this.getClass().getClassLoader().getResource("data/lehigh/univ-bench.owl").getFile());
+                            "data/lehigh/univ-bench.owl");
                     doTicket473Commit(sail);
                 } finally {
                     sail.shutDown();
@@ -219,8 +219,16 @@ public class TestTicket473 extends TestCase {
             /*
              * Run the parser, which will cause statements to be inserted.
              */
-            final InputStream is = new BufferedInputStream(new FileInputStream(
+            InputStream is = null;
+            try {
+            	is = new BufferedInputStream(new FileInputStream(
                     file));
+            } catch (java.io.FileNotFoundException f) {
+            	//Might be a resource from the classpath
+            	is = this.getClass().getClassLoader().getResourceAsStream(fileName);
+            	assert is != null;
+            }
+           
             try {
                 rdfParser.parse(is, baseURI);
             } finally {
