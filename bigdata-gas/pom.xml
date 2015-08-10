@@ -5,15 +5,31 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.1-SNAPSHOT</version>
+    <version>1.5.3-GeoSpatial-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-gas</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <name>bigdata-gas</name>
+  <version>${bigdata.version}</version>
+  <name>Blazegraph Gather Apply Scatter (GAS) API</name>
   <packaging>jar</packaging>
+  <build>
+   <plugins>
+    <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.6</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+   </plugins>
+  </build>
 
   <reporting>
     <plugins>
@@ -26,7 +42,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>bigdata-gas</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph Gather Apply Scatter (GAS) API</h1>]]></doctitle>
 	  <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
@@ -59,20 +75,23 @@ ga('send', 'pageview');
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <version>${junit3.version}</version>
       <scope>test</scope>
     </dependency>
-<!--
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
       <version>${sesame.version}</version>
     </dependency>
--->
     <dependency>
       <groupId>com.blazegraph</groupId>
-      <artifactId>striterator</artifactId>
-      <version>${striterator.version}</version>
+      <artifactId>ctc-striterators</artifactId>
+      <version>${bigdata.version}</version>
     </dependency>
     <dependency>
        <!-- log4j is the primary logger for bigdata. -->

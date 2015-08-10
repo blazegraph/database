@@ -5,14 +5,14 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.1-SNAPSHOT</version>
+    <version>1.5.3-GeoSpatial-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
 <!-- TODO:  Research group IDs and java package naming -->
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-ganglia</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <name>bigdata-ganglia</name>
+  <version>${bigdata.version}</version>
+  <name>Blazegraph Ganglia</name>
   <packaging>jar</packaging>
 
   <reporting>
@@ -26,7 +26,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>bigdata-ganglia</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph Ganglia</h1>]]></doctitle>
           <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
@@ -58,9 +58,9 @@ ga('send', 'pageview');
 
   <dependencies>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>junit-ext</artifactId>
+      <version>${junit-ext.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

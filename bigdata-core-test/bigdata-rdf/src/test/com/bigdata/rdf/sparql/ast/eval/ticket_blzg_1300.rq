@@ -1,0 +1,7 @@
+select (SUM(DISTINCT $a) as $aggr)
+{ { BIND(1 as $a) }
+  UNION 
+  { BIND(1 as $a) }
+  UNION 
+  { BIND(2 as $a) }
+}

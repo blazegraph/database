@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+--><!-- 
+This POM is intended to support the use of bigdata(R) as an embedded
+database as part of your own maven project.  It declares the
+dependencies for the embedded database, but does not include the
+dependencies for the NanoSparqlServer or the clustered database - use
+the ant build.xml file to generate and deploy those artifacts.
+
+To install the dependencies into your local maven repository, do:
+
+        mvn clean install
+        
+If you change any of the dependencies that are published by the bigdata
+project (whether because we maintain them or because they are not readily
+available) then you need to publish the updated dependencies to the maven
+repository.  There are commands in comment blocks in this POM that will
+deploy those dependencies.  Be sure to update the version numbers in the
+commands first!
+
+See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=ReleaseGuide
+for information on publishing maven releases and snapshots for bigdata and its
+dependencies.
+
+--><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+   <modelVersion>4.0.0</modelVersion>
+   <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.3-GeoSpatial-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+   </parent>
+   <groupId>com.blazegraph</groupId>
+   <artifactId>bigdata-sails-test</artifactId>
+    <version>${bigdata.version}</version>
+   <packaging>jar</packaging>
+   <name>Blazegraph Sail Tests</name>
+    <description>Blazegraph(TM) Maven Build</description>
+    <url>http://www.blazegraph.com</url>
+    <organization>
+        <name>SYSTAP, LLC</name>
+        <url>http://www.systap.com/</url>
+    </organization>
+    <inceptionYear>2006</inceptionYear>
+    <licenses>
+        <license>
+            <name>GNU General Public License Version 2 (GPLv2)</name>
+            <url>http://www.gnu.org/licenses/gpl-2.0.html</url>
+        </license>
+    </licenses>
+    <!-- properties are now in the parent POM. -->
+    <build>
+     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.18.1</version>
+        <configuration>
+          <includes>
+            <include>com/bigdata/rdf/sail/TestAll.java</include>
+            <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>
+           </includes>
+           <excludes>
+    	    <exclude>com/bigdata/TestAll.java</exclude>
+	    <exclude>com/bigdata/bfs/TestAll.java</exclude>
+	  </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+	  <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:src/test/resources/log4j.properties</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war-html</artifactId>
+                  <version>${bigdata.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <!-- other configurations here -->
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
+     </plugins>
+    <resources>
+	<resource>
+            <directory>src/test/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+                <include>**/*.n3</include>
+                <include>**/*.owl</include>
+                <include>**/*.txt</include>
+                <include>**/*.ttl</include>
+                <include>**/*.ttlx</include>
+                <include>**/*.rq</include>
+                <include>**/*.srx</include>
+                <include>**/*.trig</include>
+            </includes>
+        </resource>
+    </resources>
+    <extensions>
+      <!-- Enabling the use of SSH. -->
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+         <artifactId>wagon-ssh-external</artifactId>
+         <version>1.0-beta-6</version>
+      </extension>
+    </extensions>
+    </build>
+    
+    <distributionManagement>
+        <repository>
+            <id>bigdata.releases</id>
+            <name>bigdata(R) releases</name>
+            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>bigdata.snapshots</id>
+            <name>bigdata(R) snapshots</name>
+            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
+            <uniqueVersion>true</uniqueVersion>
+        </snapshotRepository>
+    </distributionManagement>
+   <!-- 
+   <repositories>
+    <repository>
+      <id>bigdata.releases</id>
+      <url>http://www.systap.com/maven/releases/</url>
+    </repository>
+    <repository>
+      <id>jetty.releases</id>
+      <url>https://oss.sonatype.org/content/groups/jetty/</url>
+    </repository>
+  </repositories>
+-->
+
+   <!-- This declares the basic dependencies that you need to use     -->
+   <!-- bigdata as an embedded database.  Use ant (build.xml) for     -->
+   <!-- NanoSparqlServer or cluster builds and deployments.           -->
+   
+   <dependencies>
+       <!--                                                           -->
+       <!-- artifacts already present in public repositories          -->
+       <!--                                                           -->
+       <dependency>
+           <groupId>com.github.stephenc.high-scale-lib</groupId>
+           <artifactId>high-scale-lib</artifactId>
+           <version>${highscalelib.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>colt</groupId>
+           <artifactId>colt</artifactId>
+           <version>${colt.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.lucene</groupId>
+           <artifactId>lucene-core</artifactId>
+           <version>${lucene.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.lucene</groupId>
+           <artifactId>lucene-analyzers</artifactId>
+           <version>${lucene.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>com.ibm.icu</groupId>
+           <artifactId>icu4j</artifactId>
+           <version>${icu.version}</version>
+       </dependency>
+       <dependency>
+           <!-- log4j is the primary logger for bigdata. -->
+           <groupId>log4j</groupId>
+           <artifactId>log4j</artifactId>
+           <version>${log4j.version}</version>
+           <!-- There is a bug with log4j 1.2.15 where it has a lot  -->
+           <!-- of dependencies that we do not need in its POM. The  --> 
+           <!-- exclusions are only necessary with that version.     -->
+           <!-- 
+           <exclusions>
+             <exclusion>
+               <groupId>javax.jms</groupId>
+               <artifactId>jms</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>com.sun.jdmk</groupId>
+               <artifactId>jmxtools</artifactId>
+             </exclusion>
+             <exclusion>
+               <groupId>com.sun.jmx</groupId>
+               <artifactId>jmxri</artifactId>
+             </exclusion>
+           </exclusions>
+           -->
+        </dependency>
+       <dependency>
+           <groupId>org.slf4j</groupId>
+           <artifactId>slf4j-api</artifactId>
+           <version>${slf4j.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.slf4j</groupId>
+           <artifactId>slf4j-log4j12</artifactId>
+           <version>${slf4j.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.httpcomponents</groupId>
+           <artifactId>httpclient</artifactId>
+           <version>${apache.httpclient.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.httpcomponents</groupId>
+           <artifactId>httpclient-cache</artifactId>
+           <version>${apache.httpclient_cache.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.httpcomponents</groupId>
+           <artifactId>httpcore</artifactId>
+           <version>${apache.httpcore.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.httpcomponents</groupId>
+           <artifactId>httpmime</artifactId>
+           <version>${apache.httpmime.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>commons-codec</groupId>
+           <artifactId>commons-codec</artifactId>
+           <version>${apache.commons_codec.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>commons-fileupload</groupId>
+           <artifactId>commons-fileupload</artifactId>
+           <version>${apache.commons_fileupload.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>commons-io</groupId>
+           <artifactId>commons-io</artifactId>
+           <version>${apache.commons_io.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>commons-logging</groupId>
+           <artifactId>commons-logging</artifactId>
+           <version>${apache.commons_logging.version}</version>
+       </dependency>
+        <dependency>
+           <groupId>com.fasterxml.jackson.core</groupId>
+           <artifactId>jackson-core</artifactId>
+           <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+           <groupId>com.fasterxml.jackson.core</groupId>
+           <artifactId>jackson-annotations</artifactId>
+           <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+           <groupId>com.fasterxml.jackson.core</groupId>
+           <artifactId>jackson-databind</artifactId>
+           <version>${jackson.version}</version>
+        </dependency>
+	<dependency>
+           <groupId>org.codehaus.jettison</groupId>
+           <artifactId>jettison</artifactId>
+           <version>${jettison.version}</version>
+    	</dependency>	
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-runtime</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-rdfxml</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-queryresultio-sparqljson</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+     <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-testsuite</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-sparql-testsuite</artifactId>
+	<version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+	<groupId>org.openrdf.sesame</groupId>
+	<artifactId>sesame-store-testsuite</artifactId>
+	<version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.zookeeper</groupId>
+      <artifactId>zookeeper</artifactId>
+      <version>3.4.5</version>
+    </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-ganglia</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>ctc-striterators</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>dsi-utils</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit4.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>junit-ext</artifactId>
+      <version>${junit-ext.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>lgpl-utils</artifactId>
+       <version>${bigdata.version}</version>
+     </dependency>
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>rdf-properties</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-util</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-client</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-core</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-core-test</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-core-test</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+    </dependency>
+<!-- TODO:  Factor our main classes.
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-sails</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+-->
+     <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-gas</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-continuation</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-http</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-io</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-jmx</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-jndi</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-security</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-xml</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-rewrite</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-client</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-proxy</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+       <dependency>
+        <groupId>javax.servlet</groupId>
+        <artifactId>javax.servlet-api</artifactId>
+        <version>${servlet.version}</version>
+      </dependency>
+   </dependencies>
+</project>
