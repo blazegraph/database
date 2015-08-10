@@ -35,6 +35,7 @@ import org.apache.log4j.Logger;
 import com.sun.jini.admin.DestroyAdmin;
 import com.sun.jini.start.NonActivatableServiceDescriptor;
 import com.sun.jini.start.NonActivatableServiceDescriptor.Created;
+
 import net.jini.admin.Administrable;
 import net.jini.config.AbstractConfiguration;
 import net.jini.config.ConfigurationException;
@@ -60,15 +61,21 @@ public class LookupStarter extends Thread {
     private static final org.apache.log4j.Logger logger = 
         LogUtil.getLog4jLogger( LookupStarter.class );
 
-    private String pSep = System.getProperty("path.separator");
-    private String fSep = System.getProperty("file.separator");
-    private String userDir = System.getProperty("user.dir");
+    private final String pSep = System.getProperty("path.separator");
+    private final String fSep = System.getProperty("file.separator");
+    private final String userDir = System.getProperty("user.dir");
 
     //set on command line
-    private String appHome = System.getProperty("app.home");
-    private String jiniLib = System.getProperty("jini.lib");
-    private String jiniLibDl = System.getProperty("jini.lib.dl");
-    private String localPolicy = System.getProperty("java.security.policy");
+    private final String appHome = System.getProperty("app.home");
+    private final String jiniLib = System.getProperty("jini.lib");
+    private final String jiniLibDl = System.getProperty("jini.lib.dl");
+    private final String localPolicy = System.getProperty("java.security.policy");
+    
+    private final String reggieJar = System.getProperty("reggie.jar","reggie.jar");
+    private static final String jskdlJar = System.getProperty("jsk-dl.jar","jsk-dl.jar");
+    private static final String reggiedlJar = System.getProperty("reggie-dl.jar","reggie-dl.jar");
+    
+    public static final String LOOKUP_CONFIG = "bigdata.lookup.config";
 
     private static String thisHost = null;
     private static String defaultGroup = null;
@@ -96,14 +103,15 @@ public class LookupStarter extends Thread {
     private static String jskCodebase;
     private static String lookupServerCodebase;
     private static String lookupCodebase;
-    private String lookupClasspath = jiniLib+fSep+"reggie.jar";
+    private String lookupClasspath = jiniLib+fSep+reggieJar;
     private String lookupImplName =
                                 "com.sun.jini.reggie.TransientRegistrarImpl";
-    private String lookupConfig = appHome // See #1194
-                                  +fSep+"bigdata-jini"+fSep+"src"+fSep+"main"+fSep+"java"
-                                  +fSep+"com"+fSep+"bigdata"+fSep+"service"
-                                  +fSep+"jini"+fSep+"util"+fSep+"config"
-                                  +fSep+"lookup.config";
+    private String lookupConfig = System.getProperty(LOOKUP_CONFIG, 
+    								appHome 
+    							// Maintains compatibility during maven migration. See #1194
+                                  +fSep+"bigdata-jini"+fSep+"src"+fSep+"test"+fSep+"resources"
+                                  +fSep+"lookup.config");
+
     private static HashSet<ServiceRegistrar> proxySet = 
         new HashSet<ServiceRegistrar>();
     private static HashSet<Created> implRefSet = new HashSet<Created>();
@@ -193,9 +201,9 @@ public class LookupStarter extends Thread {
         logger.log(Level.INFO, "groups="+writeGroupArrayToString(groups)
                    +", locators="+writeArrayElementsToString(locators));
         jskCodebase = ConfigurationUtil.computeCodebase
-                          (thisHost, "jsk-dl.jar", codebasePort);
+                          (thisHost, jskdlJar, codebasePort);
         lookupServerCodebase = ConfigurationUtil.computeCodebase
-                                   (thisHost, "reggie-dl.jar", codebasePort);
+                                   (thisHost, reggiedlJar, codebasePort);
         lookupCodebase = lookupServerCodebase+" "+jskCodebase;
 
         // Turn on Lookup discovery in ldm

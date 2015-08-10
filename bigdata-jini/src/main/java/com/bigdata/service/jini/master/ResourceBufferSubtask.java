@@ -39,6 +39,7 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.proc.IKeyArrayIndexProcedure;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.relation.accesspath.BlockingBuffer;
+import com.bigdata.service.master.IAsynchronousClientTask;
 import com.bigdata.service.ndx.pipeline.AbstractPendingSetSubtask;
 
 /**

@@ -24,6 +24,8 @@
 /DIST.*.tgz
 /REL.*.tgz
 /target
+.classpath
+.project
 
 # /bigdata/
 /bigdata/bin
@@ -350,3 +352,7 @@ target/**
 *.log
 
 /*/target
+
+.DS_Store
+**/.DS_Store
+**/.settings

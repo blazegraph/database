@@ -17,7 +17,6 @@ package com.bigdata.rdf.graph.analytics;
 
 import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,7 +30,6 @@ import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGraphAccessor;
 import com.bigdata.rdf.graph.IStaticFrontier;
 import com.bigdata.rdf.graph.analytics.FuzzySSSP.FuzzySSSPResult;
-import com.bigdata.rdf.graph.impl.bd.BigdataGraphFixture;
 
 /**
  * This algorithm provides a fuzzy implementation of the shortest paths between
@@ -385,36 +383,6 @@ public class FuzzySSSP implements Callable<FuzzySSSPResult>{
         
     }
 
-    public static void main(final String[] args) throws Exception {
-
-        final int nthreads = 4;
-
-        final Properties properties = new Properties();
-
-        final BigdataGraphFixture graphFixture = new BigdataGraphFixture(
-                properties);
-
-        final IGASEngine gasEngine = graphFixture.newGASEngine(nthreads);
-
-        try {
-
-            final Value[] src = null;
-            final Value[] tgt = null;
-            final int N = 0;
-            
-            final IGraphAccessor graphAccessor = graphFixture
-                    .newGraphAccessor(null/* ignored */);
-
-            final FuzzySSSPResult result = new FuzzySSSP(src, tgt, N,
-                    gasEngine, graphAccessor).call();
-
-            System.out.println(result);
-            
-        } finally {
-
-            gasEngine.shutdownNow();
-
-        }
-    }
+   
 
 }

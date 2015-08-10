@@ -52,7 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-   <version>1.5.1-SNAPSHOT</version>
+   <version>1.5.3-BLZG_1269_merge-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -74,7 +74,8 @@ dependencies.
       <!-- This is a copy of that information. However, there are a   -->
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
-      <bigdata.version>1.5.2-SNAPSHOT</bigdata.version>
+      <bigdata.version>1.5.3-BLZG_1269_merge-SNAPSHOT</bigdata.version>
+      <bigdata.legacy.version>1.5.3-BLZG_1269_merge-SNAPSHOT</bigdata.legacy.version>
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
@@ -91,11 +92,11 @@ dependencies.
       <apache.httpclient_cache.version>4.1.3</apache.httpclient_cache.version>
       <apache.httpcore.version>4.1.4</apache.httpcore.version>
       <apache.httpmime.version>4.1.3</apache.httpmime.version>
-      <colt.version>1.2.0</colt.version>
       <highscalelib.version>1.1.2</highscalelib.version>
       <log4j.version>1.2.17</log4j.version>
+      <colt.version>1.2.0</colt.version>
       <fastutil.version>6.5.16</fastutil.version>
-      <dsiutils.version>1.0.6-020610</dsiutils.version>
+      <dsiutils.version>1.0.10</dsiutils.version>
       <lgplutils.version>1.0.7-270114</lgplutils.version>
       <bigdata.ganglia.version>1.0.4</bigdata.ganglia.version>
       <jackson.version>2.2.3</jackson.version>
@@ -103,10 +104,13 @@ dependencies.
       <jettison.version>1.3.3</jettison.version>
       <rexster.version>2.5.0</rexster.version>
       <striterator.version>1.0</striterator.version>
-      <jini.version>2.1</jini.version>
+      <jini.version>2.2.1</jini.version>
+      <junit-ext.version>1.1-b3-dev</junit-ext.version>
       <junit4.version>4.11</junit4.version>
       <junit3.version>3.8.1</junit3.version>
       <servlet.version>3.1.0</servlet.version>
+      <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <build>
     <plugins>
@@ -117,7 +121,13 @@ dependencies.
         <configuration>
           <source>1.7</source>
           <target>1.7</target>
+	  <encoding>${project.build.sourceEncoding}</encoding>
         </configuration>
+      </plugin>
+      <plugin>
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-war-plugin</artifactId>
+       <version>2.6</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -127,6 +137,14 @@ dependencies.
           <includes>
             <include>**/TestAll.java</include>
           </includes>
+          <excludes>
+            <exclude>com/bigdata/TestAll.java</exclude>
+          </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+	  <printSummary>false</printSummary>
+          <disableXmlReport>false</disableXmlReport>
+          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack}</argLine>
         </configuration>
       </plugin>
     </plugins>
@@ -169,5 +187,29 @@ dependencies.
     </repository>
     -->
   </repositories>
+
+  <modules>
+    <module>../junit-ext</module>
+    <module>../ctc-striterators</module>
+    <module>../lgpl-utils</module>
+    <module>../dsi-utils</module>
+    <module>../rdf-properties</module>
+    <module>../bigdata-util</module>
+    <module>../bigdata-client</module>
+    <module>../bigdata-ganglia</module>
+    <module>../bigdata-gas</module>
+    <module>../bigdata-core/</module>
+<!--
+	Temporarily remove to CI purposes
+    <module>../bigdata-jini</module>
+-->
+    <module>../bigdata-war-html</module>
+    <module>../bigdata-war</module>
+    <module>../bigdata-blueprints</module>
+    <module>../bigdata-jar</module>
+    <module>../bigdata-core-test/</module>
+    <module>../bigdata-sails-test/</module>
+  </modules>
+
 
 </project>

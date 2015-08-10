@@ -46,6 +46,11 @@ import com.bigdata.btree.IndexMetadata;
 import com.bigdata.relation.accesspath.BlockingBuffer;
 import com.bigdata.service.IMetadataService;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.master.AbstractResourceScanner;
+import com.bigdata.service.master.IAsynchronousClientTask;
+import com.bigdata.service.master.IHashFunction;
+import com.bigdata.service.master.INotifyOutcome;
+import com.bigdata.service.master.IResourceScannerFactory;
 
 /**
  * Extends the {@link TaskMaster} to assign chunks of resources for processing

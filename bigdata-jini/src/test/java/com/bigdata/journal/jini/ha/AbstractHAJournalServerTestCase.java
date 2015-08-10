@@ -54,7 +54,6 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.TupleQueryResult;
 
 import com.bigdata.BigdataStatics;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.HAStatusEnum;
 import com.bigdata.ha.halog.IHALogReader;
@@ -69,7 +68,6 @@ import com.bigdata.journal.DumpJournal;
 import com.bigdata.journal.Journal;
 import com.bigdata.journal.jini.ha.HAJournalServer.RunStateEnum;
 import com.bigdata.journal.jini.ha.HAJournalTest.HAGlueTest;
-import com.bigdata.rdf.sail.TestConcurrentKBCreate;
 import com.bigdata.rdf.sail.webapp.NanoSparqlServer;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
@@ -77,6 +75,7 @@ import com.bigdata.rdf.sail.webapp.client.HttpException;
 import com.bigdata.rdf.sail.webapp.client.JettyResponseListener;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepository;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
 
@@ -115,7 +114,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     /**
      * Path to the config files.
      */
-    static final protected String SRC_PATH = "bigdata-jini/src/test/resources/com/bigdata/journal/jini/ha/";
+    static final protected String SRC_PATH = "src/test/resources/com/bigdata/journal/jini/ha/";
 
     /**
      * Path to the directory in which the service directories exist. The
@@ -123,6 +122,17 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     // static final protected String TGT_PATH = "/Volumes/SSDData/bigdata/"+FEDNAME+"/CI-HAJournal-1/";
     static final protected String TGT_PATH = FEDNAME + "/CI-HAJournal-1/";
+    
+    /**
+     * Path to the war file
+     */
+    static final protected String WAR_DIR = "target/";
+    
+    /**
+     * Name of the war file to be used for testing.
+     */
+    static final protected String WAR_FILE_NAME = "bigdata.war";
+    
 
     /**
      * The timeout used to await quorum meet or break.
@@ -422,6 +432,15 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
 				RemoteRepository.checkResponseCode(response);
 
 				final String s = response.getResponseBody();
+				
+				if(log.isInfoEnabled()) {
+					log.info("HA Status: " + s);
+				}
+				
+				//Added to look at test failures BLZG-1269
+				if(s == null || s.isEmpty()) {
+					return HAStatusEnum.NotReady;
+				}
 				
 				return HAStatusEnum.valueOf(s);
 			} finally {
@@ -731,7 +750,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      * @see <a href="http://sourceforge.net/apps/trac/bigdata/ticket/617" >
      *      Concurrent KB create fails with "No axioms defined?" </a>
      * 
-     * @see TestConcurrentKBCreate
+     * @see com.bigdata.rdf.sail.TestConcurrentKBCreate
      * 
      *      Note: This method sometimes deadlocked in the repo.size() call on
      *      the leader (HTTP end point). This was tracked down to an attempt by
@@ -1122,7 +1141,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
          */
  
         final String s = "file:"
-                + new File("bigdata-rdf/src/resources/data/foaf/", string)
+                + new File("src/test/resources/data/foaf/", string)
                         .getAbsolutePath();
 
         return s;

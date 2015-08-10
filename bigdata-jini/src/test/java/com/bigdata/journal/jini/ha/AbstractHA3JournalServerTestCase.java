@@ -1827,17 +1827,19 @@ public abstract class AbstractHA3JournalServerTestCase extends
              */
             {
                 final File webAppDir = serviceDir;
-                // webAppDir = new File(serviceDir, "bigdata-war/src");
+
                 if (!webAppDir.exists() && !webAppDir.mkdirs()) {
                     throw new IOException("Could not create directory: "
                             + webAppDir);
                 }
-                copyFiles(new File("bigdata-war/src"), webAppDir);
+
+				copyFile(new File(WAR_DIR + WAR_FILE_NAME), new File(webAppDir,
+						WAR_FILE_NAME), true);
             }
 
             // log4j configuration.
             copyFile(new File(
-                    "bigdata/src/resources/logging/log4j-dev.properties"),
+                    "src/test/resources/logging/log4j-dev.properties"),
                     new File(serviceDir, "log4j-" + name + ".properties"),
                     false/* append */);
 
@@ -1848,7 +1850,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
             // java logging configuration.
             copyFile(new File(
-                    "bigdata/src/resources/logging/logging.properties"),
+                    "src/test/resources/logging/logging.properties"),
                     new File(serviceDir, "logging-" + name + ".properties"),
                     false/* append */);
 
@@ -2296,10 +2298,10 @@ public abstract class AbstractHA3JournalServerTestCase extends
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
 
                 // Override the location of the webapp as deployed.
-                cmds.add("-D" + JETTY_RESOURCE_BASE + "=.");
+                cmds.add("-D" + JETTY_RESOURCE_BASE + "=" + WAR_FILE_NAME);
 
                 // Override the location of the override-web.xml file as deployed.
-                cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
+                //cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
 
                 // Override the jetty.dump.start.
                 cmds.add("-D" + TEST_JETTY_DUMP_START + "=" + jettyDumpStart);
@@ -3466,18 +3468,38 @@ public abstract class AbstractHA3JournalServerTestCase extends
     /** Verify zookeeper is running on the local host at the client port. */
     protected void assertZookeeperRunning() {
 
-        if (!isZookeeperRunning())
+        if (!isZookeeperRunning()) {
+            final String pname = "test.zookeeper.installDir";
+            final String zookeeperDirStr = System.getProperty(pname,"NOT_DEFINED");
+            final File zookeeperDir = new File(zookeeperDirStr);
+            final File binDir = new File(zookeeperDir, "bin");
+            final String shell = SystemUtil.isWindows() ? "cmd" : "/bin/sh";
+            final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
+                    : "zkServer.sh";
             fail("Zookeeper not running: localIP=" + getZKInetAddress()
-                    + ", clientPort=" + getZKClientPort());
+                    + ", clientPort=" + getZKClientPort() + ":: installDir="
+                    + zookeeperDirStr + ", binDir=" + binDir + ", shell="
+                    + shell + ", executable=" + executable);
+        }
 
     }
 
     /** Verify zookeeper is not running on the local host at the client port. */
     protected void assertZookeeperNotRunning() {
 
-        if (isZookeeperRunning())
+        if (isZookeeperRunning()) {
+            final String pname = "test.zookeeper.installDir";
+            final String zookeeperDirStr = System.getProperty(pname,"NOT_DEFINED");
+            final File zookeeperDir = new File(zookeeperDirStr);
+            final File binDir = new File(zookeeperDir, "bin");
+            final String shell = SystemUtil.isWindows() ? "cmd" : "/bin/sh";
+            final String executable = SystemUtil.isWindows() ? "zkServer.cmd"
+                    : "zkServer.sh";
             fail("Zookeeper is running: localIP=" + getZKInetAddress()
-                    + ", clientPort=" + getZKClientPort());
+                    + ", clientPort=" + getZKClientPort()+ ":: installDir="
+                    + zookeeperDirStr + ", binDir=" + binDir + ", shell="
+                    + shell + ", executable=" + executable);
+        }
         
     }
 
