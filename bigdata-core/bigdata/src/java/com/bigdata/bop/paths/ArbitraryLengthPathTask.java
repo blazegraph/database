@@ -437,8 +437,8 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                 runningSubquery = queryEngine.eval(subquery, nextRoundInput
                         .toArray(new IBindingSet[nextRoundInput.size()]));
 
-                long subqueryChunksOut = 0L; // #of chunks read from
-                                             // subquery
+                long subqueryChunksOut = 0L; // #of chunks read from subquery
+                long subquerySolutionsOut = 0L; // #of solutions read from subquery
 
                 try {
 
@@ -456,7 +456,8 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
 
                         final IBindingSet[] chunk = subquerySolutionItr
                                 .next();
-
+                        subqueryChunksOut++;
+                        if (Thread.interrupted()) throw new InterruptedException();
                         for (IBindingSet bs : chunk) {
 
                             /**
@@ -465,7 +466,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                              *      OutOfMemoryError instead of Timeout for
                              *      SPARQL Property Paths </a>
                              */
-                            if (subqueryChunksOut++ % 10 == 0
+                            if (subquerySolutionsOut++ % 10 == 0
                                     && Thread.interrupted()) {
                                 throw new InterruptedException();
                             }
