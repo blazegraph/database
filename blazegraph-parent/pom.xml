@@ -199,7 +199,10 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
+<!--
+	Temporarily remove to CI purposes
     <module>../bigdata-jini</module>
+-->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
     <module>../bigdata-blueprints</module>

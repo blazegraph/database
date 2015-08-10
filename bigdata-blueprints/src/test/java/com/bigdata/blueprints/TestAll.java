@@ -92,9 +92,11 @@ public class TestAll extends TestCase {
 
         //Blueprints related test cases
         suite.addTestSuite(com.bigdata.blueprints.TestPathConstraints.class);
-        suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphEmbeddedTransactional.class);
+        //See BLZG-1415 
+        //suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphEmbeddedTransactional.class);
         suite.addTestSuite(com.bigdata.blueprints.TestBigdataGraphClientInMemorySail.class);
-        suite.addTestSuite(com.bigdata.blueprints.TestPathConstraints.class);
+        //See BLZG-1415 
+        //suite.addTestSuite(com.bigdata.blueprints.TestPathConstraints.class);
         
         return suite;
         
