@@ -4321,4 +4321,9 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
 
 	}
 
+	@Override
+	public boolean isHAJournal() {
+		return false;
+	}
+
 }

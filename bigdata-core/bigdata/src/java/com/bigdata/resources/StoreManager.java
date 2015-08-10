@@ -2752,6 +2752,12 @@ abstract public class StoreManager extends ResourceEvents implements
             return getFederation().getHttpdPort();
         }
 
+		@Override
+		public boolean isHAJournal() {
+			// TODO Auto-generated method stub
+			return false;
+		}
+
     } // class ManagedJournal
 
     /**

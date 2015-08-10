@@ -24,19 +24,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rwstore;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.*;
 
 import org.apache.log4j.Logger;
 
 import com.bigdata.cache.ConcurrentWeakValueCache;
 import com.bigdata.io.ChecksumUtility;
-import com.bigdata.journal.ICommitter;
 import com.bigdata.journal.AbstractJournal.ISnapshotData;
+import com.bigdata.journal.ICommitter;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rwstore.RWStore.AllocationStats;
 import com.bigdata.rwstore.StorageStats.Bucket;
@@ -746,6 +750,11 @@ public class FixedAllocator implements Allocator {
 		return free(addr, size, false);
 	}
 	
+	/**
+	 * Need to check if address to be freed was 'live' for any shadowed allocator to
+	 * determine if we need to adjust the 'savedLive' data.  This is critical since
+	 * otherwise we will not be able to reset any unisolated alloc/frees.
+	 */
 	public boolean free(final int addr, final int size, final boolean overideSession) {
 		if (addr < 0) {
 			final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK) - 3; // bit adjust
@@ -1206,7 +1215,7 @@ public class FixedAllocator implements Allocator {
 		final int offset = ((-addr) & RWStore.OFFSET_BITS_MASK); // bit adjust
 		final boolean committed = isCommitted(offset);
 
-		if (context == m_context && !m_pendingContextCommit) {
+		if (!m_pendingContextCommit && ((context == m_context) || (m_context == null && !context.isIsolated()))) {
 			
 			return !committed;
 		} else if (m_context != null) {
@@ -1226,7 +1235,8 @@ public class FixedAllocator implements Allocator {
 	
 	/**
 	 * The semantics of reset are to ditch all unisolated modifications
-	 * since the last commit point.
+	 * since the last commit point.  Note that this includes unisolated frees
+	 * as well as allocations.
 	 * 
 	 * @param cache
 	 * @param nextAllocation 
@@ -1445,6 +1455,7 @@ public class FixedAllocator implements Allocator {
                 	if (!m_pendingContextCommit)
                 		throw new IllegalStateException("Unexpected m_saveCommit when no pending commit");
                 	b.m_saveCommit = null;
+                	b.m_isoFrees = null;
                 }
             }
 

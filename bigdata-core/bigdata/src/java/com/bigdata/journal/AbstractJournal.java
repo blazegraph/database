@@ -2760,7 +2760,7 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
             }
 
 		} catch (Throwable e) {
-
+			
 			throw new RuntimeException(e);
 
 		} finally {
@@ -2955,6 +2955,10 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			
 			success = true; // mark successful abort.
 
+		} catch (Throwable e) {			
+			log.error("ABORT FAILED!", e);
+			
+			throw new RuntimeException("ABORT FAILED", e);
 		} finally {
 			// @see #1021 (Add critical section protection to AbstractJournal.abort() and BigdataSailConnection.rollback())
 			abortRequired.set(!success);
@@ -4407,18 +4411,18 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
         
     }
 
-    @Override
-    public void registerContext(final IAllocationContext context) {
-        
-        assertCanWrite();
-
-        if(_bufferStrategy instanceof IRWStrategy) {
-
-            ((IRWStrategy) _bufferStrategy).registerContext(context);
-            
-        }
-        
-    }
+//    @Override
+//    public void registerContext(final IAllocationContext context) {
+//        
+//        assertCanWrite();
+//
+//        if(_bufferStrategy instanceof IRWStrategy) {
+//
+//            ((IRWStrategy) _bufferStrategy).registerContext(context);
+//            
+//        }
+//        
+//    }
     
     @Override
 	final public long getRootAddr(final int index) {
@@ -8703,9 +8707,13 @@ public abstract class AbstractJournal implements IJournal/* , ITimestampService 
 			};
 		}   	
     }
-    
+
     @Override
-    public boolean isHAJournal() {
-    	return false;
+	public IAllocationContext newAllocationContext(final boolean isolated) {
+		if (_bufferStrategy instanceof RWStrategy) {
+			return ((RWStrategy) _bufferStrategy).newAllocationContext(isolated);
+		} else {
+			return null;
+		}
     }
 }

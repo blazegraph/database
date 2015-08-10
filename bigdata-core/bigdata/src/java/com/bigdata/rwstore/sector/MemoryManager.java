@@ -1117,7 +1117,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	 */
     @Override
 	public IMemoryManager createAllocationContext() {
-		return new AllocationContext(this);
+		return new AllocationContext(this, true /*isolated*/);
 	}
 
     @Override
@@ -1634,6 +1634,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void abortContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
+			context.release();
+			
+        	if (context.isIsolated()) {
 			final AllocationContext alloc = m_contexts.remove(context);
 			
 			if (alloc != null) {
@@ -1643,6 +1646,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 				if (m_activeTxCount == 0 && m_contexts.isEmpty())
 					releaseSessions();
 			}
+        	}
 			
 		} finally {
 			m_allocationLock.unlock();
@@ -1653,6 +1657,9 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void detachContext(final IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
+			context.release();
+			
+        	if (context.isIsolated()) {
 			final AllocationContext alloc = m_contexts.remove(context);
 			
 			if (alloc != null) {
@@ -1665,20 +1672,27 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 			if (m_contexts.isEmpty() && this.m_activeTxCount == 0) {
 				releaseSessions();
 			}
+        	}
 		} finally {
 			m_allocationLock.unlock();
 		}
 	}
 
-	@Override
-	public void registerContext(final IAllocationContext context) {
-		m_allocationLock.lock();
-		try {
-			establishContextAllocation(context);
-		} finally {
-			m_allocationLock.unlock();
+    private void checkContext(final IAllocationContext context) {
+		if (context != null) {
+			context.checkActive();
 		}
 	}
+
+//	@Override
+//	public void registerContext(final IAllocationContext context) {
+//		m_allocationLock.lock();
+//		try {
+//			establishContextAllocation(context);
+//		} finally {
+//			m_allocationLock.unlock();
+//		}
+//	}
 
 	private final Map<IAllocationContext, AllocationContext> m_contexts = 
 		new ConcurrentHashMap<IAllocationContext, AllocationContext>();
@@ -1688,7 +1702,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 
 	private long m_retention = 0; // retention period
 	
-    private AllocationContext establishContextAllocation(
+    private AllocationContext getContextAllocation(
             final IAllocationContext context) {
 
         /*
@@ -1697,32 +1711,13 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
          */
         assert m_allocationLock.isHeldByCurrentThread();
         
+        checkContext(context);
+        
         AllocationContext ret = m_contexts.get(context);
         
         if (ret == null) {
         	
-            ret = new AllocationContext(this);
-
-            if (m_contexts.put(context, ret) != null) {
-                
-                throw new AssertionError();
-                
-            }
-        
-            if (log.isTraceEnabled())
-				log.trace("Establish ContextAllocation: " + ret 
-						+ ", total: " + m_contexts.size() 
-						+ ", requests: " + ++m_contextRequests 
-						+ ", removals: " + m_contextRemovals );
-      
-            
-            if (log.isInfoEnabled())
-                log.info("Context: ncontexts=" + m_contexts.size()
-                        + ", context=" + context);
-            
-			if (m_activeTxCount == 0 && m_contexts.size() == 1)
-				acquireSessions();
-
+            throw new IllegalStateException("No associated Context found");
             
         }
 
@@ -1783,7 +1778,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public long allocate(ByteBuffer data, IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
-			return establishContextAllocation(context).allocate(data);
+			return getContextAllocation(context).allocate(data);
 		} finally {
 			m_allocationLock.unlock();
 		}
@@ -1798,7 +1793,7 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
 	public void free(long addr, IAllocationContext context) {
 		m_allocationLock.lock();
 		try {
-			establishContextAllocation(context).free(addr);
+			getContextAllocation(context).free(addr);
 		} finally {
 			m_allocationLock.unlock();
 		}
@@ -1808,5 +1803,17 @@ public class MemoryManager implements IMemoryManager, ISectorManager {
     public void delete(long addr, IAllocationContext context) {
         free(addr,context);
     }
+
+	public IAllocationContext newAllocationContext(final boolean isolated) {
+		AllocationContext ret = new AllocationContext(this, isolated);
+
+		if (isolated) {
+	        m_contexts.put(ret, ret);
+	    	if (m_activeTxCount == 0 && m_contexts.size() == 1)
+				acquireSessions();
+		}
+		
+ 		return ret;
+	}
 
 }
