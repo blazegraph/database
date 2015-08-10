@@ -66,8 +66,9 @@ public class TestAll extends TestCase {
         suite.addTestSuite(TestSynchronizedHardReferenceQueueWithTimeout.class);
 
         suite.addTestSuite(TestHardReferenceQueueWithBatchingUpdates.class);
-        
-        suite.addTestSuite(TestConcurrentWeakValueCacheWithBatchingUpdates.class);
+
+       //Disabled see BLZG-1417 
+       // suite.addTestSuite(TestConcurrentWeakValueCacheWithBatchingUpdates.class);
         
 //        // Test all ICacheEntry implementations.
 //        retval.addTestSuite( TestCacheEntry.class );
