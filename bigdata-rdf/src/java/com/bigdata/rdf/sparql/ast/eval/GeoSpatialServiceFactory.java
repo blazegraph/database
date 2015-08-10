@@ -36,9 +36,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
-import org.openrdf.model.Value;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
@@ -55,6 +53,7 @@ import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
+import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
@@ -75,6 +74,7 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
+import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
@@ -333,16 +333,19 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final IServiceOptions serviceOptions;
       private final TermNode searchFunction;
       private TermNode predicate = null;
-      private TermNode spatialPoint = null;
-      private TermNode spatialDistance = null;
-      private TermNode spatialDistanceUnit = null;
-      private TermNode timePoint = null;
-      private TermNode timeDistance = null;
-      private TermNode timeDistanceUnit = null;
+      private TermNode spatialCircleCenter = null;
+      private TermNode spatialCircleRadius = null;
+      private TermNode spatialRectangleUpperLeft = null;
+      private TermNode spatialRectangleLowerRight = null;
+      private TermNode spatialUnit = null;
+      private TermNode timeStart = null;
+      private TermNode timeEnd = null;
+      private TermNode timeUnit = null;
+      
       private IVariable<?>[] vars;
       private final GeoSpatialDefaults defaults;
-      private final AbstractTripleStore kb;
-
+      private final AbstractTripleStore kb;      
+      
       public GeoSpatialServiceCall(
             final IVariable<?> searchVar,
             final Map<URI, StatementPatternNode> statementPatterns,
@@ -376,30 +379,37 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          searchFunction = sp.o();
 
          TermNode predicate = null;
-         TermNode spatialPoint = null;
-         TermNode spatialDistance = null;
-         TermNode spatialDistanceUnit = null;
-         TermNode timePoint = null;
-         TermNode timeDistance = null;
-         TermNode timeDistanceUnit = null;
+         TermNode spatialCircleCenter = null;
+         TermNode spatialCircleRadius = null;
+         TermNode spatialRectangleUpperLeft = null;
+         TermNode spatialRectangleLowerRight = null;
+         TermNode spatialUnit = null;
+         TermNode timeStart = null;
+         TermNode timeEnd = null;
+         TermNode timeUnit = null;
+         
          for (StatementPatternNode meta : statementPatterns.values()) {
 
             final URI p = (URI) meta.p().getValue();
 
-            if (GeoSpatial.SPATIAL_POINT.equals(p)) {
-               spatialPoint = meta.o();
-            } else if (GeoSpatial.PREDICATE.equals(p)) {
+            if (GeoSpatial.PREDICATE.equals(p)) {
                predicate = meta.o();
-            } else if (GeoSpatial.SPATIAL_DISTANCE.equals(p)) {
-               spatialDistance = meta.o();
-            } else if (GeoSpatial.SPATIAL_DISTANCE_UNIT.equals(p)) {
-               spatialDistanceUnit = meta.o();
-            } else if (GeoSpatial.TIME_POINT.equals(p)) {
-               timePoint = meta.o();
-            } else if (GeoSpatial.TIME_DISTANCE.equals(p)) {
-               timeDistance = meta.o();
-            } else if (GeoSpatial.TIME_DISTANCE_UNIT.equals(p)) {
-               timeDistanceUnit = meta.o();
+            } else if (GeoSpatial.SPATIAL_CIRCLE_CENTER.equals(p)) {
+               spatialCircleCenter = meta.o();
+            } else if (GeoSpatial.SPATIAL_CIRCLE_RADIUS.equals(p)) {
+               spatialCircleRadius = meta.o();
+            } else if (GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT.equals(p)) {
+               spatialRectangleUpperLeft = meta.o();
+            } else if (GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT.equals(p)) {
+               spatialRectangleLowerRight = meta.o();
+            } else if (GeoSpatial.SPATIAL_UNIT.equals(p)) {
+               spatialUnit = meta.o();
+            } else if (GeoSpatial.TIME_START.equals(p)) {
+               timeStart = meta.o();
+            } else if (GeoSpatial.TIME_END.equals(p)) {
+               timeEnd = meta.o();
+            } else if (GeoSpatial.TIME_UNIT.equals(p)) {
+               timeUnit = meta.o();
             }
 
          }
@@ -408,16 +418,49 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.vars = new IVariable[] { searchVar };
 
          this.predicate = predicate;
-         this.spatialPoint = spatialPoint;
-         this.spatialDistance = spatialDistance;
-         this.spatialDistanceUnit = spatialDistanceUnit;
-         this.timePoint = timePoint;
-         this.timeDistance = timeDistance;
-         this.timeDistanceUnit = timeDistanceUnit;
+         this.spatialCircleCenter = spatialCircleCenter;
+         this.spatialCircleRadius = spatialCircleRadius;
+         this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
+         this.spatialRectangleLowerRight = spatialRectangleLowerRight;
+         this.spatialUnit = spatialUnit;
+         this.timeStart = timeStart;
+         this.timeEnd = timeEnd;
+         this.timeUnit = timeUnit;
          this.kb = kb;
 
       }
-        
+      
+
+      @Override
+      public ICloseableIterator<IBindingSet> call(
+              final IBindingSet[] incomingBs) {
+
+         // iterate over the incoming binding set, issuing search requests
+         // for all bindings in the binding set
+         return new GeoSpatialInputBindingsIterator(incomingBs, searchFunction,
+               predicate, spatialCircleCenter, spatialCircleRadius,
+               spatialRectangleUpperLeft, spatialRectangleLowerRight,
+               spatialUnit, timeStart, timeEnd, timeUnit, defaults, kb, this);
+          
+      }
+      
+
+      @Override
+      public IServiceOptions getServiceOptions() {
+          
+          return serviceOptions;
+          
+      }
+       
+      /**
+       * The search function itself, implementing a search request for a single
+       * query.
+       * 
+       * @param query the geospatial search query
+       * @param kb the triple store to issue search against
+       * 
+       * @return an iterator over the search results
+       */
       @SuppressWarnings({ "unchecked", "rawtypes" })
       public ICloseableIterator<IBindingSet> search(
             final GeoSpatialSearchQuery query,
@@ -430,21 +473,42 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                kb.getLexiconRelation().getNamespace(),
                kb.getSPORelation().getTimestamp());
 
-         final PointLatLonTime centerPoint = new PointLatLonTime(
-               query.getSpatialPoint(), query.getTimePoint());
-
-         final BoundingBoxLatLonTime boundingBox = new BoundingBoxLatLonTime(
-               centerPoint, query.getSpatialDistance() /* lat */,
-               query.getSpatialDistance() /* lon */, query.getTimeDistance() /* time */
-         );
-
-         final Var oVar = Var.var(); // object position variable
-         final StatementPatternNode sp = 
-            new StatementPatternNode(
-               new VarNode(vars[0].getName()), query.getPredicate(), new VarNode(oVar));
+         // this is needed for any function
+         final Long timeStart = query.getTimeStart();
+         final Long timeEnd = query.getTimeEnd();
+         final SpatialUnit spatialUnit = query.getSpatialUnit();
+         final TimeUnit timeUnit = query.getTimeUnit();
          
+         // construct the bounding boxes and ranges
+         switch (query.getSearchFunction()) {
+         case IN_CIRCLE:
+            {
+               final PointLatLon centerPoint = query.getSpatialCircleCenter();
+               final Double distance = query.getSpatialCircleRadius();
+
+               // TODO: implement
+            }
+            break;
+         case IN_RECTANGLE:
+            {
+               final PointLatLon upperLeft = query.getSpatialRectangleUpperLeft();
+               final PointLatLon lowerRight = query.getSpatialRectangleLowerRight();
+
+               // TODO: implement
+            }
+            break;
+         default:
+            throw new RuntimeException("Unknown geospatial search function.");
+         }
+
+         final BoundingBoxLatLonTime boundingBox = null;
+//         final BoundingBoxLatLonTime boundingBox = new BoundingBoxLatLonTime(
+//               centerPoint, query.getSpatialDistance() /* lat */,
+//               query.getSpatialDistance() /* lon */, query.getTimeDistance() /* time */
+//         );
+
          // construct the RangeBOp and attach to triple pattern
-         GeoSpatialLiteralExtension<BigdataValue> litExt = 
+         final GeoSpatialLiteralExtension<BigdataValue> litExt = 
             new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
          
          final Object[] lowerBorderComponents = 
@@ -453,7 +517,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Object[] upperBorderComponents = 
             PointLatLonTime.toComponentString(boundingBox.getUpperBorder());
          
-         // set up range scan node
+         // set up range scan
+         final Var oVar = Var.var(); // object position variable
          final RangeNode range = new RangeNode(
             new VarNode(oVar),
             new ConstantNode(
@@ -465,65 +530,45 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final RangeBOp rangeBop = 
             ASTRangeOptimizer.toRangeBOp(context, range, globals);
                   
-         range.setRangeBOp(rangeBop);
-         sp.setRange(range);
-
+//         // set up the element filter
+         IElementFilter<ISPO> filter = 
+            new GeoSpatialInSquareFilter(
+               boundingBox.getLowerBorder(), boundingBox.getUpperBorder(), litExt);
+         
+         // set up the predicate
+         final VarNode s = new VarNode(vars[0].getName());
+         final VarNode o = new VarNode(oVar);
          IPredicate<ISPO> pred = (IPredicate<ISPO>)
-               kb.getPredicate(
-                     sp.s() != null && sp.s().isConstant() ? (Resource) sp.s().getValue() : null, 
-                     sp.p() != null && sp.p().isConstant() ? (URI) sp.p().getValue() : null, 
-                     sp.o() != null && sp.o().isConstant() ? (Value) sp.o().getValue() : null, 
-                     sp.c() != null && sp.c().isConstant() ? (Resource) sp.c().getValue() : null,
-                     null, rangeBop);
+            kb.getPredicate(
+               (URI)s.getValue(),                     /* subject */
+               (URI)query.getPredicate().getValue(),  /* predicate */
+               o.getValue(),                          /* object */ 
+               null,                                  /* context */
+               filter,                                  /* filter */
+               rangeBop);                             /* rangeBop */
 
          /**
-          * The predicate is null is the p we pass in does not appear in the
-          * database. In that case, we return null to indicate that there are
-          * no matches.
+          * The predicate is null if the p we pass in does not appear in the
+          * database. In that case, return null to indicate there aren't matches.
           */
          if (pred==null) {
             return null;
          }
          
          pred = (IPredicate<ISPO>) pred.setProperty(
-               IPredicate.Annotations.TIMESTAMP, kb.getSPORelation().getTimestamp());
+            IPredicate.Annotations.TIMESTAMP, kb.getSPORelation().getTimestamp());
 
          final IRelation<ISPO> relation = context.getRelation(pred);
 
          final AccessPath<ISPO> accessPath = 
             (AccessPath<ISPO>) context.getAccessPath(relation, pred);
 
-         IChunkedOrderedIterator<ISPO> apIt = accessPath.iterator();
-
-         return new ISPOIteratorWrapper(apIt,Var.var(vars[0].getName()));
+         return new ISPOIteratorWrapper(
+            accessPath.iterator(),Var.var(vars[0].getName()));
       }
-
-        @Override
-        public ICloseableIterator<IBindingSet> call(
-                final IBindingSet[] incomingBs) {
-
-           return getGeoSpatialSearchMultiHiterator(incomingBs);
-            
-        }
-
-        private ICloseableIterator<IBindingSet> getGeoSpatialSearchMultiHiterator(
-              IBindingSet[] bsList) {
-
-           return new GeoSpatialInputBindingsIterator(bsList, searchFunction,
-              predicate, spatialPoint, spatialDistance, spatialDistanceUnit,
-              timePoint, timeDistance, timeDistanceUnit, defaults, kb, this);
-
-        }
         
-
-        @Override
-        public IServiceOptions getServiceOptions() {
-            
-            return serviceOptions;
-            
-        }
-        
-    }
+   }
+   
     
    public static class ISPOIteratorWrapper implements
          ICloseableIterator<IBindingSet> {
@@ -580,15 +625,18 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     public static class GeoSpatialInputBindingsIterator 
     implements ICloseableIterator<IBindingSet> {
        
-       final IBindingSet[] bindingSet;
-       final TermNode searchFunction;
-       final TermNode predicate;
-       final TermNode spatialPoint;
-       final TermNode spatialDistance;
-       final TermNode spatialDistanceUnit;
-       final TermNode timePoint;
-       final TermNode timeDistance;
-       final TermNode timeDistanceUnit;
+       private final IBindingSet[] bindingSet;
+       private final TermNode searchFunction;
+       private final TermNode predicate;
+       private final TermNode spatialCircleCenter;
+       private final TermNode spatialCircleRadius;
+       private final TermNode spatialRectangleUpperLeft;
+       private final TermNode spatialRectangleLowerRight;
+       private final TermNode spatialUnit;
+       private final TermNode timeStart;
+       private final TermNode timeEnd;
+       private final TermNode timeUnit;
+       
        final GeoSpatialDefaults defaults;
        final AbstractTripleStore kb;
        final GeoSpatialServiceCall serviceCall;
@@ -599,21 +647,26 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
        public GeoSpatialInputBindingsIterator(final IBindingSet[] bindingSet, 
              final TermNode searchFunction, final TermNode predicate,
-             final TermNode spatialPoint, final TermNode spatialDistance, 
-             final TermNode spatialDistanceUnit, final TermNode timePoint,
-             final TermNode timeDistance, final TermNode timeDistanceUnit,
+             final TermNode spatialCircleCenter, 
+             final TermNode spatialCircleRadius, 
+             final TermNode spatialRectangleUpperLeft, 
+             final TermNode spatialRectangleLowerRight,
+             final TermNode spatialUnit, final TermNode timeStart,
+             final TermNode timeEnd, final TermNode timeUnit,
              final GeoSpatialDefaults defaults, final AbstractTripleStore kb,
              GeoSpatialServiceCall serviceCall) {
 
           this.bindingSet = bindingSet;
           this.searchFunction = searchFunction;
           this.predicate = predicate;
-          this.spatialPoint = spatialPoint;
-          this.spatialDistance = spatialDistance;
-          this.spatialDistanceUnit = spatialDistanceUnit;          
-          this.timePoint = timePoint;
-          this.timeDistance = timeDistance;
-          this.timeDistanceUnit = timeDistanceUnit;
+          this.spatialCircleCenter = spatialCircleCenter;
+          this.spatialCircleRadius = spatialCircleRadius;
+          this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;          
+          this.spatialRectangleLowerRight = spatialRectangleLowerRight;
+          this.spatialUnit = spatialUnit;
+          this.timeStart = timeStart;
+          this.timeEnd = timeEnd;
+          this.timeUnit = timeUnit;
           this.defaults = defaults;
           this.kb = kb;
           this.serviceCall = serviceCall;
@@ -692,21 +745,24 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
           if (bindingSet == null || nextBindingSetItr >= bindingSet.length) {
              curDelegate = null;
              return false;
-          }
-
+          }          
+          
           final IBindingSet bs = bindingSet[nextBindingSetItr++];
           final GeoFunction searchFunction = resolveAsGeoFunction(this.searchFunction, bs);
-          final PointLatLon spatialPoint = resolveAsPoint(this.spatialPoint, bs);
-          final Double spatialDistance = resolveAsDouble(this.spatialDistance, bs);
-          final SpatialUnit spatialDistanceUnit = resolveAsSpatialDistanceUnit(this.spatialDistanceUnit, bs);
-          final Long timePoint = resolveAsLong(this.timePoint, bs);
-          final Long timeDistance = resolveAsLong(this.timeDistance, bs);
-          final TimeUnit timeDistanceUnit = resolveAsTimeDistanceUnit(this.timeDistanceUnit, bs);
+          final PointLatLon spatialCircleCenter = resolveAsPoint(this.spatialCircleCenter, bs);
+          final Double spatialCircleRadius = resolveAsDouble(this.spatialCircleRadius, bs);
+          final PointLatLon spatialRectangleUpperLeft = resolveAsPoint(this.spatialRectangleUpperLeft, bs);
+          final PointLatLon spatialRectangleLowerRight = resolveAsPoint(this.spatialRectangleLowerRight, bs);
+          final SpatialUnit spatialUnit = resolveAsSpatialDistanceUnit(this.spatialUnit, bs);
+          final Long timeStart = resolveAsLong(this.timeStart, bs);
+          final Long timeEnd = resolveAsLong(this.timeEnd, bs);
+          final TimeUnit timeUnit = resolveAsTimeDistanceUnit(this.timeUnit, bs);
 
 
           GeoSpatialSearchQuery sq = new GeoSpatialSearchQuery(searchFunction,
-                predicate, spatialPoint, spatialDistance, spatialDistanceUnit,
-                timePoint, timeDistance, timeDistanceUnit, bs);
+                predicate, spatialCircleCenter, spatialCircleRadius,
+                spatialRectangleUpperLeft, spatialRectangleLowerRight,
+                spatialUnit, timeStart, timeEnd, timeUnit, bs);
           
           curDelegate = serviceCall.search(sq, kb);
 
@@ -732,7 +788,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
              try {
 
-                return GeoFunction.valueOf(geoFunctionStr);
+                return GeoFunction.forName(geoFunctionStr);
 
              } catch (NumberFormatException e) {
 
@@ -764,7 +820,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
              try {
 
-                return TimeUnit.valueOf(timeUnitStr);
+                return TimeUnit.forName(timeUnitStr);
 
              } catch (NumberFormatException e) {
 
@@ -795,7 +851,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
              try {
 
-                return SpatialUnit.valueOf(spatialUnitStr);
+                return SpatialUnit.forName(spatialUnitStr);
 
              } catch (NumberFormatException e) {
 
@@ -974,5 +1030,137 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          return defaultTimeDistanceUnit;
       }
     }
+    
+    
+    public abstract static class GeoSpatialFilterBase implements IElementFilter<ISPO> {
+       
+       final GeoSpatialLiteralExtension<BigdataValue> litExt;
+       
+       public GeoSpatialFilterBase(
+          final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+          
+          this.litExt = litExt;
+      }
+       
+       
+      /**
+       * Helper method to convert a visited object to a point.
+       */
+      @SuppressWarnings("rawtypes")
+      public PointLatLonTime asPoint(Object obj) {
+          
+         if (obj instanceof ISPO) {
+            final ISPO ispo = (ISPO)obj;
+            final IV oIV = ispo.o();
+            if (oIV instanceof LiteralExtensionIV) {
+               final LiteralExtensionIV lit = (LiteralExtensionIV)oIV;
+               
+               long[] longArr = litExt.asLongArray(lit, null);
+               final Object[] components = litExt.longArrAsComponentArr(longArr);
+                
+               return new PointLatLonTime(
+                  new PointLatLon((Double)components[0], (Double)components[1]), 
+                  (Long)components[2]);
+            }
+         }
+
+         return null; // something went wrong
+      }
+       
+      @Override
+      public boolean canAccept(Object o) {
+         return true;
+      }
+   }
+    
+   /**
+    * Filter asserting that a given point lies into a specified square,
+    * defined by its lower and upper border, plus time frame.
+    */
+   public static class GeoSpatialInCircleFilter extends GeoSpatialFilterBase {
+       
+      final PointLatLon spatialPoint;
+      final Double distance;
+      
+      final Long timeMin;
+      final Long timeMax;
+
+      
+       
+      public GeoSpatialInCircleFilter(
+          final PointLatLon spatialPoint, final Double distance,
+          final Long timeMin, final Long timeMax, 
+          final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         
+         super(litExt);
+         
+         this.spatialPoint = spatialPoint;
+         this.distance = distance;
+         this.timeMin = timeMin;
+         this.timeMax = timeMax;
+         
+      }
+       
+       @Override
+       public boolean isValid(Object e) {
+          return false; // TODO: implement
+       }
+       
+    }
+   
+    
+    /**
+     * Filter asserting that a given point lies into a specified distance
+     * (i.e. circle) plus time frame.
+     */
+    public static class GeoSpatialInSquareFilter extends GeoSpatialFilterBase {
+
+       final private PointLatLonTime lowerBorder;
+       final private PointLatLonTime upperBorder;
+       
+       public GeoSpatialInSquareFilter(
+          final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
+          final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+       
+          super(litExt);
+          
+          this.lowerBorder = lowerBorder;
+          this.upperBorder = upperBorder;
+       }
+
+       @Override
+       public boolean isValid(Object obj) {
+          
+          final PointLatLonTime point = asPoint(obj);
+          
+          /**
+           * Check containment in range.
+           */
+          return 
+             lowerBorder.getXCoord() <= point.getXCoord() &&
+             lowerBorder.getYCoord() <= point.getYCoord() &&
+             lowerBorder.getTimestamp() <= point.getTimestamp() &&
+             upperBorder.getXCoord() >= point.getXCoord() &&
+             upperBorder.getYCoord() >= point.getYCoord() &&
+             upperBorder.getTimestamp() >= point.getTimestamp();
+             
+       }
+        
+     }
+    
+//    public static class InSquareFilter {
+//    IElementFilter<ISPO> filter = new IElementFilter<ISPO>() {
+//
+//       @Override
+//       public boolean isValid(Object e) {
+//          System.out.println();
+//          return true;
+//       }
+//
+//       @Override
+//       public boolean canAccept(Object o) {
+//          return true;
+//       }
+//    };
 
 }
