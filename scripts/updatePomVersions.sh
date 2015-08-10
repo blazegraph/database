@@ -6,13 +6,14 @@ PARENT_POM=./blazegraph-parent/pom.xml
 
 CURRENT_SNAPSHOT=`cat $PARENT_POM | perl -n -e '/^.*\<version\>(.*)-SNAPSHOT\<\/version\>.*$/ && printf("%s", $1)'`
 CURRENT_BRANCH=`cat .git/HEAD | cut -d\/ -f3`
+CURRENT_VERSION=`echo $CURRENT_SNAPSHOT | cut -d\- -f1`
 
-echo "${CURRENT_SNAPSHOT}-${CURRENT_BRANCH}-SNAPSHOT"
+echo "${CURRENT_VERSION}-${CURRENT_BRANCH}-SNAPSHOT"
 
 
 for file in `find . -name "pom.xml" -maxdepth 2 -print`; do
 
-	cat $file | sed "s/${CURRENT_SNAPSHOT}/${CURRENT_SNAPSHOT}-${CURRENT_BRANCH}/" > /tmp/$$
+	cat $file | sed "s/${CURRENT_SNAPSHOT}/${CURRENT_VERSION}-${CURRENT_BRANCH}/" > /tmp/$$
 	cat /tmp/$$ > $file
 	rm -f /tmp/$$
 
