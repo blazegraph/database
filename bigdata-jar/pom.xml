@@ -5,7 +5,11 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-GeoSpatial-SNAPSHOT</version>
+<<<<<<< HEAD
+    <version>1.5.3-SNAPSHOT</version>
+=======
+    <version>1.5.3-SNAPSHOT</version>
+>>>>>>> master
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
@@ -18,12 +22,6 @@
   <build>
      <resources>
         <resource>
-            <directory>../bigdata-war-html/src/main/resources</directory>
-            <includes>
-		<include>**/RWStore.properties</include>
-	    </includes>
-	</resource>
-        <resource>
             <directory>src/main/resources</directory>
             <includes>
 		<include>**/*.xml</include>
@@ -33,31 +31,6 @@
 	</resource>
     </resources>
     <plugins>
-      <plugin>
-        <artifactId>maven-resources-plugin</artifactId>
-        <version>2.7</version>
-        <executions>
-          <execution>
-            <id>copy-resources</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>target/classes/bigdata-war-html/src</outputDirectory>
-              <resources>          
-                <resource>
-                  <directory>../bigdata-war-html/src</directory>
-		  <includes>
-			<include>**/*</include>
-		  </includes>
-                  <filtering>true</filtering>
-                </resource>
-              </resources>              
-            </configuration>            
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -77,7 +50,7 @@
                   <version>${bigdata.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
-                  <outputDirectory>target/classes</outputDirectory>
+                  <outputDirectory>target/classes/war</outputDirectory>
                   <destFileName>bigdata.war</destFileName>
                 </artifactItem>
               </artifactItems>
@@ -85,6 +58,31 @@
           </execution>
         </executions>
         </plugin>
+       <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+               <id>unpack-war</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>compile</phase>
+               <configuration>
+                 <target>
+ 		   <unzip dest="target/classes/war">
+        		<fileset dir="target/classes/war">
+            			<include name="bigdata.war" />
+        		</fileset>    
+    		   </unzip>
+ 		   <delete file = "target/classes/war/bigdata.war"/>
+		   <copy file = "target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+	</plugin>
+
 <!--
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
