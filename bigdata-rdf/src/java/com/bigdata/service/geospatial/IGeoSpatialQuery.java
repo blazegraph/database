@@ -65,12 +65,14 @@ public interface IGeoSpatialQuery {
 
       final GeoFunction searchFunction;
       final TermNode predicate;
-      final PointLatLon spatialPoint;
-      final Double spatialDistance;
-      final SpatialUnit spatialDistanceUnit;
-      final Long timePoint;
-      final Long timeDistance;
-      final TimeUnit timeDistanceUnit;
+      final PointLatLon spatialCircleCenter;
+      final Double spatialCircleRadius;
+      final PointLatLon spatialRectangleUpperLeft;
+      final PointLatLon spatialRectangleLowerRight;
+      final SpatialUnit spatialUnit;
+      final Long timeStart;
+      final Long timeEnd;
+      final TimeUnit timeUnit;
       final IBindingSet incomingBindings;
 
 
@@ -78,20 +80,24 @@ public interface IGeoSpatialQuery {
        * Constructor
        */
       public GeoSpatialSearchQuery(final GeoFunction searchFunction, 
-            final TermNode predicate,
-            final PointLatLon spatialPoint, final Double spatialDistance,
-            final SpatialUnit spatialDistanceUnit, final Long timePoint,
-            final Long timeDistance, final TimeUnit timeDistanceUnit,
+            final TermNode predicate, final PointLatLon spatialCircleCenter, 
+            final Double spatialCircleRadius,
+            PointLatLon spatialRectangleUpperLeft,
+            PointLatLon spatialRectangleLowerRight,
+            final SpatialUnit spatialUnit, final Long timeStart,
+            final Long timeEnd, final TimeUnit timeUnit,
             final IBindingSet incomingBindings) {
 
          this.searchFunction = searchFunction;
          this.predicate = predicate;
-         this.spatialPoint = spatialPoint;
-         this.spatialDistance = spatialDistance;
-         this.spatialDistanceUnit = spatialDistanceUnit;
-         this.timePoint = timePoint;
-         this.timeDistance = timeDistance;
-         this.timeDistanceUnit = timeDistanceUnit;
+         this.spatialCircleCenter = spatialCircleCenter;
+         this.spatialCircleRadius = spatialCircleRadius;
+         this.spatialRectangleUpperLeft = spatialRectangleUpperLeft;
+         this.spatialRectangleLowerRight = spatialRectangleLowerRight;
+         this.spatialUnit = spatialUnit;
+         this.timeStart = timeStart;
+         this.timeEnd = timeEnd;
+         this.timeUnit = timeUnit;
          this.incomingBindings = incomingBindings;
 
       }
@@ -104,35 +110,37 @@ public interface IGeoSpatialQuery {
          return predicate;
       }
 
-      public PointLatLon getSpatialPoint() {
-         return spatialPoint;
+      public PointLatLon getSpatialCircleCenter() {
+         return spatialCircleCenter;
       }
 
-
-      public Double getSpatialDistance() {
-         return spatialDistance;
+      public Double getSpatialCircleRadius() {
+         return spatialCircleRadius;
       }
 
-
-      public SpatialUnit getSpatialDistanceUnit() {
-         return spatialDistanceUnit;
+      public PointLatLon getSpatialRectangleUpperLeft() {
+         return spatialRectangleUpperLeft;
       }
 
-
-      public Long getTimePoint() {
-         return timePoint;
+      public PointLatLon getSpatialRectangleLowerRight() {
+         return spatialRectangleLowerRight;
       }
 
-
-      public Long getTimeDistance() {
-         return timeDistance;
+      public SpatialUnit getSpatialUnit() {
+         return spatialUnit;
       }
 
-
-      public TimeUnit getTimeDistanceUnit() {
-         return timeDistanceUnit;
+      public Long getTimeStart() {
+         return timeStart;
       }
-      
+
+      public Long getTimeEnd() {
+         return timeEnd;
+      }
+
+      public TimeUnit getTimeUnit() {
+         return timeUnit;
+      }
       
       public IBindingSet getIncomingBindings() {
          return incomingBindings;
@@ -153,22 +161,31 @@ public interface IGeoSpatialQuery {
             ((searchFunction == null) ? 0 : searchFunction.hashCode());
          
          result = prime * result +
-            ((spatialPoint == null) ? 0 : spatialPoint.hashCode());
+            ((predicate == null) ? 0 : predicate.hashCode());
          
          result = prime * result + 
-            ((spatialDistance == null) ? 0 : spatialDistance.hashCode());
+            ((spatialCircleCenter == null) ? 0 : spatialCircleCenter.hashCode());
          
          result = prime * result + 
-            ((spatialDistanceUnit == null) ? 0 : spatialDistanceUnit.hashCode());
+            ((spatialCircleRadius == null) ? 0 : spatialCircleRadius.hashCode());
 
          result = prime * result + 
-            ((timePoint == null) ? 0 : timePoint.hashCode());
+            ((spatialRectangleUpperLeft == null) ? 0 : spatialRectangleUpperLeft.hashCode());
 
          result = prime * result + 
-            ((timeDistance == null) ? 0 : timeDistance.hashCode());
+            ((spatialRectangleLowerRight == null) ? 0 : spatialRectangleLowerRight.hashCode());
 
          result = prime * result + 
-            ((timeDistanceUnit == null) ? 0 : timeDistanceUnit.hashCode());
+            ((spatialUnit == null) ? 0 : spatialUnit.hashCode());
+
+         result = prime * result + 
+               ((timeStart == null) ? 0 : timeStart.hashCode());
+
+         result = prime * result + 
+               ((timeEnd == null) ? 0 : timeEnd.hashCode());
+
+         result = prime * result + 
+               ((timeUnit == null) ? 0 : timeUnit.hashCode());
 
          return result;
       }
@@ -198,30 +215,44 @@ public interface IGeoSpatialQuery {
                || !predicate.equals(other.predicate))
             return false;
 
-
-         if ((spatialPoint == null && other.spatialPoint != null)
-               || (spatialPoint != null && other.spatialPoint == null)
-               || !spatialPoint.equals(other.spatialPoint))
+         if ((spatialCircleCenter == null && other.spatialCircleCenter != null)
+               || (spatialCircleCenter != null && other.spatialCircleCenter == null)
+               || !spatialCircleCenter.equals(other.spatialCircleCenter))
             return false;
 
-         if ((spatialDistance == null && other.spatialDistance != null)
-               || (spatialDistance != null && other.spatialDistance == null)
-               || !spatialDistance.equals(other.spatialDistance))
+         if ((spatialCircleRadius == null && other.spatialCircleRadius != null)
+               || (spatialCircleRadius != null && other.spatialCircleRadius == null)
+               || !spatialCircleRadius.equals(other.spatialCircleRadius))
             return false;
 
-         if ((spatialDistanceUnit == null && other.spatialDistanceUnit != null)
-               || (spatialDistanceUnit != null && other.spatialDistanceUnit == null)
-               || !spatialDistanceUnit.equals(other.spatialDistanceUnit))
+         if ((spatialRectangleUpperLeft == null && other.spatialRectangleUpperLeft != null)
+               || (spatialRectangleUpperLeft != null && other.spatialRectangleUpperLeft == null)
+               || !spatialRectangleUpperLeft.equals(other.spatialRectangleUpperLeft))
             return false;
 
-         if ((timePoint == null && other.timePoint != null)
-               || (timePoint != null && other.timePoint == null)
-               || !timePoint.equals(other.timePoint))
+         if ((spatialRectangleLowerRight == null && other.spatialRectangleLowerRight != null)
+               || (spatialRectangleLowerRight != null && other.spatialRectangleLowerRight == null)
+               || !spatialRectangleLowerRight.equals(other.spatialRectangleLowerRight))
             return false;
 
-         if ((timeDistanceUnit == null && other.timeDistanceUnit != null)
-               || (timeDistanceUnit != null && other.timeDistanceUnit == null)
-               || !timeDistanceUnit.equals(other.timeDistanceUnit))
+         if ((spatialUnit == null && other.spatialUnit != null)
+               || (spatialUnit != null && other.spatialUnit == null)
+               || !spatialUnit.equals(other.spatialUnit))
+            return false;
+
+         if ((timeStart == null && other.timeStart != null)
+               || (timeStart != null && other.timeStart == null)
+               || !timeStart.equals(other.timeStart))
+            return false;
+
+         if ((timeEnd == null && other.timeEnd != null)
+               || (timeEnd != null && other.timeEnd == null)
+               || !timeEnd.equals(other.timeEnd))
+            return false;
+
+         if ((timeUnit == null && other.timeUnit != null)
+               || (timeUnit != null && other.timeUnit == null)
+               || !timeUnit.equals(other.timeUnit))
             return false;
 
          return true;

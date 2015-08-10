@@ -37,17 +37,26 @@ import org.openrdf.model.impl.URIImpl;
  * Example:
  * 
  * <pre>
- * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
- * SELECT ?res WHERE {
- *   ?res geo:search "inCircle" .
- *   ?res geo:spatialPoint "12.1#12.4" .
- *   ?res geo:spatialDistance "0.01" . # radius
- *   ?res geo:spatialDistanceUnit "km" . # radius
- *   ?res geo:timePoint "1248885" .
- *   ?res geo:timeDistance "10" .
- *   ?res geo:timeDistanceUnit "s" .
+PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+SELECT ?res WHERE {
+  ?res geo:search "inCircle" .
+  ?res geo:spatialCircleCenter "12.1#12.4" .
+  ?res geo:spatialCircleRadius "0.1" .
+  ?res geo:spatialUnit "km" .
+  ?res geo:timeStart "124888539" .
+  ?res geo:timeEnd "124888534" .
+  ?res geo:timeUnit "s" .
+}
+    }
+ * </pre>
+ * 
+ * or
+ * 
+ * <pre>
+
  * }
  * </pre>
+
  * 
  * The query returns all points falling into the circle defined by radius 0.01
  * around the specified latitude and longitude for 1248885 +/- 10s.
@@ -61,31 +70,85 @@ public interface GeoSpatial {
     * A spatial unit.
     */
    public static enum SpatialUnit {
-      FOOT,
-      METER,
-      KILOMETER,
-      MILE
+      
+      FOOT("ft"),
+      METER("m"),
+      KILOMETER("km"),
+      MILE("mi");
+      
+      SpatialUnit(String name) {
+         this.name = name;
+      }
+      
+      public static SpatialUnit forName(String name) {
+         for (SpatialUnit e : SpatialUnit.values()) {
+             if (e.toString().equalsIgnoreCase(name)) {
+                 return e;
+             }
+         }
+
+         return null;
+     }
+      
+      @Override
+      public String toString() {
+         return name;
+      }
+      
+      private String name;
    }
 
    /**
     * A time unit.
     */
    public static enum TimeUnit {
-      SECOND,
-      MINUTE,
-      HOUR,
-      DAY
+      SECOND("s"),
+      MINUTE("m"),
+      HOUR("h"),
+      DAY("d");
+      
+      TimeUnit(String name) {
+         this.name = name;
+      }
+      
+      public static TimeUnit forName(String name) {
+         for (TimeUnit e : TimeUnit.values()) {
+             if (e.toString().equalsIgnoreCase(name)) {
+                 return e;
+             }
+         }
+
+         return null;
+     }
+      
+      @Override
+      public String toString() {
+         return name;
+      }
+      
+      private String name;
    }
    
    /**
     * Enum for implemented geo functions.
     */
    public static enum GeoFunction {
-      IN_CIRCLE("inCircle");
+      IN_CIRCLE("inCircle"),
+      IN_RECTANGLE("inRectangle");
       
       GeoFunction(final String name) {
          this.name = name;
       }
+      
+      public static GeoFunction forName(String name) {
+         for (GeoFunction e : GeoFunction.values()) {
+             if (e.toString().equalsIgnoreCase(name)) {
+                 return e;
+             }
+         }
+
+         return null;
+     }
       
       @Override
       public String toString() {
@@ -135,15 +198,16 @@ public interface GeoSpatial {
     */
    final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
 
-
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
    final URI PREDICATE = new URIImpl(NAMESPACE + "predicate");
-   final URI SPATIAL_POINT = new URIImpl(NAMESPACE + "spatialPoint");
-   final URI SPATIAL_DISTANCE = new URIImpl(NAMESPACE + "spatialDistance");
-   final URI SPATIAL_DISTANCE_UNIT = new URIImpl(NAMESPACE + "spatialDistanceUnit");
-   final URI TIME_POINT = new URIImpl(NAMESPACE + "timePoint");
-   final URI TIME_DISTANCE = new URIImpl(NAMESPACE + "timeDistance");
-   final URI TIME_DISTANCE_UNIT = new URIImpl(NAMESPACE + "timeDistanceUnit");
+   final URI SPATIAL_CIRCLE_CENTER = new URIImpl(NAMESPACE + "spatialCircleCenter");
+   final URI SPATIAL_CIRCLE_RADIUS = new URIImpl(NAMESPACE + "spatialCircleRadius");
+   final URI SPATIAL_RECTANGLE_UPPER_LEFT = new URIImpl(NAMESPACE + "spatialRectangleUpperLeft");
+   final URI SPATIAL_RECTANGLE_LOWER_RIGHT = new URIImpl(NAMESPACE + "spatialRectangleLowerRight");
+   final URI SPATIAL_UNIT = new URIImpl(NAMESPACE + "spatialUnit");
+   final URI TIME_START = new URIImpl(NAMESPACE + "timeStart");
+   final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
+   final URI TIME_UNIT = new URIImpl(NAMESPACE + "timeUnit");
    
 
 

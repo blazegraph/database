@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.openrdf.model.URI;
+import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.service.fts.FTS;
@@ -51,15 +52,17 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
     static {
       
         final Set<URI> set = new LinkedHashSet<URI>();
-
+        
         set.add(GeoSpatial.SEARCH);
         set.add(GeoSpatial.PREDICATE);
-        set.add(GeoSpatial.SPATIAL_POINT);
-        set.add(GeoSpatial.SPATIAL_DISTANCE);
-        set.add(GeoSpatial.SPATIAL_DISTANCE_UNIT);
-        set.add(GeoSpatial.TIME_POINT);
-        set.add(GeoSpatial.TIME_DISTANCE);
-        set.add(GeoSpatial.TIME_DISTANCE_UNIT);
+        set.add(GeoSpatial.SPATIAL_CIRCLE_CENTER);
+        set.add(GeoSpatial.SPATIAL_CIRCLE_RADIUS);
+        set.add(GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT);
+        set.add(GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT);
+        set.add(GeoSpatial.SPATIAL_UNIT);        
+        set.add(GeoSpatial.TIME_START);
+        set.add(GeoSpatial.TIME_END);
+        set.add(GeoSpatial.TIME_UNIT);
         
         searchUris = Collections.unmodifiableSet(set);
     }

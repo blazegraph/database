@@ -140,6 +140,16 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    @SuppressWarnings({ "unchecked", "rawtypes" })
    @Override
    public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
+      
+      final long[] componentsAsLongArr = asLongArray(iv, vf);
+      
+      final String litStr = longArrAsComponentString(componentsAsLongArr);
+      
+      return (V) vf.createLiteral(litStr, datatype);
+   }
+   
+   @SuppressWarnings("rawtypes")
+   public long[] asLongArray(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
 
       if (!datatype.getIV().equals(iv.getExtensionIV())) {
          throw new IllegalArgumentException("unrecognized datatype");
@@ -156,6 +166,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final int paddedArraySize = numDimensions * BASE_SIZE + 1; /* +1 leading zero byte to make value unsigned */
       
       final byte[] bigIntAsByteArrPad = new byte[paddedArraySize];
+      
       int idx = 0;
       for (int i = 0; i < paddedArraySize - bigIntAsByteArr.length; i++) {
          bigIntAsByteArrPad[idx++] = 0;   // padding
@@ -169,10 +180,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       
       long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned, sd);
       
-      final String litStr = longArrAsComponentString(componentsAsLongArr, sd);
+      return componentsAsLongArr;
       
-      return (V) vf.createLiteral(litStr, datatype);
+
    }
+   
 
    /**
     * Convert the components into a long array. The array is passed as an
@@ -185,7 +197,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * are converted into Long according to the precision specified in the
     * passed {@link SchemaDescription}.
     */
-   final static long[] componentsAsLongArr(
+   final long[] componentsAsLongArr(
       final Object[] components, final SchemaDescription sd) {
 
       final long[] ret = new long[sd.getNumDimensions()];
@@ -229,16 +241,43 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    }
 
    
+
    
    /**
     * Converts a a Long[] reflecting the long values of the individual 
     * components back into a component string representing the literal.
     * 
-    * @param s the unparsed component string
+    * @param arr the long array representing the components
     * @param sd the associated schema description
     * @return the string literal
     */
-   final static String longArrAsComponentString(final long[] arr, final SchemaDescription sd) {
+   final String longArrAsComponentString(final long[] arr) {
+      
+      final Object[] componentArr = longArrAsComponentArr(arr);
+      
+      final StringBuffer buf = new StringBuffer();
+      for (int i=0; i<componentArr.length; i++) {
+         
+         if (i>0)
+            buf.append(COMPONENT_SEPARATOR);
+         
+         buf.append(componentArr[i]);
+         
+      }
+      
+      return buf.toString();
+   }
+
+   
+   /**
+    * Converts a a Long[] reflecting the long values of the individual 
+    * components back into a component array representing the literal.
+    * 
+    * @param arr the long array representing the components
+    * @param sd the associated schema description
+    * @return the component array (containing longs and precision adjusted doubles)
+    */
+   final public Object[] longArrAsComponentArr(final long[] arr) {
       
       int numDimensions = sd.getNumDimensions();
       if (arr.length!=numDimensions) {
@@ -248,6 +287,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       }
          
       final StringBuffer buf = new StringBuffer();
+      final Object[] componentArr = new Object[arr.length];
       for (int i=0; i<arr.length; i++) {
          if (i>0)
             buf.append(COMPONENT_SEPARATOR);
@@ -257,21 +297,20 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          
          switch (sfd.getDatatype()) {
          case DOUBLE:
-            buf.append(String.valueOf((double)arr[i]/precisionAdjustment));
+            componentArr[i] = (double)arr[i]/precisionAdjustment;
             break;
          case LONG:
-            buf.append(String.valueOf(arr[i]));
+            componentArr[i] = arr[i];
             break;
          default:
             throw new RuntimeException("Uncovered decoding case. Please fix code.");
          }
-         
 
       }
-      
-      return buf.toString();
-   }
 
+      return componentArr;
+   }
+   
    /**
     * Converts a long array representing the components to a z-order byte array
     * 
@@ -279,7 +318,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * @param sd
     * @return
     */
-   static byte[] toZOrderByteArray(
+   byte[] toZOrderByteArray(
          final long[] componentsAsLongArr, final SchemaDescription sd) {
       
       IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
@@ -297,7 +336,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * @param sd2
     * @return
     */
-   static long[] fromZOrderByteArray(
+   long[] fromZOrderByteArray(
       final byte[] byteArr, final SchemaDescription sd) {
       
       IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
@@ -315,7 +354,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * not harm) yet makes sure that the array is an unsigned value, for which
     * the two's complement representation does not differ.
     */
-   static byte[] unsignedToTwosComplement(byte[] arr) {
+   byte[] unsignedToTwosComplement(byte[] arr) {
       byte[] ret = new byte[arr.length+1];
       
       // ret[0] = 0 by construction
@@ -330,7 +369,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    /**
     * Reverts method {{@link #unsignedToTwosComplement(byte[])}.
     */
-   static byte[] twosComplementToUnsigned(byte[] arr) {
+   byte[] twosComplementToUnsigned(byte[] arr) {
       
       byte[] ret = new byte[arr.length-1];
       
@@ -350,7 +389,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
      * TODO: this is fixed for now, we may want to make this take a datatype
      * as input.
      */
-   static SchemaDescription getSchemaDescription() {
+   private SchemaDescription getSchemaDescription() {
       
       final List<SchemaFieldDescription> sfd = 
          new ArrayList<SchemaFieldDescription>();

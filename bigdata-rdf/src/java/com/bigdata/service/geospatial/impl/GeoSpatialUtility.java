@@ -163,6 +163,16 @@ public class GeoSpatialUtility {
          return spatialPoint;
       }
       
+      
+      public Double getXCoord() {
+         return spatialPoint.getXCoord();
+      }
+      
+
+      public Double getYCoord() {
+         return spatialPoint.getYCoord();
+      }
+      
       public Long getTimestamp() {
          return timestamp;
       }
