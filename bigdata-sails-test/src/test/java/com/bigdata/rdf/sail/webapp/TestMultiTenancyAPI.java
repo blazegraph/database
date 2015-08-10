@@ -26,6 +26,7 @@ package com.bigdata.rdf.sail.webapp;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -85,7 +86,7 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
     static public Test suite() {
 
        return ProxySuiteHelper.suiteWhenStandalone(TestMultiTenancyAPI.class,
-             "test_create01",
+             "test_create0[13]",
              Collections.singleton(BufferMode.DiskRW),
              TestMode.quads
              );
@@ -355,6 +356,28 @@ public class TestMultiTenancyAPI<S extends IIndexManager> extends
 
         doTestCreate(namespace2);
         
+    }
+    
+    /**
+     * Test verifies rejecting an incorrect string as a namespace name.
+     * 
+     * @throws Exception
+     */
+    public void test_create03() throws Exception {
+
+        final List<String> incorrectNamespaces = Arrays.asList("", "te.st");
+
+        for(String incorrectNamespace:incorrectNamespaces){
+            try {
+
+                doTestCreate(incorrectNamespace);
+
+                fail("Expecting: " + HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
+            } catch (HttpException ex) {
+                assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getStatusCode());
+            }
+        }
     }
     
     private void doTestCreate(final String namespace2) throws Exception {
