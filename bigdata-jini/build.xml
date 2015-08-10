@@ -1,0 +1,217 @@
+<project name="bigdata-jini" default="bundleJar" basedir=".">
+
+    <property file="testServices.properties" />
+    <property environment="env"/>
+    <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+    </condition>
+    <condition property="mvn.home" value="${env.MAVEN_HOME}" else="">
+       <isset property="env.MAVEN_HOME" />
+    </condition>
+    <condition property="java.home" value="${env.JAVA_HOME}" else="/usr/java/current">
+       <isset property="env.JAVA_HOME" />
+    </condition>
+    <exec executable="hostname"
+        outputproperty="this.hostname">
+     </exec>
+    <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
+       <isset property="env.DEFAULT_NIC" />
+    </condition>
+    <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
+    <property name="app.home" value ="."/>
+    <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
+
+
+    <path id="jini.classpath">
+        <fileset dir="${test.codebase.dir}">
+            <include name="**/*.jar" />
+        </fileset>
+        <dirset dir=".">
+	    <include name="${maven.class.dir}"/>
+  	</dirset>
+    </path>
+
+    <!-- Note: It appears to be necessary to spawn the script which starts -->
+    <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
+    <!-- though it will start without being spawned under others (OSX).    -->
+    <!-- However, this change appears to result in zookeeper not running   -->
+    <!-- so I have backed it out for now.                                  -->
+    <target name="startZookeeper">
+
+        <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+        <echo>bin/zkServer.(sh|cmd) start</echo>
+	
+	<!-- Make sure ZK is stopped before we get started. -->
+        <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+       	   <arg value="stop"/>
+        </exec>
+        <!-- Make sure old state is clean. -->
+	<delete dir="${test.zookeeper.installDir}/data" quiet="true" />
+       	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+       	   <arg value="start"/>
+       	</exec>
+	<!-- Make sure ZK is stopped before we get started. -->
+       	<exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+       	   <arg value="stop"/>
+       	</exec>
+       	<exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+       	   <arg value="start"/>
+       	</exec>
+    </target>
+
+    <target name = "getMavenDependencies">
+	<exec executable="${mvn.home}/bin/mvn" logerror="true" dir = ".">
+	    <arg value = "dependency:copy-dependencies"/>
+	</exec>
+    </target>
+
+
+    <target name="stopZookeeper">
+    <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+    <echo>bin/zkServer.(sh|cmd) stop</echo>
+    <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+        <arg value="stop"/>
+    </exec>
+    <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+        <arg value="stop"/>
+    </exec>
+    </target>
+    <target name="stopTestServices" unless="${skipTestServices}">
+          <echo message="Stopping test services."/>
+          <antcall target="stopZookeeper"/>
+          <antcall target="stopLookup" />
+          <antcall target="stopHttpd" />
+    </target>
+
+    <target name="preTestPreparation">
+        <!-- make sure we have a clean set of test reports -->
+        <delete dir="${HATest.dir}" quiet="true" />
+        <mkdir dir="${HATest.dir}" />
+        <delete dir="${test.results.dir}/surefire-reports" quiet="true" />
+        <mkdir dir="${test.results.dir}/surefire-reports" />
+	<antcall target = "startTestServices"/>
+    </target>
+
+    <target name="startTestServices" depends="getMavenDependencies" unless="${skipTestServices}">
+      <property name="test.codebase.port" value="23333" />
+      <property name="test.codebase.dir" value="${dist.lib.dl}" />
+      <property name="test.codebase" value="http://${this.hostname}:${test.codebase.port}/jsk-dl.jar" />
+
+      <!-- These zookeeper configuration properties used to inform the test -->
+      <!-- suite about the zookeeper instance which will be used by the     -->
+      <!-- tests. These properties MUST be consistent with the actual       -->
+      <!-- zookeeper configuration.  Zookeeper is assumed (by the tests) to -->
+      <!-- be running on the localhost.                                     -->
+      <property name="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+      <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+
+      <!-- The zookeeper install directory. -->
+      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+
+      <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
+      <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
+      <property name="java.net.preferIPv4Stack" value="true" />
+          <echo message="Starting test services."/>
+          <antcall target="startZookeeper"/>
+          <antcall target="startHttpd"/>
+          <antcall target="startLookup"/>
+    </target>
+
+    <target name="startHttpd">
+      <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
+</echo>
+      <java jar="${dependency.dir}/${classserver.jar}"
+	    jvm="${java.home}/bin/java"
+            fork="true"
+            spawn="true">
+        <arg value="-verbose" />
+        <arg value="-stoppable" />
+        <arg line="-port ${test.codebase.port}" />
+        <arg line="-dir  '${test.codebase.dir}'" />
+      </java>
+    </target>
+
+    <target name="stopHttpd">
+      <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
+	</echo>
+      <java jar="${dependency.dir}/${classserver.jar}"
+	    jvm="${java.home}/bin/java"
+            fork="true"
+            failonerror="true">
+        <arg line="-port ${test.codebase.port}" />
+        <arg line="-dir  '${test.codebase.dir}'" />
+        <arg value="-stop" />
+      </java>
+    </target>
+
+     <target name="startLookup">
+
+       <!-- Emit the property to the ant console -->
+       <property name="print_classpath" value = "${jini.classpath}"/>
+       <echo message="Classpath = ${jini.classpath}"/>
+       <echo>${print_classpath}</echo>
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -Dbigdata.lookup.config=${lookup.config} -Dreggie.jar=${reggie.jar} -Dreggie-dl.jar=${reggie-dl.jar} -Djsk-dl.jar=${jsk-dl.jar} com.bigdata.service.jini.util.LookupStarter
+</echo>
+      <echo>
+</echo>
+      <java classname="com.bigdata.service.jini.util.LookupStarter"
+	    classpathref="jini.classpath"
+	    jvm="${java.home}/bin/java"
+            fork="true"
+            spawn="true">
+        <sysproperty key="app.home" value="${app.home}" />
+        <sysproperty key="jini.lib" value="${dist.lib}" />
+        <sysproperty key="jini.lib.dl" value="${dist.lib.dl}" />
+        <sysproperty key="java.security.policy" value="${java.security.policy}" />
+        <sysproperty key="java.security.debug" value="off" />
+        <sysproperty key="java.protocol.handler.pkgs" value="net.jini.url" />
+        <sysproperty key="log4j.configuration" value="${log4j.configuration}" />
+        <sysproperty key="codebase.port" value="${test.codebase.port}" />
+        <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
+        <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+        <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
+        <sysproperty key="default.nic" value="${default.nic}" />
+        <sysproperty key="bigdata.lookup.config" value="${lookup.config}" />
+	<sysproperty key="reggie.jar" value="${reggie.jar}"/>
+	<sysproperty key="reggie-dl.jar" value="${reggie-dl.jar}"/>
+	<sysproperty key="jsk-dl.jar" value="${jsk-dl.jar}"/>
+      </java>
+    </target>
+
+    <target name="stopLookup">
+      <echo>java -Dapp.home=${app.home} -Djini.lib=${dist.lib} -Djini.lib.dl=${dist.lib.dl} -Djava.security.policy=${java.security.policy} -Djava.security.debug=off -Djava.protocol.handler.pkgs=net.jini.url -Dlog4j.configuration=${log4j.configuration} -Dcodebase.port=${test.codebase.port} -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dbigdata.fedname=${bigdata.fedname} -Ddefault.nic=${default.nic} -Dbigdata.lookup.config=${lookup.config} -Dreggie.jar=${reggie.jar} -Dreggie-dl.jar=${reggie-dl.jar} -Djsk-dl.jar=${jsk-dl.jar} com.bigdata.service.jini.util.LookupStarter stop
+</echo>
+      <echo>
+</echo>
+      <java classname="com.bigdata.service.jini.util.LookupStarter"
+            fork="true"
+	    jvm="${java.home}/bin/java"
+            failonerror="true">
+        <classpath refid="jini.classpath" />
+        <sysproperty key="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+        <sysproperty key="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+        <sysproperty key="app.home" value="${app.home}" />
+        <sysproperty key="jini.lib" value="${dist.lib}" />
+        <sysproperty key="jini.lib.dl" value="${dist.lib.dl}" />
+        <sysproperty key="java.security.policy" value="${java.security.policy}" />
+        <sysproperty key="log4j.configuration" value="${log4j.configuration}" />
+        <sysproperty key="java.net.preferIPv4Stack" value="${java.net.preferIPv4Stack}" />
+        <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
+        <sysproperty key="default.nic" value="${default.nic}" />
+        <arg value="-stop" />
+      </java>
+    </target>
+
+    <target name = "postTestCleanup">
+	<antcall target="stopTestServices"/>
+	<antcall target="testReportArchive"/>
+    </target>
+
+    <target name = "testReportArchive">
+         <tar destfile="${test.results.dir}/report.tgz" basedir="${test.results.dir}/surefire-reports" compression="gzip"/>
+
+         <tar destfile="${test.results.dir}/HAtest-report.tgz" basedir="${HATest.dir}" compression="gzip"/>
+    </target>
+
+</project>

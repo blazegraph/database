@@ -5,13 +5,13 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.2-SNAPSHOT</version>
+    <version>1.5.3-BLZG_1269_merge-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>rdf-properties</artifactId>
   <version>${bigdata.version}</version>
-  <name>rdf-properties</name>
+  <name>Blazegraph RDF Properties</name>
   <url>http://maven.apache.org</url>
   <build>
   </build>
@@ -27,7 +27,7 @@
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>rdf-properties</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph RDF Properties</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){
@@ -52,28 +52,6 @@ ga('send', 'pageview');
   </reporting>
   
   <dependencies>
-<!--
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit4.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-client</artifactId>
-      <version>${jetty.version}</version>
-    </dependency>
-    <dependency>
-       <groupId>log4j</groupId>
-       <artifactId>log4j</artifactId>
-       <version>${log4j.version}</version>
-     </dependency>
--->
      <dependency>
        <groupId>commons-io</groupId>
        <artifactId>commons-io</artifactId>
@@ -84,10 +62,20 @@ ga('send', 'pageview');
 	<artifactId>sesame-util</artifactId>
 	<version>${sesame.version}</version>
      </dependency>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-rio-rdfxml</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
      <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-rio-rdfxml</artifactId>
-	<version>${sesame.version}</version>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-queryresultio-sparqljson</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>log4j</groupId>
+       <artifactId>log4j</artifactId>
+       <version>${log4j.version}</version>
      </dependency>
   </dependencies>
 
