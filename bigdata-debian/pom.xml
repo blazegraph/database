@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT-BLZG_1269_client-BLZG-1370</version>
+    <version>1.5.3-rwstore_refactor-SNAPSHOT-BLZG_1269_client-BLZG-1370</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
