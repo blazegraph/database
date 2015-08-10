@@ -25,7 +25,7 @@ package com.bigdata.rdf.internal;
 
 import java.util.Arrays;
 
-import com.bigdata.btree.BytesUtil.UnsignedByteArrayComparator;
+import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
 
 public class IPv4Address {
 
