@@ -93,30 +93,14 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 
 		BigdataGraph testGraph = new BigdataGraphClient(testURL);
 
+
 		try {
 			testBigdataGraph(testGraph);
 		} catch (Exception e) {
 
+
 			fail(e.toString());
 		}
-	}
-
-	protected void testBigdataGraph(BigdataGraph testGraph) throws Exception {
-
-		final String example = "graph-example-1.xml";
-
-		GraphMLReader.inputGraph(testGraph, this.getClass()
-				.getResourceAsStream(example));
-
-		for (Vertex v : testGraph.getVertices()) {
-			testPrint(v);
-		}
-		for (Edge e : testGraph.getEdges()) {
-			testPrint(e);
-		}
-
-		testGraph.shutdown();
-
 	}
 
 	@Override
@@ -127,12 +111,6 @@ public class TestBigdataGraphClientNSS extends AbstractTestNSSBlueprintsClient  
 		testPrint("Connecting to Remote Repository at " + testURL);
 
 		return new BigdataGraphClient(testURL);
-	}
-
-	@Override
-	protected BigdataGraph loadGraph(String file) throws Exception {
-		
-		return getNewGraph(file);
 	}
 
 }

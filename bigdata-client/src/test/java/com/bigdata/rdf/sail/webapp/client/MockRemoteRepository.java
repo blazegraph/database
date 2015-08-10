@@ -12,7 +12,8 @@ import org.eclipse.jetty.client.HttpResponse;
 import org.eclipse.jetty.client.api.Response.ResponseListener;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.http.HttpHeader;
-import org.eclipse.jetty.http.MimeTypes;
+import org.openrdf.query.resultio.TupleQueryResultFormat;
+import org.openrdf.rio.RDFFormat;
 
 public class MockRemoteRepository extends RemoteRepository {
 
@@ -24,12 +25,12 @@ public class MockRemoteRepository extends RemoteRepository {
 	}
 	public Data data;
 
-	public MockRemoteRepository(RemoteRepositoryManager mgr, String sparqlEndpointURL, IRemoteTx tx, Data data) {
+	private MockRemoteRepository(RemoteRepositoryManager mgr, String sparqlEndpointURL, IRemoteTx tx, Data data) {
 		super(mgr, sparqlEndpointURL, tx);
 		this.data = data;
 	}
 
-	public static MockRemoteRepository create(final String responseJson) {
+	public static MockRemoteRepository create(final String tupleQueryResponse, final String graphQueryResponse) {
 		// pojo to retrieve values from mock service
 		final Data data = new Data();
 
@@ -50,10 +51,21 @@ public class MockRemoteRepository extends RemoteRepository {
 							};
 							
 						};
-						response.getHeaders().add(HttpHeader.CONTENT_TYPE, MimeTypes.Type.APPLICATION_JSON.toString());
+						String requestMimeType = request.getHeaders().get(HttpHeader.ACCEPT).split(";")[0];
+						TupleQueryResultFormat tupleQueryMimeType = TupleQueryResultFormat.forMIMEType(requestMimeType);
+						String responseMimeType;
+						String responseContent;
+						if (tupleQueryMimeType!=null) {
+							responseMimeType = TupleQueryResultFormat.TSV.getDefaultMIMEType();
+							responseContent = tupleQueryResponse;
+						} else {
+							responseMimeType = RDFFormat.NTRIPLES.getDefaultMIMEType();
+							responseContent = graphQueryResponse;
+						}
+						response.getHeaders().add(HttpHeader.CONTENT_TYPE, responseMimeType);
 						((JettyResponseListener)listener).onHeaders(response);
-						java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(responseJson.length());
-						buf.put(responseJson.getBytes(Charset.forName(StandardCharsets.UTF_8.name())));
+						java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(responseContent.length());
+						buf.put(responseContent.getBytes(Charset.forName(StandardCharsets.UTF_8.name())));
 						buf.flip();
 						((JettyResponseListener)listener).onContent(response, buf);
 						((JettyResponseListener)listener).onSuccess(response);

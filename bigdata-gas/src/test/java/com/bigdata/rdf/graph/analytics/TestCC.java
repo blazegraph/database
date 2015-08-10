@@ -26,6 +26,7 @@ import com.bigdata.rdf.graph.IGASEngine;
 import com.bigdata.rdf.graph.IGASState;
 import com.bigdata.rdf.graph.IGASStats;
 import com.bigdata.rdf.graph.IGraphAccessor;
+import com.bigdata.rdf.graph.analytics.CC.VS;
 import com.bigdata.rdf.graph.impl.sail.AbstractSailGraphTestCase;
 
 /**
@@ -96,18 +97,21 @@ public class TestCC extends AbstractSailGraphTestCase {
                 
                 // the size of the connected component for this vertex.
                 {
-                    final Value label = gasState.getState(p1.getFoafPerson())
-                            .getLabel();
+                	final VS valueState = gasState.getState(p1.getFoafPerson()); 
+                    final Value label = valueState != null?valueState.getLabel():null;
                  
                     assertEquals(4, labels.get(label).get());
                 }
 
                 // the size of the connected component for this vertex.
                 {
-                    final Value label = gasState.getState(p2.get_v1())
-                            .getLabel();
+                	final VS valueState = gasState.getState(p2.get_v1());
+                    final Value label = valueState != null?valueState.getLabel():null;
+                    
+                    final AtomicInteger ai = labels.get(label);
+                    final int count = ai!=null?ai.get():-1;
 
-                    assertEquals(5, labels.get(label).get());
+                    assertEquals(5, count);
                 }
 
                 if (false) {

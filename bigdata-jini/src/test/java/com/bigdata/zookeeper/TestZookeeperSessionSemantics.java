@@ -45,8 +45,8 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.io.TestCase3;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.config.NicUtil;
 
 /**

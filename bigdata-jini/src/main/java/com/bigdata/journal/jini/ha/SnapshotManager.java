@@ -32,7 +32,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigest;
@@ -64,6 +63,7 @@ import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.msg.HASnapshotResponse;
 import com.bigdata.ha.msg.IHASnapshotRequest;
 import com.bigdata.ha.msg.IHASnapshotResponse;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.journal.AbstractJournal.ISnapshotData;
 import com.bigdata.journal.CommitCounterUtility;
 import com.bigdata.journal.FileMetadata;
@@ -76,12 +76,11 @@ import com.bigdata.journal.jini.ha.SnapshotIndex.ISnapshotRecord;
 import com.bigdata.journal.jini.ha.SnapshotIndex.SnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumException;
-import com.bigdata.rawstore.Bytes;
 import com.bigdata.service.IServiceInit;
 import com.bigdata.striterator.Resolver;
 import com.bigdata.striterator.Striterator;
+import com.bigdata.util.Bytes;
 import com.bigdata.util.ChecksumError;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.concurrent.LatchedExecutor;
 
 /**
@@ -106,12 +105,12 @@ public class SnapshotManager implements IServiceInit<Void> {
     /**
      * The prefix for the temporary files used to generate snapshots.
      */
-    public final static String SNAPSHOT_TMP_PREFIX = "snapshot";
+	public final static String SNAPSHOT_TMP_PREFIX = com.bigdata.journal.SnapshotTask.SNAPSHOT_TMP_PREFIX;
 
     /**
      * The suffix for the temporary files used to generate snapshots.
      */
-    public final static String SNAPSHOT_TMP_SUFFIX = ".tmp";
+    public final static String SNAPSHOT_TMP_SUFFIX = com.bigdata.journal.SnapshotTask.SNAPSHOT_TMP_SUFFIX;
 
     /**
      * A {@link FileFilter} that visits all files ending with the
@@ -1706,37 +1705,6 @@ public class SnapshotManager implements IServiceInit<Void> {
     }
 
     /**
-     * Copy the input stream to the output stream.
-     * 
-     * @param content
-     *            The input stream.
-     * @param outstr
-     *            The output stream.
-     * 
-     * @throws IOException
-     */
-    static private void copyStream(final InputStream content,
-            final OutputStream outstr) throws IOException {
-
-        final byte[] buf = new byte[1024];
-
-        while (true) {
-
-            final int rdlen = content.read(buf);
-
-            if (rdlen <= 0) {
-
-                break;
-
-            }
-
-            outstr.write(buf, 0, rdlen);
-
-        }
-
-    }
-
-    /**
      * Decompress a snapshot onto the specified file. The original file is not
      * modified.
      * 
@@ -1753,39 +1721,8 @@ public class SnapshotManager implements IServiceInit<Void> {
      *             if there is a problem decompressing the source file onto the
      *             destination file.
      */
-    public static void decompress(final File src, final File dst)
-            throws IOException {
-
-        if (!src.exists())
-            throw new FileNotFoundException(src.getAbsolutePath());
-
-        if (dst.exists() && dst.length() != 0)
-            throw new IOException("Output file exists and is not empty: "
-                    + dst.getAbsolutePath());
-
-        if (log.isInfoEnabled())
-            log.info("src=" + src + ", dst=" + dst);
-
-        InputStream is = null;
-        OutputStream os = null;
-        try {
-            is = new GZIPInputStream(new FileInputStream(src));
-            os = new FileOutputStream(dst);
-            copyStream(is, os);
-            os.flush();
-        } finally {
-            if (is != null)
-                try {
-                    is.close();
-                } catch (IOException ex) {
-                }
-            if (os != null)
-                try {
-                    os.close();
-                } catch (IOException ex) {
-                }
-        }
-
-    }
-
+	public static void decompress(final File src, final File dst)
+			throws IOException {
+		com.bigdata.journal.SnapshotTask.decompress(src,dst);
+	}
 }
