@@ -37,10 +37,10 @@ import java.util.UUID;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleSerializer;
 import com.bigdata.io.LongPacker;
+import com.bigdata.util.BytesUtil;
 
 /**
  * A class that may be used to form multi-component keys but which does not
