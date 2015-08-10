@@ -476,47 +476,78 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          // this is needed for any function
          final Long timeStart = query.getTimeStart();
          final Long timeEnd = query.getTimeEnd();
+         
+         // TODO: use of units, where required
          final SpatialUnit spatialUnit = query.getSpatialUnit();
          final TimeUnit timeUnit = query.getTimeUnit();
+
+         // the literal extension object used for conversion
+         final GeoSpatialLiteralExtension<BigdataValue> litExt = 
+            new GeoSpatialLiteralExtension<BigdataValue>(
+               kb.getLexiconRelation());
+
+         // construct the bounding boxes and filters, which depend on the
+         // function that is specified through the query
+         final Object[] lowerBorderComponents;
+         final Object[] upperBorderComponents;
+         final IElementFilter<ISPO> filter;
          
-         // construct the bounding boxes and ranges
+         // TOOD: usage of units
          switch (query.getSearchFunction()) {
          case IN_CIRCLE:
             {
                final PointLatLon centerPoint = query.getSpatialCircleCenter();
                final Double distance = query.getSpatialCircleRadius();
 
-               // TODO: implement
+               final PointLatLon upperLeft = new PointLatLon(
+                  centerPoint.getXCoord() - distance, 
+                  centerPoint.getYCoord() - distance);
+
+               final PointLatLon lowerRight = new PointLatLon(
+                     centerPoint.getXCoord() + distance, 
+                     centerPoint.getYCoord() + distance);
+
+               // construct the points with time
+               final PointLatLonTime upperLeftWithTime =
+                  new PointLatLonTime(upperLeft, timeStart);
+               final PointLatLonTime lowerRightWithTime =
+                     new PointLatLonTime(lowerRight, timeEnd);
+
+               lowerBorderComponents = 
+                  PointLatLonTime.toComponentString(upperLeftWithTime);
+               upperBorderComponents = 
+                  PointLatLonTime.toComponentString(lowerRightWithTime);
+               
+               filter = new GeoSpatialInCircleFilter(
+                  centerPoint, distance, timeStart, timeEnd, litExt);
             }
             break;
+            
          case IN_RECTANGLE:
             {
                final PointLatLon upperLeft = query.getSpatialRectangleUpperLeft();
                final PointLatLon lowerRight = query.getSpatialRectangleLowerRight();
 
-               // TODO: implement
+               // construct the points with time
+               final PointLatLonTime upperLeftWithTime =
+                  new PointLatLonTime(upperLeft, timeStart);
+               final PointLatLonTime lowerRightWithTime =
+                     new PointLatLonTime(lowerRight, timeEnd);
+
+               lowerBorderComponents = 
+                  PointLatLonTime.toComponentString(upperLeftWithTime);
+               upperBorderComponents = 
+                  PointLatLonTime.toComponentString(lowerRightWithTime);
+               
+               filter = new GeoSpatialInRectangleFilter(
+                  upperLeftWithTime, lowerRightWithTime, litExt);
             }
             break;
+            
          default:
             throw new RuntimeException("Unknown geospatial search function.");
          }
 
-         final BoundingBoxLatLonTime boundingBox = null;
-//         final BoundingBoxLatLonTime boundingBox = new BoundingBoxLatLonTime(
-//               centerPoint, query.getSpatialDistance() /* lat */,
-//               query.getSpatialDistance() /* lon */, query.getTimeDistance() /* time */
-//         );
-
-         // construct the RangeBOp and attach to triple pattern
-         final GeoSpatialLiteralExtension<BigdataValue> litExt = 
-            new GeoSpatialLiteralExtension<BigdataValue>(kb.getLexiconRelation());
-         
-         final Object[] lowerBorderComponents = 
-            PointLatLonTime.toComponentString(boundingBox.getLowerBorder());
-            
-         final Object[] upperBorderComponents = 
-            PointLatLonTime.toComponentString(boundingBox.getUpperBorder());
-         
          // set up range scan
          final Var oVar = Var.var(); // object position variable
          final RangeNode range = new RangeNode(
@@ -529,22 +560,22 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          final RangeBOp rangeBop = 
             ASTRangeOptimizer.toRangeBOp(context, range, globals);
-                  
-//         // set up the element filter
-         IElementFilter<ISPO> filter = 
-            new GeoSpatialInSquareFilter(
-               boundingBox.getLowerBorder(), boundingBox.getUpperBorder(), litExt);
          
          // set up the predicate
          final VarNode s = new VarNode(vars[0].getName());
          final VarNode o = new VarNode(oVar);
+         
+         System.out.println(s.getValue());
+         System.out.println(query.getPredicate());
+         System.out.println(query.getPredicate().getValue());
+         System.out.println(o.getValue());
          IPredicate<ISPO> pred = (IPredicate<ISPO>)
             kb.getPredicate(
                (URI)s.getValue(),                     /* subject */
                (URI)query.getPredicate().getValue(),  /* predicate */
                o.getValue(),                          /* object */ 
                null,                                  /* context */
-               filter,                                  /* filter */
+               filter,                                /* filter */
                rangeBop);                             /* rangeBop */
 
          /**
@@ -1079,6 +1110,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
     */
    public static class GeoSpatialInCircleFilter extends GeoSpatialFilterBase {
        
+      private static final long serialVersionUID = -346928614528045113L;
+      
       final PointLatLon spatialPoint;
       final Double distance;
       
@@ -1102,8 +1135,17 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       }
        
        @Override
-       public boolean isValid(Object e) {
-          return false; // TODO: implement
+       public boolean isValid(Object obj) {
+          
+          final PointLatLonTime p = asPoint(obj);
+
+          final Double dx = Math.abs(p.getXCoord() - spatialPoint.getXCoord());
+          final Double dy = Math.abs(p.getYCoord() - spatialPoint.getYCoord());
+          
+          final Double spatialDist = Math.sqrt(dx*dx + dy*dy);
+          
+          return spatialDist <= distance &&
+             timeMin <= p.getTimestamp() && p.getTimestamp() <= timeMax;
        }
        
     }
@@ -1113,12 +1155,14 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
      * Filter asserting that a given point lies into a specified distance
      * (i.e. circle) plus time frame.
      */
-    public static class GeoSpatialInSquareFilter extends GeoSpatialFilterBase {
+    public static class GeoSpatialInRectangleFilter extends GeoSpatialFilterBase {
 
-       final private PointLatLonTime lowerBorder;
+      private static final long serialVersionUID = -314581671447912352L;
+      
+      final private PointLatLonTime lowerBorder;
        final private PointLatLonTime upperBorder;
        
-       public GeoSpatialInSquareFilter(
+       public GeoSpatialInRectangleFilter(
           final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
           final GeoSpatialLiteralExtension<BigdataValue> litExt) {
        

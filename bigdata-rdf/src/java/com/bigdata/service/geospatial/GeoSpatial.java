@@ -34,32 +34,40 @@ import org.openrdf.model.impl.URIImpl;
  * <p>
  * A vocabulary for geospatial extension querying.
  * <p>
- * Example:
+ * 
+ * Example: find all points in the rectangle spanned from (0.00001, 0.00002)
+ * to (0.00003, 0.00003) with times between 1-3s.
  * 
  * <pre>
-PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
-SELECT ?res WHERE {
-  ?res geo:search "inCircle" .
-  ?res geo:spatialCircleCenter "12.1#12.4" .
-  ?res geo:spatialCircleRadius "0.1" .
-  ?res geo:spatialUnit "km" .
-  ?res geo:timeStart "124888539" .
-  ?res geo:timeEnd "124888534" .
-  ?res geo:timeUnit "s" .
-}
-    }
+   PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+   SELECT ?res WHERE {
+     ?res geo:search "inRectangle" .
+     ?res geo:predicate <http://o> .
+     ?res geo:spatialRectangleUpperLeft "0.00001#0.00002" .
+     ?res geo:spatialRectangleLowerRight "0.00003#0.00003" .
+     ?res geo:timeStart "1" .
+     ?res geo:timeEnd "3" .
+     ?res geo:timeUnit "s" .
+   }
  * </pre>
  * 
  * or
  * 
- * <pre>
-
- * }
- * </pre>
-
+ * Example: find all points in a 0.1 km circle around point (0.00002,0.00002)
+ * with times between 1-3s.
  * 
- * The query returns all points falling into the circle defined by radius 0.01
- * around the specified latitude and longitude for 1248885 +/- 10s.
+ * <pre>
+   PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+   SELECT ?res WHERE {
+     ?res geo:search "inCircle" .
+     ?res geo:predicate <http://o> .
+     ?res geo:spatialCircleCenter "0.00002#0.00002" .
+     ?res geo:spatialCircleRadius "0.1" .
+     ?res geo:timeStart "1" .
+     ?res geo:timeEnd "3" .
+     ?res geo:timeUnit "s" .
+   }
+ * </pre>
  * 
  * @author <a href="mailto:ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
@@ -198,6 +206,7 @@ public interface GeoSpatial {
     */
    final URI DATATYPE = new URIImpl(NAMESPACE + "geoSpatialLiteral");
 
+   // TODO: documentation of vocabulary once finalized
    final URI SEARCH = new URIImpl(NAMESPACE + "search");
    final URI PREDICATE = new URIImpl(NAMESPACE + "predicate");
    final URI SPATIAL_CIRCLE_CENTER = new URIImpl(NAMESPACE + "spatialCircleCenter");
@@ -209,6 +218,4 @@ public interface GeoSpatial {
    final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
    final URI TIME_UNIT = new URIImpl(NAMESPACE + "timeUnit");
    
-
-
 }
