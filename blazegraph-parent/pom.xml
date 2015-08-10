@@ -74,13 +74,8 @@ dependencies.
       <!-- This is a copy of that information. However, there are a   -->
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
-<<<<<<< HEAD
       <bigdata.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.version>
       <bigdata.legacy.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.legacy.version>
-=======
-      <bigdata.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.version>
-      <bigdata.legacy.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.legacy.version>
->>>>>>> master
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
