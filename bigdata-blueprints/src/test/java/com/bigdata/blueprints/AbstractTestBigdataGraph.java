@@ -24,11 +24,13 @@ package com.bigdata.blueprints;
 
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import junit.framework.TestCase2;
 
+import com.bigdata.journal.BufferMode;
+import com.bigdata.journal.Journal;
 import com.bigdata.rdf.axioms.NoAxioms;
-import com.bigdata.rdf.sail.AbstractBigdataSailTestCase;
 import com.bigdata.rdf.sail.BigdataSail;
+import com.bigdata.rdf.sail.BigdataSail.Options;
 import com.bigdata.rdf.vocab.NoVocabulary;
 import com.tinkerpop.blueprints.EdgeTestSuite;
 import com.tinkerpop.blueprints.GraphQueryTestSuite;
@@ -40,21 +42,20 @@ import com.tinkerpop.blueprints.impls.GraphTest;
 
 /**
  */
-public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCase {
-
-    private static final transient Logger log = Logger.getLogger(AbstractTestBigdataGraph.class);
+public abstract class AbstractTestBigdataGraph extends TestCase2 { 
     
     /**
      * 
      */
     public AbstractTestBigdataGraph() {
+    	super();
     }
 
     /**
      * @param name
      */
-    public AbstractTestBigdataGraph(String name) {
-        super(name);
+    public AbstractTestBigdataGraph(final String name) {
+    	super(name);
     }
     
     protected BigdataSail getSail() {
@@ -63,10 +64,37 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
         
     }
     
-    @Override
     public Properties getProperties() {
         
-        Properties props = super.getProperties();
+        Properties props = new Properties();
+        
+        props.setProperty(Journal.Options.COLLECT_PLATFORM_STATISTICS,
+                "false");
+
+        props.setProperty(Journal.Options.COLLECT_QUEUE_STATISTICS,
+                "false");
+
+        props.setProperty(Journal.Options.HTTPD_PORT, "-1"/* none */);
+        
+        // transient means that there is nothing to delete after the test.
+//        props.setProperty(Options.BUFFER_MODE,BufferMode.Transient.toString());
+        props.setProperty(Options.BUFFER_MODE,BufferMode.Disk.toString());
+
+        /*
+         * If an explicit filename is not specified...
+         */
+        if(props.get(Options.FILE)==null) {
+
+            /*
+             * Use a temporary file for the test. Such files are always deleted when
+             * the journal is closed or the VM exits.
+             */
+
+            props.setProperty(Options.CREATE_TEMP_FILE,"true");
+        
+            props.setProperty(Options.DELETE_ON_EXIT,"true");
+            
+        }
 
         //no inference
         props.setProperty(BigdataSail.Options.AXIOMS_CLASS, NoAxioms.class.getName());
@@ -87,14 +115,12 @@ public abstract class AbstractTestBigdataGraph extends AbstractBigdataSailTestCa
         
     }
     
-    @Override
     protected BigdataSail getSail(final Properties properties) {
         
         return new BigdataSail(properties);
         
     }
 
-    @Override
     protected BigdataSail reopenSail(final BigdataSail sail) {
 
         final Properties properties = sail.getDatabase().getProperties();
