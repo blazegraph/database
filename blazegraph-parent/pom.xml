@@ -52,11 +52,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-<<<<<<< HEAD
-   <version>1.5.3-SNAPSHOT</version>
-=======
-   <version>1.5.3-SNAPSHOT</version>
->>>>>>> master
+   <version>1.5.3-GeoSpatial-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -79,11 +75,11 @@ dependencies.
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
 <<<<<<< HEAD
-      <bigdata.version>1.5.3-SNAPSHOT</bigdata.version>
-      <bigdata.legacy.version>1.5.3-SNAPSHOT</bigdata.legacy.version>
+      <bigdata.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.version>
+      <bigdata.legacy.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.legacy.version>
 =======
-      <bigdata.version>1.5.3-SNAPSHOT</bigdata.version>
-      <bigdata.legacy.version>1.5.3-SNAPSHOT</bigdata.legacy.version>
+      <bigdata.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.version>
+      <bigdata.legacy.version>1.5.3-GeoSpatial-SNAPSHOT</bigdata.legacy.version>
 >>>>>>> master
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>

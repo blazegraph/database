@@ -5,11 +5,7 @@
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-<<<<<<< HEAD
-    <version>1.5.3-SNAPSHOT-BLZG_1269_client-BLZG-1370</version>
-=======
-    <version>1.5.3-SNAPSHOT-BLZG_1269_client-BLZG-1370</version>
->>>>>>> master
+    <version>1.5.3-GeoSpatial-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
