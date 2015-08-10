@@ -14,7 +14,7 @@ echo "${CURRENT_SNAPSHOT} -> ${RESET_SNAPSHOT}"
 
 for file in `find . -name "pom.xml" -maxdepth 2 -print`; do
 
-	cat $file | sed "s/\<version\>.*SNAPSHOT/\<version\>${RESET_SNAPSHOT}-SNAPSHOT/" > /tmp/$$
+	cat $file | sed "s/version\>.*SNAPSHOT/\version\>${RESET_SNAPSHOT}-SNAPSHOT/" > /tmp/$$
 	cat /tmp/$$ > $file
 	rm -f /tmp/$$
 
