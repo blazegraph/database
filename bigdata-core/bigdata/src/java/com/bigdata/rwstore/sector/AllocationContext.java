@@ -67,7 +67,7 @@ import com.bigdata.rwstore.PSOutputStream;
  * 
  * @author Martyn Cutcher
  */
-public class AllocationContext implements IMemoryManager {//, IStore {
+public class AllocationContext implements IAllocationContext, IMemoryManager {//, IStore {
 	
 	private static final transient Logger log = Logger
 			.getLogger(AllocationContext.class);
@@ -100,10 +100,21 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 	private final AtomicLong m_userBytes = new AtomicLong();
 	private final AtomicLong m_slotBytes = new AtomicLong();
 
-	public AllocationContext(final MemoryManager root) {
+	boolean m_active = true;
+	final boolean m_isolated;
+	
+	final public void checkActive() {
+		if (!m_active) {
+			throw new IllegalStateException();
+		}
+	}
+	
+	public AllocationContext(final MemoryManager root, boolean isolated) {
 		
 		if(root == null)
 			throw new IllegalArgumentException();
+		
+		m_isolated = isolated;
 		
 		m_root = root;
 
@@ -124,6 +135,12 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		
 		lock = m_root.m_allocationLock;
 		
+		m_isolated = parent.m_isolated;
+		
+	}
+	
+	public boolean isIsolated() {
+		return m_isolated;
 	}
 
 	public long allocate(final ByteBuffer data) {
@@ -415,10 +432,10 @@ public class AllocationContext implements IMemoryManager {//, IStore {
 		throw new UnsupportedOperationException();
 	}
 
-	@Override
-	public void registerContext(final IAllocationContext context) {
-		throw new UnsupportedOperationException();
-	}
+//	@Override
+//	public void registerContext(final IAllocationContext context) {
+//		throw new UnsupportedOperationException();
+//	}
 
 //	@Override
 //	public void setRetention(final long parseLong) {
@@ -454,6 +471,18 @@ public class AllocationContext implements IMemoryManager {//, IStore {
     public void delete(long addr, IAllocationContext context) {
         free(addr,context);
     }
+
+	@Override
+	public IAllocationContext newAllocationContext(final boolean isolated) {
+		return this;
+	}
+
+	@Override
+	public void release() {
+		checkActive();
+		
+		m_active = false;
+	}
 
 //	private SectorAllocation m_head = null;
 //	

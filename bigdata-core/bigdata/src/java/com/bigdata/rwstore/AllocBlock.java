@@ -80,6 +80,10 @@ public class AllocBlock {
 	 */
 	int m_saveCommit[];
 	/**
+	 * For a shadow, the isolated frees need to be tracked to facillitate reset.
+	 */
+	int m_isoFrees[];
+	/**
 	 * Just the newly allocated bits. This will be copied onto {@link #m_commit}
 	 * when the current native transaction commits.
 	 */
@@ -171,6 +175,12 @@ public class AllocBlock {
 		 * is setup by the caller
 		 */
 		RWStore.clrBit(m_live, bit);
+		
+		// If cleared from m_saveCommit then MUST be unisolated, otherwise it would be
+		//	deferred.
+		if (m_isoFrees != null && RWStore.tstBit(m_saveCommit, bit)) {
+			RWStore.setBit(m_isoFrees, bit);
+		}
 		
 		if (log.isTraceEnabled()) {
 			log.trace("Freeing " + bitPhysicalAddress(bit) + " sessionProtect: " + sessionProtect);
@@ -287,7 +297,17 @@ public class AllocBlock {
 	 * that was allocated prior to the shadow creation.
 	 */
 	public void shadow() {
+		// Debug check if commit is different from live
+		for (int i = 0; i < m_commit.length; i++) {
+			if (m_commit[i] != m_live[i]) {
+				System.out.println("live != commit : " + i);
+			}
+		}
 		m_saveCommit = m_commit;
+		m_isoFrees = new int[m_ints]; // ensures we can calculate true differences for reset
+		for (int i = 0; i < m_ints; i++) {
+			m_isoFrees[i] = m_commit[i] & ~m_live[i]; // committed && NOT live
+		}
 		m_commit = m_transients.clone();
 	}
 
@@ -338,6 +358,7 @@ public class AllocBlock {
 		}
 		m_commit = m_saveCommit;
 		m_saveCommit = null;
+		m_isoFrees = null;
 	}
 	
 	private int clearCacheBits(final RWWriteCacheService cache, final int startBit, final int chkbits) {
@@ -420,12 +441,27 @@ public class AllocBlock {
 				 * Must then clear any buffered writes from the cache
 				 * ...and clear unisolated allocations from m_live and m_transients
 				 */
-				final int chkbits = m_commit[i] & ~m_saveCommit[i];
+				final int chkbits = m_commit[i] & ~m_saveCommit[i]; // new allocations prior to shadow
 				clearCacheBits(cache, startBit, chkbits);
 				
-				m_live[i] &= ~chkbits;
-				m_transients[i] &= ~chkbits;
+				// m_live[i] &= ~chkbits;
+				// m_transients[i] &= ~chkbits;
+
+				// Handle free bits
+				// SC: 0110, SL: 0101 - freed one and allocated one
+				// L:  1101
+				//
+				// Rollback to 1110
+				// SC ^ SL: 0011
+				// 1101 ^ 0011: 1110
+				m_live[i] |= m_isoFrees[i];
+				m_transients[i] = m_commit[i] | m_live[i];
 			}
+			}
+		
+		// Is it possible to restore the m_saveLive bits given, m_saveCommit and m_commit
+		if (m_saveCommit != null) {
+			m_isoFrees = new int[m_ints];
 		}
 	}
 	

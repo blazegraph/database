@@ -2443,9 +2443,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
      */
-    class IsolatedActionJournal implements IJournal, IAllocationContext {
+    class IsolatedActionJournal implements IJournal {
         
         private final AbstractJournal delegate;
+        
+        private final IAllocationContext context;
 
         @SuppressWarnings("rawtypes")
         private final IResourceLocator resourceLocator;
@@ -2531,9 +2533,13 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
                 //  bracket, since the tx count is decremented AFTER the
                 //  context is released
                 m_rawTx = ((IRWStrategy) bufferStrategy).newTx();
-                ((IRWStrategy) bufferStrategy).registerContext(this);
+                context = ((IRWStrategy) bufferStrategy).newAllocationContext(true /*isolated*/);
+                if (context == null) {
+                	throw new AssertionError("Null context returned by " + bufferStrategy.getClass().getName());
+                }
             } else {
                 m_rawTx = null;
+                context = null;
             }
         }
 
@@ -3068,7 +3074,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         @Override
         public long write(final ByteBuffer data) {
-            return delegate.write(data, this);
+            return delegate.write(data, context);
         }
 
 //        @Override
@@ -3079,7 +3085,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         @Override
         public IPSOutputStream getOutputStream() {
-            return delegate.getOutputStream(this);
+            return delegate.getOutputStream(context);
         }
 
         @Override
@@ -3089,7 +3095,7 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 
         @Override
         public void delete(final long addr) {
-            delegate.delete(addr, this);
+            delegate.delete(addr, context);
         }
 
 //      public void delete(long addr, IAllocationContext context) {
@@ -3105,11 +3111,11 @@ public abstract class AbstractTask<T> implements Callable<T>, ITask<T> {
 //      }
 
         public void detachContext() {
-            delegate.detachContext(this);
+            delegate.detachContext(context);
         }
 
         public void abortContext() {
-            delegate.abortContext(this);
+            delegate.abortContext(context);
             
             completeTask();
         }

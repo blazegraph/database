@@ -163,7 +163,7 @@ public class TestMemoryManager extends TestCase2 {
 	 * externally created context.
 	 */
 	public void testNestedAllocationContexts() {
-		final IAllocationContext context = new IAllocationContext() {};
+		final IAllocationContext context = manager.newAllocationContext(true);
 		
 		final String test = "Hello World";
 		
@@ -186,8 +186,9 @@ public class TestMemoryManager extends TestCase2 {
 				
 		manager.detachContext(context);
 		
-		// now check recycling
-		final long addr4 = allocate(manager, context, test);
+		// now check recycling with new context
+		final IAllocationContext context2 = manager.newAllocationContext(true);
+		final long addr4 = allocate(manager, context2, test);
 		
 		// confirm that addr1 is now available for use
 		assertTrue(addr1 == addr4);
