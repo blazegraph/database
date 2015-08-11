@@ -553,11 +553,13 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final VarNode s = new VarNode(vars[0].getName());
          final VarNode o = new VarNode(oVar);
 
+         
+         // TODO: take SPORelation and call SPORelation.getPredicate() and remove pred==null check
          IPredicate<ISPO> pred = (IPredicate<ISPO>) kb.getPredicate(
                (URI) s.getValue(), /* subject */
                (URI) query.getPredicate().getValue(), /* predicate */
                o.getValue(), /* object */
-               null, /* context */
+               null, /* context */ // TODO: fix to make work for quads
                filter, /* filter */
                rangeBop); /* rangeBop */
 
@@ -579,6 +581,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final AccessPath<ISPO> accessPath = (AccessPath<ISPO>) context
                .getAccessPath(relation, pred);
 
+         // TODO: use accessPath.solutions(...), which is an iterator already
          return new ISPOIteratorWrapper(accessPath.iterator(), Var.var(vars[0]
                .getName()));
       }
