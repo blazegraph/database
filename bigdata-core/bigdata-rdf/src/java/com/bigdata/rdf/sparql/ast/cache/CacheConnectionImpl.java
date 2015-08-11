@@ -491,6 +491,11 @@ public class CacheConnectionImpl implements ICacheConnection {
         public boolean isGroupCommit() {
            return getLocalIndexManager().isGroupCommit();
         }
+
+		@Override
+		public boolean isHAJournal() {
+			return false;
+		}
         
     } // class CacheJournal
 

@@ -68,10 +68,10 @@ import com.bigdata.journal.RWStrategy;
 import com.bigdata.journal.TestJournalAbort;
 import com.bigdata.journal.TestJournalBasics;
 import com.bigdata.journal.VerifyCommitRecordIndex;
+import com.bigdata.util.Bytes;
 import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IRawStore;
 import com.bigdata.service.AbstractTransactionService;
-import com.bigdata.util.Bytes;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.PseudoRandom;
 
@@ -192,6 +192,22 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		return properties;
 
 	}
+	
+    private int fibslug(int n) {
+    	if (n < 2) 
+    		return 1;
+    	else
+    		return fibslug(n-1) + fibslug(n-2);
+    }
+    public void testFibSlug() {
+    	final long t1 = System.currentTimeMillis();
+    	fibslug(37);
+    	final long t2 = System.currentTimeMillis();
+    	fibslug(40);
+    	final long t3 = System.currentTimeMillis();
+    	
+    	log.info("fib 37: " + (t2-t1) + "ms, fib 40: " + (t3-t2) + "ms");
+    }
 	
 	/**
 	 * The RWStore relies on several bit manipulation methods to manage both FixedAllocators
@@ -1239,9 +1255,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt1 = new IAllocationContext() {};
+				IAllocationContext cntxt1 = rw.newAllocationContext(true);
 				
-				IAllocationContext cntxt2 = new IAllocationContext() {};
+				IAllocationContext cntxt2 = rw.newAllocationContext(true);
 				
 				// allocate a global address
 				int gaddr = rw.alloc(412, null);
@@ -1283,7 +1299,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt = new IAllocationContext() {};
+				IAllocationContext cntxt = rw.newAllocationContext(true);
 				
 				// allocate a global address
 				final int allocs = 100000;
@@ -1310,6 +1326,259 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				}
 				
 				store.commit();
+				
+			} finally {
+				store.destroy();
+			}
+		}
+		
+		/**
+		 * This tests whether AllocationContexts efficiently recycle transient
+		 * allocations with an Unisolated AllocationContext.
+		 * 
+		 * To do this it will allocate and free 1 million 50 byte regions, in batches
+		 * of 10K.
+		 */
+		public void testStressUnisolatedAllocationContextRecycling() {
+			
+			final Journal store = (Journal) getStore(1);
+
+			try {
+
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				
+				IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/);
+				
+				// allocate a global address
+				final int allocs = 100000;
+				final Random ran = new Random();
+				
+				for (int r = 0; r < 20; r++) {
+					ArrayList<Integer> addrs = new ArrayList<Integer>();
+					for (int a = 0; a < allocs; a++) {
+						addrs.add(rw.alloc(50, cntxt));
+					}
+					final PseudoRandom ps = new PseudoRandom(allocs, ran.nextInt(allocs));
+					for (int a : addrs) {
+						rw.free(addrs.get(ps.next()), 50, cntxt);
+					}
+				}
+				
+				assertTrue(rw.getFixedAllocatorCount() < 20);
+				
+				if (log.isInfoEnabled()) {
+					final StringBuilder str = new StringBuilder();
+					rw.showAllocators(str);
+					
+					log.info(str);
+				}
+				
+				store.commit();
+				
+			} finally {
+				store.destroy();
+			}
+		}
+		
+		int getIndex(int rwaddr) {
+			return (-rwaddr) >>> 13;
+		}
+		
+		/**
+		 * Need to test the handling of aborted Unisolated connections and specifically the
+		 * logic behind freed addresses.
+		 * <p>
+		 * The process is to: 
+		 *	Allocate a range of data (to establish a number of Allocators)
+		 *  Create an Isolated context and allocate a handful more
+		 *  Create an Unisolated context
+		 *  Free some committed addreses
+		 *  Abort the Unisolated context - calling abort on the Journal
+		 *  Commit the Isolated context
+		 *  Observe if any of the previously committed data is freed!
+		 */
+		public void testUnisolatedAllocationContextRecycling() {
+			
+			final Journal store = (Journal) getStore(0);
+
+			try {
+
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				
+				IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/); // Unisolated context
+				
+				// allocate a global address
+				final int allocs = 1000;
+				final PseudoRandom ran = new PseudoRandom(20000);
+				ArrayList<Integer> addrs = new ArrayList<Integer>();
+				ArrayList<Integer> sizes = new ArrayList<Integer>();
+				
+				for (int a = 0; a < allocs; a++) {
+					final int sze = 32 + ran.nextInt(1200);
+					addrs.add(rw.alloc(sze, cntxt));
+					sizes.add(sze);
+				}
+				
+				// Commit the addresses
+				store.commit();
+				
+				// Now create some allocation contexts
+				IAllocationContext iso_cntxt = rw.newAllocationContext(true /*Isolated*/); // Isolated context
+				for (int a = 0; a < 3; a++) {
+					rw.alloc(32 + ran.nextInt(1200), iso_cntxt); // don't need to remember these
+				}
+				
+				if (log.isInfoEnabled()) {
+					final StringBuilder str = new StringBuilder();
+					rw.showAllocators(str);
+					
+					log.info(str);
+				}
+				
+				// Now free a few of committed addresses from the unisolated connection
+				for (int a = 0; a < 36; a++) {
+					rw.free(addrs.get(a), sizes.get(a), cntxt);
+				}
+				
+				// now call abort on the unisolated connection
+				store.abort();
+				
+				// Freed addresses current?
+				
+				for (int a = 0; a < 36; a++) {
+					final int rwaddr = addrs.get(a);
+					
+					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr));
+				}
+				
+				// Intermediate commit?
+				// store.commit();
+				log.info("INTERMEDIATE COMMIT");
+				
+				
+				for (int a = 0; a < 36; a++) {
+					final int rwaddr = addrs.get(a);
+					
+					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+				}
+				
+				log.info("DETACH CONTEXT");
+				
+				// This is the point that the AllocationContext ends up setting the free bits, iff we have committed after the abort.				
+				rw.detachContext(iso_cntxt);
+				
+				for (int a = 0; a < 36; a++) {
+					final int rwaddr = addrs.get(a);
+					
+					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+				}
+				
+				// ...and now those free bits are committed!				
+				store.commit();
+				
+				log.info("COMMIT");
+				
+				for (int a = 0; a < 36; a++) {
+					final int rwaddr = addrs.get(a);
+					
+					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+				}
+				
+				// ...and now those free bits are committed!				
+				store.commit();
+				
+				log.info("SECONDARY");
+				
+				for (int a = 0; a < 36; a++) {
+					final int rwaddr = addrs.get(a);
+					
+					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+				}
+				
+			} finally {
+				store.destroy();
+			}
+		}
+		
+		void showAddress(final RWStore rw, final int rwaddr) {
+			log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+		}
+		
+		public void testSimpleUnisolatedAllocationContextRecycling() {
+			
+			final Journal store = (Journal) getStore(0);
+
+			try {
+
+				final RWStrategy bufferStrategy = (RWStrategy) store.getBufferStrategy();
+
+				final RWStore rw = bufferStrategy.getStore();
+				
+				IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/); // Unisolated context
+				
+				// allocate three global addresses of different sizes
+				final int sze1 = 48; // 64 bytes allocator
+				final int sze2 = 72; // 128	
+				final int sze3 = 135; // 256
+				
+				final int addr1 = rw.alloc(sze1, cntxt);
+				final int addr2 = rw.alloc(sze2, cntxt);
+				final int addr3 = rw.alloc(sze3, cntxt);
+				
+				// Commit the addresses
+				store.commit();
+				
+				showAddress(rw, addr1);
+				showAddress(rw, addr2);
+				showAddress(rw, addr3);
+				
+				// Now create some allocation contexts
+				IAllocationContext iso_cntxt = rw.newAllocationContext(true /*Isolated*/); // Isolated context
+				
+				// now allocate a new unisolated address
+				rw.alloc(sze1, cntxt);
+				// free the originall
+				rw.free(addr1,  sze1, cntxt);
+				// and ensure that allocator is 'owned' by an iso
+				rw.alloc(sze1, iso_cntxt);
+				
+				// now grab a pristine allocator
+				rw.alloc(sze2,  iso_cntxt);
+				// and free the original address (with the unisolated context)
+				rw.free(addr2, sze2, cntxt);				
+				
+				if (log.isInfoEnabled()) {
+					final StringBuilder str = new StringBuilder();
+					rw.showAllocators(str);
+					
+					log.info(str);
+				}	
+				
+				store.abort();
+				
+				log.info("ABORT");
+				showAddress(rw, addr1);
+				showAddress(rw, addr2);
+				showAddress(rw, addr3);
+				
+				// This is the point that the AllocationContext ends up setting the free bits, iff we have committed after the abort.				
+				rw.detachContext(iso_cntxt);
+				
+				log.info("DETACH");
+				showAddress(rw, addr1);
+				showAddress(rw, addr2);
+				showAddress(rw, addr3);
+				
+				store.commit();
+				
+				log.info("COMMIT");
+				showAddress(rw, addr1);
+				showAddress(rw, addr2);
+				showAddress(rw, addr3);
 				
 			} finally {
 				store.destroy();
@@ -1736,7 +2005,27 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			}
 		}
 
-		static class DummyAllocationContext implements IAllocationContext {
+		public void test_multiVoidCommit() {
+
+			Journal store = (Journal) getStore();
+            try {
+
+			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+
+			final RWStore rw = bs.getStore();
+			
+			final boolean initRequire = bs.requiresCommit(store.getRootBlockView());
+			assertTrue(initRequire);
+			for (int n = 0; n < 20; n++) {
+				store.commit();
+				final IRootBlockView rbv = store.getRootBlockView();
+				assertTrue(1 == rbv.getCommitCounter());
+				assertFalse(bs.requiresCommit(store.getRootBlockView()));
+				assertFalse(rw.requiresCommit());
+			}
+			} finally {
+				store.destroy();
+			}
 		}
 
 		/**
@@ -1763,8 +2052,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				// JournalShadow shadow = new JournalShadow(store);
 
 				// Create a couple of contexts
-				final IAllocationContext allocContext1 = new DummyAllocationContext();
-				final IAllocationContext allocContext2 = new DummyAllocationContext();
+				final IAllocationContext allocContext1 = rw.newAllocationContext(true);
+				final IAllocationContext allocContext2 = rw.newAllocationContext(true);
 
 				final int sze = 650;
 				final byte[] buf = new byte[sze + 4]; // extra for checksum
@@ -1778,20 +2067,28 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				long addr2b = bs.write(ByteBuffer.wrap(buf), allocContext2);
 				rw.detachContext(allocContext2);
 
-				// Re-establish context
-				long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				// Attempt to re-establish context
+				try {
+					bs.write(ByteBuffer.wrap(buf), allocContext1);
+					fail("Should have failed to re-use detached context");
+				} catch (IllegalStateException ise) {
+					// Expected
+				}
+				
+				final IAllocationContext allocContext3 = rw.newAllocationContext(true);
+				long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext3);
 
 				// By detaching contexts we end up using the same allocator
 				assertTrue("allocator re-use", bs.getPhysicalAddress(addr1c) > bs.getPhysicalAddress(addr2b));
 
 				// Now, prior to commit, try deleting an uncommitted allocation
-				bs.delete(addr1c, allocContext1);
+				bs.delete(addr1c, allocContext3);
 				// and re-allocating it from the same context
-				long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext3);
 
 				assertTrue("re-allocation", addr1c == addr1d);
 
-				rw.detachContext(allocContext1);
+				rw.detachContext(allocContext3);
 
 				// Now commit
 				store.commit();
@@ -1799,7 +2096,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				// now try deleting and re-allocating again, but in a global
 				// context
 				bs.delete(addr1d); // this should call deferFree
-				long addr1e = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				long addr1e = bs.write(ByteBuffer.wrap(buf));
 
 				assertTrue("deferred-delete", addr1e != addr1d);
 
@@ -2739,7 +3036,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	                filter.add(randomBytes(12));
 	                final long addrb = filter.write(store);
 	                
-	                System.out.println("Bloomfilter: " + ((int) addrb));
+	                log.info("Bloomfilter: " + ((int) addrb));
             	}
             	
                	final long addr = bs.write(randomData(4088)); // BLOB 2 * 2044
@@ -3059,7 +3356,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			Journal store = (Journal) getStore();
 	        try {
 	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-	        	final IAllocationContext isolated = new IAllocationContext() {};
+	        	final IAllocationContext isolated = bs.newAllocationContext(true);
 	        	
 	        	final long addr = bs.write(randomData(78));
 	        	final long addr2 = bs.write(randomData(78));
@@ -3121,7 +3418,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			Journal store = (Journal) getStore();
 	        try {
 	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
-	        	final IAllocationContext isolated = new IAllocationContext() {};
+	        	final IAllocationContext isolated = bs.newAllocationContext(true);
 	        	
 	        	final long addr = bs.write(randomData(78));
 	        	final long addr2 = bs.write(randomData(78));
