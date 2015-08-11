@@ -293,6 +293,12 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * query controller.
      */
     final private RunState runState;
+    /** 
+     * Set true iff a query is cancelled.
+     * 
+     * @see BLZG-1418 (query timeout does not clean up completely).
+     */
+    private volatile boolean cancelled = false;
 
     /**
      * Flag used to prevent retriggering of query tear down activities in
@@ -782,6 +788,9 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
             if(log.isTraceEnabled())
                 log.trace(msg.toString());
+
+			if (cancelled) // BLZG-1418
+				throw new RuntimeException("Query has been cancelled");
             
             runState.startOp(msg);
 
@@ -1340,6 +1349,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         lock.lock();
         try {
             // halt the query.
+            this.cancelled = true;
             boolean cancelled = future.cancel(mayInterruptIfRunning);
             if (didQueryTearDown
                     .compareAndSet(false/* expect */, true/* update */)) {
