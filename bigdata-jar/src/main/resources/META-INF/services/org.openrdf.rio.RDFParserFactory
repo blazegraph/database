@@ -1,6 +1,7 @@
 com.bigdata.rdf.rio.ntriples.BigdataNTriplesParserFactory
 com.bigdata.rdf.rio.turtle.BigdataTurtleParserFactory
-com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactoryorg.openrdf.rio.binary.BinaryRDFParserFactory
+com.bigdata.rdf.rio.json.BigdataSPARQLResultsJSONParserForConstructFactory
+org.openrdf.rio.binary.BinaryRDFParserFactory
 org.openrdf.rio.n3.N3ParserFactory
 org.openrdf.rio.nquads.NQuadsParserFactory
 org.openrdf.rio.ntriples.NTriplesParserFactory
