@@ -29,11 +29,10 @@ package com.bigdata.service.geospatial;
 import java.io.Serializable;
 
 import com.bigdata.bop.IBindingSet;
+import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
-import com.bigdata.service.geospatial.GeoSpatial.SpatialUnit;
-import com.bigdata.service.geospatial.GeoSpatial.TimeUnit;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 
 /**
@@ -69,10 +68,9 @@ public interface IGeoSpatialQuery {
       final Double spatialCircleRadius;
       final PointLatLon spatialRectangleUpperLeft;
       final PointLatLon spatialRectangleLowerRight;
-      final SpatialUnit spatialUnit;
+      final UNITS spatialUnit;
       final Long timeStart;
       final Long timeEnd;
-      final TimeUnit timeUnit;
       final IBindingSet incomingBindings;
 
 
@@ -84,9 +82,8 @@ public interface IGeoSpatialQuery {
             final Double spatialCircleRadius,
             PointLatLon spatialRectangleUpperLeft,
             PointLatLon spatialRectangleLowerRight,
-            final SpatialUnit spatialUnit, final Long timeStart,
-            final Long timeEnd, final TimeUnit timeUnit,
-            final IBindingSet incomingBindings) {
+            final UNITS spatialUnit, final Long timeStart,
+            final Long timeEnd, final IBindingSet incomingBindings) {
 
          this.searchFunction = searchFunction;
          this.predicate = predicate;
@@ -97,7 +94,6 @@ public interface IGeoSpatialQuery {
          this.spatialUnit = spatialUnit;
          this.timeStart = timeStart;
          this.timeEnd = timeEnd;
-         this.timeUnit = timeUnit;
          this.incomingBindings = incomingBindings;
 
       }
@@ -126,7 +122,7 @@ public interface IGeoSpatialQuery {
          return spatialRectangleLowerRight;
       }
 
-      public SpatialUnit getSpatialUnit() {
+      public UNITS getSpatialUnit() {
          return spatialUnit;
       }
 
@@ -137,15 +133,12 @@ public interface IGeoSpatialQuery {
       public Long getTimeEnd() {
          return timeEnd;
       }
-
-      public TimeUnit getTimeUnit() {
-         return timeUnit;
-      }
       
       public IBindingSet getIncomingBindings() {
          return incomingBindings;
       }
       
+      // TODO: remove if unneeded
       /*
        * (non-Javadoc)
        * 
@@ -184,12 +177,10 @@ public interface IGeoSpatialQuery {
          result = prime * result + 
                ((timeEnd == null) ? 0 : timeEnd.hashCode());
 
-         result = prime * result + 
-               ((timeUnit == null) ? 0 : timeUnit.hashCode());
-
          return result;
       }
 
+      // TODO: remove if unneeded
       /*
        * (non-Javadoc)
        * 
@@ -248,11 +239,6 @@ public interface IGeoSpatialQuery {
          if ((timeEnd == null && other.timeEnd != null)
                || (timeEnd != null && other.timeEnd == null)
                || !timeEnd.equals(other.timeEnd))
-            return false;
-
-         if ((timeUnit == null && other.timeUnit != null)
-               || (timeUnit != null && other.timeUnit == null)
-               || !timeUnit.equals(other.timeUnit))
             return false;
 
          return true;

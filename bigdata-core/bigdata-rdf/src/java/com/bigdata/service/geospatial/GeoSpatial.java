@@ -29,6 +29,8 @@ package com.bigdata.service.geospatial;
 import org.openrdf.model.URI;
 import org.openrdf.model.impl.URIImpl;
 
+import com.bigdata.rdf.internal.gis.ICoordinate.UNITS;
+
 
 /**
  * <p>
@@ -47,7 +49,6 @@ import org.openrdf.model.impl.URIImpl;
      ?res geo:spatialRectangleLowerRight "0.00003#0.00003" .
      ?res geo:timeStart "1" .
      ?res geo:timeEnd "3" .
-     ?res geo:timeUnit "s" .
    }
  * </pre>
  * 
@@ -65,7 +66,6 @@ import org.openrdf.model.impl.URIImpl;
      ?res geo:spatialCircleRadius "0.1" .
      ?res geo:timeStart "1" .
      ?res geo:timeEnd "3" .
-     ?res geo:timeUnit "s" .
    }
  * </pre>
  * 
@@ -73,70 +73,7 @@ import org.openrdf.model.impl.URIImpl;
  * @version $Id$
  */
 public interface GeoSpatial {
-   
-   /**
-    * A spatial unit.
-    */
-   public static enum SpatialUnit {
-      
-      FOOT("ft"),
-      METER("m"),
-      KILOMETER("km"),
-      MILE("mi");
-      
-      SpatialUnit(String name) {
-         this.name = name;
-      }
-      
-      public static SpatialUnit forName(String name) {
-         for (SpatialUnit e : SpatialUnit.values()) {
-             if (e.toString().equalsIgnoreCase(name)) {
-                 return e;
-             }
-         }
 
-         return null;
-     }
-      
-      @Override
-      public String toString() {
-         return name;
-      }
-      
-      private String name;
-   }
-
-   /**
-    * A time unit.
-    */
-   public static enum TimeUnit {
-      SECOND("s"),
-      MINUTE("m"),
-      HOUR("h"),
-      DAY("d");
-      
-      TimeUnit(String name) {
-         this.name = name;
-      }
-      
-      public static TimeUnit forName(String name) {
-         for (TimeUnit e : TimeUnit.values()) {
-             if (e.toString().equalsIgnoreCase(name)) {
-                 return e;
-             }
-         }
-
-         return null;
-     }
-      
-      @Override
-      public String toString() {
-         return name;
-      }
-      
-      private String name;
-   }
-   
    /**
     * Enum for implemented geo functions.
     */
@@ -181,17 +118,10 @@ public interface GeoSpatial {
        * Option that may be set to specify a default for {@link GeoSpatial#SPATIAL_DISTANCE_UNIT},
        * to be used in geo service. Defaults to meters.
        */
-      String GEO_SPATIAL_DISTANCE_UNIT = GeoSpatial.class.getName() + ".defaultSpatialDistanceUnit";
+      String GEO_SPATIAL_UNIT = GeoSpatial.class.getName() + ".defaultSpatialUnit";
       
-      SpatialUnit DEFAULT_GEO_SPATIAL_DISTANCE_UNIT = SpatialUnit.METER;
+      UNITS DEFAULT_GEO_SPATIAL_UNIT = UNITS.Kilometers;
 
-      /**
-       * Option that may be set to specify a default for {@link GeoSpatial#TIME_DISTANCE_UNIT},
-       * to be used in geo service. Defaults to minutes.
-       */
-      String GEO_TIME_DISTANCE_UNIT = GeoSpatial.class.getName() + ".defaulTimeDistanceUnit";
-      
-      TimeUnit DEFAULT_GEO_TIME_DISTANCE_UNIT = TimeUnit.SECOND;
 
    }
    
@@ -216,6 +146,5 @@ public interface GeoSpatial {
    final URI SPATIAL_UNIT = new URIImpl(NAMESPACE + "spatialUnit");
    final URI TIME_START = new URIImpl(NAMESPACE + "timeStart");
    final URI TIME_END = new URIImpl(NAMESPACE + "timeEnd");
-   final URI TIME_UNIT = new URIImpl(NAMESPACE + "timeUnit");
    
 }

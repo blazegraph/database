@@ -133,6 +133,55 @@ public class CoordinateUtility {
         // assert lengthOfArc <= metersPerSecondOfLongitudeAtSeaLevelAtEquator;
         return lengthOfArc;
     }
+    
+    public static CoordinateDD boundingBoxUpperLeft(
+       final CoordinateDD start, double distance, UNITS units) {
+       
+       double distanceAsMeters = unitsToMeters(distance, units);
+
+       // compute numbers of degrees to travel to the top
+       final double deltaNorthSouth = 
+          distanceAsMeters/metersPerDegreeOfLatitudeAtSeaLevel;
+       System.out.println("dNS (lat) = " + deltaNorthSouth);
+       
+       // compute numbers of degrees to travel to the left
+       final Double currentLat = start.northSouth;
+       
+       final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
+       
+       System.out.println("dEW (lon) = " + deltaEastWest);
+
+
+       
+       final CoordinateDD ret = new CoordinateDD(
+             start.northSouth - deltaNorthSouth, start.eastWest - deltaEastWest);
+       
+       System.out.println("BBUL = " + ret.toString());
+       return ret;
+    }
+    
+    public static CoordinateDD boundingBoxLowerRight(
+          final CoordinateDD start, double distance, UNITS units) {
+          
+          double distanceAsMeters = unitsToMeters(distance, units);
+
+          // compute numbers of degrees to travel to the left
+          final double deltaNorthSouth = 
+             distanceAsMeters/metersPerDegreeOfLatitudeAtSeaLevel;
+          
+          // compute numbers of degrees to travel to the top
+
+          final Double currentLat = start.northSouth;
+          final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
+
+          final CoordinateDD ret = new CoordinateDD(
+                start.northSouth + deltaNorthSouth, start.eastWest + deltaEastWest);
+          
+          System.out.println("BBLR = " + ret.toString());
+          return ret;
+
+       }
+    
 
     public static void assertDegreeLatitude(double d) {
         if (d <= -90d || d > 90d)
@@ -314,6 +363,34 @@ public class CoordinateUtility {
             throw new AssertionError("Unknown units: " + units);
         }
     }
+    
+    
+    /**
+     * Convert meters to the desired units.
+     * 
+     * @param meters
+     *            The #of meters.
+     * @param units
+     *            The target units.
+     * 
+     * @return The converted distance.
+     */
+    public static double unitsToMeters(double val, UNITS units) {
+       switch (units) {
+       case Feet:
+           return val / 3.2808399d;
+       case Miles:
+           return val * 1609.344d;
+       case Meters:
+           return val;
+       case Kilometers:
+           return val * 1000d;
+       case NauticalMiles:
+           return val * 1852d;
+       default:
+           throw new AssertionError("Unknown units: " + units);
+       }
+    }
 
     /**
      * Convert Degrees, Minutes, and Seconds to Decimal Degrees.
@@ -330,5 +407,14 @@ public class CoordinateUtility {
     public static double toDecimalDegrees(int degrees, int minutes,
             double seconds) {
         return degrees + minutes / 60d + seconds / 3600d;
+    }
+    
+    public static void main(String [] args)
+    {
+       CoordinateDD center = new CoordinateDD(10, 0);
+       System.out.println(center);
+
+       System.out.println(boundingBoxUpperLeft(center, 2, UNITS.Kilometers));
+       System.out.println(boundingBoxLowerRight(center, 2, UNITS.Kilometers));
     }
 }

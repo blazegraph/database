@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.service.geospatial.impl;
 
+import com.bigdata.rdf.internal.gis.CoordinateDD;
+
 /**
  * GeoSpatial utility functions.
  * 
@@ -42,8 +44,8 @@ public class GeoSpatialUtility {
       
       public static final String POINT_SEPARATOR = "#";
 
-      private final Double xCoord;
-      private final Double yCoord;
+      private final Double lat;
+      private final Double lon;
       
       /**
        * Construction from string.
@@ -54,38 +56,50 @@ public class GeoSpatialUtility {
             throw new NumberFormatException("Point is null or empty.");
          }
          
-         String[] xyCoord = s.split(POINT_SEPARATOR);
-         if (xyCoord.length!=2) {
-            throw new NumberFormatException("Point must have 2 components, but has " + xyCoord.length);
+         String[] coords = s.split(POINT_SEPARATOR);
+         if (coords.length!=2) {
+            throw new NumberFormatException("Point must have 2 components, but has " + coords.length);
          }
          
-         xCoord = Double.valueOf(xyCoord[0]);
-         yCoord = Double.valueOf(xyCoord[1]);
+         lat = Double.valueOf(coords[0]);
+         lon = Double.valueOf(coords[1]);
       }
 
       /**
        * Construction from data.
        */
-      public PointLatLon(final Double xCoord, final Double yCoord) {
-         this.xCoord = xCoord;
-         this.yCoord = yCoord;
+      public PointLatLon(final Double lat, final Double lon) {
+         this.lat = lat;
+         this.lon = lon;
       }
       
-      public Double getXCoord() {
-         return xCoord;
+      public Double getLat() {
+         return lat;
       }
       
 
-      public Double getYCoord() {
-         return yCoord;
+      public Double getLon() {
+         return lon;
       }
+      
+      public CoordinateDD asCoordinateDD() {
+    	  
+    	  return new CoordinateDD(lat, lon);
+    	  
+      }
+      
+      public static PointLatLon fromCoordinateDD(CoordinateDD dd) {
+         
+         return new PointLatLon(dd.northSouth, dd.eastWest);
+      }
+
       
       @Override
       public String toString() {
          final StringBuffer buf = new StringBuffer();
-         buf.append(xCoord);
+         buf.append(lat);
          buf.append("#");
-         buf.append(yCoord);
+         buf.append(lon);
          return buf.toString();
       }
       
@@ -99,8 +113,8 @@ public class GeoSpatialUtility {
       public static Object[] toComponentString(PointLatLon point) {
          
          final Object[] components = {
-               point.getXCoord(),
-               point.getYCoord(),
+               point.getLat(),
+               point.getLon(),
          };
          
          return components;
@@ -164,25 +178,25 @@ public class GeoSpatialUtility {
       }
       
       
-      public Double getXCoord() {
-         return spatialPoint.getXCoord();
+      public Double getLat() {
+         return spatialPoint.getLat();
       }
       
 
-      public Double getYCoord() {
-         return spatialPoint.getYCoord();
+      public Double getLon() {
+         return spatialPoint.getLon();
       }
       
       public Long getTimestamp() {
          return timestamp;
       }
-
+      
       @Override
       public String toString() {
          final StringBuffer buf = new StringBuffer();
-         buf.append(spatialPoint.xCoord);
+         buf.append(spatialPoint.lat);
          buf.append("#");
-         buf.append(spatialPoint.yCoord);
+         buf.append(spatialPoint.lon);
          buf.append("#");
          buf.append(timestamp);
          return buf.toString();
@@ -198,8 +212,8 @@ public class GeoSpatialUtility {
       public static Object[] toComponentString(PointLatLonTime point) {
          
          final Object[] components = {
-               point.getSpatialPoint().getXCoord(),
-               point.getSpatialPoint().getYCoord(),
+               point.getSpatialPoint().getLat(),
+               point.getSpatialPoint().getLon(),
                point.getTimestamp()
          };
          
@@ -237,8 +251,8 @@ public class GeoSpatialUtility {
       public PointLatLonTime getLowerBorder() {
          
          return new PointLatLonTime(
-              centerPoint.getSpatialPoint().getXCoord() - distanceLat, 
-              centerPoint.getSpatialPoint().getYCoord() - distanceLon,
+              centerPoint.getSpatialPoint().getLat() - distanceLat, 
+              centerPoint.getSpatialPoint().getLon() - distanceLon,
               centerPoint.getTimestamp() - distanceTime);
          
       }
@@ -246,8 +260,8 @@ public class GeoSpatialUtility {
       public PointLatLonTime getUpperBorder() {
          
          return new PointLatLonTime(
-            centerPoint.getSpatialPoint().getXCoord() + distanceLat, 
-            centerPoint.getSpatialPoint().getYCoord() + distanceLon,
+            centerPoint.getSpatialPoint().getLat() + distanceLat, 
+            centerPoint.getSpatialPoint().getLon() + distanceLon,
             centerPoint.getTimestamp() + distanceTime);
       }
          

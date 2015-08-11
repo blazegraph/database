@@ -32,7 +32,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.openrdf.model.URI;
-import org.openrdf.model.impl.URIImpl;
 
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.service.fts.FTS;
@@ -62,7 +61,6 @@ public class ASTGeoSpatialSearchOptimizer extends ASTSearchOptimizerBase {
         set.add(GeoSpatial.SPATIAL_UNIT);        
         set.add(GeoSpatial.TIME_START);
         set.add(GeoSpatial.TIME_END);
-        set.add(GeoSpatial.TIME_UNIT);
         
         searchUris = Collections.unmodifiableSet(set);
     }
