@@ -37,10 +37,10 @@ import com.bigdata.bop.NV;
 import com.bigdata.bop.Var;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.BlobIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
+import com.bigdata.test.MockTermIdFactory;
 
 /**
  * Test suite for {@link SPOPredicate}.

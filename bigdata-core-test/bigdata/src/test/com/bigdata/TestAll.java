@@ -125,7 +125,8 @@ public class TestAll extends TestCase {
         //suite.addTest(com.bigdata.jini.TestAll.suite());
 
         // RDF
-        suite.addTest(com.bigdata.rdf.TestAll.suite());
+        //Moved into bigdata-rdf-test
+        //suite.addTest(com.bigdata.rdf.TestAll.suite());
         //Moved into bigdata-sails-test
  //       suite.addTest(com.bigdata.rdf.sail.TestAll.suite());
 

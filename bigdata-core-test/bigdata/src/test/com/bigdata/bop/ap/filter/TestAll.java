@@ -69,8 +69,6 @@ public class TestAll extends TestCase {
         // TODO test distinct operators (native and JVM).
 //        suite.addTestSuite(TestDistinctFilter.class);
 
-        suite.addTestSuite(TestSameVariableConstraint.class);
-        
         // @todo operators and test suites for the remaining striterator patterns.
         
         return suite;

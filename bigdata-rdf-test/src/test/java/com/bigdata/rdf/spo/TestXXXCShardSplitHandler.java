@@ -43,12 +43,12 @@ import com.bigdata.mdi.IResourceMetadata;
 import com.bigdata.mdi.LocalPartitionMetadata;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.IVUtility;
-import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.resources.AbstractTestSegSplitter;
 import com.bigdata.resources.SplitUtility;
 import com.bigdata.service.Split;
+import com.bigdata.test.MockTermIdFactory;
 import com.bigdata.util.BytesUtil;
 
 /**

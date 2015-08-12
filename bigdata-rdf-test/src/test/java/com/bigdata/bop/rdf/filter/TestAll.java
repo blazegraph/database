@@ -65,6 +65,8 @@ public class TestAll extends TestCase {
 
         // Distinct IV filter using HTree.
         suite.addTestSuite(TestNativeDistinctFilter.class);
+        
+        suite.addTestSuite(TestSameVariableConstraint.class);
 
         return suite;
         

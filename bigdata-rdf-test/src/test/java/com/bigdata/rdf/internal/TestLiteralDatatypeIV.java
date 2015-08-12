@@ -12,6 +12,7 @@ import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.internal.impl.literal.PartlyInlineTypedLiteralIV;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
 import com.bigdata.rdf.model.BigdataLiteral;
+import com.bigdata.test.MockTermIdFactory;
 
 /**
  * Test suite for {@link PartlyInlineTypedLiteralIV}.

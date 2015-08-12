@@ -66,10 +66,10 @@ import com.bigdata.rdf.lexicon.IValueCentricTextIndexer;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.BigdataSail.Options;
-import com.bigdata.rdf.sparql.ast.eval.service.TestSearch;
 import com.bigdata.rdf.store.BDS;
 import com.bigdata.search.Hiterator;
 import com.bigdata.search.IHit;
+import com.bigdata.search.TestSearch;
 
 /**
  * Test suite for high-level query against a graph containing statements about

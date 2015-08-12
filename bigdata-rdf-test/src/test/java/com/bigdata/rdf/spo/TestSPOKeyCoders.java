@@ -44,7 +44,7 @@ import com.bigdata.io.AbstractFixedByteArrayBuffer;
 import com.bigdata.io.DataOutputBuffer;
 import com.bigdata.io.FixedByteArrayBuffer;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
+import com.bigdata.test.MockTermIdFactory;
 
 /**
  * Test suite for approaches to key compression for statement indices (keys are

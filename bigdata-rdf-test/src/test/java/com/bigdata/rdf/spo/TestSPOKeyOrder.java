@@ -41,8 +41,8 @@ import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.btree.keys.SuccessorUtil;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
+import com.bigdata.test.MockTermIdFactory;
 import com.bigdata.util.Bytes;
 import com.bigdata.util.BytesUtil;
 

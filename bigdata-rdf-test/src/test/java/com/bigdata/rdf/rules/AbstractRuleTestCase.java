@@ -69,6 +69,8 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
 
     }
     
+
+    
     /**
      * Applies the rule, copies the new entailments into the store and checks
      * the expected #of inferences computed and new statements copied into the
@@ -270,5 +272,4 @@ abstract public class AbstractRuleTestCase extends AbstractInferenceEngineTestCa
         return false;
         
     }
-    
-}
+}    
