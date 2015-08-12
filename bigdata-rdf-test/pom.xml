@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+/?xml version="1.0" encoding="UTF-8"?>
 <!--
 Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
 
@@ -144,14 +144,17 @@ dependencies.
 	<resource>
             <directory>src/test/java</directory>
             <includes>
+		<include>**/*.n3</include>
+                <include>**/*.nt</include>
+                <include>**/*.owl</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
-                <include>**/*.n3</include>
-                <include>**/*.owl</include>
+                <include>**/*.gz</include>
                 <include>**/*.txt</include>
                 <include>**/*.ttl</include>
                 <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
+                <include>**/*.rdf</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
             </includes>
