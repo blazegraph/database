@@ -193,21 +193,21 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 	}
 	
-    private int fibslug(int n) {
-    	if (n < 2) 
-    		return 1;
-    	else
-    		return fibslug(n-1) + fibslug(n-2);
-    }
-    public void testFibSlug() {
-    	final long t1 = System.currentTimeMillis();
-    	fibslug(37);
-    	final long t2 = System.currentTimeMillis();
-    	fibslug(40);
-    	final long t3 = System.currentTimeMillis();
-    	
-    	log.info("fib 37: " + (t2-t1) + "ms, fib 40: " + (t3-t2) + "ms");
-    }
+//    private int fibslug(int n) {
+//    	if (n < 2) 
+//    		return 1;
+//    	else
+//    		return fibslug(n-1) + fibslug(n-2);
+//    }
+//    public void testFibSlug() {
+//    	final long t1 = System.currentTimeMillis();
+//    	fibslug(37);
+//    	final long t2 = System.currentTimeMillis();
+//    	fibslug(40);
+//    	final long t3 = System.currentTimeMillis();
+//    	
+//    	log.info("fib 37: " + (t2-t1) + "ms, fib 40: " + (t3-t2) + "ms");
+//    }
 	
 	/**
 	 * The RWStore relies on several bit manipulation methods to manage both FixedAllocators
@@ -1255,12 +1255,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt1 = rw.newAllocationContext(true);
+				final IAllocationContext cntxt1 = rw.newAllocationContext(true/*isolated*/);
 				
-				IAllocationContext cntxt2 = rw.newAllocationContext(true);
+				final IAllocationContext cntxt2 = rw.newAllocationContext(true/*isolated*/);
 				
 				// allocate a global address
-				int gaddr = rw.alloc(412, null);
+				final int gaddr = rw.alloc(412, null);
 				
 				store.commit();
 				
@@ -1273,7 +1273,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				
 				store.commit();
 
-				long paddr = rw.physicalAddress(gaddr);
+				final long paddr = rw.physicalAddress(gaddr);
 				
 				assertTrue("Global allocation must be protected", paddr != 0);
 
@@ -1299,7 +1299,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt = rw.newAllocationContext(true);
+				final IAllocationContext cntxt = rw.newAllocationContext(true/*isolated*/);
 				
 				// allocate a global address
 				final int allocs = 100000;
@@ -1349,14 +1349,14 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/);
+				final IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/);
 				
 				// allocate a global address
 				final int allocs = 100000;
 				final Random ran = new Random();
 				
 				for (int r = 0; r < 20; r++) {
-					ArrayList<Integer> addrs = new ArrayList<Integer>();
+					final ArrayList<Integer> addrs = new ArrayList<Integer>();
 					for (int a = 0; a < allocs; a++) {
 						addrs.add(rw.alloc(50, cntxt));
 					}
@@ -1409,13 +1409,13 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/); // Unisolated context
+				final IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/); // Unisolated context
 				
 				// allocate a global address
 				final int allocs = 1000;
 				final PseudoRandom ran = new PseudoRandom(20000);
-				ArrayList<Integer> addrs = new ArrayList<Integer>();
-				ArrayList<Integer> sizes = new ArrayList<Integer>();
+				final ArrayList<Integer> addrs = new ArrayList<Integer>();
+				final ArrayList<Integer> sizes = new ArrayList<Integer>();
 				
 				for (int a = 0; a < allocs; a++) {
 					final int sze = 32 + ran.nextInt(1200);
@@ -1452,7 +1452,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				for (int a = 0; a < 36; a++) {
 					final int rwaddr = addrs.get(a);
 					
-					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr));
+					if (log.isInfoEnabled())
+						log.info("Address: " + rw.physicalAddress(rwaddr)
+								+ ", Committed: " + rw.isCommitted(rwaddr));
 				}
 				
 				// Intermediate commit?
@@ -1463,7 +1465,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				for (int a = 0; a < 36; a++) {
 					final int rwaddr = addrs.get(a);
 					
-					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+					if (log.isInfoEnabled())
+						log.info("Address: " + rw.physicalAddress(rwaddr)
+								+ ", Committed: " + rw.isCommitted(rwaddr)
+								+ ", Index: " + getIndex(rwaddr));
 				}
 				
 				log.info("DETACH CONTEXT");
@@ -1474,7 +1479,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				for (int a = 0; a < 36; a++) {
 					final int rwaddr = addrs.get(a);
 					
-					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+					if (log.isInfoEnabled())
+						log.info("Address: " + rw.physicalAddress(rwaddr)
+								+ ", Committed: " + rw.isCommitted(rwaddr)
+								+ ", Index: " + getIndex(rwaddr));
 				}
 				
 				// ...and now those free bits are committed!				
@@ -1485,7 +1493,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				for (int a = 0; a < 36; a++) {
 					final int rwaddr = addrs.get(a);
 					
-					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+					if (log.isInfoEnabled())
+						log.info("Address: " + rw.physicalAddress(rwaddr)
+								+ ", Committed: " + rw.isCommitted(rwaddr)
+								+ ", Index: " + getIndex(rwaddr));
 				}
 				
 				// ...and now those free bits are committed!				
@@ -1496,7 +1507,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				for (int a = 0; a < 36; a++) {
 					final int rwaddr = addrs.get(a);
 					
-					log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+					if (log.isInfoEnabled())
+						log.info("Address: " + rw.physicalAddress(rwaddr)
+								+ ", Committed: " + rw.isCommitted(rwaddr)
+								+ ", Index: " + getIndex(rwaddr));
 				}
 				
 			} finally {
@@ -1505,7 +1519,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		void showAddress(final RWStore rw, final int rwaddr) {
-			log.info("Address: " + rw.physicalAddress(rwaddr) + ", Committed: " + rw.isCommitted(rwaddr) + ", Index: " + getIndex(rwaddr));
+			if (log.isInfoEnabled())
+				log.info("Address: " + rw.physicalAddress(rwaddr)
+						+ ", Committed: " + rw.isCommitted(rwaddr)
+						+ ", Index: " + getIndex(rwaddr));
 		}
 		
 		public void testSimpleUnisolatedAllocationContextRecycling() {
@@ -1518,7 +1535,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 				final RWStore rw = bufferStrategy.getStore();
 				
-				IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/); // Unisolated context
+				final IAllocationContext cntxt = rw.newAllocationContext(false /*Isolated*/); // Unisolated context
 				
 				// allocate three global addresses of different sizes
 				final int sze1 = 48; // 64 bytes allocator
@@ -1537,7 +1554,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				showAddress(rw, addr3);
 				
 				// Now create some allocation contexts
-				IAllocationContext iso_cntxt = rw.newAllocationContext(true /*Isolated*/); // Isolated context
+				final IAllocationContext iso_cntxt = rw.newAllocationContext(true /*Isolated*/); // Isolated context
 				
 				// now allocate a new unisolated address
 				rw.alloc(sze1, cntxt);
@@ -1591,9 +1608,11 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 			final RWStore rw = bufferStrategy.getStore();
 
-			if(log.isInfoEnabled())log.info("Fixed Allocators: " + rw.getFixedAllocatorCount() + ", heap allocated: "
-					+ rw.getFileStorage() + ", utilised bytes: " + rw.getAllocatedSlots() + ", file length: "
-					+ rw.getStoreFile().length());
+			if (log.isInfoEnabled())
+				log.info("Fixed Allocators: " + rw.getFixedAllocatorCount()
+						+ ", heap allocated: " + rw.getFileStorage()
+						+ ", utilised bytes: " + rw.getAllocatedSlots()
+						+ ", file length: " + rw.getStoreFile().length());
 
 		}
 
@@ -2007,7 +2026,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 
 		public void test_multiVoidCommit() {
 
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
             try {
 
 			final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
@@ -2043,7 +2062,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * @throws IOException
 		 */
 		public void test_allocationContexts() throws IOException {
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
 			try {
 			    final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 
@@ -2059,12 +2078,12 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				final byte[] buf = new byte[sze + 4]; // extra for checksum
 				r.nextBytes(buf);
 
-				long addr1a = bs.write(ByteBuffer.wrap(buf), allocContext1);
-				long addr1b = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				final long addr1a = bs.write(ByteBuffer.wrap(buf), allocContext1);
+				final long addr1b = bs.write(ByteBuffer.wrap(buf), allocContext1);
 				rw.detachContext(allocContext1);
 
-				long addr2a = bs.write(ByteBuffer.wrap(buf), allocContext2);
-				long addr2b = bs.write(ByteBuffer.wrap(buf), allocContext2);
+				final long addr2a = bs.write(ByteBuffer.wrap(buf), allocContext2);
+				final long addr2b = bs.write(ByteBuffer.wrap(buf), allocContext2);
 				rw.detachContext(allocContext2);
 
 				// Attempt to re-establish context
@@ -2076,7 +2095,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				}
 				
 				final IAllocationContext allocContext3 = rw.newAllocationContext(true);
-				long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext3);
+				final long addr1c = bs.write(ByteBuffer.wrap(buf), allocContext3);
 
 				// By detaching contexts we end up using the same allocator
 				assertTrue("allocator re-use", bs.getPhysicalAddress(addr1c) > bs.getPhysicalAddress(addr2b));
@@ -2084,7 +2103,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				// Now, prior to commit, try deleting an uncommitted allocation
 				bs.delete(addr1c, allocContext3);
 				// and re-allocating it from the same context
-				long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext3);
+				final long addr1d = bs.write(ByteBuffer.wrap(buf), allocContext3);
 
 				assertTrue("re-allocation", addr1c == addr1d);
 
@@ -2096,7 +2115,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 				// now try deleting and re-allocating again, but in a global
 				// context
 				bs.delete(addr1d); // this should call deferFree
-				long addr1e = bs.write(ByteBuffer.wrap(buf));
+				final long addr1e = bs.write(ByteBuffer.wrap(buf));
 
 				assertTrue("deferred-delete", addr1e != addr1d);
 
@@ -2130,7 +2149,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		public int doStressCommitIndex(final long retention, final int runs) {
-			Journal journal = (Journal) getStore(retention); // remember no history!
+			final Journal journal = (Journal) getStore(retention); // remember no history!
 			try {
 				final int cRuns = runs;
 				for (int i = 0; i < cRuns; i++)
@@ -2989,7 +3008,7 @@ public class TestRWJournal extends AbstractJournalTestCase {
 			Journal store = (Journal) getStore(4000);
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	final long addr = bs.write(randomData(253728)); // BLOB
             	
@@ -3025,10 +3044,10 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		public void test_allocBlobBoundariesCommitFreeCommitWithHistory() {
-			Journal store = (Journal) getStore(5);
+			final Journal store = (Journal) getStore(5);
             try {
 
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	if (false) {
 	                final int n = 1000000;
@@ -3036,7 +3055,8 @@ public class TestRWJournal extends AbstractJournalTestCase {
 	                filter.add(randomBytes(12));
 	                final long addrb = filter.write(store);
 	                
-	                log.info("Bloomfilter: " + ((int) addrb));
+					if (log.isInfoEnabled())
+						log.info("Bloomfilter: " + ((int) addrb));
             	}
             	
                	final long addr = bs.write(randomData(4088)); // BLOB 2 * 2044
@@ -3113,9 +3133,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		}
 		
 		public void test_allocCommitFreeCommitWriteCacheWithHistory() {
-			Journal store = (Journal) getStore(5);
+			final Journal store = (Journal) getStore(5);
             try {
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	final long addr = bs.write(randomData(78));
             	
@@ -3148,9 +3168,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * ..but with session protection using a RawTx
 		 */
 		public void test_allocCommitFreeCommitSessionWriteCache() {
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
             try {
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	final long addr = bs.write(randomData(78));
             	
@@ -3191,9 +3211,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * Tracks writeCache state through allocation
 		 */
 		public void test_allocCommitFreeCommitAllocSessionWriteCache() {
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
             try {
-            	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+            	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
             	
             	final long addr = bs.write(randomData(78));
             	
@@ -3245,9 +3265,9 @@ public class TestRWJournal extends AbstractJournalTestCase {
 		 * Test that deletion and new allocation are void
 		 */
 		public void test_simpleReset() {
-			Journal store = (Journal) getStore();
+			final Journal store = (Journal) getStore();
 	        try {
-	        	RWStrategy bs = (RWStrategy) store.getBufferStrategy();
+	        	final RWStrategy bs = (RWStrategy) store.getBufferStrategy();
 	        	
 	        	final long addr = bs.write(randomData(78));
 	        	
