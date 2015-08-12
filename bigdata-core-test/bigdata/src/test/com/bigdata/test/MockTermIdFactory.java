@@ -25,10 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * Created on Jun 8, 2011
  */
 
-package com.bigdata.rdf.internal;
+package com.bigdata.test;
 
 import java.util.Random;
 
+import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.impl.TermId;
 
 /**
