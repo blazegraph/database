@@ -486,7 +486,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          case IN_CIRCLE: {
             final PointLatLon centerPoint = query.getSpatialCircleCenter();
             
-            // TODO: change X -> latitude
             final CoordinateDD centerPointDD = centerPoint.asCoordinateDD();
             
             final Double distance = query.getSpatialCircleRadius();
@@ -605,10 +604,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       
       private final IBindingSet incomingBindingSet; 
 
-      /**
-       * TODO: pass in addition filter to post-process results (e.g.: circle,
-       * bounding box).
-       */
       @SuppressWarnings("rawtypes")
       public ISPOIteratorWrapper(final IChunkedOrderedIterator<ISPO> delegate,
             final Var var, final IBindingSet incomingBindingSet) {
@@ -1098,12 +1093,6 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          this.timeMin = timeMin;
          this.timeMax = timeMax;
 
-         System.out.println(spatialPointAsCoordinateDD);
-         System.out.println(distance);
-         System.out.println(unit);
-         System.out.println(timeMin);
-         System.out.println(timeMax);
-
       }
 
       @Override
@@ -1111,19 +1100,12 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
 			final PointLatLonTime p = asPoint(obj);
          final CoordinateDD pAsDD = p.getSpatialPoint().asCoordinateDD();
-
-//         
-//         System.out.println("# Comparing point : " + pAsDD + ", dist=" + distance);
-//
-//			System.out.println("# It's distance is : " + CoordinateUtility.distance(
-//               pAsDD, spatialPointAsCoordinateDD, unit));
 			
 			boolean ret = 
 			   CoordinateUtility.distance(
 			      pAsDD, spatialPointAsCoordinateDD, unit) <= distance &&
 			      timeMin <= p.getTimestamp() && p.getTimestamp() <= timeMax;
 			   
-//			System.out.println("# ret = " + ret);
 			return ret;
 		}
    }
