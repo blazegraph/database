@@ -4,6 +4,7 @@ import java.util.concurrent.locks.Lock;
 
 import com.bigdata.journal.IBufferStrategy;
 import com.bigdata.journal.RWStrategy;
+import com.bigdata.rawstore.IAllocationContext;
 import com.bigdata.rawstore.IAllocationManagerStore;
 import com.bigdata.rwstore.sector.MemStrategy;
 
@@ -49,5 +50,5 @@ public interface IRWStrategy extends IBufferStrategy, IAllocationManager,
      * commit protocol.
      */
     public void postCommit();
-    
+
 }
