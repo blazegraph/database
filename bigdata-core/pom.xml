@@ -424,20 +424,11 @@ public class BuildInfo {
        <artifactId>bigdata-ganglia</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
-<!-- TODO: Factor out dependency on bigdata-gas BLZG-1272
      <dependency>
        <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-gas</artifactId>
+       <artifactId>bigdata-util</artifactId>
        <version>${bigdata.version}</version>
      </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
-       <type>test-jar</type>
-       <scope>test</scope>
-     </dependency>
--->
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>

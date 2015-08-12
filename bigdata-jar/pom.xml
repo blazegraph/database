@@ -23,6 +23,7 @@
 		<include>**/*.xml</include>
 		<include>**/*.properties</include>
 		<include>**/org.openrdf.rio.*</include>
+		<include>**/com.bigdata.*</include>
 	    </includes>
 	</resource>
     </resources>
@@ -117,6 +118,18 @@
             </goals>
             <configuration>
                <filters>
+		<filter>
+                  <artifact>com.blazegraph:rdf-properties</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
+		<filter>
+                  <artifact>com.blazegraph:bigdata-jar</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
                 <filter>
                   <artifact>*:*</artifact>
                   <excludes>
@@ -124,8 +137,6 @@
                     <exclude>org/junit/runners/**</exclude>
                     <exclude>junit/framework/**</exclude>
                     <exclude>junit/**</exclude>
-                    <exclude>license/**</exclude>
-                    <exclude>META-INF/license/**</exclude>
                     <exclude>org/junit/**</exclude>
                     <exclude>WEB-INF/**</exclude>
                     <exclude>test*/**</exclude>
@@ -192,6 +203,11 @@ ga('send', 'pageview');
   <dependencies>
     <dependency>
       <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
       <version>${bigdata.version}</version>
        <exclusions>
@@ -225,6 +241,10 @@ ga('send', 'pageview');
         <exclusion>
           <groupId>com.blazegraph</groupId>
           <artifactId>junit-ext</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>bigdata-war-html</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

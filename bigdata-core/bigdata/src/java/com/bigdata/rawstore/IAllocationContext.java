@@ -30,6 +30,11 @@ package com.bigdata.rawstore;
  * 
  * @author Martyn Cutcher
  */
-public interface IAllocationContext {
+public abstract interface IAllocationContext {
+	
+	public void release();
 
+	public void checkActive();
+
+	public boolean isIsolated();
 }
