@@ -402,7 +402,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
             throws Exception {
 
         final String[] dataFiles = readFiles(new File(
-        "bigdata-rdf/src/resources/data/lehigh/U1"),
+        "src/test/resources/data/lehigh/U1"),
         new FilenameFilter() {
             public boolean accept(File dir, String name) {
                 return name.endsWith(".owl");
