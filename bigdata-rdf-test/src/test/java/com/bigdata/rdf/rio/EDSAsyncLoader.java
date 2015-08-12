@@ -48,7 +48,7 @@ import com.bigdata.service.EmbeddedFederation;
  * -server -Xmx1000m
  * </pre>
  * <pre>
- * bigdata-rdf/src/test/com/bigdata/rdf/rio/EDSAsyncLoader.properties kb "..\rdf-data\lehigh\U1"
+ * src/test/java/com/bigdata/rdf/rio/EDSAsyncLoader.properties kb "..\rdf-data\lehigh\U1"
  * </pre>
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

@@ -933,9 +933,9 @@ public class TestTruthMaintenance extends AbstractInferenceEngineTestCase {
 
 //        fail("enable test");
         
-        final String ontology = "bigdata-rdf/src/resources/data/lehigh/univ-bench.owl";
+        final String ontology = "src/test/resources/data/lehigh/univ-bench.owl";
         final String resource =
-                "bigdata-rdf/src/resources/data/lehigh/U1";
+                "src/test/resources/data/lehigh/U1";
 //                "../rdf-data/alibaba_data.rdf",
 //                "../rdf-data/alibaba_schema.rdf"
 //                };
