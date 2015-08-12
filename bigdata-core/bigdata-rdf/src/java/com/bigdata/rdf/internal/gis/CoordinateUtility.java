@@ -142,21 +142,15 @@ public class CoordinateUtility {
        // compute numbers of degrees to travel to the top
        final double deltaNorthSouth = 
           distanceAsMeters/metersPerDegreeOfLatitudeAtSeaLevel;
-       System.out.println("dNS (lat) = " + deltaNorthSouth);
        
        // compute numbers of degrees to travel to the left
        final Double currentLat = start.northSouth;
        
        final Double deltaEastWest = (1 / (111320 * Math.cos(currentLat/360*2*Math.PI))) * distanceAsMeters;
        
-       System.out.println("dEW (lon) = " + deltaEastWest);
-
-
-       
        final CoordinateDD ret = new CoordinateDD(
              start.northSouth - deltaNorthSouth, start.eastWest - deltaEastWest);
        
-       System.out.println("BBUL = " + ret.toString());
        return ret;
     }
     
@@ -177,7 +171,6 @@ public class CoordinateUtility {
           final CoordinateDD ret = new CoordinateDD(
                 start.northSouth + deltaNorthSouth, start.eastWest + deltaEastWest);
           
-          System.out.println("BBLR = " + ret.toString());
           return ret;
 
        }
@@ -409,12 +402,4 @@ public class CoordinateUtility {
         return degrees + minutes / 60d + seconds / 3600d;
     }
     
-    public static void main(String [] args)
-    {
-       CoordinateDD center = new CoordinateDD(10, 0);
-       System.out.println(center);
-
-       System.out.println(boundingBoxUpperLeft(center, 2, UNITS.Kilometers));
-       System.out.println(boundingBoxLowerRight(center, 2, UNITS.Kilometers));
-    }
 }
