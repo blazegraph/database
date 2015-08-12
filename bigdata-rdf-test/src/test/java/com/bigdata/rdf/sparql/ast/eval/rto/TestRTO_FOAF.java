@@ -64,9 +64,9 @@ public class TestRTO_FOAF extends AbstractRTOTestCase {
      * card.
      */
     private static final String[] dataFiles = new String[] { // data files
-            "bigdata-rdf/src/resources/data/foaf/data-0.nq.gz",//
-            "bigdata-rdf/src/resources/data/foaf/data-1.nq.gz",//
-            "bigdata-rdf/src/resources/data/foaf/data-2.nq.gz",//
+            "src/test/resources/data/foaf/data-0.nq.gz",//
+            "src/test/resources/data/foaf/data-1.nq.gz",//
+            "src/test/resources/data/foaf/data-2.nq.gz",//
     };//
     
     @Override

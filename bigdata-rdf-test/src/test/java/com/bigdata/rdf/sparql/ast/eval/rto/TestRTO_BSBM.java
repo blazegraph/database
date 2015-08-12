@@ -147,7 +147,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q1", // testURI,
                 "rto/BSBM-Q1.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q1.srx"// resultFileURL
         );
         
@@ -180,7 +180,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q2", // testURI,
                 "rto/BSBM-Q2.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q2.srx"// resultFileURL
         );
         
@@ -201,7 +201,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q3", // testURI,
                 "rto/BSBM-Q3.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q3.srx"// resultFileURL
         );
         
@@ -229,7 +229,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q4", // testURI,
                 "rto/BSBM-Q4.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q4.srx"// resultFileURL
         );
         
@@ -253,7 +253,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q5", // testURI,
                 "rto/BSBM-Q5.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q5.srx"// resultFileURL
         );
         
@@ -275,7 +275,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q7", // testURI,
                 "rto/BSBM-Q7.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q7.srx"// resultFileURL
         );
         
@@ -329,7 +329,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q7b", // testURI,
                 "rto/BSBM-Q7b.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q7b.srx"// resultFileURL
         );
         
@@ -351,7 +351,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q8", // testURI,
                 "rto/BSBM-Q8.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q8.srx"// resultFileURL
         );
         
@@ -373,7 +373,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BSBM-Q10", // testURI,
                 "rto/BSBM-Q10.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
+                "src/test/resources/data/bsbm/dataset_pc100.nt",// dataFileURL
                 "rto/BSBM-Q10.srx"// resultFileURL
         );
         
@@ -399,7 +399,7 @@ public class TestRTO_BSBM extends AbstractRTOTestCase {
 //        final TestHelper helper = new TestHelper(//
 //                "rto/BSBM-Q1", // testURI,
 //                "rto/BSBM-Q1.rq",// queryFileURL
-//                "bigdata-rdf/src/resources/data/bsbm/dataset_pc1000.nt.gz",// dataFileURL
+//                "src/test/resources/data/bsbm/dataset_pc1000.nt.gz",// dataFileURL
 //                "rto/BSBM-Q1.srx"// resultFileURL
 //        );
 //        

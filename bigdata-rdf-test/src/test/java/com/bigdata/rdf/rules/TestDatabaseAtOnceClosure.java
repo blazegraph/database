@@ -375,7 +375,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 //            throws Exception {
 //
 //        final String[] resources = readFiles(new File(
-//                "bigdata-rdf/src/resources/data/lehigh/U1"),
+//                "src/test/resources/data/lehigh/U1"),
 //                new FilenameFilter() {
 //                    public boolean accept(File dir, String name) {
 //                        return name.endsWith(".owl");
@@ -411,7 +411,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         // And add in the ontology.
         final List<String> tmp = new LinkedList<String>();
-        tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench-modified-no-bnodes.owl");
+        tmp.add("src/test/resources/data/lehigh/univ-bench-modified-no-bnodes.owl");
         tmp.addAll(Arrays.asList(dataFiles));
         final String[] resources = tmp.toArray(new String[tmp.size()]);
 
@@ -433,7 +433,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
 //    public void test_fixedPoint_LUBM_U1_As_Fast_NestedSubquery() throws Exception {
 //
-//        final String[] resources = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
+//        final String[] resources = readFiles(new File("src/test/resources/data/lehigh/U1"),
 //                new FilenameFilter() {
 //                    public boolean accept(File dir, String name) {
 //                        return name.endsWith(".owl");
@@ -458,7 +458,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
     public void test_fixedPoint_LUBM_U1_As_Fast_PipelineJoins() throws Exception {
 
-        final String[] dataFiles = readFiles(new File("bigdata-rdf/src/resources/data/lehigh/U1"),
+        final String[] dataFiles = readFiles(new File("src/test/resources/data/lehigh/U1"),
                 new FilenameFilter() {
                     public boolean accept(File dir, String name) {
                         return name.endsWith(".owl");
@@ -467,7 +467,7 @@ public class TestDatabaseAtOnceClosure extends AbstractRuleTestCase {
 
         // And add in the ontology.
         final List<String> tmp = new LinkedList<String>();
-        tmp.add("bigdata-rdf/src/resources/data/lehigh/univ-bench-modified-no-bnodes.owl");
+        tmp.add("src/test/resources/data/lehigh/univ-bench-modified-no-bnodes.owl");
         tmp.addAll(Arrays.asList(dataFiles));
         final String[] resources = tmp.toArray(new String[tmp.size()]);
         

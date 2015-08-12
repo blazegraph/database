@@ -356,7 +356,7 @@ public class TestUpdateBootstrap extends AbstractASTEvaluationTestCase {
 
             op.setSourceGraph(new ConstantNode(
                     makeIV(new URIImpl(
-                            "file:bigdata-rdf/src/test/com/bigdata/rdf/sparql/ast/eval/update/load_01.trig"))));
+                            "file:src/test/java/com/bigdata/rdf/sparql/ast/eval/update/load_01.trig"))));
 
             /*
              * Note: This is loading into an unspecified graph since the target

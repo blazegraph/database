@@ -99,7 +99,7 @@ public class TestRTO_BAR extends AbstractRTOTestCase {
         final TestHelper helper = new TestHelper(//
                 "rto/BAR-Q1", // testURI,
                 "rto/BAR-Q1.rq",// queryFileURL
-                "bigdata-rdf/src/resources/data/barData/barData.trig.gz",// dataFileURL
+                "src/test/resources/data/barData/barData.trig.gz",// dataFileURL
                 "rto/BAR-Q1.srx"// resultFileURL
         );
 
