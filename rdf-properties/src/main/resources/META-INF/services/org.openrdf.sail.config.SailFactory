@@ -1,0 +1,7 @@
+org.openrdf.sail.federation.config.FederationFactory
+org.openrdf.sail.inferencer.fc.config.ForwardChainingRDFSInferencerFactory
+org.openrdf.sail.inferencer.fc.config.DirectTypeHierarchyInferencerFactory
+org.openrdf.sail.inferencer.fc.config.CustomGraphQueryInferencerFactory
+org.openrdf.sail.memory.config.MemoryStoreFactory
+org.openrdf.sail.nativerdf.config.NativeStoreFactory
+org.openrdf.sail.rdbms.config.RdbmsStoreFactory
