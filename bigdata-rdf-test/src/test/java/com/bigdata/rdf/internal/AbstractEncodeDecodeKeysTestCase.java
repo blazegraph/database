@@ -29,13 +29,14 @@ package com.bigdata.rdf.internal;
 
 import java.util.Arrays;
 
+import junit.framework.TestCase2;
+
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.rdf.lexicon.BlobsIndexHelper;
+import com.bigdata.test.MockTermIdFactory;
 import com.bigdata.util.BytesUtil.UnsignedByteArrayComparator;
-
-import junit.framework.TestCase2;
 
 /**
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>

@@ -48,7 +48,6 @@ import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlan2;
 import com.bigdata.bop.joinGraph.fast.DefaultEvaluationPlanFactory2;
 import com.bigdata.rdf.axioms.NoAxioms;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.model.StatementEnum;
 import com.bigdata.rdf.rules.RuleContextEnum;
@@ -66,6 +65,7 @@ import com.bigdata.relation.rule.eval.ISolution;
 import com.bigdata.relation.rule.eval.RuleState;
 import com.bigdata.striterator.ChunkedArrayIterator;
 import com.bigdata.striterator.IChunkedOrderedIterator;
+import com.bigdata.test.MockTermIdFactory;
 
 /**
  * Test ability to insert, update, or remove elements from a relation and the

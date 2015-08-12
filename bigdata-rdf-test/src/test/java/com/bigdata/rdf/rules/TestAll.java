@@ -28,6 +28,8 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 import com.bigdata.rdf.spo.TestSPORelation;
+import com.bigdata.relation.rule.TestProgram;
+import com.bigdata.relation.rule.TestRule;
 
 /**
  * Aggregates test suites into increasing dependency order.
@@ -199,6 +201,7 @@ public class TestAll extends TestCase {
         
         // test suite for RDF specific rule evaluation support.
         suite.addTest(com.bigdata.rdf.internal.constraints.TestAll.suite());
+        
 
         /*
          * Test truth maintenance. This examines the incremental assertion and
