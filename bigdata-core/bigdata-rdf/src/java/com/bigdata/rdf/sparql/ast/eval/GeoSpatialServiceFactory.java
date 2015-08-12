@@ -28,8 +28,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sparql.ast.eval;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -41,10 +45,12 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.Constant;
+import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
+import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.fed.QueryEngineFactory;
@@ -78,6 +84,7 @@ import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
+import com.bigdata.service.fts.FTS;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
@@ -582,8 +589,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                .getAccessPath(relation, pred);
 
          // TODO: use accessPath.solutions(...), which is an iterator already
-         return new ISPOIteratorWrapper(accessPath.iterator(), Var.var(vars[0]
-               .getName()));
+         return new ISPOIteratorWrapper(
+            accessPath.iterator(), Var.var(vars[0].getName()),
+            query.getIncomingBindings());
       }
 
    }
@@ -594,6 +602,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       private final IChunkedOrderedIterator<ISPO> delegate;
       @SuppressWarnings("rawtypes")
       private final Var var;
+      
+      private final IBindingSet incomingBindingSet; 
 
       /**
        * TODO: pass in addition filter to post-process results (e.g.: circle,
@@ -601,10 +611,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
        */
       @SuppressWarnings("rawtypes")
       public ISPOIteratorWrapper(final IChunkedOrderedIterator<ISPO> delegate,
-            final Var var) {
+            final Var var, final IBindingSet incomingBindingSet) {
 
          this.delegate = delegate;
          this.var = var;
+         this.incomingBindingSet = incomingBindingSet;
       }
 
       @Override
@@ -618,7 +629,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          final ISPO elem = delegate.next();
 
-         final IBindingSet bs = new ListBindingSet();
+         final IBindingSet bs = incomingBindingSet.clone();
          bs.set(var, new Constant<IV>(elem.s()));
 
          return bs;
@@ -1157,4 +1168,59 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
    }
 
+   /**
+    * Returns the statement patterns contained in the service node.
+    * 
+    * @param serviceNode
+    * @return
+    */
+   Collection<StatementPatternNode> getStatementPatterns(final ServiceNode serviceNode) {
+
+      final List<StatementPatternNode> statementPatterns = 
+         new ArrayList<StatementPatternNode>();
+      
+      for (IGroupMemberNode child : serviceNode.getGraphPattern()) {
+         
+         if (child instanceof StatementPatternNode) {      
+            statementPatterns.add((StatementPatternNode)child);
+         } else {
+            throw new FulltextSearchException("Nested groups are not allowed.");            
+         }
+      }
+      
+      return statementPatterns;
+   }
+   
+   @Override
+   public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {
+
+      /**
+       * This method extracts exactly those variables that are incoming,
+       * i.e. must be bound before executing the execution of the service.
+       */
+      final Set<IVariable<?>> requiredBound = new HashSet<IVariable<?>>();
+      for (StatementPatternNode sp : getStatementPatterns(serviceNode)) {
+            
+         final URI predicate = (URI) (sp.p()).getValue();
+         final IVariableOrConstant<?> object = sp.o().getValueExpression();
+            
+         if (object instanceof IVariable<?>) {
+            
+            if (predicate.equals(GeoSpatial.PREDICATE)
+               ||  predicate.equals(GeoSpatial.SEARCH)
+               || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_CENTER)
+               || predicate.equals(GeoSpatial.SPATIAL_CIRCLE_RADIUS)
+               || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_LOWER_RIGHT) 
+               || predicate.equals(GeoSpatial.SPATIAL_RECTANGLE_UPPER_LEFT)
+               || predicate.equals(GeoSpatial.SPATIAL_UNIT)
+               || predicate.equals(GeoSpatial.TIME_START)
+               || predicate.equals(GeoSpatial.TIME_END)) {
+               
+               requiredBound.add((IVariable<?>)object); // the subject var is what we return                  
+            }
+         }
+      }
+
+      return requiredBound;
+   }
 }
