@@ -114,6 +114,7 @@ dependencies.
                 <include>**/*.java</include>
             </includes>
         </resource>
+<!--
         <resource>
             <directory>bigdata-gom/src/test</directory>
             <includes>
@@ -130,6 +131,7 @@ dependencies.
                 <include>**/*.java</include>
             </includes>
         </resource>
+-->
         <resource>
             <directory>bigdata-gom/src/test/resources</directory>
             <includes>
@@ -284,25 +286,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                        <include>**/*.trig</include>
                    </includes>
                </resource>
+<!--
                <resource>
                    <directory>bigdata-gom/src/test/resources</directory>
                    <includes>
                        <include>**/*.n3</include>
                        <include>**/*.owl</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-<!--
-               <resource>
-                   <directory>bigdata-war/src</directory>
-                   <includes>
-                       <include>**/*.n3</include>
                        <include>**/*.properties</include>
                        <include>**/*.xml</include>
                        <include>**/*.txt</include>
@@ -324,9 +313,9 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             </goals>
             <configuration>
               <sources>
-                <source>bigdata/src/java</source>
-                <source>bigdata-rdf/src/java</source>
-                <source>bigdata-gom/src/java</source>
+                <source>bigdata/src/test/</source>
+                <source>bigdata-rdf/src/test</source>
+                <source>bigdata-gom/src/test</source>
               </sources>
             </configuration>
           </execution>
