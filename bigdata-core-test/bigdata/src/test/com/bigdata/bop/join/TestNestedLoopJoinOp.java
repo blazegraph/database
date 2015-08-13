@@ -26,8 +26,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.bop.join;
 
-import com.bigdata.rdf.sparql.ast.eval.TestInclude;
-
 import junit.framework.TestCase2;
 
 /**
@@ -59,7 +57,7 @@ public class TestNestedLoopJoinOp extends TestCase2 {
 	/**
 	 * Note: There are some tests at the data-driven level.
 	 * 
-	 * @see TestInclude
+	 * @see com.bigdata.rdf.sparql.ast.eval.TestInclude
 	 * 
 	 * FIXME Implement test.
 	 */

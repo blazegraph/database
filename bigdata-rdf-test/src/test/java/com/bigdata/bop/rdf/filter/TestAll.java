@@ -21,7 +21,8 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-package com.bigdata.bop.ap.filter;
+package com.bigdata.bop.rdf.filter;
+
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -58,21 +59,17 @@ public class TestAll extends TestCase {
     public static Test suite()
     {
 
-        final TestSuite suite = new TestSuite("access path filters");
+        final TestSuite suite = new TestSuite("RDF filter operators");
 
-        // test filter operator.
-        suite.addTestSuite(TestFilter.class);
+        suite.addTestSuite(TestStripContextFilter.class);
 
-        // test resolver operator.
-        suite.addTestSuite(TestResolver.class);
-
-        // TODO test distinct operators (native and JVM).
-//        suite.addTestSuite(TestDistinctFilter.class);
-
-        // @todo operators and test suites for the remaining striterator patterns.
+        // Distinct IV filter using HTree.
+        suite.addTestSuite(TestNativeDistinctFilter.class);
         
+        suite.addTestSuite(TestSameVariableConstraint.class);
+
         return suite;
-
+        
     }
-
+    
 }
