@@ -1,0 +1,325 @@
+<?xml version="1.0"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.3-master-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+  </parent>
+  <groupId>com.blazegraph</groupId>
+  <artifactId>bigdata-runtime</artifactId>
+  <version>${bigdata.version}</version>
+  <name>Blazegraph Runtime</name>
+  <url>https//www.blazegraph.com/</url>
+  <description>This file contains all of the blazegraph artifacts without any external artifacts.</description>
+   
+  <packaging>jar</packaging>
+
+  <properties>
+	<build.timestamp>${maven.build.timestamp}</build.timestamp>
+        <maven.build.timestamp.format>yyyyMMdd</maven.build.timestamp.format> 
+  </properties>
+
+  <build>
+    <plugins>
+<!--
+     <plugin>
+       <artifactId>maven-assembly-plugin</artifactId>
+       <executions>
+         <execution>
+           <id>create-assembly</id>
+           <phase>package</phase>
+           <goals>
+             <goal>single</goal>
+           </goals>
+           <configuration>
+		<descriptors>
+                    <descriptor>/src/main/assembly/assembly.xml</descriptor>
+                </descriptors>
+           </configuration>
+         </execution>
+  	</executions>
+      </plugin>
+-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war-html</artifactId>
+                  <version>${bigdata.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/classes/war</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
+       <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+               <id>unpack-war</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>compile</phase>
+               <configuration>
+                 <target>
+ 		   <unzip dest="target/classes/war">
+        		<fileset dir="target/classes/war">
+            			<include name="bigdata.war" />
+        		</fileset>    
+    		   </unzip>
+ 		   <delete file = "target/classes/war/bigdata.war"/>
+		   <copy file = "target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+	</plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.4</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+	       <finalName>${project.artifactId}-${project.version}-${maven.build.timestamp}</finalName>
+               <filters>
+		<filter>
+                  <artifact>com.blazegraph:*</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
+                <filter>
+                  <artifact>commons-io:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>commons-lang:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>commons-codec:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>commons-fileupload:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.openrdf.sesame:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>com.github.stephenc.high-scale-lib:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>colt:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.apache.lucene:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>com.ibm.icu:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.slf4j:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.apache.httpcomponents:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.codehaus.jettison:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.apache.*:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>org.eclipse.jetty:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>com.tinkerpop.*:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>javax.servlet:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+                <filter>
+                  <artifact>log4j:*</artifact>
+                  <excludes>
+                    <exclude>**</exclude>
+                  </excludes>
+                </filter>
+               </filters>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
+                    <Build-Number>${bigdata.version}</Build-Number>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+     </plugins>
+   </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+	  <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph Runtime</h1>]]></doctitle>
+          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+<script>
+jQuery(document).ready(function(){
+  jQuery('ul.sf-menu').superfish({
+  pathClass: 'current',
+  cssArrows: false
+  });
+});
+
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
+ga('send', 'pageview');
+</script>
+]]></bottom>
+ 
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+  
+  <dependencies>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
+      <version>${bigdata.version}</version>
+       <exclusions>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-blueprints</artifactId>
+      <version>${bigdata.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>junit-ext</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>bigdata-war-html</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+  </dependencies>
+
+  </project>
