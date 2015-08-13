@@ -49,7 +49,7 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.5.3-BLZG-1428-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
@@ -192,7 +192,9 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             <!-- not suppported yet/
             <include>com/bigdata/bfs/TestAll.java</include>
             -->
+<!-- Moved into bigdata-rdf-test
             <include>com/bigdata/rdf/TestAll.java</include>
+-->
 <!-- Moved into bigdata-sails-test
             <include>com/bigdata/rdf/sail/TestAll.java</include>
             <include>com/bigdata/rdf/sail/webapp/TestAll.java</include>

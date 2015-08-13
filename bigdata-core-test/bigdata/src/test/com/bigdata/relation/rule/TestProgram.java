@@ -30,6 +30,11 @@ package com.bigdata.relation.rule;
 
 import java.util.Iterator;
 
+import com.bigdata.relation.rule.IProgram;
+import com.bigdata.relation.rule.IRule;
+import com.bigdata.relation.rule.IStep;
+import com.bigdata.relation.rule.Program;
+
 /**
  * Test suite for {@link Program} and common rule/program re-writes.
  * 

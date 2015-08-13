@@ -119,6 +119,10 @@ public class SameVariableConstraint<E> implements IFilterTest, Externalizable {
 
     }
     
+    public int[] getIndices() {
+    	return indices;
+    }
+    
     private boolean accept(final E e) {
 
         int i = 0;
