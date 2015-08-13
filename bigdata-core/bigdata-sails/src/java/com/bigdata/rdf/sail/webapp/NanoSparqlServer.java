@@ -215,6 +215,12 @@ public class NanoSparqlServer {
          */
         
         String BIGDATA_PROPERTY_FILE = "bigdata.propertyFile";
+        
+        /**
+         * The jetty.home property.
+         */
+
+		String JETTY_HOME = "jetty.home";
 
     }
 
@@ -312,9 +318,14 @@ public class NanoSparqlServer {
          */
         String jettyXml = System.getProperty(//
                 SystemProperties.JETTY_XML,//
-                "bigdata-sails/src/resources/jetty.xml"//
+                "jetty.xml"//
 //                SystemProperties.DEFAULT_JETTY_XML
                 );
+        
+      //Set the resource base to inside of the jar file if jetty.home is not set
+        if(System.getProperty(SystemProperties.JETTY_HOME) == null)
+        	System.setProperty(SystemProperties.JETTY_HOME,
+      				jettyXml.getClass().getResource("/war").toExternalForm());
 
         /*
          * Handle all arguments starting with "-". These should appear before
@@ -391,6 +402,19 @@ public class NanoSparqlServer {
 //         * Property file.
 //         */
         final String propertyFile = args[i++];
+        
+       
+        //Through an Exception is the propertyFile does not exist.
+        final File pFile = new File(propertyFile);
+        
+        if(!pFile.exists()) {
+			final String errMsg = "Property or config file " + propertyFile
+					+ " does not exist and is a required parameter.";
+			System.err.println(errMsg);
+        	log.error(errMsg);
+        	throw new RuntimeException(errMsg);
+        }
+        
 //        final File file = new File(propertyFile);
 //        if (!file.exists()) {
 //            throw new RuntimeException("Could not find file: " + file);
@@ -782,7 +806,10 @@ public class NanoSparqlServer {
 
         if (jettyXmlUrl == null) {
 
-            throw new RuntimeException("Not found: " + jettyXml);
+        	
+        	if(jettyXmlUrl == null)
+
+        		throw new RuntimeException("Not found: " + jettyXml);
 
         }
 
@@ -827,7 +854,7 @@ public class NanoSparqlServer {
              */
 
             // The default location to check in the file system.
-            final File file = new File("bigdata-war/src/main/webapp");
+            final File file = new File("bigdata-war-html/src/main/webapp");
 
             final URL resourceBaseURL;
             if (file.exists()) {
@@ -882,7 +909,7 @@ public class NanoSparqlServer {
                      * </pre>
                      */
                     tmp = ClassLoader.getSystemClassLoader().getResource(
-                            src = "bigdata-war/src/main/webapp/WEB-INF/web.xml");
+                            src = "war/src/main/webapp/WEB-INF/web.xml");
                 }
                 
                 if (tmp != null) {
