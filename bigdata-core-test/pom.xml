@@ -74,12 +74,6 @@ dependencies.
     <build>
        <resources>
         <resource>
-            <directory>bigdata-rdf/src/resources</directory>
-            <includes>
-                <include>**/*</include>
-	    </includes>
-        </resource>
-        <resource>
             <directory>bigdata/src/test</directory>
             <includes>
                 <include>**/*.csv</include>
@@ -90,25 +84,6 @@ dependencies.
                 <include>**/*.ttl</include>
                 <include>**/*.ttlx</include>
                 <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-                <include>**/*.java</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-rdf/src/test</directory>
-            <includes>
-                <include>**/*.n3</include>
-                <include>**/*.nt</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.gz</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.rdf</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
                 <include>**/*.java</include>
@@ -241,22 +216,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                </includes>
                </resource>
                <resource>
-                   <directory>bigdata-rdf/src/test</directory>
-                   <includes>
-                       <include>**/*.n3</include>
-                       <include>**/*.nt</include>
-                       <include>**/*.owl</include>
-                       <include>**/*.properties</include>
-                       <include>**/*.rdf</include>
-                       <include>**/*.xml</include>
-                       <include>**/*.txt</include>
-                       <include>**/*.ttl</include>
-                       <include>**/*.rq</include>
-                       <include>**/*.srx</include>
-                       <include>**/*.trig</include>
-                   </includes>
-               </resource>
-               <resource>
                    <directory>bigdata-gom/src/test</directory>
                    <includes>
                        <include>**/*.n3</include>
@@ -298,7 +257,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             <configuration>
               <sources>
                 <source>bigdata/src/test/</source>
-                <source>bigdata-rdf/src/test</source>
                 <source>bigdata-gom/src/test</source>
               </sources>
             </configuration>
@@ -312,7 +270,6 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
             <configuration>
               <sources>
             	<source>bigdata/src/test</source>
-                <source>bigdata-rdf/src/test</source>
                 <source>bigdata-gom/src/test</source>
               </sources>
             </configuration>
