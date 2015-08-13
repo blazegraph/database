@@ -16,15 +16,6 @@
   <packaging>war</packaging>
   <build>
     <plugins>
-<!--
-       <plugin>
-        <groupId>org.codehaus.cargo</groupId>
-        <artifactId>cargo-maven2-plugin</artifactId>
-        <configuration>
-          <descriptor>src/assemble/merge.xml</descriptor>
-        </configuration>
-      </plugin>
--->
       <plugin>
        <groupId>org.apache.maven.plugins</groupId>
        <artifactId>maven-war-plugin</artifactId>

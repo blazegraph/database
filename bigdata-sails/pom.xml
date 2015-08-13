@@ -49,11 +49,7 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-<<<<<<< HEAD
     <version>1.5.3-GeoSpatial-SNAPSHOT</version>
-=======
-    <version>1.5.3-GeoSpatial-SNAPSHOT</version>
->>>>>>> master
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
