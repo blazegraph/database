@@ -39,9 +39,9 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.bindingSet.HashBindingSet;
 import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.internal.MockTermIdFactory;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.spo.SPOKeyOrder;
+import com.bigdata.test.MockTermIdFactory;
 
 /**
  * Test suite for basic {@link Rule} mechanisms.
