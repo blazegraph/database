@@ -49,7 +49,7 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.5.3-BLZG-1428-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
@@ -418,6 +418,25 @@ dependencies.
        <version>${bigdata.version}</version>
        <type>test-jar</type>
     </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-rdf-test</artifactId>
+       <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-rdf-test</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+    </dependency>
+<!--
+    <dependency>
+       <groupId>com.blazegraph</groupId>
+       <artifactId>bigdata-rdf-test</artifactId>
+       <version>${bigdata.version}</version>
+       <type>test-jar</type>
+    </dependency>
+-->
 <!-- TODO:  Factor our main classes.
     <dependency>
        <groupId>com.blazegraph</groupId>

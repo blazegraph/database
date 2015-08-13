@@ -63,12 +63,13 @@ public class TestAll extends TestCase {
 
         // test ISlice() impl.
         suite.addTestSuite(TestSlice.class);
-
-        // test suite for basic rule mechanisms.
+        
+     // test suite for basic rule mechanisms.
         suite.addTestSuite(TestRule.class);
-
+        
         // test suite for IProgram, but not program evaluation.
         suite.addTestSuite(TestProgram.class);
+
 
         // @todo test suite for XML interchange of programs.
 
