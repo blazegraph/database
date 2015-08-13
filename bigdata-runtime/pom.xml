@@ -33,25 +33,40 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-jar</artifactId>
+  <artifactId>bigdata-runtime</artifactId>
   <version>${bigdata.version}</version>
-  <name>Blazegraph Executable Jar</name>
-  <url>http://maven.apache.org</url>
+  <name>Blazegraph Runtime</name>
+  <url>https//www.blazegraph.com/</url>
+  <description>This file contains all of the blazegraph artifacts without any external artifacts.</description>
+   
   <packaging>jar</packaging>
 
+  <properties>
+	<build.timestamp>${maven.build.timestamp}</build.timestamp>
+        <maven.build.timestamp.format>yyyyMMdd</maven.build.timestamp.format> 
+  </properties>
+
   <build>
-     <resources>
-        <resource>
-            <directory>src/main/resources</directory>
-            <includes>
-		<include>**/*.xml</include>
-		<include>**/*.properties</include>
-		<include>**/org.openrdf.rio.*</include>
-		<include>**/com.bigdata.*</include>
-	    </includes>
-	</resource>
-    </resources>
     <plugins>
+<!--
+     <plugin>
+       <artifactId>maven-assembly-plugin</artifactId>
+       <executions>
+         <execution>
+           <id>create-assembly</id>
+           <phase>package</phase>
+           <goals>
+             <goal>single</goal>
+           </goals>
+           <configuration>
+		<descriptors>
+                    <descriptor>/src/main/assembly/assembly.xml</descriptor>
+                </descriptors>
+           </configuration>
+         </execution>
+  	</executions>
+      </plugin>
+-->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -104,32 +119,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
            </executions>
 	</plugin>
 
-<!--
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>2.4</version>
-        <configuration>
-                 <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                 </descriptorRefs>
-             <archive>
-            <manifest>
-                <mainClass>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</mainClass>
-            </manifest>
-             </archive>
-        </configuration>
-        <executions>
-             <execution>
-                    <id>make-assembly</id>
-                    <phase>package</phase>
-                    <goals>
-                      <goal>single</goal>
-                    </goals>
-             </execution>
-        </executions>
-    </plugin>
--->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -141,39 +130,31 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <goal>shade</goal>
             </goals>
             <configuration>
-               <filters>
-		<filter>
-                  <artifact>com.blazegraph:rdf-properties</artifact>
-		  <includes>
-		    <include>**/*</include>
-		  </includes>
-	   	</filter>
-		<filter>
-                  <artifact>com.blazegraph:bigdata-jar</artifact>
-		  <includes>
-		    <include>**/*</include>
-		  </includes>
-	   	</filter>
-                <filter>
-                  <artifact>*:*</artifact>
-                  <excludes>
-                    <exclude>org/junit/experimental/**</exclude>
-                    <exclude>org/junit/runners/**</exclude>
-                    <exclude>junit/framework/**</exclude>
-                    <exclude>junit/**</exclude>
-                    <exclude>org/junit/**</exclude>
-                    <exclude>WEB-INF/**</exclude>
-                    <exclude>test*/**</exclude>
-                    <exclude>cia-factbook/**</exclude>
-                    <exclude>**/*.ttl</exclude>
-                    <exclude>**/*.ttlx</exclude>
-                    <exclude>**/*.rq</exclude>
-                    <exclude>**/*.srx</exclude>
-                    <exclude>**/*.trig</exclude>
-                    <exclude>**/sesame*testsuite/**</exclude>
-                  </excludes>
-                </filter>
-               </filters>
+	       <finalName>${project.artifactId}-${project.version}-${maven.build.timestamp}</finalName>
+	       <artifactSet>
+		<includes>
+		  <include>com.blazegraph:*</include>
+		</includes>
+		<excludes>
+                  <exclude>commons-io:*</exclude>
+                  <exclude>commons-lang:*</exclude>
+                  <exclude>commons-codec:*</exclude>
+                  <exclude>commons-fileupload:*</exclude>
+                  <exclude>org.openrdf.sesame:*</exclude>
+                  <exclude>com.github.stephenc.high-scale-lib:*</exclude>
+                  <exclude>colt:*</exclude>
+                  <exclude>org.apache.lucene:*</exclude>
+                  <exclude>com.ibm.icu:*</exclude>
+                  <exclude>org.slf4j:*</exclude>
+                  <exclude>org.apache.httpcomponents:*</exclude>
+                  <exclude>org.codehaus.jettison:*</exclude>
+                  <exclude>org.apache.*:*</exclude>
+                  <exclude>org.eclipse.jetty:*</exclude>
+                  <exclude>com.tinkerpop.*:*</exclude>
+                  <exclude>javax.servlet:*</exclude>
+                  <exclude>log4j:*</exclude>
+		</excludes>
+ 	      </artifactSet>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
@@ -200,7 +181,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>Blazegraph Executable Jar</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph Runtime</h1>]]></doctitle>
           <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){

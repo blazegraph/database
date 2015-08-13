@@ -207,6 +207,7 @@ dependencies.
     <module>../bigdata-war</module>
     <module>../bigdata-blueprints</module>
     <module>../bigdata-jar</module>
+    <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
