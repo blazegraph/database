@@ -33,7 +33,7 @@ public interface IAllocationManager {
 	 * 
 	 * @return a new IAlocationContext
 	 */
-	public IAllocationContext newAllocationContext(final boolean isolated);
+	IAllocationContext newAllocationContext(final boolean isolated);
     
     /**
      * Indicates that the allocation context will no longer be used and that the
@@ -45,7 +45,7 @@ public interface IAllocationManager {
      * @param context
      *            The application object which serves as the allocation context.
      */
-    public void abortContext(IAllocationContext context);
+    void abortContext(IAllocationContext context);
 
     /**
      * Indicates that the allocation context will no longer be used, but that
@@ -58,16 +58,6 @@ public interface IAllocationManager {
      * @param context
      *            The application object which serves as the allocation context.
      */
-    public void detachContext(IAllocationContext context);
-
-    /**
-     * Notify the {@link IStore} that an object will serve as an allocation
-     * context and ensures that session protection will be active while the
-     * context is registered. Contexts are implicitly registered on first use.
-     * 
-     * @param context
-     *            The application object which serves as the allocation context.
-     */
-    // public void registerContext(IAllocationContext context);
+    void detachContext(IAllocationContext context);
 
 }

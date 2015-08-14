@@ -297,12 +297,12 @@ public class AllocBlock {
 	 * that was allocated prior to the shadow creation.
 	 */
 	public void shadow() {
-		// Debug check if commit is different from live
-		for (int i = 0; i < m_commit.length; i++) {
-			if (m_commit[i] != m_live[i]) {
-				System.out.println("live != commit : " + i);
-			}
-		}
+//		// Debug check if commit is different from live
+//		for (int i = 0; i < m_commit.length; i++) {
+//			if (m_commit[i] != m_live[i]) {
+//				System.out.println("live != commit : " + i);
+//			}
+//		}
 		m_saveCommit = m_commit;
 		m_isoFrees = new int[m_ints]; // ensures we can calculate true differences for reset
 		for (int i = 0; i < m_ints; i++) {

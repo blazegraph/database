@@ -2754,7 +2754,6 @@ abstract public class StoreManager extends ResourceEvents implements
 
 		@Override
 		public boolean isHAJournal() {
-			// TODO Auto-generated method stub
 			return false;
 		}
 
