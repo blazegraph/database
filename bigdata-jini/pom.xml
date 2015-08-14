@@ -254,6 +254,18 @@ ga('send', 'pageview');
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-rdf-test</artifactId>
+      <version>${bigdata.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-rdf-test</artifactId>
+      <version>${bigdata.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <version>${zookeeper.version}</version>
