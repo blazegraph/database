@@ -2915,15 +2915,15 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
 //      }
 //  }
 
-    /*
-     * Slug
-     */
-    private int fibslug(int n) {
-    	if (n < 2) 
-    		return 1;
-    	else
-    		return fibslug(n-1) + fibslug(n-2);
-    }
+//    /*
+//     * Slug
+//     */
+//    private int fibslug(int n) {
+//    	if (n < 2) 
+//    		return 1;
+//    	else
+//    		return fibslug(n-1) + fibslug(n-2);
+//    }
     
     /**
      * The semantics of reset are to revert unisolated writes to committed
@@ -4961,21 +4961,6 @@ public class RWStore implements IStore, IBufferedWriter, IBackingReader {
         return totalFreed;
     }
 
-    /**
-     * When a new context is started it must be registered to ensure it is
-     * protected.
-     * 
-     * @param context
-     */
-//    public void registerContext(IAllocationContext context) {
-//        m_allocationWriteLock.lock();
-//        try {
-//            establishContextAllocation(context);
-//        } finally {
-//            m_allocationWriteLock.unlock();
-//        }
-//    }
-    
     /**
      * {@inheritDoc}
      * <p>

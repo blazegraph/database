@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -100,11 +101,16 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	private final AtomicLong m_userBytes = new AtomicLong();
 	private final AtomicLong m_slotBytes = new AtomicLong();
 
-	boolean m_active = true;
-	final boolean m_isolated;
+	/**
+	 * Note: Must be either atomic or volatile since accessed without a lock!
+	 */
+	private final AtomicBoolean m_active = new AtomicBoolean(true);
 	
+	final boolean m_isolated;
+
+	@Override
 	final public void checkActive() {
-		if (!m_active) {
+		if (!m_active.get()) {
 			throw new IllegalStateException();
 		}
 	}
@@ -139,16 +145,19 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 		
 	}
 	
+	@Override
 	public boolean isIsolated() {
 		return m_isolated;
 	}
 
+	@Override
 	public long allocate(final ByteBuffer data) {
 
 		return allocate(data, true/* blocks */);
 
 	}
 	
+	@Override
 	public long allocate(final ByteBuffer data, final boolean blocks) {
 
 		if (data == null)
@@ -164,6 +173,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 	}
 
+	@Override
 	public long allocate(final int nbytes) {
 
 		return allocate(nbytes, true/*blocks*/);
@@ -173,6 +183,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	/*
 	 * Core impl.
 	 */
+	@Override
 	public long allocate(final int nbytes, final boolean blocks) {
 
 		lock.lock();
@@ -199,6 +210,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 	}
 
+	@Override
 	public void clear() {
 
 		lock.lock();
@@ -225,6 +237,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 	}
 
+	@Override
 	public void free(final long addr) {
 
 		final int rwaddr = MemoryManager.getAllocationAddress(addr);
@@ -250,48 +263,56 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 
 	}
 
+	@Override
 	public ByteBuffer[] get(final long addr) {
 
 		return m_root.get(addr);
 
 	}
 
+	@Override
 	public byte[] read(final long addr) {
 
 		return MemoryManager.read(this, addr);
 
 	}
 
+	@Override
 	public IMemoryManager createAllocationContext() {
 
 		return new AllocationContext(this);
 
 	}
 
+	@Override
 	public int allocationSize(final long addr) {
 
 		return m_root.allocationSize(addr);
 		
 	}
 
+	@Override
 	public long getAllocationCount() {
 		
 		return m_allocCount.get();
 		
 	}
 	
+	@Override
 	public long getSlotBytes() {
 	
 		return m_slotBytes.get();
 		
 	}
 
+	@Override
 	public long getUserBytes() {
 
 		return m_userBytes.get();
 		
 	}
 
+	@Override
 	public CounterSet getCounters() {
 		
 		final CounterSet root = new CounterSet();
@@ -481,7 +502,7 @@ public class AllocationContext implements IAllocationContext, IMemoryManager {//
 	public void release() {
 		checkActive();
 		
-		m_active = false;
+		m_active.set(false);
 	}
 
 //	private SectorAllocation m_head = null;

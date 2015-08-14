@@ -30,7 +30,7 @@ package com.bigdata.rawstore;
  * 
  * @author Martyn Cutcher
  */
-public abstract interface IAllocationContext {
+public interface IAllocationContext {
 	
 	public void release();
 

@@ -426,11 +426,6 @@ public class MemStrategy implements IBufferStrategy, IRWStrategy, IAllocationMan
 		m_mmgr.detachContext(context);
 	}
 
-//	@Override
-//	public void registerContext(IAllocationContext context) {
-//		m_mmgr.registerContext(context);
-//	}
-
 	@Override
 	public int checkDeferredFrees(final AbstractJournal abstractJournal) {
 		return m_mmgr.checkDeferredFrees(abstractJournal);
