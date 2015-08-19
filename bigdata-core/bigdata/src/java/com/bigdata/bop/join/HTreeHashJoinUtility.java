@@ -563,7 +563,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         // this is a DISTINCT filter).
         this.outputDistinctJVs = 
            op.getProperty(
-              HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
+              HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
 
         
         this.selectVars = filter ? joinVars : (IVariable<?>[]) op

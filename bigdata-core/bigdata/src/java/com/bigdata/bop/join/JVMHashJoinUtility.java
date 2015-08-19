@@ -289,7 +289,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         this.outputDistinctJVs = 
            op.getProperty(
-              HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
+              HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
 
         
         // The join constraints (optional).
