@@ -53,12 +53,13 @@ import com.bigdata.bop.controller.SubqueryOp;
 import com.bigdata.bop.controller.Union;
 import com.bigdata.bop.engine.QueryEngine;
 import com.bigdata.bop.engine.StaticAnalysisStats;
-import com.bigdata.bop.join.HTreeHashIndexOp;
+import com.bigdata.bop.join.HTreeHashJoinUtility;
 import com.bigdata.bop.join.HTreeMergeJoin;
 import com.bigdata.bop.join.HTreeSolutionSetHashJoinOp;
 import com.bigdata.bop.join.HashIndexOp;
 import com.bigdata.bop.join.HashJoinAnnotations;
-import com.bigdata.bop.join.JVMHashIndexOp;
+import com.bigdata.bop.join.IHashJoinUtilityFactory;
+import com.bigdata.bop.join.JVMHashJoinUtility;
 import com.bigdata.bop.join.JVMMergeJoin;
 import com.bigdata.bop.join.JVMSolutionSetHashJoinOp;
 import com.bigdata.bop.join.JoinAnnotations;
@@ -1469,8 +1470,14 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
                 final JoinTypeEnum joinType = JoinTypeEnum.Normal;
 
+                IHashJoinUtilityFactory joinUtilFactory;
                 if (ctx.nativeHashJoins) {
-                    left = applyQueryHints(new HTreeHashIndexOp(
+                    joinUtilFactory = HTreeHashJoinUtility.factory;
+                } else {
+                    joinUtilFactory = JVMHashJoinUtility.factory;
+                }
+
+                left = applyQueryHints(new HashIndexOp(
                             leftOrEmpty(left),//
                             new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                             new NV(BOp.Annotations.EVALUATION_CONTEXT,
@@ -1480,37 +1487,16 @@ public class AST2BOpUtility extends AST2BOpRTO {
                             new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                             new NV(PipelineOp.Annotations.SHARED_STATE, true),// live
                                                                               // stats.
-                            new NV(HTreeHashIndexOp.Annotations.RELATION_NAME,
-                                    new String[] { ctx.getLexiconNamespace() }),//
                             new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
                             new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
                             new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                            new NV(
-                                    HashIndexOp.Annotations.NAMED_SET_SOURCE_REF,
+                            new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                                    joinUtilFactory),//
+                            new NV(HashIndexOp.Annotations.NAMED_SET_SOURCE_REF,
                                     sourceSet),//
                             new NV(HashIndexOp.Annotations.NAMED_SET_REF,
                                     generatedSet)//
                         ), nsi, ctx);
-                } else {
-                    left = applyQueryHints(new JVMHashIndexOp(
-                            leftOrEmpty(left),//
-                            new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                            new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                                    BOpEvaluationContext.CONTROLLER),//
-                            new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                            new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                            new NV(PipelineOp.Annotations.SHARED_STATE, true),// live
-                                                                              // stats.
-                            new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                            new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                            new NV(HashIndexOp.Annotations.SELECT, selectVars),//
-                            new NV(
-                                    HashIndexOp.Annotations.NAMED_SET_SOURCE_REF,
-                                    sourceSet),//
-                            new NV(HashIndexOp.Annotations.NAMED_SET_REF,
-                                    generatedSet)//
-                        ), nsi, ctx);
-                }
 
                 // true since we are building the hash index.
                 release = true;
@@ -1712,39 +1698,30 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final int maxParallel = lastPass ? 1
                 : ctx.maxParallelForSolutionSetHashJoin;
 
-        // Generate the hash index operator.
-        if(ctx.nativeHashJoins) {
-            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
-                new NV(HTreeHashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
-            ), bindingsClause, ctx);
+        IHashJoinUtilityFactory joinUtilFactory;
+        if (ctx.nativeHashJoins) {
+            joinUtilFactory = HTreeHashJoinUtility.factory;
         } else {
-            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
+            joinUtilFactory = JVMHashJoinUtility.factory;
+        }
+
+        // Generate the hash index operator.
+        left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-//                    new NV(HTreeHashIndexOp.Annotations.SELECT, projectedVars),//
-                new NV(HTreeHashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
-                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+//                    new NV(HashIndexOp.Annotations.SELECT, projectedVars),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        joinUtilFactory),//
+                new NV(HashIndexOp.Annotations.BINDING_SETS_SOURCE, bindingSets),// source solutions from VALUES.
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)// output named solution set.
             ), bindingsClause, ctx);
-        }
 
         // Generate the solution set hash join operator.
         if(ctx.nativeHashJoins) {
@@ -2234,38 +2211,29 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (askVar == null)
             throw new UnsupportedOperationException();
 
-        if(ctx.nativeHashJoins) {
-            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                        BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ), subqueryRoot, ctx);
+        IHashJoinUtilityFactory joinUtilFactory;
+        if (ctx.nativeHashJoins) {
+            joinUtilFactory = HTreeHashJoinUtility.factory;
         } else {
-            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
+            joinUtilFactory = JVMHashJoinUtility.factory;
+        }
+
+        left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
                 new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),// required
                 new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
-                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
-                new NV(HTreeHashIndexOp.Annotations.ASK_VAR, askVar),//
-                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// Note: will be applied by the solution set hash join.
+                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+                new NV(HashIndexOp.Annotations.ASK_VAR, askVar),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        joinUtilFactory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             ), subqueryRoot, ctx);
-        }
 
         // Everything is visible inside of the EXISTS graph pattern.
 //        /*
@@ -3433,36 +3401,28 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
             left = addNamedSubqueryInclude(left, firstInclude, doneSet, ctx);
             
-            if(ctx.nativeHashJoins) {
-                left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                    new NV(HTreeHashIndexOp.Annotations.RELATION_NAME, new String[]{ctx.getLexiconNamespace()}),//
-        //                new NV(HTreeHashIndexOp.Annotations.OPTIONAL, optional),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
-        //                new NV(HTreeHashIndexOp.Annotations.SELECT, selectVars),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
-                ), joinGroup, ctx);
+            IHashJoinUtilityFactory joinUtilFactory;
+            if (ctx.nativeHashJoins) {
+                joinUtilFactory = HTreeHashJoinUtility.factory;
             } else {
-                left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
-                    new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                            BOpEvaluationContext.CONTROLLER),//
-                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
-                    new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                    new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-//                    new NV(JVMHashIndexOp.Annotations.OPTIONAL, optional),//
-                    new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                    new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinvars2),//
-        //                new NV(JVMHashIndexOp.Annotations.SELECT, selectVars),//
-                    new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
-                ), joinGroup, ctx);
+                joinUtilFactory = JVMHashJoinUtility.factory;
             }
+            
+            left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
+                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+                new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                        BOpEvaluationContext.CONTROLLER),//
+                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+    //                new NV(HashIndexOp.Annotations.OPTIONAL, optional),//
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinvars2),//
+    //                new NV(HashIndexOp.Annotations.SELECT, selectVars),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        joinUtilFactory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, firstNamedSolutionSetRef)//
+            ), joinGroup, ctx);
         }
         
         /*
@@ -5440,39 +5400,29 @@ public class AST2BOpUtility extends AST2BOpRTO {
         */
        boolean inlineProjection = joinVarsSet.equals(projectInVarsSet);
        
-        if(ctx.nativeHashJoins) {
-            left = applyQueryHints(new HTreeHashIndexOp(leftOrEmpty(left),//
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                       BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(HTreeHashIndexOp.Annotations.RELATION_NAME,// 
-                       new String[]{ctx.getLexiconNamespace()}),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                // instead of specifying the SELECT vars, we output the distinct join vars
-                new NV(HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
-                new NV(HTreeHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ), node, ctx);
-        } else {
-            left = applyQueryHints(new JVMHashIndexOp(leftOrEmpty(left),//
-                new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
-                new NV(BOp.Annotations.EVALUATION_CONTEXT,
-                       BOpEvaluationContext.CONTROLLER),//
-                new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
-                new NV(PipelineOp.Annotations.LAST_PASS, true),// required
-                new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
-                new NV(JVMHashIndexOp.Annotations.JOIN_TYPE, joinType),//
-                new NV(JVMHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                // instead of specifying the SELECT vars, we output the distinct join vars
-                new NV(JVMHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
-                new NV(JVMHashIndexOp.Annotations.CONSTRAINTS, joinConstraints),// 
-                new NV(JVMHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
-            ), node, ctx);
-        }
+       IHashJoinUtilityFactory joinUtilFactory;
+       if (ctx.nativeHashJoins) {
+           joinUtilFactory = HTreeHashJoinUtility.factory;
+       } else {
+           joinUtilFactory = JVMHashJoinUtility.factory;
+       }
+       
+       left = applyQueryHints(new HashIndexOp(leftOrEmpty(left),//
+           new NV(BOp.Annotations.BOP_ID, ctx.nextId()),//
+           new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                  BOpEvaluationContext.CONTROLLER),//
+           new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),// required for lastPass
+           new NV(PipelineOp.Annotations.LAST_PASS, true),// required
+           new NV(PipelineOp.Annotations.SHARED_STATE, true),// live stats.
+           new NV(HashIndexOp.Annotations.JOIN_TYPE, joinType),//
+           new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+           // instead of specifying the SELECT vars, we output the distinct join vars
+           new NV(HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, inlineProjection),//
+           new NV(HashIndexOp.Annotations.CONSTRAINTS, joinConstraints),//
+           new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                  joinUtilFactory),//
+           new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+       ), node, ctx);
         
         /** 
          * If the projection was not inlined, we need to apply it on top.

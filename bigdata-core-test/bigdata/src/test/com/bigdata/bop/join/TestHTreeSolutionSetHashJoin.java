@@ -119,6 +119,10 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                 new NV(HTreeSolutionSetHashJoinOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
+/*
+ Why are the next three constructors for HTreeHashIndexOp?
+ Commented!
+
         // Must run on the query controller.
         try {
             new HTreeHashIndexOp(BOp.NOARGS,//
@@ -176,6 +180,7 @@ public class TestHTreeSolutionSetHashJoin extends TestCase2 {
                 log.info("Ignoring expected exception: "+ex);
         }
         
+*/
     }
 
 }
