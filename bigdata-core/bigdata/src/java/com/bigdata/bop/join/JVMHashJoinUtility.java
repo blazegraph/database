@@ -47,6 +47,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.join.JVMHashIndex.Bucket;
 import com.bigdata.bop.join.JVMHashIndex.Key;
@@ -74,6 +75,25 @@ import cutthecrap.utils.striterators.Visitor;
 public class JVMHashJoinUtility implements IHashJoinUtility {
 
     private static final Logger log = Logger.getLogger(JVMHashJoinUtility.class);
+
+    /**
+     * Singleton {@link IHashJoinUtilityFactory} that can be used to create a 
+     * new {@link JVMHashJoinUtility}.
+     */
+    static public final IHashJoinUtilityFactory factory =
+            new IHashJoinUtilityFactory() {
+
+        public IHashJoinUtility create(//
+                BOpContext<IBindingSet> context,//
+                INamedSolutionSetRef namedSetRef,//
+                PipelineOp op,//
+                JoinTypeEnum joinType//
+                ) {
+
+            return new JVMHashJoinUtility(op, joinType);
+
+        }
+    };
 
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.

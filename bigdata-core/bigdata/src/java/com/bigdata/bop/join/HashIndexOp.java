@@ -34,7 +34,6 @@ import java.util.concurrent.FutureTask;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContext;
-import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IQueryAttributes;
@@ -78,7 +77,7 @@ import cutthecrap.utils.striterators.SingleValueIterator;
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
-abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedOp {
+public class HashIndexOp extends PipelineOp implements ISingleThreadedOp {
 
 //    static private final transient Logger log = Logger
 //            .getLogger(HashIndexOp.class);
@@ -90,6 +89,16 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
 
     public interface Annotations extends HashJoinAnnotations, JoinAnnotations,
             NamedSetAnnotations {
+
+        /**
+         * A mandatory attribute specifying the {@link IHashJoinUtilityFactory} 
+         * from which this operator obtains a {@link IHashJoinUtility} to be
+         * used by this operator. This factory is invoked once, the first time
+         * this operator is evaluated. The obtained {@link IHashJoinUtility}
+         * reference is attached to the {@link IQueryAttributes} and accessed
+         * there on subsequent evaluation passes for this operator.
+         */
+        final String HASH_JOIN_UTILITY_FACTORY = HashIndexOp.class.getName() + ".utilFactory";
 
         /**
          * An optional attribute specifying the <em>source</em> named solution
@@ -150,11 +159,6 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
                     BOp.Annotations.EVALUATION_CONTEXT + "="
                             + getEvaluationContext());
         }
-//        if (getEvaluationContext() != BOpEvaluationContext.CONTROLLER) {
-//            throw new IllegalArgumentException(
-//                    BOp.Annotations.EVALUATION_CONTEXT + "="
-//                            + getEvaluationContext());
-//        }
 
         /*
          * This operator writes on an object that is not thread-safe for
@@ -176,6 +180,9 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
 
         @SuppressWarnings("unused")
         final JoinTypeEnum joinType = (JoinTypeEnum) getRequiredProperty(Annotations.JOIN_TYPE);
+
+        @SuppressWarnings("unused")
+        final IHashJoinUtilityFactory factory = (IHashJoinUtilityFactory) getRequiredProperty(Annotations.HASH_JOIN_UTILITY_FACTORY);
 
         // Join variables must be specified.
         final IVariable<?>[] joinVars = (IVariable[]) getRequiredProperty(Annotations.JOIN_VARS);
@@ -201,26 +208,6 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
         return new NamedSolutionSetStats();
 
     }
-
-    /**
-     * Return the instance of the {@link IHashJoinUtility} to be used by this
-     * operator. This method is invoked once, the first time this operator is
-     * evaluated. The returned {@link IHashJoinUtility} reference is attached to
-     * the {@link IQueryAttributes} and accessed there on subsequent evaluation
-     * passes for this operator.
-     * 
-     * @param context
-     *            The {@link BOpEvaluationContext}
-     * @param namedSetRef
-     *            Metadata to identify the named solution set.
-     * @param joinType
-     *            The type of join.
-     */
-    abstract protected IHashJoinUtility newState(//
-            final BOpContext<IBindingSet> context,//
-            final INamedSolutionSetRef namedSetRef, //
-            final JoinTypeEnum joinType//
-            );
 
     @Override
     public FutureTask<Void> eval(final BOpContext<IBindingSet> context) {
@@ -299,7 +286,11 @@ abstract public class HashIndexOp extends PipelineOp implements ISingleThreadedO
                     final JoinTypeEnum joinType = (JoinTypeEnum) op
                             .getRequiredProperty(Annotations.JOIN_TYPE);
 
-                    state = op.newState(context, namedSetRef, joinType);
+                    final IHashJoinUtilityFactory factory =
+                            (IHashJoinUtilityFactory) op.getRequiredProperty(
+                                    Annotations.HASH_JOIN_UTILITY_FACTORY);
+
+                    state = factory.create(context, namedSetRef, op, joinType);
 
                     if (attrs.putIfAbsent(namedSetRef, state) != null)
                         throw new AssertionError();

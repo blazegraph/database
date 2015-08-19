@@ -47,6 +47,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -120,6 +121,27 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     static private final transient Logger log = Logger
             .getLogger(HTreeHashJoinUtility.class);
+
+    /**
+     * Singleton {@link IHashJoinUtilityFactory} that can be used to create a 
+     * new {@link HTreeHashJoinUtility}.
+     */
+    static public final IHashJoinUtilityFactory factory =
+            new IHashJoinUtilityFactory() {
+
+        public IHashJoinUtility create(//
+                BOpContext<IBindingSet> context,//
+                INamedSolutionSetRef namedSetRef,//
+                PipelineOp op,//
+                JoinTypeEnum joinType//
+                ) {
+
+            return new HTreeHashJoinUtility(
+                    context.getMemoryManager(namedSetRef.getQueryId()),
+                    op, joinType);
+
+        }
+    };
 
     /**
      * Note: If joinVars is an empty array, then the solutions will all hash to
