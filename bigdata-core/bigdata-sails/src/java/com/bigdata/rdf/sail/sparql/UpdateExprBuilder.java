@@ -289,7 +289,7 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             op.setSilent(true);
 
         final RDFParserOptions options = new RDFParserOptions(
-                context.tripleStore.getProperties());
+                context.getUpdateProperties());
 
         if (node.verifyData != null) {
 
@@ -633,12 +633,13 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
             final ASTIRI withNode = node.getWithClause();
             
             if (withNode != null) {
-                
-                if (!context.tripleStore.isQuads()) {
-                    throw new QuadsOperationInTriplesModeException(
-                         "Using named graph referenced through WITH clause " +
-                         "is not supported in triples mode.");
-                }
+
+// TODO: move to evaluate
+//                if (!context.tripleStore.isQuads()) {
+//                    throw new QuadsOperationInTriplesModeException(
+//                         "Using named graph referenced through WITH clause " +
+//                         "is not supported in triples mode.");
+//                }
                 
                 with = (ConstantNode) withNode.jjtAccept(this, data);
 
@@ -778,15 +779,16 @@ public class UpdateExprBuilder extends BigdataExprBuilder {
         /**
          * Reject real quads in triple mode
          */
-        if (!context.tripleStore.isQuads()) {
-           for (Statement stmt : stmts) {
-              if (stmt!=null && stmt.getContext()!=null) {
-                 throw new QuadsOperationInTriplesModeException(
-                    "Quads in SPARQL update data block are not supported " +
-                    "in triples mode.");
-              }
-           }
-        }
+    	//TODO: move to evaluate
+//        if (!context.tripleStore.isQuads()) {
+//           for (Statement stmt : stmts) {
+//              if (stmt!=null && stmt.getContext()!=null) {
+//                 throw new QuadsOperationInTriplesModeException(
+//                    "Quads in SPARQL update data block are not supported " +
+//                    "in triples mode.");
+//              }
+//           }
+//        }
 
          if (!allowBlankNodes) {
    

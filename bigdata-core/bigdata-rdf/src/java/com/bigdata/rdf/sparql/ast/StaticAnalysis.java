@@ -2478,6 +2478,20 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
 
             for (IValueExpressionNode exprNode : projection) {
 
+                if (isAggregateExpressionNode(exprNode)) {
+                    return true;
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    private static boolean isAggregateExpressionNode(IValueExpressionNode exprNode) {
+        
                 final IValueExpression<?> expr = exprNode.getValueExpression();
 
                 if (expr == null) {
@@ -2486,6 +2500,10 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                      * The value expression is not cached....
                      */
                     
+                    if (exprNode instanceof AssignmentNode) {
+                        return isAggregateExpressionNode(((AssignmentNode) exprNode).getValueExpressionNode());
+                    }
+
                     if (exprNode instanceof FunctionNode) {
 
                         /*
@@ -2513,13 +2531,7 @@ public class StaticAnalysis extends StaticAnalysis_CanJoin {
                     return true;
 
                 }
-
-            }
-
-        }
-
-        return false;
-
+                return false;
     }
 
     /**

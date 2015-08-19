@@ -37,8 +37,6 @@ import com.bigdata.relation.accesspath.IAccessPath;
  */
 public class DatasetDeclProcessor {
 
-    private final BigdataASTContext context;
-
     /*
      * Lazily instantiated sets for the default and named graphs.
      */
@@ -80,10 +78,7 @@ public class DatasetDeclProcessor {
 
     }
 
-    public DatasetDeclProcessor(final BigdataASTContext context) {
-        
-        this.context = context;
-        
+    public DatasetDeclProcessor() {
     }
     
         /**
@@ -96,7 +91,7 @@ public class DatasetDeclProcessor {
      * @throws MalformedQueryException
      *             If DatasetClause does not contain a valid URI.
      */
-    public DatasetNode process(final ASTOperationContainer qc)
+    public DatasetNode process(final ASTOperationContainer qc, final BigdataASTContext context)
             throws MalformedQueryException {
 
         final boolean update = qc instanceof ASTUpdateContainer;
@@ -186,7 +181,8 @@ public class DatasetDeclProcessor {
                         
                     } else {
 
-                        addGraph(uri.getIV(), dc.isNamed());
+                        if (uri.getIV() != null)
+                            addGraph(uri.getIV(), dc.isNamed());
 
                     }
 

@@ -35,6 +35,7 @@ package com.bigdata.rdf.sail.sparql;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Properties;
 
 import org.openrdf.model.Value;
 import org.openrdf.model.vocabulary.RDF;
@@ -43,6 +44,7 @@ import com.bigdata.rdf.internal.ILexiconConfiguration;
 import com.bigdata.rdf.lexicon.LexiconRelation;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
@@ -87,6 +89,26 @@ public class BigdataASTContext {
      */
     private int constantVarID = 1;
 
+	private final Properties updateProperties;
+
+    public BigdataASTContext(Map<Value, BigdataValue> values, Properties updateProperties) {
+    	
+    	this.tripleStore = null;
+
+    	this.valueFactory = BigdataValueFactoryImpl.getInstance("");
+        
+        this.lexicon = null;
+
+        this.lex = null;
+
+        this.conf = null;
+        
+    	this.vocab = values;
+    	
+    	this.updateProperties = updateProperties;
+
+    }
+    
     public BigdataASTContext(final AbstractTripleStore tripleStore) {
 
         this.tripleStore = tripleStore;
@@ -100,9 +122,16 @@ public class BigdataASTContext {
         this.conf = lexicon.getLexiconConfiguration();
         
         this.vocab = new LinkedHashMap<Value, BigdataValue>();
+        
+        this.updateProperties = tripleStore.getProperties();
 
     }
 
+    
+    public Properties getUpdateProperties() {
+		return updateProperties;
+	}
+    
     /**
      * Create an anonymous variable. The variable name will be unique (within
      * the scope of the query parser) and {@link VarNode#isAnonymous()} will

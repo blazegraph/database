@@ -33,25 +33,36 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sail.sparql;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
+import org.openrdf.model.Literal;
+import org.openrdf.model.URI;
 import org.openrdf.model.Value;
+import org.openrdf.model.impl.URIImpl;
 import org.openrdf.model.vocabulary.RDF;
+import org.openrdf.model.vocabulary.XMLSchema;
 import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.bop.IValueExpression;
+import com.bigdata.rdf.internal.DTE;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.LexiconConfiguration;
 import com.bigdata.rdf.internal.VTE;
 import com.bigdata.rdf.internal.constraints.SPARQLConstraint;
 import com.bigdata.rdf.internal.impl.TermId;
+import com.bigdata.rdf.internal.impl.literal.AbstractLiteralIV;
+import com.bigdata.rdf.internal.impl.literal.FullyInlineTypedLiteralIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.model.BigdataValueFactory;
+import com.bigdata.rdf.model.BigdataValueFactoryImpl;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.sparql.ast.ASTBlankNode;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
@@ -94,31 +105,34 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
     private final static Logger log = Logger
             .getLogger(BatchRDFValueResolver.class);
 
-    private final BigdataASTContext context;
-
     private final boolean readOnly;
     
-    private final BigdataValueFactory valueFactory;
+    private BigdataValueFactory valueFactory;
 
-    private final LinkedHashMap<ASTRDFValue, BigdataValue> nodes;
-    
+    private final LinkedHashMap<ASTRDFValue, Value> nodes;
+
+    private Map<Value, BigdataValue> vocab;
+
     /**
      * @param context
      * @param readOnly
      *            When <code>true</code>, unknown RDF {@link Value}s are not
      *            recorded in the database.
      */
-    public BatchRDFValueResolver(final BigdataASTContext context,
-            final boolean readOnly) {
-
-        this.context = context;
+    public BatchRDFValueResolver(final boolean readOnly) {
 
         this.readOnly = readOnly;
         
-        this.valueFactory = context.valueFactory;
+        this.valueFactory = BigdataValueFactoryImpl.getInstance("");
         
-        this.nodes = new LinkedHashMap<ASTRDFValue, BigdataValue>();
+        this.nodes = new LinkedHashMap<>();
         
+        this.vocab = new HashMap<>();
+
+    }
+    
+    public Map<ASTRDFValue, Value> getNodes() {
+        return nodes;
     }
 
     /**
@@ -136,8 +150,10 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
      * @throws MalformedQueryException
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void process(final ASTOperationContainer qc)
+    public void processOnPrepareEvaluate(final ASTOperationContainer qc, final BigdataASTContext context)
             throws MalformedQueryException {
+        
+        valueFactory = context.valueFactory;
         
         try {
 
@@ -164,23 +180,24 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             final BigdataValueFactory f = context.valueFactory;
 
             final Map<Value, BigdataValue> vocab = context.vocab;
+            this.vocab = vocab;
 
-            // RDF Collection syntactic sugar vocabulary items.
+        // RDF Collection syntactic sugar vocabulary items.
             vocab.put(RDF.FIRST, f.asValue(RDF.FIRST));
             vocab.put(RDF.REST, f.asValue(RDF.REST));
             vocab.put(RDF.NIL, f.asValue(RDF.NIL));
             vocab.put(BD.VIRTUAL_GRAPH, f.asValue(BD.VIRTUAL_GRAPH));
- 
+
             /*
              * RDF Values actually appearing in the parse tree.
              */
-            final Iterator<BigdataValue> itr = nodes.values().iterator();
+            final Iterator<Value> itr = nodes.values().iterator();
             
             while (itr.hasNext()) {
             
-                final BigdataValue value = itr.next();
+                final Value value = itr.next();
                 
-                vocab.put(value, value);
+                vocab.put(value, (BigdataValue)value);
                 
             }
             
@@ -193,12 +210,12 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         {
 
             final BigdataValue[] values = context.vocab.values().toArray(
-                    new BigdataValue[0]);
+                    new BigdataValue[context.vocab.values().size()]);
 
             context.lexicon.addTerms(values, values.length, readOnly);
 
             // Cache the BigdataValues on the IVs for later
-            for (BigdataValue value : values) {
+            for (BigdataValue value : context.vocab.values()) {
 
                 final IV iv = value.getIV();
 
@@ -242,16 +259,16 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
          */
         {
             
-            final Iterator<Map.Entry<ASTRDFValue, BigdataValue>> itr = nodes
+            final Iterator<Map.Entry<ASTRDFValue, Value>> itr = nodes
                     .entrySet().iterator();
 
             while (itr.hasNext()) {
 
-                final Map.Entry<ASTRDFValue, BigdataValue> e = itr.next();
+                final Map.Entry<ASTRDFValue, Value> e = itr.next();
 
                 final ASTRDFValue node = e.getKey();
 
-                final BigdataValue value = e.getValue();
+                final Value value = e.getValue();
 
                 final BigdataValue resolvedValue = context.vocab.get(value);
                 
@@ -259,6 +276,377 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
             }
             
+        }
+
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public void process(final ASTOperationContainer qc)
+            throws MalformedQueryException {
+        
+        try {
+
+            /*
+             * Collect all ASTRDFValue nodes into a map, paired with
+             * BigdataValue objects.
+             */
+            qc.jjtAccept(new RDFValuePrepareResolver(), null);
+            
+        } catch (VisitorException e) {
+            
+            // Turn the exception into a Query exception.
+            throw new MalformedQueryException(e);
+            
+        }
+
+        /*
+         * Build up the vocabulary. This is everything in the parse tree plus
+         * some key vocabulary items which correspond to syntactic sugar in
+         * SPARQL.
+         */
+        {
+            
+//            final BigdataValueFactory f = context.valueFactory;
+
+//            final Map<Value, BigdataValue> vocab = new HashMap<>(); // context.vocab;
+
+            /*
+             * RDF Values actually appearing in the parse tree.
+             */
+            final Iterator<Entry<ASTRDFValue, Value>> itr = nodes.entrySet().iterator();
+
+            while (itr.hasNext()) {
+            
+                final Entry<ASTRDFValue, Value> entry = itr.next();
+                ASTRDFValue value = entry.getKey();
+                
+                IV iv;
+                BigdataValue bigdataValue = null;
+                if (value.getRDFValue()!=null) {
+                    iv = ((BigdataValue)value.getRDFValue()).getIV();
+                } else if (value instanceof ASTIRI) {
+                    iv = new TermId<BigdataValue>(VTE.URI,0);
+                    bigdataValue = valueFactory.createURI(((ASTIRI)value).getValue());
+                    iv.setValue(bigdataValue);
+                    bigdataValue.setIV(iv);
+                } else if (value instanceof ASTRDFLiteral) {
+                    ASTRDFLiteral rdfNode = (ASTRDFLiteral) value;
+                    String lang = rdfNode.getLang();
+                    ASTIRI dataTypeIri = rdfNode.getDatatype();
+                    URIImpl dataTypeUri = null;
+//                  if (XMLSchema.DATETIME.equals(dataTypeUri)) {
+//                      iv = new XSD
+//                  } else 
+                    DTE dte = null;
+                    if (dataTypeIri!=null && dataTypeIri.getValue()!=null) {
+                        dataTypeUri = new URIImpl(dataTypeIri.getValue());
+                        dte = DTE.valueOf(dataTypeUri);
+                        }
+                        if (dte!=null) {
+                        iv = IVUtility.decode(rdfNode.getLabel().getValue(), dte.name());
+                        bigdataValue = getBigdataValue(iv, dte);
+                    } else { 
+                        iv = new TermId<BigdataValue>(VTE.LITERAL,0);
+                        if (lang!=null) {
+                            bigdataValue = valueFactory.createLiteral(rdfNode.getLabel().getValue(), lang);
+                        } else {
+                            bigdataValue = valueFactory.createLiteral(rdfNode.getLabel().getValue(), dataTypeUri);
+                        }
+                        iv.setValue(bigdataValue);
+                        bigdataValue.setIV(iv);
+//                      iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(rdfNode.getLabel().getValue(), rdfNode.getLang(), dataTypeUri);
+                    }
+                } else if (value instanceof ASTNumericLiteral) {
+                    ASTNumericLiteral rdfNode = (ASTNumericLiteral) value;
+                    URI dataTypeUri = rdfNode.getDatatype();
+                    DTE dte = DTE.valueOf(dataTypeUri);
+                    iv = IVUtility.decode(rdfNode.getValue(), dte.name());
+                    bigdataValue = getBigdataValue(iv, dte);
+                } else if (value instanceof ASTTrue) {
+                    bigdataValue = valueFactory.createLiteral(true);
+                    iv = bigdataValue.getIV();
+                } else if (value instanceof ASTFalse) {
+                    bigdataValue = valueFactory.createLiteral(true);
+                    iv = bigdataValue.getIV();
+                } else {
+                    iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(value.toString());
+                    bigdataValue = iv.getValue();
+                }
+
+                if (bigdataValue!=null) {
+                    value.setRDFValue(bigdataValue);
+                    vocab.put(bigdataValue, bigdataValue);
+                }
+                
+            }
+            
+        }
+
+        // RDF Collection syntactic sugar vocabulary items.
+        vocab.put(RDF.FIRST, valueFactory.asValue(RDF.FIRST));
+        vocab.put(RDF.REST, valueFactory.asValue(RDF.REST));
+        vocab.put(RDF.NIL, valueFactory.asValue(RDF.NIL));
+        vocab.put(BD.VIRTUAL_GRAPH, valueFactory.asValue(BD.VIRTUAL_GRAPH));
+
+        /*
+         * Batch resolve the BigdataValue objects against the database. This
+         * sets their IVs as a side-effect.
+         */
+        {
+
+//            final BigdataValue[] values = context.vocab.values().toArray(
+//                    new BigdataValue[0]);
+//
+//            context.lexicon.addTerms(values, values.length, readOnly);
+
+            // Cache the BigdataValues on the IVs for later
+            for (BigdataValue value : vocab.values()) {
+
+                final IV iv = value.getIV();
+
+                if (iv == null) {
+
+                    /*
+                     * Since the term identifier is NULL this value is not known
+                     * to the kb.
+                     */
+
+                    if (log.isInfoEnabled())
+                        log.info("Not in knowledge base: " + value);
+
+                    /*
+                     * Create a dummy iv and cache the unknown value on it so
+                     * that it can be used during query evaluation.
+                     */
+                    final IV dummyIV = TermId.mockIV(VTE.valueOf(value));
+
+                    value.setIV(dummyIV);
+
+                    dummyIV.setValue(value);
+
+                } else {
+
+                    iv.setValue(value);
+
+                }
+
+            }
+
+        }
+//
+//        /*
+//         * Set the BigdataValue object on each ASTRDFValue node.
+//         * 
+//         * Note: This resolves each Value against the vocabulary cache. This is
+//         * necessary in case more than one ASTRDFValue instance exists for the
+//         * same BigdataValue. Otherwise we would fail to have a side-effect on
+//         * some ASTRDFValue nodes.
+//         */
+//        {
+//            
+//            final Iterator<Map.Entry<ASTRDFValue, BigdataValue>> itr = nodes
+//                    .entrySet().iterator();
+//
+//            while (itr.hasNext()) {
+//
+//                final Map.Entry<ASTRDFValue, BigdataValue> e = itr.next();
+//
+//                final ASTRDFValue node = e.getKey();
+//
+//                final BigdataValue value = e.getValue();
+//
+//                final BigdataValue resolvedValue = context.vocab.get(value);
+//                
+//                node.setRDFValue(resolvedValue);
+//
+//            }
+//            
+//        }
+
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private BigdataValue getBigdataValue(IV iv, DTE dte) {
+        BigdataValue bigdataValue;
+        if (!iv.hasValue() && iv instanceof AbstractLiteralIV) {
+            switch(dte) {
+            case XSDByte:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).byteValue());
+                break;
+            case XSDShort:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).shortValue());
+                break;
+            case XSDInt:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).intValue());
+                break;
+            case XSDLong:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).longValue());
+                break;
+            case XSDFloat:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).floatValue());
+                break;
+            case XSDDouble:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).doubleValue());
+                break;
+            case XSDBoolean:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).booleanValue());
+                break;
+            case XSDString:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).stringValue());
+                break;
+            case XSDInteger:
+                bigdataValue = valueFactory.createLiteral(((AbstractLiteralIV)iv).stringValue(), XMLSchema.INTEGER);
+                break;
+            case XSDDecimal:
+                bigdataValue = valueFactory.createLiteral(iv.stringValue(), DTE.XSDDecimal.getDatatypeURI());
+                break;
+            default:
+                throw new RuntimeException("unknown DTE " + dte);
+            }
+            bigdataValue.setIV(iv);
+            iv.setValue(bigdataValue);
+        } else {
+            bigdataValue = iv.getValue();
+        }
+        return bigdataValue;
+    }
+
+    /**
+     * FIXME Should this be using the {@link LexiconConfiguration} to create
+     * appropriate inline {@link IV}s when and where appropriate?
+     */
+    private class RDFValuePrepareResolver extends ASTVisitorBase {
+
+        @Override
+        public Object visit(final ASTQName node, final Object data)
+                throws VisitorException {
+
+            throw new VisitorException(
+                    "QNames must be resolved before resolving RDF Values");
+
+        }
+
+        /**
+         * Note: Blank nodes within a QUERY are treated as anonymous variables,
+         * even when we are in a told bnodes mode.
+         */
+        @Override
+        public Object visit(final ASTBlankNode node, final Object data)
+                throws VisitorException {
+            
+            throw new VisitorException(
+                    "Blank nodes must be replaced with variables before resolving RDF Values");
+            
+        }
+
+        @Override
+        public Void visit(final ASTIRI node, final Object data)
+                throws VisitorException {
+
+            try {
+
+                nodes.put(node, valueFactory.createURI(node.getValue()));
+
+                return null;
+
+            } catch (IllegalArgumentException e) {
+
+                // invalid URI
+                throw new VisitorException(e.getMessage());
+
+            }
+
+        }
+
+        @Override
+        public Void visit(final ASTRDFLiteral node, final Object data)
+                throws VisitorException {
+
+            // Note: This is handled by this ASTVisitor (see below in this
+            // class).
+            final String label = (String) node.getLabel().jjtAccept(this, null);
+
+            final String lang = node.getLang();
+
+            final ASTIRI datatypeNode = node.getDatatype();
+
+            final Literal literal;
+
+            if (datatypeNode != null) {
+
+                final URI datatype;
+
+                try {
+
+                    datatype = valueFactory.createURI(datatypeNode.getValue());
+
+                } catch (IllegalArgumentException e) {
+
+                    // invalid URI
+                    throw new VisitorException(e);
+
+                }
+
+                literal = valueFactory.createLiteral(label, datatype);
+
+            } else if (lang != null) {
+
+                literal = valueFactory.createLiteral(label, lang);
+
+            } else {
+
+                literal = valueFactory.createLiteral(label);
+
+            }
+
+            nodes.put(node, literal);
+
+            return null;
+
+        }
+
+        @Override
+        public Void visit(final ASTNumericLiteral node, final Object data)
+                throws VisitorException {
+
+            nodes.put(
+                    node,
+                    valueFactory.createLiteral(node.getValue(),
+                            node.getDatatype()));
+
+            return null;
+
+        }
+
+        @Override
+        public Void visit(final ASTTrue node, final Object data)
+                throws VisitorException {
+
+            nodes.put(node, valueFactory.createLiteral(true));
+
+            return null;
+
+        }
+
+        @Override
+        public Void visit(final ASTFalse node, final Object data)
+                throws VisitorException {
+
+            nodes.put(node, valueFactory.createLiteral(false));
+
+            return null;
+
+        }
+
+        /**
+         * Note: This supports the visitor method for a Literal.
+         */
+        @Override
+        public String visit(final ASTString node, final Object data)
+                throws VisitorException {
+
+            return node.getValue();
+
         }
 
     }
@@ -297,7 +685,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
             try {
 
-                nodes.put(node, context.valueFactory.createURI(node.getValue()));
+                nodes.put(node, valueFactory.createURI(node.getValue()));
 
                 return null;
 
@@ -363,7 +751,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
             nodes.put(
                     node,
-                    context.valueFactory.createLiteral(node.getValue(),
+                    valueFactory.createLiteral(node.getValue(),
                             node.getDatatype()));
 
             return null;
@@ -374,7 +762,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         public Void visit(final ASTTrue node, final Object data)
                 throws VisitorException {
 
-            nodes.put(node, context.valueFactory.createLiteral(true));
+            nodes.put(node, valueFactory.createLiteral(true));
 
             return null;
 
@@ -384,7 +772,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
         public Void visit(final ASTFalse node, final Object data)
                 throws VisitorException {
 
-            nodes.put(node, context.valueFactory.createLiteral(false));
+            nodes.put(node, valueFactory.createLiteral(false));
 
             return null;
 
@@ -401,6 +789,10 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
 
         }
 
+    }
+
+    public Map<Value, BigdataValue> getValues() {
+        return vocab;
     }
 
 }
