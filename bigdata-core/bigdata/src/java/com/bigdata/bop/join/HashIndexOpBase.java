@@ -197,7 +197,7 @@ abstract public class HashIndexOpBase extends PipelineOp implements ISingleThrea
      */
     abstract protected static class ChunkTaskBase implements Callable<Void> {
 
-    	protected final BOpContext<IBindingSet> context;
+        protected final BOpContext<IBindingSet> context;
 
         protected final HashIndexOpBase op;
         
