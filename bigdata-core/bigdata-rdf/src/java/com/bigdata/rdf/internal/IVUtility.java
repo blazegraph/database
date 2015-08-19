@@ -841,6 +841,11 @@ public class IVUtility {
         } else {
             final String type = s.substring(0, s.indexOf('(')); 
             final String val = s.substring(s.indexOf('('), s.length()-1);
+            return decode(val, type);
+        }
+    }
+
+    public static IV decode(final String val, final String type) {
             final DTE dte = Enum.valueOf(DTE.class, type);
             switch (dte) {
             case XSDBoolean: {
@@ -887,6 +892,9 @@ public class IVUtility {
                 final BigDecimal x = new BigDecimal(val);
                 return new XSDDecimalIV<BigdataLiteral>(x);
             }
+            case XSDString: {
+                return new FullyInlineTypedLiteralIV(val);
+            }
                 // case XSDUnsignedByte:
                 // keyBuilder.appendUnsigned(t.byteValue());
                 // break;
@@ -902,7 +910,6 @@ public class IVUtility {
             default:
                 throw new UnsupportedOperationException("dte=" + dte);
             }
-        }
     }
     
 }

@@ -386,8 +386,12 @@ public class GroupByState implements IGroupByState, Serializable {
             final AtomicBoolean isNestedAggregates,
             final AtomicBoolean isAnyDistinct) {
 
-        if (op == null)
-            throw new IllegalArgumentException();
+        if (op == null) {
+            // BOp is not prepared yet, but it is not an Aggregate,
+            // otherwise dummy aggregate BOp provided
+            // by com.bigdata.rdf.sparql.ast.ProjectionNode.getValueExpressions() 
+            return false;
+        }
 
         if (op instanceof IConstant && isSelectClause) {
             /*

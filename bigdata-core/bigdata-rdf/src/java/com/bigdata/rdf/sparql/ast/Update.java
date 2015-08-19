@@ -35,6 +35,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 
 /**
  * A SPARQL Update operation.
@@ -95,6 +96,8 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
         String SCOPE = "scope";
  
     }
+
+    private ASTUpdateContainer updateContainer;
     
     /**
      * 
@@ -195,6 +198,14 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
     @Override
     public Set<IVariable<?>> getDesiredBound(StaticAnalysis sa) {
        return new HashSet<IVariable<?>>();
+    }
+
+    public void setUpdateContainer(ASTUpdateContainer uc) {
+        this.updateContainer = uc;
+    }
+
+    public ASTUpdateContainer getUpdateContainer() {
+        return updateContainer;
     }
     
 }

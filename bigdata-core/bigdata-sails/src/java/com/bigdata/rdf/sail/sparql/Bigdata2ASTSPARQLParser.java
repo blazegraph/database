@@ -30,12 +30,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail.sparql;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.openrdf.model.URI;
+import org.openrdf.model.Value;
 import org.openrdf.model.impl.URIImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.parser.ParsedOperation;
@@ -46,6 +49,7 @@ import org.openrdf.query.parser.QueryParserUtil;
 import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
@@ -65,11 +69,13 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.StatementPatternNode;
 import com.bigdata.rdf.sparql.ast.Update;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
+import com.bigdata.rdf.sparql.ast.ASTContainer.Annotations;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.hints.QueryHintScope;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTSetValueExpressionsOptimizer;
+import com.bigdata.rdf.sparql.ast.optimizers.ASTUnresolvedTermsOptimizer;
 import com.bigdata.rdf.store.AbstractTripleStore;
 
 /**
@@ -92,11 +98,19 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             + QueryHints.QUERYID);
 
     private final BigdataASTContext context;
+	private final Properties updateProperties;
 
-    public Bigdata2ASTSPARQLParser(final AbstractTripleStore tripleStore) {
+	public Bigdata2ASTSPARQLParser(AbstractTripleStore store) {
         
-        this.context = new BigdataASTContext(tripleStore);
+        this(store.getProperties(), new BigdataASTContext(store));
         
+    }
+
+    public Bigdata2ASTSPARQLParser(Properties updateProperties, BigdataASTContext context) {
+        
+    	this.updateProperties = updateProperties;
+        this.context = context;
+      
     }
 
     /**
@@ -170,7 +184,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
      *      SPARQL 1.1 Update </a>
      */
-    public ASTContainer parseUpdate2(final String updateStr,
+    public ASTContainer parseUpdate1(final String updateStr,
             final String baseURI) throws MalformedQueryException {
 
         long startTime = System.nanoTime();
@@ -204,7 +218,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
             // Class builds bigdata Update operators from SPARQL UPDATE ops.
             final UpdateExprBuilder updateExprBuilder = new UpdateExprBuilder(
-                    context);
+                    new BigdataASTContext(new LinkedHashMap<Value, BigdataValue>(), updateProperties));
 
             // The sequence of UPDATE operations to be processed.
             final List<ASTUpdateContainer> updateOperations = updateSequence
@@ -283,17 +297,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                  * 
                  * @see https://sourceforge.net/apps/trac/bigdata/ticket/558
                  */
-                new BatchRDFValueResolver(context, true/* readOnly */)
+                new BatchRDFValueResolver(true/* readOnly */)
                         .process(uc);
 
-                /*
-                 * Handle dataset declaration. It only appears for DELETE/INSERT
-                 * (aka ASTModify). It is attached to each DeleteInsertNode for
-                 * which it is given.
-                 */
-                final DatasetNode dataSetNode = new DatasetDeclProcessor(
-                        context).process(uc);
-                
                 final ASTUpdate updateNode = uc.getUpdate();
 
                 if (updateNode != null) {
@@ -303,19 +309,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                      */
                     final Update updateOp = (Update) updateNode.jjtAccept(
                             updateExprBuilder, null/* data */);
-
-                    if (dataSetNode != null) {
-
-                        /*
-                         * Attach the data set (if present)
-                         * 
-                         * Note: The data set can only be attached to a
-                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
-                         */
-
-                        ((IDataSetNode) updateOp).setDataset(dataSetNode);
-
-                    }
+                    
+                    updateOp.setUpdateContainer(uc);
 
                     updateRoot.addChild(updateOp);
 
@@ -336,6 +331,41 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     }
 
+    public ASTContainer parseUpdate2(final String updateStr,
+            final String baseURI) throws MalformedQueryException {
+        ASTContainer u = parseUpdate1(updateStr, baseURI);
+        preUpdate(context.tripleStore, u);
+        return u;
+    }
+    
+    private void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
+
+        UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
+        
+        /*
+         * Handle dataset declaration. It only appears for DELETE/INSERT
+         * (aka ASTModify). It is attached to each DeleteInsertNode for
+         * which it is given.
+         */
+        for (Update update: qc.getChildren()) {
+            ASTUpdateContainer uc = update.getUpdateContainer();
+            final DatasetNode dataSetNode = new DatasetDeclProcessor().process(uc, new BigdataASTContext(store));
+            
+                if (dataSetNode != null) {
+        
+                        /*
+                         * Attach the data set (if present)
+                         * 
+                         * Note: The data set can only be attached to a
+                         * DELETE/INSERT operation in SPARQL 1.1 UPDATE.
+                         */
+        
+                        ((IDataSetNode) update).setDataset(dataSetNode);
+        
+                }
+        }
+    }
+    
     /**
      * Parse a SPARQL query.
      * 
@@ -348,7 +378,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * 
      * @throws MalformedQueryException
      */
-    public ASTContainer parseQuery2(final String queryStr, final String baseURI)
+    public ASTContainer parseQuery1(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
         long startTime = System.nanoTime();
@@ -374,12 +404,14 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              * Batch resolve ASTRDFValue to BigdataValues with their associated
              * IVs.
              */
-            new BatchRDFValueResolver(context, true/* readOnly */).process(qc);
+            BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
+            
+            resolver.process(qc);
 
             /*
              * Build the bigdata AST from the parse tree.
              */
-            final QueryRoot queryRoot = buildQueryModel(qc, context);
+            final QueryRoot queryRoot = buildQueryModel(qc, resolver.getValues());
 
             final ASTContainer ast = new ASTContainer(queryRoot);
             
@@ -404,44 +436,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              */
             queryRoot.setPrefixDecls(prefixes);
             
-            /*
-             * Handle dataset declaration
-             * 
-             * Note: Filters can be attached in order to impose ACLs on the
-             * query. This has to be done at the application layer at this
-             * point, but it might be possible to extend the grammar for this.
-             * The SPARQL end point would have to be protected from external
-             * access if this were done. Perhaps the better way to do this is to
-             * have the NanoSparqlServer impose the ACL filters. There also
-             * needs to be an authenticated identity to make this work and that
-             * could be done via an integration within the NanoSparqlServer web
-             * application container.
-             * 
-             * Note: This handles VIRTUAL GRAPH resolution.
-             */
-            final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
-                    .process(qc);
-
-            if (dataSetNode != null) {
-
-                queryRoot.setDataset(dataSetNode);
-
-            }
-            
-            /*
-             * I think here we could set the value expressions and do last-
-             * minute validation.
-             */
-            final ASTSetValueExpressionsOptimizer opt = 
-            		new ASTSetValueExpressionsOptimizer();
-            
-            final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
-            
-            final QueryRoot queryRoot2 = (QueryRoot)
-          	    opt.optimize(context2, 
-           		     new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
-            
-            BigdataExprBuilder.verifyAggregate(queryRoot2);
+            BigdataExprBuilder.verifyAggregate(queryRoot);
 
             ast.setQueryParseTime(System.nanoTime() - startTime);
             return ast;
@@ -466,12 +461,20 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     }
 
+    public ASTContainer parseQuery2(final String queryStr, final String baseURI) throws MalformedQueryException {
+        ASTContainer q = parseQuery1(queryStr, baseURI);
+        preEvaluate(context.tripleStore, q);
+        return q;
+    }
+
     /**
      * IApplies the {@link BigdataExprBuilder} visitor to interpret the parse
      * tree, building up a bigdata {@link ASTBase AST}.
      * 
      * @param qc
      *            The root of the parse tree.
+     * @param values
+     *            Previously resolved RDF values
      * @param context
      *            The context used to interpret that parse tree.
      * 
@@ -481,9 +484,9 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @throws MalformedQueryException
      */
     private QueryRoot buildQueryModel(final ASTQueryContainer qc,
-            final BigdataASTContext context) throws MalformedQueryException {
+            final Map<Value, BigdataValue> values) throws MalformedQueryException {
 
-        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(context);
+        final BigdataExprBuilder exprBuilder = new BigdataExprBuilder(new BigdataASTContext(values, updateProperties));
 
         try {
 
@@ -559,6 +562,73 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         }
 
     }
+
+    
+    
+    private void preEvaluate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
+
+        //QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
+        ASTQueryContainer qc = (ASTQueryContainer)ast.getProperty(Annotations.PARSE_TREE);
+
+        BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
+        
+        BigdataASTContext context = new BigdataASTContext(store);
+        resolver.processOnPrepareEvaluate(qc, context);
+
+        // TODO: DO NOT!
+//        final QueryRoot queryRoot = buildQueryModel(ac, resolver.getValues());
+        final QueryRoot queryRoot = ast.getOriginalAST();
+
+        /*
+         * Handle dataset declaration
+         * 
+         * Note: Filters can be attached in order to impose ACLs on the
+         * query. This has to be done at the application layer at this
+         * point, but it might be possible to extend the grammar for this.
+         * The SPARQL end point would have to be protected from external
+         * access if this were done. Perhaps the better way to do this is to
+         * have the NanoSparqlServer impose the ACL filters. There also
+         * needs to be an authenticated identity to make this work and that
+         * could be done via an integration within the NanoSparqlServer web
+         * application container.
+         * 
+         * Note: This handles VIRTUAL GRAPH resolution.
+         */
+        final DatasetNode dataSetNode = new DatasetDeclProcessor()
+                .process(qc, context);
+
+        if (dataSetNode != null) {
+
+            queryRoot.setDataset(dataSetNode);
+
+        }
+        
+        /*
+         * I think here we could set the value expressions and do last- minute
+         * validation.
+         */
+        final ASTSetValueExpressionsOptimizer opt = new ASTSetValueExpressionsOptimizer();
+
+        final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
+
+        final QueryRoot queryRoot2 = (QueryRoot) opt.optimize(context2, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
+
+        try {
+
+            BigdataExprBuilder.verifyAggregate(queryRoot2);
+
+        } catch (VisitorException e) {
+
+            throw new MalformedQueryException(e.getMessage(), e);
+
+        }
+        
+        final ASTUnresolvedTermsOptimizer termsResolver = new ASTUnresolvedTermsOptimizer();
+        QueryRoot queryRoot3 = (QueryRoot) termsResolver.optimize(context2, new QueryNodeWithBindingSet(queryRoot, null)).getQueryNode();
+        
+        queryRoot3.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
+        ast.setOriginalAST(queryRoot3);
+	}
     
 //    public static void main(String[] args)
 //        throws java.io.IOException
