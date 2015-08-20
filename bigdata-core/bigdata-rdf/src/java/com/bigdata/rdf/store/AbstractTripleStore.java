@@ -4323,6 +4323,13 @@ abstract public class AbstractTripleStore extends
             return src;
         }
         
+        /*
+         * Bypass this for now.
+         */
+        if (true) {
+            return src;
+        }
+        
         final Properties properties = getProperties();
         
         // do not store terms

@@ -3134,13 +3134,22 @@ public class BigdataSail extends SailBase implements Sail {
             
             final Striterator sitr = new Striterator(Collections.emptyIterator());
             
+            int combined = 0;
             for (int i = 0; i < numPreds; i++) {
                 
                 final SPOPredicate pred = preds[i];
                 
                 final IAccessPath<ISPO> ap = database.getSPORelation().getAccessPath(pred);
                 
-                sitr.append(ap.iterator());
+                final IChunkedOrderedIterator<ISPO> it = ap.iterator();
+                if (it != null && it.hasNext()) {
+                    sitr.append(it);
+                    combined++;
+                }
+            }
+            
+            if (log.isDebugEnabled()) {
+                log.debug("combined " + combined + " APs...");
             }
             
             return new ChunkedWrappedIterator<ISPO>(sitr);
@@ -4407,6 +4416,23 @@ public class BigdataSail extends SailBase implements Sail {
         	}
         	
         	this.changeLog.addDelegate(changeLog);
+
+        }
+
+        /**
+         * Remove a change log from the SAIL connection.  See {@link IChangeLog} 
+         * and {@link IChangeRecord}.
+         * 
+         * @param changeLog
+         *          the change log
+         */
+        synchronized public void removeChangeLog(final IChangeLog changeLog) {
+            
+            if (this.changeLog != null) {
+
+                this.changeLog.removeDelegate(changeLog);
+                
+            }
 
         }
 
