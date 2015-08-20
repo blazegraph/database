@@ -358,3 +358,9 @@ target/**
 .DS_Store
 **/.DS_Store
 **/.settings
+
+#Maven files
+**/pom.xml.versionsBackup
+**/pom.xml.releaseBackup
+**/dependency-reduced-pom.xml
+**/release.properties

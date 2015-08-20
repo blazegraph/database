@@ -23,8 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
@@ -34,7 +33,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-util</artifactId>
-  <version>${bigdata.version}</version>
+  <version>1.5.3-master-SNAPSHOT</version>
   <name>Blazegraph Utilities</name>
   <url>http://maven.apache.org</url>
   <build>
@@ -84,12 +83,12 @@ ga('send', 'pageview');
     <dependency>
      <groupId>com.blazegraph</groupId>
      <artifactId>ctc-striterators</artifactId>
-     <version>${bigdata.version}</version>
+     <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-ganglia</artifactId>
-     <version>${bigdata.version}</version>
+     <version>${project.version}</version>
     </dependency>
     <dependency>
         <groupId>javax.servlet</groupId>
@@ -114,12 +113,12 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>dsi-utils</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
    </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>lgpl-utils</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
    </dependency>
    <dependency>
            <groupId>com.github.stephenc.high-scale-lib</groupId>
