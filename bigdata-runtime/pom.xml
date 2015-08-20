@@ -130,7 +130,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <goal>shade</goal>
             </goals>
             <configuration>
+<!--
 	       <finalName>${project.artifactId}-${project.version}-${maven.build.timestamp}</finalName>
+-->
 	       <artifactSet>
 		<includes>
 		  <include>com.blazegraph:*</include>
