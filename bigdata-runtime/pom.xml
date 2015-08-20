@@ -34,7 +34,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-runtime</artifactId>
-  <version>${bigdata.version}</version>
+  <version>1.5.3-20150819</version>
   <name>Blazegraph Runtime</name>
   <url>https//www.blazegraph.com/</url>
   <description>This file contains all of the blazegraph artifacts without any external artifacts.</description>
@@ -130,7 +130,9 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
               <goal>shade</goal>
             </goals>
             <configuration>
+<!--
 	       <finalName>${project.artifactId}-${project.version}-${maven.build.timestamp}</finalName>
+-->
 	       <artifactSet>
 		<includes>
 		  <include>com.blazegraph:*</include>
