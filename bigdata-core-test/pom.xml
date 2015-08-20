@@ -658,5 +658,15 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
         <artifactId>javax.servlet-api</artifactId>
         <version>${servlet.version}</version>
       </dependency>
+       <dependency>
+      <groupId>it.unimi.dsi</groupId>
+      <artifactId>fastutil</artifactId>
+      <version>${fastutil.version}</version>
+     </dependency>
+     <dependency>
+      <groupId>it.unimi.dsi</groupId>
+      <artifactId>dsiutils</artifactId>
+      <version>${dsiutils.version}</version>
+     </dependency>
    </dependencies>
 </project>
