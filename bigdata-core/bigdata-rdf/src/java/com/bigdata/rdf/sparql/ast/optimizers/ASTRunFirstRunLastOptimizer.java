@@ -27,13 +27,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.apache.log4j.Logger;
+
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
+import com.bigdata.rdf.sparql.ast.IReorderableNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueriesNode;
 import com.bigdata.rdf.sparql.ast.NamedSubqueryRoot;
@@ -60,8 +64,8 @@ import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
  */
 public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
 
-//    private static final Logger log = Logger
-//            .getLogger(ASTJoinOrderByTypeOptimizer.class);
+    private static final Logger log = Logger
+            .getLogger(ASTRunFirstRunLastOptimizer.class);
 
     @Override
     public QueryNodeWithBindingSet optimize(
@@ -144,7 +148,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
     		
             for (IGroupMemberNode child : joinGroup) {
             
-            	if (child instanceof IJoinNode) {
+            	if (child instanceof IReorderableNode) {
             		
             		final ASTBase join = (ASTBase) child;
             		
@@ -205,7 +209,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
             	
                 int lastJoinIndex = 0;
                 for (int i = joinGroup.size()-1; i >= 0; i--) {
-                	if (joinGroup.get(i) instanceof IJoinNode) {
+                	if (joinGroup.get(i) instanceof IBindingProducerNode) {
                 		lastJoinIndex = i;
                 		break;
                 	}
