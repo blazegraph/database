@@ -1470,7 +1470,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
 
                 final JoinTypeEnum joinType = JoinTypeEnum.Normal;
 
-                IHashJoinUtilityFactory joinUtilFactory;
+                final IHashJoinUtilityFactory joinUtilFactory;
                 if (ctx.nativeHashJoins) {
                     joinUtilFactory = HTreeHashJoinUtility.factory;
                 } else {
@@ -1698,7 +1698,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final int maxParallel = lastPass ? 1
                 : ctx.maxParallelForSolutionSetHashJoin;
 
-        IHashJoinUtilityFactory joinUtilFactory;
+        final IHashJoinUtilityFactory joinUtilFactory;
         if (ctx.nativeHashJoins) {
             joinUtilFactory = HTreeHashJoinUtility.factory;
         } else {
@@ -2211,7 +2211,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         if (askVar == null)
             throw new UnsupportedOperationException();
 
-        IHashJoinUtilityFactory joinUtilFactory;
+        final IHashJoinUtilityFactory joinUtilFactory;
         if (ctx.nativeHashJoins) {
             joinUtilFactory = HTreeHashJoinUtility.factory;
         } else {
@@ -3401,7 +3401,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
             
             left = addNamedSubqueryInclude(left, firstInclude, doneSet, ctx);
             
-            IHashJoinUtilityFactory joinUtilFactory;
+            final IHashJoinUtilityFactory joinUtilFactory;
             if (ctx.nativeHashJoins) {
                 joinUtilFactory = HTreeHashJoinUtility.factory;
             } else {
@@ -5400,7 +5400,7 @@ public class AST2BOpUtility extends AST2BOpRTO {
         */
        boolean inlineProjection = joinVarsSet.equals(projectInVarsSet);
        
-       IHashJoinUtilityFactory joinUtilFactory;
+       final IHashJoinUtilityFactory joinUtilFactory;
        if (ctx.nativeHashJoins) {
            joinUtilFactory = HTreeHashJoinUtility.factory;
        } else {
