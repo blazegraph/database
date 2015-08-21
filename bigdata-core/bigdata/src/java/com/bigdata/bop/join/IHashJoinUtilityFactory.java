@@ -27,6 +27,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.bop.join;
 
+import java.io.Serializable;
+
 import com.bigdata.bop.BOpContext;
 import com.bigdata.bop.BOpEvaluationContext;
 import com.bigdata.bop.IBindingSet;
@@ -39,7 +41,7 @@ import com.bigdata.bop.controller.INamedSolutionSetRef;
  * @author <a href="http://olafhartig.de/">Olaf Hartig</a>
  * @version $Id$
  */
-public interface IHashJoinUtilityFactory {
+public interface IHashJoinUtilityFactory extends Serializable {
     
     /**
      * Return an instance of the {@link IHashJoinUtility}.
