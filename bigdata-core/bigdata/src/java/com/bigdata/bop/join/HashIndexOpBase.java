@@ -49,6 +49,8 @@ import cutthecrap.utils.striterators.SingleValueIterator;
 
 /**
  * Base class for operators that use a hash index.
+ *
+ * @see BLZG-1438
  * 
  * @author <a href="http://olafhartig.de">Olaf Hartig</a>
  */
