@@ -83,6 +83,8 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
     static public final IHashJoinUtilityFactory factory =
             new IHashJoinUtilityFactory() {
 
+        private static final long serialVersionUID = 1L;
+
         public IHashJoinUtility create(//
                 BOpContext<IBindingSet> context,//
                 INamedSolutionSetRef namedSetRef,//
