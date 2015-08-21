@@ -38,6 +38,13 @@ import com.bigdata.bop.controller.INamedSolutionSetRef;
 /**
  * Interface for the factory pattern to create a {@link IHashJoinUtility}.
  * 
+ * @see BLZG-1438 (by using such a factory as an annotation of
+ *                 {@link HashIndexOpBase} it becomes possible
+ *                 to get rid of the two earlier subclasses of
+ *                 {@link HashIndexOp} (namely, HTreeHashIndexOp
+ *                 and JVMHashIndexOp) which imposed the duplication
+ *                 of code) 
+ *
  * @author <a href="http://olafhartig.de/">Olaf Hartig</a>
  * @version $Id$
  */
