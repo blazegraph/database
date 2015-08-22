@@ -101,11 +101,6 @@ ga('send', 'pageview');
       <version>${colt.version}</version>
    </dependency>
    <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-      <version>${fastutil.version}</version>
-   </dependency>
-   <dependency>
         <groupId>org.openrdf.sesame</groupId>
         <artifactId>sesame-util</artifactId>
         <version>${sesame.version}</version>
@@ -158,16 +153,6 @@ ga('send', 'pageview');
       <artifactId>jackson-databind</artifactId>
       <version>${jackson.version}</version>
     </dependency>
-     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-      <version>${fastutil.version}</version>
-     </dependency>
-     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>dsiutils</artifactId>
-      <version>${dsiutils.version}</version>
-     </dependency>
   </dependencies>
 
   </project>
