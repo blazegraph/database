@@ -100,7 +100,8 @@ dependencies.
       <rexster.version>2.5.0</rexster.version>
       <striterator.version>1.0</striterator.version>
       <jini.version>2.2.1</jini.version>
-      <junit-ext.version>1.1-b3-dev</junit-ext.version>
+      <!-- <junit-ext.version>1.1-b3-dev</junit-ext.version> -->
+      <junit-ext.version>${project.version}</junit-ext.version>
       <junit4.version>4.11</junit4.version>
       <junit3.version>3.8.1</junit3.version>
       <servlet.version>3.1.0</servlet.version>

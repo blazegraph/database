@@ -342,10 +342,9 @@ benchmark
 /bigdata-perf/gas/*.test
 /bigdata-perf/gas/*.jnl
 
-#Maven
-target/
-target/**
-*/target/**
+#Journal files
+*.jnl
+**/*.jnl
 
 *~
 
@@ -364,3 +363,6 @@ target/**
 **/pom.xml.releaseBackup
 **/dependency-reduced-pom.xml
 **/release.properties
+target/
+target/**
+*/target/**

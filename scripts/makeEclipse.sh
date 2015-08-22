@@ -4,6 +4,5 @@
 ./scripts/clean.sh
 #Update the POM versions for a branch
 ./scripts/setPomVersions.sh
-#Generate the eclipse projects
+#Generate the eclipse projects and compile
 mvn -f blazegraph-parent/pom.xml eclipse:eclipse
-
