@@ -39,7 +39,7 @@ import com.bigdata.bop.Var;
 import com.bigdata.bop.controller.INamedSolutionSetRef;
 
 /**
- * Test suite for {@link HTreeHashIndexOp}.
+ * Test suite for {@link HashIndexOp} that uses a {@link HTreeHashJoinUtility}.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  * @version $Id$
@@ -67,11 +67,14 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
 
         final NV[] anns1 = anns;
 
-        final NV[] anns2 = concat(anns1, new NV[] { new NV(
-                HTreeHashIndexOp.Annotations.RELATION_NAME,
-                new String[] { namespace }) });
+        final NV[] anns2 = concat(anns1, new NV[] {
+                new NV(HTreeHashJoinAnnotations.RELATION_NAME,
+                        new String[] { namespace }),
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        HTreeHashJoinUtility.factory),
+                });
 
-        return new HTreeHashIndexOp(args, anns2);
+        return new HashIndexOp(args, anns2);
 
     }
     
@@ -105,30 +108,34 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
         final INamedSolutionSetRef namedSolutionSet = NamedSolutionSetRefUtility
                 .newInstance(queryId, solutionSetName, joinVars);
 
-        new HTreeHashIndexOp(BOp.NOARGS,//
+        new HashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HashIndexOp.Annotations.SELECT, selected),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        HTreeHashJoinUtility.factory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Must run on the query controller.
         try {
-            new HTreeHashIndexOp(BOp.NOARGS,//
+            new HashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
 //                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
 //                            BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                            HTreeHashJoinUtility.factory),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -137,16 +144,18 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
 
         // Parallel evaluation is not permitted since operator writes on HTree.
         try {
-            new HTreeHashIndexOp(BOp.NOARGS,//
+            new HashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
 //                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                            HTreeHashJoinUtility.factory),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -156,16 +165,18 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
         // Last pass evaluation must be requested since operator defers outputs
         // until all inputs have been consumed.
         try {
-            new HTreeHashIndexOp(BOp.NOARGS,//
+            new HashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
 //                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                            HTreeHashJoinUtility.factory),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalArgumentException ex) {
             if(log.isInfoEnabled())
@@ -173,30 +184,34 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
         }
 
         // OPTIONAL semantics are supported.
-        new HTreeHashIndexOp(BOp.NOARGS,//
+        new HashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                new NV(HashIndexOp.Annotations.SELECT, selected),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        HTreeHashJoinUtility.factory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
 
         // Join vars must be specified.
         try {
-            new HTreeHashIndexOp(BOp.NOARGS,//
+            new HashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
 //                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                    new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                            HTreeHashJoinUtility.factory),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalStateException ex) {
             if(log.isInfoEnabled())
@@ -204,42 +219,68 @@ public class TestHTreeHashIndexOp extends HashIndexOpTestCase {
         }
 
         // Join vars may be an empty [].
-        new HTreeHashIndexOp(BOp.NOARGS,//
+        new HashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
-                new NV(HTreeHashIndexOp.Annotations.SELECT, selected),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
+                new NV(HashIndexOp.Annotations.SELECT, selected),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        HTreeHashJoinUtility.factory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
         
         // The selected variables annotation is optional.
-        new HTreeHashIndexOp(BOp.NOARGS,//
+        new HashIndexOp(BOp.NOARGS,//
                 new NV(BOp.Annotations.BOP_ID, 1),//
                 new NV(BOp.Annotations.EVALUATION_CONTEXT,
                         BOpEvaluationContext.CONTROLLER),//
                 new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                 new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
-                new NV(HTreeHashIndexOp.Annotations.SELECT, null),//
-                new NV(HTreeHashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+                new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                new NV(HashIndexOp.Annotations.JOIN_VARS, new IVariable[] {}),//
+                new NV(HashIndexOp.Annotations.SELECT, null),//
+                new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                        HTreeHashJoinUtility.factory),//
+                new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
         );
         
-        // The solution set name must be specified.
+        // The IHashJoinUtility must be specified.
         try {
-            new HTreeHashIndexOp(BOp.NOARGS,//
+            new HashIndexOp(BOp.NOARGS,//
                     new NV(BOp.Annotations.BOP_ID, 1),//
                     new NV(BOp.Annotations.EVALUATION_CONTEXT,
                             BOpEvaluationContext.CONTROLLER),//
                     new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
                     new NV(PipelineOp.Annotations.LAST_PASS, true),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
-                    new NV(HTreeHashIndexOp.Annotations.JOIN_VARS, joinVars),//
-                    new NV(HTreeHashIndexOp.Annotations.SELECT, selected)//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+//                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+//                            HTreeHashJoinUtility.factory),//
+                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
+            );
+        } catch(IllegalStateException ex) {
+            if(log.isInfoEnabled())
+                log.info("Ignoring expected exception: "+ex);
+        }
+        
+        // The solution set name must be specified.
+        try {
+            new HashIndexOp(BOp.NOARGS,//
+                    new NV(BOp.Annotations.BOP_ID, 1),//
+                    new NV(BOp.Annotations.EVALUATION_CONTEXT,
+                            BOpEvaluationContext.CONTROLLER),//
+                    new NV(PipelineOp.Annotations.MAX_PARALLEL, 1),//
+                    new NV(PipelineOp.Annotations.LAST_PASS, true),//
+                    new NV(HashIndexOp.Annotations.JOIN_TYPE, JoinTypeEnum.Normal),//
+                    new NV(HashIndexOp.Annotations.JOIN_VARS, joinVars),//
+                    new NV(HashIndexOp.Annotations.SELECT, selected),//
+                    new NV(HashIndexOp.Annotations.HASH_JOIN_UTILITY_FACTORY,
+                            HTreeHashJoinUtility.factory)//
 //                    new NV(HashIndexOp.Annotations.NAMED_SET_REF, namedSolutionSet)//
             );
         } catch(IllegalStateException ex) {

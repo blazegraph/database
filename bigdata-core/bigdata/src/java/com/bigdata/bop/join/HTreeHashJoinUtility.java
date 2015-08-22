@@ -47,6 +47,7 @@ import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IndexAnnotations;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.btree.Checkpoint;
 import com.bigdata.btree.DefaultTupleSerializer;
@@ -120,6 +121,29 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
 
     static private final transient Logger log = Logger
             .getLogger(HTreeHashJoinUtility.class);
+
+    /**
+     * Singleton {@link IHashJoinUtilityFactory} that can be used to create a 
+     * new {@link HTreeHashJoinUtility}.
+     */
+    static public final IHashJoinUtilityFactory factory =
+            new IHashJoinUtilityFactory() {
+
+        private static final long serialVersionUID = 1L;
+
+        public IHashJoinUtility create(//
+                final BOpContext<IBindingSet> context,//
+                final INamedSolutionSetRef namedSetRef,//
+                final PipelineOp op,//
+                final JoinTypeEnum joinType//
+                ) {
+
+            return new HTreeHashJoinUtility(
+                    context.getMemoryManager(namedSetRef.getQueryId()),
+                    op, joinType);
+
+        }
+    };
 
     /**
      * Note: If joinVars is an empty array, then the solutions will all hash to
@@ -541,7 +565,7 @@ public class HTreeHashJoinUtility implements IHashJoinUtility {
         // this is a DISTINCT filter).
         this.outputDistinctJVs = 
            op.getProperty(
-              HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
+              HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
 
         
         this.selectVars = filter ? joinVars : (IVariable<?>[]) op
