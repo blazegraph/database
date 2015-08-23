@@ -34,7 +34,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-runtime</artifactId>
-  <version>1.5.3-20150819</version>
+  <version>1.5.3-master-SNAPSHOT</version>
   <name>Blazegraph Runtime</name>
   <url>https//www.blazegraph.com/</url>
   <description>This file contains all of the blazegraph artifacts without any external artifacts.</description>
@@ -83,7 +83,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
                   <artifactId>bigdata-war-html</artifactId>
-                  <version>${bigdata.version}</version>
+                  <version>${project.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target/classes/war</outputDirectory>
@@ -161,7 +161,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
-                    <Build-Number>${bigdata.version}</Build-Number>
+                    <Build-Number>${project.version}</Build-Number>
                   </manifestEntries>
                 </transformer>
               </transformers>
@@ -211,12 +211,12 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>rdf-properties</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
        <exclusions>
         <exclusion>
           <groupId>org.openrdf.sesame</groupId>
@@ -239,7 +239,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-blueprints</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
       <exclusions>
         <exclusion>
           <groupId>junit</groupId>
@@ -258,7 +258,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
