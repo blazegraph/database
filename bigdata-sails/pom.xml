@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>0-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-sails</artifactId>
-    <version>${bigdata.version}</version>
+    <version>0-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Sails</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -274,17 +274,17 @@ dependencies.
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>dsi-utils</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
       <groupId>junit</groupId>
@@ -304,32 +304,32 @@ dependencies.
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>lgpl-utils</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>rdf-properties</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-core</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>

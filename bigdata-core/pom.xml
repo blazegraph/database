@@ -54,7 +54,7 @@ dependencies.
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-core</artifactId>
-    <version>${bigdata.version}</version>
+   <version>1.5.3-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Core</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -151,9 +151,8 @@ dependencies.
                <phase>process-resources</phase>
                <configuration>
                  <target>
-        		<property name="buildinfo.file" 
-            			value="bigdata/src/java/com/bigdata/BuildInfo.java"/>
-			<property name="build.ver" value = "${bigdata.version}"/>
+        		<property name="buildinfo.file" value="bigdata/src/java/com/bigdata/BuildInfo.java" />
+			<property name="build.ver" value="${project.version}" />
         		<tstamp>
             			<format property="build.timestamp" pattern="yyyy/MM/dd HH:mm:ss z" locale="en,US" />
         		</tstamp>
@@ -161,11 +160,9 @@ dependencies.
 			<loadfile property="git.branch" srcFile="../.git/HEAD">
 			   <filterchain>
     			     <linecontainsregexp>
-      				<regexp pattern="^ref: (.*)$"/>
+      				<regexp pattern="^ref: (.*)$" />
     			     </linecontainsregexp>
-    			     <replaceregex 
-      				pattern="^ref: (.*)$"
-         			replace="\1" />
+    			     <replaceregex pattern="^ref: (.*)$" replace="\1" />
 				<striplinebreaks />
   			     </filterchain>
 		 	</loadfile>  
@@ -181,8 +178,8 @@ public class BuildInfo {
     public static final String osVersion="${os.version}";
 }
 </echo>
-    			<loadfile property="buildinfo" srcFile="${buildinfo.file}"/>
-    			<echo message="${buildinfo}"/>
+    			<loadfile property="buildinfo" srcFile="${buildinfo.file}" />
+    			<echo message="${buildinfo}" />
                  </target>
                </configuration>
              </execution>
@@ -244,6 +241,10 @@ public class BuildInfo {
     <repository>
       <id>jetty.releases</id>
       <url>https://oss.sonatype.org/content/groups/jetty/</url>
+    </repository>
+    <repository>
+        <id>repo-for-dsiutils</id>
+        <url>http://ir.dcs.gla.ac.uk/~bpiwowar/maven/</url>
     </repository>
   </repositories>
 -->
@@ -422,22 +423,22 @@ public class BuildInfo {
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>dsi-utils</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
       <groupId>junit</groupId>
@@ -460,27 +461,27 @@ public class BuildInfo {
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>lgpl-utils</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>rdf-properties</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>
