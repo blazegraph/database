@@ -696,13 +696,16 @@ public abstract class BigdataGraph implements Graph {
             
             cxn.add(fromURI, edgeURI, toURI);
             
-            if (label != null) {
-                cxn.add(edgeURI, LABEL, factory.toLiteral(label));
-            }
-            
-            if (!anonymous) {
-                cxn.add(edgeURI, TYPE, EDGE);
-            }
+			if (label != null) {
+				cxn.add(edgeURI, LABEL, factory.toLiteral(label));
+
+				//2015-07-15:  Please review this change for correctness.   It is
+				//confirmed to resolve the projection test failure.
+				if (!anonymous) {
+					cxn.add(edgeURI, TYPE, EDGE);
+				}
+
+			}
             
             return new BigdataEdge(new StatementImpl(fromURI, edgeURI, toURI), this);
             

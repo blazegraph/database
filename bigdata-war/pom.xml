@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.3-master-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+  </parent>
+  <groupId>com.blazegraph</groupId>
+  <artifactId>bigdata-war</artifactId>
+  <version>1.5.3-master-SNAPSHOT</version>
+  <name>Blazegraph WAR</name>
+  <url>http://maven.apache.org</url>
+  <packaging>war</packaging>
+  <build>
+    <plugins>
+      <plugin>
+       <groupId>org.apache.maven.plugins</groupId>
+       <artifactId>maven-war-plugin</artifactId>
+       <version>2.6</version>
+       <configuration>
+        <webXml>../bigdata-war-html/src/main/webapp/WEB-INF/web.xml</webXml>
+	<failOnMissingWebXml>false</failOnMissingWebXml>
+         <overlays>
+           <overlay>
+             <groupId>com.blazegraph</groupId>
+             <artifactId>bigdata-war-html</artifactId>
+	     <includes>
+                <include>WEB-INF/web.xml</include>
+                <include>**/*</include>
+              </includes>
+           </overlay>
+         </overlays>
+       </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+	  <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph WAR</h1>]]></doctitle>
+          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+<script>
+jQuery(document).ready(function(){
+  jQuery('ul.sf-menu').superfish({
+  pathClass: 'current',
+  cssArrows: false
+  });
+});
+
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
+ga('send', 'pageview');
+</script>
+]]></bottom>
+ 
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+  
+  <dependencies>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-war-html</artifactId>
+      <version>${project.version}</version>
+      <type>war</type>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-server</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-webapp</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-servlet</artifactId>
+        </exclusion>
+        <exclusion>  
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions> 
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-util</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  </project>
