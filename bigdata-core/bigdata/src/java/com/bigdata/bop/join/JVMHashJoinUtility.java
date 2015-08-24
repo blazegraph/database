@@ -47,6 +47,7 @@ import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstraint;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.PipelineOp;
+import com.bigdata.bop.controller.INamedSolutionSetRef;
 import com.bigdata.bop.engine.BOpStats;
 import com.bigdata.bop.join.JVMHashIndex.Bucket;
 import com.bigdata.bop.join.JVMHashIndex.Key;
@@ -74,6 +75,27 @@ import cutthecrap.utils.striterators.Visitor;
 public class JVMHashJoinUtility implements IHashJoinUtility {
 
     private static final Logger log = Logger.getLogger(JVMHashJoinUtility.class);
+
+    /**
+     * Singleton {@link IHashJoinUtilityFactory} that can be used to create a 
+     * new {@link JVMHashJoinUtility}.
+     */
+    static public final IHashJoinUtilityFactory factory =
+            new IHashJoinUtilityFactory() {
+
+        private static final long serialVersionUID = 1L;
+
+        public IHashJoinUtility create(//
+                final BOpContext<IBindingSet> context,//
+                final INamedSolutionSetRef namedSetRef,//
+                final PipelineOp op,//
+                final JoinTypeEnum joinType//
+                ) {
+
+            return new JVMHashJoinUtility(op, joinType);
+
+        }
+    };
 
     /**
      * <code>true</code> until the state is discarded by {@link #release()}.
@@ -269,7 +291,7 @@ public class JVMHashJoinUtility implements IHashJoinUtility {
         
         this.outputDistinctJVs = 
            op.getProperty(
-              HTreeHashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
+              HashIndexOp.Annotations.OUTPUT_DISTINCT_JVs, false);
 
         
         // The join constraints (optional).

@@ -23,8 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
@@ -34,7 +33,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jar</artifactId>
-  <version>${bigdata.version}</version>
+  <version>1.5.3-master-SNAPSHOT</version>
   <name>Blazegraph Executable Jar</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
@@ -68,7 +67,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
                   <artifactId>bigdata-war-html</artifactId>
-                  <version>${bigdata.version}</version>
+                  <version>${project.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target/classes/war</outputDirectory>
@@ -96,8 +95,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             			<include name="bigdata.war" />
         		</fileset>    
     		   </unzip>
- 		   <delete file = "target/classes/war/bigdata.war"/>
-		   <copy file = "target/classes/war/WEB-INF/RWStore.properties" todir="target/classes"/>
+ 		   <delete file="target/classes/war/bigdata.war" />
+		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
                  </target>
                </configuration>
              </execution>
@@ -178,7 +177,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
-                    <Build-Number>${bigdata.version}</Build-Number>
+                    <Build-Number>${project.version}</Build-Number>
                   </manifestEntries>
                 </transformer>
               </transformers>
@@ -228,12 +227,12 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>rdf-properties</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
        <exclusions>
         <exclusion>
           <groupId>org.openrdf.sesame</groupId>
@@ -256,7 +255,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-blueprints</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
       <exclusions>
         <exclusion>
           <groupId>junit</groupId>
@@ -275,7 +274,7 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
