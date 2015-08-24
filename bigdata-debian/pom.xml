@@ -29,12 +29,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT-BLZG_1269_client-BLZG-1370</version>
+    <version>0-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jar</artifactId>
-  <version>${bigdata.version}</version>
+  <version>0-SNAPSHOT</version>
   <name>Blazegraph Executable Jar</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
@@ -295,7 +295,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
-                    <Build-Number>${bigdata.version}</Build-Number>
+                    <Build-Number>${project.version}</Build-Number>
                   </manifestEntries>
                 </transformer>
               </transformers>
@@ -345,12 +345,12 @@ ga('send', 'pageview');
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-blueprints</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 

@@ -854,7 +854,7 @@ public class NanoSparqlServer {
              */
 
             // The default location to check in the file system.
-            final File file = new File("bigdata-war-html/src/main/webapp");
+            final File file = new File("bigdata-war-html/src/main/webapp/");
 
             final URL resourceBaseURL;
             if (file.exists()) {
@@ -863,7 +863,7 @@ public class NanoSparqlServer {
 //                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
                 resourceBaseURL = file.toURI().toURL();
                 isFile = true;
-
+                
             } else {
 
                 /*
@@ -887,7 +887,7 @@ public class NanoSparqlServer {
                      * file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_3_0_NEW_SVN/bin/WEB-INF/web.xml
                      * </pre>
                      */
-                    tmp = classLoader.getResource(src = "/WEB-INF/web.xml");
+                    tmp = classLoader.getResource(src = "bigdata-war-html/src/main/webapp/WEB-INF/web.xml");
                 }
                 
 //                if (tmp == null)// Eclipse IDE class path (system class loader).

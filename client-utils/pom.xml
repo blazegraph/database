@@ -29,12 +29,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>0-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>client-utils</artifactId>
-  <version>${bigdata.version}</version>
+  <version>0-SNAPSHOT</version>
   <name>Blazegraph Client Utilities</name>
   <url>http://maven.apache.org</url>
   <build>
@@ -76,38 +76,6 @@ ga('send', 'pageview');
   </reporting>
   
   <dependencies>
-<!--
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit4.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-client</artifactId>
-      <version>${jetty.version}</version>
-    </dependency>
-     <dependency>
-       <groupId>commons-io</groupId>
-       <artifactId>commons-io</artifactId>
-       <version>${apache.commons_io.version}</version>
-     </dependency>
-     <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-util</artifactId>
-	<version>${sesame.version}</version>
-     </dependency>
-     <dependency>
-	<groupId>org.openrdf.sesame</groupId>
-	<artifactId>sesame-rio-rdfxml</artifactId>
-	<version>${sesame.version}</version>
-     </dependency>
--->
     <dependency>
        <groupId>log4j</groupId>
        <artifactId>log4j</artifactId>
@@ -129,5 +97,4 @@ ga('send', 'pageview');
         <version>${jetty.version}</version>
      </dependency>
   </dependencies>
-
-  </project>
+</project>
