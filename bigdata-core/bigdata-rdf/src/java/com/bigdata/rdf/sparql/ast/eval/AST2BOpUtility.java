@@ -2935,7 +2935,8 @@ public class AST2BOpUtility extends AST2BOpRTO {
         final AtomicInteger start = new AtomicInteger(0);
 
         if (ctx.gpuEvaluation != null
-        	&& joinGroup.getProperty("evaluateOnGPU",false)) {
+        	&& joinGroup.getProperty(com.bigdata.rdf.sparql.ast.eval.GpuAnnotations.EVALUATE_ON_GPU,
+        			com.bigdata.rdf.sparql.ast.eval.GpuAnnotations.DEFAULT_EVALUATE_ON_GPU)) {
         	
         	left = ctx.gpuEvaluation.convertJoinGroup(left, joinGroup, doneSet, start, ctx);
         	
