@@ -98,8 +98,6 @@ public class Banner {
         
         if(didBanner.compareAndSet(false/*expect*/, true/*update*/)) {
 
-            final boolean quiet = Boolean.getBoolean(Options.QUIET);
-
             final boolean nocatch = Boolean.getBoolean(Options.NOCATCH);
 
             if (!nocatch) {
@@ -161,12 +159,6 @@ public class Banner {
                 
             }
 
-            /*
-             * If logging is not configured for [com.bigdata] then we set a
-             * default log level @ WARN.  This is critical for good performance.
-             */
-            setDefaultLogLevel(quiet);
-            
             /*
              * Note: I have modified this to test for disabled registration and
              * to use reflection in order to decouple the JMX dependency for
@@ -425,7 +417,20 @@ public class Banner {
 
     }
     
-    private static final String banner =//
+    private static final String banner;
+    private static final boolean quiet;
+    
+    static {
+
+    	 quiet = Boolean.getBoolean(Options.QUIET);
+
+    	 /*
+         * If logging is not configured for [com.bigdata] then we set a
+         * default log level @ WARN.  This is critical for good performance.
+         */
+        setDefaultLogLevel(quiet);
+        
+    	banner = 
         "\nBlazeGraph(TM) Graph Engine"+//
         "\n"+//
         "\n                   Flexible"+//
@@ -445,5 +450,6 @@ public class Banner {
         getBuildString()+ // Note: Will add its own newline if non-empty.
         "\n\n"
         ;
+    }
     
 }
