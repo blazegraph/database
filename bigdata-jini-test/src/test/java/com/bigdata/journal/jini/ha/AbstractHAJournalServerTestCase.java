@@ -137,7 +137,7 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
     /**
      * The timeout used to await quorum meet or break.
      */
-    protected final static long awaitQuorumTimeout = 5000;
+    protected final static long awaitQuorumTimeout = 10000;
 
     /**
      * The timeout for long running LOAD operations. This is used to prevent
