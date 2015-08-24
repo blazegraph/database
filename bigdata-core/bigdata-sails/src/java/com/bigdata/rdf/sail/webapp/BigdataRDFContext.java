@@ -2033,7 +2033,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         private final boolean reportLoadProgress;
         private final boolean flushEachEvent;
         private final CAT mutationCount;
-        private final boolean echo_back;
+        private final boolean echoBack;
         
         /**
          * Used to correlate incremental LOAD progress messages.
@@ -2064,7 +2064,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public SparqlUpdateResponseWriter(final HttpServletResponse resp,
                 final OutputStream os, final Charset charset,
                 final boolean reportLoadProgress, final boolean flushEachEvent,
-                final CAT mutationCount, final boolean echo_back)
+                final CAT mutationCount, final boolean echoBack)
                 throws IOException {
 
             if (resp == null)
@@ -2098,7 +2098,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             
             this.body = writeSparqlUpdateResponseHeader();
             
-            this.echo_back = echo_back;
+            this.echoBack = echoBack;
 
         }
 
@@ -2226,7 +2226,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                                .close();
                     } else {
                     
-                        if(echo_back) {
+                        if(echoBack) {
                         	
                             body.node("pre")
                                 .text(e.getUpdate().toString())
