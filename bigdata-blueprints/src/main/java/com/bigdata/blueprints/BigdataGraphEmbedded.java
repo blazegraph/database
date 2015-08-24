@@ -35,6 +35,8 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.openrdf.model.BNode;
 import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.sail.SailRepository;
+import org.openrdf.sail.Sail;
 
 import com.bigdata.blueprints.BigdataGraphEdit.Action;
 import com.bigdata.bop.engine.IRunningQuery;
@@ -124,7 +126,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 			final BlueprintsValueFactory factory, final Properties props) {
 	    super(factory, props);
 	    
-	    this.repo = repo;
+	    this.repo = (BigdataSailRepository) repo;
 	}
 	
 	public BigdataSailRepository getRepository() {
@@ -150,7 +152,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
                 return null;
             }
             
-            final BigdataSailRepositoryConnection cxn = repo.getUnisolatedConnection();
+            final BigdataSailRepositoryConnection cxn = (BigdataSailRepositoryConnection) repo.getUnisolatedConnection();
             try {
                 cxn.setAutoCommit(false);
                 cxn.addChangeLog(BigdataGraphEmbedded.this);
@@ -191,7 +193,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 	
 	public BigdataSailRepositoryConnection getReadConnection() throws Exception {
-	    return repo.getReadOnlyConnection();
+	    return ((BigdataSailRepository)repo).getReadOnlyConnection();
 	}
 	
 	@Override
@@ -241,7 +243,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 	}
 	
 	public StringBuilder dumpStore() {
-	    return repo.getDatabase().dumpStore();
+	    return ((BigdataSailRepository)repo).getDatabase().dumpStore();
 	}
 	
 	
@@ -492,7 +494,7 @@ public class BigdataGraphEmbedded extends BigdataGraph implements TransactionalG
 
 	private IIndexManager getIndexManager() {
 	
-		final BigdataSailRepository repo = this.getRepository();
+		final BigdataSailRepository repo = (BigdataSailRepository) this.getRepository();
 		
 		final IIndexManager indexMgr = repo.getDatabase().getIndexManager();
 		

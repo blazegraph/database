@@ -57,7 +57,6 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.AbstractBTree;
 import com.bigdata.btree.BTree;
-import com.bigdata.btree.BytesUtil;
 import com.bigdata.btree.ITupleIterator;
 import com.bigdata.btree.IndexMetadata;
 import com.bigdata.btree.IndexSegment;
@@ -83,6 +82,7 @@ import com.bigdata.service.ListIndicesTask;
 import com.bigdata.service.MetadataService;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.util.BytesUtil;
 import com.bigdata.util.InnerCause;
 
 /**

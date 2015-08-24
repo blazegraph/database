@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 package com.bigdata.journal.jini.ha;
 
+
 /**
  * A policy that never permits the release of backups such that you can always
  * restore any commit point. This policy will require unbounded disk space if

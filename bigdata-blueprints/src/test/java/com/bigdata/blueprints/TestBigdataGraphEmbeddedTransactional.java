@@ -267,7 +267,7 @@ public class TestBigdataGraphEmbeddedTransactional extends AbstractTestBigdataGr
 		
 		public void shutdown() {
 		    for (BigdataGraphEmbedded sail : testGraphs.values()) {
-		        sail.repo.getSail().__tearDownUnitTest();
+		        ((BigdataSail)sail.repo.getSail()).__tearDownUnitTest();
 		    }
 		    testGraphs.clear();
 		}

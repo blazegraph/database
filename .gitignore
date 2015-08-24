@@ -24,6 +24,8 @@
 /DIST.*.tgz
 /REL.*.tgz
 /target
+.classpath
+.project
 
 # /bigdata/
 /bigdata/bin
@@ -58,6 +60,8 @@
 /bigdata/store
 /bigdata/testIndex
 /bigdata/src/java/com/bigdata/BuildInfo.java
+bigdata-core/bigdata/src/java/com/bigdata/BuildInfo.java
+**/BuildInfo.java
 
 # /bigdata/lib/
 /bigdata/lib/rio-1.2.1.jar
@@ -338,10 +342,9 @@ benchmark
 /bigdata-perf/gas/*.test
 /bigdata-perf/gas/*.jnl
 
-#Maven
-target/
-target/**
-*/target/**
+#Journal files
+*.jnl
+**/*.jnl
 
 *~
 
@@ -350,3 +353,16 @@ target/**
 *.log
 
 /*/target
+
+.DS_Store
+**/.DS_Store
+**/.settings
+
+#Maven files
+**/pom.xml.versionsBackup
+**/pom.xml.releaseBackup
+**/dependency-reduced-pom.xml
+**/release.properties
+target/
+target/**
+*/target/**

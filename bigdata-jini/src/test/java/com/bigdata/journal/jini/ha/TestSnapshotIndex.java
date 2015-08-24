@@ -32,6 +32,7 @@ import java.util.UUID;
 import junit.framework.TestCase2;
 
 import com.bigdata.btree.ITupleIterator;
+import com.bigdata.io.ChecksumUtility;
 import com.bigdata.io.SerializerUtil;
 import com.bigdata.journal.IRootBlockView;
 import com.bigdata.journal.RootBlockView;
@@ -41,7 +42,6 @@ import com.bigdata.journal.jini.ha.SnapshotIndex.SnapshotRecord;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.rawstore.TestWormAddressManager;
 import com.bigdata.rawstore.WormAddressManager;
-import com.bigdata.util.ChecksumUtility;
 import com.bigdata.util.MillisecondTimestampFactory;
 
 /**

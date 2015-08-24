@@ -1,0 +1,281 @@
+<?xml version="1.0"?>
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.3-master-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+  </parent>
+  <groupId>com.blazegraph</groupId>
+  <artifactId>bigdata-jar</artifactId>
+  <version>1.5.3-master-SNAPSHOT</version>
+  <name>Blazegraph Executable Jar</name>
+  <url>http://maven.apache.org</url>
+  <packaging>jar</packaging>
+
+  <build>
+     <resources>
+        <resource>
+            <directory>src/main/resources</directory>
+            <includes>
+		<include>**/*.xml</include>
+		<include>**/*.properties</include>
+		<include>**/org.openrdf.rio.*</include>
+		<include>**/com.bigdata.*</include>
+	    </includes>
+	</resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war-html</artifactId>
+                  <version>${project.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/classes/war</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+        </plugin>
+       <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+               <id>unpack-war</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>compile</phase>
+               <configuration>
+                 <target>
+ 		   <unzip dest="target/classes/war">
+        		<fileset dir="target/classes/war">
+            			<include name="bigdata.war" />
+        		</fileset>    
+    		   </unzip>
+ 		   <delete file="target/classes/war/bigdata.war" />
+		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
+                 </target>
+               </configuration>
+             </execution>
+           </executions>
+	</plugin>
+
+<!--
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>2.4</version>
+        <configuration>
+                 <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                 </descriptorRefs>
+             <archive>
+            <manifest>
+                <mainClass>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</mainClass>
+            </manifest>
+             </archive>
+        </configuration>
+        <executions>
+             <execution>
+                    <id>make-assembly</id>
+                    <phase>package</phase>
+                    <goals>
+                      <goal>single</goal>
+                    </goals>
+             </execution>
+        </executions>
+    </plugin>
+-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.4</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+               <filters>
+		<filter>
+                  <artifact>com.blazegraph:rdf-properties</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
+		<filter>
+                  <artifact>com.blazegraph:bigdata-jar</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>org/junit/experimental/**</exclude>
+                    <exclude>org/junit/runners/**</exclude>
+                    <exclude>junit/framework/**</exclude>
+                    <exclude>junit/**</exclude>
+                    <exclude>org/junit/**</exclude>
+                    <exclude>WEB-INF/**</exclude>
+                    <exclude>test*/**</exclude>
+                    <exclude>cia-factbook/**</exclude>
+                    <exclude>**/*.ttl</exclude>
+                    <exclude>**/*.ttlx</exclude>
+                    <exclude>**/*.rq</exclude>
+                    <exclude>**/*.srx</exclude>
+                    <exclude>**/*.trig</exclude>
+                    <exclude>**/sesame*testsuite/**</exclude>
+                  </excludes>
+                </filter>
+               </filters>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
+                    <Build-Number>${project.version}</Build-Number>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+     </plugins>
+   </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <stylesheetfile>${basedir}/src/main/javadoc/stylesheet.css</stylesheetfile>
+          <show>public</show>
+          <maxmemory>1000m</maxmemory>
+          <author>true</author>
+	  <version>true</version>
+          <doctitle><![CDATA[<h1>Blazegraph Executable Jar</h1>]]></doctitle>
+          <bottom> <![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
+<script>
+jQuery(document).ready(function(){
+  jQuery('ul.sf-menu').superfish({
+  pathClass: 'current',
+  cssArrows: false
+  });
+});
+
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-50971023-6', 'blazegraph.com');
+ga('send', 'pageview');
+</script>
+]]></bottom>
+ 
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+  
+  <dependencies>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-core</artifactId>
+      <version>${project.version}</version>
+       <exclusions>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-blueprints</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>junit-ext</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>bigdata-war-html</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  </project>
