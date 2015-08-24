@@ -204,6 +204,9 @@ dependencies.
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
     <module>../bigdata-jini</module>
+<!-- bigdata-jini unit tests are run separately
+    <module>../bigdata-jini-test</module>
+-->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
     <module>../bigdata-blueprints</module>
