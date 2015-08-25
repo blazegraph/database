@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.5.3-BLZG-1442-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>sparql-grammar</artifactId>
-   <version>1.5.3-master-SNAPSHOT</version>
+   <version>1.5.3-BLZG-1442-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Sparql Grammar</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -71,27 +71,44 @@ dependencies.
         </license>
     </licenses>
     <!-- properties are now in the parent POM. -->
+    <properties>
+	<javacc.home>/opt/javacc-5.0</javacc.home>
+    </properties>
     <build>
      <plugins>
       <plugin>
-<!-- 	
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
+             <execution>
+               <id>build-info</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>process-resources</phase>
+               <configuration>
+		<target name="javacc" description="Compile the SPARQL grammar.">
+		<mkdir dir = "target/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/"/>
+		<mkdir dir = "target/generated-sources/javacc/com/bigdata/rdf/sail/sparql/ast/"/>
+    		<jjtree
+        		javacchome="${javacc.home}"
+        		target="src/main/jjtree/com/bigdata/rdf/sail/sparql/ast/sparql.jjt"
+        		outputfile="sparql.jj"
+        		outputdirectory="target/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/"
+    		/>
+    		<javacc
+        		javacchome="${javacc.home}"
+        		target="target/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/sparql.jj"
+        		outputdirectory="target/generated-sources/javacc/com/bigdata/rdf/sail/sparql/ast/"
+       		 />
+    		</target>
+	       </configuration>
+	     </execution>
+	   </executions>
+	</plugin>
 
-	<target name="javacc" depends="prepare"
-        description="Compile the SPARQL grammar.">
-    <jjtree
-        javacchome="${javacc.home}"
-        target="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/sparql.jjt"
-        outputfile="sparql.jj"
-        outputdirectory="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/"
-    />
-    <javacc
-        javacchome="${javacc.home}"
-        target="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/sparql.jj"
-        outputdirectory="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/"
-        />
-    </target>
--->
-
+<!--
+      <plugin>
          <groupId>org.codehaus.mojo</groupId>
          <artifactId>javacc-maven-plugin</artifactId>
          <version>2.6</version>
@@ -116,10 +133,6 @@ dependencies.
             </goals>
             <configuration>
               <jdkVersion>1.5</jdkVersion>
-<!--
-              <javadocFriendlyComments>true</javadocFriendlyComments>
-              <packageName>com.bigdata.rdf.spa.javacc.utils</packageName>
--->
               <sourceDirectory>${project.build.directory}/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/</sourceDirectory>
               <outputDirectory>${project.build.directory}/generated-sources/javacc</outputDirectory>
             </configuration>
@@ -130,12 +143,10 @@ dependencies.
                <groupId>net.java.dev.javacc</groupId>
                <artifactId>javacc</artifactId>
                <version>5.0</version>
-<!--
-               <version>6.1.2</version>
--->
             </dependency>
          </dependencies>
       </plugin>	
+-->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -147,7 +158,7 @@ dependencies.
                 </goals>
                 <configuration>
                     <sources>
-                        <!-- <source>${project.build.directory}/generated-sources/jjtree</source> -->
+                        <source>${project.build.directory}/generated-sources/jjtree</source>
                         <source>${project.build.directory}/generated-sources/javacc</source>
                     </sources>
                 </configuration>
