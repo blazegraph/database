@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
+--><!-- 
+This POM is intended to support the use of bigdata(R) as an embedded
+database as part of your own maven project.  It declares the
+dependencies for the embedded database, but does not include the
+dependencies for the NanoSparqlServer or the clustered database - use
+the ant build.xml file to generate and deploy those artifacts.
+
+To install the dependencies into your local maven repository, do:
+
+        mvn clean install
+        
+If you change any of the dependencies that are published by the bigdata
+project (whether because we maintain them or because they are not readily
+available) then you need to publish the updated dependencies to the maven
+repository.  There are commands in comment blocks in this POM that will
+deploy those dependencies.  Be sure to update the version numbers in the
+commands first!
+
+See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=ReleaseGuide
+for information on publishing maven releases and snapshots for bigdata and its
+dependencies.
+
+--><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+   <modelVersion>4.0.0</modelVersion>
+   <parent>
+    <groupId>com.blazegraph</groupId>
+    <artifactId>blazegraph-parent</artifactId>
+    <version>1.5.3-BLZG-1442-SNAPSHOT</version>
+    <relativePath>../blazegraph-parent/pom.xml</relativePath>
+   </parent>
+   <groupId>com.blazegraph</groupId>
+   <artifactId>sparql-grammar</artifactId>
+   <version>1.5.3-BLZG-1442-SNAPSHOT</version>
+   <packaging>jar</packaging>
+   <name>Blazegraph Sparql Grammar</name>
+    <description>Blazegraph(TM) Maven Build</description>
+    <url>http://www.blazegraph.com</url>
+    <organization>
+        <name>SYSTAP, LLC</name>
+        <url>http://www.systap.com/</url>
+    </organization>
+    <inceptionYear>2006</inceptionYear>
+    <licenses>
+        <license>
+            <name>GNU General Public License Version 2 (GPLv2)</name>
+            <url>http://www.gnu.org/licenses/gpl-2.0.html</url>
+        </license>
+    </licenses>
+    <!-- properties are now in the parent POM. -->
+    <build>
+     <plugins>
+      <plugin>
+<!-- 	
+
+	<target name="javacc" depends="prepare"
+        description="Compile the SPARQL grammar.">
+    <jjtree
+        javacchome="${javacc.home}"
+        target="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/sparql.jjt"
+        outputfile="sparql.jj"
+        outputdirectory="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/"
+    />
+    <javacc
+        javacchome="${javacc.home}"
+        target="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/sparql.jj"
+        outputdirectory="bigdata-core/bigdata-sails/src/java/com/bigdata/rdf/sail/sparql/ast/"
+        />
+    </target>
+-->
+
+         <groupId>org.codehaus.mojo</groupId>
+         <artifactId>javacc-maven-plugin</artifactId>
+         <version>2.6</version>
+         <executions>
+           <execution>
+             <goals>
+               <goal>jjtree-javacc</goal>
+             </goals>
+           </execution>
+         </executions>
+           <dependencies>
+             <dependency>
+               <groupId>net.java.dev.javacc</groupId>
+               <artifactId>javacc</artifactId>
+               <version>5.0</version>
+               <!-- <version>6.1.2</version> -->
+            </dependency>
+         </dependencies>
+      </plugin>	
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+            <execution>
+                <phase>generate-sources</phase>
+                <goals>
+                    <goal>add-source</goal>
+                </goals>
+                <configuration>
+                    <sources>
+                        <source>${project.build.directory}/generated-sources/jjtree</source>
+                        <source>${project.build.directory}/generated-sources/javacc</source>
+                    </sources>
+                </configuration>
+            </execution>
+        </executions>
+      </plugin>
+    </plugins>
+    <extensions>
+      <!-- Enabling the use of SSH. -->
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+         <artifactId>wagon-ssh-external</artifactId>
+         <version>1.0-beta-6</version>
+      </extension>
+    </extensions>
+    </build>
+    
+    <distributionManagement>
+        <repository>
+            <id>bigdata.releases</id>
+            <name>bigdata(R) releases</name>
+            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>bigdata.snapshots</id>
+            <name>bigdata(R) snapshots</name>
+            <url>scpexe://www.systap.com/srv/www/htdocs/systap.com/maven/snapshots</url>
+            <uniqueVersion>true</uniqueVersion>
+        </snapshotRepository>
+    </distributionManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.openrdf.sesame</groupId>
+      <artifactId>sesame-runtime</artifactId>
+      <version>${sesame.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+	
