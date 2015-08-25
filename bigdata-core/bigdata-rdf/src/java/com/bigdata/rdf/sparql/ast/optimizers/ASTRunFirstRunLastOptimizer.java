@@ -148,7 +148,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
     		
             for (IGroupMemberNode child : joinGroup) {
             
-            	if (child instanceof IReorderableNode) {
+            	if (child instanceof IBindingProducerNode) {
             		
             		final ASTBase join = (ASTBase) child;
             		
