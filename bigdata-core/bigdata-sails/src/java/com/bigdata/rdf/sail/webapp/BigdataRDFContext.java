@@ -245,7 +245,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
      * HTTP header may be used to echo back the query.
      * 
      */
-    static private final String HTTP_HEADER_ECHO_BACK_QUERY = "X-ECHO-BACK-QUERY";
+    static public final String HTTP_HEADER_ECHO_BACK_QUERY = "X-ECHO-BACK-QUERY";
     /**
      * The name of the parameter/attribute that contains maxQueryTime (milliseconds)
      * for remote queries execution.
