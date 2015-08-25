@@ -326,6 +326,11 @@ abstract public class AbstractTripleStore extends
     final private boolean bottomUpEvaluation;
     
     /**
+     * @see Options#COMPUTE_CLOSURE_FOR_SIDS
+     */
+    final private boolean computeClosureForSids;
+    
+    /**
      * The {@link RDRHistory} class.
      * 
      * @see Options#RDR_HISTORY_CLASS
@@ -1269,6 +1274,14 @@ abstract public class AbstractTripleStore extends
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
 
+        /**
+         * If this option is set to false, do not compute closure for sids.
+         */
+        public static String COMPUTE_CLOSURE_FOR_SIDS = AbstractTripleStore.class
+                .getName() + ".computeClosureForSids";
+
+        public static String DEFAULT_COMPUTE_CLOSURE_FOR_SIDS = "true";
+
     }
 
     protected Class determineAxiomClass() {
@@ -1528,6 +1541,10 @@ abstract public class AbstractTripleStore extends
             }
             
         }
+        
+        this.computeClosureForSids = Boolean.valueOf(getProperty(
+                Options.COMPUTE_CLOSURE_FOR_SIDS,
+                Options.DEFAULT_COMPUTE_CLOSURE_FOR_SIDS));
         
         /*
          * Setup namespace mapping for serialization utility methods.
@@ -4320,6 +4337,13 @@ abstract public class AbstractTripleStore extends
          * sids.
          */
         if (rdrHistoryClass != null) {
+            return src;
+        }
+        
+        /*
+         * Bypass if requested.
+         */
+        if (!computeClosureForSids) {
             return src;
         }
         

@@ -379,13 +379,13 @@ public class BigdataSailFactory {
         }
         
         props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.textIndex", 
-                String.valueOf(options.contains("TextIndex"))); 
+                String.valueOf(options.contains(Option.TextIndex))); 
 
         props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.statementIdentifiers",
-                String.valueOf(options.contains("RDR")));
+                String.valueOf(options.contains(Option.RDR)));
         
         props.setProperty("com.bigdata.rdf.store.AbstractTripleStore.quads",
-                String.valueOf(options.contains("Quads")));
+                String.valueOf(options.contains(Option.Quads)));
         
         // Setup for the RWStore recycler rather than session protection.
         props.setProperty("com.bigdata.service.AbstractTransactionService.minReleaseAge","1");
@@ -418,9 +418,7 @@ public class BigdataSailFactory {
 				| IllegalAccessException | IllegalArgumentException
 				| InvocationTargetException e) {
 
-			throw new RuntimeException(providerClass
-					+ " is not found in the classpath.\n" + e.toString() + "\n"
-					+ e.getCause());
+			throw new RuntimeException(e);
 		}
 			
 	}
