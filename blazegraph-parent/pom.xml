@@ -45,14 +45,11 @@ for information on publishing maven releases and snapshots for bigdata and its
 dependencies.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" 
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd"
-         >
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-   <version>1.5.3-master-SNAPSHOT</version>
+   <version>1.5.3-BLZG-1270-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -74,8 +71,6 @@ dependencies.
       <!-- This is a copy of that information. However, there are a   -->
       <!-- few subtle differences.  See build.properties for details. -->
       <!--                                                            -->
-      <bigdata.version>1.5.3-master-SNAPSHOT</bigdata.version>
-      <bigdata.legacy.version>1.5.3-master-SNAPSHOT</bigdata.legacy.version>
       <icu.version>4.8</icu.version>
       <zookeeper.version>3.4.5</zookeeper.version>
       <sesame.version>2.7.12</sesame.version>
@@ -105,15 +100,24 @@ dependencies.
       <rexster.version>2.5.0</rexster.version>
       <striterator.version>1.0</striterator.version>
       <jini.version>2.2.1</jini.version>
-      <junit-ext.version>1.1-b3-dev</junit-ext.version>
+      <!-- <junit-ext.version>1.1-b3-dev</junit-ext.version> -->
+      <junit-ext.version>${project.version}</junit-ext.version>
       <junit4.version>4.11</junit4.version>
       <junit3.version>3.8.1</junit3.version>
       <servlet.version>3.1.0</servlet.version>
       <java.net.preferIPv4Stack>true</java.net.preferIPv4Stack>
       <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+    <scm>
+      <connection>scm:git:https://github.com/SYSTAP/bigdata.git</connection>
+    </scm>
     <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>2.5.2</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -199,8 +203,7 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
-<!--
-	Temporarily remove to CI purposes
+<!-- disabled pending BLZG-1270
     <module>../bigdata-jini</module>
 -->
     <module>../bigdata-war-html</module>

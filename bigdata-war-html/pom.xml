@@ -23,18 +23,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.5.3-BLZG-1270-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-war-html</artifactId>
-  <version>${bigdata.version}</version>
+  <version>1.5.3-BLZG-1270-SNAPSHOT</version>
   <name>Blazegraph WAR HTML</name>
   <url>http://maven.apache.org</url>
   <packaging>war</packaging>

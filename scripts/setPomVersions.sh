@@ -3,18 +3,12 @@
 # Must be run from the root of the bigdata project, i.e. ./scripts/updatePomVersions.sh
 
 PARENT_POM=./blazegraph-parent/pom.xml
-NEW_VERSION="1.5.3"
+CURRENT_VERSION=1.5.3
+BRANCH=`git rev-parse --abbrev-ref HEAD`
+SNAPSHOT="SNAPSHOT"
 
-CURRENT_SNAPSHOT=`cat $PARENT_POM | perl -n -e '/^.*\<version\>(.*)-SNAPSHOT\<\/version\>.*$/ && printf("%s", $1)'`
+echo "Updating POM versions to ${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT}"
 
-
-for file in `find . -name "pom.xml" -maxdepth 2 -print`; do
-
-	cat $file | sed "s/${CURRENT_SNAPSHOT}/${NEW_VERSION}/" > /tmp/$$
-	cat /tmp/$$ > $file
-	rm -f /tmp/$$
-
-done
-
+mvn versions:set -DnewVersion=${CURRENT_VERSION}-${BRANCH}-${SNAPSHOT} versions:update-child-modules -f ${PARENT_POM}
 
 
