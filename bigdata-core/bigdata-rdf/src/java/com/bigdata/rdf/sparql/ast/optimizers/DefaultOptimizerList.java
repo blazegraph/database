@@ -588,6 +588,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         
         /**
+         * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
+         */
+        add(new ASTRunFirstRunLastOptimizer());
+        
+        /**
          * Optimizer attaches FilterNodes which will run as "join filters" to
          * StatementPatternNodes.
          */
