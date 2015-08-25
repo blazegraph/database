@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServlet;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
@@ -97,6 +98,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	private String responseContentType = null;
 	private String accept = null;
 	private boolean permit400s = false;
+	private Header[] headers = null;
 
     private final String getSparqlURL(final String serviceURL) {
         return serviceURL + "/sparql";
@@ -124,7 +126,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		}
 	};
 
-	private RequestFactory requestFactory = GET;
+	private volatile RequestFactory requestFactory = GET;
 	
 	protected RequestFactory getRequestFactory() {
 		return requestFactory;
@@ -151,6 +153,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 		requestFactory = GET;
 		accept = null;
 		permit400s = false;
+		headers = null;
 	}
 
 	/**
@@ -167,6 +170,14 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 	 */
 	protected void setAccept(String mimetype) {
 		accept = mimetype;
+	}
+	
+	/**
+	 * 
+	 * @param mimetype
+	 */
+	protected void setHeaders(Header[] headers) {
+		this.headers = headers;
 	}
 
 	static private Pattern charset = Pattern.compile("[; ]charset *= *\"?([^ ;\"]*)([ \";]|$)");
@@ -246,6 +257,11 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 				throw new RuntimeException(e);
 			}
 			req.setHeader("Accept", accept==null?"*":accept);
+			
+			if(headers != null) {
+				req.setHeaders(headers);
+			}
+			
 			final HttpResponse resp = client.execute(req);
 			String page="";
 			final HttpEntity entity = resp.getEntity();
