@@ -180,12 +180,11 @@ public class BuildInfo {
 </echo>
     			<loadfile property="buildinfo" srcFile="${buildinfo.file}" />
     			<echo message="${buildinfo}" />
-                 </target>
-               </configuration>
-             </execution>
-            </executions>
-          </plugin>
-
+                </target>
+             </configuration>
+           </execution>
+         </executions>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -208,7 +207,7 @@ public class BuildInfo {
           </execution>
         </executions>
       </plugin>
-        </plugins>
+    </plugins>
     <extensions>
       <!-- Enabling the use of SSH. -->
       <extension>
