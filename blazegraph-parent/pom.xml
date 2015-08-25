@@ -203,7 +203,9 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
+<!-- disabled pending BLZG-1270
     <module>../bigdata-jini</module>
+-->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
     <module>../bigdata-blueprints</module>
