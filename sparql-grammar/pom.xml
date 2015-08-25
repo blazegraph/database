@@ -106,8 +106,8 @@ dependencies.
              <dependency>
                <groupId>net.java.dev.javacc</groupId>
                <artifactId>javacc</artifactId>
-               <version>5.0</version>
-               <!-- <version>6.1.2</version> -->
+               <!-- <version>5.0</version> -->
+               <version>6.1.2</version>
             </dependency>
          </dependencies>
       </plugin>	
@@ -154,11 +154,13 @@ dependencies.
         </snapshotRepository>
     </distributionManagement>
   <dependencies>
+<!--
     <dependency>
       <groupId>org.openrdf.sesame</groupId>
       <artifactId>sesame-runtime</artifactId>
       <version>${sesame.version}</version>
     </dependency>
+-->
   </dependencies>
 </project>
 	
