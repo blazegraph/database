@@ -96,18 +96,43 @@ dependencies.
          <artifactId>javacc-maven-plugin</artifactId>
          <version>2.6</version>
          <executions>
-           <execution>
-             <goals>
-               <goal>jjtree-javacc</goal>
-             </goals>
-           </execution>
+	   <execution>
+            <id>jjtree</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>jjtree</goal>
+            </goals>
+            <configuration>
+              <jdkVersion>1.5</jdkVersion>
+              <javadocFriendlyComments>true</javadocFriendlyComments>
+              <outputDirectory>${project.build.directory}/generated-sources/jjtree</outputDirectory>
+            </configuration>
+          </execution>
+	   <execution>
+            <id>javacc</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>javacc</goal>
+            </goals>
+            <configuration>
+              <jdkVersion>1.5</jdkVersion>
+<!--
+              <javadocFriendlyComments>true</javadocFriendlyComments>
+              <packageName>com.bigdata.rdf.spa.javacc.utils</packageName>
+-->
+              <sourceDirectory>${project.build.directory}/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/</sourceDirectory>
+              <outputDirectory>${project.build.directory}/generated-sources/javacc</outputDirectory>
+            </configuration>
+          </execution>
          </executions>
            <dependencies>
              <dependency>
                <groupId>net.java.dev.javacc</groupId>
                <artifactId>javacc</artifactId>
-               <!-- <version>5.0</version> -->
+               <version>5.0</version>
+<!--
                <version>6.1.2</version>
+-->
             </dependency>
          </dependencies>
       </plugin>	
@@ -122,7 +147,7 @@ dependencies.
                 </goals>
                 <configuration>
                     <sources>
-                        <source>${project.build.directory}/generated-sources/jjtree</source>
+                        <!-- <source>${project.build.directory}/generated-sources/jjtree</source> -->
                         <source>${project.build.directory}/generated-sources/javacc</source>
                     </sources>
                 </configuration>
