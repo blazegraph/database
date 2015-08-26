@@ -429,6 +429,7 @@ dependencies.
        <artifactId>bigdata-core-test</artifactId>
        <version>${project.version}</version>
        <type>test-jar</type>
+       <scope>tests</scope>
     </dependency>
     <dependency>
        <groupId>com.blazegraph</groupId>
