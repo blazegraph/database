@@ -617,7 +617,9 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
              return null;
           }
        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-          log.warn( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
+	  if(log.isInfoEnabled()) {
+          	log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
+	  }
           return null;
        }
     }
