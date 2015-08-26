@@ -212,8 +212,8 @@ TOKEN :
 |       <PIPE: "|">
 |   <INVERSE: "^">
 |   <DT_PREFIX: "^^">
-|   <NIL: <LPAREN> (<WS_CHAR>)* <RPAREN>>
-|   <ANON: <LBRACK> (<WS_CHAR>)* <RBRACK>>
+|   <NIL: <LPAREN> (<WS_CHAR>|<NEW_LINE>)* <RPAREN>>
+|   <ANON: <LBRACK> (<WS_CHAR>|<NEW_LINE>)* <RBRACK>>
 }
 
 TOKEN :
