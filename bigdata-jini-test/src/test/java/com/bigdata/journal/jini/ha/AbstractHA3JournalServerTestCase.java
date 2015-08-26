@@ -1458,7 +1458,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
                     break;
                 }
                 final long elapsed = System.nanoTime() - begin;
-                if (TimeUnit.NANOSECONDS.toSeconds(elapsed) > 4) {
+                if (TimeUnit.NANOSECONDS.toSeconds(elapsed) > 10) {
                     fail("Either zookeeper is not running or reverse DNS is not configured. "
                             + "The ZooKeeper client is taking too long to resolve server(s): state="
                             + zookeeper.getState()
@@ -1968,7 +1968,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
                     }
 
                 }
-            }, 10, TimeUnit.SECONDS);
+            }, 30, TimeUnit.SECONDS);
 
             
             return haGlue;
