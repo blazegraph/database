@@ -203,8 +203,7 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
-<!--
-	Temporarily remove to CI purposes
+<!-- disabled pending BLZG-1270
     <module>../bigdata-jini</module>
 -->
     <module>../bigdata-war-html</module>
