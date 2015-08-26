@@ -266,6 +266,13 @@ ga('send', 'pageview');
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-sails-test</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <version>${zookeeper.version}</version>
