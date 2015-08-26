@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-core-test</artifactId>
-    <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Core Tests</name>
     <description>Bigdata(R) Maven Build</description>
@@ -77,22 +77,6 @@ dependencies.
             <directory>bigdata/src/test</directory>
             <includes>
                 <include>**/*.csv</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-                <include>**/*.java</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-gom/src/test/resources</directory>
-            <includes>
-                <include>**/*.n3</include>
                 <include>**/*.owl</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>

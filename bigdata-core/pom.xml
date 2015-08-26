@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-core</artifactId>
-   <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+   <version>1.5.3-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Core</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -102,13 +102,6 @@ dependencies.
                 <include>**/*.gz</include>
                 <include>**/*.srx</include>
                 <include>**/*.trig</include>
-            </includes>
-        </resource>
-        <!-- Include the RIO parser configurations for OpenRDF -->
-        <resource>
-	   <directory>bigdata-rdf/src/resources/service-providers/</directory>
-            <includes>
-                <include>**/*</include>
             </includes>
         </resource>
         <resource>

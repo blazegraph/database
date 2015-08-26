@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-war</artifactId>
-  <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+  <version>1.5.3-master-SNAPSHOT</version>
   <name>Blazegraph WAR</name>
   <url>http://maven.apache.org</url>
   <packaging>war</packaging>
@@ -142,6 +142,12 @@ ga('send', 'pageview');
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-util</artifactId>
       <version>${project.version}</version>
+      <exclusions>
+        <exclusion>  
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions> 
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
