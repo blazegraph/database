@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.5.3-BLZG-1447-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-rdf-test</artifactId>
-    <version>1.5.3-master-SNAPSHOT</version>
+    <version>1.5.3-BLZG-1447-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph RDF Tests</name>
     <description>Blazegraph(TM) Maven Build</description>
