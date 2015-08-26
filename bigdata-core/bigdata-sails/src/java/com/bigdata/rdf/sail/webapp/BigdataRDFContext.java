@@ -98,6 +98,7 @@ import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
+import com.bigdata.rdf.sail.SPARQLUpdateEvent.DeleteInsertWhereStats;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
@@ -2226,6 +2227,20 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                                .close();
                     } else {
                     
+						/*
+						 * Report statistics for the UPDATE operation.
+						 */
+                    	
+						/*
+						 * Note: will be null unless DELETE/INSERT WHERE
+						 * operation.
+						 * 
+						 * @see BLZG-1446 (Provide detailed statistics on
+						 * execution performance inside of SPARQL UPDATE
+						 * requests).
+						 */
+                    	final DeleteInsertWhereStats deleteInsertWhereStats = e.getDeleteInsertWhereStats();
+                    	
                         if(echoBack) {
                         	
                             body.node("pre")
@@ -2235,7 +2250,12 @@ public class BigdataRDFContext extends BigdataBaseContext {
                                 //
                         body.node("p")
                                 .text("totalElapsed=" + totalElapsedMillis
-                                        + "ms, elapsed=" + elapsedMillis + "ms")//
+                                        + "ms, elapsed=" + elapsedMillis + "ms"
+										+ (deleteInsertWhereStats == null ? ""
+												: ", whereClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.whereNanos.get())
+														+ "ms, deleteClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.deleteNanos.get())
+														+ "ms, insertClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.whereNanos.get())
+														+ "ms"))//
                                 .close();
                    }
                     
