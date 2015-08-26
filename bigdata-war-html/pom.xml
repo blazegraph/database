@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG-1447-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-war-html</artifactId>
-  <version>1.5.3-BLZG-1447-SNAPSHOT</version>
+  <version>1.5.3-master-SNAPSHOT</version>
   <name>Blazegraph WAR HTML</name>
   <url>http://maven.apache.org</url>
   <packaging>war</packaging>
