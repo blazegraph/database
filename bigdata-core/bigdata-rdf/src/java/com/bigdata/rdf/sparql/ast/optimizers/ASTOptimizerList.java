@@ -120,7 +120,7 @@ public class ASTOptimizerList extends LinkedList<IASTOptimizer> implements
                 throw new AssertionError("Optimized discarded query: " + opt);
 
             if (log.isDebugEnabled())
-                log.debug("Rewritten AST:\n" + queryNode);
+                log.debug("Rewritten AST:\n" + tmp.getQueryNode());
 
             saStats.registerOptimizerCall(
                opt.getClass().getSimpleName(), 

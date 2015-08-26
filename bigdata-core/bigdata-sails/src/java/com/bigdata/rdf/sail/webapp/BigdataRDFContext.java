@@ -33,7 +33,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
-import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -99,6 +98,7 @@ import com.bigdata.rdf.sail.BigdataSailTupleQuery;
 import com.bigdata.rdf.sail.BigdataSailUpdate;
 import com.bigdata.rdf.sail.ISPARQLUpdateListener;
 import com.bigdata.rdf.sail.SPARQLUpdateEvent;
+import com.bigdata.rdf.sail.SPARQLUpdateEvent.DeleteInsertWhereStats;
 import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sail.webapp.XMLBuilder.Node;
 import com.bigdata.rdf.sail.webapp.client.StringUtil;
@@ -242,6 +242,11 @@ public class BigdataRDFContext extends BigdataBaseContext {
      */
     static private final String HTTP_HEADER_BIGDATA_MAX_QUERY_MILLIS = "X-BIGDATA-MAX-QUERY-MILLIS";
     
+    /**
+     * HTTP header may be used to echo back the query.
+     * 
+     */
+    static public final String HTTP_HEADER_ECHO_BACK_QUERY = "X-ECHO-BACK-QUERY";
     /**
      * The name of the parameter/attribute that contains maxQueryTime (milliseconds)
      * for remote queries execution.
@@ -1794,6 +1799,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
          */
         public final AtomicLong commitTime = new AtomicLong(-1);
         
+        private boolean echoBack = false;
+        
         public UpdateTask(final BigdataSailRepositoryConnection cxn, 
         		final String namespace, final long timestamp,
                 final String baseURI, final Map<String, Value> bindings,
@@ -1859,6 +1866,14 @@ public class BigdataRDFContext extends BigdataBaseContext {
 
             final SparqlUpdateResponseWriter listener;
             final ByteArrayOutputStream baos;
+            
+
+            if(req.getHeader(HTTP_HEADER_ECHO_BACK_QUERY) != null) {
+                
+                echoBack = Boolean.parseBoolean(req.getHeader(HTTP_HEADER_ECHO_BACK_QUERY));
+                
+            }
+
             if (monitor) {
 
                 /*
@@ -1903,7 +1918,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 // This will write the response entity.
                 listener = new SparqlUpdateResponseWriter(resp, os, charset,
                         true /* reportLoadProgress */, flushEachEvent,
-                        mutationCount);
+                        mutationCount, echoBack);
 
             } else {
 
@@ -1933,7 +1948,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
                 
                 listener = new SparqlUpdateResponseWriter(resp, baos, charset,
                         false/* reportLoadProgress */, false/* flushEachEvent */,
-                        mutationCount);
+                        mutationCount, echoBack);
 
             }
 
@@ -2019,6 +2034,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         private final boolean reportLoadProgress;
         private final boolean flushEachEvent;
         private final CAT mutationCount;
+        private final boolean echoBack;
         
         /**
          * Used to correlate incremental LOAD progress messages.
@@ -2049,7 +2065,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
         public SparqlUpdateResponseWriter(final HttpServletResponse resp,
                 final OutputStream os, final Charset charset,
                 final boolean reportLoadProgress, final boolean flushEachEvent,
-                final CAT mutationCount)
+                final CAT mutationCount, final boolean echoBack)
                 throws IOException {
 
             if (resp == null)
@@ -2082,6 +2098,8 @@ public class BigdataRDFContext extends BigdataBaseContext {
             this.begin = System.nanoTime();
             
             this.body = writeSparqlUpdateResponseHeader();
+            
+            this.echoBack = echoBack;
 
         }
 
@@ -2209,13 +2227,35 @@ public class BigdataRDFContext extends BigdataBaseContext {
 //                                .close();
                     } else {
                     
-                        body.node("pre")
+						/*
+						 * Report statistics for the UPDATE operation.
+						 */
+                    	
+						/*
+						 * Note: will be null unless DELETE/INSERT WHERE
+						 * operation.
+						 * 
+						 * @see BLZG-1446 (Provide detailed statistics on
+						 * execution performance inside of SPARQL UPDATE
+						 * requests).
+						 */
+                    	final DeleteInsertWhereStats deleteInsertWhereStats = e.getDeleteInsertWhereStats();
+                    	
+                        if(echoBack) {
+                        	
+                            body.node("pre")
                                 .text(e.getUpdate().toString())
-                                .close()
+                                .close();
+                        }
                                 //
-                                .node("p")
+                        body.node("p")
                                 .text("totalElapsed=" + totalElapsedMillis
-                                        + "ms, elapsed=" + elapsedMillis + "ms")//
+                                        + "ms, elapsed=" + elapsedMillis + "ms"
+										+ (deleteInsertWhereStats == null ? ""
+												: ", whereClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.whereNanos.get())
+														+ "ms, deleteClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.deleteNanos.get())
+														+ "ms, insertClause=" + TimeUnit.NANOSECONDS.toMillis(deleteInsertWhereStats.whereNanos.get())
+														+ "ms"))//
                                 .close();
                    }
                     

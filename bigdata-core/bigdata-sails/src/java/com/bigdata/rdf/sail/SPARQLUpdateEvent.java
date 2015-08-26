@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 package com.bigdata.rdf.sail;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.bigdata.rdf.sparql.ast.Update;
 
@@ -36,20 +37,37 @@ public class SPARQLUpdateEvent {
 
     private final Update op;
     private final long elapsed;
+    private DeleteInsertWhereStats deleteInsertWhereStats;
     private final Throwable cause;
+
+    /**
+	 * Class reports back the time for the WHERE clause, DELETE clause (if any),
+	 * and INSERT clause (if any) for a DELETE/INSERT WHERE operation.
+	 *
+	 * @see BLZG-1446 (Provide detailed statistics on execution performance
+	 *      inside of SPARQL UPDATE requests).
+	 */
+    public static class DeleteInsertWhereStats {
+    	final public AtomicLong whereNanos = new AtomicLong();
+    	final public AtomicLong deleteNanos = new AtomicLong();
+    	final public AtomicLong insertNanos = new AtomicLong();
+    }
     
     /**
-     * 
-     * @param op
-     *            The {@link Update} operation.
-     * @param elapsed
-     *            The elapsed time.
-     * @param cause
-     *            The cause iff an error occurred and otherwise
-     *            <code>null</code>.
-     */
-    public SPARQLUpdateEvent(final Update op, final long elapsed,
-            final Throwable cause) {
+	 * 
+	 * @param op
+	 *            The {@link Update} operation.
+	 * @param elapsed
+	 *            The elapsed time.
+	 * @param cause
+	 *            The cause iff an error occurred and otherwise
+	 *            <code>null</code>.
+	 * @param deleteInsertWhereStats
+	 *            Statistics associated with the processing of a DELETE/INSERT
+	 *            WHERE operation (and otherwise <code>null</code>).
+	 */
+	public SPARQLUpdateEvent(final Update op, final long elapsed, final Throwable cause,
+			final DeleteInsertWhereStats deleteInsertWhereStats) {
 
         if (op == null)
             throw new IllegalArgumentException();
@@ -57,6 +75,8 @@ public class SPARQLUpdateEvent {
         this.op = op;
         
         this.elapsed = elapsed;
+        
+        this.deleteInsertWhereStats = deleteInsertWhereStats;
         
         this.cause = cause;
         
@@ -84,6 +104,17 @@ public class SPARQLUpdateEvent {
     }
     
     /**
+     * Return statistics associated with the processing of a DELETE/INSERT
+	 *            WHERE operation (and otherwise <code>null</code>).
+	 *            
+	 * @see BLZG-1446 (Provide detailed statistics on execution performance
+	 *      inside of SPARQL UPDATE requests).
+     */
+    public DeleteInsertWhereStats getDeleteInsertWhereStats() {
+        return deleteInsertWhereStats;
+    }
+
+    /**
      * Incremental progress report during <code>LOAD</code>.
      */
     public static class LoadProgress extends SPARQLUpdateEvent {
@@ -94,7 +125,7 @@ public class SPARQLUpdateEvent {
         public LoadProgress(final Update op, final long elapsed,
                 final long nparsed, final boolean done) {
 
-            super(op, elapsed, null/* cause */);
+            super(op, elapsed, null/* cause */, null/*deleteInsertWhereStats*/);
 
             this.nparsed = nparsed;
             

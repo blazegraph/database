@@ -161,6 +161,11 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * {@link AST2BOpJoins}s.
      */
     public final BOpContextBase context;
+
+    /**
+     * The {@link IExternalAST2BOp} for using GPUs or <code>null</code>.
+     */
+    public final IExternalAST2BOp gpuEvaluation;
     
     /**
      * When <code>true</code>, may use the version of DISTINCT which operates on
@@ -547,6 +552,9 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
         this.context = new BOpContextBase(queryEngine);
         
         this.globallyScopedVariables = new HashSet<IVariable<?>>();
+        
+        // try to set this.gpuEvaluation
+        this.gpuEvaluation = initGPUEvaluation();
 
     }
 
@@ -587,6 +595,36 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
       }
       return optimizers;
    }
+
+    /**
+     * Tries to create the {@link IExternalAST2BOp} for using GPUs; returns
+     * <code>null</code> if the attempt fails.
+     */
+    private static IExternalAST2BOp initGPUEvaluation() {
+
+       try {
+          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.eval.GPUEvaluation" );
+
+          if (IExternalAST2BOp.class.isAssignableFrom(cls)) {
+	     if(log.isInfoEnabled()) {
+             	log.info( "Found Blazegraph-Mapgraph connector: "
+                       + cls.getCanonicalName() );
+             }
+             return (IExternalAST2BOp) cls.newInstance();
+          }
+          else {
+             log.warn( cls.getCanonicalName()
+                       + " does not extend "
+                       + IExternalAST2BOp.class.getCanonicalName() );
+             return null;
+          }
+       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+	  if(log.isInfoEnabled()) {
+          	log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
+	  }
+          return null;
+       }
+    }
 
    @Override
     public long getTimestamp() {

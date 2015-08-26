@@ -28,12 +28,12 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jar</artifactId>
-  <version>1.5.3-BLZG-1270-SNAPSHOT</version>
+  <version>1.5.3-master-SNAPSHOT</version>
   <name>Blazegraph Executable Jar</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
@@ -102,33 +102,6 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
              </execution>
            </executions>
 	</plugin>
-
-<!--
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>2.4</version>
-        <configuration>
-                 <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                 </descriptorRefs>
-             <archive>
-            <manifest>
-                <mainClass>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</mainClass>
-            </manifest>
-             </archive>
-        </configuration>
-        <executions>
-             <execution>
-                    <id>make-assembly</id>
-                    <phase>package</phase>
-                    <goals>
-                      <goal>single</goal>
-                    </goals>
-             </execution>
-        </executions>
-    </plugin>
--->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>

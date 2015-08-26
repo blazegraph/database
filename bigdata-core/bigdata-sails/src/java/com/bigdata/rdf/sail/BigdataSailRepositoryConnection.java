@@ -455,4 +455,17 @@ public class BigdataSailRepositoryConnection extends SailRepositoryConnection {
         
     }
 
+    /**
+     * Remove a change log from the SAIL connection.  See {@link IChangeLog} and
+     * {@link IChangeRecord}.
+     * 
+     * @param log
+     *          the change log
+     */
+    public void removeChangeLog(final IChangeLog log) {
+        
+        getSailConnection().removeChangeLog(log);
+        
+    }
+
 }
