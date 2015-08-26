@@ -116,7 +116,7 @@ public class ConnegUtil {
 	 * @see http://trac.blazegraph.com/ticket/984
 	 */
 	public static String getMimeTypeForQueryParameterQueryRequest(String outputFormat,
-			String acceptHeader) {
+			String... acceptHeaders) {
 
 		String acceptHeaderValue = null;
 
@@ -141,7 +141,14 @@ public class ConnegUtil {
 						+ " passed " + outputFormat + ".  Defaulting to XML.");
 			}
 		} else {
-			acceptHeaderValue = acceptHeader;
+			StringBuilder sb = new StringBuilder();
+			for(String acceptHeader: acceptHeaders) {
+				if (sb.length()>0) {
+					sb.append(", ");
+				}
+				sb.append(acceptHeader);
+			}
+			acceptHeaderValue = sb.toString();
 		}
 
 		return acceptHeaderValue;

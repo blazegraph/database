@@ -33,6 +33,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -2450,7 +2451,10 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-            acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),req.getHeader("Accept"));
+        	List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
+            acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(
+            		req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER), 
+            		acceptHeaders.toArray(new String[acceptHeaders.size()]));
         }
 
         // Do conneg.
