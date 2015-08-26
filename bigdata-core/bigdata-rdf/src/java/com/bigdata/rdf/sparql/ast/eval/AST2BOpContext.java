@@ -606,8 +606,10 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
           final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.eval.GPUEvaluation" );
 
           if (IExternalAST2BOp.class.isAssignableFrom(cls)) {
-             log.info( "Found Blazegraph-Mapgraph connector: "
+	     if(log.isInfoEnabled()) {
+             	log.info( "Found Blazegraph-Mapgraph connector: "
                        + cls.getCanonicalName() );
+             }
              return (IExternalAST2BOp) cls.newInstance();
           }
           else {
