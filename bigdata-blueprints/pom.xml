@@ -163,6 +163,13 @@ ga('send', 'pageview');
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-sails-test</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-war-html</artifactId>
       <version>${project.version}</version>
       <type>war</type>
