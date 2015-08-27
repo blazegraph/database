@@ -2451,7 +2451,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
             }
         } else {
             // Use whatever was specified by the client.
-        	List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
+        	final List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
             acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(
             		req.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER), 
             		acceptHeaders.toArray(new String[acceptHeaders.size()]));

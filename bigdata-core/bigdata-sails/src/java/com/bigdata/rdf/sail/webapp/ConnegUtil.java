@@ -115,8 +115,8 @@ public class ConnegUtil {
 	 * 
 	 * @see http://trac.blazegraph.com/ticket/984
 	 */
-	public static String getMimeTypeForQueryParameterQueryRequest(String outputFormat,
-			String... acceptHeaders) {
+	public static String getMimeTypeForQueryParameterQueryRequest(final String outputFormat,
+			final String... acceptHeaders) {
 
 		String acceptHeaderValue = null;
 

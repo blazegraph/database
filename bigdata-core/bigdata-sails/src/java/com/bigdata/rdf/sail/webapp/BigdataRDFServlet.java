@@ -554,7 +554,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
+        final List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
 		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				acceptHeaders.toArray(new String[acceptHeaders.size()])); 
@@ -626,7 +626,7 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-        List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
+        final List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
 		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
 				acceptHeaders.toArray(new String[acceptHeaders.size()])); 
