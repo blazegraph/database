@@ -155,7 +155,7 @@ public class PrefixDeclProcessor {
                 sb.append(" " + prefix);
             }
             sb.append(":");
-            sb.append(" <" + entry.getValue() + "> \n");
+            sb.append(" <" + entry.getValue() + ">");
         }
         return sb.toString();
     }
