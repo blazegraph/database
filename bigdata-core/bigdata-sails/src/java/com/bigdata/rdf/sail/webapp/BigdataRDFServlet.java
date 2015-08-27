@@ -36,9 +36,11 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLDecoder;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -51,9 +53,7 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
-import org.openrdf.model.ValueFactory;
 import org.openrdf.model.impl.URIImpl;
-import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.query.MalformedQueryException;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandlerException;
@@ -554,9 +554,10 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
+        final List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
 		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
-				req.getHeader("Accept")); 
+				acceptHeaders.toArray(new String[acceptHeaders.size()])); 
 		
         final ConnegUtil util = new ConnegUtil(acceptStr);
 
@@ -625,10 +626,11 @@ abstract public class BigdataRDFServlet extends BigdataServlet {
         /*
          * CONNEG for the MIME type.
          */
-    	final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
+        final List<String> acceptHeaders = Collections.list(req.getHeaders("Accept"));
+		final String acceptStr = ConnegUtil.getMimeTypeForQueryParameterQueryRequest(req
 				.getParameter(BigdataRDFServlet.OUTPUT_FORMAT_QUERY_PARAMETER),
-				req.getHeader("Accept")); 
-        
+				acceptHeaders.toArray(new String[acceptHeaders.size()])); 
+		
         final ConnegUtil util = new ConnegUtil(acceptStr);
 
         // The best format for that Accept header.
