@@ -49,12 +49,12 @@ dependencies.
    <parent>
     <groupId>com.blazegraph</groupId>
     <artifactId>blazegraph-parent</artifactId>
-    <version>1.5.3-BLZG-1442-SNAPSHOT</version>
+    <version>1.5.3-master-SNAPSHOT</version>
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>sparql-grammar</artifactId>
-   <version>1.5.3-BLZG-1442-SNAPSHOT</version>
+   <version>1.5.3-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Sparql Grammar</name>
     <description>Blazegraph(TM) Maven Build</description>
@@ -76,38 +76,6 @@ dependencies.
     </properties>
     <build>
      <plugins>
-      <plugin>
-           <artifactId>maven-antrun-plugin</artifactId>
-           <version>1.6</version>
-           <executions>
-             <execution>
-               <id>build-info</id>
-               <goals>
-                 <goal>run</goal>
-               </goals>
-               <phase>process-resources</phase>
-               <configuration>
-		<target name="javacc" description="Compile the SPARQL grammar.">
-		<mkdir dir = "target/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/"/>
-		<mkdir dir = "target/generated-sources/javacc/com/bigdata/rdf/sail/sparql/ast/"/>
-    		<jjtree
-        		javacchome="${javacc.home}"
-        		target="src/main/jjtree/com/bigdata/rdf/sail/sparql/ast/sparql.jjt"
-        		outputfile="sparql.jj"
-        		outputdirectory="target/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/"
-    		/>
-    		<javacc
-        		javacchome="${javacc.home}"
-        		target="target/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/sparql.jj"
-        		outputdirectory="target/generated-sources/javacc/com/bigdata/rdf/sail/sparql/ast/"
-       		 />
-    		</target>
-	       </configuration>
-	     </execution>
-	   </executions>
-	</plugin>
-
-<!--
       <plugin>
          <groupId>org.codehaus.mojo</groupId>
          <artifactId>javacc-maven-plugin</artifactId>
@@ -146,10 +114,10 @@ dependencies.
             </dependency>
          </dependencies>
       </plugin>	
--->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
+        <version>1.9.1</version>
         <executions>
             <execution>
                 <phase>generate-sources</phase>
@@ -158,7 +126,6 @@ dependencies.
                 </goals>
                 <configuration>
                     <sources>
-                        <source>${project.build.directory}/generated-sources/jjtree</source>
                         <source>${project.build.directory}/generated-sources/javacc</source>
                     </sources>
                 </configuration>
@@ -190,13 +157,6 @@ dependencies.
         </snapshotRepository>
     </distributionManagement>
   <dependencies>
-<!--
-    <dependency>
-      <groupId>org.openrdf.sesame</groupId>
-      <artifactId>sesame-runtime</artifactId>
-      <version>${sesame.version}</version>
-    </dependency>
--->
   </dependencies>
 </project>
 	
