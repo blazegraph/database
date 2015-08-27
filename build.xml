@@ -13,7 +13,8 @@ See 'bundleJar'.
 Webapp. Bigdata can be deployed as a web application exposing a SPARQL end point
 with a RESTful API.
 
-See 'war'.
+See 'war'.  Starting with the 1.5.2 release, this is deprecated and the bigdata-war maven
+artifact should be used:  cd bigdata-war; mvn package
 
 Executable jar.  Bigdata can be built as an executable jar file.  This is a fully-
 bundled single jar distribution that may be run as "java -jar <jarfile>".  You may 
@@ -53,6 +54,7 @@ See 'deploy-artifact' (binary artifact: REL.${version}.tgz).
 <project name="bigdata" default="bundleJar" basedir=".">
 
     <property file="build.properties" />
+
 
     <!-- build-time classpath. -->
     <path id="build.classpath">
@@ -206,130 +208,9 @@ public class BuildInfo {
     <!-- Note: javac error results often if verbose is disabled. -->
     <!-- I was able to perform a build with 1.6.0_07. -->
     <!-- I set the target to 1.5 to support deployment on non-1.6 JVMs. -->
-    <target name="compile" depends="prepare, buildinfo"
-        description="Compile the code base.">
-        <mkdir dir="${build.dir}" />
-        <echo>javac</echo>
-        <echo>    destdir="${build.dir}"</echo>
-        <echo>    fork="yes"</echo>
-        <echo>    memorymaximumsize="1g"</echo>
-        <echo>    debug="yes"</echo>
-        <echo>    debuglevel="${javac.debuglevel}"</echo>
-        <echo>    verbose="${javac.verbose}"</echo>
-        <echo>    encoding="${javac.encoding}"</echo>
-        <echo>    source="${javac.source}"</echo>
-        <echo>    target="${javac.target}"</echo>
-        <javac classpathref="build.classpath"
-               destdir="${build.dir}/classes"
-               fork="yes"
-               memorymaximumsize="1g"
-               debug="${javac.debug}"
-               debuglevel="${javac.debuglevel}"
-               verbose="${javac.verbose}"
-               encoding="${javac.encoding}"
-               source="${javac.source}"
-               target="${javac.target}"
-               includeantruntime="false"
-            >
-            <!-- note: must also specify -bootclasspath and -extdirs when cross-compiling -->
-            <src path="${bigdata.dir}/bigdata/src/java" />
-            <src path="${bigdata.dir}/bigdata-client/src/main/java" />
-            <src path="${bigdata.dir}/bigdata-jini/src/main/java" />
-            <src path="${bigdata.dir}/bigdata-rdf/src/java" />
-            <src path="${bigdata.dir}/bigdata-sails/src/java" />
-            <src path="${bigdata.dir}/bigdata-blueprints/src/main/java" />
-            <src path="${bigdata.dir}/bigdata-gom/src/java" />
-            <src path="${bigdata.dir}/bigdata-ganglia/src/main/java" />
-            <src path="${bigdata.dir}/bigdata-gas/src/main/java" />
-            <src path="${bigdata.dir}/ctc-striterators/src/main/java" />
-            <src path="${bigdata.dir}/bigdata/src/test"/>
-            <src path="${bigdata.dir}/bigdata-client/src/test/java"/>
-            <src path="${bigdata.dir}/bigdata-jini/src/test/java"/>
-            <src path="${bigdata.dir}/bigdata-rdf/src/test"/>
-            <src path="${bigdata.dir}/bigdata-sails/src/test"/>
-            <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
-            <src path="${bigdata.dir}/bigdata-gas/src/test/resources" />
-            <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
-            <src path="${bigdata.dir}/bigdata-gom/src/test" />
-            <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
-            <!-- Do not include the unit tests @todo conditionally include?
-            -->
-            <compilerarg value="-version" />
-        </javac>
-        <!-- copy resources. -->
-        <copy toDir="${build.dir}/classes">
-            <fileset dir="${bigdata.dir}/bigdata/src/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-                <exclude name="**/BytesUtil.c" />
-            </fileset>
-         <!-- Added for test classes -->
-            <fileset dir="${bigdata.dir}/bigdata/src/test">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-                <exclude name="**/BytesUtil.c" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-client/src/main/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-rdf/src/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-sails/src/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/main/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
-                <exclude name="**/*.java" />
-                <exclude name="**/package.html" />
-            </fileset>
-         <fileset dir="${bigdata.dir}/bigdata-gom/src/java">
-            <exclude name="**/*.java" />
-            <exclude name="**/package.html" />
-         </fileset>
-         <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java">
-            <exclude name="**/*.java" />
-            <exclude name="**/package.html" />
-         </fileset>
-         <fileset dir="${bigdata.dir}/bigdata-gas/src/test/java">
-            <exclude name="**/*.java" />
-            <exclude name="**/package.html" />
-         </fileset>
-            <!-- Note: This simple copy works so long as there is just one service
-                 provider file per interface.  It will not combine (append) multiple
-                 files for the same interface. -->
-            <fileset dir="${bigdata.dir}/bigdata-rdf/src/resources/service-providers">
-                <include name="META-INF/**" />
-            </fileset>
-            <fileset dir="${bigdata.dir}/bigdata-sails/src/resources/sesame-server">
-                <include name="META-INF/**" />
-            </fileset>
-            <!-- Copy WAR resources for the embedded NanoSparqlServer.     -->
-            <!-- TODO: This could cause problem since the files exist in   -->
-            <!-- both the JAR and the staged artifact (bigdata/var/jetty). -->
-            <!-- This makes it difficult to override the ones in the JAR.  -->
-            <!-- See also "run-junit" for an alterative to getting CI to run. -->
-            <!-- newer approach. -->
-            <!--fileset dir="${bigdata.dir}/bigdata-war/src">
-                <include name="**"/>
-            </fileset-->
-            <!-- older approach. -->
-            <fileset dir="." includes="bigdata-war/src/**"/>
-        </copy>
+    <target name="compile" description="Compile the code base.">
+	<exec command="./scripts/mavenInstall.sh">
+        </exec>
     </target>
 
     <!-- Builds the bigdata JAR and bundles it together with all of its dependencies in the ${build.dir}/lib directory. -->
@@ -343,7 +224,7 @@ public class BuildInfo {
         <jar destfile="${build.dir}/${version}-sources.jar">
             <fileset dir="${bigdata.dir}/bigdata/src/java" />
             <fileset dir="${bigdata.dir}/bigdata/src/samples" />
-            <fileset dir="${bigdata.dir}/bigdata-ganglia/src/java" />
+            <fileset dir="${bigdata.dir}/bigdata-ganglia/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-gas/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-client/src/main/java" />
             <fileset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
@@ -355,6 +236,8 @@ public class BuildInfo {
             <fileset dir="${bigdata.dir}/bigdata-gom/src/java" />
             <fileset dir="${bigdata.dir}/bigdata-gom/src/samples" />
             <fileset dir="${bigdata.dir}/ctc-striterators/src/main/java" />
+            <fileset dir="${bigdata.dir}/rdf-properties/src/main/java" />
+            <fileset dir="${bigdata.dir}/bigdata-util/src/main/java" />
         </jar>
     </target>
 
@@ -363,8 +246,7 @@ public class BuildInfo {
          See 'bundleJar'. -->
     <target name="jar" depends="compile" description="Generates the jar (see also bundleJar).">
         <jar destfile="${build.dir}/${version}.jar">
-            <!-- <fileset dir="${build.dir}/classes" excludes="test/**" /> -->
-            <fileset dir="${build.dir}/classes" />
+            <fileset dir="${build.dir}/classes" excludes="test/**" />
             <!-- Copy the copyright top-level NOTICE file. -->
             <fileset file="${bigdata.dir}/NOTICE"/>
             <!-- Copy the copyright top-level LICENSE file. -->
@@ -410,6 +292,8 @@ public class BuildInfo {
             <fileset dir="bigdata-client/src/main/java" />
             <fileset dir="bigdata-jini/src/main/java" />
             <fileset dir="bigdata-rdf/src/java" />
+            <fileset dir="rdf-properties/src/main/java" />
+            <fileset dir="bigdata-util/src/main/java" />
             <fileset dir="bigdata-sails/src/java" />
             <fileset dir="bigdata-blueprints/src/main/java" />
          <fileset dir="bigdata-gom/src/java" />
@@ -451,6 +335,8 @@ public class BuildInfo {
          <packageset dir="${bigdata.dir}/bigdata-client/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-jini/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/java" />
+         <packageset dir="${bigdata.dir}/rdf-properties/src/main/java" />
+         <packageset dir="${bigdata.dir}/bigdata-util/src/main/java" />
          <packageset dir="${bigdata.dir}/bigdata-rdf/src/samples" />
          <packageset dir="${bigdata.dir}/bigdata-sails/src/java" />
          <packageset dir="${bigdata.dir}/bigdata-blueprints/src/main/java" />
@@ -586,90 +472,9 @@ ga('send', 'pageview');
     </target>
 
     <!--depends="bundleJar"-->
-    <target name="war" depends="bundleJar, autojar-strip-fastutil" 
-        description="Generates a WAR artifact.">
-      <property name="war.dir" value="${build.dir}/staged-war"
-          description="The staging directory for the webapp."/>
-      <property name="war.file" value="${build.dir}/bigdata.war"
-          description="The generated WAR file." />
-      <delete file="${war.file}" 
-          description="Remove the old WAR file."/>
-      <delete dir="${war.dir}" 
-          description="Remove old WAR staging directory."/>
-        <echo message="Staging webapp to ${war.dir}"/>
-        <copy todir="${war.dir}"
-            includeemptydirs="yes"
-            preservelastmodified="true" 
-            description="Stage the webapp to a temporary directory."
-            >
-            <fileset dir="bigdata-war/src">
-              <include name="**/*"/>
-            <!-- The jetty.xml file is not used when deploying to a servlet container. -->
-              <exclude name="**/jetty.xml"/>
-        </fileset>
-        </copy>
-      <replace file="${war.dir}/WEB-INF/web.xml"
-          summary="true"
-          description="Override the default location of the RWStore.properties file.">
-        <replacefilter 
-         token="WEB-INF/RWStore.properties"
-            value="../webapps/bigdata/WEB-INF/RWStore.properties"
-        />
-      </replace>
-      <echo message="Building webapp in ${war.file} from ${war.dir}"/>
-        <war destfile="${war.file}"
-            webxml="${war.dir}/WEB-INF/web.xml"
-            >
-          <!-- The staged WAR files. -->
-          <fileset dir="${war.dir}"/>
-        <!-- Copy the bigdata license. -->
-          <file file="${bigdata.dir}/LICENSE.txt"/>
-          <!-- Copy the top-level NOTICE file. -->
-          <file file="${bigdata.dir}/NOTICE"/>
-        <!-- Copy all of the LEGAL directories. -->
-          <fileset dir="${bigdata.dir}/bigdata" includes="LEGAL/*"/>
-          <fileset dir="${bigdata.dir}/bigdata-rdf" includes="LEGAL/*"/>
-          <fileset dir="${bigdata.dir}/bigdata-sails" includes="LEGAL/*"/>
-            <fileset dir="${bigdata.dir}/bigdata-blueprints" includes="LEGAL/*"/>
-        <fileset dir="${bigdata.dir}/bigdata-gom" includes="LEGAL/*"/>
-          <fileset dir="${bigdata.dir}/bigdata-jini" includes="LEGAL/*"/>
-          <!-- bigdata jar plus some dependencies as filtered by autojar.
-          <lib file="${build.dir}/bigdataPlus.jar"/> -->
-          <!-- The stripped version of fastutil. -->
-          <lib file="${build.dir}/fastutil-stripped.jar"/>
-          <lib dir="${build.dir}/lib">
-            <exclude name="fastutil*.jar"/>
-            <!-- jars bundled into "bigdata-plus" by autojar. 
-            <exclude name="colt*.jar"/>
-            <exclude name="dsi-util*.jar"/>
-            <exclude name="lgpl-utils*.jar"/>
-            <exclude name="bigdata*.jar"/>-->
-            <!-- jars which are not currently used. --> 
-            <exclude name="2p-*.jar"/>
-            <!-- test suite stuff is not needed. -->
-            <exclude name="junit*.jar"/>
-            <exclude name="sesame*testsuite*.jar"/>
-            <!-- osgi stuff is not needed. -->
-            <exclude name="bnd*.jar"/>
-	    <!-- The following jetty libraries are not required for the war file. -->
-            <exclude name="jetty-continuation*.jar"/>
-            <exclude name="jetty-jmx-*.jar"/>
-            <exclude name="jetty-jndi-*.jar"/>
-            <exclude name="jetty-proxy-*.jar"/>
-            <exclude name="jetty-rewrite-*.jar"/>
-            <exclude name="jetty-security-*.jar"/>
-            <exclude name="jetty-server-*.jar"/>
-            <exclude name="jetty-servlet-*.jar"/>
-            <exclude name="jetty-webapp-*.jar"/>
-            <exclude name="jetty-xml-*.jar"/>
-         <exclude name="servlet-api*.jar"/>
-            <!-- zookeeper only used in scale-out. -->
-            <exclude name="apache/zookeeper*.jar"/>
-            <!-- jini only used in scale-out. -->
-            <exclude name="jini/**/*.jar"/>
-          </lib>
-          <classes file="${war.dir}/WEB-INF/classes/log4j.properties"/>
-        </war>
+    <target name="war" description="Generates a WAR artifact.">
+	<exec command="mvn -f bigdata-war/pom.xml package">
+	</exec>
     </target>
     
 <target name="banner" depends="jar" description="Displays the banner (verifies runtime classpath).">
@@ -1068,6 +873,10 @@ ${postInstallMessage}</echo>
     	<!-- JSON -->
       <copy file="${bigdata-sails.lib}/jackson-core-${jackson.version}.jar"
             tofile="${dist.lib}/jackson-core.jar" />
+      <copy file="${bigdata-sails.lib}/jackson-annotations-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-annotations.jar" />
+      <copy file="${bigdata-sails.lib}/jackson-databind-${jackson.version}.jar"
+            tofile="${dist.lib}/jackson-databind.jar" />
     
       <!-- jetty library -->
      <copy file="${bigdata-jetty.lib}/jetty-continuation-${jetty.version}.jar"
@@ -1554,6 +1363,12 @@ substitutions.
       <copy toDir="${build.dir}/bigdata-rdf/src">
         <fileset dir="${bigdata.dir}/bigdata-rdf/src" />
       </copy>
+      <copy toDir="${build.dir}/rdf-properites/src">
+        <fileset dir="${bigdata.dir}/rdf-properties/src" />
+      </copy>
+      <copy toDir="${build.dir}/rdf-properites/src">
+        <fileset dir="${bigdata.dir}/bigdata-util/src" />
+      </copy>
       <copy toDir="${build.dir}/bigdata-sails/src">
         <fileset dir="${bigdata.dir}/bigdata-sails/src" />
       </copy>
@@ -1653,6 +1468,8 @@ substitutions.
           <include name="bigdata-client/src/**" />
           <include name="bigdata-jini/src/**" />
           <include name="bigdata-rdf/src/**" />
+          <include name="rdf-properties/src/**" />
+          <include name="bigdata-util/src/**" />
           <include name="bigdata-sails/src/**" />
           <include name="bigdata-blueprints/src/**" />
           <include name="bigdata-gom/src/**" />
@@ -1940,7 +1757,7 @@ ${postInstallMessage}</echo>
 
         <!-- TODO ${path.separator}${dist.lib}/bigdata-gas.jar -->
       <property name="javac.test.classpath"
-         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${classes.dir}${path.separator}${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/classserver.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${dist.lib}/jackson-annotations.jar${path.separator}${dist.lib}/jackson-databind.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
             
         <echo>javac
 </echo>
@@ -1989,8 +1806,9 @@ ${postInstallMessage}</echo>
         <src path="${bigdata.dir}/bigdata-blueprints/src/test/java" />
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
         <src path="${bigdata.dir}/bigdata-gas/src/test/java" />
-        <src path="${bigdata.dir}/bigdata-ganglia/src/test" />
         <src path="${bigdata.dir}/ctc-striterators/src/test" />
+        <src path="${bigdata.dir}/bigdata-ganglia/src/test/java" />
+
 <!--
         <src path="${bigdata.dir}/bigdata-gom/src/test" />
 -->
@@ -2015,6 +1833,7 @@ ${postInstallMessage}</echo>
           <include name="**/*.class" />
           <include name="**/log4j*.properties" />
         </fileset>
+        <fileset dir="${build.dir}/classes" includes="**/*Test*" />
 <!--
         <fileset dir="${bigdata.dir}/bigdata/src/test">
           <include name="**/*.csv" />
@@ -2039,9 +1858,11 @@ ${postInstallMessage}</echo>
         <fileset dir="${bigdata.dir}/bigdata-sails/src/test">
           <exclude name="**/*.java" />
         </fileset>
+<!--
         <fileset dir="${bigdata.dir}/bigdata-blueprints/src/test/java">
           <exclude name="**/*.java" />
         </fileset>
+-->
         <fileset dir="${bigdata.dir}/bigdata-gom/src/test">
           <exclude name="**/*.java" />
         </fileset>
@@ -2125,7 +1946,9 @@ ${postInstallMessage}</echo>
       <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
 
       <!-- The zookeeper install directory. -->
-      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+      <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+      </condition>
 
       <property name="java.security.policy" value="${dist.var.config.policy}/policy.all" />
       <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
@@ -2149,10 +1972,12 @@ ${postInstallMessage}</echo>
       <antcall target="startLookup"/>
       -->
       <!-- Run the tests -->
+      <antcall target="run-junit" />
+      <!--
       <antcall target="stopTestServices"/>
       <antcall target="startTestServices"/>
-      <antcall target="run-junit" />
       <antcall target="stopTestServices"/>
+      -->
       <!--
       <antcall target="stopLookup" />
       <antcall target="stopHttpd" />
@@ -2258,8 +2083,9 @@ ${postInstallMessage}</echo>
         <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
             <arg value="start"/>
         </exec>
-        <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-            <arg value="start"/>
+        <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+        	<arg value="/C"/>
+            <arg value="zkServer.cmd start"/>
         </exec>
     </target>
 
@@ -2270,8 +2096,9 @@ ${postInstallMessage}</echo>
     <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
         <arg value="stop"/>
     </exec>
-    <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
-        <arg value="stop"/>
+    <exec executable="cmd" dir="${test.zookeeper.installDir}/bin" logerror="true" osfamily="windows">
+    	<arg value="/C"/>
+    	<arg value="zkServer.cmd stop"/>
     </exec>
     </target>
 
@@ -2333,12 +2160,14 @@ ${postInstallMessage}</echo>
         <pathelement location="${dist.lib}/httpmime.jar" />
         <pathelement location="${dist.lib}/blueprints-core.jar" />
         <pathelement location="${dist.lib}/jackson-core.jar" />
+        <pathelement location="${dist.lib}/jackson-annotations.jar" />
+        <pathelement location="${dist.lib}/jackson-databind.jar" />
         <pathelement location="${blueprints-test.jar}" />
         <pathelement location="${jettison.jar}" />
       </path>
 
       <property name="run.class.path"
-         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
+         value="${junit.jar}${path.separator}${hamcrest.jar}${path.separator}${bigdata-test.jar}${path.separator}${junit-ext.jar}${path.separator}${sesame-sparql-test.jar}${path.separator}${sesame-store-test.jar}${path.separator}${sesame-rio-test.jar}${path.separator}${dist.lib}/bigdata.jar${path.separator}${dist.lib}/colt.jar${path.separator}${dist.lib}/highscalelib.jar${path.separator}${dist.lib}/dsiutils.jar${path.separator}${dist.lib}/lgplutils.jar${path.separator}${dist.lib}/fastutil.jar${path.separator}${dist.lib}/bigdata-ganglia.jar${path.separator}${dist.lib}/bigdata-gas${path.separator}${dist.lib}/icu4j.jar${path.separator}${dist.lib}/icu4j-charset.jar${path.separator}${dist.lib}/jsk-lib.jar${path.separator}${dist.lib}/jsk-platform.jar${path.separator}${dist.lib}/log4j.jar${path.separator}${dist.lib}/lucene-analyzer.jar${path.separator}${dist.lib}/lucene-core.jar${path.separator}${dist.lib}/openrdf-sesame.jar${path.separator}${dist.lib}/slf4j.jar${path.separator}${dist.lib}/slf4j-log4j.jar${path.separator}${dist.lib}/zookeeper.jar${path.separator}${dist.lib}/jetty-continuation.jar${path.separator}${dist.lib}/jetty-http.jar${path.separator}${dist.lib}/jetty-io.jar${path.separator}${dist.lib}/jetty-jmx.jar${path.separator}${dist.lib}/jetty-jndi.jar${path.separator}${dist.lib}/jetty-server.jar${path.separator}${dist.lib}/jetty-util.jar${path.separator}${dist.lib}/jetty-webapp.jar${path.separator}${dist.lib}/jetty-servlet.jar${path.separator}${dist.lib}/jetty-security.jar${path.separator}${dist.lib}/jetty-xml.jar${path.separator}${dist.lib}/jetty-rewrite.jar${path.separator}${dist.lib}/jetty-client.jar${path.separator}${dist.lib}/jetty-proxy.jar${path.separator}${dist.lib}/servlet-api.jar${path.separator}${dist.lib}/commons-codec.jar${path.separator}${dist.lib}/commons-fileupload.jar${path.separator}${dist.lib}/commons-io.jar${path.separator}${dist.lib}/commons-logging.jar${path.separator}${dist.lib}/httpclient.jar${path.separator}${dist.lib}/httpclient-cache.jar${path.separator}${dist.lib}/httpcore.jar${path.separator}${dist.lib}/httpmime.jar${path.separator}${dist.lib}/blueprints-core.jar${path.separator}${dist.lib}/jackson-core.jar${path.separator}${dist.lib}/jackson-annotations.jar${path.separator}${dist.lib}/jackson-databind.jar${path.separator}${blueprints-test.jar}${path.separator}${jettison.jar}" />
         
       <echo>    classpath:    ${run.class.path}
 </echo>
@@ -2501,6 +2330,8 @@ ${postInstallMessage}</echo>
         <sysproperty key="servlet-api.jar" value="${dist.lib}/servlet-api.jar" />
         <sysproperty key="blueprints-core.jar" value="${dist.lib}/blueprints-core.jar" />
         <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-core.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-annotations.jar" />
+        <sysproperty key="jackson-core.jar" value="${dist.lib}/jackson-databind.jar" />
 
         <!-- Jini group name -->
         <sysproperty key="bigdata.fedname" value="${bigdata.fedname}" />
@@ -2516,6 +2347,7 @@ ${postInstallMessage}</echo>
         <test name="${testName}" todir="${test.results.dir}" if="testName" />
 
         <!-- Test suites to run when -DtestName is not set -->
+        <test name="com.bigdata.bop.TestAll" todir="${test.results.dir}" unless="testName" />
 <!-- mavenized.
         <test name="cutthecrap.utils.striterators.TestAll" todir="${test.results.dir}" unless="testName" /> -->
         <test name="com.bigdata.cache.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -2546,6 +2378,7 @@ ${postInstallMessage}</echo>
         <test name="com.bigdata.bop.fed.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.sparse.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.search.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.util.httpd.TestAll" todir="${test.results.dir}" unless="testName" />
         <!-- not suppported yet.
         <test name="com.bigdata.bfs.TestAll" todir="${test.results.dir}" unless="testName" />
         -->
@@ -2556,6 +2389,8 @@ ${postInstallMessage}</echo>
 
         <test name="com.bigdata.rdf.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.remote.TestAll" todir="${test.results.dir}" unless="testName" />
+        <test name="com.bigdata.rdf.sail.webapp.client.TestAll" todir="${test.results.dir}" unless="testName" />
         <test name="com.bigdata.rdf.sail.webapp.TestAll" todir="${test.results.dir}" unless="testName" />
 
         <test name="com.bigdata.gom.TestAll" todir="${test.results.dir}" unless="testName" />
@@ -2703,7 +2538,7 @@ ${postInstallMessage}</echo>
 <target name="DemoSesameServer" depends="samples.compile" description="Runs the DemoSesameServer sample code.">
 <java classname="com.bigdata.samples.remoting.DemoSesameServer" failonerror="true" fork="false" logerror="true">
     <classpath refid="samples.runtime.classpath" />
-    <arg value="http://localhost:8080/openrdf-sesame" />
+    <arg value="http://localhost:9999/openrdf-sesame" />
     <arg value="bigdata" />
 </java>
 </target>
@@ -2716,16 +2551,9 @@ ${postInstallMessage}</echo>
 	 <!-- are documented at the following links:                            -->
 	 <!-- http://wiki.blazegraph.com/wiki/index.php/NanoSparqlServer           -->
 	 <!-- http://wiki.blazegraph.com/wiki/index.php/HAJournalServer            -->
-    <target name="start-bigdata" depends="compile" description="Start the Bigdata Server (simple triples mode start).">
-        <java classname="com.bigdata.rdf.sail.webapp.NanoSparqlServer" failonerror="true" fork="true" logerror="true">
-            <classpath refid="runtime.classpath" />
-            <jvmarg value="-server"/>
-            <jvmarg value="-Xmx4G"/>
-            <jvmarg value="-Dlog4j.configuration=bigdata-war/src/WEB-INF/classes/log4j.properties"/>
-            <arg value="9999"/>
-            <arg value="kb"/>
-            <arg value="bigdata-war/src/WEB-INF/GraphStore.properties"/>
-        </java>
+    <target name="start-bigdata" description="Start the Bigdata Server (simple triples mode start).">
+	<exec command="./scripts/startBlazegraph.sh">
+        </exec>
     </target>
 
     <target name="executable-jar" depends="bundleJar"

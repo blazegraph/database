@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+    <head>
+      <variable name='vocabProp'/>
+      <variable name='literalProp'/>
+      <variable name='s'/>
+      <variable name='term'/>
+      <variable name='concept'/>
+    </head>
+    <results>
+      <result>
+         <binding name='vocabProp'><uri>eg:p</uri></binding>
+         <binding name='literalProp'><uri>eg:q</uri></binding>
+         <binding name='s'><uri>eg:b</uri></binding>
+         <binding name='term'><literal>d</literal></binding>
+         <binding name='concept'><uri>eg:d</uri></binding>
+      </result>
+    </results>
+</sparql>

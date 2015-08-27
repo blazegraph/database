@@ -16,7 +16,7 @@ import com.bigdata.samples.SparqlBuilder;
 
 public class DemoSesameServer {
     
-    private static final String sesameURL = "http://localhost:8080/openrdf-sesame";
+    private static final String sesameURL = "http://localhost:9999/openrdf-sesame";
     
     private static final String repoID = "bigdata";
     

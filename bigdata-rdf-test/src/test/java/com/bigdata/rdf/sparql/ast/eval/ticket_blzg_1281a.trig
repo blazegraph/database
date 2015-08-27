@@ -1,0 +1,5 @@
+<http://example.com/g1>
+{
+   <http://s> <http://p1> <http://s> .
+   <http://s> <http://p2> <http://o> .
+}

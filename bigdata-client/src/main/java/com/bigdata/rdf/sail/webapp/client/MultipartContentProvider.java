@@ -36,7 +36,7 @@ import org.eclipse.jetty.client.AsyncContentProvider;
 import org.eclipse.jetty.client.api.ContentProvider;
 import org.eclipse.jetty.util.B64Code;
 
-import com.bigdata.btree.BytesUtil;
+import com.bigdata.util.BytesUtil;
 
 public class MultipartContentProvider implements AsyncContentProvider {
 	

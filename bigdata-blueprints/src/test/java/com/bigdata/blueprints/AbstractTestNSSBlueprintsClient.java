@@ -44,6 +44,8 @@ import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
 import com.bigdata.rdf.task.AbstractApiTask;
 import com.bigdata.util.config.NicUtil;
+import com.tinkerpop.blueprints.Edge;
+import com.tinkerpop.blueprints.Vertex;
 
 /**
  * Unit tests for the {@link NanoSparqlServer} with a focus on the ability to
@@ -201,5 +203,28 @@ public abstract class AbstractTestNSSBlueprintsClient extends AbstractTestBigdat
 	        super.tearDown();
 	
 	    }
+
+	protected void testBigdataGraph(BigdataGraph testGraph) throws Exception {
+	
+		loadTestGraph(testGraph, testData);
+	
+		for (Vertex v : testGraph.getVertices()) {
+			testPrint(v);
+		}
+		for (Edge e : testGraph.getEdges()) {
+			testPrint(e);
+		}
+	
+		testGraph.shutdown();
+	
+	}
+	
+	protected abstract BigdataGraph getNewGraph(String file) throws Exception;
+
+	@Override
+	protected BigdataGraph loadGraph(String file) throws Exception {
+		
+		return getNewGraph(file);
+	}
 
 }

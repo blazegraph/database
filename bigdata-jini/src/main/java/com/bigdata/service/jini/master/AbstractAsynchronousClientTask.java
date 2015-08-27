@@ -32,6 +32,8 @@ import java.util.concurrent.Future;
 
 import com.bigdata.service.FederationCallable;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.master.IAsynchronousClientTask;
+import com.bigdata.service.master.INotifyOutcome;
 
 /**
  * Abstract base class for {@link IAsynchronousClientTask}.

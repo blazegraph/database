@@ -24,6 +24,7 @@ import com.bigdata.rdf.model.BigdataURI;
 import com.bigdata.rdf.sail.webapp.client.AutoCloseHttpClient;
 import com.bigdata.rdf.sail.webapp.client.HttpClientConfigurator;
 import com.bigdata.rdf.sail.webapp.client.RemoteRepositoryManager;
+import com.bigdata.util.httpd.Config;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 
@@ -287,7 +288,7 @@ public class Example2 implements Callable<Void> {
         /**
          * The top-level SPARQL end point for a NanoSparqlServer instance.
          */
-        final String serviceURL = "http://localhost:8080/"
+        final String serviceURL = "http://localhost:" + Config.BLAZEGRAPH_HTTP_PORT + "/"
                 + BigdataStatics.getContextPath();
 
         /**

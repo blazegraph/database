@@ -36,7 +36,7 @@ export NSS_PROPERTIES=${JETTY_DIR}/WEB-INF/RWStore.properties
 export JVM_OPTS="-Djava.awt.headless=true -server -Xmx4G -XX:MaxDirectMemorySize=3000m -XX:+UseG1GC"
 
 if [ -z "${JETTY_PORT}" ]; then
-   export JETTY_PORT="8080"
+   export JETTY_PORT="9999"
 fi
 if [ -z "${JETTY_XML}" ]; then
    export JETTY_XML="${JETTY_DIR}/jetty.xml"
