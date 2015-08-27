@@ -104,13 +104,6 @@ dependencies.
                 <include>**/*.trig</include>
             </includes>
         </resource>
-        <!-- Include the RIO parser configurations for OpenRDF -->
-        <resource>
-	   <directory>bigdata-rdf/src/resources/service-providers/</directory>
-            <includes>
-                <include>**/*</include>
-            </includes>
-        </resource>
         <resource>
             <directory>bigdata-sails/src/java</directory>
             <includes>

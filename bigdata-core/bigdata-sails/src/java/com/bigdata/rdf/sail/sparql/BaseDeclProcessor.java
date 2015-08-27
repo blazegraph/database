@@ -85,7 +85,7 @@ public class BaseDeclProcessor {
 			}
 
 			if (dataBlock != null) {
-				final String baseURIDeclaration = "BASE <" + parsedBaseURI + "> \n";
+				final String baseURIDeclaration = "BASE <" + parsedBaseURI + ">";
 				dataBlock.setDataBlock(baseURIDeclaration + dataBlock.getDataBlock());
 			}
 			else {
