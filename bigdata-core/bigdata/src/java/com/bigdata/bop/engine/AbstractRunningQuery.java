@@ -293,7 +293,7 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
      * query controller.
      */
     final private RunState runState;
-
+    
     /**
      * Flag used to prevent retriggering of query tear down activities in
      * {@link #cancel(boolean)}.
@@ -782,6 +782,9 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
             if(log.isTraceEnabled())
                 log.trace(msg.toString());
+            
+            if (future.isDone()) // BLZG-1418
+                throw new RuntimeException("Query is done");
             
             runState.startOp(msg);
 
@@ -1792,6 +1795,11 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
 
                 return false;
                 
+            }
+
+            if (future.isDone()) { // BLZG-1418
+                childQuery.cancel(true/* mayInterruptIfRunning */);
+                throw new RuntimeException("Query is done");
             }
 
             children.put(childId, childQuery);
