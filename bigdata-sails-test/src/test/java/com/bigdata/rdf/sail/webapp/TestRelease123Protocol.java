@@ -80,6 +80,20 @@ public class TestRelease123Protocol extends AbstractProtocolTest{
 		
 	}
 
+	public void testRepeatedHeaders() throws IOException {
+		resetDefaultOptions();
+		this.setAccept("application/trig, text/turtle");
+		String result1 = serviceRequest("query", CONSTRUCT);
+		resetDefaultOptions();
+		Header[] headers = {
+				new BasicHeader("Accept", "application/trig"), 
+				new BasicHeader("Accept", "text/turtle")
+				};
+		this.setHeaders(headers);
+		String result2 = serviceRequest("query", CONSTRUCT);
+		assertEquals(result1, result2);
+	}
+
 	public void testSelectPostEncodeXML() throws IOException {
 		setMethodisPostUrlEncodedData();
 		testSelectGetXML();

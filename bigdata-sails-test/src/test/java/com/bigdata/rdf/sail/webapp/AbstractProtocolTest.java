@@ -74,6 +74,7 @@ public abstract class AbstractProtocolTest  extends AbstractTestNanoSparqlClient
 
 	protected static final String SELECT = "SELECT (1 as ?one){}";
 	protected static final String ASK = "ASK WHERE {}";
+	protected static final String CONSTRUCT = "CONSTRUCT { <a:b> <c:d> <e:f> } WHERE {}";
 	protected static final long PAUSE_BEFORE_CLOSE_TIME = 100;
 	private static int updateCounter = 0;
 	private static String update() {
