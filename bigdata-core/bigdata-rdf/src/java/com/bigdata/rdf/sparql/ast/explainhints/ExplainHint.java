@@ -1,0 +1,106 @@
+/**
+
+Copyright (C) SYSTAP, LLC 2006-2015.  All rights reserved.
+
+Contact:
+     SYSTAP, LLC
+     2501 Calvert ST NW #106
+     Washington, DC 20008
+     licenses@systap.com
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+/*
+ * Created on Aug 28, 2015
+ */
+package com.bigdata.rdf.sparql.ast.explainhints;
+
+import org.openrdf.query.parser.serql.ast.ASTNode;
+
+/**
+ * Abstract base class for explain hints, providing a common base
+ * implementations, to be reused in concrete subclasses.
+ * 
+ * @author <a href="ms@metaphacts.com">Michael Schmidt</a>
+ * @version $Id$
+ */
+public abstract class ExplainHint implements IExplainHint {
+
+   private final String explainHintDescription;
+   
+   private final String explainHintType;
+   
+   private final ExplainHintCategory explainHintCategory;
+   
+   private final ExplainHintSeverity explainHintSeverity;
+   
+   private final ASTNode explainHintASTNode;
+   
+   /**
+    * Constructor
+    */
+   public ExplainHint(
+      final String explainHintDescription, final String explainHintType,
+      final ExplainHintCategory explainHintCategory, 
+      final ExplainHintSeverity explainHintSeverity,
+      final ASTNode explainHintASTNode) {
+      
+      this.explainHintDescription = explainHintDescription;
+      this.explainHintType = explainHintType;
+      this.explainHintCategory = explainHintCategory;
+      this.explainHintSeverity = explainHintSeverity;
+      this.explainHintASTNode = explainHintASTNode;
+   }
+   
+   @Override
+   public String toString() {
+      
+      final StringBuffer buf = new StringBuffer();
+      buf.append("Type: " + getExplainHintType());
+      buf.append("\n");
+      buf.append("Category: " + getExplainHintCategory());
+      buf.append("\n");
+      buf.append("Severity: " + getExplainHintSeverity());
+      buf.append("\n");
+      buf.append("Description: " + getExplainHintDescription());
+      
+      return buf.toString();
+   }
+
+   @Override
+   public String getExplainHintType() {
+      return explainHintType;
+   }
+   
+   @Override
+   public ExplainHintCategory getExplainHintCategory() {
+      return explainHintCategory;
+   }
+   
+   @Override
+   public ExplainHintSeverity getExplainHintSeverity() {
+      return explainHintSeverity;
+   }
+
+   @Override
+   public String getExplainHintDescription() {
+      return explainHintDescription;
+   }
+   
+   @Override
+   public ASTNode getExplainHintASTNode() {
+      return explainHintASTNode;
+   }
+
+}
