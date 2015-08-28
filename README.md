@@ -7,6 +7,6 @@ Please see the release notes in [bigdata/src/releases](bigdata/src/releases) for
 
 [Sign up](http://eepurl.com/VLpUj) to get the latest news on Blazegraph.
 
-Please also visit us at our: [website](https://www.blazegraph.com), [wiki](https://wiki.blazegraph.com), and [blog](https://wiki.blazegraph.com/).
+Please also visit us at our: [website](https://www.blazegraph.com), [wiki](https://wiki.blazegraph.com), and [blog](https://blog.blazegraph.com/).
 
 Find an issue?   Need help?  See [JIRA](https://jira.blazegraph.com) or purchase [Support](https://www.blazegraph.com/buy).
