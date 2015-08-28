@@ -350,7 +350,12 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
        </dependency>
        <dependency>
            <groupId>org.apache.lucene</groupId>
-           <artifactId>lucene-analyzers</artifactId>
+           <artifactId>lucene-analyzers-common</artifactId>
+           <version>${lucene.version}</version>
+       </dependency>
+       <dependency>
+           <groupId>org.apache.lucene</groupId>
+           <artifactId>lucene-analyzers-smartcn</artifactId>
            <version>${lucene.version}</version>
        </dependency>
        <dependency>
