@@ -420,11 +420,6 @@ public class BuildInfo {
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
-       <artifactId>bigdata-util</artifactId>
-       <version>${project.version}</version>
-     </dependency>
-     <dependency>
-       <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
        <version>${project.version}</version>
      </dependency>
@@ -433,12 +428,14 @@ public class BuildInfo {
        <artifactId>dsi-utils</artifactId>
        <version>${project.version}</version>
      </dependency>
+<!--
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit3.version}</version>
       <scope>test</scope>
      </dependency>
+-->
      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
