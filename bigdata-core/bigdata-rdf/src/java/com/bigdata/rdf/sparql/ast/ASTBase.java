@@ -35,6 +35,7 @@ import com.bigdata.bop.ModifiableBOpBase;
 import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
@@ -73,6 +74,11 @@ public class ASTBase extends ModifiableBOpBase {
          */
         String QUERY_HINTS = "queryHints";
         
+        /**
+         * An optional {@link ExplainHints} object specifying hints to be
+         * exposed to the user when requesting an explanation of the query.
+         */
+        String EXPLAIN_HINTS = "explainHints";
     }
 
     /**
