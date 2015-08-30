@@ -56,6 +56,7 @@ import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFWriter;
 import org.openrdf.rio.RDFWriterRegistry;
 
+import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.PipelineOp;
@@ -82,8 +83,11 @@ import com.bigdata.rdf.sail.webapp.BigdataRDFContext.RunningQuery;
 import com.bigdata.rdf.sail.webapp.BigdataRDFContext.UpdateTask;
 import com.bigdata.rdf.sail.webapp.client.ConnectOptions;
 import com.bigdata.rdf.sail.webapp.client.EncodeDecodeValue;
+import com.bigdata.rdf.sparql.ast.ASTBase.Annotations;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
+import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
+import com.bigdata.rdf.sparql.ast.explainhints.IExplainHint;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.service.IBigdataFederation;
@@ -1161,6 +1165,58 @@ public class QueryServlet extends BigdataRDFServlet {
 
                 }
 
+                {
+                   // render explain hints, if at least one is present
+                   final Iterator<BOp> it = 
+                      ExplainHints.explainHintAnnotatedBOpIterator(optimizedAST);
+                   final boolean hasExplainHints = it.hasNext();
+                
+                   // header
+                   if (hasExplainHints) {
+                   
+                      current.node("h2", "Explain Hints");
+                      current = current.node("table");
+                      
+                      // table header
+                      current = current.node("tr");
+                      current.node("th").text("#").close();
+                      current.node("th").text("type").close(); 
+                      current.node("th").text("severity").close();
+                      current.node("th").text("AST node").close();
+                      current.node("th").text("description").close();
+                      current = current.close(); // tr
+                      
+                   }
+                
+                   // content
+                   int ctr = 0;
+                   while (it.hasNext()) { // no effect if !hasExplainHints
+                   
+                      final BOp bop = it.next();
+                      final ExplainHints explainHints = 
+                         (ExplainHints)bop.getProperty(Annotations.EXPLAIN_HINTS);
+                   
+                      for (IExplainHint hint : explainHints) {
+                         
+                         current = current.node("tr");
+                         current.node("td").text(String.valueOf(ctr++)).close();
+                         current.node("td").text(hint.getExplainHintType()).close(); 
+                         current.node("td").text(hint.getExplainHintSeverity().toString()).close();
+                         current.node("td").text(hint.getExplainHintNode().toString()).close();
+                         current.node("td").text(hint.getExplainHintDescription()).close();
+                         current = current.close(); // tr
+                         
+                      }
+                   }
+
+                   // closing code
+                   if (hasExplainHints) {
+                      
+                      current = current.close(); // table
+                      
+                   }
+                }
+                
                 final PipelineOp queryPlan = astContainer.getQueryPlan();
 
                 if (queryPlan != null) {

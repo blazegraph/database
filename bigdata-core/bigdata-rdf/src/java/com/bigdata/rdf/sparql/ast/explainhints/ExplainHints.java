@@ -26,11 +26,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.explainhints;
 
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.sparql.ast.ASTBase;
+import com.bigdata.rdf.sparql.ast.ASTBase.Annotations;
+
+import cutthecrap.utils.striterators.Expander;
+import cutthecrap.utils.striterators.Filter;
+import cutthecrap.utils.striterators.SingleValueIterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A list of {@link IExplainHint}s, to be attached as an annotation to an
@@ -41,7 +49,7 @@ import com.bigdata.rdf.sparql.ast.ASTBase;
  * @author <a href="ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class ExplainHints {
+public class ExplainHints implements Iterable<IExplainHint> {
 
    private final Set<IExplainHint> explainHints;
    
@@ -66,12 +74,78 @@ public class ExplainHints {
    public void addExplainHint(final IExplainHint explainHint) {
       explainHints.add(explainHint);
    }
+   
 
    /**
-    * @return the explain hints as unmodifiable object
+    * Returns all {@link BOp}s that are annotated with {@link ExplainHints}.
+    * 
+    * @param op An operator.
+    * 
+    * @return The respective iterator.
     */
-   public Set<IExplainHint> getExplainHints() {
-      return Collections.unmodifiableSet(explainHints);
+   @SuppressWarnings({ "unchecked", "serial" })
+   public static Iterator<BOp> explainHintAnnotatedBOpIterator(final BOp astBase) {
+      
+      return new Striterator(
+         
+         BOpUtility.preOrderIterator(astBase)).addFilter(new Expander() {
+
+            private static final long serialVersionUID = 1L;
+   
+            @SuppressWarnings("rawtypes")
+            @Override
+            protected Iterator expand(final Object arg0) {
+   
+               final BOp op = (BOp)arg0;
+   
+               // visit the node.
+               final Striterator itr = 
+                  new Striterator(new SingleValueIterator(op));
+   
+               // visit the node's operator annotations.
+               final Striterator itr2 = new Striterator(
+                  BOpUtility.annotationOpIterator(op));
+   
+               // expand each operator annotation with a pre-order traversal.
+               itr2.addFilter(new Expander() {
+                  private static final long serialVersionUID = 1L;
+   
+                  @Override
+                  protected Iterator expand(final Object ann) {
+                     return explainHintAnnotatedBOpIterator((BOp) ann);
+                  }
+                    
+               });
+                
+               // append the pre-order traversal of each annotation.
+               itr.append(itr2);
+   
+               return itr;
+            }
+         }).addFilter(new Filter() {
+         
+         @Override
+         public boolean isValid(Object obj) {
+            
+            if (obj instanceof BOp) {
+               final BOp bop = (BOp)obj;
+               return bop.getProperty(Annotations.EXPLAIN_HINTS)!=null;
+            }
+            
+            return false;
+         }
+         
+      });
+   }
+
+   @Override
+   public String toString() {
+      return explainHints.toString();
+   }
+   
+   @Override
+   public Iterator<IExplainHint> iterator() {
+      return explainHints.iterator();
    }
    
 }

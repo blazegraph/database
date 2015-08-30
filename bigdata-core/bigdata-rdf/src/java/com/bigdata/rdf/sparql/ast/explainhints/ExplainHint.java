@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.explainhints;
 
-import org.openrdf.query.parser.serql.ast.ASTNode;
+import com.bigdata.bop.BOp;
 
 /**
  * Abstract base class for explain hints, providing a common base
@@ -45,7 +45,7 @@ public abstract class ExplainHint implements IExplainHint {
    
    private final ExplainHintSeverity explainHintSeverity;
    
-   private final ASTNode explainHintASTNode;
+   private final BOp explainHintNode;
    
    /**
     * Constructor
@@ -54,13 +54,13 @@ public abstract class ExplainHint implements IExplainHint {
       final String explainHintDescription, final String explainHintType,
       final ExplainHintCategory explainHintCategory, 
       final ExplainHintSeverity explainHintSeverity,
-      final ASTNode explainHintASTNode) {
+      final BOp explainHintNode) {
       
       this.explainHintDescription = explainHintDescription;
       this.explainHintType = explainHintType;
       this.explainHintCategory = explainHintCategory;
       this.explainHintSeverity = explainHintSeverity;
-      this.explainHintASTNode = explainHintASTNode;
+      this.explainHintNode = explainHintNode;
    }
    
    @Override
@@ -99,8 +99,8 @@ public abstract class ExplainHint implements IExplainHint {
    }
    
    @Override
-   public ASTNode getExplainHintASTNode() {
-      return explainHintASTNode;
+   public BOp getExplainHintNode() {
+      return explainHintNode;
    }
 
 }

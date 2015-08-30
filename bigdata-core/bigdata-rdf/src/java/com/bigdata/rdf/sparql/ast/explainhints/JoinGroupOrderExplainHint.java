@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.explainhints;
 
-import org.openrdf.query.parser.serql.ast.ASTNode;
+import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 
 /**
  * Explain hint indicating potential problems caused by the join order within
@@ -41,14 +41,25 @@ public class JoinGroupOrderExplainHint extends ExplainHint {
 
    private static final String EXPLAIN_HINT_TYPE = "Join Order";
    
+   public static final String ACROSS_PARTITION_REORDERING_PROBLEM = 
+      "The referenced AST node cannot be moved in front of an " +
+      "OPTIONAL or MINUS expression. Blazegraph tries to do " +
+      "so in order to assert best performance, but in this " +
+      "it seems like query semantics might change if we move " +
+      "the node. Please review your query and move the node to " +
+      "in front of all OPTIONAL or MINUS nodes manually if " + 
+      "this is what you wanted to implement. Note that this " +
+      "hint does not imply that your query is wrong, but there " +
+      "might be a problem with it.";
+   
    public JoinGroupOrderExplainHint(
-      final String explainHintDescription, final ASTNode explainHintASTNode) {
+      final String explainHintDescription, final IGroupMemberNode candidate) {
          
       super(
          explainHintDescription, 
          EXPLAIN_HINT_TYPE, 
          ExplainHintCategory.CORRECTNESS,
          ExplainHintSeverity.MODERATE,
-         explainHintASTNode);
+         candidate);
    }
 }
