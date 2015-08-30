@@ -43,6 +43,8 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.explainhints.ExplainHint;
+import com.bigdata.rdf.sparql.ast.explainhints.JoinGroupOrderExplainHint;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
@@ -126,7 +128,7 @@ implements IASTOptimizer {
        * for a formal explanation and justification of our approach.
        */
       if (reorderNodes && !assertCorrectnessOnly) {
-         optimizeAcrossPartitions(partitions, bindingInfoMap, externallyIncoming);
+         optimizeAcrossPartitions(joinGroup, partitions, bindingInfoMap, externallyIncoming);
       }
       
       /** 
@@ -171,6 +173,7 @@ implements IASTOptimizer {
    * @param set a set of nodes
    */
   void optimizeAcrossPartitions(
+     final JoinGroupNode joinGroup,
      final ASTJoinGroupPartitions partitions,
      final GroupNodeVarBindingInfoMap bindingInfoMap,      
      final Set<IVariable<?>> externallyKnownProduced) {      
@@ -255,7 +258,18 @@ implements IASTOptimizer {
                  
               } else {
                  
-                 // stop here, definitely can't place in prior part. as well
+                 // stop here, definitely can't place in prior part as well
+                 
+                 // if we reach this code, there might actually be something 
+                 // wrong with the query: usually non-optional non-minus nodes
+                 // can be executed before OPTIONAL or MINUS blocks -> we 
+                 // therefore append an EXPLAIN hint to the join group                 
+                 final ExplainHint explainHint = 
+                    new JoinGroupOrderExplainHint(
+                       JoinGroupOrderExplainHint.
+                          ACROSS_PARTITION_REORDERING_PROBLEM, candidate);
+                 joinGroup.addExplainHint(explainHint);
+                 
                  break; 
               }
               

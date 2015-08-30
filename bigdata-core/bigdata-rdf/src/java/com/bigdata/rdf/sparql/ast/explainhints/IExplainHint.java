@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.explainhints;
 
-import org.openrdf.query.parser.serql.ast.ASTNode;
+import com.bigdata.bop.BOp;
 
 /**
  * Hint to be interpreted by EXPLAIN, containing information to be exposed
@@ -79,11 +79,11 @@ public interface IExplainHint {
    public String getExplainHintDescription();
    
    /**
-    * @return the AST node referred by the explain node; note that we model
+    * @return the node affected by the explain node; note that we attach
     *         this node explicitly, since the node to which the hint is attached
     *         is not always the affected node, for instance if the affected node
     *         has been optimized away
     */
-   public ASTNode getExplainHintASTNode();
+   public BOp getExplainHintNode();
 
 }

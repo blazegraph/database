@@ -26,7 +26,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.explainhints;
 
-import org.openrdf.query.parser.serql.ast.ASTNode;
+import com.bigdata.bop.BOp;
+import com.bigdata.bop.IVariable;
 
 /**
  * Explain hint indicating potential problems caused by the bottom-up evaluation
@@ -40,15 +41,28 @@ public class BottomUpSemanticsExplainHint extends ExplainHint {
 
    private static final String EXPLAIN_HINT_TYPE = "Bottom-up Semantics";
    
+   private static final String DESCRIPTION1 = 
+         "SPARQL semantics is defined bottom up, and in the query " +
+         "we detected a variable that is used in a value expression " +
+         "but known not to be in scope when evaluating the value " +
+         "expression. To fix the problem, you may want to push the construct " +
+         "binding the variable (this might be a triple patter, BIND, or " +
+         "VALUES clause) inside the scope in which the variable is used. " +
+         "The affected variable is '";
+   private static final String DESCRIPTION2 = 
+      "', which has been renamed in the optimized AST to '";
+   private static final String DESCRIPTION3 = "' in order to avoid conflicts.";
+
    public BottomUpSemanticsExplainHint(
-      final String explainHintDescription, final ASTNode explainHintASTNode) {
+      final IVariable<?> original, final IVariable<?> renamed,
+      final BOp explainHintASTBase) {
       
       super(
-         explainHintDescription, 
+            DESCRIPTION1 + original + DESCRIPTION2 + renamed + DESCRIPTION3, 
          EXPLAIN_HINT_TYPE, 
          ExplainHintCategory.CORRECTNESS,
          ExplainHintSeverity.MODERATE,
-         explainHintASTNode);
+         explainHintASTBase);
       
    }
 

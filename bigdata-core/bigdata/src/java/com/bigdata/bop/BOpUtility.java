@@ -49,7 +49,6 @@ import com.bigdata.bop.solutions.IGroupByRewriteState;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.ProjectionNode;
-import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.relation.accesspath.IBlockingBuffer;
 import com.bigdata.striterator.CloseableIteratorWrapper;
 

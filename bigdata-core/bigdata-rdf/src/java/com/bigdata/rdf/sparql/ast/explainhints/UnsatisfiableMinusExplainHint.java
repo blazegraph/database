@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.explainhints;
 
-import org.openrdf.query.parser.serql.ast.ASTNode;
+import com.bigdata.bop.BOp;
 
 /**
  * Explain hint indicating a MINUS expression that is unsatisfiable, i.e. does
@@ -41,14 +41,21 @@ public class UnsatisfiableMinusExplainHint extends ExplainHint {
 
    private static final String EXPLAIN_HINT_TYPE = "Unsatisfiable MINUS";
    
-   public UnsatisfiableMinusExplainHint(
-      final String explainHintDescription, final ASTNode explainHintASTNode) {
+   private static final String EXPLAIN_HINT_DESCRIPTION =
+      "The referenced AST node has been eliminated, because the MINUS " +
+      "expression that it represents has no effect. The reason is that " +
+      "the left-hand side expressiona and the minus expression have no " +
+      "shared variables. You may consider using FILTER NOT EXISTS as an " +
+      "alternative, see section http://www.w3.org/TR/2013/REC-sparql11-query-"
+      + "20130321/#neg-notexists-minus in the SPARQL 1.1 standard.";
+   
+   public UnsatisfiableMinusExplainHint(final BOp explainHintASTBase) {
          
       super(
-         explainHintDescription, 
+         EXPLAIN_HINT_DESCRIPTION, 
          EXPLAIN_HINT_TYPE, 
          ExplainHintCategory.CORRECTNESS,
          ExplainHintSeverity.MODERATE,
-         explainHintASTNode);
+         explainHintASTBase);
    }
 }

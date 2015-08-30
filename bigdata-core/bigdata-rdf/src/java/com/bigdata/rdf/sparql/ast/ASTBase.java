@@ -36,6 +36,7 @@ import com.bigdata.bop.PipelineOp;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
 import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
+import com.bigdata.rdf.sparql.ast.explainhints.IExplainHint;
 import com.bigdata.rdf.sparql.ast.optimizers.ASTQueryHintOptimizer;
 import com.bigdata.rdf.sparql.ast.optimizers.IASTOptimizer;
 
@@ -109,6 +110,16 @@ public class ASTBase extends ModifiableBOpBase {
 
     }
 
+    /**
+     * Return the explain hints associated with this AST node
+     * 
+     * @return The explain hints -or- <code>null</code> if none have been
+     *         declared.
+     */
+    public ExplainHints getExplainHints() {
+        return (ExplainHints) getProperty(Annotations.EXPLAIN_HINTS);
+    }
+    
     /**
      * Return the value of the query hint.
      * 
@@ -191,6 +202,26 @@ public class ASTBase extends ModifiableBOpBase {
         
     }
 
+    /**
+     * Add an explain hint to the query.
+     * 
+     * @param explainHint the hint to add, ignored if null
+     */
+    public void addExplainHint(IExplainHint explainHint) {
+       
+       if (explainHint==null) {
+          return;
+       }
+       
+       // add the hint, creating a new object if required
+       final ExplainHints explainHints = getExplainHints();
+       if (explainHints==null) {
+          setProperty(Annotations.EXPLAIN_HINTS, new ExplainHints(explainHint));
+       } else {
+          explainHints.addExplainHint(explainHint);
+       }
+    }
+    
     /**
      * Set a query hint.
      * 
