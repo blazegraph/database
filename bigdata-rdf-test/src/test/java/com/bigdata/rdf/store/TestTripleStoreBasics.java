@@ -102,6 +102,14 @@ public class TestTripleStoreBasics extends TestCase2 {
          */
         suite.addTest(com.bigdata.rdf.rio.TestAll.suite());
 
+		/**
+		 * Test suite for configuration of the BLOBS index support.
+		 * 
+		 * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/25">
+		 *      Disable BLOBS indexing completely for GPU </a>
+		 */ 
+        suite.addTestSuite(TestBlobsConfiguration.class);
+        
 //        // magic sets support (still under development).
 //        suite.addTest(com.bigdata.rdf.magic.TestAll.suite());
         
