@@ -26,8 +26,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.sparql.ast.explainhints;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 import com.bigdata.bop.BOp;
@@ -69,6 +71,29 @@ public class ExplainHints implements Iterable<IExplainHint> {
       explainHints.add(explainHint);
    }
    
+
+   /**
+    * Utility function to remove explain hint annotations from a BOp. For
+    * use in test case to ease comparison. Be careful, since this modifies
+    * the argument.
+    * 
+    * @param astBase
+    */
+   public static void removeExplainHintAnnotationsFromBOp(final BOp bop) {
+
+      final Iterator<BOp> explainHintAnnotatedBOps = 
+         ExplainHints.explainHintAnnotatedBOpIterator(bop);
+      
+      // collect explain hint nodesWithExplainHints nodes
+      final List<BOp> nodesWithExplainHints = new ArrayList<BOp>();
+      while (explainHintAnnotatedBOps.hasNext()) {
+         nodesWithExplainHints.add(explainHintAnnotatedBOps.next());
+      }
+      
+      for (final BOp nodeWithExplainHint : nodesWithExplainHints) {
+         nodeWithExplainHint.setProperty(Annotations.EXPLAIN_HINTS, null);
+      }
+   }
 
    /**
     * Returns all {@link BOp}s that are annotated with {@link ExplainHints}.
