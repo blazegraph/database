@@ -365,7 +365,7 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
             // to check for aggregates in com.bigdata.bop.solutions.GroupByState.isAggregate
             IValueExpressionNode exprNode = n.getValueExpressionNode();
             if (expr == null && exprNode instanceof FunctionNode) {
-                if (FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI())) {
+                if (FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI()) || isAggregate(((FunctionNode) exprNode).args())) {
                     List<BOp> args = ((FunctionNode) exprNode).args();
                     expr = new AggregateBase<IV>(args.toArray(new BOp[args.size()]), null) {
                         @Override public void reset() {}
@@ -384,6 +384,15 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         
         return exprs;
         
+    }
+
+    private boolean isAggregate(List<BOp> args) {
+        for (BOp arg: args) {
+            if (arg instanceof FunctionNode && FunctionRegistry.isAggregate(((FunctionNode) arg).getFunctionURI()) || isAggregate(((FunctionNode) arg).args())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String toString(final int indent) {

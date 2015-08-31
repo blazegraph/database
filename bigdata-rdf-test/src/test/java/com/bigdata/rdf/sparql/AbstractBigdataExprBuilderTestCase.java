@@ -55,6 +55,7 @@ import com.bigdata.rdf.sail.sparql.BigdataASTContext;
 import com.bigdata.rdf.sail.sparql.BigdataExprBuilder;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
+import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
@@ -249,8 +250,11 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
     public QueryRoot parse(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
-        final QueryRoot ast = new Bigdata2ASTSPARQLParser(tripleStore).parseQuery2(queryStr,
-                baseURI).getOriginalAST();
+        Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(tripleStore);
+        ASTContainer astContainer = parser.parseQuery2(queryStr, baseURI);
+        parser.preEvaluate(tripleStore, astContainer);
+        final QueryRoot ast = astContainer.getOriginalAST();
+
         
         final Collection<ValueExpressionNode> nodes = 
         		new LinkedList<ValueExpressionNode>();
