@@ -74,6 +74,8 @@ public abstract class ExplainHint implements IExplainHint {
       buf.append("Severity: " + getExplainHintSeverity());
       buf.append("\n");
       buf.append("Description: " + getExplainHintDescription());
+      buf.append("\n");
+      buf.append("Node: " + getExplainHintNode());
       
       return buf.toString();
    }

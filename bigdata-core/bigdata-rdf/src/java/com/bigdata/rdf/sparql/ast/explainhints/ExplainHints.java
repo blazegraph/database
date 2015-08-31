@@ -54,17 +54,11 @@ public class ExplainHints implements Iterable<IExplainHint> {
    private final Set<IExplainHint> explainHints;
    
    /**
-    * Internal, empty constructor
-    */
-   protected ExplainHints() {
-      explainHints = new HashSet<IExplainHint>();
-   }
-   
-   /**
-    * Constructor, setting up an explain hints object with a single object
+    * Constructor, setting up an explain hints object containing
+    * a single {@link IExplainHint}.
     */
    public ExplainHints(final IExplainHint explainHint) {
-      this();
+      explainHints = new HashSet<IExplainHint>();
       explainHints.add(explainHint);
    }
 
