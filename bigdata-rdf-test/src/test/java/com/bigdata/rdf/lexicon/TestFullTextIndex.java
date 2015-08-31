@@ -197,7 +197,7 @@ public class TestFullTextIndex extends AbstractTripleStoreTestCase {
         
         final int len = store.getLexiconRelation().getLexiconConfiguration().getBlobsThreshold();
 
-        final StringBuilder sb = new StringBuilder(len);
+		final StringBuilder sb = new StringBuilder(len + 20);
 
         final String[] tokens = new String[] {
                 "apple",
