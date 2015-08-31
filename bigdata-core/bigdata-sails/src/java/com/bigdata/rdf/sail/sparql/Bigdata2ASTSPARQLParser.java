@@ -378,7 +378,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * 
      * @throws MalformedQueryException
      */
-    public ASTContainer parseQuery1(final String queryStr, final String baseURI)
+    public ASTContainer parseQuery2(final String queryStr, final String baseURI)
             throws MalformedQueryException {
 
         long startTime = System.nanoTime();
@@ -459,12 +459,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
             
         }
 
-    }
-
-    public ASTContainer parseQuery2(final String queryStr, final String baseURI) throws MalformedQueryException {
-        ASTContainer q = parseQuery1(queryStr, baseURI);
-        preEvaluate(context.tripleStore, q);
-        return q;
     }
 
     /**
@@ -565,7 +559,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     
     
-    private void preEvaluate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
+    public void preEvaluate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
 
         //QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         ASTQueryContainer qc = (ASTQueryContainer)ast.getProperty(Annotations.PARSE_TREE);

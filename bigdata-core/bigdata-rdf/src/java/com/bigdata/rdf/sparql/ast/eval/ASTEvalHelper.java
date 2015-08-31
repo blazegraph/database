@@ -46,6 +46,7 @@ import org.openrdf.query.Binding;
 import org.openrdf.query.BindingSet;
 import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.TupleQueryResult;
 import org.openrdf.query.UpdateExecutionException;
@@ -74,6 +75,7 @@ import com.bigdata.rdf.sail.Bigdata2Sesame2BindingSetIterator;
 import com.bigdata.rdf.sail.BigdataSailRepositoryConnection;
 import com.bigdata.rdf.sail.BigdataValueReplacer;
 import com.bigdata.rdf.sail.RunningQueryCloseableIterator;
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
 import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
@@ -221,6 +223,12 @@ public class ASTEvalHelper {
     static public TupleQueryResult evaluateTupleQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
+
+        try {
+            new Bigdata2ASTSPARQLParser(store).preEvaluate(store, astContainer);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 

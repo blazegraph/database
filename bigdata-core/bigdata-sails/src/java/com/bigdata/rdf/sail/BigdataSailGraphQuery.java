@@ -26,10 +26,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.openrdf.query.Dataset;
 import org.openrdf.query.GraphQueryResult;
+import org.openrdf.query.MalformedQueryException;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.algebra.evaluation.QueryBindingSet;
 import org.openrdf.repository.sail.SailGraphQuery;
 
+import com.bigdata.rdf.sail.sparql.Bigdata2ASTSPARQLParser;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.DatasetNode;
@@ -101,6 +103,11 @@ public class BigdataSailGraphQuery extends SailGraphQuery implements
     public GraphQueryResult evaluate(final BindingsClause bc)
             throws QueryEvaluationException {
 
+        try {
+            new Bigdata2ASTSPARQLParser(getTripleStore()).preEvaluate(getTripleStore(), astContainer);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
         final QueryRoot originalQuery = astContainer.getOriginalAST();
 
         if (bc != null)

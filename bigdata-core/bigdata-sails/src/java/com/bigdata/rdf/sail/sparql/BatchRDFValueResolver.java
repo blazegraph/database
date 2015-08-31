@@ -341,10 +341,14 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                     if (dataTypeIri!=null && dataTypeIri.getValue()!=null) {
                         dataTypeUri = new URIImpl(dataTypeIri.getValue());
                         dte = DTE.valueOf(dataTypeUri);
-                        }
-                        if (dte!=null) {
+                    }
+                    if (dte!=null) {
                         iv = IVUtility.decode(rdfNode.getLabel().getValue(), dte.name());
                         bigdataValue = getBigdataValue(iv, dte);
+                        if (!bigdataValue.stringValue().equals(rdfNode.getLabel().getValue())) {
+                            // Data loss could occur if inline IV will be used, as string representation of original value differ from decoded value
+                            bigdataValue = valueFactory.createLiteral(rdfNode.getLabel().getValue(), dataTypeUri);
+                        }
                     } else { 
                         iv = new TermId<BigdataValue>(VTE.LITERAL,0);
                         if (lang!=null) {
@@ -362,11 +366,15 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
                     DTE dte = DTE.valueOf(dataTypeUri);
                     iv = IVUtility.decode(rdfNode.getValue(), dte.name());
                     bigdataValue = getBigdataValue(iv, dte);
+                    if (!bigdataValue.stringValue().equals(rdfNode.getValue())) {
+                        // Data loss could occur if inline IV will be used, as string representation of original value differ from decoded value
+                        bigdataValue = valueFactory.createLiteral(rdfNode.getValue(), dataTypeUri);
+                    }
                 } else if (value instanceof ASTTrue) {
                     bigdataValue = valueFactory.createLiteral(true);
                     iv = bigdataValue.getIV();
                 } else if (value instanceof ASTFalse) {
-                    bigdataValue = valueFactory.createLiteral(true);
+                    bigdataValue = valueFactory.createLiteral(false);
                     iv = bigdataValue.getIV();
                 } else {
                     iv = new FullyInlineTypedLiteralIV<BigdataLiteral>(value.toString());
