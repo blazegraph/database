@@ -95,13 +95,17 @@ public class LexiconConfiguration<V extends BigdataValue>
         Logger.getLogger(LexiconConfiguration.class);
 
     /**
-     * The maximum character length of an RDF {@link Value} before it will be
-     * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
-     * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
-     * indices.
-     *
-     * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
-     */
+	 * The maximum character length of an RDF {@link Value} before it will be
+	 * inserted into the {@link LexiconKeyOrder#BLOBS} index rather than the
+	 * {@link LexiconKeyOrder#TERM2ID} and {@link LexiconKeyOrder#ID2TERM}
+	 * indices.
+	 * <p>
+	 * Note: {@link Integer#MAX_VALUE} disables the BLOBS index.
+	 * 
+	 * @see AbstractTripleStore.Options#BLOBS_THRESHOLD
+	 * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/25"> Disable
+	 *      BLOBS indexing completely for GPU </a>
+	 */
     private final int blobsThreshold;
 
     private final long MAX_UNSIGNED_BYTE = 1 << 9 - 1;
