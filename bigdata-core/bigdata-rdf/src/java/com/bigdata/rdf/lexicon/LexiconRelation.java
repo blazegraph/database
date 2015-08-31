@@ -1653,7 +1653,7 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         
 		if (strlen >= blobsThreshold) {
 
-			if (blobsThreshold == Integer.MAX_VALUE) {
+			if (lexiconConfiguration.isBlobsDisabled()) {
 
 				throw new IllegalArgumentException("Large literal but BLOBS index is disabled: strlen=" + strlen);
 

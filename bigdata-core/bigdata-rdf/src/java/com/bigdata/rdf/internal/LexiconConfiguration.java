@@ -249,6 +249,13 @@ public class LexiconConfiguration<V extends BigdataValue>
 
     }
     
+	@Override
+	public boolean isBlobsDisabled() {
+
+		return blobsThreshold == Integer.MAX_VALUE;
+    	
+    }
+    
     @Override
     public boolean isInlineDatatypeToTextIndex(final URI dt) {
         
