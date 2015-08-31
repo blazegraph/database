@@ -1,0 +1,5 @@
+@prefix : <http://www.bigdata.com/> .
+: {
+  <http://example.com/Alice> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.com/Person> .
+  <http://example.com/Flipper> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.com/Animal> .
+}
