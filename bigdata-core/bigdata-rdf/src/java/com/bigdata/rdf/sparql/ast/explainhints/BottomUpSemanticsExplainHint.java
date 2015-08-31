@@ -46,7 +46,7 @@ public class BottomUpSemanticsExplainHint extends ExplainHint {
          "we detected a variable that is used in a value expression " +
          "but known not to be in scope when evaluating the value " +
          "expression. To fix the problem, you may want to push the construct " +
-         "binding the variable (this might be a triple patter, BIND, or " +
+         "binding the variable (this might be a triple pattern, BIND, or " +
          "VALUES clause) inside the scope in which the variable is used. " +
          "The affected variable is '";
    private static final String DESCRIPTION2 = 
@@ -58,7 +58,7 @@ public class BottomUpSemanticsExplainHint extends ExplainHint {
       final BOp explainHintASTBase) {
       
       super(
-            DESCRIPTION1 + original + DESCRIPTION2 + renamed + DESCRIPTION3, 
+         DESCRIPTION1 + original + DESCRIPTION2 + renamed + DESCRIPTION3, 
          EXPLAIN_HINT_TYPE, 
          ExplainHintCategory.CORRECTNESS,
          ExplainHintSeverity.MODERATE,

@@ -1169,11 +1169,10 @@ public class QueryServlet extends BigdataRDFServlet {
                    // render explain hints, if at least one is present
                    final Iterator<BOp> it = 
                       ExplainHints.explainHintAnnotatedBOpIterator(optimizedAST);
-                   final boolean hasExplainHints = it.hasNext();
                 
-                   // header
-                   if (hasExplainHints) {
+                   if (it.hasNext()) {
                    
+                      // header
                       current.node("h2", "Explain Hints");
                       current = current.node("table");
                       
@@ -1186,32 +1185,28 @@ public class QueryServlet extends BigdataRDFServlet {
                       current.node("th").text("description").close();
                       current = current.close(); // tr
                       
-                   }
                 
-                   // content
-                   int ctr = 0;
-                   while (it.hasNext()) { // no effect if !hasExplainHints
-                   
-                      final BOp bop = it.next();
-                      final ExplainHints explainHints = 
-                         (ExplainHints)bop.getProperty(Annotations.EXPLAIN_HINTS);
-                   
-                      for (IExplainHint hint : explainHints) {
-                         
-                         current = current.node("tr");
-                         current.node("td").text(String.valueOf(ctr++)).close();
-                         current.node("td").text(hint.getExplainHintType()).close(); 
-                         current.node("td").text(hint.getExplainHintSeverity().toString()).close();
-                         current.node("td").text(hint.getExplainHintNode().toString()).close();
-                         current.node("td").text(hint.getExplainHintDescription()).close();
-                         current = current.close(); // tr
-                         
-                      }
-                   }
-
-                   // closing code
-                   if (hasExplainHints) {
+                      int ctr = 0;
+                      while (it.hasNext()) { // no effect if !hasExplainHints
                       
+                         final BOp bop = it.next();
+                         final ExplainHints explainHints = 
+                            (ExplainHints)bop.getProperty(Annotations.EXPLAIN_HINTS);
+                      
+                         for (IExplainHint hint : explainHints) {
+                            
+                            current = current.node("tr");
+                            current.node("td").text(String.valueOf(ctr++)).close();
+                            current.node("td").text(hint.getExplainHintType()).close(); 
+                            current.node("td").text(hint.getExplainHintSeverity().toString()).close();
+                            current.node("td").text(hint.getExplainHintNode().toString()).close();
+                            current.node("td").text(hint.getExplainHintDescription()).close();
+                            current = current.close(); // tr
+                            
+                         }
+                      }
+
+                      // closing code
                       current = current.close(); // table
                       
                    }
