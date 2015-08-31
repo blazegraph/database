@@ -944,8 +944,9 @@ public class ASTBottomUpOptimizer implements IASTOptimizer {
              */
             final IExplainHint explainHint =
                new BottomUpSemanticsExplainHint(ovar, nvar, (BOp)node);
-            ((ASTBase) parent).addExplainHint(explainHint);
-            
+            if (parent!=null) {
+               ((ASTBase) parent).addExplainHint(explainHint);
+            } // nowhere to append
         }
 
         if (parent != null)
