@@ -1,0 +1,14 @@
+SELECT ?s ?type WHERE {
+  BIND("http://example.com/" AS ?typeBase)
+  {
+    BIND(URI(CONCAT(?typeBase,"Person")) AS ?type)
+    ?s a ?o
+    FILTER(?o=?type)
+  }
+  UNION
+  {
+    BIND(URI(CONCAT(?typeBase,"Animal")) AS ?type)
+    ?s a ?o
+    FILTER(?o=?type)
+  }
+}

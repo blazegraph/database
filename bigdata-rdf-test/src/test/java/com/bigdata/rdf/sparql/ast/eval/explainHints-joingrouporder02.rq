@@ -1,0 +1,5 @@
+SELECT * WHERE {
+  ?person rdf:type <http://example.com/Person>
+  OPTIONAL { ?person <http://example.com/image> ?image } .
+  ?person <http://example.com/name> ?name
+}
