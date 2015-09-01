@@ -65,7 +65,8 @@ public class QueryCancellationHelper {
 		for (UUID queryId : queryIds) {
 
 			if (!tryCancelQuery(queryEngine, queryId)) {
-				if (!tryCancelUpdate(queryId)) {
+				//TODO:  BLZG-1464  Unify Embedded and REST cancellation
+				if (!tryCancelUpdate(queryEngine,queryId,null)) {
 					queryEngine.addPendingCancel(queryId);
 					if (log.isInfoEnabled()) {
 						log.info("No such QUERY or UPDATE: " + queryId);
@@ -75,6 +76,8 @@ public class QueryCancellationHelper {
 
 		}
 	}
+	
+	
 
 	/**
      * Attempt to cancel a running SPARQL Query
@@ -178,18 +181,45 @@ public class QueryCancellationHelper {
 
    }
 
-    public static boolean tryCancelUpdate(UUID queryId) {
-    	
-    	//TODO:  FIXME
-    	
-    	return false;
-    }
-    
-    
     //TODO:  Unify the webapp and embedded
-    public static boolean tryCancelUpdate(UUID queryId, final Future<Void> f) {
-    	
-    	return false;
+	public static boolean tryCancelUpdate(final QueryEngine queryEngine,
+			final UUID queryId, final Future<Void> f) {
+
+		final IRunningQuery q;
+		try {
+
+			q = queryEngine.getRunningQuery(queryId);
+
+			if (q != null && q.cancel(true /* interrupt when running */)) {
+				return true;
+			}
+
+		} catch (RuntimeException ex) {
+
+			/*
+			 * Ignore.
+			 * 
+			 * Either the IRunningQuery has already terminated or this is an
+			 * UPDATE rather than a QUERY.
+			 */
+
+			return false;
+
+		}
+
+		if (f != null) {
+
+			if (f.cancel(true/* mayInterruptIfRunning */)) {
+
+				return true;
+
+			}
+
+		}
+
+
+        // Either not found or found but not running when cancelled.
+        return false;
     }
 
 }
