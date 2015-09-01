@@ -712,7 +712,7 @@ public class DefaultOptimizerList extends ASTOptimizerList {
      */
     protected void addGPUAccelerationOptimizer() {
 
-       IASTOptimizer o = initGPUAccelerationOptimizer();
+       final IASTOptimizer o = initGPUAccelerationOptimizer();
        if (o != null ) {
           add(o);
        }
@@ -728,14 +728,16 @@ public class DefaultOptimizerList extends ASTOptimizerList {
           final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer" );
 
           if (IASTOptimizer.class.isAssignableFrom(cls)) {
-             log.info( "Found Blazegraph-Mapgraph connector: "
+        	  if(log.isInfoEnabled())
+        		  log.info( "Found Blazegraph-Mapgraph connector: "
                        + cls.getCanonicalName() );
              return (IASTOptimizer) cls.newInstance();
           }
           else {
-             log.warn( cls.getCanonicalName()
-                       + " does not extend "
-                       + IASTOptimizer.class.getCanonicalName() );
+        	  // Note: Please do not log @ WARN here. It appears for every non-GPU accelerated query!
+//             log.warn( cls.getCanonicalName()
+//                       + " does not extend "
+//                       + IASTOptimizer.class.getCanonicalName() );
              return null;
           }
        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
