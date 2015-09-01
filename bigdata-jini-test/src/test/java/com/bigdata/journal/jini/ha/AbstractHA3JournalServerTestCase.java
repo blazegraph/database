@@ -2297,8 +2297,9 @@ public abstract class AbstractHA3JournalServerTestCase extends
                 // Override the HTTP port for jetty.
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
 
+                //Per BLZG-1270; now managed in bigdata-jini-test jetty.xml
                 // Override the location of the webapp as deployed.
-                cmds.add("-D" + JETTY_RESOURCE_BASE + "=" + WAR_FILE_NAME);
+                //cmds.add("-D" + JETTY_RESOURCE_BASE + "=" + WAR_FILE_NAME);
 
                 // Override the location of the override-web.xml file as deployed.
                 //cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
