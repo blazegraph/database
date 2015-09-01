@@ -36,7 +36,7 @@ import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.explainhints.BottomUpSemanticsExplainHint;
 import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
 import com.bigdata.rdf.sparql.ast.explainhints.IExplainHint;
-import com.bigdata.rdf.sparql.ast.explainhints.JoinGroupOrderExplainHint;
+import com.bigdata.rdf.sparql.ast.explainhints.JoinOrderExplainHint;
 import com.bigdata.rdf.sparql.ast.explainhints.UnsatisfiableMinusExplainHint;
 
 /**
@@ -252,7 +252,7 @@ public class TestExplainHints extends AbstractDataDrivenSPARQLTestCase {
 		).runTest();
     	
     	assertCarriesExactlyOneExplainHintOfType(
-        	container.getOptimizedAST(), JoinGroupOrderExplainHint.class);
+        	container.getOptimizedAST(), JoinOrderExplainHint.class);
     }
 
     /**

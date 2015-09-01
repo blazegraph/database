@@ -86,4 +86,9 @@ public interface IExplainHint {
     */
    public BOp getExplainHintNode();
 
+   /**
+    * @return a link to an external help page.
+    */
+   public String getHelpLink();
+   
 }

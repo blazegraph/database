@@ -44,7 +44,7 @@ import com.bigdata.rdf.sparql.ast.JoinGroupNode;
 import com.bigdata.rdf.sparql.ast.StaticAnalysis;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.explainhints.ExplainHint;
-import com.bigdata.rdf.sparql.ast.explainhints.JoinGroupOrderExplainHint;
+import com.bigdata.rdf.sparql.ast.explainhints.JoinOrderExplainHint;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.sparql.ast.service.ServiceRegistry;
 
@@ -265,8 +265,8 @@ implements IASTOptimizer {
                  // can be executed before OPTIONAL or MINUS blocks -> we 
                  // therefore append an EXPLAIN hint to the join group                 
                  final ExplainHint explainHint = 
-                    new JoinGroupOrderExplainHint(
-                       JoinGroupOrderExplainHint.
+                    new JoinOrderExplainHint(
+                       JoinOrderExplainHint.
                           ACROSS_PARTITION_REORDERING_PROBLEM, candidate);
                  joinGroup.addExplainHint(explainHint);
                  

@@ -37,7 +37,7 @@ import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
  * @author <a href="ms@metaphacts.com">Michael Schmidt</a>
  * @version $Id$
  */
-public class JoinGroupOrderExplainHint extends ExplainHint {
+public class JoinOrderExplainHint extends ExplainHint {
 
    private static final String EXPLAIN_HINT_TYPE = "Join Order";
    
@@ -52,7 +52,7 @@ public class JoinGroupOrderExplainHint extends ExplainHint {
       "hint does not imply that your query is wrong, but there " +
       "might be a problem with it.";
    
-   public JoinGroupOrderExplainHint(
+   public JoinOrderExplainHint(
       final String explainHintDescription, final IGroupMemberNode candidate) {
          
       super(
