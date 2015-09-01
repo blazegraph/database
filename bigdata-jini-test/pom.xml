@@ -106,9 +106,10 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
          <basedir>${basedir}</basedir>
          <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Djava.security.manager -Djava.security.policy=${java.security.policy} -Dtest.zookeeper.clientPort=${test.zookeeper.clientPort} -Dtest.zookeeper.tickTime=${test.zookeeper.tickTime} -Dlog4j.configuration=${log4j.configuration} -Dtest.zookeeper.installDir=${zookeeper.Installation}</argLine>
 	 <forkCount>1</forkCount>
-         <reuseForks>false</reuseForks>
+         <reuseForks>true</reuseForks>
          <printSummary>false</printSummary>
          <disableXmlReport>false</disableXmlReport>
+	 <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
       <plugin>
