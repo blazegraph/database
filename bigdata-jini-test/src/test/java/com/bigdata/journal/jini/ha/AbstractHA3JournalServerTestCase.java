@@ -1835,6 +1835,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
 				copyFile(new File(WAR_DIR + WAR_FILE_NAME), new File(webAppDir,
 						WAR_FILE_NAME), true);
+				
+				copyFile(
+						new File(JETTY_OVERRIDE_DIR
+								+ System.getProperty("file.separator")
+								+ JETTY_OVERRIDE_FILE), new File(webAppDir,
+								JETTY_OVERRIDE_FILE), true);
             }
 
             // log4j configuration.
