@@ -127,6 +127,7 @@ public class QueryCancellationHelper {
      * @return
      */
 
+	//This should not be used for the StatusServlet until the Embedded and REST API are unified.
 	public static boolean tryCancelUpdate(final QueryEngine queryEngine,
 			RunningQuery query) {
 
@@ -182,6 +183,7 @@ public class QueryCancellationHelper {
    }
 
     //TODO:  Unify the webapp and embedded
+	//This should not be used for the StatusServlet until the Embedded and REST API are unified.
 	public static boolean tryCancelUpdate(final QueryEngine queryEngine,
 			final UUID queryId, final Future<Void> f) {
 
