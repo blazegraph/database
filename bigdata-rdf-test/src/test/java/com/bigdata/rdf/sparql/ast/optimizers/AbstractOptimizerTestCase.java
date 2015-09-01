@@ -76,6 +76,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -288,6 +289,30 @@ public abstract class AbstractOptimizerTestCase extends
 			assertSameAST(expected, actual);
 			
 		}
+		
+		/**
+		 * Execute the test comparing the rewrite of the {@link #given} AST by
+		 * the {@link IASTOptimizer} with the {@link #expected} AST. Thereby,
+		 * explain hints attached to the computed AST are ignored when comparing
+		 * the ASTs.
+		 */
+		public void testWhileIgnoringExplainHints() {
+
+			final IASTOptimizer rewriter = newOptimizer();
+
+			final AST2BOpContext context = new AST2BOpContext(new ASTContainer(
+					given), store);
+
+			final IQueryNode actual = rewriter.optimize(context,
+			      new QueryNodeWithBindingSet(given, new IBindingSet[] {})).
+			      getQueryNode();
+
+			// remove explain hints, to ease comparison
+			ExplainHints.removeExplainHintAnnotationsFromBOp(actual);
+			
+			assertSameAST(expected, actual);
+		}
+		
 
 		private IV iv(final String id) {
 			
