@@ -37,6 +37,16 @@ import com.bigdata.bop.BOp;
  */
 public abstract class ExplainHint implements IExplainHint {
 
+   /**
+    * By default, the links are composed according to the following scheme:
+    * a link to the Wiki's Explain summary page, where we have a subsection
+    * named according to the {@link #getExplainHintType()}. This is, whenever
+    * you implement a new {@link ExplainHint} subclass, make sure to include
+    * a respective subsection in the Wiki.
+    */
+   private final String LINK_BASE = 
+      "https://wiki.blazegraph.com/wiki/index.php/Explain#";
+   
    private final String explainHintDescription;
    
    private final String explainHintType;
@@ -104,5 +114,11 @@ public abstract class ExplainHint implements IExplainHint {
    public BOp getExplainHintNode() {
       return explainHintNode;
    }
+
+   @Override
+   public String getHelpLink() {
+      return LINK_BASE + getExplainHintType().replaceAll(" ", "_");
+   }
+   
 
 }

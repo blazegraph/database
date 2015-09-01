@@ -39,7 +39,7 @@ import com.bigdata.bop.BOp;
  */
 public class UnsatisfiableMinusExplainHint extends ExplainHint {
 
-   private static final String EXPLAIN_HINT_TYPE = "Unsatisfiable MINUS";
+   private static final String EXPLAIN_HINT_TYPE = "Unsatisfiable Minus";
    
    private static final String EXPLAIN_HINT_DESCRIPTION =
       "The referenced AST node has been eliminated, because the MINUS " +

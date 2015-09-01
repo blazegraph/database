@@ -102,7 +102,7 @@ public class ExplainHints implements Iterable<IExplainHint> {
     * 
     * @return The respective iterator.
     */
-   @SuppressWarnings({ "unchecked", "serial" })
+   @SuppressWarnings({ "unchecked" })
    public static Iterator<BOp> explainHintAnnotatedBOpIterator(final BOp astBase) {
       
       return new Striterator(
@@ -141,18 +141,21 @@ public class ExplainHints implements Iterable<IExplainHint> {
    
                return itr;
             }
+            
          }).addFilter(new Filter() {
          
-         @Override
-         public boolean isValid(Object obj) {
-            
-            if (obj instanceof BOp) {
-               final BOp bop = (BOp)obj;
-               return bop.getProperty(Annotations.EXPLAIN_HINTS)!=null;
+            private static final long serialVersionUID = -6488014508516304898L;
+
+            @Override
+            public boolean isValid(Object obj) {
+               
+               if (obj instanceof BOp) {
+                  final BOp bop = (BOp)obj;
+                  return bop.getProperty(Annotations.EXPLAIN_HINTS)!=null;
+               }
+               
+               return false;
             }
-            
-            return false;
-         }
          
       });
    }

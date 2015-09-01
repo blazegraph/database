@@ -1197,7 +1197,13 @@ public class QueryServlet extends BigdataRDFServlet {
                             
                             current = current.node("tr");
                             current.node("td").text(String.valueOf(ctr++)).close();
-                            current.node("td").text(hint.getExplainHintType()).close(); 
+                            if (hint.getHelpLink()!=null) {
+                               current.node("td").node("a").
+                               attr("href", hint.getHelpLink()).
+                               text(hint.getExplainHintType()).close().close();                               
+                            } else {
+                               current.node("td").text(hint.getExplainHintType()).close();
+                            }
                             current.node("td").text(hint.getExplainHintSeverity().toString()).close();
                             current.node("td").text(hint.getExplainHintNode().toString()).close();
                             current.node("td").text(hint.getExplainHintDescription()).close();
