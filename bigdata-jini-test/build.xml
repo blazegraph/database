@@ -117,7 +117,7 @@
           <antcall target="startLookup"/>
     </target>
 
-    <target name="startHttpd">
+    <target name="startHttpd" depends="stopHttpd">
       <echo>java -jar ${dependency.dir}/${classserver.jar} -verbose -stoppable -port ${test.codebase.port} -dir ${test.codebase.dir}
 </echo>
       <java jar="${dependency.dir}/${classserver.jar}"
@@ -144,7 +144,7 @@
       </java>
     </target>
 
-     <target name="startLookup">
+     <target name="startLookup" depends="stopLookup">
 
        <!-- Emit the property to the ant console -->
        <property name="print_classpath" value = "${jini.classpath}"/>
