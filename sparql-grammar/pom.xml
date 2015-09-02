@@ -44,19 +44,21 @@ See https://sourceforge.net/apps/mediawiki/bigdata/index.php?title=ReleaseGuide
 for information on publishing maven releases and snapshots for bigdata and its
 dependencies.
 
---><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-   <modelVersion>4.0.0</modelVersion>
-   <parent>
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.blazegraph</groupId>
+        <artifactId>blazegraph-parent</artifactId>
+        <version>1.5.3-master-SNAPSHOT</version>
+        <relativePath>../blazegraph-parent/pom.xml</relativePath>
+    </parent>
     <groupId>com.blazegraph</groupId>
-    <artifactId>blazegraph-parent</artifactId>
+    <artifactId>sparql-grammar</artifactId>
     <version>1.5.3-master-SNAPSHOT</version>
-    <relativePath>../blazegraph-parent/pom.xml</relativePath>
-   </parent>
-   <groupId>com.blazegraph</groupId>
-   <artifactId>sparql-grammar</artifactId>
-   <version>1.5.3-master-SNAPSHOT</version>
-   <packaging>jar</packaging>
-   <name>Blazegraph Sparql Grammar</name>
+    <packaging>jar</packaging>
+    <name>Blazegraph Sparql Grammar</name>
     <description>Blazegraph(TM) Maven Build</description>
     <url>http://www.blazegraph.com</url>
     <organization>
@@ -72,77 +74,70 @@ dependencies.
     </licenses>
     <!-- properties are now in the parent POM. -->
     <properties>
-	<javacc.home>/opt/javacc-5.0</javacc.home>
+        <javacc.home>/opt/javacc-5.0</javacc.home>
     </properties>
+    <profiles>
+        <profile>
+            <id>syntax</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>javacc-maven-plugin</artifactId>
+                        <version>2.6</version>
+                        <executions>
+                            <execution>
+                                <id>jjtree</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>jjtree</goal>
+                                </goals>
+                                <configuration>
+                                    <jdkVersion>1.5</jdkVersion>
+                                    <javadocFriendlyComments>true</javadocFriendlyComments>
+                                    <outputDirectory>src/main/java/</outputDirectory>
+                                    <sourceDirectory>src/main/java/com/bigdata/rdf/sail/sparql/ast/</sourceDirectory>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>javacc</id>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>javacc</goal>
+                                </goals>
+                                <configuration>
+                                    <jdkVersion>1.5</jdkVersion>
+                                    <sourceDirectory>src/main/java/</sourceDirectory>
+                                    <outputDirectory>src/main/java/com/bigdata/rdf/sail/sparql/ast/</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>net.java.dev.javacc</groupId>
+                                <artifactId>javacc</artifactId>
+                                <version>5.0</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
     <build>
-     <plugins>
-      <plugin>
-         <groupId>org.codehaus.mojo</groupId>
-         <artifactId>javacc-maven-plugin</artifactId>
-         <version>2.6</version>
-         <executions>
-	   <execution>
-            <id>jjtree</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>jjtree</goal>
-            </goals>
-            <configuration>
-              <jdkVersion>1.5</jdkVersion>
-              <javadocFriendlyComments>true</javadocFriendlyComments>
-              <outputDirectory>${project.build.directory}/generated-sources/jjtree</outputDirectory>
-            </configuration>
-          </execution>
-	   <execution>
-            <id>javacc</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>javacc</goal>
-            </goals>
-            <configuration>
-              <jdkVersion>1.5</jdkVersion>
-              <sourceDirectory>${project.build.directory}/generated-sources/jjtree/com/bigdata/rdf/sail/sparql/ast/</sourceDirectory>
-              <outputDirectory>${project.build.directory}/generated-sources/javacc</outputDirectory>
-            </configuration>
-          </execution>
-         </executions>
-           <dependencies>
-             <dependency>
-               <groupId>net.java.dev.javacc</groupId>
-               <artifactId>javacc</artifactId>
-               <version>5.0</version>
-            </dependency>
-         </dependencies>
-      </plugin>	
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <version>1.9.1</version>
-        <executions>
-            <execution>
-                <phase>generate-sources</phase>
-                <goals>
-                    <goal>add-source</goal>
-                </goals>
-                <configuration>
-                    <sources>
-                        <source>${project.build.directory}/generated-sources/javacc</source>
-                    </sources>
-                </configuration>
-            </execution>
-        </executions>
-      </plugin>
-    </plugins>
-    <extensions>
-      <!-- Enabling the use of SSH. -->
-      <extension>
-        <groupId>org.apache.maven.wagon</groupId>
-         <artifactId>wagon-ssh-external</artifactId>
-         <version>1.0-beta-6</version>
-      </extension>
-    </extensions>
+        <extensions>
+            <!-- Enabling the use of SSH. -->
+            <extension>
+                <groupId>org.apache.maven.wagon</groupId>
+                <artifactId>wagon-ssh-external</artifactId>
+                <version>1.0-beta-6</version>
+            </extension>
+        </extensions>
     </build>
-    
+
     <distributionManagement>
         <repository>
             <id>bigdata.releases</id>
@@ -156,12 +151,12 @@ dependencies.
             <uniqueVersion>true</uniqueVersion>
         </snapshotRepository>
     </distributionManagement>
-  <dependencies>
-      <dependency>
-          <groupId>org.openrdf.sesame</groupId>
-          <artifactId>sesame-runtime</artifactId>
-          <version>${sesame.version}</version>
-      </dependency>
-  </dependencies>
+    <dependencies>
+        <dependency>
+            <groupId>org.openrdf.sesame</groupId>
+            <artifactId>sesame-runtime</artifactId>
+            <version>${sesame.version}</version>
+        </dependency>
+    </dependencies>
 </project>
 	
