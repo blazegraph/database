@@ -61,7 +61,7 @@ public class BottomUpSemanticsExplainHint extends ExplainHint {
          DESCRIPTION1 + original + DESCRIPTION2 + renamed + DESCRIPTION3, 
          EXPLAIN_HINT_TYPE, 
          ExplainHintCategory.CORRECTNESS,
-         ExplainHintSeverity.MODERATE,
+         ExplainHintSeverity.SEVERE,
          explainHintASTBase);
       
    }
