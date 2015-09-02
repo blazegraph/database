@@ -133,11 +133,21 @@ public abstract class AbstractHAJournalServerTestCase extends TestCase3 {
      */
     static final protected String WAR_FILE_NAME = "bigdata.war";
     
+    /**
+     * Path to the override-web.xml for jetty
+     */
+    static final protected String JETTY_OVERRIDE_DIR = "src/test/resources/";
+    
+    /**
+     * override-web.xml file name for jetty
+     */
+    static final protected String JETTY_OVERRIDE_FILE = "override-web.xml";
+    
 
     /**
      * The timeout used to await quorum meet or break.
      */
-    protected final static long awaitQuorumTimeout = 5000;
+    protected final static long awaitQuorumTimeout = 10000;
 
     /**
      * The timeout for long running LOAD operations. This is used to prevent

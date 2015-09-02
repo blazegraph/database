@@ -1458,7 +1458,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
                     break;
                 }
                 final long elapsed = System.nanoTime() - begin;
-                if (TimeUnit.NANOSECONDS.toSeconds(elapsed) > 4) {
+                if (TimeUnit.NANOSECONDS.toSeconds(elapsed) > 10) {
                     fail("Either zookeeper is not running or reverse DNS is not configured. "
                             + "The ZooKeeper client is taking too long to resolve server(s): state="
                             + zookeeper.getState()
@@ -1835,6 +1835,12 @@ public abstract class AbstractHA3JournalServerTestCase extends
 
 				copyFile(new File(WAR_DIR + WAR_FILE_NAME), new File(webAppDir,
 						WAR_FILE_NAME), true);
+				
+				copyFile(
+						new File(JETTY_OVERRIDE_DIR
+								+ System.getProperty("file.separator")
+								+ JETTY_OVERRIDE_FILE), new File(webAppDir,
+								JETTY_OVERRIDE_FILE), true);
             }
 
             // log4j configuration.
@@ -1968,7 +1974,7 @@ public abstract class AbstractHA3JournalServerTestCase extends
                     }
 
                 }
-            }, 10, TimeUnit.SECONDS);
+            }, 30, TimeUnit.SECONDS);
 
             
             return haGlue;
@@ -2297,8 +2303,9 @@ public abstract class AbstractHA3JournalServerTestCase extends
                 // Override the HTTP port for jetty.
                 cmds.add("-D" + TEST_JETTY_PORT + "=" + jettyPort);
 
+                //Per BLZG-1270; now managed in bigdata-jini-test jetty.xml
                 // Override the location of the webapp as deployed.
-                cmds.add("-D" + JETTY_RESOURCE_BASE + "=" + WAR_FILE_NAME);
+                //cmds.add("-D" + JETTY_RESOURCE_BASE + "=" + WAR_FILE_NAME);
 
                 // Override the location of the override-web.xml file as deployed.
                 //cmds.add("-D" + JETTY_OVERRIDE_WEB_XML + "=./WEB-INF/override-web.xml");
@@ -3435,9 +3442,13 @@ public abstract class AbstractHA3JournalServerTestCase extends
     protected void zkCommand(final String cmd) throws InterruptedException,
             IOException {
         final String pname = "test.zookeeper.installDir";
-        final String zookeeperDirStr = System.getProperty(pname);
-        if (zookeeperDirStr == null)
-            fail("System property not defined: " + pname);
+        String zookeeperDirStr = System.getProperty(pname,"/opt/zookeeper-current");
+        if (zookeeperDirStr == null) {
+        	//Try for a ZOOKEEPER_HOME
+        	zookeeperDirStr = System.getenv("ZOOKEEPER_HOME");
+        	if(zookeeperDirStr == null)
+             fail("System property not defined: " + pname);
+        }
         final File zookeeperDir = new File(zookeeperDirStr);
         if (!zookeeperDir.exists())
             fail("No such file: " + zookeeperDir);
