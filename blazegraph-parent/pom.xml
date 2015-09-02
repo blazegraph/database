@@ -204,8 +204,9 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
-<!-- disabled pending BLZG-1270
     <module>../bigdata-jini</module>
+<!-- Disable the automatic test execution for now.
+    <module>../bigdata-jini-test</module>
 -->
     <module>../bigdata-war-html</module>
     <module>../bigdata-war</module>
