@@ -299,7 +299,8 @@ public class StatusServlet extends BigdataRDFServlet {
         final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
                 .getQueryController(indexManager);
         
-        QueryCancellationHelper.cancelQueries(queryIds, queryEngine);
+        //See BLZG-1464  
+        //QueryCancellationHelper.cancelQueries(queryIds, queryEngine);
 
         for (UUID queryId : queryIds) {
 
