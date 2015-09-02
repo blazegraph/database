@@ -1283,7 +1283,7 @@ public class BigdataRDFContext extends BigdataBaseContext {
              */
             {
 
-                final QueryEngine queryEngine = QueryEngineFactory
+                final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                         .getQueryController(getIndexManager());
 
                 if (queryEngine.pendingCancel(queryId2)) {

@@ -1143,7 +1143,7 @@ public class BigdataSail extends SailBase implements Sail {
         namespaces = 
             Collections.synchronizedMap(new LinkedHashMap<String, String>());
 
-        queryEngine = QueryEngineFactory.getQueryController(mainDatabase
+        queryEngine = QueryEngineFactory.getInstance().getQueryController(mainDatabase
                 .getIndexManager());
         
     }

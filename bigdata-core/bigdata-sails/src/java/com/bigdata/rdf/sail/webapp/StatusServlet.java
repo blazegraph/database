@@ -296,7 +296,7 @@ public class StatusServlet extends BigdataRDFServlet {
 
         }
 
-        final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+        final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
                 .getQueryController(indexManager);
         
         //See BLZG-1464  
@@ -511,7 +511,7 @@ public class StatusServlet extends BigdataRDFServlet {
 		 * the QueryEngine).
 		 */
 
-		final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+		final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
 				.getQueryController(getIndexManager());
 
 		final UUID[] queryIds = queryEngine.getRunningQueries();
@@ -760,7 +760,7 @@ public class StatusServlet extends BigdataRDFServlet {
             {
 
                 final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
-                        .getQueryController(getIndexManager());
+                        .getInstance().getQueryController(getIndexManager());
 
                 final CounterSet counterSet = queryEngine.getCounters();
 
@@ -831,7 +831,7 @@ public class StatusServlet extends BigdataRDFServlet {
              * on the QueryEngine).
              */
 
-            final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory
+            final QueryEngine queryEngine = (QueryEngine) QueryEngineFactory.getInstance()
                     .getQueryController(getIndexManager());
 
             final UUID[] queryIds = queryEngine.getRunningQueries();
