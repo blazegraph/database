@@ -39,31 +39,8 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <name>Blazegraph JINI (HA and Scaleout)</name>
   <packaging>jar</packaging>
 
-    <profiles>
-     <profile>
-      <id>localZookeeper</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-       </activation>
-       <properties>
-	<zookeeper.Installation>${local.test.zookeeper.installDir}</zookeeper.Installation>
-        <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
-       </properties>
-     </profile>
-     <profile>
-      <id>testZookeeper</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <property>
-          <name>TEST_ZOOKEEPER_HOME</name>
-        </property>
-       </activation>
-       <properties>
-	<zookeeper.Installation>${env.TEST_ZOOKEEPER_HOME}</zookeeper.Installation>
-        <log4j.configuration>src/test/resources/logging/log4j.properties</log4j.configuration>
-       </properties>
-     </profile>
-    </profiles>
+  <profiles>
+  </profiles>
 
   <build>
     <plugins>
@@ -112,17 +89,6 @@ ga('send', 'pageview');
   </repositories>
 
   <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
-      <scope>test</scope>
-    </dependency>
-     <dependency>
-      <groupId>com.blazegraph</groupId>
-      <artifactId>junit-ext</artifactId>
-      <version>${junit-ext.version}</version>
-    </dependency>
      <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-client</artifactId>
