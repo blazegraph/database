@@ -149,7 +149,7 @@ public class TestSolutionSetManager extends TestCase2 {
         }
         
         // Setup the QueryEngine.
-        queryEngine = QueryEngineFactory.getQueryController(journal);
+        queryEngine = QueryEngineFactory.getInstance().getQueryController(journal);
         
 //        // Setup the solution set cache.
 //        cacheConn = CacheConnectionFactory.getCacheConnection(queryEngine);

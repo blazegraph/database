@@ -734,7 +734,7 @@ abstract public class AbstractResource<E> implements IMutableResource<E> {
                  * destroy() is executed by an AbstractTask (neither the Journal
                  * nor the JiniFederation).
                  */
-                final QueryEngine queryEngine = QueryEngineFactory
+                final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                         .getQueryController(indexManager);
 
                 /*

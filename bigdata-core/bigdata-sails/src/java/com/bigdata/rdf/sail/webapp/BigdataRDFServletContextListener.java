@@ -902,7 +902,7 @@ public class BigdataRDFServletContextListener implements
                  * so we are not creating it lazily here if the NSS has not yet
                  * been issued a query.
                  */
-                final QueryEngine queryEngine = QueryEngineFactory
+                final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                         .getQueryController(fed);
 
                 final CounterSet tmp = serviceRoot;

@@ -175,7 +175,7 @@ public class DescribeCacheServlet extends BigdataRDFServlet {
 
         final BigdataRDFContext context = getBigdataRDFContext();
 
-        final QueryEngine queryEngine = QueryEngineFactory
+        final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getQueryController(context.getIndexManager());
 
         // Iff enabled.
