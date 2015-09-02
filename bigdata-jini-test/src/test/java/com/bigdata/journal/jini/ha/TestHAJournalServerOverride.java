@@ -1519,7 +1519,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
          */
         
         // wait until C becomes a follower again.
-        awaitHAStatus(20, TimeUnit.SECONDS, serverC, HAStatusEnum.Follower);
+        awaitHAStatus(60, TimeUnit.SECONDS, serverC, HAStatusEnum.Follower);
 
         // quorum should become fully met on the original token.
         final long token2 = awaitFullyMetQuorum();
@@ -1614,7 +1614,7 @@ public class TestHAJournalServerOverride extends AbstractHA3JournalServerTestCas
          */
         
         // wait until B becomes a follower again.
-        awaitHAStatus(20, TimeUnit.SECONDS, serverB, HAStatusEnum.Follower);
+        awaitHAStatus(60, TimeUnit.SECONDS, serverB, HAStatusEnum.Follower);
 
         // pipeline is changed.
         awaitPipeline(new HAGlue[] { serverA, serverC, serverB });
