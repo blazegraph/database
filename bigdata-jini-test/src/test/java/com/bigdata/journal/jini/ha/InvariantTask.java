@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.FutureTaskInvariantMon;
+import com.bigdata.ha.FutureTaskInvariantMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.IndexManagerCallable;
 import com.bigdata.ha.QuorumService;

@@ -56,9 +56,9 @@ import net.jini.jeri.tcp.TcpServerEndpoint;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.concurrent.FutureTaskInvariantMon;
 import com.bigdata.counters.CounterSet;
 import com.bigdata.counters.Instrument;
+import com.bigdata.ha.FutureTaskInvariantMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.IHAJournal;
 import com.bigdata.ha.QuorumService;

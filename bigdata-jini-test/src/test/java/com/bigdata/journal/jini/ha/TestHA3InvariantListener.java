@@ -27,7 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.bigdata.concurrent.FutureTaskInvariantMon;
+import com.bigdata.ha.FutureTaskInvariantMon;
 import com.bigdata.ha.HAGlue;
 
 /**

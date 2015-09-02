@@ -51,7 +51,7 @@ import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.ITupleIterator;
-import com.bigdata.concurrent.FutureTaskInvariantMon;
+import com.bigdata.ha.FutureTaskInvariantMon;
 import com.bigdata.ha.HAGlue;
 import com.bigdata.ha.QuorumService;
 import com.bigdata.ha.QuorumServiceBase;
