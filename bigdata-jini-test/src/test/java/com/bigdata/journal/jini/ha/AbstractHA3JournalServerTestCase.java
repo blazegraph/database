@@ -3442,9 +3442,13 @@ public abstract class AbstractHA3JournalServerTestCase extends
     protected void zkCommand(final String cmd) throws InterruptedException,
             IOException {
         final String pname = "test.zookeeper.installDir";
-        final String zookeeperDirStr = System.getProperty(pname);
-        if (zookeeperDirStr == null)
-            fail("System property not defined: " + pname);
+        String zookeeperDirStr = System.getProperty(pname,"/opt/zookeeper-current");
+        if (zookeeperDirStr == null) {
+        	//Try for a ZOOKEEPER_HOME
+        	zookeeperDirStr = System.getenv("ZOOKEEPER_HOME");
+        	if(zookeeperDirStr == null)
+             fail("System property not defined: " + pname);
+        }
         final File zookeeperDir = new File(zookeeperDirStr);
         if (!zookeeperDir.exists())
             fail("No such file: " + zookeeperDir);
