@@ -136,7 +136,7 @@ public class QueryEngineFactoryBase implements IQueryEngineFactory {
             final IBTreeManager indexManager) {
 
         if (log.isInfoEnabled())
-            log.info("Initiallizing query engine: " + indexManager);
+            log.info("Initializing query engine: " + indexManager);
 
         final QueryEngine queryEngine = new QueryEngine(indexManager);
 
