@@ -2595,7 +2595,7 @@ public class Journal extends AbstractJournal implements IConcurrencyManager,
         }
         
         // Lookup an existing query engine, but do not cause one to be created.
-        final QueryEngine queryEngine = QueryEngineFactory
+        final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getExistingQueryController(this);
 
         if (queryEngine != null) {

@@ -205,7 +205,7 @@ public class AbstractRTOTestCase extends AbstractDataDrivenSPARQLTestCase {
         helper.getASTContainer().setQueryHint(QueryHints.QUERYID,
                 queryId.toString());
         
-        final QueryEngine queryEngine = QueryEngineFactory
+        final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getExistingQueryController((IBTreeManager) helper
                         .getTripleStore().getIndexManager());
 
