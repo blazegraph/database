@@ -29,6 +29,10 @@ package com.bigdata.bop.fed;
 
 import org.apache.log4j.Logger;
 
+import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.IExternalAST2BOp;
+import com.bigdata.util.ClassPathUtil;
+
 /**
  * Singleton factory for a query controller.
  * 
@@ -44,8 +48,15 @@ public class QueryEngineFactory {
 	static final IQueryEngineFactory instance;
 	
 	static {
-		
-		instance = new QueryEngineFactoryBase();
+
+		instance = ClassPathUtil.classForName(//
+				"com.blazegraph.rdf.gpu.bop.engine.GpuQueryEngineFactory", // preferredClassName,
+				QueryEngineFactoryBase.class, // defaultClass,
+				IQueryEngineFactory.class, // sharedInterface,
+				QueryEngineFactory.class.getClassLoader() // classLoader
+		);
+
+//		instance = new QueryEngineFactoryBase();
 
 		if (log.isInfoEnabled())
 			log.info("Factory class is " + instance.getClass().getName());
