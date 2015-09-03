@@ -30,7 +30,10 @@ public class QueryEngineFactoryBase implements IQueryEngineFactory {
 
 	private static final Logger log = Logger.getLogger(QueryEngineFactoryBase.class);
 
-	protected QueryEngineFactoryBase() {
+	// Note: needs to be public for the ClassPathUtil indirection mechanism.  However
+	// callers MUST use QueryEngineFactory.getInstance() rather than directly using
+	// this constructor.
+	public QueryEngineFactoryBase() {
 	}
 
     /**
