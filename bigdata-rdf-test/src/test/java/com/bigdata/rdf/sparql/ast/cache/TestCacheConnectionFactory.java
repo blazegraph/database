@@ -78,7 +78,7 @@ public class TestCacheConnectionFactory extends TestCase2 {
         try {
 
             // Get the query controller for that Journal.
-            queryEngine = QueryEngineFactory.getQueryController(jnl);
+            queryEngine = QueryEngineFactory.getInstance().getQueryController(jnl);
 
             assertNotNull(queryEngine);
             
@@ -152,7 +152,7 @@ public class TestCacheConnectionFactory extends TestCase2 {
                     final QueryEngine queryEngine;
 
                     refs2[i] = new WeakReference<QueryEngine>(
-                            queryEngine = QueryEngineFactory
+                            queryEngine = QueryEngineFactory.getInstance()
                                     .getQueryController(jnl));
 
                     // does not exist yet.

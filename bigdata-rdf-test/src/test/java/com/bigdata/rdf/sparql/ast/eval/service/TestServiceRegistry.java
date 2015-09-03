@@ -306,7 +306,7 @@ public class TestServiceRegistry extends AbstractBigdataExprBuilderTestCase {
                  * Verify create for both end points. One is an alias. Neither
                  * is explicitly paired with a ServiceFactory.
                  */
-                final QueryEngine queryEngine = QueryEngineFactory
+                final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                         .getQueryController(store.getIndexManager());
 
 //                final ClientConnectionManager cm = queryEngine

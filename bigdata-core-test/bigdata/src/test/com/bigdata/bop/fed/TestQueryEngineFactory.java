@@ -74,17 +74,15 @@ public class TestQueryEngineFactory extends TestCase2 {
         try {
 
             // does not exist yet.
-            assertNull(QueryEngineFactory.getExistingQueryController(jnl));
+            assertNull(QueryEngineFactory.getInstance().getExistingQueryController(jnl));
 
             // was not created.
-            assertNull(QueryEngineFactory.getExistingQueryController(jnl));
+            assertNull(QueryEngineFactory.getInstance().getExistingQueryController(jnl));
 
-            final QueryEngine queryEngine = QueryEngineFactory
-                    .getQueryController(jnl);
+			final QueryEngine queryEngine = QueryEngineFactory.getInstance().getQueryController(jnl);
 
-            // still exists and is the same reference.
-            assertTrue(queryEngine == QueryEngineFactory
-                    .getExistingQueryController(jnl));
+			// still exists and is the same reference.
+			assertTrue(queryEngine == QueryEngineFactory.getInstance().getExistingQueryController(jnl));
 
         } finally {
 
@@ -135,18 +133,18 @@ public class TestQueryEngineFactory extends TestCase2 {
                     refs[i] = new WeakReference<Journal>(jnl);
 
                     // does not exist yet.
-                    assertNull(QueryEngineFactory
+                    assertNull(QueryEngineFactory.getInstance()
                             .getExistingQueryController(jnl));
 
                     // was not created.
-                    assertNull(QueryEngineFactory
+                    assertNull(QueryEngineFactory.getInstance()
                             .getExistingQueryController(jnl));
 
-                    final QueryEngine queryEngine = QueryEngineFactory
+                    final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                             .getQueryController(jnl);
 
                     // still exists and is the same reference.
-                    assertTrue(queryEngine == QueryEngineFactory
+                    assertTrue(queryEngine == QueryEngineFactory.getInstance()
                             .getExistingQueryController(jnl));
 
                     ncreated++;
@@ -169,7 +167,7 @@ public class TestQueryEngineFactory extends TestCase2 {
             if (log.isInfoEnabled())
                 log.info("Created " + ncreated + " query controllers.");
 
-            final int nalive = QueryEngineFactory.getQueryControllerCount();
+            final int nalive = QueryEngineFactory.getInstance().getQueryControllerCount();
 
             if (log.isInfoEnabled())
                 log.info("There are " + nalive

@@ -470,7 +470,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         this.idFactory = idFactory;
         
-        this.queryEngine = QueryEngineFactory.getQueryController(db
+        this.queryEngine = QueryEngineFactory.getInstance().getQueryController(db
                 .getIndexManager());
 
         /*

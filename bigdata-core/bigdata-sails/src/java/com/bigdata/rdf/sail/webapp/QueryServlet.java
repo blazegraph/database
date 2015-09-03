@@ -1044,7 +1044,7 @@ public class QueryServlet extends BigdataRDFServlet {
 					log.debug("Resolving IRunningQuery: queryId2=" + queryId2);
 				final IIndexManager indexManager = BigdataServlet
 						.getIndexManager(queryTask.req.getServletContext());
-				final QueryEngine queryEngine = QueryEngineFactory
+				final QueryEngine queryEngine = QueryEngineFactory.getInstance()
 						.getQueryController(indexManager);
 				while (!ft.isDone() && q == null) {
 					try {
