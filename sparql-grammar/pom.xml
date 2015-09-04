@@ -85,6 +85,38 @@ dependencies.
             <build>
                 <plugins>
                     <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-clean-plugin</artifactId>
+                        <version>2.6.1</version>
+                        <executions>
+                            <execution>
+                                <id>clean-to-override</id>
+                                <goals>
+                                    <goal>clean</goal>
+                                </goals>
+                                <phase>initialize</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <filesets>
+                                <fileset>
+                                    <directory>src/main/java/com/bigdata/rdf/sail/sparql/ast/</directory>
+                                    <includes>
+                                        <include>SyntaxTreeBuilderTokenManager.java</include>
+                                        <include>SyntaxTreeBuilderConstants.java</include>
+                                        <include>SyntaxTreeBuilderTokenManager.java</include>
+                                        <include>TokenMgrError.java</include>
+                                        <include>ParseException.java</include>
+                                        <include>Token.java</include>
+                                        <include>JavaCharStream.java</include>
+                                    </includes>
+                                    <followSymlinks>false</followSymlinks>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </plugin>
+
+                    <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>javacc-maven-plugin</artifactId>
                         <version>2.6</version>
@@ -110,8 +142,7 @@ dependencies.
                                 </goals>
                                 <configuration>
                                     <jdkVersion>1.5</jdkVersion>
-                                    <sourceDirectory>src/main/java/</sourceDirectory>
-                                    <outputDirectory>src/main/java/com/bigdata/rdf/sail/sparql/ast/</outputDirectory>
+                                    <sourceDirectory>src/main/java/com/bigdata/rdf/sail/sparql/ast/</sourceDirectory>
                                 </configuration>
                             </execution>
                         </executions>
