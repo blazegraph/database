@@ -31,6 +31,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Collator;
+import java.util.BitSet;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
@@ -1896,33 +1897,41 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
         }
 
     }
+    
+    @Override
+    public byte[] toZOrder(int numDimensions) {
 
-   @Override
-   public byte[] toZOrder(int numDimensions) {
-      
-      // we're operating over Long 
-      final int bytesTotal = Long.SIZE/8*numDimensions;
-      
-      byte[] zOrderArr = new byte[bytesTotal]; // target buffer
-      
-      // TODO: speed up copying by starting out with most significant bit
-      
-      // we compose the original components into the the z-order bit array
-      int zOrderIt = 0;
-      for (int bufIt=0; bufIt<Long.SIZE; bufIt++) { // iterate over bits
-         
-         for (int dimIt=0; dimIt<numDimensions; dimIt++) {  // iterate over dimensions
-            
-            final int offset = dimIt*Long.SIZE;
-            BytesUtil.setBit(
-               zOrderArr,                             // target array
-               zOrderIt++,                               // position
-               BytesUtil.getBit(buf, bufIt + offset)     // value
-            );
-               
+       // we're operating over Long
+       final int bytesTotal = Long.SIZE / 8 * numDimensions;
+
+       byte[] zOrderArr = new byte[bytesTotal]; // target buffer
+
+       // we compose the original components into the the z-order bit array
+       for (int dimIt = 0; dimIt < numDimensions; dimIt++) { // iterate dimensions
+          
+          for (int bufIt = 0; bufIt < Long.SIZE;) { // iterate over bits
+
+             final int offset = dimIt * Long.SIZE;
+
+             // skip byte if no bit is set here (for performance only,
+             // this check is not required for correctness)
+             if (buf[(bufIt + offset) / Byte.SIZE] != 0) {
+
+                BytesUtil.setBit(zOrderArr, // target array
+                      bufIt * numDimensions + dimIt, // position
+                      BytesUtil.getBit(buf, bufIt + offset) // value
+                );
+
+                bufIt++;
+
+            } else {
+
+               bufIt += Byte.SIZE; // skip full byte
+
+            }
          }
       }
-      
+
       return zOrderArr;
    }
 

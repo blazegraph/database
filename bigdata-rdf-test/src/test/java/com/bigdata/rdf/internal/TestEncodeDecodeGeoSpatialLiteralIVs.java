@@ -29,10 +29,7 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import javax.management.RuntimeErrorException;
 
 import org.openrdf.model.URI;
 
@@ -74,14 +71,14 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
     * Unit test for round-trip of GeoSpatial literals of lat+lon+time
     * GeoSpatial literals.
     */
-   public void test_encodeDecodeLatLonTimeGeoSpatialLiteralsForDefaultSchema() throws Exception {
+   public void test_encodeDecodeLatLonTimeGeoSpatialLiterals() throws Exception {
 
       final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
       
       final GeoSpatialLiteralExtension<BigdataValue> ext = 
          getLatLonTimeGSLiteralExtension(vf);
       
-      test_encodeDecodeGeoSpatialLiterals(
+      encodeDecodeGeoSpatialLiterals(
          vf, getDummyGeospatialLiteralsLatLonTime(vf), ext);
    }
 
@@ -97,7 +94,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       final GeoSpatialLiteralExtension<BigdataValue> ext = 
          getLatLonGSLiteralExtension(vf);
       
-      test_encodeDecodeGeoSpatialLiterals(
+      encodeDecodeGeoSpatialLiterals(
          vf, getDummyGeospatialLiteralsLatLon(vf), ext);
    }
    
@@ -119,7 +116,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
          final GeoSpatialLiteralExtension<BigdataValue> extLatLonTime = 
                getLatLonTimeGSLiteralExtension(vf);
          
-         test_encodeDecodeGeoSpatialLiterals(
+         encodeDecodeGeoSpatialLiterals(
             vf, getDummyGeospatialLiteralsLatLon(vf), extLatLonTime);
          
       } catch (IllegalArgumentException e) {
@@ -143,7 +140,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
          final GeoSpatialLiteralExtension<BigdataValue> extLatLon = 
                getLatLonGSLiteralExtension(vf);
 
-         test_encodeDecodeGeoSpatialLiterals(
+         encodeDecodeGeoSpatialLiterals(
             vf, getDummyGeospatialLiteralsLatLonTime(vf), extLatLon);
          
       } catch (IllegalArgumentException e) {
@@ -160,13 +157,79 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
    }
    
    /**
+    * Test z-order string construction by means of a simple, two dimensional
+    * index with positive integer values.
+    */
+   public void testZIndexOrderingPositive() {
+      
+      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+      
+      final GeoSpatialLiteralExtension<BigdataValue> litExt = 
+            getSimpleLatLonGSLiteralExtension(vf); 
+      
+      
+      zIndexOrderingPositiveBase(vf, litExt);
+      
+   }
+   
+   /**
+    * Test z-order string construction by means of a simple, two dimensional
+    * index with positive integer values, with range adjustment encoded in
+    * the datatype.
+    */
+   public void testZIndexOrderingPositiveWithRangeAdjustment() {
+      
+      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+
+      // the range in the test we delegate to is 0 .. 7
+      final GeoSpatialLiteralExtension<BigdataValue> litExt = 
+         getSimpleLatLonGSLiteralExtensionWithRange(vf, Long.valueOf(0)); 
+      
+      zIndexOrderingPositiveBase(vf, litExt);
+   }
+   
+
+   /**
+    * Test z-order string construction by means of a simple, two dimensional
+    * index with mixed negative and positive integer values.
+    */
+   public void testZIndexOrderingMixed() {
+      
+      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+
+      // the range in the test we delegate to is -2 .. 1
+      final GeoSpatialLiteralExtension<BigdataValue> litExt = 
+         getSimpleLatLonGSLiteralExtension(vf); 
+      
+      zIndexOrderingMixedBase(vf, litExt);
+   }
+   
+   /**
+    * Test z-order string construction by means of a simple, two dimensional
+    * index with mixed negative and positive integer values, with range
+    * adjustment encoded in the datatype.
+    */
+   public void testZIndexOrderingMixedWithRangeAdjustment() {
+      
+      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+
+      // the range in the test we delegate to is -2 .. 1
+      final GeoSpatialLiteralExtension<BigdataValue> litExt = 
+         getSimpleLatLonGSLiteralExtensionWithRange(vf, Long.valueOf(-2)); 
+      
+      zIndexOrderingMixedBase(vf, litExt);
+   }
+   
+   
+
+   /**
     * Helper method to test encoding and decoding / roundtrips of GeoSpatial
     * literals for a given value factory vf, list of literals dt, and
     * a {@link GeoSpatialLiteralExtension} ext. Note that the extension must
     * have been initialized to match the specific structure of the datatype
     * (see example test cases for sample code).
     */
-   protected void test_encodeDecodeGeoSpatialLiterals(
+   protected void encodeDecodeGeoSpatialLiterals(
       final BigdataValueFactory vf,
       final BigdataLiteral[] dt,
       final GeoSpatialLiteralExtension<BigdataValue> ext) throws Exception {
@@ -202,11 +265,9 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
    
    }
 
-   /**
-    * Test z-order string construction by means of a simple, two dimensional
-    * index with positive integer values.
-    */
-   public void testZIndexOrderingPositive() {
+   protected void zIndexOrderingPositiveBase(
+      final BigdataValueFactory vf,
+      final GeoSpatialLiteralExtension<BigdataValue> litExt) {
       
       /**
        * Scenario description: assume we have integers 0 .. 7 for each of the
@@ -297,7 +358,6 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
        * 7#6 -> 11 11 10 (62)
        * 7#7 -> 11 11 11 (63)
        */
-      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
       
       // Generate in syntactical order (as above): 0#0, ..., 0#7, 1#0, ... 7#7:
       final BigdataLiteral[] asWritten  =
@@ -307,12 +367,11 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       @SuppressWarnings("rawtypes")
       final LiteralExtensionIV[] asWrittenConverted = 
          new LiteralExtensionIV[asWritten.length];
-      final GeoSpatialLiteralExtension<BigdataValue> ext = 
-            getSimpleLatLonGSLiteralExtension(vf);
+   
       for (int i=0; i<asWritten.length; i++) {
-         asWrittenConverted[i] = ext.createIV(asWritten[i]);
+         asWrittenConverted[i] = litExt.createIV(asWritten[i]);
       }
-
+   
       for (int i=0; i<asWrittenConverted.length; i++) {
          System.out.println(asWritten[i] + " -> " + asWrittenConverted[i]);
       }
@@ -392,7 +451,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       ordered[61] = asWrittenConverted[55];
       ordered[62] = asWrittenConverted[62];
       ordered[63] = asWrittenConverted[63];
-
+   
       // assert that everything is in order
       int ctr = 0;
       for (int i=0; i<ordered.length-1; i++) {
@@ -406,15 +465,10 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       
       System.out.println("Executed " + ctr + " comparisons. All good, in z-order");
    }
-   
-   /**
-    * Test z-order string construction by means of a simple, two dimensional
-    * index with mixed negative and positive integer values.
-    */
 
-   public void testZIndexOrderingMixed() {
-
-      final BigdataValueFactory vf = BigdataValueFactoryImpl.getInstance("test");
+   protected void zIndexOrderingMixedBase(
+      final BigdataValueFactory vf,
+      final GeoSpatialLiteralExtension<BigdataValue> litExt) {
       
       // Generate values
       final BigdataLiteral[] asWritten  =
@@ -424,12 +478,10 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       @SuppressWarnings("rawtypes")
       final LiteralExtensionIV[] asWrittenConverted = 
          new LiteralExtensionIV[asWritten.length];
-      final GeoSpatialLiteralExtension<BigdataValue> ext = 
-            getSimpleLatLonGSLiteralExtension(vf);
       for (int i=0; i<asWritten.length; i++) {
-         asWrittenConverted[i] = ext.createIV(asWritten[i]);
+         asWrittenConverted[i] = litExt.createIV(asWritten[i]);
       }
-
+   
       for (int i=0; i<asWrittenConverted.length; i++) {
          System.out.println(asWritten[i] + " -> " + asWrittenConverted[i]);
       }
@@ -470,7 +522,7 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       
       System.out.println("Executed " + ctr + " comparisons. All good, in z-order");
    }
-   
+
    /**
     * Generates a list of about 600 dummy lat+lon GeoSpatial literals. 
     * These literals include both positive and negative values of different
@@ -684,40 +736,6 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
    }
 
    /**
-    * Asserts that the two {@link BigdataValue}s that are passed in are
-    * {@link BigdataLiteral} of the same type and that the actual values
-    * value, interpreted as numerical value, are identical.
-    * 
-    * @param val
-    * @param bigdataLiteral
-    * 
-    * @throw {@link AssertionError} in case they are not
-    */
-   protected void assertSemanticallyIdentical(final BigdataValue x1,
-         final BigdataLiteral x2) {
-
-      assertTrue(x1 instanceof BigdataLiteral);
-
-      // assert they're both of the same datatype
-      final BigdataLiteral x1AsLiteral = (BigdataLiteral) x1;
-      assertEquals(x1AsLiteral.getDatatype(), x2.getDatatype());
-
-      // compare the component values
-      String[] x1Components = x1.stringValue().split("#");
-      String[] x2Components = x2.stringValue().split("#");
-
-      assertEquals(x1Components.length, x2Components.length);
-
-      for (int i = 0; i < x1Components.length; i++) {
-         BigDecimal d1i = new BigDecimal(x1Components[i]);
-         BigDecimal d2i = new BigDecimal(x2Components[i]);
-
-         assertEquals(d1i, d2i);
-
-      }
-   }
-   
-   /**
     * Get a {@link GeoSpatialLiteralExtension} object processing lat+lon+time
     * schema literals.
     */
@@ -764,6 +782,23 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
       
    }
+   
+   /**
+    * Get simple lat lon schema description, where lat and lon correspong to
+    * long values (rather than 5 precise doubles).
+    */
+   protected GeoSpatialLiteralExtension<BigdataValue> 
+      getSimpleLatLonGSLiteralExtensionWithRange(
+         final BigdataValueFactory vf, final Long min) {
+      
+      final List<SchemaFieldDescription> latLonSfd = 
+            new ArrayList<SchemaFieldDescription>();
+      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1, min)); /* lat */
+      latLonSfd.add(new SchemaFieldDescription(Datatype.LONG, 1, min)); /* lon */
+            
+      return getGSLiteralExtension(vf, new SchemaDescription(latLonSfd));
+      
+   }
 
    /**
     * Get a {@link GeoSpatialLiteralExtension} object processing literals of
@@ -782,6 +817,40 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
                }
          },sd);
       
+   }
+
+   /**
+    * Asserts that the two {@link BigdataValue}s that are passed in are
+    * {@link BigdataLiteral} of the same type and that the actual values
+    * value, interpreted as numerical value, are identical.
+    * 
+    * @param val
+    * @param bigdataLiteral
+    * 
+    * @throw {@link AssertionError} in case they are not
+    */
+   protected void assertSemanticallyIdentical(final BigdataValue x1,
+         final BigdataLiteral x2) {
+   
+      assertTrue(x1 instanceof BigdataLiteral);
+   
+      // assert they're both of the same datatype
+      final BigdataLiteral x1AsLiteral = (BigdataLiteral) x1;
+      assertEquals(x1AsLiteral.getDatatype(), x2.getDatatype());
+   
+      // compare the component values
+      String[] x1Components = x1.stringValue().split("#");
+      String[] x2Components = x2.stringValue().split("#");
+   
+      assertEquals(x1Components.length, x2Components.length);
+   
+      for (int i = 0; i < x1Components.length; i++) {
+         BigDecimal d1i = new BigDecimal(x1Components[i]);
+         BigDecimal d2i = new BigDecimal(x2Components[i]);
+   
+         assertEquals(d1i, d2i);
+   
+      }
    }
 
 }
