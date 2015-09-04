@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 package com.bigdata.rdf.internal.impl.extensions;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -91,12 +92,28 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    private SchemaDescription sd;
    
+   /**
+    * Constructor setting up an instance with a default schema description.
+    * 
+    * @param resolver
+    */
    public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver) {
 
-      this.datatype = resolver.resolve(datatypeURI);
-      this.sd = getSchemaDescription();
+      this(resolver, defaultSchemaDescription());
    }
 
+   /**
+    * Constructor setting up an instance with a custom schema description.
+    * @param resolver
+    * @param sd
+    */
+   public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver, 
+      final SchemaDescription sd) {
+
+      this.datatype = resolver.resolve(datatypeURI);
+      this.sd = sd;
+   }
+   
    @Override
    public Set<BigdataURI> getDatatypes() {
 
@@ -216,15 +233,20 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          
          final Object component = components[i];
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
-         final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
+         
+         final BigDecimal precisionAdjustment = 
+               BigDecimal.valueOf(10).pow(sfd.getDoublePrecision());
 
          switch (sfd.getDatatype()) {
          case DOUBLE:
          {
-            final Double componentAsDouble = 
-               component instanceof Double ? 
-               (Double)component : Double.valueOf(component.toString());
-            ret[i] = (new Double(componentAsDouble*precisionAdjustment)).longValue();
+            final BigDecimal componentAsBigInteger =
+                  component instanceof BigDecimal ?
+                  (BigDecimal)component : new BigDecimal(component.toString());
+                  
+            final BigDecimal x = precisionAdjustment.multiply(componentAsBigInteger);
+            ret[i] = x.longValue();
+                  
             break;
          }
          case LONG:
@@ -392,14 +414,14 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
      * TODO: this is fixed for now, we may want to make this take a datatype
      * as input.
      */
-   private SchemaDescription getSchemaDescription() {
+   private static SchemaDescription defaultSchemaDescription() {
       
       final List<SchemaFieldDescription> sfd = 
          new ArrayList<SchemaFieldDescription>();
    
       sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
       sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, -1));  /* time */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
          
       return new SchemaDescription(sfd);      
    }
