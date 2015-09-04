@@ -31,7 +31,6 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.Collator;
-import java.util.BitSet;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.UUID;
@@ -1902,24 +1901,25 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
     public byte[] toZOrder(int numDimensions) {
 
        // we're operating over Long
-       final int bytesTotal = Long.SIZE / 8 * numDimensions;
+       final int bytesTotal = Long.SIZE / Byte.SIZE * numDimensions;
 
        byte[] zOrderArr = new byte[bytesTotal]; // target buffer
 
        // we compose the original components into the the z-order bit array
        for (int dimIt = 0; dimIt < numDimensions; dimIt++) { // iterate dimensions
           
+          final int offset = dimIt * Long.SIZE;
+          
           for (int bufIt = 0; bufIt < Long.SIZE;) { // iterate over bits
-
-             final int offset = dimIt * Long.SIZE;
 
              // skip byte if no bit is set here (for performance only,
              // this check is not required for correctness)
              if (buf[(bufIt + offset) / Byte.SIZE] != 0) {
 
-                BytesUtil.setBit(zOrderArr, // target array
-                      bufIt * numDimensions + dimIt, // position
-                      BytesUtil.getBit(buf, bufIt + offset) // value
+                BytesUtil.setBit(
+                   zOrderArr,                            // target array
+                   bufIt * numDimensions + dimIt,        // position
+                   BytesUtil.getBit(buf, bufIt + offset)    // value
                 );
 
                 bufIt++;
@@ -1938,26 +1938,34 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
    @Override
    public long[] fromZOrder(int numDimensions) {      
 
-      final int bytesTotal = Long.SIZE/8*numDimensions;
-      
+      // we're operating over Long
+      final int bytesTotal = Long.SIZE / Byte.SIZE * numDimensions;
+
       byte[] componentArr = new byte[bytesTotal]; // target buffer
-      
-      // TODO: speed up copying by starting out with most significant bit
-      
-      // we decompose the z-order bit array into its original components 
-      int zOrderIt = 0;
-      for (int bufIt=0; bufIt<Long.SIZE; bufIt++) { // iterate over bits
+
+      // we compose the original components into the the z-order bit array
+      for (int bufIt=0; bufIt< Long.SIZE * numDimensions; ) {
          
-         for (int dimIt=0; dimIt<numDimensions; dimIt++) {  // iterate over dimensions
-            
-            final int offset = dimIt*Long.SIZE;
-               
+         // first Long.SIZE bits belong to dim=0, next Long.SIZE to dim=1, etc.
+         int dimension = bufIt % numDimensions;
+         int bitPos = bufIt/numDimensions + dimension*Long.SIZE;
+         
+         // skip byte if no bit is set here (for performance only,
+         // this check is not required for correctness)
+         if (buf[bufIt / Byte.SIZE] != 0) {
+
             BytesUtil.setBit(
-                componentArr,                    // target array 
-                bufIt + offset,                    // position
-                BytesUtil.getBit(buf, zOrderIt++)  // value
+               componentArr,                 // target array
+               bitPos,                       // position
+               BytesUtil.getBit(buf, bufIt)  // value
             );
-               
+            
+            bufIt++;
+            
+         } else {
+
+            bufIt += Byte.SIZE; // skip full byte
+            
          }
       }
       
