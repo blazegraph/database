@@ -29,6 +29,7 @@ package com.bigdata.rdf.internal;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.management.RuntimeErrorException;
@@ -435,23 +436,24 @@ public class TestEncodeDecodeGeoSpatialLiteralIVs extends
       
       // manually bring into expected (z-)order
       @SuppressWarnings("rawtypes")
-      final LiteralExtensionIV[] ordered = 
+      LiteralExtensionIV[] ordered = 
             new LiteralExtensionIV[asWrittenConverted.length];
+      
       ordered[0] = asWrittenConverted[0];
       ordered[1] = asWrittenConverted[1];
-      ordered[2] = asWrittenConverted[8];
-      ordered[3] = asWrittenConverted[9];
+      ordered[2] = asWrittenConverted[4];
+      ordered[3] = asWrittenConverted[5];
       ordered[4] = asWrittenConverted[2];
       ordered[5] = asWrittenConverted[3];
-      ordered[6] = asWrittenConverted[10];
-      ordered[7] = asWrittenConverted[11];
+      ordered[6] = asWrittenConverted[6];
+      ordered[7] = asWrittenConverted[7];
       
-      ordered[8] = asWrittenConverted[4];
-      ordered[9] = asWrittenConverted[5];
+      ordered[8] = asWrittenConverted[8];
+      ordered[9] = asWrittenConverted[9];
       ordered[10] = asWrittenConverted[12];
       ordered[11] = asWrittenConverted[13];
-      ordered[12] = asWrittenConverted[6];
-      ordered[13] = asWrittenConverted[7];
+      ordered[12] = asWrittenConverted[10];
+      ordered[13] = asWrittenConverted[11];
       ordered[14] = asWrittenConverted[14];
       ordered[15] = asWrittenConverted[15];
       
