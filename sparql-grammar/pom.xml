@@ -143,6 +143,7 @@ dependencies.
                                 <configuration>
                                     <jdkVersion>1.5</jdkVersion>
                                     <sourceDirectory>src/main/java/com/bigdata/rdf/sail/sparql/ast/</sourceDirectory>
+                                    <outputDirectory>src/main/java/</outputDirectory>
                                 </configuration>
                             </execution>
                         </executions>
