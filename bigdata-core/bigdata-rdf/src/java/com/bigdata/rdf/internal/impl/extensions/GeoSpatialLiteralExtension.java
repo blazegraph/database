@@ -259,6 +259,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          default:
             throw new RuntimeException("Uncovered encoding case. Please fix code.");
          }
+         
+         ret[i] = encodeRangeShift(ret[i], sfd.getMinValue());
 
       }
       
@@ -314,11 +316,16 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final StringBuffer buf = new StringBuffer();
       final Object[] componentArr = new Object[arr.length];
       for (int i=0; i<arr.length; i++) {
+
+         final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
+         final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
+         
+         // decode range shift
+         arr[i] = decodeRangeShift(arr[i], sfd.getMinValue());
+
          if (i>0)
             buf.append(COMPONENT_SEPARATOR);
          
-         final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
-         final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
          
          switch (sfd.getDatatype()) {
          case DOUBLE:
@@ -335,6 +342,37 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
       return componentArr;
    }
+   
+   /**
+    * Shift values according to the minValue, making sure that we encode the
+    * lowest value in the range as the lowest value 00000000000000... when 
+    * encoded as byte array.
+    */
+   protected Long encodeRangeShift(final Long val, final Long minValue) {
+      
+      if (minValue==null) { // do nothing if range shift not set
+         return val;
+      }
+      
+      if (val<minValue) {
+         throw new RuntimeException("Illegal range shift -- datatype violation.");
+      }
+      
+      return Long.MIN_VALUE + (val - minValue);
+   }
+   
+   /**
+    * Invert {@link #encodeRangeShift(Long, Long)} operation.
+    */
+   protected Long decodeRangeShift(final Long val, final Long minValue) {
+
+      if (minValue==null) { // do nothing if range shift not set
+         return val;
+      }
+      
+      return val - Long.MIN_VALUE + minValue;
+   }
+
    
    /**
     * Converts a long array representing the components to a z-order byte array
@@ -418,7 +456,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       
       final List<SchemaFieldDescription> sfd = 
          new ArrayList<SchemaFieldDescription>();
-   
+
       sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
       sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
       sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
@@ -459,8 +497,9 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          LONG,
          DOUBLE
       }
-
       
+      public Long minValue; // the minimun value appearing in the data
+
       private final Datatype datatype;
 
       /**
@@ -468,15 +507,36 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
        * double into a long value. E.g., if the precision is 8 (meaning
        * 8 positions after decimal point), we multiply the double by 8
        * and convert into a long value (ignoring additional positions).
+       * 
+       * The range supported is the full range.
        */
       private final int doublePrecision;
       
       public SchemaFieldDescription(
          final Datatype datatype, final int doublePrecision) {
-         this.datatype = datatype;
-         this.doublePrecision = doublePrecision;
+         
+         this(datatype, doublePrecision, null);
       }
       
+      /**
+       * Precision of float value. Based on the precision, we convert the
+       * double into a long value. E.g., if the precision is 8 (meaning
+       * 8 positions after decimal point), we multiply the double by 8
+       * and convert into a long value (ignoring additional positions).
+       * 
+       * The minValue and maxValue parameters allow to set a range in which
+       * we know the parameters are. This is used internally for range
+       * adjustments and may help to get better performance.
+       */
+      public SchemaFieldDescription(
+            final Datatype datatype, final int doublePrecision,
+            final Long minValue) {
+         
+            this.datatype = datatype;
+            this.doublePrecision = doublePrecision;
+            this.minValue = minValue;
+                  
+         }
       
       public Datatype getDatatype() {
          return datatype;
@@ -485,6 +545,11 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       public int getDoublePrecision() {
          return doublePrecision;
       }
+      
+      public Long getMinValue() {
+         return minValue;
+      }
+
       
    }
 
