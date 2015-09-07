@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.openrdf.model.impl.URIImpl;
+import org.openrdf.model.vocabulary.XMLSchema;
 
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -893,7 +894,7 @@ public class IVUtility {
                 return new XSDDecimalIV<BigdataLiteral>(x);
             }
             case XSDString: {
-                return new FullyInlineTypedLiteralIV(val);
+                return new FullyInlineTypedLiteralIV(val, null, XMLSchema.STRING);
             }
                 // case XSDUnsignedByte:
                 // keyBuilder.appendUnsigned(t.byteValue());

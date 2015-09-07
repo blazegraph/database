@@ -184,7 +184,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
      * @see <a href="https://sourceforge.net/apps/trac/bigdata/ticket/448">
      *      SPARQL 1.1 Update </a>
      */
-    public ASTContainer parseUpdate1(final String updateStr,
+    public ASTContainer parseUpdate2(final String updateStr,
             final String baseURI) throws MalformedQueryException {
 
         long startTime = System.nanoTime();
@@ -331,14 +331,21 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     }
 
-    public ASTContainer parseUpdate2(final String updateStr,
-            final String baseURI) throws MalformedQueryException {
-        ASTContainer u = parseUpdate1(updateStr, baseURI);
-        preUpdate(context.tripleStore, u);
-        return u;
-    }
-    
-    private void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
+//    public void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
+//
+//        UpdateRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
+////        Object parseTree = ast.getProperty(Annotations.PARSE_TREE);
+//        if (parseTree instanceof ASTUpdateSequence) {
+//            for (ASTUpdateContainer uc: ((ASTUpdateSequence)parseTree).getUpdateContainers()) {
+//                preUpdate(store,ast,uc);
+//            }
+//            return;
+//        } else if (ast instanceof UpdateRoot) {
+//            ASTUpdateContainer qc = (ASTUpdateContainer)parseTree;
+//            preUpdate(store,ast,qc);
+//        }
+//    }
+    public void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
 
         UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         
@@ -364,6 +371,14 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         
                 }
         }
+        final AST2BOpContext context2 = new AST2BOpContext(ast, context.tripleStore);
+        final ASTUnresolvedTermsOptimizer termsResolver = new ASTUnresolvedTermsOptimizer();
+        UpdateRoot queryRoot3 = (UpdateRoot) termsResolver.optimize(context2, new QueryNodeWithBindingSet(qc, null)).getQueryNode();
+        if (ast.getOriginalUpdateAST().getPrefixDecls()!=null && !ast.getOriginalUpdateAST().getPrefixDecls().isEmpty()) {
+            queryRoot3.setPrefixDecls(ast.getOriginalUpdateAST().getPrefixDecls());
+        }
+        ast.setOriginalUpdateAST(queryRoot3);
+
     }
     
     /**
@@ -558,12 +573,15 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     }
 
     
-    
     public void preEvaluate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
 
         //QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         ASTQueryContainer qc = (ASTQueryContainer)ast.getProperty(Annotations.PARSE_TREE);
-
+        if (qc==null) {
+            System.err.println("No parse tree" + ast);
+            return;
+        }
+        
         BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
         
         BigdataASTContext context = new BigdataASTContext(store);
@@ -623,7 +641,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
         queryRoot3.setPrefixDecls(ast.getOriginalAST().getPrefixDecls());
         ast.setOriginalAST(queryRoot3);
 	}
-    
+
 //    public static void main(String[] args)
 //        throws java.io.IOException
 //    {

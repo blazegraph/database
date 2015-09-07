@@ -388,8 +388,11 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
 
     private boolean isAggregate(List<BOp> args) {
         for (BOp arg: args) {
-            if (arg instanceof FunctionNode && FunctionRegistry.isAggregate(((FunctionNode) arg).getFunctionURI()) || isAggregate(((FunctionNode) arg).args())) {
-                return true;
+            if (arg instanceof FunctionNode) {
+                FunctionNode functionNode = (FunctionNode) arg;
+                if (FunctionRegistry.isAggregate(functionNode.getFunctionURI()) || isAggregate(functionNode.args())) {
+                    return true;
+                }
             }
         }
         return false;
