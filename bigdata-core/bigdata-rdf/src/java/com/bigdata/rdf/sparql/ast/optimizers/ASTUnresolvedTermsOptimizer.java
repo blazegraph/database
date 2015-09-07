@@ -29,9 +29,11 @@ package com.bigdata.rdf.sparql.ast.optimizers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.apache.xalan.xsltc.compiler.util.FilterGenerator;
@@ -58,6 +60,9 @@ import com.bigdata.rdf.sparql.ast.AssignmentNode;
 import com.bigdata.rdf.sparql.ast.BindingsClause;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.ConstructNode;
+import com.bigdata.rdf.sparql.ast.CreateGraph;
+import com.bigdata.rdf.sparql.ast.DatasetNode;
+import com.bigdata.rdf.sparql.ast.DeleteInsertGraph;
 import com.bigdata.rdf.sparql.ast.FilterNode;
 import com.bigdata.rdf.sparql.ast.FunctionNode;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
@@ -76,7 +81,9 @@ import com.bigdata.rdf.sparql.ast.PathNode.PathElt;
 import com.bigdata.rdf.sparql.ast.PathNode.PathNegatedPropertySet;
 import com.bigdata.rdf.sparql.ast.PathNode.PathOneInPropertySet;
 import com.bigdata.rdf.sparql.ast.PathNode.PathSequence;
+import com.bigdata.rdf.sparql.ast.ProjectionNode;
 import com.bigdata.rdf.sparql.ast.PropertyPathNode;
+import com.bigdata.rdf.sparql.ast.QuadsDataOrNamedSolutionSet;
 import com.bigdata.rdf.sparql.ast.QueryBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeBase;
 import com.bigdata.rdf.sparql.ast.QueryNodeWithBindingSet;
@@ -87,8 +94,10 @@ import com.bigdata.rdf.sparql.ast.SubqueryFunctionNodeBase;
 import com.bigdata.rdf.sparql.ast.SubqueryRoot;
 import com.bigdata.rdf.sparql.ast.TermNode;
 import com.bigdata.rdf.sparql.ast.UnionNode;
+import com.bigdata.rdf.sparql.ast.UpdateRoot;
 import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
+import com.bigdata.rdf.sparql.ast.eval.DataSetSummary;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 
 /**
@@ -175,91 +184,102 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         final IQueryNode queryNode = input.getQueryNode();
         final IBindingSet[] bindingSets = input.getBindingSets();     
 
-        if (!(queryNode instanceof QueryRoot))
-           return new QueryNodeWithBindingSet(queryNode, bindingSets);
-
-        final QueryRoot queryRoot = (QueryRoot) queryNode;
-
-        // Main CONSTRUCT clause
-        {
-
-            GroupNodeBase constructClause = queryRoot.getConstruct();
-
-            if (constructClause != null) {
-
-                resolveGroupsWithUnknownTerms(context, constructClause);
-                
-            }
-
-        }
-
-        // Main WHERE clause
-        {
-
-            final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
-                    .getWhereClause();
-
-            if (whereClause != null) {
-
-                resolveGroupsWithUnknownTerms(context, whereClause);
-                
-            }
-
-        }
-        
-        // HAVING clause
-        {
-            HavingNode having = queryRoot.getHaving();
-            if (having!=null) {
-                for (IConstraint c: having.getConstraints()) {
-                    handleHaving(context, c);
+        if (queryNode instanceof UpdateRoot) {
+            final UpdateRoot updateRoot = (UpdateRoot) queryNode;
+            resolveGroupsWithUnknownTerms(context, updateRoot);
+            
+        } else if (queryNode instanceof QueryBase) {
+    
+            final QueryBase queryRoot = (QueryBase) queryNode;
+    
+            // SELECT clause
+            {
+                ProjectionNode projection = queryRoot.getProjection();
+                if (projection!=null) {
+                    fillInIV(context, projection);
                 }
             }
-        }
-
-        
-        // BINDINGS clause
-        {
-            BindingsClause bc = queryRoot.getBindingsClause();
-            if (bc!=null) {
-                for (IBindingSet bs: bc.getBindingSets()) {
-                    handleBindingSet(context, bs);
+    
+            // Main CONSTRUCT clause
+            {
+    
+                GroupNodeBase constructClause = queryRoot.getConstruct();
+    
+                if (constructClause != null) {
+    
+                    resolveGroupsWithUnknownTerms(context, constructClause);
+                    
                 }
+    
             }
-        }
-
-        // Named subqueries
-        if (queryRoot.getNamedSubqueries() != null) {
-
-            final NamedSubqueriesNode namedSubqueries = queryRoot
-                    .getNamedSubqueries();
-
-            /*
-             * Note: This loop uses the current size() and get(i) to avoid
-             * problems with concurrent modification during visitation.
-             */
-            for (int i = 0; i < namedSubqueries.size(); i++) {
-
-                final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
-                        .get(i);
-
-                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
+    
+            // Main WHERE clause
+            {
+    
+                final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) queryRoot
                         .getWhereClause();
-
+    
                 if (whereClause != null) {
-
+    
                     resolveGroupsWithUnknownTerms(context, whereClause);
                     
                 }
-
+    
             }
-
+            
+            // HAVING clause
+            {
+                HavingNode having = queryRoot.getHaving();
+                if (having!=null) {
+                    for (IConstraint c: having.getConstraints()) {
+                        handleHaving(context, c);
+                    }
+                }
+            }
+    
+            
+            // BINDINGS clause
+            {
+                BindingsClause bc = queryRoot.getBindingsClause();
+                if (bc!=null) {
+                    for (IBindingSet bs: bc.getBindingSets()) {
+                        handleBindingSet(context, bs);
+                    }
+                }
+            }
+    
+            // Named subqueries
+            if (queryRoot instanceof QueryRoot && ((QueryRoot)queryRoot).getNamedSubqueries() != null) {
+    
+                final NamedSubqueriesNode namedSubqueries = ((QueryRoot)queryRoot)
+                        .getNamedSubqueries();
+    
+                /*
+                 * Note: This loop uses the current size() and get(i) to avoid
+                 * problems with concurrent modification during visitation.
+                 */
+                for (int i = 0; i < namedSubqueries.size(); i++) {
+    
+                    final NamedSubqueryRoot namedSubquery = (NamedSubqueryRoot) namedSubqueries
+                            .get(i);
+    
+                    final GroupNodeBase<IGroupMemberNode> whereClause = (GroupNodeBase<IGroupMemberNode>) namedSubquery
+                            .getWhereClause();
+    
+                    if (whereClause != null) {
+    
+                        resolveGroupsWithUnknownTerms(context, whereClause);
+                        
+                    }
+    
+                }
+    
+            }
+    
+            // log.error("\nafter rewrite:\n" + queryNode);
+    
         }
-
-        // log.error("\nafter rewrite:\n" + queryNode);
-
         return new QueryNodeWithBindingSet(queryNode, bindingSets);
-
     }
 
     /**
@@ -270,19 +290,25 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
      */
     private static void resolveGroupsWithUnknownTerms(AST2BOpContext context, final QueryNodeBase op) {
 
+        if (op==null) return;
     	/*
     	 * Check the statement patterns.
     	 */
     	for (int i = 0; i < op.arity(); i++) {
     		
     		final BOp sp = op.get(i);
-    		
-    		for (int j = 0; j < sp.arity(); j++) {
-    			
-    			final BOp bop = sp.get(j);
-    			
-   				fillInIV(context, bop);
-    			
+
+    		if (sp!=null) {
+                
+        		fillInIV(context, sp);
+        		
+        		for (int j = 0; j < sp.arity(); j++) {
+        			
+        			final BOp bop = sp.get(j);
+        			
+       				fillInIV(context, bop);
+        			
+        		}
     		}
     		
     	}
@@ -293,6 +319,8 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         for (int i = 0; i < op.arity(); i++) {
 
             final BOp child = op.get(i);
+            
+            if (child!=null)
 
             if (child instanceof GroupNodeBase<?>) {
 
@@ -305,10 +333,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
 
                 final QueryBase subquery = (QueryBase) child;
 
-                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) subquery
-                        .getWhereClause();
-
-                resolveGroupsWithUnknownTerms(context, childGroup);
+//                final GroupNodeBase<IGroupMemberNode> childGroup = (GroupNodeBase<IGroupMemberNode>) subquery
+//                        .getWhereClause();
+                new ASTUnresolvedTermsOptimizer().optimize(context, new QueryNodeWithBindingSet(subquery, null));
 
             } else if (child instanceof BindingsClause) {
 
@@ -330,9 +357,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             } else if(child instanceof ServiceNode) {
                 ServiceNode node = (ServiceNode) child;
                 TermNode serviceRef = node.getServiceRef();
-                Constant newValue = resolveConstant(context, serviceRef.getValue());
+                IV newValue = resolveConstant(context, serviceRef.getValue());
                 if (newValue!=null) {
-                    node.setServiceRef(new ConstantNode(newValue));
+                    node.setServiceRef(new ConstantNode(new Constant(newValue)));
                 }
                 System.err.println("Unsupported group child "+child.getClass().getName());
             } else if(child instanceof AssignmentNode) {
@@ -341,6 +368,14 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
                 System.err.println("Unsupported group child "+child.getClass().getName());
                 FunctionNode node = (FunctionNode)child;
                 fillInIV(context, child);
+            } else if (child instanceof BindingsClause) {
+                List<IBindingSet> bsList = ((BindingsClause)child).getBindingSets();
+                if (bsList!=null) {
+                    for (IBindingSet bs: bsList) {
+                        handleBindingSet(context, bs);
+                    }
+                }
+                
             } else {
                 System.err.println("Unsupported group child "+child.getClass().getName());
             }
@@ -363,14 +398,14 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             Entry<IVariable, IConstant> entry = itr.next();
             Object value = entry.getValue().get();
             if (value instanceof BigdataValue) {
-                Constant newValue = resolveConstant(context, (BigdataValue)value);
+                IV newValue = resolveConstant(context, (BigdataValue)value);
                 if (newValue!=null) {
-                    entry.setValue(newValue);
+                    entry.setValue(new Constant(newValue));
                 }
             } else if (value instanceof TermId) {
-                Constant newValue = resolveConstant(context, ((TermId)value).getValue());
+                IV newValue = resolveConstant(context, ((TermId)value).getValue());
                 if (newValue!=null) {
-                    entry.setValue(newValue);
+                    entry.setValue(new Constant(newValue));
                 }
             }
         }
@@ -389,9 +424,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
     //            if (iv == null || iv.isNullIV())
                 {
                     
-                    Constant newValue = resolveConstant(context, value);
+                    IV newValue = resolveConstant(context, value);
                     if (newValue!=null) {
-                        ((ConstantNode) bop).setArg(0, newValue);
+                        ((ConstantNode) bop).setArg(0, new Constant(newValue));
                     }
                 }
             }
@@ -404,15 +439,15 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
                 if (pathBop instanceof Constant) {
                     Object v = ((Constant)pathBop).get();
                     if (v instanceof BigdataValue) {
-                        Constant newValue = resolveConstant(context, (BigdataValue)v);
+                        IV newValue = resolveConstant(context, (BigdataValue)v);
                         if (newValue!=null) {
-                            bop.args().set(k, newValue);
+                            bop.args().set(k, new Constant(newValue));
                         }
                     } else if (v instanceof TermId) {
-                        Constant newValue = resolveConstant(context, ((TermId)v).getValue());
+                        IV newValue = resolveConstant(context, ((TermId)v).getValue());
                         if (newValue!=null) {
                             if (bop.args() instanceof ArrayList) {
-                                bop.args().set(k, newValue);
+                                bop.args().set(k, new Constant(newValue));
                             } else {
                                 System.err.println("!");
                             }
@@ -424,7 +459,48 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             }
         }
 
-        if (bop instanceof PathNode) {
+        if (bop instanceof CreateGraph) {
+            fillInIV(context,((CreateGraph)bop).getTargetGraph());
+        } if (bop instanceof DeleteInsertGraph) {
+            fillInIV(context, ((DeleteInsertGraph)bop).getDataset());
+            fillInIV(context, ((DeleteInsertGraph)bop).getDeleteClause());
+            fillInIV(context, ((DeleteInsertGraph)bop).getInsertClause());
+            fillInIV(context, ((DeleteInsertGraph)bop).getWhereClause());
+
+        } else if (bop instanceof QuadsDataOrNamedSolutionSet) {
+            resolveGroupsWithUnknownTerms(context, ((QuadsDataOrNamedSolutionSet)bop).getQuadData());
+        } else if (bop instanceof DatasetNode) {
+            final DatasetNode dataset = ((DatasetNode) bop);
+            final Iterator<IV> defaultGraphs = dataset.getDefaultGraphs().getGraphs().iterator();
+            final Set<IV> newDefaultGraphs = new HashSet<IV>();
+            while(defaultGraphs.hasNext()) {
+                final IV iv = defaultGraphs.next();
+                final IV newValue = resolveConstant(context, iv.getValue());
+                if (newValue!=null) {
+                    newDefaultGraphs.add(newValue);
+                } else {
+                    newDefaultGraphs.add(iv);
+                }
+            }
+            dataset.setDefaultGraphs(new DataSetSummary(newDefaultGraphs, true));
+//            dataset.getDefaultGraphs().getGraphs().clear();
+//            dataset.getDefaultGraphs().getGraphs().addAll(newDefaultGraphs);
+            
+            final Set<IV> newNamedGraphs = new HashSet<IV>();
+            final Iterator<IV> namedGraphs = dataset.getNamedGraphs().getGraphs().iterator();
+            while(namedGraphs.hasNext()) {
+                final IV iv = namedGraphs.next();
+                final IV newValue = resolveConstant(context, iv.getValue());
+                if (newValue!=null) {
+                    newNamedGraphs.add(newValue);
+                } else {
+                    newNamedGraphs.add(iv);
+                }
+            }
+            dataset.setNamedGraphs(new DataSetSummary(newNamedGraphs, true));
+//            dataset.getNamedGraphs().getGraphs().clear();
+//            dataset.getNamedGraphs().getGraphs().addAll(newNamedGraphs);
+        } else if (bop instanceof PathNode) {
             PathAlternative path = ((PathNode) bop).getPathAlternative();
             for (int k = 0; k < path.arity(); k++) {
                 BOp pathBop = path.get(k);
@@ -468,9 +544,9 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             } else if (ve instanceof Constant) {
                 Object value = ((Constant)ve).get();
                 if (value instanceof BigdataValue) {
-                    Constant newValue = resolveConstant(context, (BigdataValue)value);
+                    IV newValue = resolveConstant(context, (BigdataValue)value);
                     if (newValue!=null) {
-                        ((FunctionNode)bop).setValueExpression(newValue);
+                        ((FunctionNode)bop).setValueExpression(new Constant(newValue));
                     }
                 }
             }
@@ -492,6 +568,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         } else if (bop instanceof Var) {
             //System.err.println("Unknown Bop "+bop.getClass().getName());
         } else if (bop instanceof StatementPatternNode) {
+            StatementPatternNode stmt = (StatementPatternNode)bop;
             System.err.println("Unknown Bop "+bop.getClass().getName());
         } else if (bop instanceof ServiceNode) {
             System.err.println("Unknown Bop "+bop.getClass().getName());
@@ -502,8 +579,8 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         }
     }
 
-    private static Constant resolveConstant(AST2BOpContext context, final BigdataValue value) {
-        Constant newValue = null;
+    private static IV resolveConstant(AST2BOpContext context, final BigdataValue value) {
+        IV resolvedIV = null;
         if (value instanceof Literal) {
             String label = ((Literal)value).getLabel();
             URI dataType = ((Literal)value).getDatatype();
@@ -514,7 +591,6 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             } else {
                 resolved = context.getAbstractTripleStore().getValueFactory().createLiteral(label, dataType);
             }
-            IV resolvedIV;
             if (resolved.getIV()==null) {;
                 resolvedIV = context.getAbstractTripleStore().getIV(resolved);
                 if (resolvedIV==null) {
@@ -532,21 +608,18 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             }
             resolvedIV.setValue(resolved);
             resolved.setIV(resolvedIV);
-            newValue  = new Constant(resolvedIV);
         } else {
         
             BigdataValue resolved = context.getAbstractTripleStore().getValueFactory().asValue(value);
-            IV resolvedIV;
             if (resolved!=null && resolved.getIV()==null) {
                 resolvedIV = context.getAbstractTripleStore().getIV(resolved);
                 if (resolvedIV!=null) {
                     resolved.setIV(resolvedIV);
                     resolvedIV.setValue(resolved);
-                    newValue = new Constant(resolvedIV);
                 }
             }
         }
-        return newValue;
+        return resolvedIV;
     }
 
 }

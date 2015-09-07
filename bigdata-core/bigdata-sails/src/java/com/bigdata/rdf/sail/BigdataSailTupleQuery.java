@@ -81,6 +81,11 @@ public class BigdataSailTupleQuery extends SailTupleQuery
     public TupleQueryResult evaluate(final BindingsClause bc) 
     		throws QueryEvaluationException {
 
+        try {
+            new Bigdata2ASTSPARQLParser(getTripleStore()).preEvaluate(getTripleStore(), astContainer);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
         final QueryRoot originalQuery = astContainer.getOriginalAST();
 
         if (bc != null)

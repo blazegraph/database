@@ -163,6 +163,12 @@ public class ASTEvalHelper {
             final ASTContainer astContainer, final BindingSet globallyScopedBS)
             throws QueryEvaluationException {
 
+        try {
+            new Bigdata2ASTSPARQLParser(store).preEvaluate(store, astContainer);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
+
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
         // Clear the optimized AST.
@@ -481,6 +487,12 @@ public class ASTEvalHelper {
     public static GraphQueryResult evaluateGraphQuery(
             final AbstractTripleStore store, final ASTContainer astContainer,
             final QueryBindingSet globallyScopedBS) throws QueryEvaluationException {
+
+        try {
+            new Bigdata2ASTSPARQLParser(store).preEvaluate(store, astContainer);
+        } catch (MalformedQueryException e) {
+            throw new QueryEvaluationException(e.getMessage(), e);
+        }
 
         final AST2BOpContext context = new AST2BOpContext(astContainer, store);
 
@@ -1051,6 +1063,12 @@ public class ASTEvalHelper {
             final boolean includeInferred,//
             final QueryBindingSet bs
             ) throws UpdateExecutionException {
+
+        try {
+            new Bigdata2ASTSPARQLParser(conn.getTripleStore()).preUpdate(conn.getTripleStore(), astContainer);
+        } catch (MalformedQueryException e) {
+            throw new UpdateExecutionException(e.getMessage(), e);
+        }
 
         if(conn == null)
             throw new IllegalArgumentException();

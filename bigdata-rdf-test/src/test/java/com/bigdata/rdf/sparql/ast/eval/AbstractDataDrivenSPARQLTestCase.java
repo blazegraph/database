@@ -641,8 +641,10 @@ public class AbstractDataDrivenSPARQLTestCase extends
             final String baseURI = "http://www.w3.org/2001/sw/DataAccess/tests/data-r2/dataset/manifest#"
                     + queryFileURL;
 
-            astContainer = new Bigdata2ASTSPARQLParser(store).parseUpdate2(
-                    queryStr, baseURI);
+            Bigdata2ASTSPARQLParser parser = new Bigdata2ASTSPARQLParser(store);
+            astContainer = parser.parseUpdate2(queryStr, baseURI);
+            parser.preUpdate(store, astContainer);
+
 
         }
 
