@@ -1171,4 +1171,76 @@ public class TestTickets extends AbstractDataDrivenSPARQLTestCase {
              "ticket_blzg_1113.srx"// resultFileURL
        ).runTest();
     }
+    
+    public void test_ticket_blzg_1475a() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475a",// testURI,
+          "ticket_blzg_1475a.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-noresult.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    public void test_ticket_blzg_1475b() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475b",// testURI,
+          "ticket_blzg_1475b.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-noresult.srx"// resultFileURL
+       ).runTest();       
+    }
+
+    public void test_ticket_blzg_1475c() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475c",// testURI,
+          "ticket_blzg_1475c.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-result.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    public void test_ticket_blzg_1475d() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475d",// testURI,
+          "ticket_blzg_1475d.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-noresult.srx"// resultFileURL
+       ).runTest();       
+    }
+
+    public void test_ticket_blzg_1475e() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475e",// testURI,
+          "ticket_blzg_1475e.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-result.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    public void test_ticket_blzg_1475f() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475f",// testURI,
+          "ticket_blzg_1475f.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-result.srx"// resultFileURL
+       ).runTest();       
+    }
+
+    public void test_ticket_blzg_1475g() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475g",// testURI,
+          "ticket_blzg_1475g.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-result.srx"// resultFileURL
+       ).runTest();       
+    }
+    
+    public void test_ticket_blzg_1475h() throws Exception {
+       new TestHelper(
+          "ticket_blzg_1475h",// testURI,
+          "ticket_blzg_1475h.rq",// queryFileURL
+          "ticket_blzg_1475.trig",// dataFileURL
+          "ticket_blzg_1475-result.srx"// resultFileURL
+       ).runTest();       
+    }
 }
