@@ -1,0 +1,12 @@
+prefix : <http://localhost/>
+
+select *
+{ 
+  :unbound rdfs:label ?A 
+  FILTER NOT EXISTS {
+    :unbound rdfs:label ?A .
+    FILTER EXISTS {
+      :unbound rdfs:label ?A 
+    }
+  }
+}
