@@ -168,7 +168,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                filterWithVar("y2")
             ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
    }
 
    public void testBindPlacement01() {
@@ -255,7 +255,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                stmtPatternWithVars("y1","z1")
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
       
    }   
    
@@ -484,7 +484,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                stmtPatternWithVar("z")
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
    } 
    
    /**
@@ -650,7 +650,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                assignmentWithVar("bound", "x1")
            ));
          
-      }}.test();   
+      }}.testWhileIgnoringExplainHints();   
    }
 
    /**
@@ -697,7 +697,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                filterWithVars("x1","z1")      
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
       
    }
    
@@ -749,7 +749,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                stmtPatternWithVar("x1")
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
       
    }
    
@@ -790,7 +790,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                assignmentWithVar("bound","y1")
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
       
    }   
 
@@ -824,7 +824,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                   stmtPatternWithVar("y1")
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
 
    }
    
@@ -858,7 +858,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                   stmtPatternWithVar("y1")
            ));
          
-      }}.test();
+      }}.testWhileIgnoringExplainHints();
 
    }   
    
@@ -957,7 +957,7 @@ public class TestASTJoinGroupOrderOptimizer extends AbstractOptimizerTestCaseWit
                   joinGroupWithVars("y2","y3")
            ));
          
-      }}.test();      
+      }}.testWhileIgnoringExplainHints();      
    }
 
    /**

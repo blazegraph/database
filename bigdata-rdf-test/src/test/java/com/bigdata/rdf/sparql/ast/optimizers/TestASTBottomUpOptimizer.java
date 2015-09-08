@@ -76,6 +76,7 @@ import com.bigdata.rdf.sparql.ast.ValueExpressionNode;
 import com.bigdata.rdf.sparql.ast.VarNode;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpContext;
 import com.bigdata.rdf.sparql.ast.eval.AST2BOpUtility;
+import com.bigdata.rdf.sparql.ast.explainhints.ExplainHints;
 
 /**
  * Test suite for {@link ASTBottomUpOptimizer}.
@@ -445,6 +446,9 @@ public class TestASTBottomUpOptimizer extends
         queryRoot = (QueryRoot) new ASTBottomUpOptimizer().optimize(
                 context, new QueryNodeWithBindingSet(queryRoot, null)).
                 getQueryNode();
+
+        // remove explain hints in the actual AST to ease comparison
+        ExplainHints.removeExplainHintAnnotationsFromBOp(queryRoot);
 
         final NamedSubqueriesNode namedSubqueries = queryRoot.getNamedSubqueries();
         
@@ -996,6 +1000,9 @@ public class TestASTBottomUpOptimizer extends
                 context, new QueryNodeWithBindingSet(queryRoot, null)).
                 getQueryNode();
 
+        // remove explain hints in the actual AST to ease comparison
+        ExplainHints.removeExplainHintAnnotationsFromBOp(queryRoot);
+        
         /*
          * Create the expected AST for the WHERE clause.
          */
@@ -1150,6 +1157,9 @@ public class TestASTBottomUpOptimizer extends
                 context, new QueryNodeWithBindingSet(queryRoot, null)).
                 getQueryNode();
 
+        // remove explain hints in the actual AST to ease comparison
+        ExplainHints.removeExplainHintAnnotationsFromBOp(queryRoot);
+        
         /*
          * Create the expected AST for the WHERE clause.
          */
@@ -1447,6 +1457,9 @@ public class TestASTBottomUpOptimizer extends
 
         final IQueryNode actual = rewriter.optimize(null/* AST2BOpContext */,
               new QueryNodeWithBindingSet(given, bsets)).getQueryNode();
+        
+        // remove explain hints in actual ast before comparing
+        ExplainHints.removeExplainHintAnnotationsFromBOp(actual);
 
         assertSameAST(expected, actual);
 

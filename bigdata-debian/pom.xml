@@ -23,8 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.blazegraph</groupId>
@@ -33,225 +32,76 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
     <relativePath>../blazegraph-parent/pom.xml</relativePath>
   </parent>
   <groupId>com.blazegraph</groupId>
-  <artifactId>bigdata-jar</artifactId>
-  <version>${bigdata.version}</version>
-  <name>Blazegraph Executable Jar</name>
+  <artifactId>bigdata-debian</artifactId>
+  <version>1.5.3-master-SNAPSHOT</version>
+  <name>Blazegraph Debian Package</name>
   <url>http://maven.apache.org</url>
   <packaging>jar</packaging>
-  <properties>
-     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-  </properties>
+
   <build>
      <resources>
         <resource>
-            <directory>../bigdata-war/src/main/resources</directory>
-            <includes>
-		<include>**/RWStore.properties</include>
-	    </includes>
-	</resource>
-        <resource>
             <directory>src/main/resources</directory>
             <includes>
+		<include>**/*.xml</include>
 		<include>**/*.properties</include>
 		<include>**/org.openrdf.rio.*</include>
+		<include>**/com.bigdata.*</include>
 	    </includes>
 	</resource>
     </resources>
     <plugins>
-      <!-- Create the debian file -->
       <plugin>
-        <artifactId>jdeb</artifactId>
-        <groupId>org.vafer</groupId>
-        <version>1.3</version>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.10</version>
         <executions>
           <execution>
-            <phase>package</phase>
+            <id>copy</id>
+            <phase>compile</phase>
             <goals>
-              <goal>jdeb</goal>
+              <goal>copy</goal>
             </goals>
             <configuration>
-              <deb>${project.build.directory}/${artifactId}-${version}.deb</deb>
-              <dataSet>
-                <data>
-                  <src>${project.build.directory}/${project.build.finalName}.jar</src>
-                  <type>file</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${version}/lib</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- dependencies go in /usr/local/blazegraph-[version]/lib -->
-                <data>
-                  <src>${project.build.directory}/dependency</src>
-                  <type>directory</type>
-                  <includes>*.jar</includes>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${version}/lib</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- resources -->
-                <data>
-                  <src>${basedir}/src/main/resources</src>
-                  <type>directory</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${version}/resources</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- shell scripts go in /usr/local/blazegraph-[version] -->
-                <data>
-                  <src>${basedir}</src>
-                  <type>directory</type>
-                  <includes>*.sh</includes>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/usr/local/blazegraph-${version}</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                    <filemode>744</filemode>
-                  </mapper>
-                </data>
-
-                <!-- soft link to versioned software -->
-                <data>
-                  <type>link</type>
-                  <symlink>true</symlink>
-                  <linkName>/usr/local/blazegraph</linkName>
-                  <linkTarget>/usr/local/blazegraph-${version}</linkTarget>
-                </data>
-
-                <!-- create the data directories, log directories -->
-                <data>
-                  <type>template</type>
-                  <paths>
-                    <path>var/log/blazegraph</path>
-                    <path>var/lib/blazegraph</path>
-                  </paths>
-                  <mapper>
-                    <type>perm</type>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- ingest (replay) logs -->
-                <data>
-                  <src>${basedir}/data/deploy</src>
-                  <type>directory</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/var/lib/blazegraph/ingest</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- properties files -->
-                <data>
-                  <src>${basedir}/docker.properties</src>
-                  <dst>local.properties</dst>
-                  <type>file</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/etc/blazegraph</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- logging properties files -->
-                <data>
-                  <src>${basedir}/log4j-docker.properties</src>
-                  <dst>log4j.properties</dst>
-                  <type>file</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/etc/blazegraph</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-                <!-- upstart script -->
-                <data>
-                  <src>${basedir}/src/deb/init/blazegraph.conf</src>
-                  <type>file</type>
-                  <mapper>
-                    <type>perm</type>
-                    <prefix>/etc/init</prefix>
-                    <user>${debian.user}</user>
-                    <group>${debian.userGroup}</group>
-                  </mapper>
-                </data>
-
-              </dataSet>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>com.blazegraph</groupId>
+                  <artifactId>bigdata-war-html</artifactId>
+                  <version>${project.version}</version>
+                  <type>war</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>target/classes/war</outputDirectory>
+                  <destFileName>bigdata.war</destFileName>
+                </artifactItem>
+              </artifactItems>
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-resources-plugin</artifactId>
-        <version>2.7</version>
-        <executions>
-          <execution>
-            <id>copy-resources</id>
-            <!-- here the phase you need -->
-            <phase>validate</phase>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>target/classes/bigdata-war/src</outputDirectory>
-              <resources>          
-                <resource>
-                  <directory>../bigdata-war/src</directory>
-		  <includes>
-			<include>**/*</include>
-		  </includes>
-                  <filtering>true</filtering>
-                </resource>
-              </resources>              
-            </configuration>            
-          </execution>
-        </executions>
-      </plugin>
-<!--
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>2.4</version>
-        <configuration>
-                 <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                 </descriptorRefs>
-             <archive>
-            <manifest>
-                <mainClass>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</mainClass>
-            </manifest>
-             </archive>
-        </configuration>
-        <executions>
+        </plugin>
+       <plugin>
+           <artifactId>maven-antrun-plugin</artifactId>
+           <version>1.6</version>
+           <executions>
              <execution>
-                    <id>make-assembly</id>
-                    <phase>package</phase>
-                    <goals>
-                      <goal>single</goal>
-                    </goals>
+               <id>unpack-war</id>
+               <goals>
+                 <goal>run</goal>
+               </goals>
+               <phase>compile</phase>
+               <configuration>
+                 <target>
+ 		   <unzip dest="target/classes/war">
+        		<fileset dir="target/classes/war">
+            			<include name="bigdata.war" />
+        		</fileset>    
+    		   </unzip>
+ 		   <delete file="target/classes/war/bigdata.war" />
+		   <copy file="target/classes/war/WEB-INF/RWStore.properties" todir="target/classes" />
+                 </target>
+               </configuration>
              </execution>
-        </executions>
-    </plugin>
--->
+           </executions>
+	</plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -264,21 +114,25 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
             </goals>
             <configuration>
                <filters>
+		<filter>
+                  <artifact>com.blazegraph:rdf-properties</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
+		<filter>
+                  <artifact>com.blazegraph:bigdata-jar</artifact>
+		  <includes>
+		    <include>**/*</include>
+		  </includes>
+	   	</filter>
                 <filter>
                   <artifact>*:*</artifact>
-		  <!--
-		  <includes>
-		    <include>bigdata-war/**</include>
-		    <include>META-INFO/service/**</include>
-		  </includes>
-		  -->
                   <excludes>
                     <exclude>org/junit/experimental/**</exclude>
                     <exclude>org/junit/runners/**</exclude>
                     <exclude>junit/framework/**</exclude>
                     <exclude>junit/**</exclude>
-                    <exclude>license/**</exclude>
-                    <exclude>META-INF/license/**</exclude>
                     <exclude>org/junit/**</exclude>
                     <exclude>WEB-INF/**</exclude>
                     <exclude>test*/**</exclude>
@@ -288,6 +142,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                     <exclude>**/*.rq</exclude>
                     <exclude>**/*.srx</exclude>
                     <exclude>**/*.trig</exclude>
+                    <exclude>**/sesame*testsuite/**</exclude>
                   </excludes>
                 </filter>
                </filters>
@@ -295,7 +150,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Main-Class>com.bigdata.rdf.sail.webapp.StandaloneNanoSparqlServer</Main-Class>
-                    <Build-Number>${bigdata.version}</Build-Number>
+                    <Build-Number>${project.version}</Build-Number>
                   </manifestEntries>
                 </transformer>
               </transformers>
@@ -344,14 +199,55 @@ ga('send', 'pageview');
   <dependencies>
     <dependency>
       <groupId>com.blazegraph</groupId>
+      <artifactId>rdf-properties</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-core</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
+       <exclusions>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-rio-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-sparql-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.openrdf.sesame</groupId>
+          <artifactId>sesame-store-testsuite</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.blazegraph</groupId>
       <artifactId>bigdata-blueprints</artifactId>
-      <version>${bigdata.version}</version>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>junit-ext</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.blazegraph</groupId>
+          <artifactId>bigdata-war-html</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-client</artifactId>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
-
   </project>

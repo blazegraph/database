@@ -290,7 +290,7 @@ public class TestASTUnionFiltersOptimizer extends AbstractOptimizerTestCase {
 								)
 							) ) );
 			
-		}}.test();
+		}}.testWhileIgnoringExplainHints();
 	}
 
 	/**

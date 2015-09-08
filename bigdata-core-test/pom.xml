@@ -54,7 +54,7 @@ dependencies.
    </parent>
    <groupId>com.blazegraph</groupId>
    <artifactId>bigdata-core-test</artifactId>
-    <version>${bigdata.version}</version>
+    <version>1.5.3-master-SNAPSHOT</version>
    <packaging>jar</packaging>
    <name>Blazegraph Core Tests</name>
     <description>Bigdata(R) Maven Build</description>
@@ -77,22 +77,6 @@ dependencies.
             <directory>bigdata/src/test</directory>
             <includes>
                 <include>**/*.csv</include>
-                <include>**/*.owl</include>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-                <include>**/*.txt</include>
-                <include>**/*.ttl</include>
-                <include>**/*.ttlx</include>
-                <include>**/*.rq</include>
-                <include>**/*.srx</include>
-                <include>**/*.trig</include>
-                <include>**/*.java</include>
-            </includes>
-        </resource>
-        <resource>
-            <directory>bigdata-gom/src/test/resources</directory>
-            <includes>
-                <include>**/*.n3</include>
                 <include>**/*.owl</include>
                 <include>**/*.properties</include>
                 <include>**/*.xml</include>
@@ -186,6 +170,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
 	  <printSummary>false</printSummary>
           <disableXmlReport>false</disableXmlReport>
           <argLine>-server -ea -Xms512m -Xmx8g -XX:+UseMembar -XX:MaxPermSize=500m -Djavadoc=true -Djava.net.preferIPv4Stack=${java.net.preferIPv4Stack} -Dlog4j.configuration=file:bigdata/src/resources/logging/log4j.properties</argLine>
+	   <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
       </plugin>
       <plugin>
@@ -292,7 +277,7 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
                 <artifactItem>
                   <groupId>com.blazegraph</groupId>
                   <artifactId>bigdata-war-html</artifactId>
-                  <version>${bigdata.version}</version>
+                  <version>${project.version}</version>
                   <type>war</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>target</outputDirectory>
@@ -515,33 +500,28 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-ganglia</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
        <type>test-jar</type>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>ctc-striterators</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>dsi-utils</artifactId>
-       <version>${bigdata.version}</version>
-     </dependency>
-     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit3.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
       <groupId>junit</groupId>
@@ -556,32 +536,32 @@ See https://maven.apache.org/plugins/maven-jar-plugin/examples/create-test-jar.h
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-core</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>lgpl-utils</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
      </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>rdf-properties</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-util</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-client</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
      <dependency>
        <groupId>com.blazegraph</groupId>
        <artifactId>bigdata-gas</artifactId>
-       <version>${bigdata.version}</version>
+       <version>${project.version}</version>
     </dependency>
     <dependency>
         <groupId>org.eclipse.jetty</groupId>

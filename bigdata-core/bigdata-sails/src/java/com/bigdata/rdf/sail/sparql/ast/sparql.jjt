@@ -132,6 +132,25 @@ public class SyntaxTreeBuilder {
 		    nesting--;
 		    if (nesting == 0) break;
 		}
+		// To provide correct line numbers (see https://jira.blazegraph.com/browse/BLZG-1397)
+		// we should keep line breaks and one-line comments. So, we are adding special tokens
+		// (comments and and new line char) per https://javacc.java.net/doc/tokenmanager.html
+
+		if (tok.specialToken != null) {
+			// The above statement determines that there is a special token
+			Token tmp_t = tok.specialToken;
+			while (tmp_t.specialToken != null)
+				tmp_t = tmp_t.specialToken;
+			// The above line walks back the special token chain until it
+			// reaches the first special token after the previous regular
+			// token.
+			while (tmp_t != null) {
+				sb.append(tmp_t.image);
+				tmp_t = tmp_t.next;
+			}
+			// The above loop now walks the special token chain in the forward
+			// direction printing them in the process.
+		}
 		sb.append(tok.image);
 		previousTokenDtSep = tok.image.equals("^^");
 
@@ -150,7 +169,7 @@ PARSER_END(SyntaxTreeBuilder)
 TOKEN :
 {
     // Whitespace characters
-    <#WS_CHAR: " " | "\t" | "\n" | "\r" | "\f">
+    <#WS_CHAR: " " | "\t" | "\r" | "\f">
 }
 
 SKIP :
@@ -161,6 +180,7 @@ SKIP :
 SPECIAL_TOKEN :
 {
     <SINGLE_LINE_COMMENT: "#" (~["\n","\r"])*>
+|   <NEW_LINE: "\n">
 }
 
 // Special characters
@@ -192,8 +212,8 @@ TOKEN :
 |       <PIPE: "|">
 |   <INVERSE: "^">
 |   <DT_PREFIX: "^^">
-|   <NIL: <LPAREN> (<WS_CHAR>)* <RPAREN>>
-|   <ANON: <LBRACK> (<WS_CHAR>)* <RBRACK>>
+|   <NIL: <LPAREN> (<WS_CHAR>|<NEW_LINE>)* <RPAREN>>
+|   <ANON: <LBRACK> (<WS_CHAR>|<NEW_LINE>)* <RBRACK>>
 }
 
 TOKEN :

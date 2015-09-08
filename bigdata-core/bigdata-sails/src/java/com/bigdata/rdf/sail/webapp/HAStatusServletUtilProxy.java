@@ -123,7 +123,7 @@ public class HAStatusServletUtilProxy {
 			
 			try {
 				final Class<?> c = Class.forName(provider);
-				final Constructor<?> cons = c.getConstructor();
+				final Constructor<?> cons = c.getConstructor(IIndexManager.class);
 				final Object object = cons.newInstance(indexManager);
 				final HAStatusServletUtilProxy proxy = (HAStatusServletUtilProxy) object;
 				return proxy;

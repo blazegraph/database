@@ -772,15 +772,14 @@ public class NanoSparqlServer {
 
     private static URL getEffectiveJettyXmlURL(final ClassLoader classLoader,
             final String jettyXml) throws MalformedURLException {
-
+    
         // Locate jetty.xml.
-        final URL jettyXmlUrl;
+        URL jettyXmlUrl;
         boolean isFile = false;
         boolean isClassPath = false;
         if (new File(jettyXml).exists()) {
 
             // Check the file system.
-            // jettyXmlUrl = new File(jettyXml).toURI();
             jettyXmlUrl = new URL("file:" + jettyXml);
             isFile = true;
 
@@ -788,22 +787,38 @@ public class NanoSparqlServer {
 
             // Check the classpath.
             jettyXmlUrl = classLoader.getResource(jettyXml);
-            // jettyXmlUrl =
-            // classLoader.getResource("bigdata-war/src/jetty.xml");
-            isClassPath = true;
-            //Set the resource base
-            /*
-			final String resourceBase = new URL(jettyXmlUrl.getPath().substring(0,
-					jettyXmlUrl.getPath().length() - "jetty.xml".length())).toExternalForm();
-            if(log.isInfoEnabled()) {
-				log.info("Setting " + SystemProperties.JETTY_RESOURCE_BASE
-						+ " to " + resourceBase);
+
+            if(jettyXmlUrl == null)
+            {
+            	jettyXmlUrl = classLoader.getResource("/" + jettyXml);
             }
-            System.setProperty(SystemProperties.JETTY_RESOURCE_BASE, resourceBase);
-            */
+
+            isClassPath = true;
 
         }
+        
 
+		// See BLZG-1447
+		// Check if it is running as a test suite in Eclipse or Maven.
+		// If it is running as maven surefire execution the target/bigdata.war
+		// will exist.
+
+		final File warFile = new File("target/bigdata.war");
+
+		if (jettyXmlUrl == null && warFile.exists()) {
+			// This is the maven surefire plugin case.
+			jettyXmlUrl = classLoader.getResource("jetty/jettyMavenTest.xml");
+		} else if (jettyXmlUrl == null) {
+			jettyXmlUrl = classLoader.getResource("jetty/jettyEclipseTest.xml");
+		} 
+	
+		//If we still didn't get it, we may be running the executable jar.
+		if (jettyXmlUrl == null) { 	// This is the executable jar a file
+									// reference into the jar
+			jettyXmlUrl = classLoader.getResource("jetty.xml");
+			isFile = true;
+		}
+        
         if (jettyXmlUrl == null) {
 
         	
@@ -854,7 +869,7 @@ public class NanoSparqlServer {
              */
 
             // The default location to check in the file system.
-            final File file = new File("bigdata-war-html/src/main/webapp");
+            final File file = new File("bigdata-war-html/src/main/webapp/");
 
             final URL resourceBaseURL;
             if (file.exists()) {
@@ -863,7 +878,7 @@ public class NanoSparqlServer {
 //                resourceBaseURL = new URL("file:" + file.getAbsolutePath());
                 resourceBaseURL = file.toURI().toURL();
                 isFile = true;
-
+                
             } else {
 
                 /*
@@ -887,7 +902,8 @@ public class NanoSparqlServer {
                      * file:/Users/bryan/Documents/workspace/BIGDATA_RELEASE_1_3_0_NEW_SVN/bin/WEB-INF/web.xml
                      * </pre>
                      */
-                    tmp = classLoader.getResource(src = "/WEB-INF/web.xml");
+                    tmp = ClassLoader.getSystemClassLoader().getResource(
+                            src = "bigdata-war-html/src/main/webapp/WEB-INF/web.xml");
                 }
                 
 //                if (tmp == null)// Eclipse IDE class path (system class loader).
