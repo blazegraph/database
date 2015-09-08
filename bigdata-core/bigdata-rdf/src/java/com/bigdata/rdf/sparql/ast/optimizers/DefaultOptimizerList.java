@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast.optimizers;
 
+import org.apache.log4j.Logger;
 import org.openrdf.query.algebra.evaluation.impl.CompareOptimizer;
 import org.openrdf.query.algebra.evaluation.impl.ConjunctiveConstraintSplitter;
 import org.openrdf.query.algebra.evaluation.impl.DisjunctiveConstraintOptimizer;
@@ -40,6 +41,7 @@ import com.bigdata.rdf.sparql.ast.QueryHints;
 import com.bigdata.rdf.sparql.ast.eval.ASTFulltextSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchInSearchOptimizer;
 import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
+import com.bigdata.util.ClassPathUtil;
 
 /**
  * Pre-populated list of the default optimizers.
@@ -129,6 +131,8 @@ import com.bigdata.rdf.sparql.ast.eval.ASTSearchOptimizer;
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
  */
 public class DefaultOptimizerList extends ASTOptimizerList {
+
+    private static final Logger log = Logger.getLogger(DefaultOptimizerList.class);
 
     /**
      * 
@@ -588,6 +592,11 @@ public class DefaultOptimizerList extends ASTOptimizerList {
          */
         
         /**
+         * Uses the query hints RUN_FIRST and RUN_LAST to rearrange IJoinNodes.
+         */
+        add(new ASTRunFirstRunLastOptimizer());
+        
+        /**
          * Optimizer attaches FilterNodes which will run as "join filters" to
          * StatementPatternNodes.
          */
@@ -688,10 +697,60 @@ public class DefaultOptimizerList extends ASTOptimizerList {
         add(new ASTNamedSubqueryOptimizer());
         
         /**
+         * Prepare Mapgraph GPU acceleration of join groups.
+         */
+        addGPUAccelerationOptimizer();
+        
+        /**
          * Identify and assign the join variables to sub-groups.
          */
         add(new ASTSubGroupJoinVarOptimizer());
-        
+    }
+
+    /**
+     * Tries to add the {@link IASTOptimizer} for using GPUs.
+     */
+    protected void addGPUAccelerationOptimizer() {
+
+       final IASTOptimizer o = initGPUAccelerationOptimizer();
+       if (o != null ) {
+          add(o);
+       }
+    }
+
+    /**
+     * Tries to create the {@link IASTOptimizer} for using GPUs; returns
+     * <code>null</code> if the attempt fails.
+     */
+    protected IASTOptimizer initGPUAccelerationOptimizer() {
+
+    	return ClassPathUtil.classForName(//
+    			"com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer", // preferredClassName,
+				null, // defaultClass,
+				IASTOptimizer.class, // sharedInterface,
+				getClass().getClassLoader() // classLoader
+		);
+    	
+//       try {
+//          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.optimizers.ASTGPUAccelerationOptimizer" );
+//
+//          if (IASTOptimizer.class.isAssignableFrom(cls)) {
+//        	  if(log.isInfoEnabled())
+//        		  log.info( "Found Blazegraph-Mapgraph connector: "
+//                       + cls.getCanonicalName() );
+//             return (IASTOptimizer) cls.newInstance();
+//          }
+//          else {
+//        	  // Note: Please do not log @ WARN here. It appears for every non-GPU accelerated query!
+////             log.warn( cls.getCanonicalName()
+////                       + " does not extend "
+////                       + IASTOptimizer.class.getCanonicalName() );
+//             return null;
+//          }
+//       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+//          if(log.isInfoEnabled()) log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
+//          return null;
+//       }
     }
 
 }

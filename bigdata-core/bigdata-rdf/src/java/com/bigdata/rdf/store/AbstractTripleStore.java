@@ -326,6 +326,11 @@ abstract public class AbstractTripleStore extends
     final private boolean bottomUpEvaluation;
     
     /**
+     * @see Options#COMPUTE_CLOSURE_FOR_SIDS
+     */
+    final private boolean computeClosureForSids;
+    
+    /**
      * The {@link RDRHistory} class.
      * 
      * @see Options#RDR_HISTORY_CLASS
@@ -1012,31 +1017,50 @@ abstract public class AbstractTripleStore extends
          */
 
         /**
-         * The threshold (in character length) at which an RDF {@link Value}
-         * will be inserted into the {@link LexiconKeyOrder#BLOBS} index rather
-         * than the {@link LexiconKeyOrder#TERM2ID} and
-         * {@link LexiconKeyOrder#ID2TERM} indices (default
-         * {@value #DEFAULT_BLOBS_THRESHOLD}).
-         * <p>
-         * The {@link LexiconKeyOrder#BLOBS} index is capable of storing very
-         * large literals but has more IO scatter due to the hash code component
-         * of the key for that index. Therefore smaller RDF {@link Value}s
-         * should be inserted into the {@link LexiconKeyOrder#TERM2ID} and
-         * {@link LexiconKeyOrder#ID2TERM} indices while very large RDF
-         * {@link Value}s MUST be inserted into the
-         * {@link LexiconKeyOrder#BLOBS} index.
-         * <p>
-         * The {@link LexiconKeyOrder#TERM2ID} index keys are Unicode sort codes
-         * based on the RDF {@link Value}s. This threshold essentially limits
-         * the maximum length of the keys in the {@link LexiconKeyOrder#TERM2ID}
-         * index.
-         */
+		 * The threshold (in character length) at which an RDF {@link Value}
+		 * will be inserted into the {@link LexiconKeyOrder#BLOBS} index rather
+		 * than the {@link LexiconKeyOrder#TERM2ID} and
+		 * {@link LexiconKeyOrder#ID2TERM} indices (default
+		 * {@value #DEFAULT_BLOBS_THRESHOLD}).
+		 * <p>
+		 * The {@link LexiconKeyOrder#BLOBS} index is capable of storing very
+		 * large literals but has more IO scatter due to the hash code component
+		 * of the key for that index. Therefore smaller RDF {@link Value}s
+		 * should be inserted into the {@link LexiconKeyOrder#TERM2ID} and
+		 * {@link LexiconKeyOrder#ID2TERM} indices while very large RDF
+		 * {@link Value}s MUST be inserted into the
+		 * {@link LexiconKeyOrder#BLOBS} index.
+		 * <p>
+		 * The {@link LexiconKeyOrder#TERM2ID} index keys are Unicode sort codes
+		 * based on the RDF {@link Value}s. This threshold essentially limits
+		 * the maximum length of the keys in the {@link LexiconKeyOrder#TERM2ID}
+		 * index.
+		 * <p>
+		 * Note: The BLOBS index MAY be disabled entirely by setting this
+		 * property to {@link #BLOBS_THRESHOLD_DISABLE} (@value
+		 * {@link #BLOBS_THRESHOLD_DISABLE}). However, this is generally not
+		 * advised since it implies that large literals will be appear as keys
+		 * in the TERM2ID index.
+		 * 
+		 * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/25">
+		 *      Disable BLOBS indexing completely for GPU </a>
+		 */
         String BLOBS_THRESHOLD = AbstractTripleStore.class.getName()
                 + ".blobsThreshold";
 
         String DEFAULT_BLOBS_THRESHOLD = "256";
 		
-		/**
+        /**
+         * The constant that may be used to disable the BLOBS index.
+         * 
+         *  @see #BLOBS_THRESHOLD
+		 * 
+		 * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/25">
+		 *      Disable BLOBS indexing completely for GPU </a>
+         */
+        String BLOBS_THRESHOLD_DISABLE = Integer.toString(Integer.MAX_VALUE);
+        
+        /**
 		 * Set up database to inline XSD datatype literals corresponding to
 		 * primitives (boolean) and numerics (byte, short, int, etc) directly
 		 * into the statement indices (default
@@ -1268,6 +1292,14 @@ abstract public class AbstractTripleStore extends
          */
         String RDR_HISTORY_CLASS = AbstractTripleStore.class.getName()
                 + ".rdrHistoryClass";
+
+        /**
+         * If this option is set to false, do not compute closure for sids.
+         */
+        public static String COMPUTE_CLOSURE_FOR_SIDS = AbstractTripleStore.class
+                .getName() + ".computeClosureForSids";
+
+        public static String DEFAULT_COMPUTE_CLOSURE_FOR_SIDS = "true";
 
     }
 
@@ -1528,6 +1560,10 @@ abstract public class AbstractTripleStore extends
             }
             
         }
+        
+        this.computeClosureForSids = Boolean.valueOf(getProperty(
+                Options.COMPUTE_CLOSURE_FOR_SIDS,
+                Options.DEFAULT_COMPUTE_CLOSURE_FOR_SIDS));
         
         /*
          * Setup namespace mapping for serialization utility methods.
@@ -4320,6 +4356,13 @@ abstract public class AbstractTripleStore extends
          * sids.
          */
         if (rdrHistoryClass != null) {
+            return src;
+        }
+        
+        /*
+         * Bypass if requested.
+         */
+        if (!computeClosureForSids) {
             return src;
         }
         

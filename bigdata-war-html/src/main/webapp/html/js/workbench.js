@@ -1418,23 +1418,31 @@ function loadURI(target) {
    // jshint multistr:true
    var vertexQuery = '\
 select ?col1 ?col2 ?incoming (count(?star) as ?star) {\n\
-  bind (URI as ?explore ) .\n\
-  {\n\
-    bind (<<?explore ?col1 ?col2>> as ?sid) . \n\
-    bind (false as ?incoming) . \n\
-    optional {\n\
-      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
-    }\n\
-  } union {\n\
-    bind (<<?col1 ?col2 ?explore>> as ?sid) .\n\
-    bind (true as ?incoming) . \n\
-    optional {\n\
-      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
-    }\n\
-  }\n\
-}\n\
-group by ?col1 ?col2 ?incoming';
-
+	   {\n\
+	     URI ?col1 ?col2\n\
+	     bind (false as ?incoming) .\n\
+	     optional {\n\
+	       {\n\
+	         bind(<<URI ?col1 ?col2>> AS ?sid) . ?sid ?sidP ?star\n\
+	       } union {\n\
+	         bind(<<URI ?col1 ?col2>> AS ?sid) . ?star ?sidP ?sid\n\
+	       }\n\
+	     }\n\
+	   } union {\n\
+	     ?col1 ?col2 URI\n\
+	     bind (true as ?incoming) .\n\
+	     optional {\n\
+	       {\n\
+	         bind(<<?col1 ?col2 URI>> AS ?sid) . ?sid ?sidP ?star\n\
+	       } union {\n\
+	         bind(<<?col1 ?col2 URI>> AS ?sid) . ?star ?sidP ?sid\n\
+	       }\n\
+	     }\n\
+	   }\n\
+	 }\n\
+	 group by ?col1 ?col2 ?incoming';
+   
+   
    var edgeQuery = '\
 select ?col1 ?col2 ?incoming (count(?star) as ?star)\n\
 with {\n\
@@ -1445,16 +1453,14 @@ with {\n\
 where {\n\
   include %_explore .\n\
   {\n\
-    bind (<<?explore ?col1 ?col2>> as ?sid) . \n\
     bind (false as ?incoming) . \n\
     optional {\n\
-      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
+      { bind (<<?explore ?col1 ?col2>> as ?sid) . ?sid ?sidP ?star } union { bind (<<?explore ?col1 ?col2>> as ?sid) . ?star ?sidP ?sid }\n\
     }\n\
   } union {\n\
-    bind (<<?col1 ?col2 ?explore>> as ?sid) .\n\
     bind (true as ?incoming) . \n\
     optional {\n\
-      { ?sid ?sidP ?star } union { ?star ?sidP ?sid }\n\
+      { bind (<<?col1 ?col2 ?explore>> as ?sid) . ?sid ?sidP ?star } union { bind (<<?col1 ?col2 ?explore>> as ?sid) . ?star ?sidP ?sid }\n\
     }\n\
   }\n\
 }\n\
@@ -1462,7 +1468,7 @@ group by ?col1 ?col2 ?incoming';
 
    var query;
    if(vertex) {
-      query = vertexQuery.replace('URI', target);
+      query = vertexQuery.replace(/URI/g, target);
    } else {
       query = edgeQuery.replace('SID', target);
    }

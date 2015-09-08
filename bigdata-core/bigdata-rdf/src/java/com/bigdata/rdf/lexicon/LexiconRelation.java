@@ -391,7 +391,13 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
                     AbstractTripleStore.Options.BLOBS_THRESHOLD,
                     AbstractTripleStore.Options.DEFAULT_BLOBS_THRESHOLD));
 
-            if (blobsThreshold < 0 || blobsThreshold > 4 * Bytes.kilobyte) {
+			/**
+			 * Note: Integer.MAX_VALUE disables the BLOBS index.
+			 * 
+			 * @see <a href="https://github.com/SYSTAP/bigdata-gpu/issues/25">
+			 *      Disable BLOBS indexing completely for GPU </a>
+			 */
+			if (blobsThreshold < 0 || blobsThreshold > 4 * Bytes.kilobyte && blobsThreshold != Integer.MAX_VALUE) {
 
                 throw new IllegalArgumentException(
                         AbstractTripleStore.Options.BLOBS_THRESHOLD + "="
@@ -732,8 +738,12 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
             indexManager
                     .registerIndex(getId2TermIndexMetadata(getFQN(LexiconKeyOrder.ID2TERM)));
 
-            indexManager
-                    .registerIndex(getBlobsIndexMetadata(getFQN(LexiconKeyOrder.BLOBS)));
+			if (getLexiconConfiguration().getBlobsThreshold() != Integer.MAX_VALUE) {
+
+				// Do not create the BLOBS index if BLOBS support has been disabled.
+				indexManager.registerIndex(getBlobsIndexMetadata(getFQN(LexiconKeyOrder.BLOBS)));
+				
+			}
 
             if (textIndex) {
 
@@ -779,7 +789,10 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
 
             indexManager.dropIndex(getFQN(LexiconKeyOrder.TERM2ID));
             indexManager.dropIndex(getFQN(LexiconKeyOrder.ID2TERM));
-            indexManager.dropIndex(getFQN(LexiconKeyOrder.BLOBS));
+			if (getLexiconConfiguration().getBlobsThreshold() != Integer.MAX_VALUE) {
+				// Destroy BLOBS index IFF it exists.
+				indexManager.dropIndex(getFQN(LexiconKeyOrder.BLOBS));
+			}
 
             term2id = null;
             id2term = null;
@@ -1636,7 +1649,20 @@ public class LexiconRelation extends AbstractRelation<BigdataValue>
         if (blobsThreshold == 0)
             return true;
         
-        return BigdataValueSerializer.getStringLength(v) >= blobsThreshold;
+        final long strlen = BigdataValueSerializer.getStringLength(v);
+        
+		if (strlen >= blobsThreshold) {
+
+			if (lexiconConfiguration.isBlobsDisabled()) {
+
+				throw new IllegalArgumentException("Large literal but BLOBS index is disabled: strlen=" + strlen);
+
+			}
+
+        	return true;
+        }
+        
+        return false;
 
     }
 

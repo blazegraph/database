@@ -437,9 +437,9 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                 runningSubquery = queryEngine.eval(subquery, nextRoundInput
                         .toArray(new IBindingSet[nextRoundInput.size()]));
 
-                long subqueryChunksOut = 0L; // #of chunks read from
-                                             // subquery
-
+                long subqueryChunksOut = 0L; // #of chunks read from subquery
+                long subquerySolutionsOut = 0L; // #of solutions read from subquery
+                
                 try {
 
                     // Declare the child query to the parent.
@@ -457,6 +457,8 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                         final IBindingSet[] chunk = subquerySolutionItr
                                 .next();
 
+                        subqueryChunksOut++;
+                        if (Thread.interrupted()) throw new InterruptedException();
                         for (IBindingSet bs : chunk) {
 
                             /**
@@ -465,7 +467,7 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
                              *      OutOfMemoryError instead of Timeout for
                              *      SPARQL Property Paths </a>
                              */
-                            if (subqueryChunksOut++ % 10 == 0
+                            if (subquerySolutionsOut++ % 10 == 0
                                     && Thread.interrupted()) {
                                 throw new InterruptedException();
                             }
@@ -623,26 +625,22 @@ public class ArbitraryLengthPathTask implements Callable<Void> {
 
             } catch (Throwable t) {
 
-                if (runningSubquery == null
-                        || runningSubquery.getCause() != null) {
-                    /*
-                     * If things fail before we start the subquery, or if a
-                     * subquery fails (due to abnormal termination), then
-                     * propagate the error to the parent and rethrow the
-                     * first cause error out of the subquery.
-                     * 
-                     * Note: IHaltable#getCause() considers exceptions
-                     * triggered by an interrupt to be normal termination.
-                     * Such exceptions are NOT propagated here and WILL NOT
-                     * cause the parent query to terminate.
-                     */
-                    throw new RuntimeException(
-                            ArbitraryLengthPathTask.this.context
-                                    .getRunningQuery().halt(
-                                            runningSubquery == null ? t
-                                                    : runningSubquery
-                                                            .getCause()));
-                }
+                /*
+                 * If things fail before we start the subquery, or if a subquery
+                 * fails (due to abnormal termination), then propagate the error
+                 * to the parent and rethrow the first cause error out of the
+                 * subquery.
+                 * 
+                 * Note: IHaltable#getCause() considers exceptions triggered by
+                 * an interrupt to be normal termination. Such exceptions are
+                 * NOT propagated here and WILL NOT cause the parent query to
+                 * terminate.
+                 */
+                final Throwable cause = (runningSubquery != null && runningSubquery
+                        .getCause() != null) ? runningSubquery.getCause() : t;
+
+                throw new RuntimeException(ArbitraryLengthPathTask.this.context
+                        .getRunningQuery().halt(cause));
 
             } finally {
 

@@ -232,7 +232,7 @@ public class BigdataConnectionTest extends RepositoryConnectionTest {
 
         if (backend != null) {
             if(log.isInfoEnabled() && backend instanceof Journal)
-                log.info(QueryEngineFactory.getExistingQueryController((Journal)backend).getCounters());
+                log.info(QueryEngineFactory.getInstance().getExistingQueryController((Journal)backend).getCounters());
             backend.destroy();
         }
 

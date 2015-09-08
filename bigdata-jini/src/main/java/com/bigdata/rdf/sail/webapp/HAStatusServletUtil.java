@@ -115,7 +115,7 @@ public class HAStatusServletUtil extends HAStatusServletUtilProxy {
 
     final private IIndexManager indexManager;
 
-    protected HAStatusServletUtil(final IIndexManager indexManager) {
+    public HAStatusServletUtil(final IIndexManager indexManager) {
     	
     	super(indexManager);
     	

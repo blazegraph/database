@@ -31,6 +31,7 @@ import com.bigdata.bop.BOp;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.rdf.sparql.ast.ASTBase;
 import com.bigdata.rdf.sparql.ast.GraphPatternGroup;
+import com.bigdata.rdf.sparql.ast.IBindingProducerNode;
 import com.bigdata.rdf.sparql.ast.IGroupMemberNode;
 import com.bigdata.rdf.sparql.ast.IJoinNode;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
@@ -61,7 +62,7 @@ import com.bigdata.rdf.sparql.ast.eval.IEvaluationContext;
 public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
 
 //    private static final Logger log = Logger
-//            .getLogger(ASTJoinOrderByTypeOptimizer.class);
+//            .getLogger(ASTRunFirstRunLastOptimizer.class);
 
     @Override
     public QueryNodeWithBindingSet optimize(
@@ -144,7 +145,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
     		
             for (IGroupMemberNode child : joinGroup) {
             
-            	if (child instanceof IJoinNode) {
+            	if (child instanceof IBindingProducerNode) {
             		
             		final ASTBase join = (ASTBase) child;
             		
@@ -189,7 +190,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
             	
                 int firstJoinIndex = 0;
                 for (int i = 0; i < joinGroup.arity(); i++) {
-                	if (joinGroup.get(i) instanceof IJoinNode) {
+                	if (joinGroup.get(i) instanceof IBindingProducerNode) {
                 		firstJoinIndex = i;
                 		break;
                 	}
@@ -205,7 +206,7 @@ public class ASTRunFirstRunLastOptimizer implements IASTOptimizer {
             	
                 int lastJoinIndex = 0;
                 for (int i = joinGroup.size()-1; i >= 0; i--) {
-                	if (joinGroup.get(i) instanceof IJoinNode) {
+                	if (joinGroup.get(i) instanceof IBindingProducerNode) {
                 		lastJoinIndex = i;
                 		break;
                 	}

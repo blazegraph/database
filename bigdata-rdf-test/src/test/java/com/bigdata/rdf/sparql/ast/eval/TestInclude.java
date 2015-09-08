@@ -151,7 +151,7 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         
         final BigdataValueFactory vf = tripleStore.getValueFactory();
         
-		final QueryEngine queryEngine = QueryEngineFactory
+		final QueryEngine queryEngine = QueryEngineFactory.getInstance()
 				.getQueryController(tripleStore.getIndexManager());
 		
         final ISolutionSetManager sparqlCache = new SolutionSetManager(
@@ -284,7 +284,7 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         
         final BigdataValueFactory vf = tripleStore.getValueFactory();
         
-        final QueryEngine queryEngine = QueryEngineFactory
+        final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getQueryController(tripleStore.getIndexManager());
         
         final ISolutionSetManager sparqlCache = new SolutionSetManager(
@@ -430,7 +430,7 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
         
         final BigdataValueFactory vf = tripleStore.getValueFactory();
         
-		final QueryEngine queryEngine = QueryEngineFactory
+		final QueryEngine queryEngine = QueryEngineFactory.getInstance()
 				.getQueryController(tripleStore.getIndexManager());
 		
         final ISolutionSetManager sparqlCache = new SolutionSetManager(
@@ -612,7 +612,7 @@ public class TestInclude extends AbstractDataDrivenSPARQLTestCase {
 
             final BigdataValueFactory vf = tripleStore.getValueFactory();
 
-            final QueryEngine queryEngine = QueryEngineFactory
+            final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getQueryController(tripleStore.getIndexManager());
 
             final ISolutionSetManager sparqlCache = new SolutionSetManager(

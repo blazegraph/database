@@ -137,7 +137,7 @@ public class TestFederatedQueryEngine extends
         assertNotNull(dataService0);
         assertNull(dataService1);
         
-        queryEngine = QueryEngineFactory.getFederatedQueryController(fed);
+        queryEngine = QueryEngineFactory.getInstance().getFederatedQueryController(fed);
         
 //        dataService0 = fed.getDataService(dataServices[0]); 
 //        dataService1 = fed.getDataService(dataServices[1]); 

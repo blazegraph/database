@@ -201,10 +201,13 @@ public class ListBindingSet implements IBindingSet {
 	}
 	
     /**
-     * Constructor used by unit tests.
-     * @param vars
-     * @param vals
-     */
+	 * Alternative constructor.
+	 * 
+	 * @param vars
+	 *            A copy is made of the data.
+	 * @param vals
+	 *            A copy is made of the data.
+	 */
     @SuppressWarnings("rawtypes")
     public ListBindingSet(final IVariable[] vars, final IConstant[] vals) {
 
