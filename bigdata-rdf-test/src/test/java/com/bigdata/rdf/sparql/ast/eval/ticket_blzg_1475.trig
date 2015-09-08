@@ -1,0 +1,4 @@
+prefix : <http://localhost/>
+{
+  :unbound rdfs:label "unbound" .
+}
