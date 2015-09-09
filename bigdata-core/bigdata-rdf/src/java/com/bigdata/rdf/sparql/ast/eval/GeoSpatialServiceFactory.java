@@ -31,6 +31,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,15 +46,16 @@ import org.openrdf.model.URI;
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.BOpContextBase;
 import com.bigdata.bop.Constant;
-import com.bigdata.bop.IBind;
 import com.bigdata.bop.IBindingSet;
 import com.bigdata.bop.IConstant;
 import com.bigdata.bop.IPredicate;
 import com.bigdata.bop.IVariable;
 import com.bigdata.bop.IVariableOrConstant;
 import com.bigdata.bop.Var;
-import com.bigdata.bop.bindingSet.ListBindingSet;
 import com.bigdata.bop.fed.QueryEngineFactory;
+import com.bigdata.btree.IRangeQuery;
+import com.bigdata.btree.ITuple;
+import com.bigdata.btree.filter.Advancer;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
@@ -64,6 +66,7 @@ import com.bigdata.rdf.internal.impl.TermId;
 import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.sparql.ast.ConstantNode;
 import com.bigdata.rdf.sparql.ast.GlobalAnnotations;
 import com.bigdata.rdf.sparql.ast.GroupNodeBase;
@@ -79,21 +82,23 @@ import com.bigdata.rdf.sparql.ast.service.IServiceOptions;
 import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
+import com.bigdata.rdf.spo.SPO;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
 import com.bigdata.relation.accesspath.IElementFilter;
-import com.bigdata.service.fts.FTS;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
 import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
+import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
 import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
+import cutthecrap.utils.striterators.Striterator;
 
 /**
  * A factory for a geospatial service, see {@link GeoSpatial#SEARCH}.
@@ -473,7 +478,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final Long timeEnd = query.getTimeEnd();
 
          // the literal extension object used for conversion
-         final GeoSpatialLiteralExtension<BigdataValue> litExt = new GeoSpatialLiteralExtension<BigdataValue>(
+         final GeoSpatialLiteralExtension<BigdataValue> litExt = 
+            new GeoSpatialLiteralExtension<BigdataValue>(
                kb.getLexiconRelation());
 
          // construct the bounding boxes and filters, which depend on the
@@ -545,7 +551,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          default:
             throw new RuntimeException("Unknown geospatial search function.");
          }
+         
 
+         
+         
          // set up range scan
          final Var oVar = Var.var(); // object position variable
          final RangeNode range = new RangeNode(new VarNode(oVar),
@@ -587,6 +596,32 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final AccessPath<ISPO> accessPath = (AccessPath<ISPO>) context
                .getAccessPath(relation, pred);
 
+         ////// NEW CODE
+         // calculate the lower 
+         final byte[] lowerZOrderKey = litExt.toZOrderByteArray(lowerBorderComponents);
+         final byte[] upperZOrderKey = litExt.toZOrderByteArray(upperBorderComponents);
+         
+         final BigdataValueFactory vf = kb.getValueFactory();
+
+         System.out.println("FROMKEY=" + litExt.asValue(lowerZOrderKey, vf) );
+         System.out.println("TOKEY=" + litExt.asValue(upperZOrderKey, vf) );
+
+         
+         final Advancer<SPO> bigMinAdvancer = 
+            new ZOrderIndexBigMinAdvancer(
+               lowerZOrderKey, upperZOrderKey, litExt, 1 /* TODO !!!: dynamic calc of z-order string position */);
+         //bigMinAdvancer.addFilter(filter);
+         final Iterator<ITuple> itr = new Striterator(accessPath.getIndex()
+               .rangeIterator(accessPath.getFromKey(), accessPath.getToKey(),//
+                       0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
+                       bigMinAdvancer));
+
+
+         while (itr.hasNext()) {
+            final ITuple next = itr.next();
+            System.out.println();
+         }
+         
          // TODO: use accessPath.solutions(...), which is an iterator already
          return new ISPOIteratorWrapper(
             accessPath.iterator(), Var.var(vars[0].getName()),
@@ -1042,7 +1077,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             if (oIV instanceof LiteralExtensionIV) {
                final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
 
-               long[] longArr = litExt.asLongArray(lit, null);
+               long[] longArr = litExt.asLongArray(lit);
                final Object[] components = litExt
                      .longArrAsComponentArr(longArr);
 

@@ -152,6 +152,31 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return new LiteralExtensionIV(delegate, datatype.getIV());
    }
 
+   public int getNumDimensions() {
+      return sd.getNumDimensions();
+   }
+   
+   // NEW (TODO: describe)
+   public byte[] toZOrderByteArray(final LiteralExtensionIV iv) {
+      
+      final long[] componentsAsLongArr = asLongArray(iv);
+
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+
+      return unsignedToTwosComplement(zOrderByteArray);
+
+   }
+   
+   public byte[] toZOrderByteArray(Object[] components) {
+      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
+
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+
+      return unsignedToTwosComplement(zOrderByteArray);
+
+   }
+   
+   
 
    /**
     * Decodes an xsd:integer into an n-dimensional string of the form 
@@ -161,15 +186,34 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    @Override
    public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
       
-      final long[] componentsAsLongArr = asLongArray(iv, vf);
+      final long[] componentsAsLongArr = asLongArray(iv);
       
       final String litStr = longArrAsComponentString(componentsAsLongArr);
       
       return (V) vf.createLiteral(litStr, datatype);
    }
    
+   /**
+    * Convert a key into the target literal.
+    * 
+    * @param key
+    * @return
+    */
+   @SuppressWarnings("unchecked")
+   public V asValue(byte[] key, final BigdataValueFactory vf) {
+    
+      byte[] bigIntAsByteArrUnsigned = twosComplementToUnsigned(key);
+      
+      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned, sd);
+
+      final String litStr = longArrAsComponentString(componentsAsLongArr);
+      
+      return (V) vf.createLiteral(litStr, datatype);
+
+   }
+   
    @SuppressWarnings("rawtypes")
-   public long[] asLongArray(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
+   public long[] asLongArray(final LiteralExtensionIV iv) {
 
       if (!datatype.getIV().equals(iv.getExtensionIV())) {
          throw new IllegalArgumentException("unrecognized datatype");
@@ -417,7 +461,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * not harm) yet makes sure that the array is an unsigned value, for which
     * the two's complement representation does not differ.
     */
-   byte[] unsignedToTwosComplement(byte[] arr) {
+   public byte[] unsignedToTwosComplement(byte[] arr) {
       byte[] ret = new byte[arr.length+1];
       
       // ret[0] = 0 by construction
@@ -432,7 +476,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    /**
     * Reverts method {{@link #unsignedToTwosComplement(byte[])}.
     */
-   byte[] twosComplementToUnsigned(byte[] arr) {
+   public byte[] twosComplementToUnsigned(byte[] arr) {
       
       byte[] ret = new byte[arr.length-1];
       
