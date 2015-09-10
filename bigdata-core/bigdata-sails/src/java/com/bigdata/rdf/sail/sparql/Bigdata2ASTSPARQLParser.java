@@ -451,7 +451,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
              */
             queryRoot.setPrefixDecls(prefixes);
             
-            BigdataExprBuilder.verifyAggregate(queryRoot);
+            VerifyAggregates.verifyAggregate(queryRoot);
 
             ast.setQueryParseTime(System.nanoTime() - startTime);
             return ast;
