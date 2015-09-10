@@ -4,6 +4,8 @@ package com.bigdata.rdf.sail.sparql.ast;
 
 import org.openrdf.rio.RDFParser.DatatypeHandling;
 
+import com.bigdata.rdf.rio.RDFParserOptions;
+
 public
 class ASTLoad extends ASTUpdate {
 
