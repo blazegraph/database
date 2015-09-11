@@ -76,6 +76,7 @@ import com.bigdata.rdf.sail.sparql.ast.ASTRDFValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTString;
 import com.bigdata.rdf.sail.sparql.ast.ASTTrue;
 import com.bigdata.rdf.sail.sparql.ast.VisitorException;
+import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.store.BD;
 
 /**
@@ -150,25 +151,11 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
      * @throws MalformedQueryException
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public void processOnPrepareEvaluate(final ASTOperationContainer qc, final BigdataASTContext context)
+    public void processOnPrepareEvaluate(final QueryRoot qc, final BigdataASTContext context)
             throws MalformedQueryException {
         
         valueFactory = context.valueFactory;
         
-        try {
-
-            /*
-             * Collect all ASTRDFValue nodes into a map, paired with
-             * BigdataValue objects.
-             */
-            qc.jjtAccept(new RDFValueResolver(), null);
-            
-        } catch (VisitorException e) {
-            
-            // Turn the exception into a Query exception.
-            throw new MalformedQueryException(e);
-            
-        }
 
         /*
          * Build up the vocabulary. This is everything in the parse tree plus

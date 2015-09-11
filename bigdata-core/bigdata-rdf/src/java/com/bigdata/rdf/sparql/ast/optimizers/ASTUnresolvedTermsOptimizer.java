@@ -168,6 +168,11 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         final IQueryNode queryNode = input.getQueryNode();
         final IBindingSet[] bindingSets = input.getBindingSets();     
 
+        if (queryNode instanceof QueryRoot) {
+            fillInIV(context, ((QueryRoot)queryNode).getDataset());
+            
+        }
+
         if (queryNode instanceof UpdateRoot) {
             final UpdateRoot updateRoot = (UpdateRoot) queryNode;
             resolveGroupsWithUnknownTerms(context, updateRoot);
@@ -175,7 +180,7 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
         } else if (queryNode instanceof QueryBase) {
     
             final QueryBase queryRoot = (QueryBase) queryNode;
-    
+            
             // SELECT clause
             {
                 ProjectionNode projection = queryRoot.getProjection();
@@ -455,10 +460,8 @@ public class ASTUnresolvedTermsOptimizer implements IASTOptimizer {
             resolveGroupsWithUnknownTerms(context, ((QuadsDataOrNamedSolutionSet)bop).getQuadData());
         } else if (bop instanceof DatasetNode) {
             final DatasetNode dataset = ((DatasetNode) bop);
-            final Iterator<IV> defaultGraphs = dataset.getDefaultGraphs().getGraphs().iterator();
             final Set<IV> newDefaultGraphs = new HashSet<IV>();
-            while(defaultGraphs.hasNext()) {
-                final IV iv = defaultGraphs.next();
+            for(IV iv: dataset.getDefaultGraphs().getGraphs()) {
                 final IV newValue = resolveConstant(context, iv.getValue());
                 if (newValue!=null) {
                     newDefaultGraphs.add(newValue);

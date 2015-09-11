@@ -27,7 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.rdf.sparql.ast;
 
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,6 +37,7 @@ import org.openrdf.query.algebra.StatementPattern.Scope;
 
 import com.bigdata.bop.BOp;
 import com.bigdata.bop.IVariable;
+import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdateContainer;
 
 /**
@@ -94,17 +97,21 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
          * The {@link Scope} (required for operations which have this concept).
          */
         String SCOPE = "scope";
+        
+        /**
+         * Reference to ASTDatasetClause list for operations deferred until evaluation stage
+         */
+        String DATASET_CLAUSES = "datasetClauses";
  
     }
 
-    private ASTUpdateContainer updateContainer;
-    
     /**
      * 
      */
     public Update(final UpdateType updateType) {
 
         setProperty(Annotations.UPDATE_TYPE, updateType);
+        setProperty(Annotations.DATASET_CLAUSES, Collections.emptyList());
 
     }
 
@@ -200,12 +207,15 @@ abstract public class Update extends GroupMemberNodeBase<IGroupMemberNode> {
        return new HashSet<IVariable<?>>();
     }
 
-    public void setUpdateContainer(ASTUpdateContainer uc) {
-        this.updateContainer = uc;
+    public void setDatasetClauses(List<ASTDatasetClause> uc) {
+        if (uc!=null && !uc.isEmpty()) {
+            setProperty(Annotations.DATASET_CLAUSES, uc);
+        }
     }
 
-    public ASTUpdateContainer getUpdateContainer() {
-        return updateContainer;
+    @SuppressWarnings("unchecked")
+    public List<ASTDatasetClause> getDatasetClauses() {
+        return (List<ASTDatasetClause>) getProperty(Annotations.DATASET_CLAUSES);
     }
     
 }
