@@ -39,9 +39,6 @@ import com.bigdata.bop.BOpUtility;
 import com.bigdata.bop.Bind;
 import com.bigdata.bop.IValueExpression;
 import com.bigdata.bop.IVariable;
-import com.bigdata.bop.aggregate.AggregateBase;
-import com.bigdata.rdf.internal.IV;
-import com.bigdata.rdf.sparql.ast.FunctionRegistry.UnknownFunctionBOp;
 
 /**
  * AST node modeling projected value expressions.
@@ -359,43 +356,12 @@ public class ProjectionNode extends ValueExpressionListBaseNode<AssignmentNode> 
         
         for (AssignmentNode n : this) {
 
-            IValueExpression expr = n.getValueExpression();
-
-            // Replacing unresolvedFunctionNodes with specific AggregateBase to be able
-            // to check for aggregates in com.bigdata.bop.solutions.GroupByState.isAggregate
-            IValueExpressionNode exprNode = n.getValueExpressionNode();
-            if (expr == null && exprNode instanceof FunctionNode) {
-                if (FunctionRegistry.isAggregate(((FunctionNode) exprNode).getFunctionURI()) || isAggregate(((FunctionNode) exprNode).args())) {
-                    List<BOp> args = ((FunctionNode) exprNode).args();
-                    expr = new AggregateBase<IV>(args.toArray(new BOp[args.size()]), null) {
-                        @Override public void reset() {}
-                        @Override public IV done() { return null; }
-                    };
-                } else {
-                    List<BOp> args = ((FunctionNode) exprNode).args();
-                    expr = new UnknownFunctionBOp(args.toArray(new BOp[args.size()]), null);
-                }
-
-            }
-
-            exprs[i++] = new Bind(n.getVar(), expr);
+            exprs[i++] = new Bind(n.getVar(), n.getValueExpression());
 
         }
         
         return exprs;
         
-    }
-
-    private boolean isAggregate(List<BOp> args) {
-        for (BOp arg: args) {
-            if (arg instanceof FunctionNode) {
-                FunctionNode functionNode = (FunctionNode) arg;
-                if (FunctionRegistry.isAggregate(functionNode.getFunctionURI()) || isAggregate(functionNode.args())) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     public String toString(final int indent) {

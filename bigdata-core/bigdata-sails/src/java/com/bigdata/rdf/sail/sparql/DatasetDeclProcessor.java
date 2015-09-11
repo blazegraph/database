@@ -15,6 +15,7 @@ import org.openrdf.query.MalformedQueryException;
 
 import com.bigdata.rdf.internal.IV;
 import com.bigdata.rdf.model.BigdataURI;
+import com.bigdata.rdf.model.BigdataValue;
 import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
 import com.bigdata.rdf.sail.sparql.ast.ASTIRI;
 import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
@@ -55,7 +56,7 @@ public class DatasetDeclProcessor {
      *            graphs. Otherwise, it will be added to the set of graphs in
      *            the default graph.
      */
-    private void addGraph(final IV<?,?> graph, final boolean named) {
+    private void addGraph(final BigdataASTContext context, final IV<?,?> graph, final boolean named) {
 
         if (graph == null)
             throw new IllegalArgumentException();
@@ -91,26 +92,13 @@ public class DatasetDeclProcessor {
      * @throws MalformedQueryException
      *             If DatasetClause does not contain a valid URI.
      */
-    public DatasetNode process(final ASTOperationContainer qc, final BigdataASTContext context)
+    public DatasetNode process(final List<ASTDatasetClause> datasetClauses, final BigdataASTContext context, boolean update)
             throws MalformedQueryException {
-
-        final boolean update = qc instanceof ASTUpdateContainer;
-        
-        final ASTOperation op = qc.getOperation();
-
-        if(op == null) {
-
-            // Allowed for some negative syntax tests.
-            return null;
-            
-        }
-        
-        final List<ASTDatasetClause> datasetClauses = op.getDatasetClauseList();
 
         // Lazily resolved.
         BigdataURI virtualGraph = null;
 
-        if (!datasetClauses.isEmpty()) {
+        if (datasetClauses!=null && !datasetClauses.isEmpty()) {
 
 //          dataset = new DatasetImpl();
             
@@ -130,7 +118,18 @@ public class DatasetDeclProcessor {
                      * Note: This is the URI with the IV already resolved.
                      */
 //                  URI uri = new URIImpl(astIri.getValue());
-                    final BigdataURI uri = (BigdataURI) astIri.getRDFValue();
+                    BigdataURI uri = context.tripleStore.getValueFactory().asValue((BigdataURI) astIri.getRDFValue());
+                    if (uri!=null && uri.getIV()==null) {
+                        IV resolvedIV = context.tripleStore.getIV(uri);
+                        if (resolvedIV!=null) {
+                            uri.setIV(resolvedIV);
+                            resolvedIV.setValue(uri);
+                        } else {
+                            uri = (BigdataURI) astIri.getRDFValue();
+                        }
+                        
+                    }
+
 
                     if (dc.isVirtual()) {
 
@@ -173,16 +172,17 @@ public class DatasetDeclProcessor {
                         
                         while(itr.hasNext()) {
 
-                            final IV<?,?> memberGraph = itr.next().o();
-                            
-                            addGraph(memberGraph, dc.isNamed());
+                            final IV memberGraph = itr.next().o();
+                            BigdataValue value = context.lexicon.getTerm(memberGraph);
+                            memberGraph.setValue(value);
+                            addGraph(context, memberGraph, dc.isNamed());
 
                         }
                         
                     } else {
 
                         if (uri.getIV() != null)
-                            addGraph(uri.getIV(), dc.isNamed());
+                            addGraph(context, uri.getIV(), dc.isNamed());
 
                     }
 

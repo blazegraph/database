@@ -50,6 +50,8 @@ import org.openrdf.query.parser.sparql.SPARQLParser;
 
 import com.bigdata.bop.BOpUtility;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.sail.sparql.ast.ASTDatasetClause;
+import com.bigdata.rdf.sail.sparql.ast.ASTOperation;
 import com.bigdata.rdf.sail.sparql.ast.ASTPrefixDecl;
 import com.bigdata.rdf.sail.sparql.ast.ASTQueryContainer;
 import com.bigdata.rdf.sail.sparql.ast.ASTUpdate;
@@ -310,7 +312,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
                     final Update updateOp = (Update) updateNode.jjtAccept(
                             updateExprBuilder, null/* data */);
                     
-                    updateOp.setUpdateContainer(uc);
+                    updateOp.setDatasetClauses(updateNode.getDatasetClauseList());
 
                     updateRoot.addChild(updateOp);
 
@@ -355,8 +357,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
          * which it is given.
          */
         for (Update update: qc.getChildren()) {
-            ASTUpdateContainer uc = update.getUpdateContainer();
-            final DatasetNode dataSetNode = new DatasetDeclProcessor().process(uc, new BigdataASTContext(store));
+            final DatasetNode dataSetNode = new DatasetDeclProcessor().process(update.getDatasetClauses(), new BigdataASTContext(store), true);
             
                 if (dataSetNode != null) {
         
@@ -575,21 +576,13 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
     
     public void preEvaluate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
 
-        //QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
+        QueryRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
         ASTQueryContainer qc = (ASTQueryContainer)ast.getProperty(Annotations.PARSE_TREE);
-        if (qc==null) {
-            System.err.println("No parse tree" + ast);
-            return;
-        }
         
         BatchRDFValueResolver resolver = new BatchRDFValueResolver(true/* readOnly */);
         
         BigdataASTContext context = new BigdataASTContext(store);
-        resolver.processOnPrepareEvaluate(qc, context);
-
-        // TODO: DO NOT!
-//        final QueryRoot queryRoot = buildQueryModel(ac, resolver.getValues());
-        final QueryRoot queryRoot = ast.getOriginalAST();
+        resolver.processOnPrepareEvaluate(queryRoot, context);
 
         /*
          * Handle dataset declaration
@@ -607,7 +600,7 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
          * Note: This handles VIRTUAL GRAPH resolution.
          */
         final DatasetNode dataSetNode = new DatasetDeclProcessor()
-                .process(qc, context);
+                .process(qc.getOperation().getDatasetClauseList(), context, false);
 
         if (dataSetNode != null) {
 

@@ -56,6 +56,7 @@ import com.bigdata.rdf.sail.sparql.BigdataExprBuilder;
 import com.bigdata.rdf.sail.sparql.ast.Node;
 import com.bigdata.rdf.sail.sparql.ast.SimpleNode;
 import com.bigdata.rdf.sparql.ast.ASTContainer;
+import com.bigdata.rdf.sparql.ast.CreateGraph.Annotations;
 import com.bigdata.rdf.sparql.ast.IQueryNode;
 import com.bigdata.rdf.sparql.ast.QueryRoot;
 import com.bigdata.rdf.sparql.ast.UpdateRoot;
@@ -329,6 +330,20 @@ public class AbstractBigdataExprBuilderTestCase extends TestCase {
             }
             
         }
+        if (actual instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)actual).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
+        if (expected instanceof UpdateRoot) {
+            // ignore ASTDatasetClause annotation in actual result, as tests are not configuring expected values
+            for (BOp x: ((UpdateRoot)expected).args()) {
+                x.setProperty(Annotations.DATASET_CLAUSES, null);
+            }
+        }
+        
 
         if (!expected.equals(actual)) {
 
