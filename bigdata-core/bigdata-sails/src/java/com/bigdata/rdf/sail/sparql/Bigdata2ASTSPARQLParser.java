@@ -333,20 +333,6 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
 
     }
 
-//    public void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
-//
-//        UpdateRoot queryRoot = (QueryRoot)ast.getProperty(Annotations.ORIGINAL_AST);
-////        Object parseTree = ast.getProperty(Annotations.PARSE_TREE);
-//        if (parseTree instanceof ASTUpdateSequence) {
-//            for (ASTUpdateContainer uc: ((ASTUpdateSequence)parseTree).getUpdateContainers()) {
-//                preUpdate(store,ast,uc);
-//            }
-//            return;
-//        } else if (ast instanceof UpdateRoot) {
-//            ASTUpdateContainer qc = (ASTUpdateContainer)parseTree;
-//            preUpdate(store,ast,qc);
-//        }
-//    }
     public void preUpdate(AbstractTripleStore store, ASTContainer ast) throws MalformedQueryException {
 
         UpdateRoot qc = (UpdateRoot)ast.getProperty(Annotations.ORIGINAL_AST);
@@ -357,7 +343,8 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
          * which it is given.
          */
         for (Update update: qc.getChildren()) {
-            final DatasetNode dataSetNode = new DatasetDeclProcessor().process(update.getDatasetClauses(), new BigdataASTContext(store), true);
+            final DatasetNode dataSetNode = new DatasetDeclProcessor(new BigdataASTContext(store))
+                .process(update.getDatasetClauses(), true);
             
                 if (dataSetNode != null) {
         
@@ -599,13 +586,15 @@ public class Bigdata2ASTSPARQLParser implements QueryParser {
          * 
          * Note: This handles VIRTUAL GRAPH resolution.
          */
-        final DatasetNode dataSetNode = new DatasetDeclProcessor()
-                .process(qc.getOperation().getDatasetClauseList(), context, false);
-
-        if (dataSetNode != null) {
-
-            queryRoot.setDataset(dataSetNode);
-
+        if (qc!=null && qc.getOperation()!=null) {
+            final DatasetNode dataSetNode = new DatasetDeclProcessor(context)
+                .process(qc.getOperation().getDatasetClauseList(), false);
+    
+            if (dataSetNode != null) {
+    
+                queryRoot.setDataset(dataSetNode);
+    
+            }
         }
         
         /*

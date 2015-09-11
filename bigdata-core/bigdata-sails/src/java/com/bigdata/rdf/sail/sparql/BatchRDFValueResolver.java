@@ -169,7 +169,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             final Map<Value, BigdataValue> vocab = context.vocab;
             this.vocab = vocab;
 
-        // RDF Collection syntactic sugar vocabulary items.
+            // RDF Collection syntactic sugar vocabulary items.
             vocab.put(RDF.FIRST, f.asValue(RDF.FIRST));
             vocab.put(RDF.REST, f.asValue(RDF.REST));
             vocab.put(RDF.NIL, f.asValue(RDF.NIL));
@@ -277,7 +277,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
              * Collect all ASTRDFValue nodes into a map, paired with
              * BigdataValue objects.
              */
-            qc.jjtAccept(new RDFValuePrepareResolver(), null);
+            qc.jjtAccept(new RDFValueResolver(), null);
             
         } catch (VisitorException e) {
             
@@ -510,7 +510,7 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
      * FIXME Should this be using the {@link LexiconConfiguration} to create
      * appropriate inline {@link IV}s when and where appropriate?
      */
-    private class RDFValuePrepareResolver extends ASTVisitorBase {
+    private class RDFValueResolver extends ASTVisitorBase {
 
         @Override
         public Object visit(final ASTQName node, final Object data)
@@ -570,146 +570,6 @@ public class BatchRDFValueResolver extends ASTVisitorBase {
             if (datatypeNode != null) {
 
                 final URI datatype;
-
-                try {
-
-                    datatype = valueFactory.createURI(datatypeNode.getValue());
-
-                } catch (IllegalArgumentException e) {
-
-                    // invalid URI
-                    throw new VisitorException(e);
-
-                }
-
-                literal = valueFactory.createLiteral(label, datatype);
-
-            } else if (lang != null) {
-
-                literal = valueFactory.createLiteral(label, lang);
-
-            } else {
-
-                literal = valueFactory.createLiteral(label);
-
-            }
-
-            nodes.put(node, literal);
-
-            return null;
-
-        }
-
-        @Override
-        public Void visit(final ASTNumericLiteral node, final Object data)
-                throws VisitorException {
-
-            nodes.put(
-                    node,
-                    valueFactory.createLiteral(node.getValue(),
-                            node.getDatatype()));
-
-            return null;
-
-        }
-
-        @Override
-        public Void visit(final ASTTrue node, final Object data)
-                throws VisitorException {
-
-            nodes.put(node, valueFactory.createLiteral(true));
-
-            return null;
-
-        }
-
-        @Override
-        public Void visit(final ASTFalse node, final Object data)
-                throws VisitorException {
-
-            nodes.put(node, valueFactory.createLiteral(false));
-
-            return null;
-
-        }
-
-        /**
-         * Note: This supports the visitor method for a Literal.
-         */
-        @Override
-        public String visit(final ASTString node, final Object data)
-                throws VisitorException {
-
-            return node.getValue();
-
-        }
-
-    }
-
-    /**
-     * FIXME Should this be using the {@link LexiconConfiguration} to create
-     * appropriate inline {@link IV}s when and where appropriate?
-     */
-    private class RDFValueResolver extends ASTVisitorBase {
-
-        @Override
-        public Object visit(final ASTQName node, final Object data)
-                throws VisitorException {
-
-            throw new VisitorException(
-                    "QNames must be resolved before resolving RDF Values");
-
-        }
-
-        /**
-         * Note: Blank nodes within a QUERY are treated as anonymous variables,
-         * even when we are in a told bnodes mode.
-         */
-        @Override
-        public Object visit(final ASTBlankNode node, final Object data)
-                throws VisitorException {
-            
-            throw new VisitorException(
-                    "Blank nodes must be replaced with variables before resolving RDF Values");
-            
-        }
-
-        @Override
-        public Void visit(final ASTIRI node, final Object data)
-                throws VisitorException {
-
-            try {
-
-                nodes.put(node, valueFactory.createURI(node.getValue()));
-
-                return null;
-
-            } catch (IllegalArgumentException e) {
-
-                // invalid URI
-                throw new VisitorException(e.getMessage());
-
-            }
-
-        }
-
-        @Override
-        public Void visit(final ASTRDFLiteral node, final Object data)
-                throws VisitorException {
-
-            // Note: This is handled by this ASTVisitor (see below in this
-            // class).
-            final String label = (String) node.getLabel().jjtAccept(this, null);
-
-            final String lang = node.getLang();
-
-            final ASTIRI datatypeNode = node.getDatatype();
-
-            final BigdataLiteral literal;
-
-            if (datatypeNode != null) {
-
-                final BigdataURI datatype;
 
                 try {
 
