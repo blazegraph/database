@@ -38,6 +38,8 @@ import com.bigdata.relation.accesspath.IAccessPath;
  */
 public class DatasetDeclProcessor {
 
+    private final BigdataASTContext context;
+
     /*
      * Lazily instantiated sets for the default and named graphs.
      */
@@ -56,7 +58,7 @@ public class DatasetDeclProcessor {
      *            graphs. Otherwise, it will be added to the set of graphs in
      *            the default graph.
      */
-    private void addGraph(final BigdataASTContext context, final IV<?,?> graph, final boolean named) {
+    private void addGraph(final IV<?,?> graph, final boolean named) {
 
         if (graph == null)
             throw new IllegalArgumentException();
@@ -79,7 +81,10 @@ public class DatasetDeclProcessor {
 
     }
 
-    public DatasetDeclProcessor() {
+    public DatasetDeclProcessor(final BigdataASTContext context) {
+        
+        this.context = context;
+        
     }
     
         /**
@@ -92,7 +97,7 @@ public class DatasetDeclProcessor {
      * @throws MalformedQueryException
      *             If DatasetClause does not contain a valid URI.
      */
-    public DatasetNode process(final List<ASTDatasetClause> datasetClauses, final BigdataASTContext context, boolean update)
+    public DatasetNode process(final List<ASTDatasetClause> datasetClauses, boolean update)
             throws MalformedQueryException {
 
         // Lazily resolved.
@@ -175,14 +180,14 @@ public class DatasetDeclProcessor {
                             final IV memberGraph = itr.next().o();
                             BigdataValue value = context.lexicon.getTerm(memberGraph);
                             memberGraph.setValue(value);
-                            addGraph(context, memberGraph, dc.isNamed());
+                            addGraph(memberGraph, dc.isNamed());
 
                         }
                         
                     } else {
 
                         if (uri.getIV() != null)
-                            addGraph(context, uri.getIV(), dc.isNamed());
+                            addGraph(uri.getIV(), dc.isNamed());
 
                     }
 
