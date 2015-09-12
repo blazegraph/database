@@ -56,8 +56,10 @@ import com.bigdata.bop.fed.QueryEngineFactory;
 import com.bigdata.btree.IRangeQuery;
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.filter.Advancer;
+import com.bigdata.btree.filter.TupleFilter;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.rdf.internal.IV;
+import com.bigdata.rdf.internal.IVUtility;
 import com.bigdata.rdf.internal.constraints.RangeBOp;
 import com.bigdata.rdf.internal.gis.CoordinateDD;
 import com.bigdata.rdf.internal.gis.CoordinateUtility;
@@ -95,9 +97,9 @@ import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
-import com.bigdata.striterator.IChunkedOrderedIterator;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
+import cutthecrap.utils.striterators.Resolver;
 import cutthecrap.utils.striterators.Striterator;
 
 /**
@@ -484,8 +486,9 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
          // construct the bounding boxes and filters, which depend on the
          // function that is specified through the query
-         final Object[] lowerBorderComponents;
-         final Object[] upperBorderComponents;
+         // TOOD: make final
+         Object[] lowerBorderComponents;
+         Object[] upperBorderComponents;
          final IElementFilter<ISPO> filter;
 
          switch (query.getSearchFunction()) {
@@ -553,7 +556,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          }
          
 
-         
+         // TODO: remove this code again!!!
+         lowerBorderComponents = new Object[]{ (long)(double)lowerBorderComponents[0], (long)(double)lowerBorderComponents[1] };
+         upperBorderComponents = new Object[]{ (long)(double)upperBorderComponents[0], (long)(double)upperBorderComponents[1] };
+         // end TODO
          
          // set up range scan
          final Var oVar = Var.var(); // object position variable
@@ -596,87 +602,74 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final AccessPath<ISPO> accessPath = (AccessPath<ISPO>) context
                .getAccessPath(relation, pred);
 
-         ////// NEW CODE
-         // calculate the lower 
+
          final byte[] lowerZOrderKey = litExt.toZOrderByteArray(lowerBorderComponents);
          final byte[] upperZOrderKey = litExt.toZOrderByteArray(upperBorderComponents);
          
          final BigdataValueFactory vf = kb.getValueFactory();
 
-         System.out.println("FROMKEY=" + litExt.asValue(lowerZOrderKey, vf) );
-         System.out.println("TOKEY=" + litExt.asValue(upperZOrderKey, vf) );
+//         System.out.println("FROMKEY=" + litExt.asValue(lowerZOrderKey, vf) );
+//         System.out.println("TOKEY=" + litExt.asValue(upperZOrderKey, vf) );
 
-         
+         // extract position of subject and object in index
+         // TODO: are there convenience methods to do this?
+         final String indexName = 
+            accessPath.getIndex().getIndexMetadata().getName();
+         final String indexShortName = 
+            indexName.substring(indexName.lastIndexOf(".")+1);
+         final int subjectPos = indexShortName.indexOf("S");
+         final int objectPos = indexShortName.indexOf("O");
+                  
          final Advancer<SPO> bigMinAdvancer = 
             new ZOrderIndexBigMinAdvancer(
-               lowerZOrderKey, upperZOrderKey, litExt, 1 /* TODO !!!: dynamic calc of z-order string position */);
+               lowerZOrderKey, upperZOrderKey, litExt, objectPos, vf);
          //bigMinAdvancer.addFilter(filter);
-         final Iterator<ITuple> itr = new Striterator(accessPath.getIndex()
-               .rangeIterator(accessPath.getFromKey(), accessPath.getToKey(),//
-                       0/* capacity */, IRangeQuery.KEYS | IRangeQuery.CURSOR,
-                       bigMinAdvancer));
-
-
-         while (itr.hasNext()) {
-            final ITuple next = itr.next();
-            System.out.println();
-         }
          
-         // TODO: use accessPath.solutions(...), which is an iterator already
-         return new ISPOIteratorWrapper(
-            accessPath.iterator(), Var.var(vars[0].getName()),
-            query.getIncomingBindings());
-      }
+         final Var var = Var.var(vars[0].getName());
+         final IBindingSet incomingBindingSet = query.getIncomingBindings();
+         final Iterator<IBindingSet> itr = 
+            new Striterator(accessPath.getIndex().rangeIterator(
+               accessPath.getFromKey(), accessPath.getToKey(), 0/* capacity */, 
+               IRangeQuery.KEYS | IRangeQuery.CURSOR, bigMinAdvancer))
+                  .addFilter(new TupleFilter() {
 
+                     private static final long serialVersionUID = -4577110008838036545L;
+
+                     @Override
+                     protected boolean isValid(ITuple tuple) {
+                        System.out.println("[TupleFilter] " + tuple);
+                        
+                        return true;
+                     }
+                        
+                  }).addFilter(new Resolver() {
+
+                     private static final long serialVersionUID = 1L;
+                          
+                     /**
+                       * Resolve tuple to IV.
+                       */
+                     @Override
+                     protected IBindingSet resolve(final Object obj) {
+
+                        final byte[] key = ((ITuple<?>) obj).getKey();
+                             
+                        final IV[] ivs = IVUtility.decode(key, subjectPos+1);
+
+                        final IBindingSet bs = incomingBindingSet.clone();
+                        bs.set(var, new Constant<IV>(ivs[subjectPos]));
+
+                        return bs;
+
+                     }
+                  }
+               );
+
+         return (ICloseableIterator<IBindingSet>)itr;
+      }
    }
-
-   public static class ISPOIteratorWrapper implements
-         ICloseableIterator<IBindingSet> {
-
-      private final IChunkedOrderedIterator<ISPO> delegate;
-      @SuppressWarnings("rawtypes")
-      private final Var var;
-      
-      private final IBindingSet incomingBindingSet; 
-
-      @SuppressWarnings("rawtypes")
-      public ISPOIteratorWrapper(final IChunkedOrderedIterator<ISPO> delegate,
-            final Var var, final IBindingSet incomingBindingSet) {
-
-         this.delegate = delegate;
-         this.var = var;
-         this.incomingBindingSet = incomingBindingSet;
-      }
-
-      @Override
-      public boolean hasNext() {
-         return delegate.hasNext();
-      }
-
-      @SuppressWarnings("rawtypes")
-      @Override
-      public IBindingSet next() {
-
-         final ISPO elem = delegate.next();
-
-         final IBindingSet bs = incomingBindingSet.clone();
-         bs.set(var, new Constant<IV>(elem.s()));
-
-         return bs;
-      }
-
-      @Override
-      public void remove() {
-         delegate.remove();
-      }
-
-      @Override
-      public void close() {
-         delegate.close();
-      }
-
-   }
-
+   
+   
    /**
     * Iterates a geospatial search over a set of input bindings. This is done
     * incrementally, in a binding by binding fashion.
@@ -1240,4 +1233,5 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       return requiredBound;
    }
+   
 }
