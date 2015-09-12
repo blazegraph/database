@@ -37,6 +37,7 @@ import com.bigdata.rdf.internal.impl.extensions.GeoSpatialLiteralExtension;
 import com.bigdata.rdf.internal.impl.literal.LiteralExtensionIV;
 import com.bigdata.rdf.model.BigdataLiteral;
 import com.bigdata.rdf.model.BigdataValue;
+import com.bigdata.rdf.model.BigdataValueFactory;
 import com.bigdata.rdf.spo.SPO;
 import com.bigdata.util.BytesUtil;
 
@@ -51,33 +52,58 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
 
    private static final long serialVersionUID = -6438977707376228799L;
 
-   private final byte[] searchMin;
+   // Search min (upper left) byte array as z-order string (as unsigned)
+   private final byte[] searchMinZOrder;
+
+   // the long values representing search min's values in the dimensions
+   private final long[] seachMinLong;
    
-   private final byte[] searchMax;
+   // Search max (lower right) byte array as z-order string (as unsigned)
+   private final byte[] searchMaxZOrder;
    
+   // the long values representing search max's values in the dimensions
+   private final long[] seachMaxLong;
+
+   // the position within the index in which we find the zOrderComponent
    private final int zOrderComponentPos;
    
+   // the GeoSpatialLiteralExtension object
    private final GeoSpatialLiteralExtension<BigdataValue> litExt;
+   
+   // value factory
+   private final BigdataValueFactory vf;
+   
    
    private transient IKeyBuilder keyBuilder;
 
    public ZOrderIndexBigMinAdvancer(
-      final byte[] searchMin, /* the minimum search key (top left) */
-      final byte[] searchMax, /* the maximum search key (bottom right) */
+      final byte[] searchMinZOrder, /* the minimum search key (top left) */
+      final byte[] searchMaxZOrder, /* the maximum search key (bottom right) */
       final GeoSpatialLiteralExtension<BigdataValue> litExt,
-      final int zOrderComponentPos /* position of the zOrder in the index */) {
+      final int zOrderComponentPos /* position of the zOrder in the index */,
+      final BigdataValueFactory vf) {
 
+      // TODO: is the decoding here incorrect? but we want to operator on top of these values...
       this.litExt = litExt;
-      this.searchMin = litExt.twosComplementToUnsigned(searchMin);
-      this.searchMax = litExt.twosComplementToUnsigned(searchMax);
+      this.searchMinZOrder = litExt.unpadLeadingZero(searchMinZOrder);
+      this.seachMinLong = litExt.fromZOrderByteArray(this.searchMinZOrder);
+      
+      this.searchMaxZOrder = litExt.unpadLeadingZero(searchMaxZOrder);
+      this.seachMaxLong = litExt.fromZOrderByteArray(this.searchMaxZOrder);
+      
       this.zOrderComponentPos = zOrderComponentPos;
+      this.vf = vf;
            
    }
 
    @Override
    protected void advance(final ITuple<SPO> tuple) {
+      System.out.println("[Advancor]    " + tuple);
 
-      // check if the current tuple represents a match in the boundary box
+      // if we're beyond the end, nothing to do
+      if (tuple==null) {
+         return;
+      }
       
       if (keyBuilder == null) {
 
@@ -106,33 +132,53 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       for (int i=0; i<ivs.length-1; i++) {
          IVUtility.encode(keyBuilder, ivs[i]);
       }
-      
-      // calculate bigmin over the z-order component
+
+      // this is the z-order literal
       @SuppressWarnings("unchecked")
-      byte[] bigMin = 
-         calculateBigMin(
-            (LiteralExtensionIV<BigdataLiteral>)ivs[ivs.length-1] /* current z-order string */);
+      final LiteralExtensionIV<BigdataLiteral> zOrderIv = 
+         (LiteralExtensionIV<BigdataLiteral>)ivs[ivs.length-1];
       
-      // TODO: is this correct?
-      keyBuilder.append(litExt.unsignedToTwosComplement(bigMin));
+      // current record (aka dividing record) as unsigned
+      final byte[] dividingRecord = 
+         litExt.unpadLeadingZero(litExt.toZOrderByteArray(zOrderIv));
       
-      System.out.println();
-//
-//      /*
-//       * new approach.
-//       */
-//
-//      final byte[] key = tuple.getKey();
-//
-//      keyBuilder.reset();
-//
-//      IVUtility.decode(key).encode(keyBuilder);
-//
-//      final byte[] fromKey = keyBuilder.getKey();
-//
-//      final byte[] toKey = SuccessorUtil.successor(fromKey.clone());
-//
-//      src.seek(toKey);
+      long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
+      
+      
+      // TODO: make sure to catch case where we're beyond the search range 
+      // (in that case, we don't need to proceed)
+      boolean inRange = true;
+      for (int i=0; i<divRecordComponents.length && inRange; i++) {
+         inRange &= seachMinLong[i]<=divRecordComponents[i];
+         inRange &= seachMaxLong[i]>=divRecordComponents[i];
+      }
+      
+      if (!inRange) {
+         
+         // calculate bigmin over the z-order component
+         final byte[] bigMin = calculateBigMin(dividingRecord);
+         
+         // pad a zero
+         final byte[] bigMinAsUnsigned = litExt.padLeadingZero(bigMin);
+         
+         final BigdataValue value = litExt.asValue(bigMinAsUnsigned, vf);
+         
+         // TODO: can this be done more efficiently?
+         LiteralExtensionIV bigMinIv = litExt.createIV(value);
+         IVUtility.encode(keyBuilder, bigMinIv);
+
+         // advance to the specified key ...
+         ITuple<SPO> next = src.seek(keyBuilder.getKey());
+         // ... or the next higher one
+         if (next==null) {
+            next = src.next(); 
+         }
+
+         // go into recursion (if the next value is fine, this call will have
+         // no effect, otherwise it will advance the cursor once more)
+         advance(next);
+         
+      } // else: nothing to do
 
    }
 
@@ -149,29 +195,27 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
     * @param iv the IV of the dividing record
     * @return
     */
-   private byte[] calculateBigMin(LiteralExtensionIV<BigdataLiteral> iv) {
-      
-      final byte[] dividingRecord = 
-         litExt.twosComplementToUnsigned(litExt.toZOrderByteArray(iv));
-      
-      if (dividingRecord.length!=searchMin.length ||
-          dividingRecord.length!=searchMax.length) {
-         throw new RuntimeException("Key range differs");
+   private byte[] calculateBigMin(final byte[] dividingRecord) {
+            
+      if (dividingRecord.length!=searchMinZOrder.length ||
+          dividingRecord.length!=searchMaxZOrder.length) {
+         // TODO: proper error handling
+         throw new RuntimeException("Key dimenisions differs");
       } 
       
       final int numBytes = dividingRecord.length;
       final int numDimensions = litExt.getNumDimensions();
 
-      final byte[] min = searchMin; 
-      final byte[] max = searchMax;
+      final byte[] min = searchMinZOrder.clone(); 
+      final byte[] max = searchMaxZOrder.clone();
       byte[] bigmin = new byte[numBytes];
       boolean finished = false;
       for (int i = 0; i < numBytes * Byte.SIZE && !finished; i++) { 
 
          // TODO: optimize through usage of mask
          boolean dividingRecordBitSet = BytesUtil.getBit(dividingRecord, i);
-         boolean minBitSet = BytesUtil.getBit(searchMin, i);
-         boolean maxBitSet = BytesUtil.getBit(searchMax, i);
+         boolean minBitSet = BytesUtil.getBit(min, i);
+         boolean maxBitSet = BytesUtil.getBit(max, i);
 
          if (!dividingRecordBitSet) {
             
@@ -184,7 +228,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                } else {
                   
                   // case 0 - 0 - 1
-                  bigmin = min;
+                  bigmin = min.clone();
                   load(true /* setFirst */, i, bigmin, numDimensions);
                   load(false, i, max, numBytes);
                   
@@ -200,7 +244,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                } else {
                   
                   // case 0 - 1 - 1
-                  bigmin = min;
+                  bigmin = min.clone();
                   finished = true; 
                   
                }               
@@ -238,10 +282,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          }
       }
       
-      
-      System.out.println("seachMin=" + searchMin);
-      System.out.println("bigmin=" + bigmin);
-      
+//      System.out.println("seachMin=" + searchMinZOrder);
+//      System.out.println("bigmin=" + bigmin);
       
       return bigmin;
    }

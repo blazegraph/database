@@ -1918,7 +1918,7 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
 
                 BytesUtil.setBit(
                    zOrderArr,                            // target array
-                   bufIt * numDimensions + dimIt,        // position
+                   bufIt * numDimensions + ((numDimensions-1)-dimIt),        // position
                    BytesUtil.getBit(buf, bufIt + offset)    // value
                 );
 
@@ -1972,7 +1972,7 @@ public class KeyBuilder implements IKeyBuilder, LongPacker.IByteBuffer {
       // having restored the components, decode them as long[]
       final long[] ret = new long[numDimensions];
       for (int i=0; i<numDimensions; i++) {
-         ret[i] = decodeLong(componentArr, i*(Long.SIZE/8));
+         ret[(numDimensions-1)-i] = decodeLong(componentArr, i*(Long.SIZE/8));
       }
       return ret;
    }

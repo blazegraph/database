@@ -107,8 +107,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * @param resolver
     * @param sd
     */
-   public GeoSpatialLiteralExtension(final IDatatypeURIResolver resolver, 
-      final SchemaDescription sd) {
+   public GeoSpatialLiteralExtension(
+      final IDatatypeURIResolver resolver, final SchemaDescription sd) {
 
       this.datatype = resolver.resolve(datatypeURI);
       this.sd = sd;
@@ -123,9 +123,45 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
    }
 
+   /****************************************************************************
+    * DIRECTION "DOWN":
+    * -----------------
+    * The following methods implement either the full or parts of the "down"
+    * direction. For the down, direction, conversion works as follows:
+    * 
+    * A.) We get as value a literal such as "2.54#3.21"^^geo:geoSpatialLiteral
+    * 
+    * B.) The literal is split into its components.
+    * 
+    * C.) The components are mapped to long values (either trivially, if they
+    *     represent long values according to the schema, or based on a
+    *     precision); for instance, assuming precision=2 in the schema for the
+    *     two components, the literal above would be converted into [254,321]
+    *     
+    * D.) Next, from these long components, we compute the z-order string:
+    *     D1.) If specified in the schema, we apply a range shift based on the
+    *          minimum value known to shop up in the data. Assuming, e.g., our
+    *          minimum value is zero, the components are shifted as
+    *          [Long.MIN+254, Long.MIN+321].
+    *     D2.) We compute the z-order string by mixing up the components bit
+    *          representation. For instance (not matching the values from
+    *          the example above), if component one has bit representation
+    *          0011 and component two has bit representation 0110, we mix the
+    *          bits as 00101101, where position 0,2,4,6 represent the second
+    *          string, position 1,3,5,7 represent the first string.
+    *          
+    * E.) We pad a 0 byte to the z-order string, to make sure that the
+    *     BigInteger constructor (which expects a two's complement), does
+    *     not destroy order.
+    *     
+    * F.) The 0 byte padded string is converted into a BigInteger
+    * 
+    * G.) The BigInteger is converted to an XSDIntegerIV
+    **************************************************************************/
+
    /**
-    * Encodes an n-dimensional string of the form <int_1>#...#<int_n> as 
-    * xsd:integer.
+    * Create an IV from a given value (where the value must be a Literal).
+    * Implements transformation A->G.
     */
    @SuppressWarnings("rawtypes")
    @Override
@@ -134,122 +170,34 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       if (value instanceof Literal == false)
          throw new IllegalArgumentException("Value not a literal");
 
+      // delegate, splitting the value into its components
       return createIV(value.stringValue().split(COMPONENT_SEPARATOR));
    }
 
+   /**
+    * Create an IV from a given value (where the value must be a Literal).
+    * Implements transformation B->F.
+    */
    @SuppressWarnings({ "rawtypes", "unchecked" })
    public LiteralExtensionIV createIV(Object[] components) {
 
+      // convert component array into long's (B->C)
       final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
 
+      // convert the long array into a byte[] (C->D)
       final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
 
-      final byte[] zOrderByteArrayTwoCompl = unsignedToTwosComplement(zOrderByteArray);
+      // convert into a valid two's complement byte array (D->E)
+      final byte[] zOrderByteArrayTwoCompl = padLeadingZero(zOrderByteArray);
+      
+      // we now can safely call the BigInteger constructor (E->F)
       final BigInteger bi = new BigInteger(zOrderByteArrayTwoCompl);
 
-      // store big integer using xsd:integer datatype
+      // finally, wrap the big integer into an xsd:integer (F->G)
       final AbstractLiteralIV delegate = new XSDIntegerIV(bi);
       return new LiteralExtensionIV(delegate, datatype.getIV());
    }
-
-   public int getNumDimensions() {
-      return sd.getNumDimensions();
-   }
    
-   // NEW (TODO: describe)
-   public byte[] toZOrderByteArray(final LiteralExtensionIV iv) {
-      
-      final long[] componentsAsLongArr = asLongArray(iv);
-
-      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
-
-      return unsignedToTwosComplement(zOrderByteArray);
-
-   }
-   
-   public byte[] toZOrderByteArray(Object[] components) {
-      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
-
-      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
-
-      return unsignedToTwosComplement(zOrderByteArray);
-
-   }
-   
-   
-
-   /**
-    * Decodes an xsd:integer into an n-dimensional string of the form 
-    * <int_1>#...#<int_n>.
-    */
-   @SuppressWarnings({ "unchecked", "rawtypes" })
-   @Override
-   public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
-      
-      final long[] componentsAsLongArr = asLongArray(iv);
-      
-      final String litStr = longArrAsComponentString(componentsAsLongArr);
-      
-      return (V) vf.createLiteral(litStr, datatype);
-   }
-   
-   /**
-    * Convert a key into the target literal.
-    * 
-    * @param key
-    * @return
-    */
-   @SuppressWarnings("unchecked")
-   public V asValue(byte[] key, final BigdataValueFactory vf) {
-    
-      byte[] bigIntAsByteArrUnsigned = twosComplementToUnsigned(key);
-      
-      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned, sd);
-
-      final String litStr = longArrAsComponentString(componentsAsLongArr);
-      
-      return (V) vf.createLiteral(litStr, datatype);
-
-   }
-   
-   @SuppressWarnings("rawtypes")
-   public long[] asLongArray(final LiteralExtensionIV iv) {
-
-      if (!datatype.getIV().equals(iv.getExtensionIV())) {
-         throw new IllegalArgumentException("unrecognized datatype");
-      }
-      
-      final int numDimensions = sd.getNumDimensions();
-      
-      final BigInteger bigInt = iv.getDelegate().integerValue();
-   
-      // convert BigInteger back to byte array
-      final byte[] bigIntAsByteArr = bigInt.toByteArray();
-      
-      // pad 0-bytes if necessary and copy over bytes
-      final int paddedArraySize = numDimensions * BASE_SIZE + 1; /* +1 leading zero byte to make value unsigned */
-      
-      final byte[] bigIntAsByteArrPad = new byte[paddedArraySize];
-      
-      int idx = 0;
-      for (int i = 0; i < paddedArraySize - bigIntAsByteArr.length; i++) {
-         bigIntAsByteArrPad[idx++] = 0;   // padding
-      }
-      for (int i = 0; i < bigIntAsByteArr.length; i++) {
-         bigIntAsByteArrPad[idx++] = bigIntAsByteArr[i];   // copy of bytes
-      }
-
-      byte[] bigIntAsByteArrUnsigned = twosComplementToUnsigned(bigIntAsByteArrPad);
-
-      
-      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned, sd);
-      
-      return componentsAsLongArr;
-      
-
-   }
-   
-
    /**
     * Convert the components into a long array. The array is passed as an
     * Object[], in order to allow for unparsed strings as well as Long or
@@ -260,8 +208,10 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * array without modification. Floats (or objects being parseable as Float)
     * are converted into Long according to the precision specified in the
     * passed {@link SchemaDescription}.
+    * 
+    * Implements step B->C.
     */
-   final long[] componentsAsLongArr(
+   public final long[] componentsAsLongArr(
       final Object[] components, final SchemaDescription sd) {
 
       final long[] ret = new long[sd.getNumDimensions()];
@@ -303,26 +253,172 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          default:
             throw new RuntimeException("Uncovered encoding case. Please fix code.");
          }
-         
-         ret[i] = encodeRangeShift(ret[i], sfd.getMinValue());
 
       }
       
       return ret;
    }
+   
+   /**
+    * Converts a long array representing the components to a z-order byte array.
+    * Thereby, a range shift is performed, if specified.
+    * 
+    * Implements step C->D
+    */
+   public byte[] toZOrderByteArray(
+         final long[] componentsAsLongArr, final SchemaDescription sd) {
+      
+      IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
+      for (int i=0; i<componentsAsLongArr.length; i++) {
+         
+         // get current component
+         final long componentAsLong = componentsAsLongArr[i];
+         
+         // shift component by given range
+         final Long minValue = sd.getSchemaFieldDescription(i).getMinValue();
+         final long componentAsLongRangeShifted = 
+            minValue==null ? 
+            componentAsLong : 
+            encodeRangeShift(componentAsLong, minValue);
+
+         kb.append(componentAsLongRangeShifted);
+      }
+      
+      return kb.toZOrder(sd.getNumDimensions());
+   }
+   
+   /**
+    * Pads a leading zero byte to the byte array. This changes the value (which 
+    * does not harm order, if we do it consistently for all zOrder strings
+    * prior to saving them) and makes sure that the array represents an unsigned
+    * value, for which the two's complement representation does not differ.
+    * More concretely, having padded the zero, we may safely call the
+    * {@link BigInteger} constructor (which expects a two's complement input).
+    * 
+    * Implements step D->E.
+    */
+   public byte[] padLeadingZero(byte[] arr) {
+      byte[] ret = new byte[arr.length+1];
+      
+      for (int i=0; i<arr.length; i++) {
+         ret[i+1] = arr[i];
+      }
+      
+      return ret;
+      
+   }
 
    
+   
+   /****************************************************************************
+    * DIRECTION "UP":
+    * -----------------
+    * The following methods implement either the full or parts of the "up"
+    * direction (which is the inverse of the down direction discussed in detail
+    * above.
+    ***************************************************************************/
+
+   /**
+    * Decodes an xsd:integer into an n-dimensional string of the form 
+    * <int_1>#...#<int_n>.
+    * 
+    * Implements transformation G->A.
+    */
+   @SuppressWarnings({ "unchecked", "rawtypes" })
+   @Override
+   public V asValue(final LiteralExtensionIV iv, final BigdataValueFactory vf) {
+      
+      // get the components represented by the IV (which must be of type
+      // xsd:integer (G->C)
+      final long[] componentsAsLongArr = asLongArray(iv);
+      
+      // set up the component and merge them into a string (C->B)
+      final String litStr = longArrAsComponentString(componentsAsLongArr);
+      
+      // setup a literal carrying the component string (B->A)
+      return (V) vf.createLiteral(litStr, datatype);
+   }
+
+   
+   /**
+    * Decodes an xsd:integer into the long values of the z-order components
+    * represented through the xsd:integer.
+    * 
+    * Implements transformation G->C
+    * @param iv
+    * @return
+    */
+   @SuppressWarnings("rawtypes")
+   public long[] asLongArray(final LiteralExtensionIV iv) {
+
+      if (!datatype.getIV().equals(iv.getExtensionIV())) {
+         throw new IllegalArgumentException("unrecognized datatype");
+      }
+      
+      final int numDimensions = sd.getNumDimensions();
+      
+      final BigInteger bigInt = iv.getDelegate().integerValue();
+   
+      // convert BigInteger back to byte array (F->E)
+      final byte[] bigIntAsByteArr = bigInt.toByteArray();
+      
+      // pad 0-bytes if necessary and copy over bytes; note that we make sure
+      // to get the correct number of bytes (no trailing bytes may be skipped),
+      // so the code below looks somewhat complex
+      final int paddedArraySize = numDimensions * BASE_SIZE + 1;
+      final byte[] bigIntAsByteArrPad = new byte[paddedArraySize];
+      int idx = 0;
+      for (int i = 0; i < paddedArraySize - bigIntAsByteArr.length; i++) {
+         bigIntAsByteArrPad[idx++] = 0;   // padding
+      }
+      for (int i = 0; i < bigIntAsByteArr.length; i++) {
+         bigIntAsByteArrPad[idx++] = bigIntAsByteArr[i];   // copy of bytes
+      }
+
+      // removed the padded zero (E->D2)
+      byte[] bigIntAsByteArrUnsigned = unpadLeadingZero(bigIntAsByteArrPad);
+
+      // retrieve the original long values from z-order byte[] (D2 -> C)
+      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned);
+      
+      return componentsAsLongArr;
+   }
+
+   
+   /**
+    * Converts a z-order byte array to a long array representing the components.
+    * As part of this transformation, a possible range shift is reverted.
+    * 
+    * Implements transformation D2 -> C.
+    */
+   public long[] fromZOrderByteArray(final byte[] byteArr) {
+      
+      IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
+      for (int i=0; i<byteArr.length; i++) {
+         kb.append(byteArr[i]);
+      }
+      
+      final long[] componentsAsLongArr = kb.fromZOrder(sd.getNumDimensions());
+      
+      // revert range shift
+      for (int i=0; i<componentsAsLongArr.length; i++) {
+         final Long minValue = sd.getSchemaFieldDescription(i).getMinValue();
+         if (minValue!=null) {
+            componentsAsLongArr[i] = decodeRangeShift(componentsAsLongArr[i], minValue);
+         }
+      }
+      
+      return componentsAsLongArr;
+   }
 
    
    /**
     * Converts a a Long[] reflecting the long values of the individual 
     * components back into a component string representing the literal.
     * 
-    * @param arr the long array representing the components
-    * @param sd the associated schema description
-    * @return the string literal
+    * Implements a wrapper around step C->B.
     */
-   final String longArrAsComponentString(final long[] arr) {
+   public final String longArrAsComponentString(final long[] arr) {
       
       final Object[] componentArr = longArrAsComponentArr(arr);
       
@@ -344,9 +440,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
     * Converts a a Long[] reflecting the long values of the individual 
     * components back into a component array representing the literal.
     * 
-    * @param arr the long array representing the components
-    * @param sd the associated schema description
-    * @return the component array (containing longs and precision adjusted doubles)
+    * Implements step C->B.
     */
    final public Object[] longArrAsComponentArr(final long[] arr) {
       
@@ -364,12 +458,8 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
          final SchemaFieldDescription sfd = sd.getSchemaFieldDescription(i);
          final double precisionAdjustment = Math.pow(10, sfd.getDoublePrecision());
          
-         // decode range shift
-         arr[i] = decodeRangeShift(arr[i], sfd.getMinValue());
-
          if (i>0)
             buf.append(COMPONENT_SEPARATOR);
-         
          
          switch (sfd.getDatatype()) {
          case DOUBLE:
@@ -386,11 +476,74 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
       return componentArr;
    }
+
+      
+   ///////////   ///////////   ///////////   ///////////   ///////////
+   ///////////   ///////////   ///////////   ///////////   ///////////
+   ///////////   ///////////   ///////////   ///////////   ///////////
+   // TODO: how do these methods fit in???
+   
+   // NEW (TODO: should go via IVs numerical value, no string manip)
+   public byte[] toZOrderByteArray(final LiteralExtensionIV iv) {
+      
+      final long[] componentsAsLongArr = asLongArray(iv);
+
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+
+      return padLeadingZero(zOrderByteArray);
+
+   }
+   
+   // NEW (TODO: should go via IVs numerical value, no string manip)
+   public byte[] toZOrderByteArray(Object[] components) {
+      
+      final long[] componentsAsLongArr = componentsAsLongArr(components, sd);
+
+      final byte[] zOrderByteArray = toZOrderByteArray(componentsAsLongArr, sd);
+
+      return padLeadingZero(zOrderByteArray);
+
+   }
+   
+   
+   // NEW
+   @SuppressWarnings("unchecked")
+   public V asValue(byte[] key, final BigdataValueFactory vf) {
+    
+      byte[] bigIntAsByteArrUnsigned = unpadLeadingZero(key);
+      
+      long[] componentsAsLongArr = fromZOrderByteArray(bigIntAsByteArrUnsigned);
+
+      final String litStr = longArrAsComponentString(componentsAsLongArr);
+      
+      return (V) vf.createLiteral(litStr, datatype);
+
+   }
+   
+
+   /**
+    * Reverts method {{@link #padLeadingZero(byte[])}.
+    * 
+    * Implements step E->D.
+    */
+   public byte[] unpadLeadingZero(byte[] arr) {
+      
+      byte[] ret = new byte[arr.length-1];
+      
+      for (int i=0; i<ret.length; i++) {
+         ret[i] = arr[i+1];
+      }
+      
+      return ret;
+      
+   }
    
    /**
     * Shift values according to the minValue, making sure that we encode the
-    * lowest value in the range as the lowest value 00000000000000... when 
+    * lowest value in the range as the lowest value 00000000... when 
     * encoded as byte array.
+    * 
+    * Implements steps C->D1.
     */
    protected Long encodeRangeShift(final Long val, final Long minValue) {
       
@@ -407,6 +560,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    
    /**
     * Invert {@link #encodeRangeShift(Long, Long)} operation.
+    * Implements steps D1->C.
     */
    protected Long decodeRangeShift(final Long val, final Long minValue) {
 
@@ -417,78 +571,17 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       return val - Long.MIN_VALUE + minValue;
    }
 
-   
+
+   /****************************************************************************
+    ***************           GENERAL HELPER FUNCTIONS           ***************
+    ***************************************************************************/
    /**
-    * Converts a long array representing the components to a z-order byte array
-    * 
-    * @param componentsAsLongArr
-    * @param sd
-    * @return
+    * Gets the number of dimensions from the underlying schema description
     */
-   byte[] toZOrderByteArray(
-         final long[] componentsAsLongArr, final SchemaDescription sd) {
-      
-      IKeyBuilder kb = KeyBuilder.newInstance(componentsAsLongArr.length*BASE_SIZE);
-      for (int i=0; i<componentsAsLongArr.length; i++) {
-         kb.append(componentsAsLongArr[i]);
-      }
-      
-      return kb.toZOrder(sd.getNumDimensions());
+   public int getNumDimensions() {
+      return sd.getNumDimensions();
    }
    
-   /**
-    * Converts a z-order byte array to a long array representing the components
-    * 
-    * @param byteArr
-    * @param sd2
-    * @return
-    */
-   long[] fromZOrderByteArray(
-      final byte[] byteArr, final SchemaDescription sd) {
-      
-      IKeyBuilder kb = KeyBuilder.newInstance(byteArr.length);
-      for (int i=0; i<byteArr.length; i++) {
-         kb.append(byteArr[i]);
-      }
-      
-      return kb.fromZOrder(sd.getNumDimensions());
-   }
-
-   /**
-    * Converts an unsigned byte array into a (positive) two's complement array.
-    * 
-    * The trick here is to pad a zero byte. This changes the value (which does
-    * not harm) yet makes sure that the array is an unsigned value, for which
-    * the two's complement representation does not differ.
-    */
-   public byte[] unsignedToTwosComplement(byte[] arr) {
-      byte[] ret = new byte[arr.length+1];
-      
-      // ret[0] = 0 by construction
-      for (int i=0; i<arr.length; i++) {
-         ret[i+1] = arr[i];
-      }
-      
-      return ret;
-      
-   }
-
-   /**
-    * Reverts method {{@link #unsignedToTwosComplement(byte[])}.
-    */
-   public byte[] twosComplementToUnsigned(byte[] arr) {
-      
-      byte[] ret = new byte[arr.length-1];
-      
-      // ret[0] = 0 by construction
-      for (int i=0; i<ret.length; i++) {
-         ret[i] = arr[i+1];
-      }
-      
-      return ret;
-      
-   }
-
    /**
      * For now, we're using a fixed, three-dimensional datatype for
      * latitued, longitude and time.
@@ -501,13 +594,17 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final List<SchemaFieldDescription> sfd = 
          new ArrayList<SchemaFieldDescription>();
 
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
-      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
+      
+//      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
+//      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
+//      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
          
       return new SchemaDescription(sfd);      
    }
 
+   
    /**
     * Schema description for a geospatial literal
     */
