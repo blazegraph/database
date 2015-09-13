@@ -197,6 +197,10 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
     */
    private byte[] calculateBigMin(final byte[] dividingRecord) {
             
+      if (dividingRecord[15]==16) {
+         System.out.println("DELETE TODO");         
+      }
+      
       if (dividingRecord.length!=searchMinZOrder.length ||
           dividingRecord.length!=searchMaxZOrder.length) {
          // TODO: proper error handling
@@ -230,7 +234,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                   // case 0 - 0 - 1
                   bigmin = min.clone();
                   load(true /* setFirst */, i, bigmin, numDimensions);
-                  load(false, i, max, numBytes);
+                  load(false, i, max, numDimensions);
                   
                }
                
@@ -261,7 +265,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
                } else {
                   
                   // case 1 - 0 - 1
-                  load(true, i, min, numBytes);
+                  load(true, i, min, numDimensions);
                   
                }
                
