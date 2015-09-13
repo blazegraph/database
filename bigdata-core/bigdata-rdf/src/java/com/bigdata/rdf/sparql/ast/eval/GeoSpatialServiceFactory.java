@@ -89,7 +89,6 @@ import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
 import com.bigdata.relation.accesspath.AccessPath;
-import com.bigdata.relation.accesspath.IElementFilter;
 import com.bigdata.service.fts.FulltextSearchException;
 import com.bigdata.service.geospatial.GeoSpatial;
 import com.bigdata.service.geospatial.GeoSpatial.GeoFunction;
@@ -474,7 +473,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          final GlobalAnnotations globals = new GlobalAnnotations(kb
                .getLexiconRelation().getNamespace(), kb.getSPORelation()
                .getTimestamp());
-
+         
          // this is needed for any function
          final Long timeStart = query.getTimeStart();
          final Long timeEnd = query.getTimeEnd();
@@ -485,12 +484,11 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                kb.getLexiconRelation());
 
          // construct the bounding boxes and filters, which depend on the
-         // function that is specified through the query
-         // TOOD: make final
-         Object[] lowerBorderComponents;
-         Object[] upperBorderComponents;
-         final IElementFilter<ISPO> filter;
-
+         // function that is specified within the query
+         final Object[] lowerBorderComponents;
+         final Object[] upperBorderComponents;
+         final GeoSpatialFilterBase filter;
+         
          switch (query.getSearchFunction()) {
          case IN_CIRCLE: {
             final PointLatLon centerPoint = query.getSpatialCircleCenter();
@@ -525,8 +523,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                   .toComponentString(lowerRightWithTime);
 
             // set up the filter
-            filter = new GeoSpatialInCircleFilter(centerPoint, distance,
-                  timeStart, timeEnd, spatialUnit, litExt);
+            filter = new GeoSpatialInCircleFilter(
+               centerPoint, distance, spatialUnit, timeStart, timeEnd, litExt);
          }
             break;
 
@@ -546,8 +544,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             upperBorderComponents = PointLatLonTime
                   .toComponentString(lowerRightWithTime);
 
-            filter = new GeoSpatialInRectangleFilter(upperLeftWithTime,
-                  lowerRightWithTime, litExt);
+            filter = new GeoSpatialInRectangleFilter(
+               upperLeftWithTime, lowerRightWithTime, litExt);
          }
             break;
 
@@ -556,10 +554,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          }
          
 
-         // TODO: remove this code again!!!
-         lowerBorderComponents = new Object[]{ (long)(double)lowerBorderComponents[0], (long)(double)lowerBorderComponents[1] };
-         upperBorderComponents = new Object[]{ (long)(double)upperBorderComponents[0], (long)(double)upperBorderComponents[1] };
-         // end TODO
+//         lowerBorderComponents = new Object[]{ (long)(double)lowerBorderComponents[0], (long)(double)lowerBorderComponents[1] };
+//         upperBorderComponents = new Object[]{ (long)(double)upperBorderComponents[0], (long)(double)upperBorderComponents[1] };
+         
+
          
          // set up range scan
          final Var oVar = Var.var(); // object position variable
@@ -581,9 +579,10 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
                (URI) query.getPredicate().getValue(), /* predicate */
                o.getValue(), /* object */
                null, /* context */ // TODO: fix to make work for quads
-               filter, /* filter */
+               null, /* filter */
                rangeBop); /* rangeBop */
 
+         
          /**
           * The predicate is null if the p we pass in does not appear in the
           * database. In that case, return null to indicate there aren't
@@ -619,11 +618,15 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             indexName.substring(indexName.lastIndexOf(".")+1);
          final int subjectPos = indexShortName.indexOf("S");
          final int objectPos = indexShortName.indexOf("O");
-                  
+         
+         // set object (=z-order literal) position in the surrounding filter
+         filter.setObjectPos(objectPos);
+
+         // set up the advancer, which iterates exactly over the values in range
+         // TODO: we want to have this multithreaded at some point
          final Advancer<SPO> bigMinAdvancer = 
             new ZOrderIndexBigMinAdvancer(
                lowerZOrderKey, upperZOrderKey, litExt, objectPos, vf);
-         //bigMinAdvancer.addFilter(filter);
          
          final Var var = Var.var(vars[0].getName());
          final IBindingSet incomingBindingSet = query.getIncomingBindings();
@@ -631,18 +634,8 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
             new Striterator(accessPath.getIndex().rangeIterator(
                accessPath.getFromKey(), accessPath.getToKey(), 0/* capacity */, 
                IRangeQuery.KEYS | IRangeQuery.CURSOR, bigMinAdvancer))
-                  .addFilter(new TupleFilter() {
-
-                     private static final long serialVersionUID = -4577110008838036545L;
-
-                     @Override
-                     protected boolean isValid(ITuple tuple) {
-                        System.out.println("[TupleFilter] " + tuple);
-                        
-                        return true;
-                     }
-                        
-                  }).addFilter(new Resolver() {
+                  .addFilter(filter)
+                  .addFilter(new Resolver() {
 
                      private static final long serialVersionUID = 1L;
                           
@@ -1045,47 +1038,37 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
    }
 
-   public abstract static class GeoSpatialFilterBase implements
-         IElementFilter<ISPO> {
+   @SuppressWarnings("rawtypes")
+   public abstract static class GeoSpatialFilterBase extends TupleFilter {
 
       private static final long serialVersionUID = 2271038531634362860L;
+      
+      protected final GeoSpatialLiteralExtension<BigdataValue> litExt;
 
-      final GeoSpatialLiteralExtension<BigdataValue> litExt;
+      // position of the subject in the tuples
+      protected int objectPos = -1;
 
       public GeoSpatialFilterBase(
-            final GeoSpatialLiteralExtension<BigdataValue> litExt) {
-
+         final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         
          this.litExt = litExt;
+      }      
+      
+
+
+      public void setObjectPos(int objectPos) {
+         this.objectPos = objectPos;
       }
+
 
       /**
-       * Helper method to convert a visited object to a point.
+       * Return the {@link GeoSpatialLiteralExtension} object associated
+       * with this filter.
+       * 
+       * @return the object
        */
-      @SuppressWarnings("rawtypes")
-      public PointLatLonTime asPoint(Object obj) {
-
-         if (obj instanceof ISPO) {
-            final ISPO ispo = (ISPO) obj;
-            final IV oIV = ispo.o();
-            if (oIV instanceof LiteralExtensionIV) {
-               final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
-
-               long[] longArr = litExt.asLongArray(lit);
-               final Object[] components = litExt
-                     .longArrAsComponentArr(longArr);
-
-               return new PointLatLonTime(new PointLatLon(
-                     (Double) components[0], (Double) components[1]),
-                     (Long) components[2]);
-            }
-         }
-
-         return null; // something went wrong
-      }
-
-      @Override
-      public boolean canAccept(Object o) {
-         return true;
+      public GeoSpatialLiteralExtension<BigdataValue> getGeoSpatialLiteralExtension() {
+         return litExt;
       }
 
    }
@@ -1098,35 +1081,43 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 
       private static final long serialVersionUID = -346928614528045113L;
 
-      final CoordinateDD spatialPointAsCoordinateDD;
-      final Double distance;
-      final UNITS unit;
+      final private CoordinateDD spatialPointAsCoordinateDD;
+      final private Double distance;
+      final private UNITS unit;
 
-      final Long timeMin;
-      final Long timeMax;
+      final private Long timeMin;
+      final private Long timeMax;
 
-      public GeoSpatialInCircleFilter(final PointLatLon spatialPoint,
-            final Double distance, final Long timeMin, final Long timeMax,
-            final UNITS unit,
-            final GeoSpatialLiteralExtension<BigdataValue> litExt) {
-
+      public GeoSpatialInCircleFilter(
+         final PointLatLon spatialPoint, Double distance,
+         final UNITS unit, final Long timeMin, final Long timeMax, 
+         final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         
          super(litExt);
 
-
          this.spatialPointAsCoordinateDD = spatialPoint.asCoordinateDD();
-
          this.distance = distance;
          this.unit = unit;
-         
          this.timeMin = timeMin;
-         this.timeMax = timeMax;
-
+         this.timeMax = timeMax;         
       }
 
       @Override
-		public boolean isValid(Object obj) {
+      @SuppressWarnings("rawtypes")      
+      protected boolean isValid(ITuple tuple) {
+         
+			final PointLatLonTime p = asPoint(tuple);
+			
+			if (p==null) {
+			   if (log.isInfoEnabled()) {
+			      log.info(
+			         "Something went wrong extracting the object. " +
+			         "Rejecting unprocessable value.");
+			   }
 
-			final PointLatLonTime p = asPoint(obj);
+			   return false; // reject value
+			}
+			
          final CoordinateDD pAsDD = p.getSpatialPoint().asCoordinateDD();
 			
 			boolean ret = 
@@ -1136,45 +1127,66 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
 			   
 			return ret;
 		}
+
+      @SuppressWarnings("rawtypes")
+      public PointLatLonTime asPoint(ITuple tuple) {
+
+         final byte[] key = ((ITuple<?>) tuple).getKey();
+
+         final IV[] ivs = IVUtility.decode(key, objectPos+1);
+         final IV oIV= ivs[objectPos];
+
+         if (oIV instanceof LiteralExtensionIV) {
+            final LiteralExtensionIV lit = (LiteralExtensionIV) oIV;
+
+            long[] longArr = litExt.asLongArray(lit);
+            final Object[] components = litExt.longArrAsComponentArr(longArr);
+
+            return new PointLatLonTime(
+               new PointLatLon((Double) components[0],
+               (Double) components[1]), (Long) components[2]);
+         }
+
+         return null; // something went wrong
+      }
+   
    }
 
    /**
-    * Filter asserting that a given point lies into a specified distance (i.e.
-    * circle) plus time frame.
+    * Dummy filter asserting that a point delivered by the advancer lies into
+    * a given rectangle. Given the current advancer implementation, there's
+    * nothing to do for the filter, since the advancer delivers exactly those
+    * points that are actually in this range.
     */
    public static class GeoSpatialInRectangleFilter extends GeoSpatialFilterBase {
 
       private static final long serialVersionUID = -314581671447912352L;
 
-      final private PointLatLonTime lowerBorder;
-      final private PointLatLonTime upperBorder;
-
-      public GeoSpatialInRectangleFilter(final PointLatLonTime lowerBorder,
-            final PointLatLonTime upperBorder,
-            final GeoSpatialLiteralExtension<BigdataValue> litExt) {
-
+      @SuppressWarnings("unused") // unused for now, but may become important
+      private final PointLatLonTime lowerBorder;
+      
+      @SuppressWarnings("unused") // unused for now, but may become important
+      private final PointLatLonTime upperBorder;
+      
+      public GeoSpatialInRectangleFilter(
+         final PointLatLonTime lowerBorder, final PointLatLonTime upperBorder,
+         final GeoSpatialLiteralExtension<BigdataValue> litExt) {
+         
          super(litExt);
-
+         
          this.lowerBorder = lowerBorder;
          this.upperBorder = upperBorder;
       }
 
+      @SuppressWarnings("rawtypes")
       @Override
-      public boolean isValid(Object obj) {
+      protected boolean isValid(ITuple tuple) {
 
-         final PointLatLonTime point = asPoint(obj);
-
-         /**
-          * Check containment in range.
-          */
-         return lowerBorder.getLat() <= point.getLat()
-               && lowerBorder.getLon() <= point.getLon()
-               && lowerBorder.getTimestamp() <= point.getTimestamp()
-               && upperBorder.getLat() >= point.getLat()
-               && upperBorder.getLon() >= point.getLon()
-               && upperBorder.getTimestamp() >= point.getTimestamp();
-
+         // the advancer by design already returns only those values that
+         // are in the rectangle, so there's nothing to do here
+         return true;
       }
+
 
    }
 
@@ -1200,6 +1212,7 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
       
       return statementPatterns;
    }
+   
    
    @Override
    public Set<IVariable<?>> getRequiredBound(final ServiceNode serviceNode) {

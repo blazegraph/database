@@ -288,6 +288,26 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    }
    
    /**
+    * Shift values according to the minValue, making sure that we encode the
+    * lowest value in the range as the lowest value 00000000... when 
+    * encoded as byte array.
+    * 
+    * Implements steps C->D1.
+    */
+   protected Long encodeRangeShift(final Long val, final Long minValue) {
+      
+      if (minValue==null) { // do nothing if range shift not set
+         return val;
+      }
+      
+      if (val<minValue) {
+         throw new RuntimeException("Illegal range shift -- datatype violation.");
+      }
+      
+      return Long.MIN_VALUE + (val - minValue);
+   }
+   
+   /**
     * Pads a leading zero byte to the byte array. This changes the value (which 
     * does not harm order, if we do it consistently for all zOrder strings
     * prior to saving them) and makes sure that the array represents an unsigned
@@ -410,6 +430,20 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       
       return componentsAsLongArr;
    }
+   
+   
+   /**
+    * Invert {@link #encodeRangeShift(Long, Long)} operation.
+    * Implements steps D1->C.
+    */
+   protected Long decodeRangeShift(final Long val, final Long minValue) {
+
+      if (minValue==null) { // do nothing if range shift not set
+         return val;
+      }
+      
+      return val - Long.MIN_VALUE + minValue;
+   }
 
    
    /**
@@ -476,14 +510,34 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
 
       return componentArr;
    }
+   
+
+   /**
+    * Reverts method {{@link #padLeadingZero(byte[])}.
+    * 
+    * Implements step E->D.
+    */
+   public byte[] unpadLeadingZero(byte[] arr) {
+      
+      byte[] ret = new byte[arr.length-1];
+      
+      for (int i=0; i<ret.length; i++) {
+         ret[i] = arr[i+1];
+      }
+      
+      return ret;
+      
+   }
 
       
    ///////////   ///////////   ///////////   ///////////   ///////////
    ///////////   ///////////   ///////////   ///////////   ///////////
    ///////////   ///////////   ///////////   ///////////   ///////////
-   // TODO: how do these methods fit in???
+   // TODO: how do these methods fit in? The could/should probably be optimized
+   //       in terms of performance
    
    // NEW (TODO: should go via IVs numerical value, no string manip)
+   @SuppressWarnings("rawtypes")
    public byte[] toZOrderByteArray(final LiteralExtensionIV iv) {
       
       final long[] componentsAsLongArr = asLongArray(iv);
@@ -506,7 +560,7 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    }
    
    
-   // NEW
+   // NEW (TODO: should go via IVs numerical value, no string manip)
    @SuppressWarnings("unchecked")
    public V asValue(byte[] key, final BigdataValueFactory vf) {
     
@@ -521,59 +575,9 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
    }
    
 
-   /**
-    * Reverts method {{@link #padLeadingZero(byte[])}.
-    * 
-    * Implements step E->D.
-    */
-   public byte[] unpadLeadingZero(byte[] arr) {
-      
-      byte[] ret = new byte[arr.length-1];
-      
-      for (int i=0; i<ret.length; i++) {
-         ret[i] = arr[i+1];
-      }
-      
-      return ret;
-      
-   }
-   
-   /**
-    * Shift values according to the minValue, making sure that we encode the
-    * lowest value in the range as the lowest value 00000000... when 
-    * encoded as byte array.
-    * 
-    * Implements steps C->D1.
-    */
-   protected Long encodeRangeShift(final Long val, final Long minValue) {
-      
-      if (minValue==null) { // do nothing if range shift not set
-         return val;
-      }
-      
-      if (val<minValue) {
-         throw new RuntimeException("Illegal range shift -- datatype violation.");
-      }
-      
-      return Long.MIN_VALUE + (val - minValue);
-   }
-   
-   /**
-    * Invert {@link #encodeRangeShift(Long, Long)} operation.
-    * Implements steps D1->C.
-    */
-   protected Long decodeRangeShift(final Long val, final Long minValue) {
-
-      if (minValue==null) { // do nothing if range shift not set
-         return val;
-      }
-      
-      return val - Long.MIN_VALUE + minValue;
-   }
-
 
    /****************************************************************************
-    ***************           GENERAL HELPER FUNCTIONS           ***************
+    ***************               SCHEMA MANAGEMENT              ***************
     ***************************************************************************/
    /**
     * Gets the number of dimensions from the underlying schema description
@@ -594,12 +598,12 @@ public class GeoSpatialLiteralExtension<V extends BigdataValue> implements IExte
       final List<SchemaFieldDescription> sfd = 
          new ArrayList<SchemaFieldDescription>();
 
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
-      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
+//      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
+//      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1, Long.valueOf(0)));  /* time */
       
-//      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
-//      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
-//      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* latitude */
+      sfd.add(new SchemaFieldDescription(Datatype.DOUBLE, 5)); /* longitude */
+      sfd.add(new SchemaFieldDescription(Datatype.LONG, 1));  /* time */
          
       return new SchemaDescription(sfd);      
    }

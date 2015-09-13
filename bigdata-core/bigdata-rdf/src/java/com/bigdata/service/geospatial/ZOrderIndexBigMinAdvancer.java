@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 package com.bigdata.service.geospatial;
 
+import java.util.NoSuchElementException;
+
+import org.apache.log4j.Logger;
+
 import com.bigdata.btree.ITuple;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.keys.IKeyBuilder;
@@ -52,6 +56,9 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
 
    private static final long serialVersionUID = -6438977707376228799L;
 
+   private static final transient Logger log = Logger
+         .getLogger(ZOrderIndexBigMinAdvancer.class);
+   
    // Search min (upper left) byte array as z-order string (as unsigned)
    private final byte[] searchMinZOrder;
 
@@ -72,8 +79,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
    
    // value factory
    private final BigdataValueFactory vf;
-   
-   
+      
    private transient IKeyBuilder keyBuilder;
 
    public ZOrderIndexBigMinAdvancer(
@@ -83,7 +89,6 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       final int zOrderComponentPos /* position of the zOrder in the index */,
       final BigdataValueFactory vf) {
 
-      // TODO: is the decoding here incorrect? but we want to operator on top of these values...
       this.litExt = litExt;
       this.searchMinZOrder = litExt.unpadLeadingZero(searchMinZOrder);
       this.seachMinLong = litExt.fromZOrderByteArray(this.searchMinZOrder);
@@ -98,8 +103,11 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
 
    @Override
    protected void advance(final ITuple<SPO> tuple) {
-      System.out.println("[Advancor]    " + tuple);
-
+      
+      if (log.isDebugEnabled()) {
+         log.debug("Advancor visiting tuple:    " + tuple);
+      }
+      
       // if we're beyond the end, nothing to do
       if (tuple==null) {
          return;
@@ -124,8 +132,8 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
 
       keyBuilder.reset();
 
-      // TODO: need to parameterize, encoding n components (up to the z-order string)
       // decode components up to (and including) the z-order string
+      @SuppressWarnings("rawtypes")
       IV[] ivs = IVUtility.decode(key,zOrderComponentPos+1);
       
       // encode everything up to (and excluding) the z-order component "as is"
@@ -145,8 +153,6 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       long[] divRecordComponents = litExt.fromZOrderByteArray(dividingRecord);
       
       
-      // TODO: make sure to catch case where we're beyond the search range 
-      // (in that case, we don't need to proceed)
       boolean inRange = true;
       for (int i=0; i<divRecordComponents.length && inRange; i++) {
          inRange &= seachMinLong[i]<=divRecordComponents[i];
@@ -154,7 +160,7 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       }
       
       if (!inRange) {
-         
+
          // calculate bigmin over the z-order component
          final byte[] bigMin = calculateBigMin(dividingRecord);
          
@@ -164,19 +170,26 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          final BigdataValue value = litExt.asValue(bigMinAsUnsigned, vf);
          
          // TODO: can this be done more efficiently?
+         @SuppressWarnings("rawtypes")
          LiteralExtensionIV bigMinIv = litExt.createIV(value);
          IVUtility.encode(keyBuilder, bigMinIv);
-
+         
          // advance to the specified key ...
-         ITuple<SPO> next = src.seek(keyBuilder.getKey());
-         // ... or the next higher one
-         if (next==null) {
-            next = src.next(); 
+         try {
+            ITuple<SPO> next = src.seek(keyBuilder.getKey());
+                  
+            // ... or the next higher one
+            if (next==null) {
+               next = src.next(); 
+            }
+   
+            // go into recursion (if the next value is fine, this call will have
+            // no effect, otherwise it will advance the cursor once more)
+            advance(next);
+            
+         }  catch (NoSuchElementException e) {
+            return; // we're done
          }
-
-         // go into recursion (if the next value is fine, this call will have
-         // no effect, otherwise it will advance the cursor once more)
-         advance(next);
          
       } // else: nothing to do
 
@@ -197,10 +210,6 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
     */
    private byte[] calculateBigMin(final byte[] dividingRecord) {
             
-      if (dividingRecord[15]==16) {
-         System.out.println("DELETE TODO");         
-      }
-      
       if (dividingRecord.length!=searchMinZOrder.length ||
           dividingRecord.length!=searchMaxZOrder.length) {
          // TODO: proper error handling
@@ -216,12 +225,11 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
       boolean finished = false;
       for (int i = 0; i < numBytes * Byte.SIZE && !finished; i++) { 
 
-         // TODO: optimize through usage of mask
-         boolean dividingRecordBitSet = BytesUtil.getBit(dividingRecord, i);
-         boolean minBitSet = BytesUtil.getBit(min, i);
-         boolean maxBitSet = BytesUtil.getBit(max, i);
+         final boolean divRecordBitSet = BytesUtil.getBit(dividingRecord, i);
+         final boolean minBitSet = BytesUtil.getBit(min, i);
+         final boolean maxBitSet = BytesUtil.getBit(max, i);
 
-         if (!dividingRecordBitSet) {
+         if (!divRecordBitSet) {
             
             if (!minBitSet) {
                
