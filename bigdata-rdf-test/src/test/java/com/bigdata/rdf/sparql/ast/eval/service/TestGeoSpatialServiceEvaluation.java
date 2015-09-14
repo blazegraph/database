@@ -316,6 +316,26 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
     }
     
     
+    /**
+     * Test query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "1" . #km
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "7" .
+     *   }
+     * }
+     * 
+     * , which extracts the center point 4#4 with three timestamps.
+     * 
+     * @throws Exception
+     */
     public void testInCircleQuery01a() throws Exception {
        
        new TestHelper(
@@ -326,6 +346,27 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
     
+    /**
+     * Test query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "105" . #km
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "7" .
+     *   }
+     * } 
+     * 
+     * , which extracts the center point 4#4 with three timestamps (105km
+     * is still too small to match any points of 1 lat/lon distance in the grid)
+     * 
+     * @throws Exception
+     */    
     public void testInCircleQuery01b() throws Exception {
        
        new TestHelper(
@@ -336,6 +377,28 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
     
+    /**
+     * Test query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "65" . 
+     *     ?res geo:spatialUnit "Miles" .
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "7" .
+     *   }
+     * } 
+     * 
+     * , which is the same as the circle01b, just using a (roughly) equivalent
+     * value specified in miles rather than kilometers.
+     * 
+     * @throws Exception
+     */ 
     public void testInCircleQuery01c() throws Exception {
        
        new TestHelper(
@@ -346,7 +409,56 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
     
+    /**
+     * Test query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   ?res geo:search "inCircle" .
+     *   ?res geo:predicate <http://p> .
+     *   ?res geo:spatialCircleCenter "4#4" .
+     *   ?res geo:spatialCircleRadius "1" . #km
+     *   ?res geo:timeStart "5" .
+     *   ?res geo:timeEnd "7" .
+     * }
+     * 
+     * , which is a variante of circle01a just not wrapped into a SERVICE.
+     * 
+     * @throws Exception
+     */
+    public void testInCircleQuery01d() throws Exception {
+       
+       new TestHelper(
+          "geo-circle01d",
+          "geo-circle01d.rq", 
+          "geo-grid101010.nt",
+          "geo-circle01.srx").runTest();
+       
+    }
+    
 
+    /**
+     * Compared to the circle01* queries, the query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "112" . #km
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "5" .
+     *   }
+     * } 
+     * 
+     * extends the radius such that the point's neighbors in the east, west,
+     * south, and nord are matched now.
+     * 
+     * @throws Exception
+     */
     public void testInCircleQuery02() throws Exception {
        
        new TestHelper(
@@ -358,6 +470,10 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
     }
     
 
+    /**
+     * A variant of circle02 where the unit is specified in miles rather
+     * than kilometers (delivering the same result).
+     */
     public void testInCircleQuery03() throws Exception {
        
        new TestHelper(
@@ -368,7 +484,26 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
     
-
+    /**
+     * Compared to queries circle02 and circle03, the query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "190" . #km
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "5" .
+     *   }
+     * } 
+     * 
+     * extends the radius such that the point's neighbors in the south-east,
+     * sout-west, north-east, and north-west are included now as well.
+     * @throws Exception
+     */
     public void testInCircleQuery04() throws Exception {
        
        new TestHelper(
@@ -380,9 +515,24 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
     }
     
     /**
-     * Verify rectangle search with simple query:
+     *  Compared to queries circle04, the query
+     *  
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
      * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "4#4" .
+     *     ?res geo:spatialCircleRadius "240000" . 
+     *     ?res geo:spatialUnit "Meters" .
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "5" .
+     *   }
+     * }
      * 
+     * further extends the range such that the next set of eastern, western,
+     * southern, and northern points are matched.
      */
     public void testInCircleQuery05() throws Exception {
        
@@ -394,6 +544,80 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
     
+    /**
+     * Query similar in spirit to circle04, but settled at the corner of our
+     * gred (top left):
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT * WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inCircle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialCircleCenter "1#1" .
+     *     ?res geo:spatialCircleRadius "240" . 
+     *     ?res geo:timeStart "5" .
+     *     ?res geo:timeEnd "5" .
+     *   }
+     * }
+     * 
+     * @throws Exception
+     */
+    public void testInCircleQuery06a() throws Exception {
+       
+       new TestHelper(
+          "geo-circle06a",
+          "geo-circle06a.rq", 
+          "geo-grid101010.nt",
+          "geo-circle06a.srx").runTest();
+       
+    }
+
+    /**
+     * Query similar in spirit to circle06a, but top-right corner.
+     * 
+     * @throws Exception
+     */
+    public void testInCircleQuery06b() throws Exception {
+       
+       new TestHelper(
+          "geo-circle06b",
+          "geo-circle06b.rq", 
+          "geo-grid101010.nt",
+          "geo-circle06b.srx").runTest();
+       
+    }
+
+    /**
+     * Query similar in spirit to circle06a, but lower-left corner.
+     * 
+     * @throws Exception
+     */
+    public void testInCircleQuery06c() throws Exception {
+       
+       new TestHelper(
+          "geo-circle06c",
+          "geo-circle06c.rq", 
+          "geo-grid101010.nt",
+          "geo-circle06c.srx").runTest();
+       
+    }
+
+    /**
+     * Query similar in spirit to circle06a, but lower-right corner.
+     * 
+     * @throws Exception
+     */
+    public void testInCircleQuery06d() throws Exception {
+       
+       new TestHelper(
+          "geo-circle06d",
+          "geo-circle06d.rq", 
+          "geo-grid101010.nt",
+          "geo-circle06d.srx").runTest();
+       
+    }
+
     
     
     @Override
