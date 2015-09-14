@@ -1,8 +1,8 @@
-package com.bigdata.jini.start.config;
+package com.bigdata.zookeeper.start.config;
 
 import java.io.Serializable;
 
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 
 /**
  * A constraint on where the service may be instantiated. For example, at most N
@@ -26,6 +26,6 @@ public interface IServiceConstraint extends Serializable {
      * @param fed
      *            The federation.
      */
-    public boolean allow(JiniFederation fed) throws Exception;
+    public boolean allow(ZookeeperFederation fed) throws Exception;
 
 }

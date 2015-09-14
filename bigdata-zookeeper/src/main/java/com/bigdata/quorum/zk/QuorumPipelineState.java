@@ -34,7 +34,7 @@ import java.io.ObjectOutput;
 import java.net.InetSocketAddress;
 import java.util.UUID;
 
-import com.bigdata.jini.start.BigdataZooDefs;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * A object whose state contains the address at which a service listens for

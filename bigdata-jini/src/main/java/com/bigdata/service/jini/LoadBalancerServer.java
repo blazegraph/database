@@ -27,6 +27,7 @@ import com.bigdata.service.LoadBalancerService;
 import com.bigdata.service.jini.util.DumpFederation;
 import com.bigdata.service.jini.util.DumpFederation.FormatRecord;
 import com.bigdata.service.jini.util.DumpFederation.FormatTabTable;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
 import com.bigdata.util.config.NicUtil;
 import com.bigdata.util.httpd.AbstractHTTPD;
 import com.bigdata.util.httpd.HTTPGetHandler;
@@ -381,7 +382,7 @@ public class LoadBalancerServer extends AbstractServer {
         }
         
         @Override
-        public JiniFederation<?> getFederation() {
+        public JiniFederation getFederation() {
 
             return server.getClient().getFederation();
             

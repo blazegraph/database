@@ -68,7 +68,6 @@ import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.ha.HAGlue;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.quorum.AbstractQuorumClient;
 import com.bigdata.quorum.Quorum;
@@ -85,6 +84,7 @@ import com.bigdata.service.IServiceShutdown;
 import com.bigdata.service.jini.JiniClient;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.util.StackInfoReport;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
 import com.sun.jini.start.ServiceDescriptor;
 
 /**

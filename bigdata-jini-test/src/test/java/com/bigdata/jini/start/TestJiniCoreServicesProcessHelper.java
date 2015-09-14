@@ -44,9 +44,9 @@ import net.jini.lookup.ServiceDiscoveryManager;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration;
 import com.bigdata.jini.start.config.JiniCoreServicesConfiguration.Options;
 import com.bigdata.jini.start.process.JiniCoreServicesProcessHelper;
-import com.bigdata.jini.util.ConfigMath;
 import com.bigdata.service.jini.JiniClientConfig;
 import com.bigdata.service.jini.util.JiniServicesHelper;
+import com.bigdata.zookeeper.util.ConfigMath;
 
 /**
  * Test suite for the {@link JiniCoreServicesProcessHelper}

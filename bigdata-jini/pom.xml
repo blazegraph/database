@@ -106,6 +106,11 @@ ga('send', 'pageview');
       <version>${project.version}</version>
     </dependency>
     <dependency>
+      <groupId>com.blazegraph</groupId>
+      <artifactId>bigdata-zookeeper</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <version>${zookeeper.version}</version>

@@ -86,7 +86,6 @@ import com.bigdata.ha.msg.IHAWriteSetStateResponse;
 import com.bigdata.io.DirectBufferPool;
 import com.bigdata.io.IBufferAccess;
 import com.bigdata.io.writecache.WriteCache;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
 import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.AbstractJournal;
 import com.bigdata.journal.IHABufferStrategy;
@@ -112,6 +111,7 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.LatchedExecutor;
 import com.bigdata.util.concurrent.MonitoredFutureTask;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
 import com.sun.jini.start.LifeCycle;
 
 /**

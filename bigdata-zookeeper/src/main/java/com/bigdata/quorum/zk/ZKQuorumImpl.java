@@ -56,7 +56,6 @@ import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.ha.HAPipelineGlue;
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.quorum.AbstractQuorum;
 import com.bigdata.quorum.Quorum;
 import com.bigdata.quorum.QuorumActor;
@@ -67,6 +66,7 @@ import com.bigdata.quorum.QuorumMember;
 import com.bigdata.quorum.QuorumWatcher;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Implementation of the {@link Quorum} using zookeeper to maintain the

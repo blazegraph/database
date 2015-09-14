@@ -45,7 +45,7 @@ import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
-import com.bigdata.jini.start.config.ZookeeperClientConfig;
+import com.bigdata.zookeeper.start.config.ZookeeperClientConfig;
 
 /**
  * Utility for dumping out the portion of a zookeeper ensemble state pertaining

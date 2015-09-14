@@ -33,10 +33,10 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.journal.IResourceLock;
 import com.bigdata.journal.IResourceLockService;
-import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.service.zookeeper.ZookeeperFederation;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Implementation using {@link ZLock}s. This is purely a gloss on the
@@ -49,9 +49,9 @@ final public class ZooResourceLockService implements IResourceLockService {
 
     final static protected Logger log = Logger.getLogger(ZooResourceLockService.class);
 
-    private final JiniFederation<?> fed;
+    private final ZookeeperFederation<?> fed;
 
-    public ZooResourceLockService(final JiniFederation<?> fed) {
+    public ZooResourceLockService(final ZookeeperFederation<?> fed) {
 
         if (fed == null)
             throw new IllegalArgumentException();

@@ -1,20 +1,13 @@
-package com.bigdata.jini.start;
+package com.bigdata.zookeeper.start;
 
 import java.util.UUID;
-
-import net.jini.core.lookup.ServiceID;
-import net.jini.core.lookup.ServiceItem;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 
-import com.bigdata.jini.start.config.IServiceConstraint;
-import com.bigdata.jini.start.config.ServiceConfiguration;
-import com.bigdata.jini.util.JiniUtil;
 import com.bigdata.journal.IResourceLockService;
 import com.bigdata.quorum.zk.ZKQuorum;
-import com.bigdata.service.jini.TransactionServer;
 import com.bigdata.zookeeper.DumpZookeeper;
 import com.bigdata.zookeeper.ZLock;
 
@@ -67,7 +60,7 @@ import com.bigdata.zookeeper.ZLock;
  *          instances (persistent znodes) 
  * </pre>
  * 
- * Each {@link ServiceConfiguration} znode defines the service type, the target
+ * Each {@link com.bigdata.jini.start.config.ServiceConfiguration} znode defines the service type, the target
  * #of service instances, the replication count, etc for a service. The children
  * of the configuration node are the logicalService instances and use
  * {@link CreateMode#PERSISTENT_SEQUENTIAL}.
@@ -87,7 +80,7 @@ import com.bigdata.zookeeper.ZLock;
  * lock and whichever one holds the lock is the primary. The order of the
  * services in the lock queue is the failover order for the secondaries.
  * <p>
- * A {@link ServiceConfigurationZNodeMonitorTask} is run for the each discovered
+ * A {@link com.bigdata.jini.start.config.ServiceConfigurationZNodeMonitorTask} is run for the each discovered
  * {@link ServiceConfiguration} znode and maintains watches on the dominated
  * logical services znodes and physical service znodes. This allows it to
  * observe changes in the target serviceCount for a given service type and the

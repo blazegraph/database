@@ -8,10 +8,10 @@ import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.KeeperException.SessionExpiredException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
 import com.bigdata.io.SerializerUtil;
@@ -22,6 +22,7 @@ import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.HierarchicalZNodeWatcher;
 import com.bigdata.zookeeper.ZLock;
 import com.bigdata.zookeeper.ZLockImpl;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * This is a standing task whose {@link Future} is monitored by the
@@ -46,7 +47,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
     final static private Logger log = Logger
             .getLogger(ServiceConfigurationZNodeMonitorTask.class);
 
-    protected final JiniFederation<?> fed;
+    protected final JiniFederation fed;
 
     protected final IServiceListener listener;
     
@@ -66,7 +67,7 @@ public class ServiceConfigurationZNodeMonitorTask implements Callable<Void> {
      * @param className
      *            The class name (aka service type).
      */
-    public ServiceConfigurationZNodeMonitorTask(final JiniFederation<?> fed,
+    public ServiceConfigurationZNodeMonitorTask(final JiniFederation fed,
             final IServiceListener listener,
             final String className) {
 

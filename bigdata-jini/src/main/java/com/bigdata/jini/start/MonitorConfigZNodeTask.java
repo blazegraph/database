@@ -13,6 +13,7 @@ import com.bigdata.jini.start.config.ServiceConfiguration;
 import com.bigdata.service.jini.JiniFederation;
 import com.bigdata.util.InnerCause;
 import com.bigdata.zookeeper.UnknownChildrenWatcher;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Task monitors the {@link BigdataZooDefs#CONFIG} znode and creates a new

@@ -38,14 +38,13 @@ import net.jini.core.lookup.ServiceID;
 import net.jini.lookup.entry.Name;
 
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.KeeperException.SessionExpiredException;
 
 import com.bigdata.jini.lookup.entry.ServiceUUID;
-import com.bigdata.jini.start.BigdataZooDefs;
 import com.bigdata.jini.start.IServiceListener;
 import com.bigdata.jini.start.ManageLogicalServiceTask;
 import com.bigdata.jini.start.process.ProcessHelper;
 import com.bigdata.service.jini.JiniFederation;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Configuration of a managed service. These are generally jini services whose

@@ -83,7 +83,7 @@ public abstract class AbstractAsynchronousClientTask<U, V, L> extends
         if (future == null)
             throw new IllegalStateException();
         
-        return ((JiniFederation<?>) getFederation()).getProxy(future);
+        return ((JiniFederation) getFederation()).getProxy(future);
         
     }
 

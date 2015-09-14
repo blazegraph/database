@@ -1,6 +1,7 @@
 package com.bigdata.jini.start;
 
 import com.bigdata.jini.start.config.ServiceConfiguration;
+import com.bigdata.zookeeper.start.BigdataZooDefs;
 
 /**
  * Type-safe enum classifying the different kinds of znodes for a
