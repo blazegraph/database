@@ -35,7 +35,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-ha-test</artifactId>
   <version>1.5.3-BLZG-1378-SNAPSHOT</version>
-  <name>Blazegraph High Availability Tests</name>
+  <name>Blazegraph High Availability (HA) Tests</name>
   <packaging>jar</packaging>
 
     <profiles>
@@ -183,7 +183,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
           <maxmemory>1000m</maxmemory>
           <author>true</author>
 	  <version>true</version>
-          <doctitle><![CDATA[<h1>Blazegraph High Availability Tests</h1>]]></doctitle>
+          <doctitle><![CDATA[<h1>Blazegraph High Availability (HA) Tests</h1>]]></doctitle>
 	  <bottom><![CDATA[<i>Copyright &#169; 2006-2015 SYSTAP, LLC. All Rights Reserved.</i>
 <script>
 jQuery(document).ready(function(){

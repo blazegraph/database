@@ -36,7 +36,7 @@ Copyright 2010 by TalkingTrends (Amsterdam, The Netherlands)
   <groupId>com.blazegraph</groupId>
   <artifactId>bigdata-jini</artifactId>
   <version>1.5.3-BLZG-1378-SNAPSHOT</version>
-  <name>Blazegraph JINI (HA and Scaleout)</name>
+  <name>Blazegraph JINI (Scaleout)</name>
   <packaging>jar</packaging>
 
   <profiles>
