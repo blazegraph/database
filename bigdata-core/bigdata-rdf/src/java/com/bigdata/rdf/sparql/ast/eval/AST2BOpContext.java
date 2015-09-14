@@ -78,6 +78,7 @@ import com.bigdata.rdf.sparql.ast.ssets.ISolutionSetManager;
 import com.bigdata.rdf.sparql.ast.ssets.SolutionSetManager;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.service.IBigdataFederation;
+import com.bigdata.util.ClassPathUtil;
 
 /**
  * Convenience class for passing around the various pieces of context necessary
@@ -470,7 +471,7 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
 
         this.idFactory = idFactory;
         
-        this.queryEngine = QueryEngineFactory.getQueryController(db
+        this.queryEngine = QueryEngineFactory.getInstance().getQueryController(db
                 .getIndexManager());
 
         /*
@@ -601,29 +602,36 @@ public class AST2BOpContext implements IdFactory, IEvaluationContext {
      * <code>null</code> if the attempt fails.
      */
     private static IExternalAST2BOp initGPUEvaluation() {
+    	
+		return ClassPathUtil.classForName(//
+				"com.blazegraph.rdf.gpu.sparql.ast.eval.GPUEvaluation", // preferredClassName,
+				null, // defaultClass,
+				IExternalAST2BOp.class, // sharedInterface,
+				AST2BOpContext.class.getClassLoader() // classLoader
+		);
 
-       try {
-          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.eval.GPUEvaluation" );
-
-          if (IExternalAST2BOp.class.isAssignableFrom(cls)) {
-	     if(log.isInfoEnabled()) {
-             	log.info( "Found Blazegraph-Mapgraph connector: "
-                       + cls.getCanonicalName() );
-             }
-             return (IExternalAST2BOp) cls.newInstance();
-          }
-          else {
-             log.warn( cls.getCanonicalName()
-                       + " does not extend "
-                       + IExternalAST2BOp.class.getCanonicalName() );
-             return null;
-          }
-       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-	  if(log.isInfoEnabled()) {
-          	log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
-	  }
-          return null;
-       }
+//       try {
+//          final Class<?> cls = Class.forName( "com.blazegraph.rdf.gpu.sparql.ast.eval.GPUEvaluation" );
+//
+//          if (IExternalAST2BOp.class.isAssignableFrom(cls)) {
+//	     if(log.isInfoEnabled()) {
+//             	log.info( "Found Blazegraph-Mapgraph connector: "
+//                       + cls.getCanonicalName() );
+//             }
+//             return (IExternalAST2BOp) cls.newInstance();
+//          }
+//          else {
+//             log.warn( cls.getCanonicalName()
+//                       + " does not extend "
+//                       + IExternalAST2BOp.class.getCanonicalName() );
+//             return null;
+//          }
+//       } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+//	  if(log.isInfoEnabled()) {
+//          	log.info( "No Blazegraph-Mapgraph connector found (" + e.getMessage() + ")" );
+//	  }
+//          return null;
+//       }
     }
 
    @Override

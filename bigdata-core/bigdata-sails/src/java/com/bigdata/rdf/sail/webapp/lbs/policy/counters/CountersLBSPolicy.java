@@ -213,7 +213,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
 
         final Journal journal = (Journal) getJournal();
 
-        QueryEngine queryEngine = QueryEngineFactory
+        QueryEngine queryEngine = QueryEngineFactory.getInstance()
                 .getExistingQueryController(journal);
 
         if (queryEngine == null) {
@@ -225,7 +225,7 @@ public class CountersLBSPolicy extends AbstractHostLBSPolicy {
              * TODO This could cause a race condition with the shutdown of the
              * journal. Perhaps use synchronized(journal) {} here?
              */
-            queryEngine = QueryEngineFactory.getQueryController(journal);
+            queryEngine = QueryEngineFactory.getInstance().getQueryController(journal);
 
         }
 

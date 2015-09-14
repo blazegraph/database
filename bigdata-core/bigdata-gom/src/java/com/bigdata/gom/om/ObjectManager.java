@@ -102,7 +102,7 @@ public class ObjectManager extends ObjectMgrModel {
          */
         {
 
-            final QueryEngine queryEngine = QueryEngineFactory
+            final QueryEngine queryEngine = QueryEngineFactory.getInstance()
                     .getStandaloneQueryController((Journal) m_repo
                             .getDatabase().getIndexManager());
 
