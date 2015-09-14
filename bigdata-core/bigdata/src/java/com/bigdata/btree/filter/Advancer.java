@@ -1,6 +1,7 @@
 package com.bigdata.btree.filter;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.apache.log4j.Logger;
 
@@ -20,7 +21,6 @@ import cutthecrap.utils.striterators.FilterBase;
  * the RDF DB is written in this manner.
  * 
  * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
- * @version $Id$
  * @param <E>
  *            The type of the objects visited by the source iterator.
  * 
@@ -88,7 +88,6 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
      * Implements the {@link Advancer} semantics as a layer iterator.
      * 
      * @author <a href="mailto:thompsonbry@users.sourceforge.net">Bryan Thompson</a>
-     * @version $Id$
      * @param <E>
      */
     private static class Advancerator<E> implements ITupleIterator<E> {
@@ -97,6 +96,7 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
         final protected Object context;
 
         final private Advancer<E> filter;
+        private ITuple<E> nextTuple = null;
 
         /**
          * Used to invoke {@link Advancer#init()}.
@@ -124,15 +124,19 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
                 final Advancer<E> filter) {
 
             this.src = src;
-
+            
             this.context = context;
             
             this.filter = filter;
 
         }
 
+        @Override
         public boolean hasNext() {
 
+			if (nextTuple != null) // already cached.
+				return true;
+	
         	if(firstTime) {
     			
 				if (!filter.init()) {
@@ -146,16 +150,57 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
         		firstTime =false;
         		
         	}
-        	
-            if(exhausted) return false;
-            
-            return src.hasNext();
 
+			if (src.hasNext()) {
+
+				final ITuple<E> tuple = src.next(); // cache tuple.
+        		
+				try {
+
+                    // skip to the next tuple of interest.
+					filter.advance(tuple);
+                    
+					// tuple was not skipped. cache for next().
+					nextTuple = tuple;
+					
+                } catch(KeyOutOfRangeException ex) {
+
+                    /*
+                     * We have advanced beyond a key range constraint imposed either
+                     * by the ITupleCursor or by an index partition. In either case
+                     * we treat the source iterator as if it was exhausted.
+                     * 
+                     * If the advancer is running over a partitioned index, then the
+                     * partitioned iterator will automatically check the next index
+                     * partition that would be spanned by the range constraints on
+                     * the source cursor (not the local cursor).
+                     */
+                    if(log.isInfoEnabled())
+                        log.info("Exhausted - advanced beyond key range constraint: " + ex);
+                    
+                    exhausted = true;
+                    
+                }
+
+        	} else {
+        		
+				exhausted = true;
+				
+        	}
+        	
+            return !exhausted;
+            
         }
 
+        @Override
         public ITuple<E> next() {
 
-            final ITuple<E> tuple = src.next();
+			if (!hasNext())
+				throw new NoSuchElementException();
+        	
+            final ITuple<E> tuple = nextTuple; // from cache.
+
+            nextTuple = null; // clear cache.
 
             if (log.isInfoEnabled()) {
 
@@ -166,34 +211,11 @@ abstract public class Advancer<E> extends FilterBase implements ITupleFilter<E> 
             // copy the key for the current tuple.
             kbuf.reset().copyAll(tuple.getKeyBuffer());
 
-            try {
-
-                // skip to the next tuple of interest.
-                filter.advance(tuple);
-                
-            } catch(KeyOutOfRangeException ex) {
-
-                /*
-                 * We have advanced beyond a key range constraint imposed either
-                 * by the ITupleCursor or by an index partition. In either case
-                 * we treat the source iterator as if it was exhausted.
-                 * 
-                 * If the advancer is running over a partitioned index, then the
-                 * partitioned iterator will automatically check the next index
-                 * partition that would be spanned by the range constraints on
-                 * the source cursor (not the local cursor).
-                 */
-                if(log.isInfoEnabled())
-                    log.info("Exhausted - advanced beyond key range constraint: " + ex);
-                
-                exhausted = true;
-                
-            }
-
             return tuple;
 
         }
 
+        @Override
         public void remove() {
 
             final byte[] key = this.kbuf.toByteArray();
