@@ -1598,59 +1598,6 @@ abstract public class AbstractRunningQuery implements IRunningQuery {
         
     }
     
-    /**
-     * {@inheritDoc}
-     * <p>
-     * TODO See PipelineOp.Annotations#MAX_MEMORY.
-     * <p>
-     * It would be nice to have the concept of a limit on the amount of native
-     * memory which an operator may use. However, there is currently no way to
-     * specify this for a child allocation context on the memory manager. Also,
-     * even if we do this for the root MemoryManager, that leads to a situation
-     * in which allocations will deadlock.
-     * <p>
-     * I think that we really want one of two things. Either we want to control
-     * the amount of native memory which will be used before we begin evictions
-     * to disk or we want to have the child allocation context simply toss an
-     * error if it attempts to use too much native memory.
-     * <p>
-     * To place a limit on memory before eviction to disk (as opposed to
-     * eviction to the memory manager) we need to create a new IRawStore
-     * interface which maintains a map from an addr to the appropriate backing
-     * persistence store BUT we have to somehow mark the addresses as being on
-     * the MemoryManager or on an RWStore backed by DISK. This gets into the
-     * question of whether or not there is a bit which is clean and available
-     * for this purpose. (Consider that we also want such a bit for the HTree to
-     * mark bucket pages versus directory pages in the address).
-     * <p>
-     * If we throw out an exception from the child memory manager if the memory
-     * allocation limit is exceeded then we can bound the memory easily enough,
-     * but it could lead to an unpleasant surprise.
-     * <p>
-     * If we do NOT bound the memory, then this could lead to swapping or a
-     * kernel over commit error if the total memory burden of the native process
-     * grows too large. It could also eat into the OS memory available to buffer
-     * the disk.
-     * <p>
-     * For the moment I am NOT going to put a bound on the native memory which
-     * can be allocated by an operator or a query and rely on the maximum
-     * concurrency of the queries to have reasonable bounds on the memory
-     * demand, but we should think about our options here.
-     * <p>
-     * I guess we could try the exception and re-do the operator against disk if
-     * we have too.
-     * <p>
-     * Or if memory demand is high the query controller might throttle the start
-     * of new queries, only allowing those which are apparently selective (based
-     * on some inspection) to execute until more memory has been release...
-     * <p>
-     * But also see ChunkedRunningQuery#scheduleNext() which places bounds on
-     * how much data can be buffered for an operator before it is evaluated.
-     * That is the other way to interpret MAX_MEMORY, as a limit on the buffered
-     * IBindingSet[]s which are input to the operator (assuming that they are
-     * buffered on the native heap) rather than as a limit to the among of
-     * native memory the operator may use while it is running.
-     */
     @Override
     public IMemoryManager getMemoryManager() {
         IMemoryManager memoryManager = this.memoryManager.get();
