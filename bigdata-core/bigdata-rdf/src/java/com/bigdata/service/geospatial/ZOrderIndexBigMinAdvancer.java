@@ -32,6 +32,7 @@ import java.util.NoSuchElementException;
 import org.apache.log4j.Logger;
 
 import com.bigdata.btree.ITuple;
+import com.bigdata.btree.KeyOutOfRangeException;
 import com.bigdata.btree.filter.Advancer;
 import com.bigdata.btree.keys.IKeyBuilder;
 import com.bigdata.btree.keys.KeyBuilder;
@@ -158,8 +159,12 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          inRange &= seachMinLong[i]<=divRecordComponents[i];
          inRange &= seachMaxLong[i]>=divRecordComponents[i];
       }
-      
+
       if (!inRange) {
+         
+         if (log.isDebugEnabled()) {
+            log.debug("-> tuple " + tuple + " not in range");
+         }
 
          // calculate bigmin over the z-order component
          final byte[] bigMin = calculateBigMin(dividingRecord);
@@ -176,6 +181,10 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
          
          // advance to the specified key ...
          try {
+            if (log.isDebugEnabled()) {
+               log.debug("-> advancing to bigmin: " + value);
+            }
+            
             ITuple<SPO> next = src.seek(keyBuilder.getKey());
                   
             // ... or the next higher one
@@ -188,10 +197,18 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
             advance(next);
             
          }  catch (NoSuchElementException e) {
-            return; // we're done
+  
+            throw new KeyOutOfRangeException("Advancer out of search range");
+            
          }
          
-      } // else: nothing to do
+      } else {
+         
+         if (log.isDebugEnabled()) {
+            log.debug("-> inRange, nothing todo");
+         }
+         
+      }
 
    }
 
@@ -293,9 +310,6 @@ public class ZOrderIndexBigMinAdvancer extends Advancer<SPO> {
             
          }
       }
-      
-//      System.out.println("seachMin=" + searchMinZOrder);
-//      System.out.println("bigmin=" + bigmin);
       
       return bigmin;
    }
