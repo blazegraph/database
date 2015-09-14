@@ -58,11 +58,23 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
     }
 
 
+
     /**
      * Verify rectangle search with simple query:
      * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
      * 
-     */
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "2#2" .
+     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:timeStart "4" .
+     *     ?res geo:timeEnd "4" .
+     *   }
+     * } 
+     */    
     public void testInRectangleQuery01() throws Exception {
        
        new TestHelper(
@@ -76,7 +88,18 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
     /**
      * Verify rectangle search with simple query:
      * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
      * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "5#5" .
+     *     ?res geo:spatialRectangleLowerRight "5#5" .
+     *     ?res geo:timeStart "1" .
+     *     ?res geo:timeEnd "10" .
+     *   }
+     * } 
      */
     public void testInRectangleQuery02() throws Exception {
        
@@ -88,10 +111,22 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
        
     }
 
+
     /**
      * Verify rectangle search with simple query:
      * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
      * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "-1#9" .
+     *     ?res geo:spatialRectangleLowerRight "1#12" .
+     *     ?res geo:timeStart "7" .
+     *     ?res geo:timeEnd "12" .
+     *   }
+     * } 
      */
     public void testInRectangleQuery03() throws Exception {
        
@@ -99,14 +134,25 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
           "geo-rectangle03",
           "geo-rectangle03.rq", 
           "geo-grid101010.nt",
-          "geo-rectangle030405.srx").runTest();
+          "geo-rectangle03040506.srx").runTest();
        
     }
 
     /**
      * Verify rectangle search with simple query:
      * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
      * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "-10000#8.8837" .
+     *     ?res geo:spatialRectangleLowerRight "1.00#12.2344" .
+     *     ?res geo:timeStart "7" .
+     *     ?res geo:timeEnd "100000000000000" .
+     *   }
+     * } 
      */
     public void testInRectangleQuery04() throws Exception {
        
@@ -114,14 +160,25 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
           "geo-rectangle04",
           "geo-rectangle04.rq", 
           "geo-grid101010.nt",
-          "geo-rectangle030405.srx").runTest();
+          "geo-rectangle03040506.srx").runTest();
        
     }
 
     /**
      * Verify rectangle search with simple query:
      * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
      * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "-10000E0#.88837E1" .
+     *     ?res geo:spatialRectangleLowerRight "1.00#100000000.2344" .
+     *     ?res geo:timeStart "7" .
+     *     ?res geo:timeEnd "1000000" .
+     *   }
+     * } 
      */
     public void testInRectangleQuery05() throws Exception {
        
@@ -129,9 +186,215 @@ public class TestGeoSpatialServiceEvaluation extends AbstractDataDrivenSPARQLTes
           "geo-rectangle05",
           "geo-rectangle05.rq", 
           "geo-grid101010.nt",
-          "geo-rectangle030405.srx").runTest();
+          "geo-rectangle03040506.srx").runTest();
        
     }
+    
+
+    /**
+     * Verify rectangle search with simple query (not wrapped into service):
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   ?res geo:search "inRectangle" .
+     *   ?res geo:predicate <http://p> .
+     *   ?res geo:spatialRectangleUpperLeft "-10000E0#.88837E1" .
+     *   ?res geo:spatialRectangleLowerRight "1.00#100000000.2344" .
+     *   ?res geo:timeStart "7" .
+     *   ?res geo:timeEnd "1000000" .
+     * } 
+     */
+    public void testInRectangleQuery06() throws Exception {
+       
+       new TestHelper(
+          "geo-rectangle06",
+          "geo-rectangle06.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle03040506.srx").runTest();
+       
+    }
+    
+    /**
+     * Verify rectangle search with simple query and subsequent join of result.
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * 
+     * SELECT ?res WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "2#2" .
+     *     ?res geo:spatialRectangleLowerRight "3#6" .
+     *     ?res geo:timeStart "4" .
+     *     ?res geo:timeEnd "4" .
+     *   }
+     *   ?res ?p ?o .
+     *   FILTER(?p = <http://p>)
+     * } 
+     */
+    public void testInRectangleQuery07() throws Exception {
+       
+       new TestHelper(
+          "geo-rectangle07",
+          "geo-rectangle07.rq", 
+          "geo-grid101010.nt",
+          "geo-rectangle07.srx").runTest();
+       
+    }
+    
+    
+    /**
+     * Verify precision handling. The query
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * SELECT ?res ?o WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "1.10#1.100000001111" .
+     *     ?res geo:spatialRectangleLowerRight "6.666666#7" .
+     *     ?res geo:timeStart "0" .
+     *     ?res geo:timeEnd "0" .
+     *   }
+     *   ?res ?p ?o .
+     * }
+     * 
+     * is evaluated over data
+     * 
+     * <http://s0> <http://p> "0#0#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s1> <http://p> "1.1#1.1#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s2> <http://p> "2.22#2.22#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s3> <http://p> "3.333#3.333#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6> <http://p> "6.666666#6.6666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6b> <http://p> "6.66667#6.6666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6c> <http://p> "6.66667#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * 
+     * Since the geospatial datatype has precision=5 (in our standard datatype), 
+     * the query is equivalent to
+     * 
+     * PREFIX geo: <http://www.bigdata.com/rdf/geospatial#>
+     * SELECT ?res ?o WHERE {
+     *   SERVICE geo:search {
+     *     ?res geo:search "inRectangle" .
+     *     ?res geo:predicate <http://p> .
+     *     ?res geo:spatialRectangleUpperLeft "1.10#1.1" .
+     *     ?res geo:spatialRectangleLowerRight "6.66666#7" .
+     *     ?res geo:timeStart "0" .
+     *     ?res geo:timeEnd "0" .
+     *   }
+     *   ?res ?p ?o .
+     * }
+     * 
+     * and the data is equivalent to 
+     * 
+     * <http://s0> <http://p> "0#0#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s1> <http://p> "1.1#1.1#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s2> <http://p> "2.22#2.22#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s3> <http://p> "3.333#3.333#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s4> <http://p> "4.4444#4.4444#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s5> <http://p> "5.55555#5.55555#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6> <http://p> "6.66666#6.666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6b> <http://p> "6.66667#6.666666#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6c> <http://p> "6.66666#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     * <http://s6d> <http://p> "6.66667#6.66667#0"^^<http://www.bigdata.com/rdf/geospatial#geoSpatialLiteral> .
+     *  
+     * Consequently, subjects s0, s6b, and s6d are *not* contained in the
+     * result, while all others are.
+     */
+    public void testInRectangleQuery08() throws Exception {
+       
+       new TestHelper(
+          "geo-rectangle08",
+          "geo-rectangle08.rq", 
+          "geo-rectangle08.nt",
+          "geo-rectangle08.srx").runTest();
+       
+    }
+    
+    
+    public void testInCircleQuery01a() throws Exception {
+       
+       new TestHelper(
+          "geo-circle01a",
+          "geo-circle01a.rq", 
+          "geo-grid101010.nt",
+          "geo-circle01.srx").runTest();
+       
+    }
+    
+    public void testInCircleQuery01b() throws Exception {
+       
+       new TestHelper(
+          "geo-circle01b",
+          "geo-circle01b.rq", 
+          "geo-grid101010.nt",
+          "geo-circle01.srx").runTest();
+       
+    }
+    
+    public void testInCircleQuery01c() throws Exception {
+       
+       new TestHelper(
+          "geo-circle01c",
+          "geo-circle01c.rq", 
+          "geo-grid101010.nt",
+          "geo-circle01.srx").runTest();
+       
+    }
+    
+
+    public void testInCircleQuery02() throws Exception {
+       
+       new TestHelper(
+          "geo-circle02",
+          "geo-circle02.rq", 
+          "geo-grid101010.nt",
+          "geo-circle0203.srx").runTest();
+       
+    }
+    
+
+    public void testInCircleQuery03() throws Exception {
+       
+       new TestHelper(
+          "geo-circle03",
+          "geo-circle03.rq", 
+          "geo-grid101010.nt",
+          "geo-circle0203.srx").runTest();
+       
+    }
+    
+
+    public void testInCircleQuery04() throws Exception {
+       
+       new TestHelper(
+          "geo-circle04",
+          "geo-circle04.rq", 
+          "geo-grid101010.nt",
+          "geo-circle04.srx").runTest();
+       
+    }
+    
+    /**
+     * Verify rectangle search with simple query:
+     * 
+     * 
+     */
+    public void testInCircleQuery05() throws Exception {
+       
+       new TestHelper(
+          "geo-circle05",
+          "geo-circle05.rq", 
+          "geo-grid101010.nt",
+          "geo-circle05.srx").runTest();
+       
+    }
+    
+    
     
     @Override
     public Properties getProperties() {
