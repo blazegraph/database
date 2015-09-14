@@ -88,9 +88,6 @@ public class TestAll extends TestCase {
         // zookeeper quorum integration test suite.
         suite.addTest(com.bigdata.quorum.zk.TestAll.suite());
 
-        // highly available Journal test suite running with zookeeper.
-        suite.addTest(com.bigdata.journal.jini.ha.TestAll.suite());
-
         // concrete impls of bigdata services using jini.
         suite.addTest(com.bigdata.service.jini.TestAll.suite());
 
