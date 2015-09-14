@@ -55,6 +55,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.log4j.Logger;
 
 import com.bigdata.concurrent.FutureTaskMon;
+import com.bigdata.ha.HAPipelineGlue;
+import com.bigdata.ha.QuorumService;
 import com.bigdata.util.InnerCause;
 import com.bigdata.util.StackInfoReport;
 import com.bigdata.util.concurrent.DaemonThreadFactory;
@@ -2448,7 +2450,6 @@ public abstract class AbstractQuorum<S extends Remote, C extends QuorumClient<S>
                 try {
                     // ask it to move itself to the end of the pipeline (RMI)
                     ((HAPipelineGlue) otherService).moveToEndOfPipeline().get();
-                   otherService.moveToEndOfPipeline().get();
                     modified = true;
                     if(qlog.isInfoEnabled()) {
                         qlog.info("moved   ="+otherId);
