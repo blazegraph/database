@@ -114,6 +114,11 @@ public class TestAll extends TestCase {
          */
         suite.addTestSuite(TestServiceRegistry.class);
         
+        /*
+         * GeoSpatial Service extensions
+         */
+        suite.addTestSuite(TestGeoSpatialServiceEvaluation.class);
+        
         return suite;
         
     }
