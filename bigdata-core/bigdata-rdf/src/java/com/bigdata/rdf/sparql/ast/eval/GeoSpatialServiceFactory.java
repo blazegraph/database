@@ -85,6 +85,7 @@ import com.bigdata.rdf.sparql.ast.service.ServiceCallCreateParams;
 import com.bigdata.rdf.sparql.ast.service.ServiceNode;
 import com.bigdata.rdf.spo.ISPO;
 import com.bigdata.rdf.spo.SPO;
+import com.bigdata.rdf.spo.SPOKeyOrder;
 import com.bigdata.rdf.store.AbstractTripleStore;
 import com.bigdata.rdf.store.BD;
 import com.bigdata.relation.IRelation;
@@ -96,6 +97,7 @@ import com.bigdata.service.geospatial.IGeoSpatialQuery.GeoSpatialSearchQuery;
 import com.bigdata.service.geospatial.ZOrderIndexBigMinAdvancer;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLon;
 import com.bigdata.service.geospatial.impl.GeoSpatialUtility.PointLatLonTime;
+import com.bigdata.striterator.IKeyOrder;
 
 import cutthecrap.utils.striterators.ICloseableIterator;
 import cutthecrap.utils.striterators.Resolver;
@@ -607,17 +609,16 @@ public class GeoSpatialServiceFactory extends AbstractServiceFactoryBase {
          
          final BigdataValueFactory vf = kb.getValueFactory();
 
-//         System.out.println("FROMKEY=" + litExt.asValue(lowerZOrderKey, vf) );
-//         System.out.println("TOKEY=" + litExt.asValue(upperZOrderKey, vf) );
+         if (log.isInfoEnabled()) {
+            log.info("Scanning from key " + litExt.asValue(lowerZOrderKey, vf) );
+            log.info("Scanning to   key: " + litExt.asValue(upperZOrderKey, vf) );           
+         }
+
 
          // extract position of subject and object in index
-         // TODO: are there convenience methods to do this?
-         final String indexName = 
-            accessPath.getIndex().getIndexMetadata().getName();
-         final String indexShortName = 
-            indexName.substring(indexName.lastIndexOf(".")+1);
-         final int subjectPos = indexShortName.indexOf("S");
-         final int objectPos = indexShortName.indexOf("O");
+         final SPOKeyOrder keyOrder = (SPOKeyOrder)accessPath.getKeyOrder();
+         final int subjectPos = keyOrder.getPositionInIndex(SPOKeyOrder.S);
+         final int objectPos = keyOrder.getPositionInIndex(SPOKeyOrder.O);
          
          // set object (=z-order literal) position in the surrounding filter
          filter.setObjectPos(objectPos);
