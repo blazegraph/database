@@ -82,11 +82,13 @@ public class TestAll extends TestCase {
         // jini configuration helpers.
         suite.addTest(com.bigdata.jini.util.TestAll.suite());
 
+        //BLZG-1472 moved to com.bigdata.zookeeper
         // zookeeper client library (queues, locks, etc).
-        suite.addTest(com.bigdata.zookeeper.TestAll.suite());
+        //suite.addTest(com.bigdata.zookeeper.TestAll.suite());
 
+        //BLZG-1472 moved to com.bigdata.quorum.zk
         // zookeeper quorum integration test suite.
-        suite.addTest(com.bigdata.quorum.zk.TestAll.suite());
+        //suite.addTest(com.bigdata.quorum.zk.TestAll.suite());
 
         // concrete impls of bigdata services using jini.
         suite.addTest(com.bigdata.service.jini.TestAll.suite());

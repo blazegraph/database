@@ -1,0 +1,111 @@
+<project name="bigdata-jini" default="bundleJar" basedir=".">
+
+    <property file="testServices.properties" />
+    <property environment="env"/>
+    <condition property="test.zookeeper.installDir" value="${env.TEST_ZOOKEEPER_HOME}" else="${local.test.zookeeper.installDir}">
+       <isset property="env.TEST_ZOOKEEPER_HOME" />
+    </condition>
+    <condition property="mvn.home" value="${env.MAVEN_HOME}" else="">
+       <isset property="env.MAVEN_HOME" />
+    </condition>
+    <condition property="java.home" value="${env.JAVA_HOME}" else="/usr/java/current">
+       <isset property="env.JAVA_HOME" />
+    </condition>
+    <exec executable="hostname"
+        outputproperty="this.hostname">
+     </exec>
+    <condition property="default.nic" value="${env.DEFAULT_NIC}" else="">
+       <isset property="env.DEFAULT_NIC" />
+    </condition>
+    <property name="bigdata.fedname" value="bigdata.test.group-${this.hostname}" />
+    <property name="app.home" value ="."/>
+    <echo>${bigdata.fedname} ${default.nic} ${app.home}</echo>
+
+
+    <path id="jini.classpath">
+        <fileset dir="${test.codebase.dir}">
+            <include name="**/*.jar" />
+        </fileset>
+        <dirset dir=".">
+	    <include name="${maven.class.dir}"/>
+  	</dirset>
+    </path>
+
+    <!-- Note: It appears to be necessary to spawn the script which starts -->
+    <!-- zookeeper under some OS platforms (for example, Centos 5.4) even  -->
+    <!-- though it will start without being spawned under others (OSX).    -->
+    <!-- However, this change appears to result in zookeeper not running   -->
+    <!-- so I have backed it out for now.                                  -->
+    <target name="startZookeeper">
+
+        <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+        <echo>bin/zkServer.(sh|cmd) start</echo>
+	
+	<!-- Make sure ZK is stopped before we get started. -->
+        <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+       	   <arg value="stop"/>
+        </exec>
+        <!-- Make sure old state is clean. -->
+	<delete dir="${test.zookeeper.installDir}/data" quiet="true" />
+       	<exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+       	   <arg value="start"/>
+       	</exec>
+	<!-- Make sure ZK is stopped before we get started. -->
+       	<exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+       	   <arg value="stop"/>
+       	</exec>
+       	<exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+       	   <arg value="start"/>
+       	</exec>
+    </target>
+
+    <target name = "getMavenDependencies">
+	<exec executable="${mvn.home}/bin/mvn" logerror="true" dir = ".">
+	    <arg value = "dependency:copy-dependencies"/>
+	</exec>
+    </target>
+
+
+    <target name="stopZookeeper">
+    <echo message="test.zookeeper.installDir=${test.zookeeper.installDir}"/>
+    <echo>bin/zkServer.(sh|cmd) stop</echo>
+    <exec executable="bin/zkServer.sh" dir="${test.zookeeper.installDir}" logerror="true" osfamily="unix">
+        <arg value="stop"/>
+    </exec>
+    <exec executable="bin/zkServer.cmd" dir="${test.zookeeper.installDir}" logerror="true" osfamily="windows">
+        <arg value="stop"/>
+    </exec>
+    </target>
+    <target name="stopTestServices" unless="${skipTestServices}">
+          <echo message="Stopping test services."/>
+          <antcall target="stopZookeeper"/>
+    </target>
+
+    <target name="preTestPreparation">
+	<antcall target = "startTestServices"/>
+    </target>
+
+    <target name="startTestServices" depends="getMavenDependencies" unless="${skipTestServices}">
+      <!-- These zookeeper configuration properties used to inform the test -->
+      <!-- suite about the zookeeper instance which will be used by the     -->
+      <!-- tests. These properties MUST be consistent with the actual       -->
+      <!-- zookeeper configuration.  Zookeeper is assumed (by the tests) to -->
+      <!-- be running on the localhost.                                     -->
+      <property name="test.zookeeper.tickTime" value="${test.zookeeper.tickTime}" />
+      <property name="test.zookeeper.clientPort" value="${test.zookeeper.clientPort}" />
+
+      <!-- The zookeeper install directory. -->
+      <property name="test.zookeeper.installDir" value="${zookeeper.installDir}" />
+
+      <property name="log4j.configuration" value="${bigdata.test.log4j.rel}" />
+      <property name="java.net.preferIPv4Stack" value="true" />
+          <echo message="Starting test services."/>
+          <antcall target="startZookeeper"/>
+    </target>
+
+
+    <target name = "postTestCleanup">
+	<antcall target="stopTestServices"/>
+    </target>
+
+</project>

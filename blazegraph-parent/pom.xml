@@ -217,6 +217,7 @@ dependencies.
     <module>../bigdata-jar</module>
     <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
+    <module>../bigdata-zookeeper-test</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
   </modules>
