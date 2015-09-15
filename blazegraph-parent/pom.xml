@@ -49,7 +49,7 @@ dependencies.
    <modelVersion>4.0.0</modelVersion>
    <groupId>com.blazegraph</groupId>
    <artifactId>blazegraph-parent</artifactId>
-   <version>1.5.3-BLZG-1378-SNAPSHOT</version>
+   <version>1.5.3-BLZG-1472-SNAPSHOT</version>
    <packaging>pom</packaging>
    <name>Blazegraph Database Platform</name>
     <description>Blazegraph™ is our ultra high-performance graph database supporting Blueprints and RDF/SPARQL APIs. It supports up to 50 Billion edges on a single machine and has a High Availability and Scale-out architecture. It is in production use for Fortune 500 customers such as EMC, Autodesk, and many others.</description>
@@ -204,6 +204,7 @@ dependencies.
     <module>../bigdata-ganglia</module>
     <module>../bigdata-gas</module>
     <module>../bigdata-core/</module>
+    <module>../bigdata-zookeeper</module>
     <module>../bigdata-jini</module>
 <!-- Disable the automatic test execution for now.
     <module>../bigdata-jini-test</module>
@@ -216,6 +217,7 @@ dependencies.
     <module>../bigdata-jar</module>
     <module>../bigdata-runtime</module>
     <module>../bigdata-core-test/</module>
+    <module>../bigdata-zookeeper-test</module>
     <module>../bigdata-rdf-test/</module>
     <module>../bigdata-sails-test/</module>
   </modules>
